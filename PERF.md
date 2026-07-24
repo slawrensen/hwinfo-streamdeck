@@ -494,3 +494,84 @@ saturation), and the ceiling case equals the standing e2e:load scenario
 (520 contexts at 250 ms), green in the same gate. Rings stay
 index-spaced: a poll-cadence change still clears them, and history stays
 process memory, so a plugin restart starts lines fresh on purpose.
+
+### 2026-07-24 15:35: 48 h hardware soak, preview 2 (1.3.90.0) on the live deck
+
+`node scripts/soak-monitor.mjs --duration 172800 --out release/soak-20260722-1502.csv`,
+external observation only at 60 s intervals (monitor PID 80696, exited on
+schedule and printed its summary; per-stretch numbers recomputed with
+`--summary` over per-PID splits of the same CSV). Window 2026-07-22T22:02:00Z
+to 2026-07-24T22:08:00Z: 48.1 h, 2,887 samples, zero ERROR lines, 17 WARN
+lines (every one attributed below), seven plugin restarts and two Stream Deck
+app restarts (every one deliberate), one real sleep, one monitor-side
+sampling failure.
+
+Soaked bytes: `bin/hwsm.node` sha256 ff72a2ab878f... was byte-identical across
+the entire window (deterministic /Brepro build; installs rewrote the file with
+the same hash). The release-candidate stretches ran the exact preview 2 pack
+(sha256 d1b58dea8905..., GitHub pre-1.4-issue3-2, manifest 1.3.90.0,
+bin/plugin.js d9b327eabb35), installed 2026-07-23T14:17:12Z with the process
+up from 14:21:24Z; the stretches before that ran the two dev builds noted in
+the events list, carrying the same native addon.
+
+| Stretch (PID, bytes) | Span (UTC) | Hours | RSS slope | Private slope | Handles | Avg CPU | WARN / ERROR |
+| --- | --- | ---: | ---: | ---: | --- | ---: | --- |
+| 24356, dev (sparkline-lifetime build) | 07-23 03:12 to 14:21 | 11.1 | -0.38 | +0.06 | 203 to 205 | 0.23% | 1 / 0 |
+| 35524, preview 2 | 07-23 14:22 to 07-24 02:24 | 12.0 | -0.48 | +0.03 | 212 to 213 | 0.27% | 0 / 0 |
+| 81412, preview 2 | 07-24 02:26 to 15:08 | 12.7 | +0.11 | +0.11 | 179 to 180 | 0.22% | 0 / 0 |
+| 7816, preview 2 | 07-24 15:09 to 22:08 | 7.0 | -0.19 | -0.04 | 179 to 178 | 0.18% | 0 / 0 |
+
+Slopes are MB/30 min, least squares per same-PID stretch (mixing PIDs would
+fake a negative slope). Gates: RSS slope under +1 MB/30 min on every stretch
+of 6 h or more: PASS, worst is +0.11. Private-bytes slopes match RSS: PASS.
+Handles drift at most 2 inside any stretch, and the last stretch ends net
+negative: PASS. CPU 0.18 to 0.27% lifetime average per stretch with no upward
+trend across consecutive stretches; the 0.07% precedent above was v1.1's
+idle-stop poller over 35 min, while these builds collect sparkline history
+for the plugin lifetime (03:45 entry) and drove the full Stream Deck + XL
+day and night, so the comparable precedent is the 7 h live-deck 0.18%
+(2026-07-16 entry): PASS. The four sub-6-h dev stretches (74428 3 min, 72260
+2.7 h, 41696 33 min, 70144 1.8 h) sat under heavy local suite activity and
+are below the gate floor; their endpoint deltas are unremarkable.
+
+Preview 2 total: three stretches, 31.7 h, 1,903 samples, zero WARN, zero
+ERROR, and a plugin log silent between startup lines.
+
+Events, every one timestamped and attributed:
+
+- 07-22 22:05Z pid 74428 to 72260: deliberate restart validating the
+  monitor's own restart detection at soak start.
+- 07-22 22:26 to 23:14Z, 10 WARN inside pid 72260: capability-API
+  final-review suites; e2e harness plugins log WARN into the linked plugin's
+  logs directory, excluded by timestamp per the runbook.
+- 07-23 00:35 to 00:47Z, 6 WARN plus log rotations, then 00:50Z pid to
+  41696: layout-change-fix gate suites, then that build's deploy.
+- 07-23 01:23Z pid to 70144: unit-corridor plus in-place-reopen build
+  deploy (commits landed 01:22:41Z).
+- 07-23 03:12Z pid to 24356: sparkline-lifetime build deploy (8ec6f0b,
+  committed 03:11:46Z).
+- 07-23 03:27Z: real HWiNFO restart test (TESTING.md row 12); the single
+  03:28Z WARN is the designed staleness warning.
+- 07-23 14:05 to 14:25Z: excluded suite window (unit tests, test:native,
+  pack for the preview 2 cut); 14:22Z pid to 35524 is the preview 2 install.
+- 07-23 18:30Z: one sample row failed monitor-side (powershell exec error
+  under system load) and the next two samples never landed; same plugin PID
+  and handle count on both sides, working set dipped to 9.9 MB (trim) and
+  recovered. Not a plugin event, not sleep.
+- 07-24 02:25Z app restart #1 (sdAppPid 29760 to 49796), plugin back
+  02:26:00Z as 81412 with a fresh shared-memory session (row 11).
+- 07-24 05:59:45Z: real HWiNFO layout growth mid-soak; the poller logged
+  "Data source layout changed; reopened in place", no WARN, no error frame.
+- 07-24 14:51 to 14:58Z: sleep testing at the desk; the long sleep shows as
+  the only true sampling gap (14:53:00 to 14:56:34Z, 214 s) with PID 81412
+  continuous across it, device reconnects on each resume, and zero staleness
+  WARN: resume beat the 15 s hold window (row 13).
+- 07-24 15:08Z app restart #2 (49796 to 26868), plugin back 15:09:00Z as
+  7816 (row 11 again).
+- Post-window note: the Stream Deck app process ended abruptly at 22:21Z,
+  13 minutes after the window closed, leaving no fault record; the plugin
+  was idle at the time and exited with it. Outside the window, recorded here
+  only so the timeline stays complete.
+
+Verdict: every soak gate PASS with margin. Nothing in 48.1 h of external
+observation blocks promoting the preview 2 bytes to 1.4.0.0.

@@ -219,14 +219,16 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
-  /* An image in a page that has not been laid out yet reports clientWidth 0,
-     so the ratio test below cannot be answered and enable() has to give up.
-     That happens for real: a page opened in a background tab lays out at zero
-     width, and it stays that way through DOMContentLoaded and load. Without
-     this, the image would silently never gain its zoom control, because the
-     only other re-scan is on resize and switching tabs does not fire one.
-     Hand those images to a ResizeObserver and enable them the moment they
-     have a box. */
+  /* An image whose page has not been laid out yet reports clientWidth 0, so
+     the ratio test below cannot be answered and enable() has to give up. That
+     state is reachable: the multi-readout board on the Sensor Dial page was
+     observed loading with no zoom control at all, gaining one only after a
+     resize was forced. Nothing retried, because resize was the sole re-scan.
+
+     A ResizeObserver picks those images up the moment they get a box. It is
+     not sufficient on its own: a tab that is not rendering suspends observer
+     callbacks along with rAF, so the scans below cover the same ground
+     through events that fire regardless of rendering. */
   function retryWhenSized(el) {
     if (typeof ResizeObserver !== "function") return;
     if (!sizeWatch) {
@@ -279,6 +281,15 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
   else scan();
+  /* DOMContentLoaded can land before the images have their final box. load
+     runs after layout, and visibilitychange is the exact moment a background
+     tab starts rendering, which is when a suspended ResizeObserver would
+     otherwise still be waiting. enable() is idempotent through its zoomReady
+     guard, so scanning more than once costs nothing. */
+  if (document.readyState !== "complete") window.addEventListener("load", scan);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) scan();
+  });
   /* Re-measure when the column width changes: an image that fits on a wide
      screen may be worth zooming on a narrow one. */
   var t;

@@ -1,0 +1,267 @@
+<!--
+  Click to zoom for the wide renderer boards.
+
+  Several boards on this site are much wider than the content column: the
+  multi-readout board is 2820 px of key faces, the display board and the theme
+  contact sheet are not far behind. Scaled into a 700 px column, the values on
+  those faces are too small to read, which defeats the point of showing real
+  renderer output.
+
+  This marks any image whose natural width meaningfully exceeds its rendered
+  width and lets it open full size, where it can be panned and zoomed. Images
+  that already fit are left alone, so nothing gains a control it does not need.
+
+  No dependencies and no build step: just-the-docs is a remote theme, so this
+  include is the whole feature.
+-->
+<style>
+  .zoomable {
+    cursor: zoom-in;
+    position: relative;
+    display: block;
+    border-radius: 6px;
+    transition: box-shadow 160ms ease, transform 160ms ease;
+  }
+  .zoomable:hover,
+  .zoomable:focus-visible {
+    box-shadow: 0 0 0 1px rgba(140, 170, 220, 0.45), 0 8px 26px -12px rgba(0, 0, 0, 0.8);
+  }
+  .zoom-wrap {
+    position: relative;
+    display: block;
+    margin: 0;
+  }
+  .zoom-hint {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #dfe6f2;
+    background: rgba(12, 14, 18, 0.82);
+    border: 1px solid rgba(150, 170, 200, 0.28);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    pointer-events: none;
+  }
+  .zoom-wrap:hover .zoom-hint,
+  .zoomable:focus-visible + .zoom-hint {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .zoom-hint svg { width: 12px; height: 12px; flex: none; }
+
+  .zoom-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    background: rgba(6, 7, 9, 0.94);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .zoom-overlay[open] { display: block; }
+  .zoom-stage {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    display: grid;
+    place-items: center;
+    padding: 56px 16px 16px;
+    overscroll-behavior: contain;
+  }
+  .zoom-stage img {
+    display: block;
+    max-width: none;
+    transform-origin: 0 0;
+    image-rendering: -webkit-optimize-contrast;
+    border-radius: 4px;
+    box-shadow: 0 24px 80px -20px rgba(0, 0, 0, 0.9);
+  }
+  .zoom-stage.is-fit img { max-width: 100%; height: auto; cursor: zoom-in; }
+  .zoom-stage.is-full { place-items: start; cursor: grab; }
+  .zoom-stage.is-full img { cursor: grab; }
+  .zoom-stage.is-full.is-dragging,
+  .zoom-stage.is-full.is-dragging img { cursor: grabbing; }
+
+  .zoom-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: linear-gradient(rgba(8, 9, 12, 0.92), rgba(8, 9, 12, 0));
+    color: #cfd7e4;
+    font: 500 12.5px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .zoom-cap { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
+  .zoom-btn {
+    flex: none;
+    appearance: none;
+    border: 1px solid rgba(150, 170, 200, 0.3);
+    background: rgba(20, 24, 31, 0.85);
+    color: #e6ecf6;
+    border-radius: 8px;
+    padding: 5px 11px;
+    font: 600 12px/1 inherit;
+    cursor: pointer;
+  }
+  .zoom-btn:hover { background: rgba(32, 38, 48, 0.95); }
+  .zoom-btn:focus-visible { outline: 2px solid #5cb8ff; outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zoomable, .zoom-hint { transition: none; }
+  }
+  @media (max-width: 640px) {
+    .zoom-hint { right: 6px; bottom: 6px; padding: 4px 7px; font-size: 10px; }
+  }
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  var MIN_RATIO = 1.15; // only offer zoom when it actually reveals something
+  var overlay, stage, img, cap, toggle, lastFocus;
+
+  function build() {
+    overlay = document.createElement("div");
+    overlay.className = "zoom-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Zoomed image");
+    overlay.innerHTML =
+      '<div class="zoom-bar">' +
+        '<span class="zoom-cap"></span>' +
+        '<button type="button" class="zoom-btn" data-act="toggle">Actual size</button>' +
+        '<button type="button" class="zoom-btn" data-act="close">Close</button>' +
+      '</div>' +
+      '<div class="zoom-stage is-fit"><img alt=""></div>';
+    document.body.appendChild(overlay);
+    stage = overlay.querySelector(".zoom-stage");
+    img = overlay.querySelector(".zoom-stage img");
+    cap = overlay.querySelector(".zoom-cap");
+    toggle = overlay.querySelector('[data-act="toggle"]');
+
+    overlay.addEventListener("click", function (e) {
+      var act = e.target.getAttribute && e.target.getAttribute("data-act");
+      if (act === "close") return close();
+      if (act === "toggle") return setFull(stage.classList.contains("is-fit"));
+      if (e.target === stage || e.target === overlay) close();
+    });
+    img.addEventListener("click", function () { setFull(stage.classList.contains("is-fit")); });
+    document.addEventListener("keydown", function (e) {
+      if (!overlay.hasAttribute("open")) return;
+      if (e.key === "Escape") { e.preventDefault(); close(); }
+    });
+    dragToPan();
+  }
+
+  function setFull(full) {
+    stage.classList.toggle("is-fit", !full);
+    stage.classList.toggle("is-full", full);
+    toggle.textContent = full ? "Fit to screen" : "Actual size";
+    if (full) {
+      // Centre the full-size image rather than dumping the viewer top-left.
+      stage.scrollLeft = Math.max(0, (img.naturalWidth - stage.clientWidth) / 2);
+      stage.scrollTop = Math.max(0, (img.naturalHeight - stage.clientHeight) / 2);
+    }
+  }
+
+  function dragToPan() {
+    var down = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    stage.addEventListener("pointerdown", function (e) {
+      if (!stage.classList.contains("is-full")) return;
+      down = true; sx = e.clientX; sy = e.clientY;
+      ox = stage.scrollLeft; oy = stage.scrollTop;
+      stage.classList.add("is-dragging");
+      stage.setPointerCapture(e.pointerId);
+    });
+    stage.addEventListener("pointermove", function (e) {
+      if (!down) return;
+      stage.scrollLeft = ox - (e.clientX - sx);
+      stage.scrollTop = oy - (e.clientY - sy);
+    });
+    ["pointerup", "pointercancel"].forEach(function (t) {
+      stage.addEventListener(t, function () { down = false; stage.classList.remove("is-dragging"); });
+    });
+  }
+
+  function open(src, alt, trigger) {
+    if (!overlay) build();
+    // Remember the image that opened this, not document.activeElement: a mouse
+    // click does not always leave focus on the trigger, and restoring to a
+    // stale element strands a keyboard user on the closed dialog's button.
+    lastFocus = trigger || document.activeElement;
+    img.src = src;
+    img.alt = alt || "";
+    cap.textContent = alt || "";
+    setFull(false);
+    overlay.setAttribute("open", "");
+    document.body.style.overflow = "hidden";
+    toggle.focus();
+  }
+
+  function close() {
+    overlay.removeAttribute("open");
+    document.body.style.overflow = "";
+    img.removeAttribute("src");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  function enable(el) {
+    if (el.dataset.zoomReady) return;
+    if (!el.naturalWidth || !el.clientWidth) return;
+    if (el.naturalWidth < el.clientWidth * MIN_RATIO) return;
+    el.dataset.zoomReady = "1";
+    el.classList.add("zoomable");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", (el.alt ? el.alt + ". " : "") + "Open full size");
+
+    var wrap = document.createElement("span");
+    wrap.className = "zoom-wrap";
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    var hint = document.createElement("span");
+    hint.className = "zoom-hint";
+    hint.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6M11 8.4v5.2M8.4 11h5.2"/></svg>Zoom';
+    wrap.appendChild(hint);
+
+    el.addEventListener("click", function () { open(el.currentSrc || el.src, el.alt, el); });
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(el.currentSrc || el.src, el.alt, el); }
+    });
+  }
+
+  function scan() {
+    var imgs = document.querySelectorAll(".main-content img");
+    Array.prototype.forEach.call(imgs, function (el) {
+      if (el.complete) enable(el);
+      else el.addEventListener("load", function () { enable(el); }, { once: true });
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
+  else scan();
+  // Re-measure when the column width changes: an image that fits on a wide
+  // screen may be worth zooming on a narrow one.
+  var t;
+  window.addEventListener("resize", function () {
+    clearTimeout(t);
+    t = setTimeout(scan, 250);
+  });
+})();
+</script>

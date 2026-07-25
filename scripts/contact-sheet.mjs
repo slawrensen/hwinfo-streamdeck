@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { renderDial } from "../src/ui/dial-renderer";
-import { renderReadingKey } from "../src/ui/key-renderer";
+import { renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
 import { classifyTypeAccent, loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType } from "../src/hwinfo/types";
 
@@ -31,7 +31,12 @@ const READINGS = {
 const KEY = 144;
 const CELL = KEY + 8;
 const HEADER = 22;
-const DIAL_ROW_Y = HEADER + 3 * CELL + 12;
+// A fourth key row shows what one key can hold besides a single reading:
+// the multi-readout layouts and the two bounded-value gauges. The themes rows
+// above are all single faces, so without this the sheet never shows the
+// layouts at all.
+const FACES_ROW_Y = HEADER + 3 * CELL + 14;
+const DIAL_ROW_Y = FACES_ROW_Y + CELL + 14;
 const SHEET_W = themes.length * CELL + 8;
 const SHEET_H = DIAL_ROW_Y + 100 + 12;
 
@@ -56,6 +61,65 @@ for (let i = 0; i < themes.length; i++) {
 	for (let row = 0; row < faces.length; row++) {
 		composites.push({ input: await png(faces[row]), left: x, top: HEADER + row * CELL });
 	}
+}
+
+// What one key can hold: two, three and four readings, then the Bar and Ring
+// displays. Same renderers the plugin runs, same Void palette throughout so
+// the row reads as a shape comparison rather than a second theme sweep.
+const facePalette = (accent) => resolvePalette(config, "void", accent, "normal");
+const FACES = [
+	{
+		name: "two readings",
+		svg: renderDualKey({
+			top: { label: "CPU", valueText: "56.3", unitText: "°C", statBadge: "" },
+			bottom: { label: "GPU", valueText: "44.1", unitText: "°C", statBadge: "" },
+			palette: facePalette("temperature")
+		})
+	},
+	{
+		name: "three readings",
+		svg: renderTripleKey({
+			rows: [
+				{ label: "CCD1", valueText: "54.5", unitText: "°C" },
+				{ label: "CCD2", valueText: "47.9", unitText: "°C" },
+				{ label: "Core Max", valueText: "59.4", unitText: "°C" }
+			],
+			palette: facePalette("temperature")
+		})
+	},
+	{
+		name: "four readings",
+		svg: renderQuadKey({
+			cells: [
+				{ label: "CPU", valueText: "56.3", unitText: "°C", color: config.typeAccents.temperature },
+				{ label: "GPU", valueText: "44.1", unitText: "°C", color: config.typeAccents.load },
+				{ label: "PUMP", valueText: "1762", unitText: "RPM", color: config.typeAccents.fan },
+				{ label: "PWR", valueText: "95.4", unitText: "W", color: config.typeAccents.power }
+			],
+			palette: facePalette("temperature")
+		})
+	},
+	{
+		name: "bar",
+		svg: renderReadingKey({
+			label: "Total CPU Usage", valueText: "37.4", unitText: "%", statBadge: "",
+			gauge: { kind: "bar", fraction: 0.374, zones: [{ from: 0.8, to: 0.9, color: config.alerts.warn.bg }, { from: 0.9, to: 1, color: config.alerts.crit.bg }] },
+			palette: facePalette("load")
+		})
+	},
+	{
+		name: "ring",
+		svg: renderReadingKey({
+			label: "CPU (Tctl/Tdie)", valueText: "56.3", unitText: "°C", statBadge: "",
+			gauge: { kind: "ring", fraction: 0.62, zones: [{ from: 0.8, to: 0.9, color: config.alerts.warn.bg }, { from: 0.9, to: 1, color: config.alerts.crit.bg }] },
+			palette: facePalette("temperature")
+		})
+	}
+];
+for (let i = 0; i < FACES.length; i++) {
+	const x = i * CELL + 8;
+	headers.push(`<text x="${x + KEY / 2}" y="${FACES_ROW_Y - 5}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#c8cdd6">${FACES[i].name}</text>`);
+	composites.push({ input: await png(FACES[i].svg), left: x, top: FACES_ROW_Y });
 }
 
 // Two dials: one live with a type accent, one pinned at critical.
@@ -86,4 +150,4 @@ for (let i = 0; i < dials.length; i++) {
 const base = `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}" height="${SHEET_H}"><rect width="${SHEET_W}" height="${SHEET_H}" fill="#101013"/>${headers.join("")}</svg>`;
 const file = path.join(outDir, "contact-sheet.png");
 await sharp(Buffer.from(base)).composite(composites).png().toFile(file);
-console.log(`Rendered ${themes.length}×3 keys + ${dials.length} dials to ${file}`);
+console.log(`Rendered ${themes.length}×3 keys + ${FACES.length} layout/gauge faces + ${dials.length} dials to ${file}`);

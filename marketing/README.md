@@ -68,10 +68,11 @@ sidecar. Exposure +0.55 into the 1.07 EV of highlight headroom the frame had
 spare, highlights -45 to hold the screens, shadows +75 and blacks +12 to bring
 the chassis and dials out of black. Nothing clips. There is no exposure
 blending and no compositing: the touch strip sits slightly outside the depth of
-field at f/2.5, and it was recovered with a bounded deconvolution of that
-region rather than by borrowing a sharper strip from another frame, because the
-other frames have a different sensor configured on the strip and would have
-shown a deck state that never existed.
+field at f/2.5, and it was recovered with a bounded Richardson-Lucy
+deconvolution of that region (Gaussian PSF sigma 1.9, 26 iterations, damped so
+flat dark areas keep the original pixels) rather than by borrowing a sharper
+strip from another frame, because the other frames have a different sensor
+configured on the strip and would have shown a deck state that never existed.
 
 The app icon is resized from the plugin's own marketplace icon:
 

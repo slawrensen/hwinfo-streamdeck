@@ -65,8 +65,20 @@ default.
 Current master, replacing the earlier iPhone ProRAW capture: Sony A7 III, FE
 85mm at f/2.5, 1/400, ISO 1600, developed once in Adobe Camera Raw from an XMP
 sidecar. Exposure +0.55 into the 1.07 EV of highlight headroom the frame had
-spare, highlights -45 to hold the screens, shadows +75 and blacks +12 to bring
-the chassis and dials out of black. Nothing clips. There is no exposure
+spare, highlights -25 and whites 0, shadows +75 and blacks +12 to bring the
+chassis and dials out of black. Nothing clips.
+
+The grade is measured against the renderer rather than judged by eye. The Warn
+and Crit demo keys are the only large flat colour patches in the frame and
+their values are fixed in themes.json (#E8940D and #CB2114, never themed,
+never accented), so they serve as a colour target. The camera first recorded
+80% of the renderer's saturation and, once that was corrected, only 68% and
+74% of its brightness, because the highlight suppression protecting the
+screens was landing on the screens themselves. Relaxing it to -25/0 rather
+than raising exposure keeps the chassis dark while the faces land at 93% and
+96% of target saturation and 85% and 94% of target brightness, still with
+nothing clipped. `colorcheck.py` in the session scratchpad measures this; rerun
+it after any regrade. There is no exposure
 blending and no compositing: the touch strip sits slightly outside the depth of
 field at f/2.5, and it was recovered with a bounded Richardson-Lucy
 deconvolution of that region (Gaussian PSF sigma 1.9, 26 iterations, damped so

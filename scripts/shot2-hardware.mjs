@@ -6,7 +6,7 @@
 //
 //   node scripts/shot2-hardware.mjs [photoPath]
 //
-// photoPath defaults to the processed ProRAW edit; pass any reworked photo
+// photoPath defaults to the processed Camera Raw develop; pass any reworked photo
 // (a Photoshop pass, a new shot) and the board rebuilds around its aspect.
 import path from "node:path";
 import { fileURLToPath } from "node:url";

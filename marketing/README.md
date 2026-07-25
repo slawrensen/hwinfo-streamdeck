@@ -3,7 +3,7 @@
 The Elgato Marketplace listing images for HWiNFO Sensors. Nothing here is a
 mockup: the boards are drawn by the plugin's own renderers (`src/ui/`) from
 live HWiNFO readings on the dev machine, and the one photograph is the plugin
-running on real hardware, perspective-straightened and nothing staged. The
+running on real hardware, nothing staged. The
 marketing is the product output. That is the point, and it is why these files
 live in the open repo instead of a private drive.
 

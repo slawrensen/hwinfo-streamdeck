@@ -22,10 +22,13 @@ and are blocked from the pack by the packaging gate.
 ## Manual host-condition matrix
 
 Conditions that depend on real elevation, sessions, or power transitions.
-Expected results follow from the access model: the mapping and mutex are
-opened with `FILE_MAP_READ` / `SYNCHRONIZE` only, and an elevated producer's
-objects are not readable from a non-elevated consumer (shown as the
-"Access denied / un-elevate" screen, reason `access-denied`).
+The addon opens the mapping and mutex with `FILE_MAP_READ` / `SYNCHRONIZE`
+only, so what a non-elevated consumer may read is decided entirely by the
+DACL HWiNFO puts on its own objects, not by elevation as such. Row 2
+measured that directly on 2026-07-25: an elevated HWiNFO stayed fully
+readable from a non-elevated Stream Deck. Treat "elevated producer means
+`access-denied`" as unproven for HWiNFO; it is the behavior to expect only
+where a producer restricts its objects deliberately.
 
 Record for each executed row: date, Windows/Stream Deck/HWiNFO versions,
 session and elevation relationship, observed error code. Never mark an
@@ -39,9 +42,9 @@ soaked bytes are exactly the shipped bytes.
 | # | Condition | Expected | Status |
 | --- | --- | --- | --- |
 | 1 | Standard HWiNFO / standard Stream Deck | Live readings via shared memory | PASS 2026-07-22, Win 10.0.19044, SD dev-linked, HWiNFO SM v2.1: 21 sensors / 515 readings via probe + live deck |
-| 2 | Elevated HWiNFO / standard Stream Deck | `access-denied` screen; Gadget fallback works if enabled | not executed |
+| 2 | Elevated HWiNFO / standard Stream Deck | Live readings: HWiNFO's objects carry a DACL the interactive user can read, so elevation alone does not deny the consumer | PASS 2026-07-25, Win 10.0.19044, real deck. Elevation confirmed by token query, not inferred: HWiNFO64 pid 36424 `TokenElevation` nonzero (ELEVATED), StreamDeck pid 86416 and the plugin's node pid 92660 both not elevated. Plugin log across the relaunch: 15:59:48Z mapping gone while HWiNFO was down (`HWSM_NOT_FOUND: OpenFileMappingW failed (Win32 error 2)`) held the last values, 16:00:02Z surfaced the honest "Start HWiNFO" screen once the hold window passed, 16:00:04Z reopened shared memory against the now-elevated producer, 16:00:48Z absorbed a layout change in place. One WARN (the legitimate one while HWiNFO was genuinely down), zero ERROR. **No mutex regression:** every failure was `OpenFileMappingW` error 2, never error 5 and never `OpenMutexW`, so the non-elevated plugin acquired the consistency mutex and completed guarded reads throughout. This is the condition where the mandatory-mutex path could have diverged from 1.3.0's unguarded fallback, and it did not |
 | 3 | Standard HWiNFO / elevated Stream Deck | Live readings (elevated consumer may read non-elevated objects) | not executed |
-| 4 | Elevated HWiNFO / elevated Stream Deck | Live readings | not executed |
+| 4 | Elevated HWiNFO / elevated Stream Deck | Live readings | not executed. Supporting evidence only, not a pass: on 2026-07-25 `npm run probe` happened to run from an elevated shell against the elevated HWiNFO of row 2 and read 20 sensors / 496 readings through the same reader and addon the plugin uses. That exercises the elevated-consumer direction of the access model but not Stream Deck itself, so the row stays open. Rows 3 and 4 both put an elevated consumer against a producer a non-elevated consumer already reads (row 2), so neither is expected to fail |
 | 5 | Different Windows user runs HWiNFO | `Global\` mapping readable only with rights; typically `access-denied` or `not-running` | not executed |
 | 6 | Fast User Switching (plugin session inactive) | Polling continues or idles; recovery after switch-back | not executed |
 | 7 | Separate interactive session (console + RDP concurrently) | Same-session objects only; `Global\` namespace readable per ACLs | not executed |

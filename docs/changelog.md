@@ -14,6 +14,56 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.4.0.0 - 2026-07-25
+
+- Three readings on one key. The key Layout setting gains "Three
+  readings, rows": three full-width rows, each with its own sensor,
+  label, value and inline unit, split by thin rules. Every row shows
+  the same stat and the key press cycles all three together;
+  thresholds follow the first sensor and recolor the whole key on
+  alert. The third slot is the quad layout's third sensor, so moving a
+  key between the three-reading and quad layouts keeps what you
+  picked. (Requested by @FattSlice in issue #3.)
+- Key labels size themselves to fit. A label now steps down through a
+  ladder of sizes until it fits the row instead of being cut at one
+  fixed size, measured against per-glyph Segoe UI Semibold advances
+  rather than a character count. Names like "Total CPU Usage", "CPU
+  CCD1/CCD2 (Tdie)" and "Current DL rate" render whole again. Across
+  my own profiles no label came out smaller than it did in 1.3.0.
+- The MIN/MAX/AVG stat badge moved from the key corner into a gap
+  under the title, the same idiom the two-reading layout already used
+  in its divider. A badged label no longer gives up width to a corner
+  clip, so "Core2 (CCD1)" with an AVG badge renders whole at 20px
+  where it used to cut at 16px.
+- The unit on a single-reading key sits on baseline 114 at 18px. A
+  sparkline riding its session maximum used to draw over the unit's
+  descenders; the spark strip is now inset so its worst-case ink stops
+  at the band edge, and the unit clears it. (Measured, see PERF.md.)
+- Sparkline history collects for as long as the plugin runs. The
+  poller keeps a ring for every reading a key or dial row has asked
+  for and feeds it on every fresh snapshot, on screen or not, so
+  paging back to a key returns a complete, current line instead of one
+  that rebuilds from scratch. Changing the poll interval still clears
+  the history, because the ring is spaced by sample, not by clock, and
+  a plugin restart still starts the lines fresh on purpose.
+- An HWiNFO layout change no longer flashes an error screen. Starting
+  a game that adds GPU readings changes the shared-memory layout; the
+  poller now reopens the data source at the new size and re-reads it
+  within the same tick, so live values never leave the keys. If that
+  reopen does not land at once, the last values stay on screen for up
+  to 15 seconds before any status screen appears. Access denied,
+  disabled and damaged-install still surface immediately.
+- I replaced the koffi FFI dependency with hwsm, my own Node-API
+  addon built from `native/hwsm` in this repo and covered by the same
+  MIT license. The download drops from 583,133 B to 215,672 B. Nothing
+  about reading sensors changes for you, with one exception worth
+  knowing: hwsm reads HWiNFO's shared memory only while holding
+  HWiNFO's consistency mutex, and there is no unguarded read path.
+  Earlier versions read without the mutex when it was missing, so on a
+  host that publishes the mapping without a mutex this version reports
+  HWiNFO as not running and, in auto mode, falls back to Gadget
+  reporting.
+
 ## 1.3.90.0 - 2026-07-23
 
 - Preview build for the issue #3 testers, published as the GitHub

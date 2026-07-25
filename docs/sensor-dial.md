@@ -37,6 +37,10 @@ Three things keep the short labels readable:
 - **Values share one right-aligned column.** Every value's ones digit lands on the same column edge, with units in their own column beside it. The three-row face fixes the column and steps the value size down a ladder until the widest visible value fits, so numbers never move, and each row's label runs right up to its own value before it shortens; the two-row face places its columns by the widest visible value, so a short value donates its slack to the labels.
 - **You can rename any reading.** Click a chip's name under **Rotation set** and type a new one (Enter or click away to save; clear it to go back to the HWiNFO name). The name shows on that row and as the dial's title whenever that reading is selected, in both views. Unticking a reading keeps its name for later.
 
+  ![The dial's Rotation set in the settings panel: two chips already renamed to "CPU" and "GPU" (the first highlighted because that reading is on the dial), and a third chip open in its inline rename box with the typed name selected, above the line reading "Rotation moves through these 3 readings only".]({{ '/assets/img/pi-dial-rename.png' | relative_url }})
+
+  This is the fix for readings HWiNFO gives the same name. Two DDR5 modules both report as `SPD Hub Temperature`, so name them `DIMM 1` and `DIMM 2` once and every row, title and overview line tells them apart from then on.
+
 ![Multi-readout key and dial faces rendered by the plugin, including the three-row overview with its rail thumb and context line shown before and after rotation moved the marked row.]({{ '/assets/img/multi-readouts.png' | relative_url }})
 
 The overview does not get its own list to manage. It shows exactly what rotation already steps through, in the same order:

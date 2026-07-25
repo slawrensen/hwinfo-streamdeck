@@ -1,9 +1,10 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Fifteen states: the key PI's settings view,
+// the theme gallery are present. Sixteen states: the key PI's settings view,
 // open picker (marketplace shot 3), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, dual, triple and quad layouts
 // (quad with the cell-colors row); the dial PI's rotation-set picker with ticked
+// rows, a chip open mid-rename beside two already-renamed chips,
 // rows and chips, the rotation-group editor (two named groups with the
 // collector radio), the Elite preset view, the Custom gesture rows with
 // touch zones, the overview view's Context line + Separators controls, and
@@ -332,6 +333,101 @@ try {
 	await sleep(600);
 	await capture("pi-dial-rotation.png");
 
+	// ---- dial PI: chip rename, mid-edit ----
+	// Two chips carry custom names, the third is open in its inline input:
+	// renamed chips and the edit affordance readable in one shot. Renames go
+	// through the production path (click .hw-set-name, then change) rather
+	// than writing settings, so the capture proves the interaction the docs
+	// describe instead of illustrating it.
+	// Two things this has to get right, both learned the hard way:
+	//
+	// Index the CHIP, not the name span. An open rename replaces its chip's
+	// span with an input, so a span-indexed lookup silently shifts onto the
+	// next chip and renames the wrong reading.
+	//
+	// Commit, then blur, then dispatch focusout by hand. renderRotationSet()
+	// deliberately defers while a name field is focused (pi-common.js: a
+	// settings echo must not clobber typing), and restores the chip on
+	// focusout. In the real panel Enter blurs and the browser fires focusout;
+	// under headless the document never holds focus, so blur() moves
+	// activeElement without dispatching the event and the chip would stay an
+	// input forever. Same handler, same result, just not relying on a focus
+	// event a headless page does not send.
+	const openChipRename = async (index, what) => {
+		expectOk(what, await evaluate(`(() => {
+			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
+			if (!chip) return "missing chip";
+			const el = chip.querySelector(".hw-set-name");
+			if (!el) return "already open";
+			el.click();
+			return "ok";
+		})()`));
+		await sleep(250);
+	};
+	const renameChip = async (index, name) => {
+		await openChipRename(index, `chip ${index} name`);
+		expectOk(`chip ${index} rename commit`, await evaluate(`(() => {
+			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
+			const input = chip && chip.querySelector("input.hw-chip-rename");
+			if (!input) return "missing";
+			input.value = ${JSON.stringify(name)};
+			input.dispatchEvent(new Event("change", { bubbles: true }));
+			input.blur();
+			input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+			return "ok";
+		})()`));
+		await sleep(500);
+		expectOk(`chip ${index} shows "${name}"`, await evaluate(`(() => {
+			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
+			const el = chip && chip.querySelector(".hw-set-name");
+			if (!el) return "still an input";
+			return el.textContent === ${JSON.stringify(name)} ? "ok" : el.textContent;
+		})()`));
+	};
+	await renameChip(0, "CPU");
+	await renameChip(1, "GPU");
+	// Leave the third open mid-edit with its text selected: the state a user
+	// is in one click after reading the bullet this shot sits under.
+	await openChipRename(2, "third chip opened for rename");
+	expectOk("rename input focused", await evaluate(`(() => {
+		const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[2];
+		const input = chip && chip.querySelector("input.hw-chip-rename");
+		if (!input) return "missing";
+		input.value = "Pump";
+		input.focus();
+		input.setSelectionRange(0, input.value.length);
+		return "ok";
+	})()`));
+	await sleep(300);
+	// Clip from the "Rotation" section heading, not from the item: starting at
+	// the item shears the heading in half. The help line under the set is the
+	// bottom edge, so the crop is a whole section rather than a floating row.
+	await captureClipped("pi-dial-rename.png", await evaluate(`(() => {
+		const item = document.getElementById("rotation-set").closest("sdpi-item");
+		const help = document.getElementById("rotation-help");
+		if (!item || !help) return "missing";
+		const heading = item.previousElementSibling?.classList.contains("hw-section")
+			? item.previousElementSibling
+			: item;
+		const a = heading.getBoundingClientRect();
+		const b = help.getBoundingClientRect();
+		const top = Math.min(a.top, b.top) + window.scrollY;
+		const bottom = Math.max(a.bottom, b.bottom) + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 8)), h: Math.ceil(bottom - top + 18) };
+	})()`));
+	// Commit and blur the open edit so the group shots below start from chips,
+	// never a stranded input.
+	await evaluate(`(() => {
+		const input = document.querySelector("#rotation-set input.hw-chip-rename");
+		if (input) {
+			input.dispatchEvent(new Event("change", { bubbles: true }));
+			input.blur();
+			input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+		}
+		return "ok";
+	})()`);
+	await sleep(500);
+
 	// ---- dial PI: rotation groups (split set, named, collector radio) ----
 	// Split the set built above: group 1 inherits its three readings, the
 	// collector radio lands on the new empty group 2, two GPU readings are
@@ -464,7 +560,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 15 PI states to ${outDir}`);
+	console.log(`captured 16 PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

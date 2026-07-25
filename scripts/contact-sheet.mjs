@@ -4,7 +4,7 @@
 import path from "node:path";
 import sharp from "sharp";
 
-import { renderDial } from "../src/ui/dial-renderer";
+import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
 import { classifyTypeAccent, loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType } from "../src/hwinfo/types";
@@ -36,7 +36,12 @@ const HEADER = 22;
 // above are all single faces, so without this the sheet never shows the
 // layouts at all.
 const FACES_ROW_Y = HEADER + 3 * CELL + 14;
-const DIAL_ROW_Y = FACES_ROW_Y + CELL + 14;
+// Dials are drawn at their native 200x100 next to 144x144 keys, which is the
+// real hardware ratio: a key is a small square, the touchscreen slot is a wide
+// short strip. Keeping both at 1x is the only way the sheet tells you which is
+// which, so neither is ever scaled to look tidy.
+const DIAL_ROW_Y = FACES_ROW_Y + CELL + 26;
+const DIAL_CELL = 212;
 const SHEET_W = themes.length * CELL + 8;
 const SHEET_H = DIAL_ROW_Y + 100 + 12;
 
@@ -122,9 +127,18 @@ for (let i = 0; i < FACES.length; i++) {
 	composites.push({ input: await png(FACES[i].svg), left: x, top: FACES_ROW_Y });
 }
 
-// Two dials: one live with a type accent, one pinned at critical.
+// The Stream Deck + touchscreen: a single readout, both multi-row overview
+// views, and a critical state. These are the wide faces, and showing them
+// beside the keys at matching scale is the point of the row.
+const dialPal = resolvePalette(config, "void", "temperature", "normal");
+const overviewRows = [
+	{ label: "CPU (Tctl/Tdie)", valueText: "56.3", unitText: "°C", selected: true, valueColor: dialPal.value },
+	{ label: "GPU Temperature", valueText: "44.1", unitText: "°C", selected: false, valueColor: dialPal.value },
+	{ label: "PUMP SYS1", valueText: "1762", unitText: "RPM", selected: false, valueColor: dialPal.value }
+];
+const trend = [52, 54, 53, 57, 60, 58, 62, 65, 63, 66, 70, 68, 71, 69, 72];
 const dials = [
-	renderDial({
+	["one reading", renderDial({
 		title: "CPU (Tctl/Tdie)",
 		valueText: "56.3",
 		unitText: "°C",
@@ -132,8 +146,22 @@ const dials = [
 		fraction: 0.62,
 		palette: resolvePalette(config, "midnight", "temperature", "normal"),
 		barColor: config.typeAccents.temperature
-	}),
-	renderDial({
+	})],
+	["overview, three rows", renderDialOverview({
+		rows: overviewRows,
+		contextText: "session",
+		statsText: "▼42.0 ▲78.5",
+		palette: dialPal
+	})],
+	["overview, two rows + trend", renderDialTwoRow({
+		rows: [
+			{ ...overviewRows[0], history: trend },
+			{ ...overviewRows[1], history: trend.map((v) => 110 - v) }
+		],
+		footerText: "▼ 42.0  ▲ 78.5  session",
+		palette: dialPal
+	})],
+	["critical", renderDial({
 		title: "GPU Hot Spot",
 		valueText: "104",
 		unitText: "°C · MAX",
@@ -141,13 +169,15 @@ const dials = [
 		fraction: 0.97,
 		palette: resolvePalette(config, "void", "temperature", "normal"),
 		barColor: config.alerts.crit.bg
-	})
+	})]
 ];
 for (let i = 0; i < dials.length; i++) {
-	composites.push({ input: await png(dials[i]), left: 8 + i * 212, top: DIAL_ROW_Y });
+	const x = 8 + i * DIAL_CELL;
+	headers.push(`<text x="${x + 100}" y="${DIAL_ROW_Y - 7}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#c8cdd6">${dials[i][0]}</text>`);
+	composites.push({ input: await png(dials[i][1]), left: x, top: DIAL_ROW_Y });
 }
 
 const base = `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}" height="${SHEET_H}"><rect width="${SHEET_W}" height="${SHEET_H}" fill="#101013"/>${headers.join("")}</svg>`;
 const file = path.join(outDir, "contact-sheet.png");
 await sharp(Buffer.from(base)).composite(composites).png().toFile(file);
-console.log(`Rendered ${themes.length}×3 keys + ${FACES.length} layout/gauge faces + ${dials.length} dials to ${file}`);
+console.log(`Rendered ${themes.length}×3 keys + ${FACES.length} layout/gauge faces + ${dials.length} touchscreen faces to ${file}`);

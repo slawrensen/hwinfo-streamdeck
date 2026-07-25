@@ -19,7 +19,7 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 | **Ember** | Amber-on-black monochrome: VFD/nostalgia look, warm amber value on true black. |
 | **Paper** | High-contrast light theme (near-black ink on warm paper `#E9E6DE`) for bright rooms and low vision. |
 
-![A contact sheet of the seven themes (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline, with the amber warn and red critical alert states below them, then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges), and two Stream Deck + dials with session range bars.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+![A contact sheet of the seven themes (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline, with the amber warn and red critical alert states below them, then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges), and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
 > **Note:** Void is the default for new installs. Graphite is the pre-theme legacy look. If you had the plugin configured before themes existed, the deck default stays on **Graphite** so nothing changes visually; a genuinely fresh install starts on **Void**. Either way, the moment you pick any theme yourself, that choice takes over.
 

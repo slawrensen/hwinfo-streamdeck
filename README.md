@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="docs/assets/img/themes-contact-sheet.png" width="900"
-       alt="HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and two Stream Deck + dials with session range bars">
+       alt="HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews">
 </p>
 
 <p align="center">

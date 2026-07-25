@@ -66,7 +66,7 @@ A typical desktop-CPU key in °C:
 
 Idle and under load the key stays themed. At 80 °C it goes amber; at 90 °C it goes red. If you'd rather read the face in Fahrenheit, tick *Show temperatures in °F* **and** enter the thresholds in °F (e.g. `176` / `194`); the numbers must match the displayed unit.
 
-![HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and two Stream Deck + dials with session range bars.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+![HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
 ### Fan RPM: alert when it drops
 

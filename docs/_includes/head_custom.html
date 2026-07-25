@@ -132,7 +132,7 @@
   "use strict";
 
   var MIN_RATIO = 1.15; /* only offer zoom when it actually reveals something */
-  var overlay, stage, img, cap, toggle, lastFocus;
+  var overlay, stage, img, cap, toggle, lastFocus, sizeWatch;
 
   function build() {
     overlay = document.createElement("div");
@@ -219,9 +219,32 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
+  /* An image in a page that has not been laid out yet reports clientWidth 0,
+     so the ratio test below cannot be answered and enable() has to give up.
+     That happens for real: a page opened in a background tab lays out at zero
+     width, and it stays that way through DOMContentLoaded and load. Without
+     this, the image would silently never gain its zoom control, because the
+     only other re-scan is on resize and switching tabs does not fire one.
+     Hand those images to a ResizeObserver and enable them the moment they
+     have a box. */
+  function retryWhenSized(el) {
+    if (typeof ResizeObserver !== "function") return;
+    if (!sizeWatch) {
+      sizeWatch = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.target.clientWidth) return;
+          sizeWatch.unobserve(entry.target);
+          enable(entry.target);
+        });
+      });
+    }
+    sizeWatch.observe(el);
+  }
+
   function enable(el) {
     if (el.dataset.zoomReady) return;
-    if (!el.naturalWidth || !el.clientWidth) return;
+    if (!el.naturalWidth) return;
+    if (!el.clientWidth) { retryWhenSized(el); return; }
     if (el.naturalWidth < el.clientWidth * MIN_RATIO) return;
     el.dataset.zoomReady = "1";
     el.classList.add("zoomable");

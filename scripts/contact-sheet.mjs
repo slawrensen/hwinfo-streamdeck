@@ -36,16 +36,26 @@ const HEADER = 22;
 // above are all single faces, so without this the sheet never shows the
 // layouts at all.
 const FACES_ROW_Y = HEADER + 3 * CELL + 14;
-// Dials are drawn at their native 200x100 next to 144x144 keys, which is the
-// real hardware ratio: a key is a small square, the touchscreen slot is a wide
-// short strip. Keeping both at 1x is the only way the sheet tells you which is
-// which, so neither is ever scaled to look tidy.
+// Dial slots are drawn at their real size relative to a key, not at the size
+// their images happen to be. A key icon is 144x144 and a dial slot renders
+// 200x100, but those are image resolutions, not glass: the touchscreen has a
+// different pixel pitch, so 1x made the strip look smaller than it is.
+//
+// Measured off the hardware photograph (marketing/hwinfo-streamdeckxlplus.png):
+// a key face is 290 photo px square, the strip is 2819 px across six slots
+// (470 each) and 266 px tall. So a slot is 1.62x a key wide and 0.92x tall,
+// which at KEY=144 is 233x132. Rendering the 200x100 image into that box also
+// reproduces the ~12% vertical stretch the device itself applies.
+const DIAL_W = Math.round(KEY * 470 / 290);   // 233
+const DIAL_H = Math.round(KEY * 266 / 290);   // 132
 const DIAL_ROW_Y = FACES_ROW_Y + CELL + 26;
-const DIAL_CELL = 212;
+const DIAL_CELL = DIAL_W + 12;
 const SHEET_W = themes.length * CELL + 8;
-const SHEET_H = DIAL_ROW_Y + 100 + 12;
+const SHEET_H = DIAL_ROW_Y + DIAL_H + 12;
 
 const png = (svg) => sharp(Buffer.from(svg)).png().toBuffer();
+// Dials rasterise into the measured box rather than their native 200x100.
+const dialPng = (svg) => sharp(Buffer.from(svg)).resize(DIAL_W, DIAL_H, { fit: "fill" }).png().toBuffer();
 const headerSvg = (name, x) =>
 	`<text x="${x}" y="15" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#c8cdd6">${name}</text>`;
 
@@ -173,8 +183,8 @@ const dials = [
 ];
 for (let i = 0; i < dials.length; i++) {
 	const x = 8 + i * DIAL_CELL;
-	headers.push(`<text x="${x + 100}" y="${DIAL_ROW_Y - 7}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#c8cdd6">${dials[i][0]}</text>`);
-	composites.push({ input: await png(dials[i][1]), left: x, top: DIAL_ROW_Y });
+	headers.push(`<text x="${x + DIAL_W / 2}" y="${DIAL_ROW_Y - 7}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#c8cdd6">${dials[i][0]}</text>`);
+	composites.push({ input: await dialPng(dials[i][1]), left: x, top: DIAL_ROW_Y });
 }
 
 const base = `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_W}" height="${SHEET_H}"><rect width="${SHEET_W}" height="${SHEET_H}" fill="#101013"/>${headers.join("")}</svg>`;

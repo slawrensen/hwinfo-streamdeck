@@ -24,6 +24,7 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | **Sensor missing** / pick again | Sensor missing / waiting | The saved sensor isn't in HWiNFO's current output. |
 | **Needs x64** / Windows | Needs x64 Windows | 32-bit or Windows-on-ARM: unsupported. |
 | **HWiNFO error** / restart HWiNFO | HWiNFO error / restart HWiNFO | Header didn't validate (mid-restart or incompatible build). |
+| **Plugin damaged** / reinstall | Plugin damaged / reinstall it | The plugin's native bridge (`bin/hwsm.node`) would not load: missing, blocked by antivirus, or a version mismatch. Reinstall the plugin. |
 
 ![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})
 
@@ -38,6 +39,7 @@ The plugin found HWiNFO on **neither** interface. In order of likelihood:
 3. **Portable HWiNFO window was closed.** The portable build only publishes while its window is open, and nothing auto-starts it. Reopen it (and add it to autostart yourself if you want it always on).
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It can take a few seconds after start to create the shared-memory mapping. Wait, then the key recovers on its own; the plugin re-probes every tick.
+6. **The mapping exists but its consistency mutex doesn't.** Since 1.4.0.0 the plugin reads shared memory only while holding HWiNFO's consistency mutex, with no unguarded read path, so a mapping published without a reachable mutex is treated as HWiNFO still starting up (HWiNFO creates the mapping first and the mutex just after). During a normal start that window is brief and the key recovers on its own. If it never clears, enable **Gadget reporting** and tick the sensors you need: the Gadget registry doesn't use the mutex, and in the default **Auto** data source the plugin falls back to it by itself.
 
 ## Keys show "Shared Memory off"
 
@@ -104,20 +106,23 @@ The settings-panel sensor list is populated live from whatever source is active:
 3. **Not on Windows / wrong architecture.** The plugin is Windows x64 only; macOS and Windows-on-ARM are unsupported (you'll see **"Needs x64 Windows"** if it loads at all).
 4. **Install got corrupted.** Remove the plugin and reinstall by double-clicking the `.streamDeckPlugin` file, then restart Stream Deck.
 
-## Temperatures show the wrong unit
+## A reading shows the wrong unit
 
-Each key/dial has a per-key **Unit** checkbox: **"Show temperatures in °F."** It only affects `°C` readings (the only meaningful conversion in HWiNFO data). If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
+Each key/dial has a per-key **Unit** checkbox: **"Show temperatures in °F."** It only affects `°C` readings. If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
+
+Byte quantities and transfer rates follow a separate, deck-wide control: **Advanced → Data units**, either **Decimal (KB, MB, GB, rates in Mbps)** or **Binary (KiB, MiB, GiB, rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (deck-wide)](sensor-reading.md#advanced-deck-wide).
 
 ## Thresholds (warn/critical) don't fire
 
-Two gotchas cause almost all of these:
+Three gotchas cause almost all of these:
 
 1. **Thresholds are in *display* units.** The warn/critical fields are compared against the value **as shown on the key**. If you enabled **°F**, enter the threshold in °F (e.g. `176`), not °C (`80`). The placeholder text says "display units" for exactly this reason.
 2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Direction → "Alert when value drops below thresholds."**
+3. **A dial rotated to a different unit.** Warn/critical values are anchored to the unit they were typed against, so `80` typed while a °C reading was on screen stands down on the 3000 RPM fan you rotate to; the manual **Bar min**/**Bar max** stand down with it and the bar falls back to the session low/high. Edit the threshold while the reading you want is on screen and it re-anchors to that reading's unit. Thresholds saved before this behavior existed keep their old apply-everywhere reach until you next edit one. See [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
 Other notes:
 - Alerts always track the **live** value, even while the key is showing MIN/MAX/AVG (a key press cycles the *displayed* stat, not what's tested).
-- On **dials**, only the range bar's fill flips to the alert color; the touchscreen slot is too small for a full field flip. On **keys**, the whole key flips (amber field at warn, red field at critical).
+- On **dials**, the alert lands wherever the face has room. In the **One reading** view the range bar's fill flips to the alert color, and with **Warn at** or **Critical at** set the bar's track marks those zones in muted amber and red whatever the value is doing. The **two-row and three-row overviews** have no bar, so an alerting row shows its **value** in the alert color instead. Either way the rest of the touchscreen stays themed; the slot is too small for a full field flip. On **keys**, the whole key flips (amber field at warn, red field at critical).
 - Leave a field blank to disable that level. Both accept a locale decimal comma (`70,5`).
 
 ## Dial gestures do nothing
@@ -126,7 +131,7 @@ Other notes:
 2. **No sensor picked yet**: a fresh dial shows **"rotate to pick."** Rotate to select a reading, or pick one in the settings panel.
 3. **Turns specifically do nothing**: check whether **Ignore turns** is on, or the dial is **pinned** (the bottom line says "pinned"; unpin via the gesture or an HWiNFO Control key).
 
-Dial gesture reference (Legacy preset, the default): **rotate** cycles readings of the same sensor source · **push** resets session min/max/avg · **touch** cycles current/min/max/avg · **long touch** returns to the live value. The Elite and Custom presets remap these; see [Dial controls & presets](controls.md).
+Dial gesture reference (Legacy preset, the default): **rotate** cycles your rotation set if you built one, otherwise the readings of the same sensor source · **push** resets session min/max/avg · **touch** cycles current/min/max/avg · **long touch** returns to the live value. The Elite and Custom presets remap these; see [Dial controls & presets](controls.md).
 
 ## High memory, high CPU, or a stuck process
 
@@ -164,7 +169,9 @@ Useful lines to look for:
 
 - `Opened HWiNFO data source: shared-memory` / `gadget`: which interface is actually in use.
 - A `Shared memory returned` line: auto-fallback recovered and upgraded from the gadget registry.
-- `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `access-denied`, `gadget-empty`, `invalid`, `unsupported-platform`).
+- `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `access-denied`, `gadget-empty`, `bridge-failed`, `invalid`, `unsupported-platform`).
+- `Data source layout changed; reopened in place (shared-memory)`: HWiNFO's sensor list grew or shrank (starting a game that adds GPU readings does it) and the poller reopened at the new size and re-read within the same tick, so the values never left the keys. Logged at INFO; it is not an error.
+- `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid` or `not-running`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
 - `Deck theme = … (source: …)`: the resolved deck-wide theme.
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
 
@@ -194,5 +201,5 @@ If it still fails, open an issue at the [project repository](https://github.com/
 4. **Stream Deck software version** and device model (regular, Stream Deck +, Stream Deck + XL).
 5. **Windows version**.
 6. **The relevant lines from the log** (`com.lawrensen.hwinfo.0.log`), especially any `HWiNFO unavailable […]` and the `Opened HWiNFO data source` lines.
-7. **The support report**: every settings panel has a **Copy support report** button under its advanced section. It copies a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, action states; no sensor values, no sensor names, nothing uploaded). Paste it into the issue.
+7. **The support report**: the Sensor Reading and Sensor Dial panels have a **Copy support report** button in their advanced section, and the HWiNFO Control panel has one under **Support**. It copies a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, action states; no sensor values, no sensor names, nothing uploaded). Paste it into the issue.
 8. **Whether either HWiNFO or Stream Deck is running elevated.**

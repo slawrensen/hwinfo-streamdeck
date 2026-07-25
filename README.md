@@ -92,8 +92,9 @@ the current value.
 | **Warn / Critical at** | Key turns amber / red at these values (in the displayed unit). |
 | **Direction** | "Alert when below" flips the comparison, for fan RPM, free space, etc. |
 
-**Pressing the key** cycles what's shown: current → MIN → MAX → AVG (badge in the
-corner). The warn/critical colors always track the *live* value.
+**Pressing the key** cycles what's shown: current → MIN → MAX → AVG (the badge
+sits in a gap under the label, or on the row divider in a multi-reading
+layout). The warn/critical colors always track the *live* value.
 
 <p align="center">
   <img src="docs/assets/img/multi-readouts.png" width="900"
@@ -113,7 +114,8 @@ The touchscreen shows the label, live value, session ▼min/▲max and a range b
        alt="A Stream Deck + dial face: CPU temperature with its live value, session min/max, and a range bar whose track marks the warn and critical zones in amber and red">
 </p>
 
-- **Rotate**: step through the readings of the same sensor source
+- **Rotate**: step through the rotation set ticked in the dial's settings, or
+  every reading of the picked sensor when the set is empty
 - **Push**: reset the session min/max/avg
 - **Touch**: cycle current / session-min / session-max / session-avg
 - **Long touch**: back to the current value
@@ -135,6 +137,24 @@ face stays themed (the touchscreen slot is too small for a full field flip).
 <p align="center">
   <em>The Stream Deck + XL's six-dial strip: per-reading session ▼min/▲max, pin and pause, and a critical range bar</em>
 </p>
+
+## HWiNFO Control (keys)
+
+A third action drives Sensor Dials from a key: next or previous reading, next
+or previous sensor or group, cycle stat mode, show current / session min / max
+/ average, pause or resume the auto cycle, pin or unpin the reading, and reset
+session stats. Pause/resume and pin/unpin also exist as one-way commands, so a
+repeated press inside a Multi Action stays harmless.
+
+Targeting is explicit. Give a dial a **Link ID** in its settings (*Dial
+gestures & advanced*) and put the same name in the control key's **Target** to
+steer just that dial; an empty Target drives every dial. The key shows a tick
+when the command reached at least one matching dial and an alert icon when
+none matched. The target dial has to be on screen somewhere, on any connected
+deck, which is why this runs from a pedal, a G-key, a Multi Action step or a
+key on another deck rather than one that pages the dial away as you press it.
+Full command and targeting reference:
+[Dial controls & presets](https://docs.slawrensen.com/hwinfo-streamdeck/controls.html#the-hwinfo-control-key-action).
 
 ## Themes
 
@@ -174,9 +194,10 @@ The faces follow a written display spec, and its rules ship as measured
 facts rather than taste:
 
 - **True black is the instrument.** The default theme's background is
-  `#000000`: OLED pixels off, only the data glows. The six tinted presets
-  keep background luminance low enough to read as black with a cast at
-  arm's length.
+  `#000000`: OLED pixels off, only the data glows. Graphite, Ultraviolet,
+  Midnight, Forest and Ember keep background luminance low enough to read
+  as black with a cast at arm's length; Paper is the deliberate exception,
+  a light face for bright rooms.
 - **One bright element per key.** On the default theme the value sits at
   21:1 contrast against the background, the label at 5.5:1, the unit at
   4.2:1. The unit is the dimmest on purpose: position and magnitude
@@ -187,8 +208,8 @@ facts rather than taste:
   one. Value digits (26 to 52 px by length) stay glanceable; the label is
   sized for identification, not reading.
 - **Anchors never move.** Label baseline 32, value baseline 94, unit
-  baseline 114, sparkline ink capped at y=120, on every key, with or
-  without a sparkline: that is what makes a mixed wall read as one
+  baseline 114, sparkline ink capped at y=120, on every single-reading key,
+  with or without a sparkline: that is what makes a mixed wall read as one
   instrument. The unit's corridor is measured, not eyeballed: 6.5 to
   7.0 px of ink air up to the value and 5.9 down to the spark band, the
   larger gap against the heavier neighbor.
@@ -210,7 +231,9 @@ status screen that names the problem and its fix:
 | --- | --- |
 | **Start HWiNFO** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
 | **Shared Memory off** | HWiNFO reports sharing disabled. This is also where the free version's **12-hour timer** lands: it switches sharing off (HWiNFO Pro removes the limit). Re-enable it in HWiNFO Settings, or enable Gadget reporting; Auto mode falls back to it by itself. |
+| **Tick sensors in Gadget** | Gadget reporting is on but nothing is ticked, so the registry is empty. In HWiNFO's sensor window, right-click each value you want on the deck and tick **Report value in Gadget**. |
 | **Not updating** | Values frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. Reopen the Sensors window; if it keeps happening, restart HWiNFO. |
+| **Plugin damaged** | The plugin's native bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; restarting HWiNFO cannot clear this one. |
 | **Access denied** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **Pick a sensor** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing** | The saved sensor isn't in HWiNFO's current output (hardware/driver change, or a renamed sensor profile). Pick it again. |
@@ -252,9 +275,13 @@ then `npm run watch` (rebuilds and restarts the plugin on save).
 
 Native access goes through `hwsm` (`native/hwsm`), a small N-API addon this
 project builds with node-gyp, calling `OpenFileMappingW`/`MapViewOfFile` on
-`Global\HWiNFO_SENS_SM2` under HWiNFO's consistency mutex; strides and offsets
-are read from the live header, never hardcoded, so newer HWiNFO layouts (e.g.
-the UTF-8 label extensions) decode correctly.
+`Global\HWiNFO_SENS_SM2`; strides and offsets are read from the live header,
+never hardcoded, so newer HWiNFO layouts (e.g. the UTF-8 label extensions)
+decode correctly. It is a capability API: JavaScript gets opaque session
+objects and never a handle, pointer or generic Win32 call. Every read holds
+HWiNFO's consistency mutex, and there is no unguarded fallback, so a mapping
+published without a reachable mutex is treated as HWiNFO still starting up
+rather than read anyway.
 
 ## License
 

@@ -87,7 +87,7 @@ They're two different things:
 
 ### Why do my sparklines fill in slowly when a graph starts from empty?
 
-Sparkline history lives with the poller and keeps **collecting while a key is off screen** (as of 1.4; between 1.1.6 and 1.3 a page unviewed for over a minute rebuilt from empty). Switching pages, waking the machine, or the app reconnecting returns you to a complete, current line. A graph only builds from empty the first time a reading is shown, after a plugin or Stream Deck restart (history is plugin memory), or after a poll-interval change.
+Sparkline history lives with the poller and keeps **collecting while a key is off screen** (as of 1.4; between 1.1.6 and 1.3 a page unviewed for over a minute rebuilt from empty). Switching pages, waking the machine, or the app reconnecting brings the line back complete instead of rebuilding it from empty. It stays current while at least one of the plugin's keys or dials is on screen somewhere; if none of them are visible the poller stops entirely (see the CPU answer below), so collection pauses and picks up where it left off when a key comes back. A graph only builds from empty the first time a reading is shown, after a plugin or Stream Deck restart (history is plugin memory), or after a poll-interval change.
 
 When it does build from empty: **it fills at HWiNFO's own update rate, not the plugin's poll rate.** The sparkline only gains a new point when HWiNFO produces a genuinely fresh reading; a frozen source never pushes duplicate points (that would flatten the line). HWiNFO's default sensor polling period is 2 seconds, and the sparkline holds 36 samples, so a full graph takes ~72 seconds to build from scratch. To fill faster, lower HWiNFO's polling period in **HWiNFO → Settings → Polling period**.
 
@@ -117,11 +117,11 @@ And when none of the plugin's keys are on screen (you switched to another page/p
 
 ### How many sensors / keys can I use?
 
-There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them (the list shows up to 150 rows at once and asks you to refine the search past that). You can place as many keys and dials as your Stream Deck hardware has, all reading from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
+There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them (the list shows up to 150 rows at once and asks you to refine the search past that). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Layout** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
 
 ### Can multiple keys show the same sensor?
 
-Yes. Put the same sensor on as many keys as you like; each can have its own label, theme, decimals, unit, stat mode, sparkline and thresholds. They all read from the shared poller, so extra copies cost nothing meaningful.
+Yes. Put the same sensor on as many keys as you like; each can have its own label, layout, theme, text color, decimals, unit, stat mode, display (sparkline, bar or ring) and thresholds. They all read from the shared poller, so extra copies cost nothing meaningful.
 
 ## Alerts, thresholds and colors
 
@@ -132,9 +132,11 @@ It's crossed a threshold you set. In the key's settings:
 - **Warn at** → the whole key flips to an **amber** field with black text.
 - **Critical at** → a **red** field with white text.
 
+With **Display** set to **Bar** or **Ring**, those same thresholds also mark muted amber and red zones on the gauge track, escalating toward the alarmed end (the high side normally, the low side when *Direction* alerts below). The zones are fixed landmarks: they show whenever the thresholds are set, crossed or not, so red on the track is not by itself an alert. The field flip is. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
+
 Alerts always track the **live** value (not the displayed stat: a key showing MAX still colors by the current reading). By default higher is worse; tick **Direction → Alert when value drops below thresholds** to flip the comparison (for fan RPM, free disk space, etc.).
 
-On a **dial**, the alert colors the range-bar fill instead of the whole face; the touchscreen slot is too small for a full field flip.
+On a **dial**, the alert colors the range-bar fill instead of the whole face; the touchscreen slot is too small for a full field flip. Once you set thresholds, the bar's track also marks the warn and critical bands in dimmed amber and red, so you can see where the trip points sit before the value reaches them. The two **Overview** views (two rows and three rows) have no range bar: there an alerting row shows its **value** in the alert color instead. See [Sensor Dial](sensor-dial.md).
 
 If a key is amber/red and you didn't mean to set a threshold, clear the **Warn at** / **Critical at** fields. The two alert palettes are global and never themed, so warn and crit stay unmistakable on any theme and with any color-vision deficiency.
 
@@ -200,5 +202,6 @@ They're status screens telling you exactly what to fix. As of 1.1.6 they're pure
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
 | `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |
 | `Needs x64 / Windows` | Not a 64-bit Windows machine (Windows-on-ARM / other); unsupported. |
+| `Plugin damaged / reinstall` | The plugin's native bridge (`bin/hwsm.node`) is missing, was blocked from loading, or does not match this plugin version; often an antivirus quarantine. Reinstall the plugin, and allow that file in your antivirus if it comes back. |
 
 ![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})

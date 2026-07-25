@@ -30,7 +30,7 @@ With **Custom** selected, one select per gesture appears (rotate, press+rotate, 
 
 ## Rotation groups
 
-Optional, and nothing changes until you build them: split the rotation set into named groups (group A, group B, group C) and the dial gets two speeds. Plain rotate stays inside the active group; press+rotate on Elite (or any gesture set to "Switch sensor or group" on Custom) jumps to the next group, and the dial shows the landing group's name on its bottom line for a moment.
+Optional, and nothing changes until you build them: split the rotation set into named groups (group 1, group 2, group 3, or the names you type) and the dial gets two speeds. Plain rotate stays inside the active group; press+rotate on Elite (or any gesture set to "Switch sensor or group" on Custom) jumps to the next group, and the dial shows the landing group's name on its bottom line for a moment.
 
 Build them in the dial's settings panel. **Split into groups** under the rotation set turns your current set into group 1 and adds an empty group 2. The radio in front of a group marks where ticks land: tick readings in the sensor list and they join that group. Each group has an optional name ("CPU", "GPU", "Cooling"); unnamed groups show as "group 2" and so on. **Add group** appends another, the × on a group removes it (its readings leave the rotation), and **Merge back into one set** flattens everything into a plain rotation set again.
 
@@ -65,7 +65,7 @@ Each reading keeps its own session min/max/average, keyed by HWiNFO's stable sen
 
 ## Thresholds and mixed units
 
-The mapping is yours to define: a reading is **warning** once it crosses **Warn at** and **critical** once it crosses **Critical at**, in the alert direction (above the value by default; below it with the Direction checkbox). Warn paints the face amber, critical paints it red, on keys and dials alike.
+The mapping is yours to define: a reading is **warning** once it crosses **Warn at** and **critical** once it crosses **Critical at**, in the alert direction (above the value by default; below it with the Direction checkbox). Warn paints a key's whole face amber and critical paints it red. A dial keeps its theme: on the single view only the range bar's fill takes the alert color, and on the overview, which has no bar, the alerting row's own value takes it.
 
 Warn/critical thresholds and the manual bar range apply only to readings measured in the unit they were configured against. Type a warn value of 80 while a °C reading is selected, and it will never fire on a 3000 RPM fan you rotate to; the alert and the manual bar simply stand down for readings in other units. Edit a threshold and it re-anchors to the unit of the reading on screen at that moment.
 
@@ -93,7 +93,7 @@ Settings only ever gain fields; nothing existing is renamed or removed.
 - Rotation groups are a new optional field; dials without groups behave exactly as before on every preset. The flat rotation set is kept mirrored to the union of all groups, so a downgrade to an older plugin version runs the union as one set and loses nothing.
 - The unit anchor for thresholds (`alertUnit`) is stamped the first time you edit a threshold after updating, from the reading on screen at that moment; until then thresholds behave exactly as they did.
 - **Label mode** defaults to the existing behavior (a custom label clears when rotation moves to another reading). Pick "fixed title" to keep it through rotation.
-- The dial's **View** and the key's **Layout** (1.2.0) are new optional fields too: anything other than their exact overview/dual markers, including values a newer version might write, renders the unchanged single face. A dual key also needs a usable second reading; without one it stays single.
+- The dial's **View** and the key's **Layout** are new optional fields too (both 1.2.0; the key's `triple` marker arrived in 1.4.0). Only their exact markers switch face: `overview` and `tworow` on the dial, `dual`, `triple` and `quad` on the key. Anything else, including a value a newer version might write, renders the unchanged single face. A dual key also needs a second reading picked, and a triple or quad key at least two of its slots picked; short of that they stay single too.
 - Per-reading names (`rotationNames`, 1.2.0) are another optional field: a map from reading identity to display name, written only by the chip rename in the settings panel. Junk entries are ignored one by one, and older plugin versions ignore the field entirely.
 - The overview's **Row labels** field (`overviewLabels`, 1.2.0) shortens shared prefixes by default; only the exact value "full" turns that off. Anything else, including future values, keeps the default.
 - Malformed or unexpected values in any field fall back to safe defaults instead of failing; a broken settings blob renders and keeps working.

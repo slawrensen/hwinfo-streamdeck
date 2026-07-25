@@ -29,7 +29,7 @@ There are two ways to install, depending on where you got the plugin.
 
 **From the Elgato Marketplace**
 
-Once the plugin is approved on the Marketplace, you can install it from there in one click; the Marketplace hands the same package to the Stream Deck app. Use whichever channel you prefer; the plugin is identical.
+The plugin is on the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). Install it from there in one click and the Marketplace hands the package to the Stream Deck app. I publish each version to GitHub Releases first, so while an update is in review the Marketplace can be a version behind. Check the version shown on the listing if you want the newest build.
 
 > **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, that is a privilege *mismatch* between HWiNFO and Stream Deck, not a permission you granted at install. See [Troubleshooting](troubleshooting.md).
 

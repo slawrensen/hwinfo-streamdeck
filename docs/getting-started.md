@@ -9,7 +9,7 @@ This page gets one live sensor onto a Stream Deck key in about a minute, then po
 
 ## 1. Install the plugin
 
-Double-click the `.streamDeckPlugin` file (or install from the Marketplace once published). The Stream Deck app asks you to confirm the install, then adds an **HWiNFO Sensors** category to the actions list on the right.
+Install the plugin from the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54), or double-click the `.streamDeckPlugin` file from [GitHub Releases](https://github.com/slawrensen/hwinfo-streamdeck/releases/latest). The Stream Deck app asks you to confirm the install, then adds an **HWiNFO Sensors** category to the actions list on the right.
 
 ## 2. Drag "Sensor Reading" onto a key
 
@@ -38,7 +38,7 @@ That's the whole loop: drag, pick, done. The key now updates roughly once a seco
 
 Everything below is optional; the defaults already give you a clean live reading.
 
-- **[Sensor Reading (keys)](sensor-reading.md)**. Every key setting: custom **Label**, **Show** (current / min / max / average), **Decimals**, **°F**, **Display** (sparkline, bar or ring), and press-to-cycle stat modes.
+- **[Sensor Reading (keys)](sensor-reading.md)**. Every key setting: custom **Label**, **Show** (current / min / max / average), **Decimals**, **Unit** (°F for temperatures), **Layout** (one reading, two stacked, three rows, or a quad grid of four), **Display** (sparkline, bar or ring), and press-to-cycle stat modes.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**. The dial/touchscreen action for the Stream Deck + and + XL: rotate-to-switch, rotation sets, auto cycle, push-to-reset, and a session range bar.
 - **[Dial controls & presets](controls.md)**. The Legacy, Elite and Custom gesture presets, touch zones, pause/pin, reset reach, and the **HWiNFO Control** key action that drives dials from any key or pedal.
 - **[Themes](themes.md)**. The seven presets (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), per-key vs. deck-wide, and type accents.

@@ -25,7 +25,7 @@ The **Live value** row directly below the picker mirrors the current reading (an
 
 ### Label
 
-Custom text for the key. Leave it blank to use the sensor's own (HWiNFO-renamed) label. Labels size themselves to the key: a short name like `CCD1` renders large, a longer one steps down through smaller sizes, and only a name too wide for the smallest size is truncated with an ellipsis. A stat badge (MIN/MAX/AVG) sharing the top row shortens the label's room but never collides with it.
+Custom text for the key. Leave it blank to use the sensor's own (HWiNFO-renamed) label. Labels size themselves to the key: a short name like `CCD1` renders large, a longer one steps down through smaller sizes, and only a name too wide for the smallest size is truncated with an ellipsis. A stat badge (MIN / MAX / AVG) sits in its own gap under the label, so it never costs the label any width.
 
 ### Theme
 
@@ -55,7 +55,7 @@ What the key displays, drawn from HWiNFO's own statistics since it started:
 | **Maximum (since HWiNFO start)** | Highest value HWiNFO has recorded. |
 | **Average (since HWiNFO start)** | Running average HWiNFO has computed. |
 
-When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears in the top-right corner of the key.
+When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears in a gap between the label and the value, centered on the key, so the label keeps its full width.
 
 > **Note:** Min / max / average come from HWiNFO's Shared Memory interface. On the Gadget-registry fallback these statistics aren't available, so all four modes show the current value. See [Data sources](data-sources.md).
 
@@ -66,7 +66,7 @@ When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears i
 **Second shows** decides the second row's stat:
 
 - **Follows the first reading** *(default)*: both rows show the same stat, and the key press cycles them together. When that stat isn't the current value, **one MIN / MAX / AVG badge sits centered in the divider gap**, the key's most visible spot.
-- **Always current / min / max / avg**: pins the second row to a fixed stat. A pinned row whose stat differs from the first row's shows its own small badge inline after its unit (the same idiom the dial uses), never in the key's corner, so row labels always keep their full width.
+- **Always current / min / max / avg**: pins the second row to a fixed stat. When the two rows show different stats, the shared badge in the divider gap gives way and each non-current row carries its own small badge inline after its unit (the same idiom the dial uses), so row labels always keep their full width.
 
 ![The key's settings panel with Layout set to Two readings, stacked: the Second sensor picker holding a GPU temperature, the Second label field and the Second shows select below it.]({{ '/assets/img/pi-key-dual.png' | relative_url }})
 
@@ -163,7 +163,7 @@ Bar and Ring find their range automatically:
 - Everything else spans the **values actually seen**: HWiNFO's session min/max plus the plugin's own recent samples, so the gauge settles as the session accumulates. There are no manual bounds to type.
 - **Warn at / Critical at** draw amber and red zones that escalate **toward the alarmed end**: amber then red at the high side normally, mirrored to the low side when *Direction* alerts below, the classic instrument convention (a fuel gauge is red at empty, a tachometer at the top). The range widens to keep the zones visible.
 
-The zones are **fixed landmarks**, drawn as muted shades so they read as markers, not state; the **moving fill is the live value**, and it keeps its full color (accent normally, amber/red while alerting) so it always stands out over them. The gauge follows the **live** value even while the key's text shows MIN, MAX, or AVG, exactly like alert coloring. Dual and quad layouts have no strip, so the Display row hides there.
+The zones are **fixed landmarks**, drawn as muted shades so they read as markers, not state; the **moving fill is the live value**, and it keeps its full color (accent normally, amber/red while alerting) so it always stands out over them. The gauge follows the **live** value even while the key's text shows MIN, MAX, or AVG, exactly like alert coloring. The dual, triple and quad layouts have no strip, so the Display row hides there.
 
 Sparkline notes:
 
@@ -188,7 +188,7 @@ See [Thresholds & alerts](thresholds-alerts.md) for the full behavior.
 
 ## Pressing the key
 
-Pressing the key cycles the displayed stat: **current → MIN → MAX → AVG → current**. The corner badge updates to match, and the choice is saved back to the key's settings (so it's the same as changing **Show** in the panel). Warn/critical coloring keeps tracking the live value throughout.
+Pressing the key cycles the displayed stat: **current → MIN → MAX → AVG → current**. The badge under the label updates to match, and the choice is saved back to the key's settings (so it's the same as changing **Show** in the panel). Warn/critical coloring keeps tracking the live value throughout.
 
 On a dual key with **Second shows** at its default (follows the first reading), the press cycles **both rows together**, one shared badge centered on the divider. A second row pinned to a fixed stat stays put while the first row cycles, so a configured pair (say a pinned maximum under a live value) survives any press.
 
@@ -207,6 +207,9 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | **Access denied / un-elevate** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
+| **Plugin damaged / reinstall** | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, allow that file in your antivirus. |
+| **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
+| **HWiNFO error / restart HWiNFO** | Rare. The shared memory did not validate. It usually clears on the next poll; if it persists, restart HWiNFO. |
 
 The settings panel shows the matching plain-language explanation and fix while the key is in one of these states. Full details are on [Status screens](status-screens.md).
 

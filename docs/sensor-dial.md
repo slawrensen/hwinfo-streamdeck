@@ -129,9 +129,9 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 
 ## Alerts on a dial
 
-Dials take the same **Warn at** / **Critical at** thresholds as keys, compared against the **live** value. But the alert shows differently: only the **range bar's fill** flips to the alert color (amber for warn, red for critical); the label, value, and rest of the face stay in your chosen theme.
+Dials take the same **Warn at** / **Critical at** thresholds as keys, compared against the **live** value. But the alert shows differently, and differently per view: on the single view only the **range bar's fill** flips to the alert color (amber for warn, red for critical) while the label, value and rest of the face stay in your chosen theme; the two [overview](#overview-view) layouts have no range bar, so there the alerting row's **value text** carries the color instead.
 
-This is by design. The touchscreen slot is too small for the full field-flip that keys use (whole key to amber/red), so the bar carries the alert while the readout stays legible. The two alert colors are global and never tinted per theme, so they stay unmistakable. For the full alert model, see [Themes & alerts](themes.md).
+This is by design. The touchscreen slot is too small for the full field-flip that keys use (whole key to amber/red), so the bar (or, in an overview, the row's own value) carries the alert while the readout stays legible. The two alert colors are global and never tinted per theme, so they stay unmistakable. For the full alert model, see [Themes & alerts](themes.md).
 
 > **Note:** The single view has no sparkline; its range bar is the at-a-glance indicator there. The two-row [overview](#overview-view) draws real sparklines for its visible readings.
 
@@ -147,6 +147,7 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | **Gadget empty** / tick sensors | Gadget reporting is on but no values are ticked. Right-click sensors in HWiNFO → "Report value in Gadget". |
 | **Access denied** / un-elevate HWiNFO | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **HWiNFO error** / restart HWiNFO | Shared memory didn't validate (mid-restart or an incompatible version). |
+| **Plugin damaged** / reinstall it | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing, was blocked from loading (usually an antivirus quarantine), or doesn't match this plugin version. Reinstall the plugin; restarting HWiNFO won't clear this one. |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.
 

@@ -11,11 +11,13 @@ Both fields are optional and independent: set one, the other, or neither. A key 
 
 | Field | Effect on a **key** | Effect on a **dial** |
 | --- | --- | --- |
-| **Warn at** | Whole face flips to amber field / black text | Range bar fill turns amber |
-| **Critical at** | Whole face flips to red field / white text | Range bar fill turns red |
+| **Warn at** | Whole face flips to amber field / black text | Range bar fill turns amber (single view), or the alerting row's value (overview views) |
+| **Critical at** | Whole face flips to red field / white text | Range bar fill turns red (single view), or the alerting row's value (overview views) |
 | **Direction** (*Alert when value drops below thresholds*) | Flips the comparison so a *low* value is the alarm | Same |
 
-On a key the alert takes over the entire face; this is deliberate, aviation-style master caution/warning that reads across a whole wall of keys. On a Stream Deck + dial the touchscreen slot is too small for a full flip, so only the range bar's fill changes color; the label, value and range text stay themed. See [Sensor Dial](sensor-dial.md) for the rest of the dial.
+On a key the alert takes over the entire face; this is deliberate, aviation-style master caution/warning that reads across a whole wall of keys. On a Stream Deck + dial the touchscreen slot is too small for a full flip, so on the single view only the range bar's fill changes color and the label, value and range text stay themed. The two-row and three-row overview views draw no range bar, so there the alerting row's own value turns amber or red and the rest of the face stays themed. See [Sensor Dial](sensor-dial.md) for the rest of the dial.
+
+Thresholds have a second, quieter effect on any face that draws a range. A key whose **Display** is set to **Bar** or **Ring** (a one-reading-layout setting) marks the same limits on its track: muted amber from **Warn at** and muted red from **Critical at**, running toward the alarmed end, the low end when *Direction* alerts below. The dial's range bar marks them the same way. The zones are blended toward the face background so the live fill always reads over them, and a key's range, which is always automatic, widens just enough to keep a zone visible. A dial pinned with **Bar min** / **Bar max** is never widened; a zone outside those bounds is clipped. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
 
 ![The property inspector showing the Warn at, Critical at and Direction settings with example values filled in.]({{ '/assets/img/settings-panel.png' | relative_url }})
 
@@ -23,7 +25,7 @@ On a key the alert takes over the entire face; this is deliberate, aviation-styl
 
 Two rules matter, and both are easy to get wrong:
 
-**1. Thresholds are in the *displayed* unit.** The value compared against your thresholds is the **live (current) reading in whatever unit the key shows**, after the °C→°F conversion, not before. So if you tick *Show temperatures in °F*, a **Warn at** of `100` fires on a 40 °C core (which displays as 104 °F). Leave °F off and the same sensor is compared in °C. Match your numbers to the unit on the face.
+**1. Thresholds are in the *displayed* unit.** The value compared against your thresholds is the **live (current) reading in whatever unit the key shows**, after the °C→°F conversion, not before. So if you tick *Show temperatures in °F*, a **Warn at** of `100` fires on a 40 °C core (which displays as 104 °F). Leave °F off and the same sensor is compared in °C. Match your numbers to the unit on the face. One exception: the deck-wide **Data units** setting re-tiers byte and rate readings for display only. Thresholds still compare against the number HWiNFO reports, so a `12345.6 MB` reading is compared as `12345.6` while the key shows `12.3 GB`, and a `12000000 B/s` reading is compared as `12000000` while the key shows `96.0 Mbps`. Switching Decimal to Binary never re-arms an alert. See [Data units](sensor-reading.md#advanced-deck-wide).
 
 > **Note:** Alert color always tracks the *live* value, even when the key is showing MIN / MAX / AVG (press cycles the stat mode). Pressing a key to look at its max won't turn the alert off if the current value is still over the limit, and won't turn it on just because the historical max was.
 
@@ -90,6 +92,8 @@ Drops to 50 GB → amber; drops to 20 GB → red.
 
 ## Where thresholds live
 
-The **Warn at**, **Critical at** and **Direction** controls are on both the Sensor Reading (key) and Sensor Dial property inspectors, just below the display options. They're per-key / per-dial (each reading gets its own limits) and they persist with the rest of that button's [settings](sensor-reading.md).
+The **Warn at**, **Critical at** and **Direction** controls are on both the Sensor Reading (key) and Sensor Dial property inspectors, just below the display options. There is one pair of limits per key and per dial, and they persist with the rest of that button's [settings](sensor-reading.md).
+
+On the **Two readings, stacked**, **Three readings, rows** and **Four readings, quad grid** key layouts that one pair watches the **first** sensor only: the other rows or cells never raise an alert of their own, and the whole key recolors when the first sensor crosses. Put the reading you want alerts on first, or give it its own key.
 
 On a **dial**, thresholds and the manual bar range are additionally **unit-scoped**: rotation can put readings with different units on the same dial, so a threshold applies only to readings in the unit it was typed against (a °C warn level can never fire on a fan RPM you rotate to). Details on [Dial controls & presets](controls.md#thresholds-and-mixed-units).

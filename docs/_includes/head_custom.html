@@ -131,7 +131,7 @@
 (function () {
   "use strict";
 
-  var MIN_RATIO = 1.15; // only offer zoom when it actually reveals something
+  var MIN_RATIO = 1.15; /* only offer zoom when it actually reveals something */
   var overlay, stage, img, cap, toggle, lastFocus;
 
   function build() {
@@ -172,7 +172,7 @@
     stage.classList.toggle("is-full", full);
     toggle.textContent = full ? "Fit to screen" : "Actual size";
     if (full) {
-      // Centre the full-size image rather than dumping the viewer top-left.
+      /* Centre the full-size image rather than dumping the viewer top-left. */
       stage.scrollLeft = Math.max(0, (img.naturalWidth - stage.clientWidth) / 2);
       stage.scrollTop = Math.max(0, (img.naturalHeight - stage.clientHeight) / 2);
     }
@@ -199,9 +199,9 @@
 
   function open(src, alt, trigger) {
     if (!overlay) build();
-    // Remember the image that opened this, not document.activeElement: a mouse
-    // click does not always leave focus on the trigger, and restoring to a
-    // stale element strands a keyboard user on the closed dialog's button.
+    /* Remember the image that opened this, not document.activeElement: a
+       mouse click does not always leave focus on the trigger, and restoring a
+       stale element strands a keyboard user on the closed dialog's button. */
     lastFocus = trigger || document.activeElement;
     img.src = src;
     img.alt = alt || "";
@@ -256,8 +256,8 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan);
   else scan();
-  // Re-measure when the column width changes: an image that fits on a wide
-  // screen may be worth zooming on a narrow one.
+  /* Re-measure when the column width changes: an image that fits on a wide
+     screen may be worth zooming on a narrow one. */
   var t;
   window.addEventListener("resize", function () {
     clearTimeout(t);

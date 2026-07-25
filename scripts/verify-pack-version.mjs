@@ -13,6 +13,15 @@
  * "Preview releases"), so the following stable upgrades every preview.
  * When no v* tags are visible (shallow CI checkout) this warns and passes;
  * the release workflow has its own manifest-matches-tag gate.
+ *
+ * Tags pointing at HEAD are excluded from the comparison. Pushing `vX.Y.Z`
+ * is what triggers the release workflow, so by the time it packs, the tag
+ * naming this very build already exists and the manifest can never clear
+ * it: v1.4.0 failed exactly that way on its first run. That tag is not a
+ * prior release to beat. Excluding only HEAD's own tags keeps both of the
+ * cases this gate exists for: a preview still has to clear the newest
+ * stable, and re-packing an already-released version from an untagged
+ * commit (the issue #3 mistake) is still refused.
  */
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -38,7 +47,22 @@ if (packed === null) {
 
 const tags = execSync('git tag --list "v*"', { cwd: ROOT, encoding: "utf8" })
 	.split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
-const released = tags.map(quad).filter((q) => q !== null).sort(compare);
+let headTags = new Set();
+try {
+	headTags = new Set(
+		execSync("git tag --points-at HEAD", { cwd: ROOT, encoding: "utf8" })
+			.split(/\r?\n/)
+			.map((t) => t.trim())
+			.filter(Boolean)
+	);
+} catch {
+	// No git, or a checkout with no reachable HEAD: compare against every tag.
+}
+const released = tags
+	.filter((t) => !headTags.has(t))
+	.map(quad)
+	.filter((q) => q !== null)
+	.sort(compare);
 if (released.length === 0) {
 	console.error("verify-pack-version: no v* tags visible (shallow checkout?); skipping the floor check");
 	process.exit(0);

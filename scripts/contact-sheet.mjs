@@ -42,12 +42,18 @@ const FACES_ROW_Y = HEADER + 3 * CELL + 14;
 // different pixel pitch, so 1x made the strip look smaller than it is.
 //
 // Measured off the hardware photograph (marketing/hwinfo-streamdeckxlplus.png):
-// a key face is 290 photo px square, the strip is 2819 px across six slots
-// (470 each) and 266 px tall. So a slot is 1.62x a key wide and 0.92x tall,
-// which at KEY=144 is 233x132. Rendering the 200x100 image into that box also
-// reproduces the ~12% vertical stretch the device itself applies.
+// a key face is 290 photo px square and the strip is 2819 px across six slots,
+// so one slot is 1.62x a key wide. That width sets the scale.
+//
+// The height is then whatever the render's own 2:1 aspect gives, NOT a second
+// measurement. An earlier version scaled height independently to 132 to chase
+// the strip's measured height, which stretched the dial art 13% taller than
+// wide. Since a key is drawn unstretched, every glyph inside the dial grew
+// while key glyphs did not, and the touchscreen ended up with visibly larger
+// text than the keys, which is backwards from the hardware. Scaling one axis
+// of a rendered face is a distortion the plugin never produces.
 const DIAL_W = Math.round(KEY * 470 / 290);   // 233
-const DIAL_H = Math.round(KEY * 266 / 290);   // 132
+const DIAL_H = Math.round(DIAL_W / 2);        // 117, the render's native 2:1
 const DIAL_ROW_Y = FACES_ROW_Y + CELL + 26;
 const DIAL_CELL = DIAL_W + 12;
 const SHEET_W = themes.length * CELL + 8;

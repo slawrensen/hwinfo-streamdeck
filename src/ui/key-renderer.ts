@@ -250,6 +250,15 @@ export interface ReadingKeyOptions {
 	palette: Palette;
 	/** Resolved textual fills; defaults to the palette's own text tokens. */
 	text?: TextColors;
+	/** Detail view's Back tile: a restrained return arrow, bottom-left. */
+	returnMark?: boolean;
+}
+
+/** The Back tile's return arrow: a small enter-key hook in the bottom-left
+ * lens-safe corner (x 15..33, y 119..131), drawn as a vector because glyph
+ * fallback for arrow characters is unproven on the deck's renderer. */
+export function returnMarkSvg(color: string): string {
+	return `<path d="M33 119 v5 a3 3 0 0 1 -3 3 h-9" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><polygon points="24,123 24,131 16,127" fill="${color}"/>`;
 }
 
 export function renderReadingKey(opts: ReadingKeyOptions): string {
@@ -288,6 +297,9 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		if (points.length > 0) {
 			parts.push(...sparklineSvg(points, SPARK.y + SPARK.h, SPARK_STROKE, 5, palette));
 		}
+	}
+	if (opts.returnMark === true) {
+		parts.push(returnMarkSvg(text.unit));
 	}
 	parts.push("</svg>");
 	return parts.join("");
@@ -716,6 +728,9 @@ export interface StatusKeyOptions {
 	accent: string;
 	/** 1–3 short lines below the icon. */
 	lines: readonly string[];
+	/** Detail view's Back tile riding a status screen: keep the return
+	 * arrow visible so the way out never disappears with the data. */
+	returnMark?: boolean;
 }
 
 export function renderStatusKey(opts: StatusKeyOptions): string {
@@ -735,6 +750,9 @@ export function renderStatusKey(opts: StatusKeyOptions): string {
 		parts.push(
 			`<text x="72" y="${y}" text-anchor="middle" font-family="${FONT}" font-size="${headline ? 19 : 13}" font-weight="600" fill="${headline ? "#d6d9de" : "#6b7280"}">${escapeXml(lines[i] as string)}</text>`
 		);
+	}
+	if (opts.returnMark === true) {
+		parts.push(returnMarkSvg("#6b7280"));
 	}
 	parts.push("</svg>");
 	return parts.join("");

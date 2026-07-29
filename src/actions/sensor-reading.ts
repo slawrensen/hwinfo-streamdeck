@@ -3,9 +3,13 @@
  * thresholds, stat modes and a sparkline. Pressing the key cycles the stat
  * mode (current → min → max → avg).
  */
-import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyDownEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { pressBehaviorOf } from "../detail/detail-settings";
+import { PressEngine } from "../detail/press-engine";
+import type { DetailNavigator } from "../detail/navigation";
+import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
@@ -78,6 +82,21 @@ export type ReadingSettings = {
 	/** Per-slot identity colors, four #RRGGBB entries. Salvaged per entry:
 	 * an invalid entry falls back to that slot's default alone. */
 	quadColors?: string[];
+	/**
+	 * What a key press does (issue #5): "cycle-stat" (the unchanged
+	 * default), "open-details" (switch this device to its bundled detail
+	 * profile), or "tap-cycle-hold-details" (short tap cycles, a held
+	 * press opens details). Absent or unrecognized values behave exactly
+	 * as cycle-stat, so rolled-back and hand-edited profiles never break.
+	 */
+	pressBehavior?: string;
+	/** What the detail view lists: "source" (every reading of this
+	 * sensor's HWiNFO source, the default) or "custom" (detailKeys). */
+	detailMode?: string;
+	/** Custom detail list: stable reading keys in display order. */
+	detailKeys?: string[];
+	/** Optional title for the detail view's title tile. */
+	detailTitle?: string;
 };
 
 type InstanceState = {
@@ -113,8 +132,12 @@ function quadColorsOf(settings: ReadingSettings): readonly [string, string, stri
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
 export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	private readonly instances = new Map<string, InstanceState>();
+	/** Tap-vs-hold sessions for the "tap cycles; hold opens" behavior. */
+	private readonly presses = new PressEngine((contextId, outcome) => {
+		void (outcome === "hold" ? this.openDetails(contextId) : this.cycleStat(contextId));
+	});
 
-	constructor() {
+	constructor(private readonly detailNavigator: DetailNavigator) {
 		super();
 		// Isolated so a rendering bug in one action class can't starve the other
 		// listeners on the shared "tick" event.
@@ -174,6 +197,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<ReadingSettings>): void {
+		// A key that vanishes mid-press (profile switch, page nav) must never
+		// fire a late hold or tap — the session dies with the visibility.
+		this.presses.cancel(ev.action.id);
 		if (this.instances.delete(ev.action.id)) {
 			// The ring stays tracked: history keeps collecting off-screen, so
 			// paging back after any absence shows a complete, current line.
@@ -201,17 +227,85 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		this.renderAll(poller.getStatus());
 	}
 
-	/** Key press cycles the displayed stat: current → min → max → avg. */
+	/**
+	 * Key press behavior (issue #5). The default "cycle-stat" keeps the
+	 * original semantics exactly: cycle current → min → max → avg on key
+	 * DOWN. "open-details" enters the detail view on key down instead, and
+	 * "tap-cycle-hold-details" arms the press engine (tap cycles on
+	 * release, a 500 ms hold opens details once). Malformed or future
+	 * pressBehavior values take the cycle-stat path.
+	 */
 	override async onKeyDown(ev: KeyDownEvent<ReadingSettings>): Promise<void> {
 		const state = this.instances.get(ev.action.id);
-		if (state === undefined || state.settings.readingKey === undefined) {
+		if (state === undefined) {
+			return;
+		}
+		const behavior = pressBehaviorOf(state.settings);
+		if (behavior === "open-details") {
+			await this.openDetails(ev.action.id);
+			return;
+		}
+		if (behavior === "tap-cycle-hold-details") {
+			this.presses.keyDown(ev.action.id);
+			return;
+		}
+		await this.cycleStat(ev.action.id);
+	}
+
+	override onKeyUp(ev: KeyUpEvent<ReadingSettings>): void {
+		// Resolves only an armed tap/hold session; a no-session keyUp (the
+		// other behaviors, or a press that outlived its key) is a no-op.
+		this.presses.keyUp(ev.action.id);
+	}
+
+	/** The original press action, verbatim: cycle the stat and persist it. */
+	private async cycleStat(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined || state.settings.readingKey === undefined) {
 			return;
 		}
 		const current = isStatMode(state.settings.statMode) ? state.settings.statMode : "current";
 		const next = STAT_MODES[(STAT_MODES.indexOf(current) + 1) % STAT_MODES.length] as StatMode;
 		state.settings = { ...state.settings, statMode: next };
-		await ev.action.setSettings(state.settings);
+		await act.setSettings(state.settings);
 		this.renderAll(poller.getStatus());
+	}
+
+	/**
+	 * Opens the detail view for this key's device. Every refusal keeps the
+	 * key exactly as it was (no stat cycle as a fallback) and shows the
+	 * Stream Deck alert cue; the log names the device type, never a sensor.
+	 */
+	private async openDetails(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined) {
+			return;
+		}
+		const deviceId = act.device.id;
+		const caps = deviceCapabilities.get(deviceId);
+		const status = poller.getStatus();
+		const result = await this.detailNavigator.enter({
+			deviceId,
+			deviceType: caps.type,
+			settings: state.settings,
+			snapshot: status.state === "unavailable" ? null : status.snapshot
+		});
+		if (result !== "entered") {
+			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);
+			await act.showAlert();
+		}
+	}
+
+	/** The visible action proxy for a context (press outcomes arrive by id). */
+	private actionById(contextId: string): KeyAction<ReadingSettings> | undefined {
+		for (const act of this.actions) {
+			if (act.id === contextId && act.isKey()) {
+				return act;
+			}
+		}
+		return undefined;
 	}
 
 	override onSendToPlugin(ev: SendToPluginEvent<JsonValue, ReadingSettings>): void {

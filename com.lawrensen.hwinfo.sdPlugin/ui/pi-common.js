@@ -310,6 +310,92 @@
 		updateRotationHelp();
 	}
 
+	// --- custom detail list (reading PI only) --------------------------------
+	// The ordered readings a drill-down key lists in "custom" mode, stored as
+	// stable reading keys in detailKeys. The collector picker adds (rows and
+	// whole sources), the chips row orders and removes; a missing reading
+	// keeps its place and is marked, never silently substituted. Writes
+	// happen only on explicit edits — the list is never rewritten on read.
+	const detailListEl = document.getElementById("detail-list");
+	const DETAIL_KEYS_MAX = 128; // mirrors the plugin parser's cap
+	let detailKeys = [];
+	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
+
+	function adoptDetailKeys(value) {
+		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "") : [];
+		renderDetailList();
+	}
+
+	function writeDetailKeys() {
+		detailBinding[1]([...detailKeys]);
+		renderDetailList();
+		detailPicker?.renderList(); // "added" row marks follow the edit
+	}
+
+	function addDetailKey(key) {
+		if (!key || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return;
+		detailKeys.push(key);
+		writeDetailKeys();
+	}
+
+	function addDetailSource(group) {
+		let added = 0;
+		for (const reading of group.readings) {
+			if (!detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
+				detailKeys.push(reading.key);
+				added++;
+			}
+		}
+		if (added > 0) writeDetailKeys();
+	}
+
+	function renderDetailList() {
+		if (detailListEl === null) return;
+		const frag = document.createDocumentFragment();
+		detailKeys.forEach((key, index) => {
+			const label = readingLabelOf(key);
+			const chip = document.createElement("span");
+			chip.className = "hw-set-chip hw-detail-chip" + (tree !== null && label === null ? " missing" : "");
+			chip.dataset.key = key;
+			const name = document.createElement("span");
+			name.className = "hw-set-name hw-detail-name";
+			name.textContent = label ?? key;
+			if (tree !== null && label === null) {
+				name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
+			}
+			const up = document.createElement("button");
+			up.type = "button";
+			up.className = "hw-detail-move";
+			up.dataset.move = "-1";
+			up.title = "Move up the list";
+			up.textContent = "↑";
+			up.disabled = index === 0;
+			const down = document.createElement("button");
+			down.type = "button";
+			down.className = "hw-detail-move";
+			down.dataset.move = "1";
+			down.title = "Move down the list";
+			down.textContent = "↓";
+			down.disabled = index === detailKeys.length - 1;
+			const remove = document.createElement("button");
+			remove.type = "button";
+			remove.className = "hw-set-remove";
+			remove.dataset.key = key;
+			remove.title = "Remove from the detail list";
+			remove.textContent = "×";
+			chip.append(name, up, down, remove);
+			frag.appendChild(chip);
+		});
+		frag.appendChild(
+			setNote(
+				detailKeys.length === 0
+					? "Empty: add readings above, in the order the detail view should list them."
+					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"}, listed in this order. This key's own sensor shows on the Back tile, not in the list.`
+			)
+		);
+		detailListEl.replaceChildren(frag);
+	}
+
 	// --- sensor pickers -------------------------------------------------------
 	// One factory, one instance per search box. The tree is shared; rotation
 	// ticks exist only on the dial PI's primary picker. Each picker owns its
@@ -329,23 +415,28 @@
 		let searchTyped = false;
 
 		// Immediate (non-debounced) persistence; third arg null disables debounce.
-		const [getKey, setKey] = useSettings(
-			config.setting,
-			(value) => {
-				selectedKey = typeof value === "string" ? value : "";
-				showSelection();
-				renderList();
-				config.onSelectionEcho?.(); // chip highlight follows the move
-				// Rotating the dial (or autocycle) moves the selection while the
-				// list is open: keep the highlighted row in view so the movement
-				// is visible. "nearest" only scrolls when it left the viewport,
-				// and a hand-typed filter is never yanked around.
-				if (listOpen && !searchTyped) {
-					listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "nearest" });
-				}
-			},
-			null
-		);
+		// A picker without a `setting` (the detail-list collector) binds nothing:
+		// its rows feed `onPick` instead of a persisted selection.
+		const [getKey, setKey] =
+			config.setting === undefined
+				? [() => Promise.resolve(""), () => {}]
+				: useSettings(
+						config.setting,
+						(value) => {
+							selectedKey = typeof value === "string" ? value : "";
+							showSelection();
+							renderList();
+							config.onSelectionEcho?.(); // chip highlight follows the move
+							// Rotating the dial (or autocycle) moves the selection while the
+							// list is open: keep the highlighted row in view so the movement
+							// is visible. "nearest" only scrolls when it left the viewport,
+							// and a hand-typed filter is never yanked around.
+							if (listOpen && !searchTyped) {
+								listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "nearest" });
+							}
+						},
+						null
+					);
 
 		function findSelected() {
 			if (tree === null || selectedKey === "") return null;
@@ -409,10 +500,21 @@
 						header = document.createElement("div");
 						header.className = "hw-group";
 						header.textContent = group.name;
+						if (config.onGroupAdd !== undefined) {
+							// "Add this whole source" in one press, straight from the
+							// same tree data the pickers already share.
+							const addAll = document.createElement("button");
+							addAll.type = "button";
+							addAll.className = "hw-group-add";
+							addAll.dataset.group = group.name;
+							addAll.title = "Add every reading of this source";
+							addAll.textContent = "+ all";
+							header.appendChild(addAll);
+						}
 						frag.appendChild(header);
 					}
 					const row = document.createElement("div");
-					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "");
+					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "") + (config.inList?.(reading.key) === true ? " added" : "");
 					row.dataset.key = reading.key;
 					if (config.withTicks) {
 						const tick = document.createElement("input");
@@ -466,6 +568,14 @@
 
 		function selectRow(row) {
 			if (!row || !row.dataset.key) return;
+			if (config.onPick !== undefined) {
+				// Collector mode: a row click ADDS the reading and keeps the
+				// list open, so building a custom detail list is one click per
+				// reading instead of reopen-search-click cycles.
+				config.onPick(row.dataset.key);
+				renderList();
+				return;
+			}
 			selectedKey = row.dataset.key;
 			setKey(selectedKey);
 			closeList();
@@ -512,6 +622,16 @@
 
 		// mousedown fires before the input's blur, keeping selection handling simple.
 		listEl.addEventListener("mousedown", (ev) => {
+			const groupAdd = ev.target.closest(".hw-group-add");
+			if (groupAdd !== null && config.onGroupAdd !== undefined) {
+				ev.preventDefault();
+				const group = (tree ?? []).find((g) => g.name === groupAdd.dataset.group);
+				if (group !== undefined) {
+					config.onGroupAdd(group);
+					renderList();
+				}
+				return;
+			}
 			const row = ev.target.closest(".hw-row");
 			if (!row) return;
 			// Membership ticks toggle natively on the CLICK that follows; fighting
@@ -587,6 +707,20 @@
 	const secondaryPicker = extraPicker(2, "secondaryReadingKey");
 	const quadPicker3 = extraPicker(3, "quadReadingKey3");
 	const quadPicker4 = extraPicker(4, "quadReadingKey4");
+
+	// The detail-list collector: no bound setting; rows and "+ all" group
+	// buttons feed the ordered detailKeys list instead.
+	const detailPicker =
+		detailListEl === null
+			? null
+			: createPicker({
+					search: document.getElementById("pickerd-search"),
+					refresh: document.getElementById("pickerd-refresh"),
+					list: document.getElementById("pickerd-list"),
+					onPick: addDetailKey,
+					onGroupAdd: addDetailSource,
+					inList: (key) => detailKeys.includes(key)
+				});
 
 	document.addEventListener("mousedown", (ev) => {
 		// composedPath, not target.closest: toggling a rotation tick re-renders
@@ -734,6 +868,35 @@
 			thirdLabelHint(quad);
 		};
 		followSetting("keyLayout", applyLayout);
+	}
+
+	// Press behavior (reading PI only): the detail rows exist only when a
+	// press opens details, the custom-list editor only in custom mode, and
+	// the Show help stays truthful about what a press actually does. All of
+	// this is visibility and text — no setting is ever written by a toggle.
+	const detailConfigEl = document.getElementById("detail-config");
+	if (detailConfigEl !== null) {
+		const detailCustomEl = document.getElementById("detail-custom");
+		const showHelpEl = document.getElementById("show-help");
+		const applyPress = (value) => {
+			const details = value === "open-details" || value === "tap-cycle-hold-details";
+			detailConfigEl.hidden = !details;
+			if (showHelpEl !== null) {
+				showHelpEl.textContent =
+					value === "open-details"
+						? "Pressing the key opens the sensor details view; Show picks the stat on this key's own face."
+						: value === "tap-cycle-hold-details"
+							? "A short tap cycles current → min → max → avg; holding half a second opens sensor details."
+							: "Pressing the key cycles current → min → max → avg.";
+			}
+		};
+		followSetting("pressBehavior", applyPress);
+		followSetting("detailMode", (value) => {
+			if (detailCustomEl !== null) detailCustomEl.hidden = value === "source" || value === "" || value === undefined;
+		});
+		// One-shot support note: the plugin answers from its managed-profile
+		// registry, so the panel owns no device table of its own.
+		streamDeckClient.send("sendToPlugin", { event: "getDetailSupport" });
 	}
 
 	// Display select (reading PI only): one control for the single layout's
@@ -976,6 +1139,17 @@
 			renderGallery();
 			return;
 		}
+		if (p.event === "detailSupport") {
+			const note = document.getElementById("detail-unsupported");
+			if (note !== null) {
+				note.hidden = p.supported === true;
+				note.textContent =
+					p.supported === true
+						? ""
+						: `Sensor details are not available on this deck (${p.model ?? "unsupported device"}): no bundled detail view fits its layout. Everything else on this key keeps working normally.`;
+			}
+			return;
+		}
 		if (p.event === "sensorTree") {
 			tree = p.groups;
 			treeFetchedOk = p.state === "ok";
@@ -983,6 +1157,7 @@
 			setHint(p.hint);
 			for (const picker of pickers) picker.onTree();
 			renderRotationSet(); // chip labels resolve once the tree is here
+			renderDetailList(); // detail chip labels too
 		} else if (p.event === "preview") {
 			renderPreview(p);
 			setHint(p.hint);
@@ -998,6 +1173,27 @@
 	if (secondaryPicker !== null) secondaryPicker.init();
 	if (quadPicker3 !== null) quadPicker3.init();
 	if (quadPicker4 !== null) quadPicker4.init();
+	if (detailBinding !== null) {
+		detailListEl.addEventListener("click", (ev) => {
+			const move = ev.target.closest(".hw-detail-move");
+			if (move !== null && !move.disabled) {
+				const key = move.closest(".hw-set-chip")?.dataset.key;
+				const from = detailKeys.indexOf(key);
+				const to = from + Number(move.dataset.move);
+				if (from >= 0 && to >= 0 && to < detailKeys.length) {
+					[detailKeys[from], detailKeys[to]] = [detailKeys[to], detailKeys[from]];
+					writeDetailKeys();
+				}
+				return;
+			}
+			const remove = ev.target.closest(".hw-set-remove");
+			if (remove !== null) {
+				detailKeys = detailKeys.filter((k) => k !== remove.dataset.key);
+				writeDetailKeys();
+			}
+		});
+		detailBinding[0]().then(adoptDetailKeys);
+	}
 	if (rotationBinding !== null) {
 		rotationSetEl.addEventListener("click", (ev) => {
 			// Chip rename: the name swaps to an inline input; commit on

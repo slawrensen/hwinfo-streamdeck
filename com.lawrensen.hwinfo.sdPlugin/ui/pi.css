@@ -595,3 +595,57 @@ details .hw-section {
 .hw-theme.selected .hw-theme-name {
 	color: #d8d8d8;
 }
+
+/* Detail list (reading PI): the collector picker marks rows already in the
+   list, group headers grow an add-all button, and the ordered chips carry
+   move arrows (no rename here: labels come from HWiNFO). */
+
+.hw-row.added .hw-label::after {
+	content: " ✓";
+	color: #38cd89;
+}
+
+.hw-group-add {
+	float: right;
+	background: none;
+	border: 1px solid #4a4a4a;
+	border-radius: 3px;
+	color: #8ecbff;
+	cursor: pointer;
+	font-size: 7.5pt;
+	line-height: 1.2;
+	padding: 0 5px;
+	margin-left: 8px;
+}
+
+.hw-group-add:hover {
+	background: #2660aa;
+	color: #ffffff;
+}
+
+.hw-detail-name {
+	cursor: default;
+}
+
+.hw-detail-name:hover {
+	text-decoration: none;
+}
+
+.hw-detail-move {
+	background: none;
+	border: none;
+	color: #969696;
+	cursor: pointer;
+	font-size: 8pt;
+	line-height: 1;
+	padding: 0 2px;
+}
+
+.hw-detail-move:hover:not(:disabled) {
+	color: #ffffff;
+}
+
+.hw-detail-move:disabled {
+	color: #4a4a4a;
+	cursor: default;
+}

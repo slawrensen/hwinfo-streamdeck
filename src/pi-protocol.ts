@@ -5,6 +5,8 @@
 import streamDeck from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { detailProfileFor, readingSlotCapacity } from "./detail/managed-profiles";
+import { deviceCapabilities } from "./devices";
 import { buildSupportReport } from "./diagnostics";
 import { poller, type PollerStatus } from "./poller";
 import { alertLevel, convertUnit, parseThreshold, type DecimalsSetting } from "./ui/format";
@@ -99,6 +101,23 @@ type PreviewPayload = {
  */
 export function buildThemesPayload(): JsonValue {
 	return JSON.parse(JSON.stringify({ event: "themes", effectiveDeckTheme: getDeckTheme(), ...loadThemes() })) as JsonValue;
+}
+
+/**
+ * Whether the OPEN action's device has a bundled detail profile. Answered
+ * from the managed-profile registry so the PI never carries its own device
+ * table; `model` is the human name for the honest unsupported note.
+ */
+export function buildDetailSupportPayload(): JsonValue {
+	const deviceId = streamDeck.ui.action?.device.id;
+	const caps = deviceId === undefined ? undefined : deviceCapabilities.get(deviceId);
+	const profile = detailProfileFor(caps?.type);
+	return {
+		event: "detailSupport",
+		supported: profile !== undefined,
+		model: caps?.model ?? "unknown device",
+		readingSlots: profile === undefined ? 0 : readingSlotCapacity(profile)
+	};
 }
 
 /** The redacted support report, for the PI's "Copy support report" button. */
@@ -215,6 +234,8 @@ export function handlePiRequest(payload: JsonValue): void {
 		void streamDeck.ui.sendToPropertyInspector(buildThemesPayload());
 	} else if (payload.event === "getSupportReport") {
 		void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload());
+	} else if (payload.event === "getDetailSupport") {
+		void streamDeck.ui.sendToPropertyInspector(buildDetailSupportPayload());
 	}
 }
 

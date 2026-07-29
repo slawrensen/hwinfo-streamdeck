@@ -58,6 +58,24 @@
 			]
 		},
 		{
+			"Name": "Sensor Detail Slot",
+			"UUID": "com.lawrensen.hwinfo.detail-slot",
+			"Icon": "imgs/actions/reading/icon",
+			"Tooltip": "Internal tile of the plugin-managed sensor detail view. Not placeable by hand: it appears only inside the bundled detail profiles.",
+			"VisibleInActionsList": false,
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/reading/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
 			"Name": "Sensor Dial",
 			"UUID": "com.lawrensen.hwinfo.dial",
 			"Icon": "imgs/actions/dial/icon",
@@ -82,6 +100,50 @@
 					"Image": "imgs/actions/dial/dial"
 				}
 			]
+		}
+	],
+	"Profiles": [
+		{
+			"Name": "profiles/detail-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
 		}
 	]
 }

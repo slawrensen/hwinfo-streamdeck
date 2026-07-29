@@ -39,6 +39,7 @@ That's the whole loop: drag, pick, done. The key now updates roughly once a seco
 Everything below is optional; the defaults already give you a clean live reading.
 
 - **[Sensor Reading (keys)](sensor-reading.md)**. Every key setting: custom **Label**, **Show** (current / min / max / average), **Decimals**, **Unit** (°F for temperatures), **Layout** (one reading, two stacked, three rows, or a quad grid of four), **Display** (sparkline, bar or ring), and press-to-cycle stat modes.
+- **[Sensor details (drill-down)](sensor-details.md)**. A key press can instead open a full page of related readings, with the pressed key staying live as the Back tile. One bundled view per deck type, installed on first use.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**. The dial/touchscreen action for the Stream Deck + and + XL: rotate-to-switch, rotation sets, auto cycle, push-to-reset, and a session range bar.
 - **[Dial controls & presets](controls.md)**. The Legacy, Elite and Custom gesture presets, touch zones, pause/pin, reset reach, and the **HWiNFO Control** key action that drives dials from any key or pedal.
 - **[Themes](themes.md)**. The seven presets (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), per-key vs. deck-wide, and type accents.

@@ -315,7 +315,7 @@
 	// stable reading keys in detailKeys. The collector picker adds (rows and
 	// whole sources), the chips row orders and removes; a missing reading
 	// keeps its place and is marked, never silently substituted. Writes
-	// happen only on explicit edits — the list is never rewritten on read.
+	// happen only on explicit edits: the list is never rewritten on read.
 	const detailListEl = document.getElementById("detail-list");
 	const DETAIL_KEYS_MAX = 128; // mirrors the plugin parser's cap
 	let detailKeys = [];
@@ -873,7 +873,7 @@
 	// Press behavior (reading PI only): the detail rows exist only when a
 	// press opens details, the custom-list editor only in custom mode, and
 	// the Show help stays truthful about what a press actually does. All of
-	// this is visibility and text — no setting is ever written by a toggle.
+	// this is visibility and text: no setting is ever written by a toggle.
 	const detailConfigEl = document.getElementById("detail-config");
 	if (detailConfigEl !== null) {
 		const detailCustomEl = document.getElementById("detail-custom");

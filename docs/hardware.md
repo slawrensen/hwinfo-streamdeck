@@ -25,6 +25,10 @@ What this plugin has actually been proven on, and how. I distinguish four levels
 
 Stream Deck software floor is **6.9**. Features from newer apps are detected at runtime and degrade: dynamic gesture hints use a 6.4-era API, `deviceDidChange` (7.0) falls back to connect-time device info, Key Logic (7.0) simply appears when the app supports it. Basic monitoring depends on none of them.
 
+## Sensor details (drill-down) support
+
+The [sensor detail view](sensor-details.md) ships one bundled profile per deck type: Mini (3x2), 15-key (5x3, every revision), Neo (4x2), + (4x2 keys), XL (8x4) and + XL (9x4 keys). All six are generated from one layout table and structurally locked by `test/detail-profiles.test.ts`; the full switch-in, render and switch-back cycle is hardware-verified on my + XL (2026-07-28: entry switched the physical deck to the bundled view, all 36 tiles registered and rendered, and Back restored the exact previous profile). The other five classes are verified at the archive and mock-app level; a [hardware report](#hardware-test-procedure) from a Mini, 15-key, Neo, + or XL is welcome. Decks without a bundled profile (Mobile, Virtual, Studio, Galleon, pedals, G-keys) refuse entry honestly with the Stream Deck alert cue and keep the ordinary key behavior.
+
 ![Six dial faces rendered by the plugin at the Stream Deck + XL's six-encoder strip geometry (one 200 by 100 segment per encoder): CPU temperature, GPU temperature, a pinned CPU fan, CPU power, CPU load, and a GPU hot spot at a forced critical value with a red bar, with drawn knob markers beneath.]({{ '/assets/img/plusxl-dials.png' | relative_url }})
 
 And the same claim as a photograph, not a render: my Stream Deck + XL running the validation page, 36 keys and six dial readouts live from HWiNFO (Sony A7 III, 85mm at f/2.5, developed once in Camera Raw; no compositing).

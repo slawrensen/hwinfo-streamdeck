@@ -62,6 +62,7 @@
 			"UUID": "com.lawrensen.hwinfo.detail-slot",
 			"Icon": "imgs/actions/reading/icon",
 			"Tooltip": "Internal tile of the plugin-managed sensor detail view. Not placeable by hand: it appears only inside the bundled detail profiles.",
+			"PropertyInspectorPath": "ui/detail-slot.html",
 			"VisibleInActionsList": false,
 			"UserTitleEnabled": false,
 			"SupportedInMultiActions": false,

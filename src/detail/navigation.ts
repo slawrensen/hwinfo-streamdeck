@@ -64,14 +64,25 @@ type NavigatorDeps = {
 	disappearGraceMs?: number;
 	setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
 	clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
+	/** Clock for the leave debounce; tests inject a manual one. */
+	now?: () => number;
 };
 
 const PENDING_EXPIRY_MS = 30_000;
 const DISAPPEAR_GRACE_MS = 2_500;
 
+/** Repeat Back presses inside this window are one hop, not two: the app
+ * takes a beat to actually switch, and a double-tap during it would hop
+ * "previous" twice (the second hop from the detail profile itself). */
+const LEAVE_DEBOUNCE_MS = 1_500;
+
 export class DetailNavigator {
 	private readonly states = new Map<string, DeviceDetailState>();
 	private readonly cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Devices with a switchToProfile entry call still in flight. */
+	private readonly entering = new Set<string>();
+	/** Last leave per device, for the double-press debounce. */
+	private readonly leftAt = new Map<string, number>();
 	private readonly deps: Required<Pick<NavigatorDeps, "switchProfile" | "pendingExpiryMs" | "disappearGraceMs" | "setTimer" | "clearTimer">> & NavigatorDeps;
 
 	constructor(deps: NavigatorDeps) {
@@ -130,6 +141,13 @@ export class DetailNavigator {
 			this.deps.log?.warn(`Detail entry refused: already active on ${deviceId}`);
 			return "already-active";
 		}
+		if (this.entering.has(deviceId)) {
+			// A switch call for this device is still in flight; stacking a
+			// second would race its rollback. (A settled-but-declined install
+			// leaves a pending state instead, which stays retryable.)
+			this.deps.log?.warn(`Detail entry refused: switch in flight on ${deviceId}`);
+			return "already-active";
+		}
 		const group = resolveDetailGroup(snapshot, settings);
 		if (group === null) {
 			return "unresolved";
@@ -165,12 +183,19 @@ export class DetailNavigator {
 			pending: true
 		};
 		this.states.set(deviceId, state);
+		this.entering.add(deviceId);
 		try {
 			await this.deps.switchProfile(deviceId, profile.name);
 		} catch (err) {
-			this.states.delete(deviceId);
+			// Roll back only OUR session: a late rejection must never delete
+			// a newer session that replaced this one meanwhile.
+			if (this.states.get(deviceId) === state) {
+				this.states.delete(deviceId);
+			}
 			this.deps.log?.warn(`Detail profile switch failed on ${deviceId}: ${String(err)}`);
 			return "switch-failed";
+		} finally {
+			this.entering.delete(deviceId);
 		}
 		this.armCleanupTimer(deviceId, this.deps.pendingExpiryMs, "entry never confirmed");
 		this.deps.onChanged?.(deviceId);
@@ -180,9 +205,17 @@ export class DetailNavigator {
 	/**
 	 * Back: drop this device's session and ask the app to restore the
 	 * previous profile (name omitted). Works with no state too, so a
-	 * plugin restarted inside the detail profile still gets out.
+	 * plugin restarted inside the detail profile still gets out. Repeat
+	 * presses inside the debounce window collapse into the one hop the
+	 * user meant; a later stateless Back (past the window) still works.
 	 */
 	async leave(deviceId: string): Promise<void> {
+		const now = (this.deps.now ?? Date.now)();
+		const last = this.leftAt.get(deviceId);
+		if (last !== undefined && now - last < LEAVE_DEBOUNCE_MS) {
+			return;
+		}
+		this.leftAt.set(deviceId, now);
 		this.clearCleanupTimer(deviceId);
 		const had = this.states.delete(deviceId);
 		if (had) {

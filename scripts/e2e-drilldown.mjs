@@ -224,6 +224,20 @@ async function scenario(send) {
 	await sleep(4200);
 	results.backFrozen = latestSvg(backCtx);
 	results.slotFrozen = latestSvg(slot0Ctx);
+	// A replayed willAppear (reconnect/wake) while nothing changes on the
+	// face: the fresh handle must still get a frame (its cache is cold).
+	const slot0Cell = cellOfIndex(standardCells, 0);
+	const framesBeforeReplay = images.filter((i) => i.context === slot0Ctx).length;
+	const [rc, rr] = slot0Cell.coord.split(",").map(Number);
+	send({
+		event: "willAppear",
+		action: slot0Cell.uuid,
+		context: slot0Ctx,
+		device: "dev1",
+		payload: { settings: slot0Cell.settings, coordinates: { column: rc, row: rr }, controller: "Keypad", isInMultiAction: false }
+	});
+	await sleep(900);
+	results.replayRepaint = images.filter((i) => i.context === slot0Ctx).length > framesBeforeReplay;
 	fake.stdin.write("alive\n");
 	await sleep(3200);
 	results.backRecovered = latestSvg(backCtx);
@@ -237,9 +251,10 @@ async function scenario(send) {
 	await sleep(400);
 
 	// G. A stateless surface (the plugin-restart shape): honest idle tiles,
-	// Back still gets you out.
+	// Back still gets you out. The pause clears Back's double-press
+	// debounce from leg F, as a real restart-later press would.
 	installDetailSurface(send, "dev1", standardCells);
-	await sleep(900);
+	await sleep(1700);
 	results.idleSlotFace = latestSvg(slot0Ctx);
 	results.idleBackFace = latestSvg(backCtx);
 	const switchesBeforeIdleBack = switches.length;
@@ -332,6 +347,7 @@ async function finish() {
 	check("layout growth re-resolves the source (range 1-2 / 2)", typeof results.titleAfterGrow === "string" && results.titleAfterGrow.includes(">1-2 / 2<"), (results.titleAfterGrow ?? "no frame").slice(0, 160));
 	check("the grown reading fills slot 1", typeof results.slot1AfterGrow === "string" && results.slot1AfterGrow.includes("<text"), (results.slot1AfterGrow ?? "no frame").slice(0, 100));
 	check("freeze degrades slots to the stale screen", typeof results.slotFrozen === "string" && results.slotFrozen.includes("Not updating"), (results.slotFrozen ?? "no frame").slice(0, 120));
+	check("a replayed willAppear repaints the slot despite unchanged bytes", results.replayRepaint === true);
 	check("Back keeps its return mark through the freeze", typeof results.backFrozen === "string" && results.backFrozen.includes("Not updating") && results.backFrozen.includes("M33 119"), (results.backFrozen ?? "no frame").slice(0, 140));
 	check("recovery restores the live Back tile", typeof results.backRecovered === "string" && !results.backRecovered.includes("Not updating") && results.backRecovered.includes("M33 119"), (results.backRecovered ?? "no frame").slice(0, 120));
 	check("Back emitted a previous-profile restore (no profile name)", results.backSwitch !== undefined && results.backSwitch.device === "dev1" && results.backSwitch.profile === undefined, JSON.stringify(results.backSwitch));

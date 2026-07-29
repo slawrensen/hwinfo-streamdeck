@@ -59,6 +59,10 @@ export class DetailController {
 		} else {
 			existing.binding = binding;
 			existing.handle = handle;
+			// A replayed appear (reconnect, wake) may come with the app's own
+			// image cache cold: forget ours so the fresh handle gets a frame
+			// even when the face bytes have not changed.
+			existing.lastSvg = "";
 		}
 		this.renderDevice(deviceId);
 	}
@@ -127,7 +131,17 @@ export class DetailController {
 	renderDevice(deviceId: string, status: PollerStatus = this.deps.getStatus()): void {
 		const state = this.navigator.stateFor(deviceId);
 		const page = state === undefined ? null : this.navigator.pageFor(state);
-		const ctx = state === undefined ? null : this.contextFor(state);
+		let ctx: DetailFaceContext | null = null;
+		if (state !== undefined) {
+			try {
+				ctx = this.contextFor(state);
+			} catch (err) {
+				// A theme-config failure degrades this pass to idle faces
+				// instead of aborting the whole device (and, via onChanged,
+				// a caller like enter()).
+				this.deps.log?.warn(`detail presentation context failed: ${String(err)}`);
+			}
+		}
 		for (const slot of this.slots.values()) {
 			if (slot.deviceId !== deviceId) {
 				continue;

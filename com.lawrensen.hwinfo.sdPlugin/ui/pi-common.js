@@ -322,7 +322,11 @@
 	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
 
 	function adoptDetailKeys(value) {
-		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "") : [];
+		// Mirror the plugin parser: duplicates drop at their first occurrence
+		// (hand-edited settings could hold them, and indexOf-based move and
+		// remove need one chip per key).
+		const seen = new Set();
+		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)) : [];
 		renderDetailList();
 	}
 
@@ -892,7 +896,10 @@
 		};
 		followSetting("pressBehavior", applyPress);
 		followSetting("detailMode", (value) => {
-			if (detailCustomEl !== null) detailCustomEl.hidden = value === "source" || value === "" || value === undefined;
+			// The exact inverse of the plugin's parser: ONLY "custom" is
+			// custom, so a junk or future value never shows an editor whose
+			// list the runtime would ignore.
+			if (detailCustomEl !== null) detailCustomEl.hidden = value !== "custom";
 		});
 		// One-shot support note: the plugin answers from its managed-profile
 		// registry, so the panel owns no device table of its own.

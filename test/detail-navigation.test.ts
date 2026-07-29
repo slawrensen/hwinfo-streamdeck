@@ -32,20 +32,29 @@ const snapshot = snapshotOf(
 
 type Switch = { deviceId: string; profileName?: string; page?: number };
 
-function bed(overrides?: { failSwitch?: boolean }): {
+function bed(overrides?: { failSwitch?: boolean; deferSwitch?: boolean }): {
 	nav: DetailNavigator;
 	switches: Switch[];
 	changed: string[];
 	fireTimers: () => void;
 	pendingTimers: () => number;
+	advance: (ms: number) => void;
+	settleSwitch: (fail?: boolean) => void;
 } {
 	const switches: Switch[] = [];
 	const changed: string[] = [];
 	let next = 1;
+	let clock = 1_000_000;
 	const timers = new Map<number, () => void>();
+	let pendingSettle: { resolve: () => void; reject: (err: Error) => void } | null = null;
 	const nav = new DetailNavigator({
 		switchProfile: (deviceId, profileName, page) => {
 			switches.push({ deviceId, profileName, page });
+			if (overrides?.deferSwitch === true) {
+				return new Promise<void>((resolve, reject) => {
+					pendingSettle = { resolve, reject };
+				});
+			}
 			return overrides?.failSwitch === true ? Promise.reject(new Error("app said no")) : Promise.resolve();
 		},
 		onChanged: (deviceId) => changed.push(deviceId),
@@ -56,7 +65,8 @@ function bed(overrides?: { failSwitch?: boolean }): {
 		},
 		clearTimer: (h) => {
 			timers.delete(h as unknown as number);
-		}
+		},
+		now: () => clock
 	});
 	return {
 		nav,
@@ -68,7 +78,21 @@ function bed(overrides?: { failSwitch?: boolean }): {
 				fn();
 			}
 		},
-		pendingTimers: (): number => timers.size
+		pendingTimers: (): number => timers.size,
+		advance: (ms: number): void => {
+			clock += ms;
+		},
+		settleSwitch: (fail = false): void => {
+			if (pendingSettle !== null) {
+				const settle = pendingSettle;
+				pendingSettle = null;
+				if (fail) {
+					settle.reject(new Error("late no"));
+				} else {
+					settle.resolve();
+				}
+			}
+		}
 	};
 }
 
@@ -115,6 +139,22 @@ describe("entry", () => {
 		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "already-active");
 	});
 
+	it("a second press while the switch is in flight is refused, and a late rejection rolls back only its own session", async () => {
+		const { nav, switches, settleSwitch } = bed({ deferSwitch: true });
+		const first = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		const second = await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		assert.equal(second, "already-active");
+		assert.equal(switches.length, 1); // no stacked switch call
+		settleSwitch(true); // the app rejects the first call late
+		assert.equal(await first, "switch-failed");
+		assert.equal(nav.stateFor("dev1"), undefined);
+		// A retry after the failure works normally.
+		const retry = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		settleSwitch(false);
+		assert.equal(await retry, "entered");
+		assert.notEqual(nav.stateFor("dev1"), undefined);
+	});
+
 	it("an unconfirmed entry (declined install) expires quietly", async () => {
 		const { nav, fireTimers } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
@@ -150,6 +190,18 @@ describe("leaving", () => {
 		const { nav, switches } = bed();
 		await nav.leave("dev1");
 		assert.deepEqual(switches, [{ deviceId: "dev1", profileName: undefined, page: undefined }]);
+	});
+
+	it("a rapid double Back is one hop; a later stateless Back still works", async () => {
+		const { nav, switches, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		await nav.leave("dev1");
+		await nav.leave("dev1"); // double-tap or contact bounce
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 1);
+		advance(2_000); // past the debounce: a genuine second Back (stateless) hops
+		await nav.leave("dev1");
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 2);
 	});
 
 	it("stat modes die with the session", async () => {

@@ -14,6 +14,37 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.4.90.0 - 2026-07-29
+
+- A sensor key can act like a folder. The Sensor Reading key's new
+  Press setting can open a drill-down detail view: the deck switches
+  to a bundled one-page profile listing every reading of that sensor's
+  HWiNFO source (or a custom ordered list you build in the panel),
+  with the pressed key staying live as the Back tile, top left, where
+  the native folder back key sits. Previous and Next page through long
+  sources, a title tile shows the source and visible range, and
+  pressing a listed reading cycles its current / min / max / avg for
+  that visit. Back returns to the profile you came from. (Requested by
+  @FattSlice in issue #5.)
+- Three press behaviors, default unchanged: cycle stats exactly as
+  before, open details on press, or tap-to-cycle with a half-second
+  hold opening details. Keys that never touch the Press section
+  behave byte-for-byte as they did in 1.4.
+- Six read-only detail profiles ship, one per deck type: Mini (3x2),
+  15-key (5x3), Neo (4x2), + (4x2 keys), XL (8x4) and + XL (9x4
+  keys). The Stream Deck app asks to install the matching one the
+  first time details open on a deck; unsupported decks (Mobile,
+  Virtual, Studio, Galleon, pedals, G-keys) refuse the press honestly
+  with the alert cue and keep the ordinary key behavior. The profiles
+  are generated deterministically from one layout table and carry no
+  user or sensor data.
+- The detail view rides the existing single shared poller and dedupes
+  identical frames; the dense + XL page (32 live tiles) at the 250 ms
+  poll option is measured in PERF.md. HWiNFO stopping mid-view
+  degrades the tiles to the ordinary status screens with Back still
+  working, and recovery is automatic; a plugin restart inside the view
+  renders honest "No detail selected" tiles instead of stale data.
+
 ## 1.4.0.0 - 2026-07-25
 
 - Three readings on one key. The key Layout setting gains "Three

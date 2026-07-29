@@ -44,7 +44,7 @@ If HWiNFO stops publishing while the view is open, the tiles show the same statu
 The Back tile is an ordinary Sensor Reading key with one fixed job. Select it in the Stream Deck app and its settings panel opens with everything a normal key has: the sensor picker, label, Show stat, decimals, units, theme, custom text, warn and critical thresholds, the Display strip, and the single, dual, triple and quad layouts. Two things differ, both stated in the panel:
 
 - Pressing it always returns to the previous profile. There is no Press section on this tile, and the return arrow stays visible on every layout (it sits in a small gap on the divider in the dual, triple and quad layouts).
-- Until you pick a sensor, the tile shows the sensor you drilled down from, so an unconfigured page works out of the box. Once you pick one, the tile shows your pick, and a missing pick shows **Sensor missing** like any key would.
+- Until you pick a sensor, the tile shows the sensor you drilled down from, so a fresh page needs no setup. Once you pick one, the tile shows your pick, and a missing pick shows **Sensor missing** like any key would.
 
 Copying the Back tile elsewhere copies the fixed role with it: a pasted copy still returns to the previous profile when pressed. For an ordinary key, add a fresh Sensor Reading from the actions list instead.
 

@@ -317,6 +317,16 @@ async function scenario(send) {
 	await sleep(400);
 	removeDetailSurface(send, "devxl", xlCells);
 
+	// K. Virtual Stream Deck (type 11, 10x10): a guest of the XL bundle.
+	const vsdOpener = { readingKey: primary.key, pressBehavior: "open-details" };
+	appearOpener(send, "ctx-vsd", "devvsd", vsdOpener, { column: 0, row: 0 });
+	await sleep(300);
+	await keyPress(send, "ctx-vsd", "devvsd", vsdOpener);
+	await sleep(500);
+	results.vsdSwitch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-vsd", device: "devvsd", payload: { settings: vsdOpener, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
+	await sleep(200);
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -362,6 +372,7 @@ async function finish() {
 	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-plus-xl", JSON.stringify(results.xlSwitch));
 	check("the + XL title tile rendered", typeof results.xlTitle === "string" && results.xlTitle.includes("<text"));
 	check("paging devxl repainted no dev1 slot", results.dev1FramesDuringXl === 0, `${results.dev1FramesDuringXl} frames`);
+	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-xl", JSON.stringify(results.vsdSwitch));
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -403,7 +414,8 @@ const info = {
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
-		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 }
+		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
+		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }
 	],
 	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
 };

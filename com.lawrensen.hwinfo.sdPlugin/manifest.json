@@ -145,6 +145,34 @@
 			"AutoInstall": false,
 			"DontAutoSwitchWhenInstalled": false,
 			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
 		}
 	]
 }

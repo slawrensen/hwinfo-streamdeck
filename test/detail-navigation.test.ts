@@ -117,6 +117,21 @@ describe("entry", () => {
 		assert.equal(switches.length, 0);
 	});
 
+	it("a Virtual Stream Deck enters as a guest of the bundle its grid fits", async () => {
+		const { nav, switches } = bed();
+		const result = await nav.enter({ deviceId: "vsd", deviceType: 11, grid: { columns: 10, rows: 10 }, settings: opener, snapshot });
+		assert.equal(result, "entered");
+		assert.equal(switches[0]?.profileName, "profiles/detail-xl");
+		assert.equal(nav.stateFor("vsd")?.pageSize, 28);
+	});
+
+	it("a too-small virtual deck refuses honestly", async () => {
+		const { nav, switches } = bed();
+		assert.equal(await nav.enter({ deviceId: "vsd2", deviceType: 11, grid: { columns: 2, rows: 2 }, settings: opener, snapshot }), "unsupported");
+		assert.equal(await nav.enter({ deviceId: "vsd3", deviceType: 11, settings: opener, snapshot }), "unsupported");
+		assert.equal(switches.length, 0);
+	});
+
 	it("source mode with no snapshot or a missing primary refuses honestly", async () => {
 		const { nav, switches } = bed();
 		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot: null }), "unresolved");

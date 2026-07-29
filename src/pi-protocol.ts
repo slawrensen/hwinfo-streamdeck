@@ -111,7 +111,7 @@ export function buildThemesPayload(): JsonValue {
 export function buildDetailSupportPayload(): JsonValue {
 	const deviceId = streamDeck.ui.action?.device.id;
 	const caps = deviceId === undefined ? undefined : deviceCapabilities.get(deviceId);
-	const profile = detailProfileFor(caps?.type);
+	const profile = detailProfileFor(caps?.type, caps === undefined ? undefined : { columns: caps.columns, rows: caps.rows });
 	return {
 		event: "detailSupport",
 		supported: profile !== undefined,

@@ -127,9 +127,9 @@ export class DetailNavigator {
 	 * stays `pending` until a detail slot appears and quietly expires when
 	 * none ever does.
 	 */
-	async enter(request: { deviceId: string; deviceType: number | undefined; settings: DetailGroupSettings & DetailPresentation; snapshot: SensorSnapshot | null }): Promise<EnterResult> {
-		const { deviceId, deviceType, settings, snapshot } = request;
-		const profile = detailProfileFor(deviceType);
+	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation; snapshot: SensorSnapshot | null }): Promise<EnterResult> {
+		const { deviceId, deviceType, grid, settings, snapshot } = request;
+		const profile = detailProfileFor(deviceType, grid);
 		if (profile === undefined) {
 			this.deps.log?.info(`Detail entry refused: no bundled profile for device type ${deviceType ?? "unknown"}`);
 			return "unsupported";

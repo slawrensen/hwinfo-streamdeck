@@ -32,12 +32,14 @@ Elgato Marketplace listing is a separate track.
   behave byte-for-byte as they did in 1.4.
 - Six read-only detail profiles ship, one per deck type: Mini (3x2),
   15-key (5x3), Neo (4x2), + (4x2 keys), XL (8x4) and + XL (9x4
-  keys). The Stream Deck app asks to install the matching one the
-  first time details open on a deck; unsupported decks (Mobile,
-  Virtual, Studio, Galleon, pedals, G-keys) refuse the press honestly
-  with the alert cue and keep the ordinary key behavior. The profiles
-  are generated deterministically from one layout table and carry no
-  user or sensor data.
+  keys). The Virtual Stream Deck borrows whichever keypad layout fits
+  its user-sized grid (a 10x10 virtual deck runs the XL layout, a 3x2
+  one the Mini layout). The Stream Deck app asks to install the
+  matching profile the first time details open on a deck; unsupported
+  decks (Mobile, Studio, Galleon, pedals, G-keys, virtual decks under
+  3x2) refuse the press honestly with the alert cue and keep the
+  ordinary key behavior. The profiles are generated deterministically
+  from one layout table and carry no user or sensor data.
 - The detail view rides the existing single shared poller and dedupes
   identical frames; the dense + XL page (32 live tiles) at the 250 ms
   poll option is measured in PERF.md. HWiNFO stopping mid-view

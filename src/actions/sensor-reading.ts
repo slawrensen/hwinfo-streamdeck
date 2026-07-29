@@ -289,6 +289,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		const result = await this.detailNavigator.enter({
 			deviceId,
 			deviceType: caps.type,
+			// Variable-canvas guests (the Virtual Stream Deck) resolve their
+			// bundle by reported grid; fixed classes ignore it.
+			grid: { columns: caps.columns, rows: caps.rows },
 			settings: state.settings,
 			snapshot: status.state === "unavailable" ? null : status.snapshot
 		});

@@ -50,8 +50,11 @@ One bundled profile per deck type. The layouts are generated from one table and 
 | Stream Deck + | 4x2 keys | 4 (dials stay inert in the view) |
 | Stream Deck XL | 8x4 | 28 |
 | Stream Deck + XL | 9x4 keys | 32 |
+| Virtual Stream Deck | your size | by fit (see below) |
 
-Mobile and Virtual Stream Decks (variable canvas), the Studio, the Galleon 100 SD, pedals and G-keys have no bundled detail profile. On those, the key itself keeps working normally; a press configured to open details shows the Stream Deck alert cue instead of switching, and the settings panel says so plainly.
+The Virtual Stream Deck's canvas is whatever size you gave it, so it borrows a layout instead of owning one: entry picks the richest keypad layout that fits its grid. A 10x10 virtual deck runs the XL layout (28 tiles per page), a 5x3 one the 15-key layout, down to the Mini layout at 3x2. Below 3x2 there is no room for Back plus the pagers, and entry refuses with the alert cue.
+
+Mobile (variable canvas, no verified install flow), the Studio, the Galleon 100 SD, pedals and G-keys have no bundled detail profile. On those, the key itself keeps working normally; a press configured to open details shows the Stream Deck alert cue instead of switching, and the settings panel says so plainly.
 
 ## Privacy
 

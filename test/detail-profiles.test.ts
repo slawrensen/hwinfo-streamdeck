@@ -90,22 +90,56 @@ describe("managed profile registry", () => {
 			assert.equal(detailProfileFor(unsupported), undefined, String(unsupported));
 		}
 	});
+
+	it("the Virtual Stream Deck resolves by fit: richest keypad-only bundle its grid holds", () => {
+		assert.equal(detailProfileFor(11, { columns: 10, rows: 10 })?.key, "xl");
+		assert.equal(detailProfileFor(11, { columns: 8, rows: 4 })?.key, "xl");
+		assert.equal(detailProfileFor(11, { columns: 5, rows: 3 })?.key, "standard");
+		assert.equal(detailProfileFor(11, { columns: 4, rows: 2 })?.key, "neo");
+		assert.equal(detailProfileFor(11, { columns: 3, rows: 2 })?.key, "mini");
+		assert.equal(detailProfileFor(11, { columns: 2, rows: 2 }), undefined);
+		assert.equal(detailProfileFor(11), undefined); // no grid: never guess
+		assert.equal(detailProfileFor(11, { columns: 0, rows: 0 }), undefined);
+		// A fixed class ignores the grid entirely (an XL stays an XL).
+		assert.equal(detailProfileFor(2, { columns: 3, rows: 2 })?.key, "xl");
+		// Guest fitting never hands a dial-bearing bundle to a virtual deck.
+		assert.equal(detailProfileFor(11, { columns: 9, rows: 4 })?.key, "xl");
+	});
 });
 
 describe("manifest agreement", () => {
-	it("registers each bundle exactly once with the intended install flags", () => {
+	it("registers each bundle for its owner and its guests, nothing else, with the intended install flags", () => {
 		const entries = manifest.Profiles ?? [];
-		assert.equal(entries.length, DETAIL_PROFILES.length);
+		const expected: Array<{ name: string; deviceType: number }> = [];
 		for (const profile of DETAIL_PROFILES) {
-			const entry = entries.find((e) => e.Name === profile.name);
-			assert.notEqual(entry, undefined, profile.name);
-			assert.equal(entry?.DeviceType, profile.deviceType, profile.name);
+			expected.push({ name: profile.name, deviceType: profile.deviceType });
+			for (const guest of profile.guestDeviceTypes) {
+				expected.push({ name: profile.name, deviceType: guest });
+			}
+		}
+		assert.equal(entries.length, expected.length);
+		for (const want of expected) {
+			const entry = entries.find((e) => e.Name === want.name && e.DeviceType === want.deviceType);
+			assert.notEqual(entry, undefined, `${want.name} for DeviceType ${want.deviceType}`);
 			// Install on first use only; first accepted prompt continues into
 			// the view; the slot grammar is not user-editable.
-			assert.equal(entry?.AutoInstall, false, profile.name);
-			assert.equal(entry?.DontAutoSwitchWhenInstalled, false, profile.name);
-			assert.equal(entry?.Readonly, true, profile.name);
+			assert.equal(entry?.AutoInstall, false, want.name);
+			assert.equal(entry?.DontAutoSwitchWhenInstalled, false, want.name);
+			assert.equal(entry?.Readonly, true, want.name);
 		}
+	});
+
+	it("only keypad-only bundles host guests, and only the Virtual Stream Deck is one", () => {
+		for (const profile of DETAIL_PROFILES) {
+			if (profile.guestDeviceTypes.length > 0) {
+				assert.equal(profile.encoders, 0, `${profile.key}: a dial-bearing bundle must not host guests`);
+				assert.deepEqual([...profile.guestDeviceTypes], [11], profile.key);
+			}
+		}
+		assert.deepEqual(
+			DETAIL_PROFILES.filter((p) => p.guestDeviceTypes.length > 0).map((p) => p.key),
+			["mini", "standard", "neo", "xl"]
+		);
 	});
 
 	it("every entry's file exists with exact casing; no unregistered profile ships", () => {

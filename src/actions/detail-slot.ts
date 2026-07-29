@@ -7,7 +7,7 @@
  * the one shared poller while visible, and routes presses — rendering
  * and state all live behind the controller.
  */
-import { action, SingletonAction, type KeyDownEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, SingletonAction, type KeyDownEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 
 import type { DetailController } from "../detail/controller";
 import { poller } from "../poller";
@@ -35,6 +35,9 @@ export class DetailSlotAction extends SingletonAction<DetailSlotSettings> {
 			this.appeared.add(ev.action.id);
 			poller.retain();
 		}
+		// The support-log evidence channel for detail surfaces (key renders
+		// never reach the event trace), mirroring the reading key's line.
+		streamDeck.logger.debug(`Detail slot appeared on ${ev.action.device.name}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${JSON.stringify(ev.payload.settings)})`);
 		const act = ev.action;
 		this.controller.registerSlot(act.id, act.device.id, ev.payload.settings, {
 			setImage: (svg: string): void => {

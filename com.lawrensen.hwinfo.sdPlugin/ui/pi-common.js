@@ -876,25 +876,48 @@
 
 	// Press behavior (reading PI only): the detail rows exist only when a
 	// press opens details, the custom-list editor only in custom mode, and
-	// the Show help stays truthful about what a press actually does. All of
-	// this is visibility and text: no setting is ever written by a toggle.
+	// the Show help stays truthful about what a press actually does. A
+	// baked Back role (the revision-2 detail profiles' top-left tile)
+	// hides the whole Press section instead and shows the fixed-role note:
+	// the press is pinned to Back, so offering press choices would lie.
+	// All of this is visibility and text: no setting is ever written by a
+	// toggle, and detailRole is only ever read, never written.
 	const detailConfigEl = document.getElementById("detail-config");
 	if (detailConfigEl !== null) {
 		const detailCustomEl = document.getElementById("detail-custom");
 		const showHelpEl = document.getElementById("show-help");
-		const applyPress = (value) => {
-			const details = value === "open-details" || value === "tap-cycle-hold-details";
+		const pressBlockEl = document.getElementById("press-block");
+		const roleNoteEl = document.getElementById("role-note");
+		let pressValue;
+		let backRole = false;
+		// One renderer over both polled facts, so whichever poll answers
+		// last still leaves the panel consistent.
+		const applyPressState = () => {
+			const details = !backRole && (pressValue === "open-details" || pressValue === "tap-cycle-hold-details");
 			detailConfigEl.hidden = !details;
+			if (pressBlockEl !== null) pressBlockEl.hidden = backRole;
+			if (roleNoteEl !== null) roleNoteEl.hidden = !backRole;
 			if (showHelpEl !== null) {
-				showHelpEl.textContent =
-					value === "open-details"
+				showHelpEl.textContent = backRole
+					? "Show picks the stat this tile displays. Pressing it always returns to the previous profile."
+					: pressValue === "open-details"
 						? "Pressing the key opens the sensor details view; Show picks the stat on this key's own face."
-						: value === "tap-cycle-hold-details"
+						: pressValue === "tap-cycle-hold-details"
 							? "A short tap cycles current → min → max → avg; holding half a second opens sensor details."
 							: "Pressing the key cycles current → min → max → avg.";
 			}
 		};
-		followSetting("pressBehavior", applyPress);
+		followSetting("pressBehavior", (value) => {
+			pressValue = value;
+			applyPressState();
+		});
+		// The exact inverse of the plugin's parser: ONLY the exact "back"
+		// marker activates the fixed role; junk and future values leave the
+		// panel (like the runtime) on ordinary press behavior.
+		followSetting("detailRole", (value) => {
+			backRole = value === "back";
+			applyPressState();
+		});
 		followSetting("detailMode", (value) => {
 			// The exact inverse of the plugin's parser: ONLY "custom" is
 			// custom, so a junk or future value never shows an editor whose

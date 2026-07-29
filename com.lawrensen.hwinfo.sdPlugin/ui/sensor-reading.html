@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.4.90.0" />
+		<link rel="stylesheet" href="pi.css?v=1.4.91.0" />
 	</head>
 	<body>
 		<details class="hw-setup" data-fold="setup">
@@ -18,6 +18,8 @@
 				3. Pick a sensor below. That's it.
 			</p>
 		</details>
+
+		<div class="hw-hint" id="role-note" hidden>Back tile: configure its sensor and layout normally. Pressing it always returns to the previous profile.</div>
 
 		<div class="hw-section">Sensor</div>
 
@@ -68,6 +70,7 @@
 			<sdpi-checkbox setting="fahrenheit" label="Show temperatures in °F"></sdpi-checkbox>
 		</sdpi-item>
 
+		<div id="press-block">
 		<div class="hw-section">Press</div>
 
 		<sdpi-item label="Press does">
@@ -99,6 +102,7 @@
 			</div>
 			<div class="hw-hint" id="detail-unsupported" hidden></div>
 			<div class="hw-help" id="detail-help">Details open as a plugin-managed profile for this deck, not a native Stream Deck folder: the deck switches to a bundled one-page view listing the readings, with this key's sensor as the live Back tile (top left). Stream Deck asks to install the view once per deck type on first use. Previous and Next page through long lists; pressing a listed reading cycles its stat for that visit.</div>
+		</div>
 		</div>
 
 		<div class="hw-section">Appearance</div>
@@ -301,7 +305,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.4.90.0"></script>
-		<script src="pi-control.js?v=1.4.90.0"></script>
+		<script src="pi-common.js?v=1.4.91.0"></script>
+		<script src="pi-control.js?v=1.4.91.0"></script>
 	</body>
 </html>

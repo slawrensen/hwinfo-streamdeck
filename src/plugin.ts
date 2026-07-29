@@ -86,9 +86,17 @@ setInterval(() => {
 // the navigation service itself stays SDK-free and unit-testable; no other
 // module may call switchToProfile.
 const detailLog = streamDeck.logger.createScope("DetailNav");
+// Rebound right after the action is constructed below; the closure runs
+// only on later state changes. The revision-2 Back tile is a Sensor
+// Reading action whose fallback face follows the device session, so it
+// must repaint on the same signal the hidden slots do.
+const readingRepaint = { fire: (): void => undefined };
 const detailNavigator = new DetailNavigator({
 	switchProfile: (deviceId, profileName, page) => streamDeck.profiles.switchToProfile(deviceId, profileName, page),
-	onChanged: (deviceId) => detailController.renderDevice(deviceId),
+	onChanged: (deviceId) => {
+		detailController.renderDevice(deviceId);
+		readingRepaint.fire();
+	},
 	log: detailLog
 });
 const detailController = new DetailController(detailNavigator, { getStatus: () => poller.getStatus(), log: detailLog });
@@ -109,7 +117,9 @@ onThemeChange(() => {
 	}
 });
 
-streamDeck.actions.registerAction(new SensorReadingAction(detailNavigator));
+const sensorReadingAction = new SensorReadingAction(detailNavigator);
+readingRepaint.fire = (): void => sensorReadingAction.repaint();
+streamDeck.actions.registerAction(sensorReadingAction);
 streamDeck.actions.registerAction(new SensorDialAction());
 streamDeck.actions.registerAction(new HwinfoControlAction());
 streamDeck.actions.registerAction(new DetailSlotAction(detailController));

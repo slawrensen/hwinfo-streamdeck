@@ -254,11 +254,25 @@ export interface ReadingKeyOptions {
 	returnMark?: boolean;
 }
 
-/** The Back tile's return arrow: a small enter-key hook in the bottom-left
- * lens-safe corner (x 15..33, y 119..131), drawn as a vector because glyph
- * fallback for arrow characters is unproven on the deck's renderer. */
-export function returnMarkSvg(color: string): string {
-	return `<path d="M33 119 v5 a3 3 0 0 1 -3 3 h-9" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><polygon points="24,123 24,131 16,127" fill="${color}"/>`;
+/** The Back tile's return arrow: a small enter-key hook drawn as a vector
+ * because glyph fallback for arrow characters is unproven on the deck's
+ * renderer. One primitive, one shape, placed per layout: the default
+ * (15, 119) is the single/status bottom-left lens-safe corner
+ * (x 15..33, y 119..131); the multi layouts seat the same hook in a
+ * masked gap on their divider instead. */
+export function returnMarkSvg(color: string, x: number = 15, y: number = 119): string {
+	return `<path d="M${x + 18} ${y} v5 a3 3 0 0 1 -3 3 h-9" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><polygon points="${x + 9},${y + 4} ${x + 9},${y + 12} ${x + 1},${y + 8}" fill="${color}"/>`;
+}
+
+/** The return hook seated in a masked gap at the left end of a divider:
+ * the gap rect paints bg over the divider's left segment (solid fills are
+ * the engine's one proven clipping primitive), then the hook draws
+ * centered on the divider midline at the single layout's proven lens-safe
+ * x. Shared by the dual and quad layouts (midline 72) and the triple
+ * (first separator, midline 48); the 16 px gap stays clear of every
+ * row's labels, values and the centered shared-badge gap (x 47..97). */
+function dividerReturnMarkSvg(midlineY: number, bg: string, color: string): [string, string] {
+	return [`<rect x="12" y="${midlineY - 8}" width="28" height="16" fill="${bg}"/>`, returnMarkSvg(color, 15, midlineY - 6)];
 }
 
 export function renderReadingKey(opts: ReadingKeyOptions): string {
@@ -288,17 +302,26 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		// (Mbps) keep the same ≥1.9 px band clearance the 112 baseline had.
 		parts.push(`<text x="72" y="114" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="600" fill="${text.unit}">${escapeXml(unitText)}</text>`);
 	}
+	let stripDrawn = false;
 	if (gauge !== undefined && gauge.kind === "bar") {
 		parts.push(...keyBarSvg(gauge, palette));
+		stripDrawn = true;
 	}
 	if (gauge === undefined && history !== undefined) {
 		const samples = history.slice(-SPARK_SAMPLES);
 		const points = sparklinePoints(samples, SPARK.x, SPARK.y, SPARK.w, SPARK.h);
 		if (points.length > 0) {
 			parts.push(...sparklineSvg(points, SPARK.y + SPARK.h, SPARK_STROKE, 5, palette));
+			stripDrawn = true;
 		}
 	}
 	if (opts.returnMark === true) {
+		// A Bar or sparkline strip shares the hook's bottom band: mask its
+		// left segment first so the hook stays legible over the strip. The
+		// ring needs no mask (its arc caps end at x≈36, clear of the hook).
+		if (stripDrawn) {
+			parts.push(`<rect x="0" y="116" width="40" height="28" fill="${palette.bg}"/>`);
+		}
 		parts.push(returnMarkSvg(text.unit));
 	}
 	parts.push("</svg>");
@@ -370,6 +393,9 @@ export interface DualKeyOptions {
 	palette: Palette;
 	/** Resolved textual fills; defaults to the palette's own text tokens. */
 	text?: TextColors;
+	/** Detail view's Back tile: the return hook seated in a masked gap at
+	 * the left end of the divider. Absent or false changes nothing. */
+	returnMark?: boolean;
 }
 
 /**
@@ -399,6 +425,9 @@ export function renderDualKey(opts: DualKeyOptions): string {
 	parts.push(`<rect x="12" y="${DUAL.dividerY}" width="120" height="2" fill="${palette.track}"/>`);
 	if (sharedBadge !== "") {
 		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge));
+	}
+	if (opts.returnMark === true) {
+		parts.push(...dividerReturnMarkSvg(DUAL.dividerY + 1, palette.bg, text.unit));
 	}
 	parts.push("</svg>");
 	return parts.join("");
@@ -474,6 +503,9 @@ export interface TripleKeyOptions {
 	palette: Palette;
 	/** Resolved textual fills; defaults to the palette's own text tokens. */
 	text?: TextColors;
+	/** Detail view's Back tile: the return hook seated in a masked gap at
+	 * the left end of the first separator. Absent or false changes nothing. */
+	returnMark?: boolean;
 }
 
 /** Estimated width of one row's end-anchored value+unit chunk at the given
@@ -568,6 +600,9 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 	if (sharedBadge !== "") {
 		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge, TRIPLE_BADGE_GAP_Y, TRIPLE_BADGE_TEXT_Y));
 	}
+	if (opts.returnMark === true) {
+		parts.push(...dividerReturnMarkSvg((TRIPLE.separatorYs[0] as number) + 1, palette.bg, text.unit));
+	}
 	parts.push("</svg>");
 	return parts.join("");
 }
@@ -644,6 +679,10 @@ export interface QuadKeyOptions {
 	/** Resolved textual fills; defaults to the palette's own text tokens.
 	 * Cell identity colors arrive per cell, already resolved by the caller. */
 	text?: TextColors;
+	/** Detail view's Back tile: the return hook seated in a masked gap at
+	 * the left end of the horizontal cross arm. Absent or false changes
+	 * nothing. */
+	returnMark?: boolean;
 }
 
 /**
@@ -691,6 +730,9 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 	);
 	if (sharedBadge !== "") {
 		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge));
+	}
+	if (opts.returnMark === true) {
+		parts.push(...dividerReturnMarkSvg(QUAD_CROSS_H.y + 1, palette.bg, text.unit));
 	}
 	parts.push("</svg>");
 	return parts.join("");

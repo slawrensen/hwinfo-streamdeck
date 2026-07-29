@@ -9,6 +9,12 @@
 /** What a key press does; absent or unrecognized values mean "cycle-stat". */
 export type PressBehavior = "cycle-stat" | "open-details" | "tap-cycle-hold-details";
 
+/** The one fixed navigation role a Sensor Reading key can carry. The
+ *  revision-2 detail profiles bake it into their top-left cell so the
+ *  Back tile is an ordinary, fully configurable Sensor Reading whose
+ *  press is pinned to "return to the previous profile". */
+export type DetailRole = "back";
+
 /** Which readings the detail view lists; absent or junk means "source". */
 export type DetailMode = "source" | "custom";
 
@@ -25,6 +31,7 @@ export type DetailSettingsShape = {
 	detailMode?: string;
 	detailKeys?: string[];
 	detailTitle?: string;
+	detailRole?: string;
 };
 
 export function pressBehaviorOf(settings: { pressBehavior?: unknown }): PressBehavior {
@@ -34,6 +41,17 @@ export function pressBehaviorOf(settings: { pressBehavior?: unknown }): PressBeh
 
 export function detailModeOf(settings: { detailMode?: unknown }): DetailMode {
 	return settings.detailMode === "custom" ? "custom" : "source";
+}
+
+/**
+ * The baked navigation role, or undefined for an ordinary key. ONLY the
+ * exact string "back" activates the role: absent, empty, malformed and
+ * future values all behave as a plain Sensor Reading, are never
+ * normalized, and are never rewritten. The role is read from settings
+ * alone — never inferred from coordinate, profile, device or title.
+ */
+export function detailRoleOf(settings: { detailRole?: unknown }): DetailRole | undefined {
+	return settings.detailRole === "back" ? "back" : undefined;
 }
 
 /**

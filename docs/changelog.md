@@ -14,6 +14,28 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.4.91.0 - 2026-07-29
+
+- The detail view's Back tile is now a normal Sensor Reading key you
+  can configure: pick its sensor, use the single, dual, triple or quad
+  layout, themes, custom text, thresholds and the Show stat, exactly
+  like any other key. Pressing it is still fixed to returning to the
+  profile you came from, and a small return hook stays visible on
+  every layout so the way out is never ambiguous. Left unconfigured,
+  the tile keeps showing the sensor you drilled down from. (Requested
+  by @FattSlice in issue #5.)
+- The bundled detail profiles are editable now instead of read-only,
+  so you can add your own keys to the detail page and configure the
+  Back tile in place. Stream Deck never updates a profile that is
+  already installed, so this ships as a second profile revision named
+  "HWiNFO Details 2": the first drill-down after upgrading asks once
+  to install it, and a copy installed from the previous preview stays
+  untouched in your profile list (remove it there if you no longer
+  want it).
+- Ordinary keys are unaffected: a key without the internal Back marker
+  behaves exactly as before, settings are never rewritten, and the
+  marker survives every panel edit.
+
 ## 1.4.90.0 - 2026-07-29
 
 - A sensor key can act like a folder. The Sensor Reading key's new

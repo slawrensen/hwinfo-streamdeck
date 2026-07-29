@@ -103,7 +103,10 @@ wss.on("connection", (ws) => {
 
 // --- the app-side simulation ---------------------------------------------
 const OPENER = "ctx-opener";
-const slotCtx = (device, coord) => `slot-${device}-${coord.replace(",", "x")}`;
+// `suffix` mints a fresh context id space when the SAME device installs a
+// surface a second time in one run (leg R reuses dev1): latestSvg must
+// never read a stale frame from an earlier leg's identically named slot.
+const slotCtx = (device, coord, suffix = "") => `slot-${device}-${coord.replace(",", "x")}${suffix}`;
 
 function appearOpener(send, context, device, settings, coordinates = { column: 2, row: 1 }) {
 	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context, device, payload: { settings, coordinates, controller: "Keypad", isInMultiAction: false } });
@@ -120,27 +123,28 @@ function keyPress(send, context, device, settings, holdMs = 0) {
 }
 
 /** Simulates the app switching to an installed detail profile: every baked
- * cell of the REAL shipped archive appears as a hidden-slot instance. */
-function installDetailSurface(send, device, cells) {
+ * cell of the REAL shipped archive appears under its own action UUID (the
+ * revision-2 Back cell is a Sensor Reading; everything else hidden slots). */
+function installDetailSurface(send, device, cells, suffix = "") {
 	for (const cell of cells) {
 		const [column, row] = cell.coord.split(",").map(Number);
 		send({
 			event: "willAppear",
 			action: cell.uuid,
-			context: slotCtx(device, cell.coord),
+			context: slotCtx(device, cell.coord, suffix),
 			device,
 			payload: { settings: cell.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false }
 		});
 	}
 }
 
-function removeDetailSurface(send, device, cells) {
+function removeDetailSurface(send, device, cells, suffix = "") {
 	for (const cell of cells) {
 		const [column, row] = cell.coord.split(",").map(Number);
 		send({
 			event: "willDisappear",
 			action: cell.uuid,
-			context: slotCtx(device, cell.coord),
+			context: slotCtx(device, cell.coord, suffix),
 			device,
 			payload: { settings: cell.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false }
 		});
@@ -327,6 +331,130 @@ async function scenario(send) {
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-vsd", device: "devvsd", payload: { settings: vsdOpener, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 	await sleep(200);
 
+	// L. Revision 2: the generated Back cell is a REAL Sensor Reading
+	// action carrying only { detailRole: "back" }. Entry uses the r2 name,
+	// the baked cell's willAppear routes into SensorReadingAction, and the
+	// unconfigured tile renders the opener fallback with the return hook.
+	const r2Cells = profileCells("profiles/detail-r2-standard");
+	const r2Back = r2Cells.find((c) => c.uuid === "com.lawrensen.hwinfo.reading");
+	const r2BackCtx = slotCtx("devr2", r2Back.coord);
+	results.r2OpenerLabel = primary.label;
+	const r2Opener = { readingKey: primary.key, pressBehavior: "open-details" };
+	appearOpener(send, "ctx-r2", "devr2", r2Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-r2", "devr2", r2Opener);
+	await sleep(500);
+	results.r2Switch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-r2", device: "devr2", payload: { settings: r2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devr2", r2Cells);
+	await sleep(1600);
+	results.r2BackFallback = latestSvg(r2BackCtx);
+
+	// M. Configuring the Back through a real settings echo: it renders its
+	// OWN dual face (divider hook) while the press stays pinned to Back.
+	const r2BackConfigured = { detailRole: "back", readingKey: keys[1].key, keyLayout: "dual", secondaryReadingKey: primary.key };
+	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: r2BackConfigured, coordinates: { column: 0, row: 0 }, isInMultiAction: false } });
+	await sleep(900);
+	results.r2BackDual = latestSvg(r2BackCtx);
+
+	// S. HWiNFO loss and recovery under the configured Back.
+	fake.stdin.write("freeze\n");
+	await sleep(4200);
+	results.r2BackFrozen = latestSvg(r2BackCtx);
+	fake.stdin.write("alive\n");
+	await sleep(3200);
+	results.r2BackRecovered = latestSvg(r2BackCtx);
+
+	// N. The configured Back press: exactly one previous-profile restore,
+	// no stat write, no detail entry, and the release adds nothing.
+	const writesBeforeR2Back = setSettings.filter((s) => s.context === r2BackCtx).length;
+	const switchesBeforeR2Back = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: r2BackConfigured, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: r2BackConfigured, coordinates: { column: 0, row: 0 } } });
+	await sleep(500);
+	results.r2BackSwitch = switches.length > switchesBeforeR2Back ? switches.at(-1) : undefined;
+	results.r2BackWrites = setSettings.filter((s) => s.context === r2BackCtx).length - writesBeforeR2Back;
+	removeDetailSurface(send, "devr2", r2Cells);
+	await sleep(300);
+
+	// P. A malformed marker ("Back", wrong case) must keep the ordinary
+	// press behavior: the stat cycles and no profile switches.
+	const malSettings = { detailRole: "Back", readingKey: primary.key };
+	appearOpener(send, "ctx-mal", "devr2", malSettings, { column: 3, row: 2 });
+	await sleep(300);
+	const switchesBeforeMal = switches.length;
+	const writesBeforeMal = setSettings.filter((s) => s.context === "ctx-mal").length;
+	await keyPress(send, "ctx-mal", "devr2", malSettings);
+	await sleep(400);
+	results.malformedCycled = setSettings.filter((s) => s.context === "ctx-mal" && s.payload?.statMode === "min").length === writesBeforeMal + 1;
+	results.malformedSwitches = switches.length - switchesBeforeMal;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-mal", device: "devr2", payload: { settings: malSettings, coordinates: { column: 3, row: 2 }, controller: "Keypad", isInMultiAction: false } });
+	await sleep(200);
+
+	// O. A COPIED marked action on an ordinary page (not 0,0, no managed
+	// surface) keeps the Back role: press restores the previous profile.
+	// Placed on devxl so devr2's leave debounce cannot swallow the hop.
+	const copySettings = { detailRole: "back", readingKey: primary.key };
+	appearOpener(send, "ctx-copy", "devxl", copySettings, { column: 5, row: 2 });
+	await sleep(300);
+	const switchesBeforeCopy = switches.length;
+	const writesBeforeCopy = setSettings.filter((s) => s.context === "ctx-copy").length;
+	await keyPress(send, "ctx-copy", "devxl", copySettings);
+	await sleep(400);
+	results.copySwitch = switches.length > switchesBeforeCopy ? switches.at(-1) : undefined;
+	results.copyWrites = setSettings.filter((s) => s.context === "ctx-copy").length - writesBeforeCopy;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-copy", device: "devxl", payload: { settings: copySettings, coordinates: { column: 5, row: 2 }, controller: "Keypad", isInMultiAction: false } });
+	await sleep(200);
+
+	// Q. Restart-shaped: the r2 surface appears with NO session state. The
+	// generated Back renders the idle face and still gets the user out.
+	// The pause clears devr2's leave debounce from leg N first.
+	await sleep(1400);
+	installDetailSurface(send, "devr2", r2Cells);
+	await sleep(1700);
+	results.r2IdleBack = latestSvg(r2BackCtx);
+	const switchesBeforeIdle = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	await sleep(500);
+	results.r2IdleBackSwitch = switches.length > switchesBeforeIdle ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devr2", r2Cells);
+	await sleep(300);
+
+	// R. Two devices on revision 2: devr2 and dev1 hold independent
+	// sessions; leaving devr2 keeps dev1's session and its fallback face,
+	// then dev1's own Back leaves with dev1's device id.
+	appearOpener(send, "ctx-r2b", "devr2", r2Opener, { column: 2, row: 1 });
+	appearOpener(send, "ctx-r2c", "dev1", r2Opener, { column: 2, row: 1 });
+	await sleep(1600); // devr2's leave debounce from leg Q, then enter both
+	await keyPress(send, "ctx-r2b", "devr2", r2Opener);
+	await keyPress(send, "ctx-r2c", "dev1", r2Opener);
+	await sleep(500);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-r2b", device: "devr2", payload: { settings: r2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-r2c", device: "dev1", payload: { settings: r2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devr2", r2Cells);
+	installDetailSurface(send, "dev1", r2Cells, "-r2");
+	await sleep(1600);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	await sleep(600);
+	removeDetailSurface(send, "devr2", r2Cells);
+	await sleep(900);
+	const dev1BackCtx = slotCtx("dev1", r2Back.coord, "-r2");
+	results.r2Dev1FaceAfter = latestSvg(dev1BackCtx);
+	const switchesBeforeDev1 = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	await sleep(500);
+	results.r2Dev1Switch = switches.length > switchesBeforeDev1 ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "dev1", r2Cells, "-r2");
+	await sleep(300);
+	// Ghost press for a context that never appeared: must be a silent no-op.
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-ghost", device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 4, row: 3 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-ghost", device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 4, row: 3 } } });
+	await sleep(300);
+	results.r2AllBackWrites = setSettings.filter((s) => s.context === r2BackCtx || s.context === dev1BackCtx).length;
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -347,7 +475,7 @@ async function finish() {
 
 	check("legacy default press cycled to MIN via setSettings", results.legacyCycle === true);
 	check("legacy press touched no profile", results.legacySwitches === 0);
-	check("entry switched dev1 to profiles/detail-standard", results.enterSwitch?.device === "dev1" && results.enterSwitch?.profile === "profiles/detail-standard", JSON.stringify(results.enterSwitch));
+	check("entry switched dev1 to the revision-2 profile name", results.enterSwitch?.device === "dev1" && results.enterSwitch?.profile === "profiles/detail-r2-standard", JSON.stringify(results.enterSwitch));
 	check("Back tile renders the opener's reading with the return mark", typeof results.backFace === "string" && results.backFace.includes("M33 119"), (results.backFace ?? "no frame").slice(0, 120));
 	check("title tile shows the source range 1-1 / 1", typeof results.titleFace === "string" && results.titleFace.includes(">1-1 / 1<"), (results.titleFace ?? "no frame").slice(0, 160));
 	check("reading slot 0 shows the source member live", typeof results.slot0Face === "string" && results.slot0Face.includes("<text"), (results.slot0Face ?? "no frame").slice(0, 120));
@@ -367,12 +495,29 @@ async function finish() {
 	check("unsupported device alerts without switching", results.pedAlerted === true && results.refusalSwitches === 0);
 	check("an unresolvable primary alerts without switching", results.goneAlerted === true);
 	check("tap cycles exactly once", results.tapCycled === true);
-	check("hold enters details exactly once", results.holdSwitched !== undefined && results.holdSwitched.profile === "profiles/detail-standard", JSON.stringify(results.holdSwitched));
+	check("hold enters details exactly once", results.holdSwitched !== undefined && results.holdSwitched.profile === "profiles/detail-r2-standard", JSON.stringify(results.holdSwitched));
 	check("the release after a hold writes nothing (no ghost cycle)", results.holdGhostWrites === 0, `${results.holdGhostWrites} writes`);
-	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-plus-xl", JSON.stringify(results.xlSwitch));
+	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-r2-plus-xl", JSON.stringify(results.xlSwitch));
 	check("the + XL title tile rendered", typeof results.xlTitle === "string" && results.xlTitle.includes("<text"));
 	check("paging devxl repainted no dev1 slot", results.dev1FramesDuringXl === 0, `${results.dev1FramesDuringXl} frames`);
-	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-xl", JSON.stringify(results.vsdSwitch));
+	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r2-xl", JSON.stringify(results.vsdSwitch));
+
+	// Revision-2 configurable Back (the generated Sensor Reading cell)
+	check("r2 entry switched devr2 to the revision-2 profile name", results.r2Switch?.device === "devr2" && results.r2Switch?.profile === "profiles/detail-r2-standard", JSON.stringify(results.r2Switch));
+	check("the generated Back cell reached SensorReadingAction and rendered the opener fallback", typeof results.r2BackFallback === "string" && results.r2BackFallback.includes("M33 119") && results.r2BackFallback.includes(results.r2OpenerLabel), (results.r2BackFallback ?? "no frame").slice(0, 160));
+	check("a configured Back renders its own dual face with the divider hook", typeof results.r2BackDual === "string" && results.r2BackDual.includes("M33 66"), (results.r2BackDual ?? "no frame").slice(0, 160));
+	check("HWiNFO loss keeps the configured Back on the status screen with the hook", typeof results.r2BackFrozen === "string" && results.r2BackFrozen.includes("Not updating") && results.r2BackFrozen.includes("M33 119"), (results.r2BackFrozen ?? "no frame").slice(0, 160));
+	check("recovery restores the configured Back face", typeof results.r2BackRecovered === "string" && results.r2BackRecovered.includes("M33 66") && !results.r2BackRecovered.includes("Not updating"), (results.r2BackRecovered ?? "no frame").slice(0, 160));
+	check("pressing the configured Back restored the previous profile (name omitted)", results.r2BackSwitch !== undefined && results.r2BackSwitch.device === "devr2" && results.r2BackSwitch.profile === undefined, JSON.stringify(results.r2BackSwitch));
+	check("the Back press wrote no settings and cycled no stat", results.r2BackWrites === 0, `${results.r2BackWrites} writes`);
+	check("a malformed marker keeps ordinary behavior (stat cycled, no switch)", results.malformedCycled === true && results.malformedSwitches === 0, `cycled=${results.malformedCycled} switches=${results.malformedSwitches}`);
+	check("a copied marked action still acts as Back on an ordinary page", results.copySwitch !== undefined && results.copySwitch.profile === undefined && results.copyWrites === 0, JSON.stringify({ sw: results.copySwitch, writes: results.copyWrites }));
+	check("a restart-shaped r2 surface shows the idle Back face", typeof results.r2IdleBack === "string" && results.r2IdleBack.includes(">Back<"), (results.r2IdleBack ?? "no frame").slice(0, 120));
+	check("the stateless r2 Back still restores the previous profile", results.r2IdleBackSwitch !== undefined && results.r2IdleBackSwitch.profile === undefined, JSON.stringify(results.r2IdleBackSwitch));
+	check("two devices: leaving devr2 kept dev1's session and fallback face", typeof results.r2Dev1FaceAfter === "string" && results.r2Dev1FaceAfter.includes("M33 119") && !results.r2Dev1FaceAfter.includes(">Back<"), (results.r2Dev1FaceAfter ?? "no frame").slice(0, 140));
+	check("two devices: dev1's own Back then left with its device id", results.r2Dev1Switch !== undefined && results.r2Dev1Switch.device === "dev1" && results.r2Dev1Switch.profile === undefined, JSON.stringify(results.r2Dev1Switch));
+	check("no r2 Back context ever received a setSettings write", results.r2AllBackWrites === 0, `${results.r2AllBackWrites} writes`);
+
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -413,6 +558,7 @@ const info = {
 	devicePixelRatio: 1,
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

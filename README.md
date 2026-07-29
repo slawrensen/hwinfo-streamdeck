@@ -99,12 +99,14 @@ layout). The warn/critical colors always track the *live* value.
 **Or the press can drill down** (issue #5): set **Press does** to *Open sensor
 details* (or *Tap cycles; hold opens details*) and the press switches the deck
 to a bundled one-page detail view listing every reading of that sensor's
-HWiNFO source, or a custom list you build. The key you pressed stays live as
-the Back tile (top left), Previous/Next page through long sources, and
-pressing a listed reading cycles its stat for that visit. Six read-only
-profiles ship, one per deck type (Mini, 15-key, Neo, +, XL, + XL); the Stream
-Deck app asks to install the right one the first time you open details on a
-deck. This is a plugin-managed profile, not a native folder; details in
+HWiNFO source, or a custom list you build. The top-left Back tile is a normal
+Sensor Reading key with its press fixed to returning: configure its sensor and
+any layout (or leave it showing the sensor you drilled down from),
+Previous/Next page through long sources, and pressing a listed reading cycles
+its stat for that visit. Six editable profiles ship, one per deck type (Mini,
+15-key, Neo, +, XL, + XL); the Stream Deck app asks to install the right one
+the first time you open details on a deck, and you can add your own keys to
+the page. This is a plugin-managed profile, not a native folder; details in
 [the docs](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html).
 
 <p align="center">

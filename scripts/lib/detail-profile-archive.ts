@@ -16,7 +16,8 @@
  *
  * The page never contains reading keys, sensor names, values, device
  * ids or user data: each cell is the hidden detail-slot action with its
- * static role binding, nothing else.
+ * static role binding — except the revision-2 Back cell, a real Sensor
+ * Reading action carrying exactly its role marker and nothing else.
  */
 import { createHash } from "node:crypto";
 
@@ -24,8 +25,38 @@ import type { DetailNavRole, ManagedDetailProfile } from "../../src/detail/manag
 
 export const PLUGIN_UUID = "com.lawrensen.hwinfo";
 export const DETAIL_SLOT_UUID = "com.lawrensen.hwinfo.detail-slot";
-/** Every bundle shows this name in the app's per-device profile list. */
-export const DETAIL_PROFILE_DISPLAY_NAME = "HWiNFO Details";
+export const SENSOR_READING_UUID = "com.lawrensen.hwinfo.reading";
+
+/**
+ * Structural revisions this generator can emit. Installed profiles never
+ * auto-update, so a revision is a complete identity change: archive
+ * path (managed-profiles' naming authority), internal GUID namespace and
+ * the display name below all differ per revision, and revision-1 output
+ * stays byte-frozen for already installed copies.
+ *
+ * Revision 2's one structural change: the Back cell (0,0) is a real
+ * Sensor Reading action baked with exactly { detailRole: "back" } — no
+ * sensor identity, no user data — so the tile is fully configurable in
+ * the (now editable) profile while its press stays fixed to Back.
+ */
+export type DetailProfileRevision = 1 | 2;
+
+/** Per-device display names in the app's profile list, by revision. */
+export const DETAIL_PROFILE_DISPLAY_NAMES: Readonly<Record<DetailProfileRevision, string>> = {
+	1: "HWiNFO Details",
+	2: "HWiNFO Details 2"
+};
+/** Revision-1 name kept under its original export for the frozen tests. */
+export const DETAIL_PROFILE_DISPLAY_NAME = DETAIL_PROFILE_DISPLAY_NAMES[1];
+
+/** The internal GUID namespace for one bundle at one revision. Revision 1
+ * keeps its original namespace so its GUIDs (and bytes) never move;
+ * later revisions carry the revision marker, so no GUID collides across
+ * revisions (distinct SHA-1 inputs). */
+export function detailNamespaceFor(profile: Pick<ManagedDetailProfile, "key">, revision: DetailProfileRevision): string {
+	return revision === 1 ? `${PLUGIN_UUID}.detail:${profile.key}` : `${PLUGIN_UUID}.detail:r${revision}:${profile.key}`;
+}
+
 /** Fixed environment metadata: the app/OS the canonical import test ran on. */
 const APP_VERSION = "7.4.2.22730";
 const OS_VERSION = "10.0.19044";
@@ -40,45 +71,51 @@ export function guidFor(namespace: string, name: string): string {
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** One page cell: the hidden slot action with its baked role binding. */
-function slotEntry(namespace: string, cellName: string, settings: Record<string, unknown>): Record<string, unknown> {
+/** One page cell, shaped exactly like Elgato's own profile exports. */
+function cellEntry(namespace: string, cellName: string, actionName: string, uuid: string, settings: Record<string, unknown>): Record<string, unknown> {
 	return {
 		ActionID: guidFor(namespace, cellName),
 		LinkedTitle: true,
-		Name: "Sensor Detail Slot",
+		Name: actionName,
 		Plugin: { Name: "HWiNFO Sensors", UUID: PLUGIN_UUID, Version: "1.0" },
 		Resources: null,
 		Settings: settings,
 		State: 0,
 		States: [{}],
-		UUID: DETAIL_SLOT_UUID
+		UUID: uuid
 	};
 }
 
 /** The page's Actions map, keyed "column,row". Throws on any plan defect
  * (duplicate or out-of-bounds cell) — a generator must fail loudly, not
- * ship a subtly wrong grid. */
-export function buildPageActions(profile: ManagedDetailProfile, namespace: string): Record<string, unknown> {
+ * ship a subtly wrong grid. Revision 2 bakes the Back cell as a normal
+ * Sensor Reading carrying only the role marker; every other cell (and
+ * the whole revision-1 page) is the hidden slot action. */
+export function buildPageActions(profile: ManagedDetailProfile, namespace: string, revision: DetailProfileRevision): Record<string, unknown> {
 	const { layout } = profile;
 	const actions: Record<string, unknown> = {};
-	const place = (cell: { column: number; row: number }, cellName: string, settings: Record<string, unknown>): void => {
+	const place = (cell: { column: number; row: number }, key: string, entry: Record<string, unknown>): void => {
 		if (cell.column < 0 || cell.column >= layout.columns || cell.row < 0 || cell.row >= layout.rows) {
 			throw new Error(`${profile.key}: cell ${cell.column},${cell.row} is outside the ${layout.columns}x${layout.rows} grid`);
 		}
-		const key = `${cell.column},${cell.row}`;
 		if (actions[key] !== undefined) {
 			throw new Error(`${profile.key}: duplicate cell ${key}`);
 		}
-		actions[key] = slotEntry(namespace, cellName, settings);
+		actions[key] = entry;
 	};
 	for (const role of ["back", "title", "previous", "next"] as DetailNavRole[]) {
 		const cell = layout.nav[role];
-		if (cell !== null) {
-			place(cell, `nav:${role}`, { slot: role });
+		if (cell === null) {
+			continue;
 		}
+		const entry =
+			role === "back" && revision >= 2
+				? cellEntry(namespace, "nav:back", "Sensor Reading", SENSOR_READING_UUID, { detailRole: "back" })
+				: cellEntry(namespace, `nav:${role}`, "Sensor Detail Slot", DETAIL_SLOT_UUID, { slot: role });
+		place(cell, `${cell.column},${cell.row}`, entry);
 	}
 	profile.layout.readings.forEach((cell, index) => {
-		place(cell, `reading:${index}`, { slot: "reading", index });
+		place(cell, `${cell.column},${cell.row}`, cellEntry(namespace, `reading:${index}`, "Sensor Detail Slot", DETAIL_SLOT_UUID, { slot: "reading", index }));
 	});
 	const expected = layout.columns * layout.rows;
 	if (Object.keys(actions).length !== expected) {
@@ -93,8 +130,8 @@ function jsonBytes(value: unknown): Buffer {
 	return Buffer.from(JSON.stringify(value), "utf8");
 }
 
-export function buildDetailProfileArchive(profile: ManagedDetailProfile): Buffer {
-	const namespace = `${PLUGIN_UUID}.detail:${profile.key}`;
+export function buildDetailProfileArchive(profile: ManagedDetailProfile, revision: DetailProfileRevision = 2): Buffer {
+	const namespace = detailNamespaceFor(profile, revision);
 	const umbrella = guidFor(namespace, "umbrella");
 	const page = guidFor(namespace, "page-0");
 	const umbrellaUpper = umbrella.toUpperCase();
@@ -111,11 +148,11 @@ export function buildDetailProfileArchive(profile: ManagedDetailProfile): Buffer
 	};
 	const umbrellaManifest = {
 		Device: { Model: profile.deviceModel, UUID: umbrella },
-		Name: DETAIL_PROFILE_DISPLAY_NAME,
+		Name: DETAIL_PROFILE_DISPLAY_NAMES[revision],
 		Pages: { Current: "00000000-0000-0000-0000-000000000000", Default: page, Pages: [page] },
 		Version: "3.0"
 	};
-	const controllers: Array<Record<string, unknown>> = [{ Actions: buildPageActions(profile, namespace), Type: "Keypad" }];
+	const controllers: Array<Record<string, unknown>> = [{ Actions: buildPageActions(profile, namespace, revision), Type: "Keypad" }];
 	if (profile.encoders > 0) {
 		// Dials are deliberately empty: detail navigation must not require
 		// them (they stay inert while the detail page is up).

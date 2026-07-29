@@ -103,7 +103,7 @@ describe("entry", () => {
 		const { nav, switches } = bed();
 		const result = await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
 		assert.equal(result, "entered");
-		assert.deepEqual(switches, [{ deviceId: "dev1", profileName: "profiles/detail-standard", page: undefined }]);
+		assert.deepEqual(switches, [{ deviceId: "dev1", profileName: "profiles/detail-r2-standard", page: undefined }]);
 		const state = nav.stateFor("dev1");
 		assert.equal(state?.pageSize, 11);
 		assert.equal(state?.group.keys.length, 13); // 14 CPU readings minus the primary
@@ -121,7 +121,7 @@ describe("entry", () => {
 		const { nav, switches } = bed();
 		const result = await nav.enter({ deviceId: "vsd", deviceType: 11, grid: { columns: 10, rows: 10 }, settings: opener, snapshot });
 		assert.equal(result, "entered");
-		assert.equal(switches[0]?.profileName, "profiles/detail-xl");
+		assert.equal(switches[0]?.profileName, "profiles/detail-r2-xl");
 		assert.equal(nav.stateFor("vsd")?.pageSize, 28);
 	});
 
@@ -270,7 +270,7 @@ describe("paging and stats", () => {
 		const { nav, switches } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
 		await nav.enter({ deviceId: "devxl", deviceType: 13, settings: { readingKey: "gpu:0:1" }, snapshot });
-		assert.equal(switches[1]?.profileName, "profiles/detail-plus-xl");
+		assert.equal(switches[1]?.profileName, "profiles/detail-r2-plus-xl");
 		nav.pageNext("dev1");
 		nav.cycleSlotStat("dev1", "cpu:0:1");
 		const xl = nav.stateFor("devxl");

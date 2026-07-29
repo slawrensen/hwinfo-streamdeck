@@ -1,8 +1,11 @@
 /**
  * The managed detail-profile registry: the ONE authority for the bundled
  * drill-down profiles (issue #5). Six device classes ship, one reusable
- * profile each; every profile is a single physical page whose cells all
- * carry the hidden detail-slot action with a static role binding.
+ * profile each; every profile is a single physical page. At the active
+ * revision the top-left Back cell is a real Sensor Reading action baked
+ * with only the "back" role marker (fully user-configurable), and every
+ * other cell carries the hidden detail-slot action with a static role
+ * binding.
  *
  * Nothing outside this module may hardcode a detail profile name, grid
  * size, slot capacity, device-type mapping or coordinate plan: the
@@ -26,6 +29,27 @@
  * (alert, no switch).
  */
 import { DeviceType } from "@elgato/schemas/streamdeck/plugins";
+
+/**
+ * The CURRENT structural revision of the bundled detail profiles.
+ * Installed Stream Deck profiles never auto-update, so any change to a
+ * page's cell grammar (revision 2: the Back cell became a real,
+ * configurable Sensor Reading action) must ship as a NEW profile
+ * identity — archive path, internal GUID namespace and internal display
+ * name all differ — and the upgraded plugin then prompts once for the
+ * new profile instead of silently running a stale installed copy.
+ * Revision 1 stays bundled byte-frozen for already installed copies;
+ * nothing in current code ever switches to it.
+ */
+export const DETAIL_PROFILE_REVISION = 2;
+
+/** Manifest `Profiles.Name` (path from the .sdPlugin root, no extension)
+ * for a bundle key at a structural revision. Revision 1 keeps its
+ * original unversioned paths; later revisions carry the revision in the
+ * path so both can ship side by side. */
+export function detailProfileNameFor(key: string, revision: number): string {
+	return revision === 1 ? `profiles/detail-${key}` : `profiles/detail-r${revision}-${key}`;
+}
 
 /** Navigation roles a detail page always carries. */
 export type DetailNavRole = "back" | "title" | "previous" | "next";
@@ -94,12 +118,13 @@ function buildLayout(columns: number, rows: number, nav: Readonly<Record<DetailN
 /**
  * The six bundles. Back is always top-left (0,0), matching where native
  * folders put their fixed back key; the rest of the navigation fills the
- * left column first and overflows rightward on short grids.
+ * left column first and overflows rightward on short grids. `name` is
+ * stamped below from the ONE naming authority at the ACTIVE revision, so
+ * the runtime (navigation entry) always targets the current bundles.
  */
-export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
+const PROFILE_TABLE: readonly Omit<ManagedDetailProfile, "name">[] = [
 	{
 		key: "mini",
-		name: "profiles/detail-mini",
 		deviceType: DeviceType.StreamDeckMini,
 		deviceModel: "20GAI9901",
 		modelVerified: true,
@@ -114,7 +139,6 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 	},
 	{
 		key: "standard",
-		name: "profiles/detail-standard",
 		deviceType: DeviceType.StreamDeck,
 		deviceModel: "20GBA9901",
 		modelVerified: true,
@@ -129,7 +153,6 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 	},
 	{
 		key: "neo",
-		name: "profiles/detail-neo",
 		deviceType: DeviceType.StreamDeckNeo,
 		deviceModel: "20GBJ9901",
 		modelVerified: false,
@@ -144,7 +167,6 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 	},
 	{
 		key: "plus",
-		name: "profiles/detail-plus",
 		deviceType: DeviceType.StreamDeckPlus,
 		deviceModel: "20GBD9901",
 		modelVerified: true,
@@ -159,7 +181,6 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 	},
 	{
 		key: "xl",
-		name: "profiles/detail-xl",
 		deviceType: DeviceType.StreamDeckXL,
 		deviceModel: "20GAT9901",
 		modelVerified: true,
@@ -174,7 +195,6 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 	},
 	{
 		key: "plus-xl",
-		name: "profiles/detail-plus-xl",
 		deviceType: DeviceType.StreamDeckPlusXL,
 		deviceModel: "20GBX9901",
 		modelVerified: true,
@@ -188,6 +208,12 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = [
 		})
 	}
 ];
+
+/** The registry at the ACTIVE revision: what entry and the manifest's
+ * current registrations use. The generator additionally rebuilds the
+ * frozen revision-1 archives from this same table via the naming
+ * authority, so layout stays a single source of truth. */
+export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = PROFILE_TABLE.map((p) => ({ ...p, name: detailProfileNameFor(p.key, DETAIL_PROFILE_REVISION) }));
 
 /**
  * The bundle for a device, or undefined when it isn't supported. An exact

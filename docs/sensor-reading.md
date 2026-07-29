@@ -196,7 +196,9 @@ On a quad key every cell shows the same stat, so the press cycles **all four tog
 
 ### Press does (drill-down)
 
-The **Press** section can repurpose the press instead. **Open sensor details** switches the deck to a bundled detail view listing every reading of this sensor's HWiNFO source (or a custom list), with this key staying live as the Back tile. **Tap cycles; hold opens details** keeps the stat cycle on a short tap and opens the view after holding half a second. Keys that never touch the Press section behave exactly as before. The whole feature has [its own page](sensor-details.md): what the view shows, the one-time install prompt per deck type, and which decks are supported.
+The **Press** section can repurpose the press instead. **Open sensor details** switches the deck to a bundled detail view listing every reading of this sensor's HWiNFO source (or a custom list). **Tap cycles; hold opens details** keeps the stat cycle on a short tap and opens the view after holding half a second. Keys that never touch the Press section behave exactly as before. The whole feature has [its own page](sensor-details.md): what the view shows, the one-time install prompt per deck type, and which decks are supported.
+
+The detail view's own Back tile is this same Sensor Reading action with one difference: its press is fixed to returning to the previous profile, so its panel shows a note in place of the Press section. Everything else here (sensor, layouts, theme, text, thresholds, Display) applies to it unchanged; see [configuring the Back tile](sensor-details.md#configuring-the-back-tile).
 
 ## Status screens
 

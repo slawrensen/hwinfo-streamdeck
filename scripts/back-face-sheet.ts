@@ -27,7 +27,7 @@ const down: PollerStatus = { state: "unavailable", reason: "not-running", messag
 
 const detail: DeviceDetailState = {
 	deviceId: "dev1",
-	profileName: "profiles/detail-r2-standard",
+	profileName: "profiles/detail-r3-standard",
 	pageSize: 11,
 	primaryKey: "cpu:0:0",
 	groupSettings: { readingKey: "cpu:0:0" },

@@ -7,7 +7,7 @@ A Sensor Reading key can open a full page of related readings: press the CPU tem
 
 ## What it is (and is not)
 
-The detail view is a **plugin-managed profile**, not a native Stream Deck folder. The Stream Deck SDK does not let a plugin place keys inside a user's folders or profiles, so the plugin ships one editable, one-page profile per supported deck type ("HWiNFO Details 2" in the app's profile list) and switches to it on demand. Pressing Back asks the Stream Deck app to return to the profile you came from.
+The detail view is a **plugin-managed profile**, not a native Stream Deck folder. The Stream Deck SDK does not let a plugin place keys inside a user's folders or profiles, so the plugin ships one editable, one-page profile per supported deck type ("HWiNFO Details" in the app's profile list) and switches to it on demand. Pressing Back asks the Stream Deck app to return to the profile you came from.
 
 Practical consequences:
 

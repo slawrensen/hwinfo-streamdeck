@@ -1,9 +1,10 @@
 // The bundled detail profiles: registry integrity, manifest agreement,
 // archive structure, strict baked bindings, byte-for-byte determinism,
 // and the absence of anything personal in the shipped artifacts — for
-// BOTH structural revisions. Revision 1 (hidden Back slot) is frozen for
-// already installed copies and pinned here by content hash; revision 2
-// (configurable Sensor Reading Back) is the identity the runtime
+// EVERY revision. Revisions 1 (hidden Back slot) and 2 (configurable
+// Sensor Reading Back, numbered display name) are frozen for already
+// installed copies and pinned here by content hash; revision 3 (same
+// page as 2, unnumbered display name) is the identity the runtime
 // switches to. The generator is imported directly so a drifted committed
 // file (or a hand-edited manifest entry) fails here, in CI, not on a
 // user's deck.
@@ -26,7 +27,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(pluginDir, "manifest.json"
 	Profiles?: Array<{ Name: string; DeviceType: number; AutoInstall?: boolean; DontAutoSwitchWhenInstalled?: boolean; Readonly?: boolean }>;
 };
 
-const REVISIONS: readonly DetailProfileRevision[] = [1, 2];
+const REVISIONS: readonly DetailProfileRevision[] = [1, 2, 3];
 
 /** Case-exact existence: NTFS existsSync is case-insensitive, so walk. */
 function existsExact(relPath: string): boolean {
@@ -56,6 +57,21 @@ const REVISION1_SHA256: Record<string, string> = {
 	"plus-xl": "2dc8d5ee845e5d2a07084364edda69f41910bd7cf93c7c1a66d0efe21e6a1e46"
 };
 
+/**
+ * Revision 2 shipped in pre-1.5-issue5-2 and installed copies exist in
+ * the wild: its bytes may never move again either. Hashes taken from
+ * the committed files at that tag (byte-identical to the published
+ * pre-release asset).
+ */
+const REVISION2_SHA256: Record<string, string> = {
+	mini: "14e3f9c0187e7b07cee54b001d96d404e1e098b7176cdd6f7ca51fdc9672dd12",
+	standard: "70b48f0f50e678a5a057d4d7ff03cb5fd0446c9952e809aef046c019493fde9f",
+	neo: "b4189bf7a978296f3830c25a07eeeb6dbf4362d5efad406285cf3cdecc9e80e5",
+	plus: "b0a63b9c751715a3c99d725898bb6efd4c3ff14a3a8f2c099773d52c2562b53a",
+	xl: "40b4ed7734fb4a2701e70d02c84383966311bf3ee4423561c62bf6f97a8cd9d7",
+	"plus-xl": "c89fa95cd2c32ab443ba56d769f3cbfa9c66e9bc63f9562d55e8fce552325ca4"
+};
+
 const EXPECTED_CAPACITY: Record<string, number> = { mini: 3, standard: 11, neo: 4, plus: 4, xl: 28, "plus-xl": 32 };
 
 describe("managed profile registry", () => {
@@ -70,11 +86,12 @@ describe("managed profile registry", () => {
 		);
 	});
 
-	it("the active revision is 2 and every runtime name carries it", () => {
-		assert.equal(DETAIL_PROFILE_REVISION, 2);
+	it("the active revision is 3 and every runtime name carries it", () => {
+		assert.equal(DETAIL_PROFILE_REVISION, 3);
 		for (const profile of DETAIL_PROFILES) {
-			assert.equal(profile.name, `profiles/detail-r2-${profile.key}`, profile.key);
+			assert.equal(profile.name, `profiles/detail-r3-${profile.key}`, profile.key);
 			assert.equal(profile.name, detailProfileNameFor(profile.key, DETAIL_PROFILE_REVISION), profile.key);
+			assert.equal(detailProfileNameFor(profile.key, 2), `profiles/detail-r2-${profile.key}`, profile.key);
 			assert.equal(detailProfileNameFor(profile.key, 1), `profiles/detail-${profile.key}`, profile.key);
 		}
 	});
@@ -116,9 +133,9 @@ describe("managed profile registry", () => {
 		}
 	});
 
-	it("resolves supported device types to revision-2 names and refuses the rest", () => {
-		assert.equal(detailProfileFor(0)?.name, "profiles/detail-r2-standard");
-		assert.equal(detailProfileFor(13)?.name, "profiles/detail-r2-plus-xl");
+	it("resolves supported device types to revision-3 names and refuses the rest", () => {
+		assert.equal(detailProfileFor(0)?.name, "profiles/detail-r3-standard");
+		assert.equal(detailProfileFor(13)?.name, "profiles/detail-r3-plus-xl");
 		for (const unsupported of [3, 4, 5, 6, 8, 10, 11, 12, 99, undefined]) {
 			assert.equal(detailProfileFor(unsupported), undefined, String(unsupported));
 		}
@@ -202,7 +219,7 @@ describe("manifest agreement", () => {
 });
 
 describe("archives", () => {
-	it("committed artifacts are byte-identical to a fresh deterministic build, both revisions", () => {
+	it("committed artifacts are byte-identical to a fresh deterministic build, every revision", () => {
 		for (const revision of REVISIONS) {
 			for (const profile of DETAIL_PROFILES) {
 				const built = buildDetailProfileArchive(profile, revision);
@@ -218,6 +235,13 @@ describe("archives", () => {
 		for (const profile of DETAIL_PROFILES) {
 			const committed = fs.readFileSync(path.join(pluginDir, `${detailProfileNameFor(profile.key, 1)}.streamDeckProfile`));
 			assert.equal(createHash("sha256").update(committed).digest("hex"), REVISION1_SHA256[profile.key], `${profile.key}: installed revision-1 copies exist; these bytes may never change`);
+		}
+	});
+
+	it("revision-2 bytes are frozen at their shipped pre-1.5-issue5-2 hashes", () => {
+		for (const profile of DETAIL_PROFILES) {
+			const committed = fs.readFileSync(path.join(pluginDir, `${detailProfileNameFor(profile.key, 2)}.streamDeckProfile`));
+			assert.equal(createHash("sha256").update(committed).digest("hex"), REVISION2_SHA256[profile.key], `${profile.key}: installed revision-2 copies exist; these bytes may never change`);
 		}
 	});
 
@@ -265,10 +289,25 @@ describe("archives", () => {
 		}
 	});
 
-	it("the two revisions differ at every identity layer and share no GUID", () => {
+	it("revisions differ at every functional identity layer and share no GUID", () => {
+		// Display names: adjacent revisions differ so an upgrade is visible in
+		// the profile list, but revision 3 deliberately REUSES revision 1's
+		// unnumbered name. The name carries no upgrade mechanics: the app's
+		// already-installed check keys on the profile path, and a same-device
+		// display collision gets a " copy" suffix from the app itself (both
+		// proven on the real app, 2026-07-29).
 		assert.notEqual(DETAIL_PROFILE_DISPLAY_NAMES[1], DETAIL_PROFILE_DISPLAY_NAMES[2]);
+		assert.notEqual(DETAIL_PROFILE_DISPLAY_NAMES[2], DETAIL_PROFILE_DISPLAY_NAMES[3]);
+		assert.equal(DETAIL_PROFILE_DISPLAY_NAMES[3], DETAIL_PROFILE_DISPLAY_NAMES[1]);
+		const pairs: Array<[DetailProfileRevision, DetailProfileRevision]> = [
+			[1, 2],
+			[2, 3],
+			[1, 3]
+		];
 		for (const profile of DETAIL_PROFILES) {
-			assert.notEqual(detailProfileNameFor(profile.key, 1), detailProfileNameFor(profile.key, 2), profile.key);
+			for (const [a, b] of pairs) {
+				assert.notEqual(detailProfileNameFor(profile.key, a), detailProfileNameFor(profile.key, b), `${profile.key} r${a}/r${b}`);
+			}
 			const guidsOf = (revision: DetailProfileRevision): Set<string> => {
 				const guids = new Set<string>();
 				for (const [, data] of unzipStore(buildDetailProfileArchive(profile, revision))) {
@@ -285,11 +324,13 @@ describe("archives", () => {
 				}
 				return guids;
 			};
-			const r1 = guidsOf(1);
-			const r2 = guidsOf(2);
-			assert.ok(r1.size > 0 && r2.size > 0, profile.key);
-			for (const guid of r2) {
-				assert.equal(r1.has(guid), false, `${profile.key}: GUID ${guid} collides across revisions`);
+			for (const [a, b] of pairs) {
+				const first = guidsOf(a);
+				const second = guidsOf(b);
+				assert.ok(first.size > 0 && second.size > 0, profile.key);
+				for (const guid of second) {
+					assert.equal(first.has(guid), false, `${profile.key}: GUID ${guid} collides across r${a}/r${b}`);
+				}
 			}
 		}
 	});
@@ -310,55 +351,57 @@ describe("archives", () => {
 		}
 	});
 
-	it("revision-2 pages bake exactly one Sensor Reading (the 0,0 Back, marker only) among hidden slots", () => {
-		for (const profile of DETAIL_PROFILES) {
-			const files = unzipStore(buildDetailProfileArchive(profile, 2));
-			const pageName = [...files.keys()][2] as string;
-			const page = JSON.parse((files.get(pageName) as Buffer).toString("utf8")) as { Controllers: Array<{ Actions: Record<string, { UUID: string; Name: string; Settings: unknown }> | null; Type: string }>; Icon: string; Name: string };
-			const keypad = page.Controllers.find((c) => c.Type === "Keypad");
-			assert.notEqual(keypad, undefined, profile.key);
-			const actions = keypad?.Actions ?? {};
-			assert.equal(Object.keys(actions).length, profile.layout.columns * profile.layout.rows, profile.key);
-			const readings = Object.entries(actions).filter(([, entry]) => entry.UUID === SENSOR_READING_UUID);
-			assert.equal(readings.length, 1, `${profile.key}: exactly one Sensor Reading cell`);
-			const [coord, back] = readings[0] as [string, { UUID: string; Name: string; Settings: unknown }];
-			assert.equal(coord, "0,0", profile.key);
-			assert.equal(back.Name, "Sensor Reading", profile.key);
-			// Exactly the internal role marker: no reading keys, no layout, no
-			// labels, no device or user data baked into the shipped page.
-			assert.deepEqual(back.Settings, { detailRole: "back" }, profile.key);
-			assert.equal(detailRoleOf(back.Settings as { detailRole?: unknown }), "back", profile.key);
-			const roles: string[] = [];
-			const indices: number[] = [];
-			for (const [c, entry] of Object.entries(actions)) {
-				assert.match(c, /^\d+,\d+$/);
-				if (entry.UUID === SENSOR_READING_UUID) {
-					continue;
+	it("revision-2 and revision-3 pages bake exactly one Sensor Reading (the 0,0 Back, marker only) among hidden slots", () => {
+		for (const revision of [2, 3] as DetailProfileRevision[]) {
+			for (const profile of DETAIL_PROFILES) {
+				const files = unzipStore(buildDetailProfileArchive(profile, revision));
+				const pageName = [...files.keys()][2] as string;
+				const page = JSON.parse((files.get(pageName) as Buffer).toString("utf8")) as { Controllers: Array<{ Actions: Record<string, { UUID: string; Name: string; Settings: unknown }> | null; Type: string }>; Icon: string; Name: string };
+				const keypad = page.Controllers.find((c) => c.Type === "Keypad");
+				assert.notEqual(keypad, undefined, profile.key);
+				const actions = keypad?.Actions ?? {};
+				assert.equal(Object.keys(actions).length, profile.layout.columns * profile.layout.rows, profile.key);
+				const readings = Object.entries(actions).filter(([, entry]) => entry.UUID === SENSOR_READING_UUID);
+				assert.equal(readings.length, 1, `${profile.key}: exactly one Sensor Reading cell`);
+				const [coord, back] = readings[0] as [string, { UUID: string; Name: string; Settings: unknown }];
+				assert.equal(coord, "0,0", profile.key);
+				assert.equal(back.Name, "Sensor Reading", profile.key);
+				// Exactly the internal role marker: no reading keys, no layout, no
+				// labels, no device or user data baked into the shipped page.
+				assert.deepEqual(back.Settings, { detailRole: "back" }, profile.key);
+				assert.equal(detailRoleOf(back.Settings as { detailRole?: unknown }), "back", profile.key);
+				const roles: string[] = [];
+				const indices: number[] = [];
+				for (const [c, entry] of Object.entries(actions)) {
+					assert.match(c, /^\d+,\d+$/);
+					if (entry.UUID === SENSOR_READING_UUID) {
+						continue;
+					}
+					assert.equal(entry.UUID, DETAIL_SLOT_UUID, `${profile.key} ${c}`);
+					const binding = parseSlotBinding(entry.Settings);
+					assert.notEqual(binding, null, `${profile.key} ${c}: unparsable baked settings`);
+					if (binding !== null && binding.slot === "reading") {
+						indices.push(binding.index);
+					} else if (binding !== null) {
+						roles.push(binding.slot);
+					}
 				}
-				assert.equal(entry.UUID, DETAIL_SLOT_UUID, `${profile.key} ${c}`);
-				const binding = parseSlotBinding(entry.Settings);
-				assert.notEqual(binding, null, `${profile.key} ${c}: unparsable baked settings`);
-				if (binding !== null && binding.slot === "reading") {
-					indices.push(binding.index);
-				} else if (binding !== null) {
-					roles.push(binding.slot);
+				// The Back role moved onto the reading action; the remaining hidden
+				// roles are exactly the pagers (and the title where the grid has room).
+				const expectedRoles = profile.key === "mini" ? ["next", "previous"] : ["next", "previous", "title"];
+				assert.deepEqual(roles.sort(), expectedRoles, profile.key);
+				assert.deepEqual(
+					indices.sort((a, b) => a - b),
+					Array.from({ length: readingSlotCapacity(profile) }, (_, i) => i),
+					profile.key
+				);
+				// Encoder-bearing classes carry an explicitly empty dial bank.
+				const encoder = page.Controllers.find((c) => c.Type === "Encoder");
+				assert.equal(encoder !== undefined, profile.encoders > 0, profile.key);
+				if (encoder !== undefined) {
+					assert.equal(encoder.Actions, null, profile.key);
 				}
-			}
-			// The Back role moved onto the reading action; the remaining hidden
-			// roles are exactly the pagers (and the title where the grid has room).
-			const expectedRoles = profile.key === "mini" ? ["next", "previous"] : ["next", "previous", "title"];
-			assert.deepEqual(roles.sort(), expectedRoles, profile.key);
-			assert.deepEqual(
-				indices.sort((a, b) => a - b),
-				Array.from({ length: readingSlotCapacity(profile) }, (_, i) => i),
-				profile.key
-			);
-			// Encoder-bearing classes carry an explicitly empty dial bank.
-			const encoder = page.Controllers.find((c) => c.Type === "Encoder");
-			assert.equal(encoder !== undefined, profile.encoders > 0, profile.key);
-			if (encoder !== undefined) {
-				assert.equal(encoder.Actions, null, profile.key);
-			}
+		}
 		}
 	});
 

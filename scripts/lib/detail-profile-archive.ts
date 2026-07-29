@@ -28,23 +28,35 @@ export const DETAIL_SLOT_UUID = "com.lawrensen.hwinfo.detail-slot";
 export const SENSOR_READING_UUID = "com.lawrensen.hwinfo.reading";
 
 /**
- * Structural revisions this generator can emit. Installed profiles never
+ * Revisions this generator can emit. Installed profiles never
  * auto-update, so a revision is a complete identity change: archive
- * path (managed-profiles' naming authority), internal GUID namespace and
- * the display name below all differ per revision, and revision-1 output
- * stays byte-frozen for already installed copies.
+ * path (managed-profiles' naming authority) and internal GUID namespace
+ * always differ per revision, and the output of every revision with
+ * installed copies in the wild stays byte-frozen.
  *
  * Revision 2's one structural change: the Back cell (0,0) is a real
  * Sensor Reading action baked with exactly { detailRole: "back" } — no
  * sensor identity, no user data — so the tile is fully configurable in
  * the (now editable) profile while its press stays fixed to Back.
+ *
+ * Revision 3 changes no cell: it exists to drop the number from the
+ * display name for the stable release. The name is NOT part of the
+ * upgrade mechanics: the app's already-installed check keys on the
+ * manifest profile path, not the display name, and a display-name
+ * collision on one device gets a " copy" suffix from the app itself
+ * (both behaviors proven on the real app, 2026-07-29). Only the two
+ * preview installs can collide; the release notes tell them to delete
+ * the old preview profiles first.
  */
-export type DetailProfileRevision = 1 | 2;
+export type DetailProfileRevision = 1 | 2 | 3;
 
-/** Per-device display names in the app's profile list, by revision. */
+/** Per-device display names in the app's profile list, by revision.
+ * Revision 3 deliberately returns to the unnumbered name: fresh installs
+ * see a clean, stable name no matter how many revisions ship. */
 export const DETAIL_PROFILE_DISPLAY_NAMES: Readonly<Record<DetailProfileRevision, string>> = {
 	1: "HWiNFO Details",
-	2: "HWiNFO Details 2"
+	2: "HWiNFO Details 2",
+	3: "HWiNFO Details"
 };
 /** Revision-1 name kept under its original export for the frozen tests. */
 export const DETAIL_PROFILE_DISPLAY_NAME = DETAIL_PROFILE_DISPLAY_NAMES[1];

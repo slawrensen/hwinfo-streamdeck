@@ -243,6 +243,76 @@
 			"AutoInstall": false,
 			"DontAutoSwitchWhenInstalled": false,
 			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
 		}
 	]
 }

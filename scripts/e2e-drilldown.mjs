@@ -332,10 +332,11 @@ async function scenario(send) {
 	await sleep(200);
 
 	// L. Revision 2: the generated Back cell is a REAL Sensor Reading
-	// action carrying only { detailRole: "back" }. Entry uses the r2 name,
+	// action carrying only { detailRole: "back" }. The grammar shipped in r2
+	// and is unchanged in r3; entry uses the ACTIVE revision's name,
 	// the baked cell's willAppear routes into SensorReadingAction, and the
 	// unconfigured tile renders the opener fallback with the return hook.
-	const r2Cells = profileCells("profiles/detail-r2-standard");
+	const r2Cells = profileCells("profiles/detail-r3-standard");
 	const r2Back = r2Cells.find((c) => c.uuid === "com.lawrensen.hwinfo.reading");
 	const r2BackCtx = slotCtx("devr2", r2Back.coord);
 	results.r2OpenerLabel = primary.label;
@@ -475,7 +476,7 @@ async function finish() {
 
 	check("legacy default press cycled to MIN via setSettings", results.legacyCycle === true);
 	check("legacy press touched no profile", results.legacySwitches === 0);
-	check("entry switched dev1 to the revision-2 profile name", results.enterSwitch?.device === "dev1" && results.enterSwitch?.profile === "profiles/detail-r2-standard", JSON.stringify(results.enterSwitch));
+	check("entry switched dev1 to the active-revision profile name", results.enterSwitch?.device === "dev1" && results.enterSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.enterSwitch));
 	check("Back tile renders the opener's reading with the return mark", typeof results.backFace === "string" && results.backFace.includes("M33 119"), (results.backFace ?? "no frame").slice(0, 120));
 	check("title tile shows the source range 1-1 / 1", typeof results.titleFace === "string" && results.titleFace.includes(">1-1 / 1<"), (results.titleFace ?? "no frame").slice(0, 160));
 	check("reading slot 0 shows the source member live", typeof results.slot0Face === "string" && results.slot0Face.includes("<text"), (results.slot0Face ?? "no frame").slice(0, 120));
@@ -495,15 +496,15 @@ async function finish() {
 	check("unsupported device alerts without switching", results.pedAlerted === true && results.refusalSwitches === 0);
 	check("an unresolvable primary alerts without switching", results.goneAlerted === true);
 	check("tap cycles exactly once", results.tapCycled === true);
-	check("hold enters details exactly once", results.holdSwitched !== undefined && results.holdSwitched.profile === "profiles/detail-r2-standard", JSON.stringify(results.holdSwitched));
+	check("hold enters details exactly once", results.holdSwitched !== undefined && results.holdSwitched.profile === "profiles/detail-r3-standard", JSON.stringify(results.holdSwitched));
 	check("the release after a hold writes nothing (no ghost cycle)", results.holdGhostWrites === 0, `${results.holdGhostWrites} writes`);
-	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-r2-plus-xl", JSON.stringify(results.xlSwitch));
+	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-r3-plus-xl", JSON.stringify(results.xlSwitch));
 	check("the + XL title tile rendered", typeof results.xlTitle === "string" && results.xlTitle.includes("<text"));
 	check("paging devxl repainted no dev1 slot", results.dev1FramesDuringXl === 0, `${results.dev1FramesDuringXl} frames`);
-	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r2-xl", JSON.stringify(results.vsdSwitch));
+	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r3-xl", JSON.stringify(results.vsdSwitch));
 
 	// Revision-2 configurable Back (the generated Sensor Reading cell)
-	check("r2 entry switched devr2 to the revision-2 profile name", results.r2Switch?.device === "devr2" && results.r2Switch?.profile === "profiles/detail-r2-standard", JSON.stringify(results.r2Switch));
+	check("r2 entry switched devr2 to the active-revision profile name", results.r2Switch?.device === "devr2" && results.r2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.r2Switch));
 	check("the generated Back cell reached SensorReadingAction and rendered the opener fallback", typeof results.r2BackFallback === "string" && results.r2BackFallback.includes("M33 119") && results.r2BackFallback.includes(results.r2OpenerLabel), (results.r2BackFallback ?? "no frame").slice(0, 160));
 	check("a configured Back renders its own dual face with the divider hook", typeof results.r2BackDual === "string" && results.r2BackDual.includes("M33 66"), (results.r2BackDual ?? "no frame").slice(0, 160));
 	check("HWiNFO loss keeps the configured Back on the status screen with the hook", typeof results.r2BackFrozen === "string" && results.r2BackFrozen.includes("Not updating") && results.r2BackFrozen.includes("M33 119"), (results.r2BackFrozen ?? "no frame").slice(0, 160));

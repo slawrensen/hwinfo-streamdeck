@@ -33,7 +33,7 @@ const down: PollerStatus = { state: "unavailable", reason: "not-running", messag
 function stateOf(presentation: DeviceDetailState["presentation"] = {}, primaryKey = "cpu:0:0"): DeviceDetailState {
 	return {
 		deviceId: "dev1",
-		profileName: "profiles/detail-r2-standard",
+		profileName: "profiles/detail-r3-standard",
 		pageSize: 11,
 		primaryKey,
 		groupSettings: { readingKey: primaryKey },

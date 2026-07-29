@@ -31,17 +31,18 @@
 import { DeviceType } from "@elgato/schemas/streamdeck/plugins";
 
 /**
- * The CURRENT structural revision of the bundled detail profiles.
- * Installed Stream Deck profiles never auto-update, so any change to a
- * page's cell grammar (revision 2: the Back cell became a real,
- * configurable Sensor Reading action) must ship as a NEW profile
- * identity — archive path, internal GUID namespace and internal display
- * name all differ — and the upgraded plugin then prompts once for the
- * new profile instead of silently running a stale installed copy.
- * Revision 1 stays bundled byte-frozen for already installed copies;
- * nothing in current code ever switches to it.
+ * The CURRENT revision of the bundled detail profiles. Installed Stream
+ * Deck profiles never auto-update, so any change to a shipped page
+ * (revision 2: the Back cell became a real, configurable Sensor Reading
+ * action; revision 3: the display name dropped its number for the
+ * stable release) must ship as a NEW profile identity — archive path
+ * and internal GUID namespace differ — and the upgraded plugin then
+ * prompts once for the new profile instead of silently running a stale
+ * installed copy. Revisions 1 and 2 stay bundled byte-frozen for
+ * already installed copies; nothing in current code ever switches to
+ * them.
  */
-export const DETAIL_PROFILE_REVISION = 2;
+export const DETAIL_PROFILE_REVISION = 3;
 
 /** Manifest `Profiles.Name` (path from the .sdPlugin root, no extension)
  * for a bundle key at a structural revision. Revision 1 keeps its

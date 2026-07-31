@@ -8,10 +8,10 @@
 // honest idle tiles with Back still working. Run with `npm run
 // e2e:drilldown` (after `npm run build`).
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { profileCells as sharedProfileCells } from "./lib/profile-cells.mjs";
 
 const PORT = 28994;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,31 +29,7 @@ function check(name, ok, detail = "") {
 	}
 }
 
-// --- minimal store-only ZIP reader (the shipped profiles never compress) --
-function unzipStore(archive) {
-	const files = new Map();
-	let pos = 0;
-	while (pos + 4 <= archive.length && archive.readUInt32LE(pos) === 0x04034b50) {
-		const size = archive.readUInt32LE(pos + 18);
-		const nameLen = archive.readUInt16LE(pos + 26);
-		const extraLen = archive.readUInt16LE(pos + 28);
-		const name = archive.subarray(pos + 30, pos + 30 + nameLen).toString("utf8");
-		const start = pos + 30 + nameLen + extraLen;
-		files.set(name, Buffer.from(archive.subarray(start, start + size)));
-		pos = start + size;
-	}
-	return files;
-}
-
-/** The baked keypad cells of a shipped detail profile: [{coord, settings}]. */
-function profileCells(name) {
-	const archive = fs.readFileSync(path.join(pluginDir, `${name}.streamDeckProfile`));
-	const files = unzipStore(archive);
-	const pageName = [...files.keys()].find((n) => /Profiles\/.*\/Profiles\/.*manifest\.json$/.test(n));
-	const page = JSON.parse(files.get(pageName).toString("utf8"));
-	const keypad = page.Controllers.find((c) => c.Type === "Keypad");
-	return Object.entries(keypad.Actions).map(([coord, entry]) => ({ coord, settings: entry.Settings, uuid: entry.UUID }));
-}
+const profileCells = (name) => sharedProfileCells(pluginDir, name);
 
 // --- traffic capture -----------------------------------------------------
 const images = []; // { context, svg }
@@ -94,6 +70,12 @@ wss.on("connection", (ws) => {
 				break;
 			case "showAlert":
 				showAlerts.push(msg.context);
+				break;
+			case "sendToPropertyInspector":
+				// The tree arrives on the PI channel; capture it for the scenario.
+				if (msg.payload?.event === "sensorTree") {
+					results.tree = msg.payload;
+				}
 				break;
 			default:
 				break;
@@ -642,16 +624,6 @@ plugin.on("exit", (code) => {
 		console.error(`plugin exited early with code ${code}`);
 		process.exit(1);
 	}
-});
-
-// The tree arrives on the PI channel; capture it for the scenario.
-wss.on("connection", (ws) => {
-	ws.on("message", (data) => {
-		const msg = JSON.parse(data.toString());
-		if (msg.event === "sendToPropertyInspector" && msg.payload?.event === "sensorTree") {
-			results.tree = msg.payload;
-		}
-	});
 });
 
 setTimeout(() => {

@@ -29,16 +29,6 @@ export const DETAIL_KEYS_MAX = 128;
 /** How long a key must stay down to count as a hold (tap-cycle-hold-details). */
 export const HOLD_THRESHOLD_MS = 500;
 
-/** The drill-down fields appended to ReadingSettings; all optional. */
-export type DetailSettingsShape = {
-	pressBehavior?: string;
-	detailMode?: string;
-	detailKeys?: string[];
-	detailTitle?: string;
-	detailFilter?: string;
-	detailRole?: string;
-};
-
 export function pressBehaviorOf(settings: { pressBehavior?: unknown }): PressBehavior {
 	const raw = settings.pressBehavior;
 	return raw === "open-details" || raw === "tap-cycle-hold-details" ? raw : "cycle-stat";

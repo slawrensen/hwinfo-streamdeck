@@ -26,5 +26,12 @@ export default tseslint.config(
 		rules: {
 			"no-console": "off"
 		}
+	},
+	{
+		// Plain-JS script modules cannot carry TypeScript boundary types.
+		files: ["scripts/**/*.mjs"],
+		rules: {
+			"@typescript-eslint/explicit-module-boundary-types": "off"
+		}
 	}
 );

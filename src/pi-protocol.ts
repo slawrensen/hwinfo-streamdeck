@@ -5,7 +5,7 @@
 import streamDeck from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
-import { detailProfileFor, readingSlotCapacity } from "./detail/managed-profiles";
+import { detailProfileFor } from "./detail/managed-profiles";
 import { deviceCapabilities } from "./devices";
 import { buildSupportReport } from "./diagnostics";
 import { poller, type PollerStatus } from "./poller";
@@ -115,8 +115,7 @@ export function buildDetailSupportPayload(): JsonValue {
 	return {
 		event: "detailSupport",
 		supported: profile !== undefined,
-		model: caps?.model ?? "unknown device",
-		readingSlots: profile === undefined ? 0 : readingSlotCapacity(profile)
+		model: caps?.model ?? "unknown device"
 	};
 }
 

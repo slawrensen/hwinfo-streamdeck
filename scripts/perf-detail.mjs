@@ -5,11 +5,11 @@
 // CIM and prints a PERF.md-ready summary plus per-sample CSV lines.
 //   node scripts/perf-detail.mjs          (PERF_DETAIL_SEC=480 default)
 import { execFile, spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { profileCells } from "./lib/profile-cells.mjs";
 
 const execFileAsync = promisify(execFile);
 const PORT = 28993;
@@ -19,26 +19,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function unzipStore(archive) {
-	const files = new Map();
-	let pos = 0;
-	while (pos + 4 <= archive.length && archive.readUInt32LE(pos) === 0x04034b50) {
-		const size = archive.readUInt32LE(pos + 18);
-		const nameLen = archive.readUInt16LE(pos + 26);
-		const extraLen = archive.readUInt16LE(pos + 28);
-		const name = archive.subarray(pos + 30, pos + 30 + nameLen).toString("utf8");
-		const start = pos + 30 + nameLen + extraLen;
-		files.set(name, Buffer.from(archive.subarray(start, start + size)));
-		pos = start + size;
-	}
-	return files;
-}
-
-const archive = fs.readFileSync(path.join(pluginDir, "profiles", "detail-plus-xl.streamDeckProfile"));
-const files = unzipStore(archive);
-const pageName = [...files.keys()].find((n) => /Profiles\/.*\/Profiles\/.*manifest\.json$/.test(n));
-const page = JSON.parse(files.get(pageName).toString("utf8"));
-const cells = Object.entries(page.Controllers.find((c) => c.Type === "Keypad").Actions).map(([coord, entry]) => ({ coord, settings: entry.Settings, uuid: entry.UUID }));
+const cells = profileCells(pluginDir, "profiles/detail-plus-xl");
 
 let frames = 0;
 let switches = 0;

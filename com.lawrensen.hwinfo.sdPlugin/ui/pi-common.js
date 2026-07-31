@@ -413,7 +413,7 @@
 		detailKeys.forEach((key, index) => {
 			const label = readingLabelOf(key);
 			const chip = document.createElement("span");
-			chip.className = "hw-set-chip hw-detail-chip" + (tree !== null && label === null ? " missing" : "");
+			chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
 			chip.dataset.key = key;
 			const name = document.createElement("span");
 			name.className = "hw-set-name hw-detail-name";
@@ -1245,13 +1245,12 @@
 			return;
 		}
 		if (p.event === "detailSupport") {
+			// The note starts hidden and empty; the one-shot reply only ever
+			// needs to reveal it on an unsupported deck.
 			const note = document.getElementById("detail-unsupported");
-			if (note !== null) {
-				note.hidden = p.supported === true;
-				note.textContent =
-					p.supported === true
-						? ""
-						: `Sensor details are not available on this deck (${p.model ?? "unsupported device"}): no bundled detail view fits its layout. Everything else on this key keeps working normally.`;
+			if (note !== null && p.supported !== true) {
+				note.hidden = false;
+				note.textContent = `Sensor details are not available on this deck (${p.model ?? "unsupported device"}): no bundled detail view fits its layout. Everything else on this key keeps working normally.`;
 			}
 			return;
 		}

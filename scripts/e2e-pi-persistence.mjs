@@ -17,7 +17,7 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
@@ -117,7 +117,7 @@ wss.on("connection", (ws) => {
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
-					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: { event: "detailSupport", supported: true, model: "Harness Deck", readingSlots: 11 } });
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: { event: "detailSupport", supported: true, model: "Harness Deck" } });
 				}
 				break;
 			}
@@ -217,7 +217,6 @@ try {
 	if (target === null) {
 		throw new Error("chrome debugger never came up");
 	}
-	const { default: WebSocket } = await import("ws");
 	const ws = new WebSocket(target.webSocketDebuggerUrl, { maxPayload: 64 * 1024 * 1024 });
 	cdpSocket = ws;
 	await new Promise((resolve, reject) => {

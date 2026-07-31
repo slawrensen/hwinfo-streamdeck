@@ -136,11 +136,6 @@ export class DetailController {
 		this.navigator.setMirrorSlotIndex(deviceId, mirror);
 	}
 
-	/** True when this context is a registered detail slot. */
-	hasSlot(contextId: string): boolean {
-		return this.slots.has(contextId);
-	}
-
 	/** Routes a slot press. Everything acts on key-down, like the opener. */
 	slotKeyDown(contextId: string): void {
 		const slot = this.slots.get(contextId);
@@ -182,12 +177,10 @@ export class DetailController {
 	 * carry the identical snapshot and every face would compose to the
 	 * identical bytes the dedupe then drops. Skipping those passes outright
 	 * removes the compose cost too (tick-signature.ts owns what "changed"
-	 * means; the provider's valueRevision keeps sub-second HWiNFO polls
-	 * visible through pollTime's one-second grain). Every face is a pure
-	 * function of this signature: session changes repaint via
-	 * requestRender, theme changes via renderAll, new slots via
-	 * registerSlot, and no status face renders wall-clock time (staleForMs
-	 * is deliberately not displayed).
+	 * means). Every face is a pure function of this signature: session
+	 * changes repaint via requestRender, theme changes via renderAll, new
+	 * slots via registerSlot, and no status face renders wall-clock time
+	 * (staleForMs is deliberately not displayed).
 	 */
 	private lastTickSignature = "";
 
@@ -274,7 +267,7 @@ export class DetailController {
 				// past the beat (a no-op switch, a restart-shaped surface).
 				return composeVoidFace();
 			}
-			return composeIdleFace(binding.slot === "reading" ? "reading" : binding.slot);
+			return composeIdleFace(binding.slot);
 		}
 		switch (binding.slot) {
 			case "back":

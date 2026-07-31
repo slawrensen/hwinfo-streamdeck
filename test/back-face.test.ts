@@ -42,7 +42,10 @@ function stateOf(presentation: DeviceDetailState["presentation"] = {}, primaryKe
 		offset: 0,
 		statModes: new Map(),
 		surfaceCount: 1,
-		pending: false
+		pending: false,
+		dispatchedAt: 0,
+		openerCell: null,
+		mirrorSlotIndex: null
 	};
 }
 

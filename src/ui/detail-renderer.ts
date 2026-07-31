@@ -72,3 +72,12 @@ export function renderDetailBlankKey(palette: Palette): string {
 	parts.push("</svg>");
 	return parts.join("");
 }
+
+/** Pure black, nothing else: the face a just-left detail surface wears
+ * during the app's switch beat. The app caches each key's LAST image per
+ * profile and replays it on the next entry before fresh frames arrive,
+ * so whatever leave paints is what entry flashes. Black flashes as
+ * nothing; the old idle face flashed as a wall of "No detail selected". */
+export function renderDetailVoidKey(): string {
+	return `${svgOpen(144, 144, "#000000").join("")}</svg>`;
+}

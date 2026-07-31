@@ -121,8 +121,8 @@ describe("entry", () => {
 		const { nav, switches } = bed();
 		const result = await nav.enter({ deviceId: "vsd", deviceType: 11, grid: { columns: 10, rows: 10 }, settings: opener, snapshot });
 		assert.equal(result, "entered");
-		assert.equal(switches[0]?.profileName, "profiles/detail-r3-xl");
-		assert.equal(nav.stateFor("vsd")?.pageSize, 28);
+		assert.equal(switches[0]?.profileName, "profiles/detail-r3-plus-xl");
+		assert.equal(nav.stateFor("vsd")?.pageSize, 32);
 	});
 
 	it("a too-small virtual deck refuses honestly", async () => {
@@ -217,6 +217,38 @@ describe("leaving", () => {
 		advance(2_000); // past the debounce: a genuine second Back (stateless) hops
 		await nav.leave("dev1");
 		assert.equal(switches.filter((s) => s.profileName === undefined).length, 2);
+	});
+
+	it("the just-left blackout flushes before the restore is dispatched", async () => {
+		const order: string[] = [];
+		const nav = new DetailNavigator({
+			switchProfile: () => {
+				order.push("switch");
+				return Promise.resolve();
+			},
+			onLeaving: () => order.push("blackout"),
+			now: () => 1
+		});
+		await nav.leave("dev1");
+		assert.deepEqual(order, ["blackout", "switch"]);
+	});
+
+	it("recentlyLeft covers exactly the switch beat, and a new entry clears it", async () => {
+		const { nav, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		assert.equal(nav.recentlyLeft("dev1"), false);
+		await nav.leave("dev1");
+		assert.equal(nav.recentlyLeft("dev1"), true);
+		advance(1_400);
+		assert.equal(nav.recentlyLeft("dev1"), true);
+		advance(200); // past the beat: honest idle faces may return
+		assert.equal(nav.recentlyLeft("dev1"), false);
+		await nav.leave("dev1"); // stateless Back re-arms the window
+		assert.equal(nav.recentlyLeft("dev1"), true);
+		advance(300);
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		assert.equal(nav.recentlyLeft("dev1"), false); // fresh session, no ghost
 	});
 
 	it("stat modes die with the session", async () => {
@@ -316,6 +348,100 @@ describe("re-resolution", () => {
 		});
 		nav.refresh("dev1", snapshot);
 		assert.deepEqual(nav.stateFor("dev1")?.group.keys, ["cpu:0:5", "gpu:0:1", "cpu:0:2"]);
+	});
+});
+
+describe("switch-beat and late-accept seams", () => {
+	it("a double-tapped opener dispatches one switch; the pending entry stays retryable past the beat", async () => {
+		const { nav, switches, advance } = bed();
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "entered");
+		// The second tap lands while the app is still switching (or the
+		// install prompt just opened): no second switchToProfile, which
+		// could stamp the detail profile into the app's "previous" register.
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "already-active");
+		assert.equal(switches.length, 1);
+		// Past the beat the pending session is retryable (declined install).
+		advance(1_600);
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "entered");
+		assert.equal(switches.length, 2);
+	});
+
+	it("a confirmed re-entry clears the leave debounce: Back on the new view works immediately", async () => {
+		const { nav, switches, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		await nav.leave("dev1");
+		advance(400);
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		advance(700); // 1.1 s after the first Back: inside the old debounce
+		await nav.leave("dev1");
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 2);
+		assert.equal(nav.stateFor("dev1"), undefined);
+	});
+
+	it("an install prompt accepted after the pending expiry backs out instead of stranding", async () => {
+		const { nav, switches, fireTimers } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		fireTimers(); // 30 s: the unconfirmed entry expires
+		nav.surfaceSeen("dev1"); // the user accepts late; the app switches in
+		assert.deepEqual(switches.at(-1), { deviceId: "dev1", profileName: undefined, page: undefined });
+		assert.equal(nav.stateFor("dev1"), undefined);
+	});
+
+	it("a stale tombstone or a plain restart keeps the honest idle surface", async () => {
+		const { nav, switches, fireTimers, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		fireTimers();
+		advance(11 * 60_000); // the accept comes far too late to correlate
+		nav.surfaceSeen("dev1");
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 0);
+		// No tombstone at all (the restart-inside-the-view shape): same.
+		nav.surfaceSeen("dev1");
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 0);
+	});
+
+	it("a fresh entry after an expiry claims the appearing surface (no bounce)", async () => {
+		const { nav, switches, fireTimers, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		fireTimers();
+		advance(2_000);
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "entered");
+		nav.surfaceSeen("dev1");
+		assert.equal(nav.stateFor("dev1")?.pending, false);
+		assert.equal(switches.filter((s) => s.profileName === undefined).length, 0);
+	});
+});
+
+describe("mirror Back slot", () => {
+	it("carries the opener cell, pages with the reduced stride, and restores it when cleared", async () => {
+		const { nav, changed } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot, openerCell: { column: 2, row: 1 } });
+		const state = nav.stateFor("dev1");
+		assert.deepEqual(state?.openerCell, { column: 2, row: 1 });
+		if (state === undefined) return;
+		nav.setMirrorSlotIndex("dev1", 4);
+		assert.equal(nav.pageFor(state).step, 10); // 11 slots, one mirrored
+		assert.equal(nav.pageFor(state).slots[4], undefined);
+		nav.pageNext("dev1");
+		assert.equal(state.offset, 10);
+		assert.equal(nav.pageFor(state).rangeText, "11-13 / 13");
+		nav.pagePrevious("dev1");
+		assert.equal(state.offset, 0);
+		const repaints = changed.length;
+		nav.setMirrorSlotIndex("dev1", 4); // unchanged value: no repaint
+		assert.equal(changed.length, repaints);
+		nav.setMirrorSlotIndex("dev1", null);
+		assert.equal(nav.pageFor(state).step, 11);
+	});
+
+	it("a session without an opener cell has no mirror; unknown devices no-op", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		const state = nav.stateFor("dev1");
+		assert.equal(state?.openerCell, null);
+		nav.setMirrorSlotIndex("ghost", 3); // no state: silently ignored
+		assert.equal(state?.mirrorSlotIndex, null);
 	});
 });
 

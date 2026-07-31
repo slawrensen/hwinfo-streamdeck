@@ -15,11 +15,13 @@
  *
  * The Virtual Stream Deck (11) has a USER-SIZED canvas (3x2 up to
  * 10x10 on this bench), so it cannot own a fixed bundle; instead it is a
- * GUEST of the keypad-only bundles: entry picks the largest bundle whose
- * grid fits the virtual deck's reported size (a 10x10 virtual deck runs
- * the 15-key layout, a 3x2 one the Mini layout), and the manifest
+ * GUEST of the fixed bundles: entry picks the largest bundle whose grid
+ * fits the virtual deck's reported size (a 9-wide virtual deck runs the
+ * + XL's 9x4 keypad, a 3x2 one the Mini layout), and the manifest
  * registers those bundles a second time under DeviceType 11 so the
- * app's first-use install flow works there too.
+ * app's first-use install flow works there too. A dial-bearing bundle
+ * may host a virtual guest because its dial bank is baked EMPTY: the
+ * page references no hardware the guest lacks.
  *
  * Deliberately absent: Mobile (3) has a variable canvas with no
  * install-flow evidence, Studio (10) does not take app profiles the same
@@ -91,8 +93,9 @@ export type ManagedDetailProfile = {
 	/** Encoder count, for the page manifest's (empty) Encoder controller. */
 	readonly encoders: number;
 	/** Extra DeviceTypes this bundle also registers for in the manifest:
-	 * variable-canvas guests that borrow it when their grid fits. Only
-	 * keypad-only bundles may host guests (a guest has no dials). */
+	 * variable-canvas guests that borrow it when their grid fits. A
+	 * dial-bearing host is fine for the Virtual Stream Deck: the baked
+	 * dial bank is empty, so the guest page references no dials. */
 	readonly guestDeviceTypes: readonly number[];
 	readonly layout: DetailLayout;
 };
@@ -200,7 +203,11 @@ const PROFILE_TABLE: readonly Omit<ManagedDetailProfile, "name">[] = [
 		deviceModel: "20GBX9901",
 		modelVerified: true,
 		encoders: 6,
-		guestDeviceTypes: [],
+		// The one dial-bearing bundle that hosts a guest: its dial bank is
+		// baked EMPTY, so on a dial-less virtual deck nothing references
+		// hardware the device lacks, and a 9-column canvas gains the widest
+		// layout (32 reading slots, and column 8 can mirror the opener).
+		guestDeviceTypes: [DeviceType.VirtualStreamDeck],
 		layout: buildLayout(9, 4, {
 			back: { column: 0, row: 0 },
 			title: { column: 0, row: 1 },
@@ -219,10 +226,10 @@ export const DETAIL_PROFILES: readonly ManagedDetailProfile[] = PROFILE_TABLE.ma
 /**
  * The bundle for a device, or undefined when it isn't supported. An exact
  * DeviceType owner wins outright. A guest type (the Virtual Stream Deck)
- * resolves by FIT: the richest keypad-only bundle whose grid fits the
- * deck's reported size, so a 10x10 virtual deck runs the 8x4 XL layout
- * and a 3x2 one the Mini layout. A guest with no known grid resolves to
- * nothing rather than guessing.
+ * resolves by FIT: the richest guest-hosting bundle whose KEY GRID fits
+ * the deck's reported size, so a 10x10 virtual deck runs the + XL's 9x4
+ * keypad (dial bank empty) and a 3x2 one the Mini layout. A guest with
+ * no known grid resolves to nothing rather than guessing.
  */
 export function detailProfileFor(deviceType: number | undefined, grid?: { columns: number; rows: number }): ManagedDetailProfile | undefined {
 	const owner = DETAIL_PROFILES.find((p) => p.deviceType === deviceType);

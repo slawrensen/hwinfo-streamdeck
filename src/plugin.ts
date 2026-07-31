@@ -94,9 +94,12 @@ const readingRepaint = { fire: (): void => undefined };
 const detailNavigator = new DetailNavigator({
 	switchProfile: (deviceId, profileName, page) => streamDeck.profiles.switchToProfile(deviceId, profileName, page),
 	onChanged: (deviceId) => {
-		detailController.renderDevice(deviceId);
+		detailController.requestRender(deviceId);
 		readingRepaint.fire();
 	},
+	// Synchronous by design: the blackout must hit the socket before the
+	// switchToProfile that follows it (see the navigator's onLeaving doc).
+	onLeaving: (deviceId) => detailController.renderDevice(deviceId),
 	log: detailLog
 });
 const detailController = new DetailController(detailNavigator, { getStatus: () => poller.getStatus(), log: detailLog });

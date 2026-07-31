@@ -175,6 +175,13 @@
 			"Readonly": true
 		},
 		{
+			"Name": "profiles/detail-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
 			"Name": "profiles/detail-r2-mini",
 			"DeviceType": 1,
 			"AutoInstall": false,
@@ -245,6 +252,13 @@
 			"Readonly": false
 		},
 		{
+			"Name": "profiles/detail-r2-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
 			"Name": "profiles/detail-r3-mini",
 			"DeviceType": 1,
 			"AutoInstall": false,
@@ -309,6 +323,13 @@
 		},
 		{
 			"Name": "profiles/detail-r3-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus-xl",
 			"DeviceType": 11,
 			"AutoInstall": false,
 			"DontAutoSwitchWhenInstalled": false,

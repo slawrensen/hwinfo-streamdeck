@@ -76,6 +76,41 @@ describe("source-mode resolution", () => {
 		assert.deepEqual(group?.keys, ["a:0:1", "a:0:3"]);
 	});
 
+	it("filter mode matches source name or label with * and ?, case-insensitively, in snapshot order", () => {
+		const gpuOnly = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "*gpu*" });
+		assert.deepEqual(gpuOnly?.keys, ["b:0:1", "b:0:2"]);
+		assert.equal(gpuOnly?.title, "*gpu*");
+		const anchored = resolveDetailGroup(snapshot, { readingKey: "b:0:1", detailMode: "filter", detailFilter: "?PU*tctl*" });
+		assert.deepEqual(anchored?.keys, ["a:0:1"]);
+		const upper = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "TDIE" });
+		assert.deepEqual(upper?.keys, ["a:0:2"]); // plain text = substring, any case
+	});
+
+	it("filter mode excludes the primary, titles from detailTitle when set, and resolves without the primary present", () => {
+		const all = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "*", detailTitle: "Everything" });
+		assert.deepEqual(all?.keys, ["a:0:2", "b:0:1", "a:0:3", "b:0:2"]);
+		assert.equal(all?.title, "Everything");
+		// A primary the snapshot no longer publishes: the pattern still works
+		// (it lives on the Back tile as Sensor missing, like custom mode).
+		const orphaned = resolveDetailGroup(snapshot, { readingKey: "gone:0:0", detailMode: "filter", detailFilter: "hotspot" });
+		assert.deepEqual(orphaned?.keys, ["b:0:2"]);
+	});
+
+	it("filter mode without a usable pattern (or snapshot) is unresolvable", () => {
+		assert.equal(resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter" }), null);
+		assert.equal(resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "   " }), null);
+		assert.equal(resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: 42 }), null);
+		assert.equal(resolveDetailGroup(null, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "*gpu*" }), null);
+	});
+
+	it("an orphan primary (sensorIndex -1) is unresolvable, never a cross-source group", () => {
+		// The reader parks readings whose SHM row points past the sensor
+		// table at sensorIndex -1; every orphan shares it. Grouping by it
+		// would list another source's strays under this reading's label.
+		const orphans = snapshotOf([reading("?:5:a", -1, "Orphan A"), reading("?:9:b", -1, "Orphan B"), reading("a:0:1", 0, "CPU Tctl")], ["CPU [#0]"]);
+		assert.equal(resolveDetailGroup(orphans, { readingKey: "?:5:a" }), null);
+	});
+
 	it("resolves by stable key only: a missing primary returns null (ride on the last list)", () => {
 		assert.equal(resolveDetailGroup(snapshot, { readingKey: "gone:0:0" }), null);
 		assert.equal(resolveDetailGroup(null, { readingKey: "a:0:1" }), null);
@@ -162,5 +197,28 @@ describe("pagination", () => {
 		const page = pageOf(["a"], 0, 0);
 		assert.equal(page.slots.length, 1);
 		assert.equal(page.rangeText, "1-1 / 1");
+	});
+
+	it("a reserved mirror slot: readings flow around it, the step shrinks, nothing hides", () => {
+		const ten = Array.from({ length: 10 }, (_, i) => `k${i}`);
+		const first = pageOf(ten, 0, 5, 1);
+		assert.equal(first.step, 4);
+		assert.deepEqual(first.slots, ["k0", undefined, "k1", "k2", "k3"]);
+		assert.equal(first.rangeText, "1-4 / 10");
+		assert.equal(first.hasNext, true);
+		const second = pageOf(ten, first.offset + first.step, 5, 1);
+		assert.deepEqual(second.slots, ["k4", undefined, "k5", "k6", "k7"]);
+		assert.equal(second.rangeText, "5-8 / 10");
+		const last = pageOf(ten, second.offset + second.step, 5, 1);
+		assert.deepEqual(last.slots, ["k8", undefined, "k9", undefined, undefined]);
+		assert.equal(last.rangeText, "9-10 / 10");
+		assert.equal(last.hasNext, false);
+	});
+
+	it("a mirror outside the page (or on a one-slot page) is ignored", () => {
+		assert.equal(pageOf(["a", "b"], 0, 2, 7).step, 2);
+		assert.equal(pageOf(["a", "b"], 0, 2, -1).step, 2);
+		assert.equal(pageOf(["a"], 0, 1, 0).step, 1);
+		assert.equal(pageOf(["a", "b"], 0, 2, 1.5).step, 2);
 	});
 });

@@ -246,11 +246,18 @@ async function scenario(send) {
 	await sleep(3200);
 	results.backRecovered = latestSvg(backCtx);
 
-	// F. Back: previous-profile restore with the name omitted.
+	// F. Back: previous-profile restore with the name omitted. Through the
+	// app's switch beat the just-left tiles paint PURE BLACK (the app
+	// caches each key's last image per profile and replays it on the next
+	// entry, so black here is what entry flashes); only the Back tile
+	// keeps its face, so the way out never blinks away.
 	const switchesBeforeBack = switches.length;
 	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
 	await sleep(500);
 	results.backSwitch = switches.length > switchesBeforeBack ? switches.at(-1) : undefined;
+	results.leftSlotFace = latestSvg(slot0Ctx);
+	results.leftTitleFace = latestSvg(titleCtx);
+	results.leftBackFace = latestSvg(backCtx);
 	removeDetailSurface(send, "dev1", standardCells);
 	await sleep(400);
 
@@ -321,7 +328,8 @@ async function scenario(send) {
 	await sleep(400);
 	removeDetailSurface(send, "devxl", xlCells);
 
-	// K. Virtual Stream Deck (type 11, 10x10): a guest of the XL bundle.
+	// K. Virtual Stream Deck (type 11, 10x10): a guest of the + XL keypad
+	// (the dial-bearing bundle hosts it with an empty dial bank).
 	const vsdOpener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-vsd", "devvsd", vsdOpener, { column: 0, row: 0 });
 	await sleep(300);
@@ -456,6 +464,32 @@ async function scenario(send) {
 	await sleep(300);
 	results.r2AllBackWrites = setSettings.filter((s) => s.context === r2BackCtx || s.context === dev1BackCtx).length;
 
+	// T. Filter mode + the mirror Back, self-contained on its own device:
+	// a glob-driven group opens, the reading slot on the OPENER'S OWN CELL
+	// renders the opener face with the return mark, the readings flow
+	// around it (step shrinks, nothing hides), and pressing that cell
+	// leaves exactly like the canonical top-left Back.
+	const fltCells = profileCells("profiles/detail-r3-standard");
+	const fltOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
+	appearOpener(send, "ctx-flt", "devflt", fltOpener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-flt", "devflt", fltOpener);
+	await sleep(500);
+	results.fltSwitch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-flt", device: "devflt", payload: { settings: fltOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devflt", fltCells);
+	await sleep(1600);
+	const fltMirrorCell = fltCells.find((c) => c.coord === "2,1");
+	results.fltMirrorFace = latestSvg(slotCtx("devflt", "2,1"));
+	results.fltTitleFace = latestSvg(slotCtx("devflt", cellOfRole(fltCells, "title").coord));
+	results.fltSlot0Face = latestSvg(slotCtx("devflt", cellOfIndex(fltCells, 0).coord));
+	const switchesBeforeMirror = switches.length;
+	slotPress(send, "devflt", fltMirrorCell.coord, fltMirrorCell.settings);
+	await sleep(500);
+	results.fltMirrorSwitch = switches.length > switchesBeforeMirror ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devflt", fltCells);
+	await sleep(300);
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -501,7 +535,7 @@ async function finish() {
 	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-r3-plus-xl", JSON.stringify(results.xlSwitch));
 	check("the + XL title tile rendered", typeof results.xlTitle === "string" && results.xlTitle.includes("<text"));
 	check("paging devxl repainted no dev1 slot", results.dev1FramesDuringXl === 0, `${results.dev1FramesDuringXl} frames`);
-	check("a 10x10 Virtual Stream Deck enters as a guest of the XL bundle", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r3-xl", JSON.stringify(results.vsdSwitch));
+	check("a 10x10 Virtual Stream Deck enters as a guest of the + XL keypad", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r3-plus-xl", JSON.stringify(results.vsdSwitch));
 
 	// Revision-2 configurable Back (the generated Sensor Reading cell)
 	check("r2 entry switched devr2 to the active-revision profile name", results.r2Switch?.device === "devr2" && results.r2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.r2Switch));
@@ -519,6 +553,13 @@ async function finish() {
 	check("two devices: dev1's own Back then left with its device id", results.r2Dev1Switch !== undefined && results.r2Dev1Switch.device === "dev1" && results.r2Dev1Switch.profile === undefined, JSON.stringify(results.r2Dev1Switch));
 	check("no r2 Back context ever received a setSettings write", results.r2AllBackWrites === 0, `${results.r2AllBackWrites} writes`);
 
+	check("a just-left surface goes black through the switch beat (no idle wall)", typeof results.leftSlotFace === "string" && !results.leftSlotFace.includes("<text") && results.leftSlotFace.includes("#000000") && typeof results.leftTitleFace === "string" && !results.leftTitleFace.includes("<text"), (results.leftSlotFace ?? "no frame").slice(0, 120));
+	check("the way out keeps its face while leaving", typeof results.leftBackFace === "string" && results.leftBackFace.includes(">Back<"), (results.leftBackFace ?? "no frame").slice(0, 120));
+	check("filter entry switched devflt to the active-revision profile", results.fltSwitch?.device === "devflt" && results.fltSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.fltSwitch));
+	check("the mirror Back rides the opener's own cell with the return mark", typeof results.fltMirrorFace === "string" && results.fltMirrorFace.includes("M33 119"), (results.fltMirrorFace ?? "no frame").slice(0, 140));
+	check("filter title shows the glob range 1-2 / 2", typeof results.fltTitleFace === "string" && results.fltTitleFace.includes(">1-2 / 2<"), (results.fltTitleFace ?? "no frame").slice(0, 160));
+	check("readings flow around the mirror (slot 0 stays live)", typeof results.fltSlot0Face === "string" && results.fltSlot0Face.includes("<text"), (results.fltSlot0Face ?? "no frame").slice(0, 100));
+	check("pressing the mirror cell left the view (restore, name omitted)", results.fltMirrorSwitch !== undefined && results.fltMirrorSwitch.device === "devflt" && results.fltMirrorSwitch.profile === undefined, JSON.stringify(results.fltMirrorSwitch));
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -560,6 +601,7 @@ const info = {
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devflt", name: "Harness Deck C", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

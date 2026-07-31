@@ -331,7 +331,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// bundle by reported grid; fixed classes ignore it.
 			grid: { columns: caps.columns, rows: caps.rows },
 			settings: state.settings,
-			snapshot: status.state === "unavailable" ? null : status.snapshot
+			snapshot: status.state === "unavailable" ? null : status.snapshot,
+			// The opener's own cell: a detail reading slot on the same cell
+			// becomes the mirror Back tile (tap in, tap out, one finger).
+			openerCell: act.coordinates === undefined ? undefined : { column: act.coordinates.column, row: act.coordinates.row }
 		});
 		if (result !== "entered") {
 			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);

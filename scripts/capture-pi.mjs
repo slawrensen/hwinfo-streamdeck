@@ -260,6 +260,23 @@ try {
 		const r = block.getBoundingClientRect();
 		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
 	})()`));
+	// ---- key PI: the filter mode with its live match count ----
+	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await setSelect("detailMode", "filter");
+	await sleep(900);
+	expectOk("filter editor revealed", await evaluate(`document.getElementById("detail-filter").hidden === false ? "ok" : "hidden"`));
+	// sdpi-textfield: drive the shadow input (the property path throws on
+	// plain strings; same gotcha as the placeholder).
+	await evaluate(`(() => { const input = document.querySelector('sdpi-textfield[setting="detailFilter"]').shadowRoot.querySelector("input"); input.focus(); input.value = "*4090*"; input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	await sleep(1200); // the setting echo, the 400 ms follow poll, the count
+	expectOk("live match count shown", await evaluate(`(() => { const el = document.getElementById("detail-filter-count"); return el && !el.hidden && /Matches \\d+ readings right now/.test(el.textContent) ? "ok" : (el ? "text: " + el.textContent : "missing"); })()`));
+	await captureClipped("pi-key-detail-filter.png", await evaluate(`(() => {
+		const block = document.getElementById("detail-config");
+		if (!block) return "missing";
+		const r = block.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
+	})()`));
+
 	// Back to the plain panel so the later layout shots stay untouched.
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
 	await setSelect("detailMode", "source");

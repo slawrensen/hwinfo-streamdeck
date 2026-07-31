@@ -13,7 +13,7 @@
  */
 import type { PollerStatus } from "../poller";
 import type { Reading } from "../hwinfo/types";
-import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey } from "../ui/detail-renderer";
+import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
 import { alertLevel, convertUnit, parseThreshold, STAT_BADGE } from "../ui/format";
 import { renderReadingKey, renderStatusKey } from "../ui/key-renderer";
 import { formatMeasurement, type MeasureOptions } from "../ui/measure";
@@ -138,4 +138,11 @@ export function composePagerFace(direction: "previous" | "next", page: DetailPag
  * restarted inside the profile): honest idle tiles, Back stays live. */
 export function composeIdleFace(role: DetailNavRole | "reading"): string {
 	return role === "back" ? renderDetailIdleBackKey() : renderDetailIdleKey();
+}
+
+/** A just-left surface during the app's switch beat: pure black, so the
+ * app's per-key image cache replays black (not an idle wall) when the
+ * profile is next entered. See DetailNavigator.recentlyLeft. */
+export function composeVoidFace(): string {
+	return renderDetailVoidKey();
 }

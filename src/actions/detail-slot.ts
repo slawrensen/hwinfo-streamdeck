@@ -39,7 +39,10 @@ export class DetailSlotAction extends SingletonAction<DetailSlotSettings> {
 		// never reach the event trace), mirroring the reading key's line.
 		streamDeck.logger.debug(`Detail slot appeared on ${ev.action.device.name}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${JSON.stringify(ev.payload.settings)})`);
 		const act = ev.action;
-		this.controller.registerSlot(act.id, act.device.id, ev.payload.settings, {
+		// The cell drives the mirror Back tile (the slot on the opener's own
+		// cell); a coordinate-less appear (multi-action shapes) just has none.
+		const cell = act.isKey() && act.coordinates !== undefined ? { column: act.coordinates.column, row: act.coordinates.row } : null;
+		this.controller.registerSlot(act.id, act.device.id, ev.payload.settings, cell, {
 			setImage: (svg: string): void => {
 				void act.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);
 			}

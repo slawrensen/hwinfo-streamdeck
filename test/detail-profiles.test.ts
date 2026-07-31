@@ -141,8 +141,9 @@ describe("managed profile registry", () => {
 		}
 	});
 
-	it("the Virtual Stream Deck resolves by fit: richest keypad-only bundle its grid holds", () => {
-		assert.equal(detailProfileFor(11, { columns: 10, rows: 10 })?.key, "xl");
+	it("the Virtual Stream Deck resolves by fit: richest hosting bundle its key grid holds", () => {
+		assert.equal(detailProfileFor(11, { columns: 10, rows: 10 })?.key, "plus-xl");
+		assert.equal(detailProfileFor(11, { columns: 9, rows: 4 })?.key, "plus-xl");
 		assert.equal(detailProfileFor(11, { columns: 8, rows: 4 })?.key, "xl");
 		assert.equal(detailProfileFor(11, { columns: 5, rows: 3 })?.key, "standard");
 		assert.equal(detailProfileFor(11, { columns: 4, rows: 2 })?.key, "neo");
@@ -152,8 +153,6 @@ describe("managed profile registry", () => {
 		assert.equal(detailProfileFor(11, { columns: 0, rows: 0 }), undefined);
 		// A fixed class ignores the grid entirely (an XL stays an XL).
 		assert.equal(detailProfileFor(2, { columns: 3, rows: 2 })?.key, "xl");
-		// Guest fitting never hands a dial-bearing bundle to a virtual deck.
-		assert.equal(detailProfileFor(11, { columns: 9, rows: 4 })?.key, "xl");
 	});
 });
 
@@ -185,17 +184,21 @@ describe("manifest agreement", () => {
 		}
 	});
 
-	it("only keypad-only bundles host guests, and only the Virtual Stream Deck is one", () => {
+	it("only the Virtual Stream Deck is a guest, and a dial-bearing host bakes its dial bank empty", () => {
 		for (const profile of DETAIL_PROFILES) {
 			if (profile.guestDeviceTypes.length > 0) {
-				assert.equal(profile.encoders, 0, `${profile.key}: a dial-bearing bundle must not host guests`);
 				assert.deepEqual([...profile.guestDeviceTypes], [11], profile.key);
 			}
 		}
 		assert.deepEqual(
 			DETAIL_PROFILES.filter((p) => p.guestDeviceTypes.length > 0).map((p) => p.key),
-			["mini", "standard", "neo", "xl"]
+			["mini", "standard", "neo", "xl", "plus-xl"]
 		);
+		// The one dial-bearing host: its archive's Encoder controller carries
+		// no actions, so a dial-less virtual deck gets nothing it lacks (the
+		// archive check below asserts Actions: null for every encoder bank).
+		const plusXl = DETAIL_PROFILES.find((p) => p.key === "plus-xl");
+		assert.equal(plusXl?.guestDeviceTypes.includes(11), true);
 	});
 
 	it("every entry's file exists with exact casing; no unregistered profile ships", () => {

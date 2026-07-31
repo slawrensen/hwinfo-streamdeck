@@ -39,6 +39,9 @@ function stateOf(overrides?: Partial<DeviceDetailState> & { presentation?: Devic
 		statModes: new Map(),
 		surfaceCount: 1,
 		pending: false,
+		dispatchedAt: 0,
+		openerCell: null,
+		mirrorSlotIndex: null,
 		...overrides
 	};
 }

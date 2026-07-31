@@ -42,6 +42,13 @@ export type DeviceDetailState = {
 	/** Last valid resolution; ridden on while HWiNFO restarts (transient
 	 *  recovery), replaced whenever the primary resolves again. */
 	group: DetailGroup;
+	/** The opener key's grid cell on ITS profile, when known. A detail
+	 *  reading slot at the same cell becomes a mirror Back tile, so the
+	 *  finger that pressed in presses right back out. */
+	readonly openerCell: { readonly column: number; readonly row: number } | null;
+	/** The reading-slot index acting as the mirror Back (controller-fed
+	 *  from the registered slots' coordinates); null = no mirror. */
+	mirrorSlotIndex: number | null;
 	offset: number;
 	/** Ephemeral per-reading stat modes for this detail session. */
 	readonly statModes: Map<string, StatMode>;
@@ -49,6 +56,11 @@ export type DeviceDetailState = {
 	surfaceCount: number;
 	/** True until the first detail slot appears after the switch. */
 	pending: boolean;
+	/** When this session's switch was dispatched (deps.now clock). A second
+	 *  entry inside the app's switch beat is refused, not re-dispatched: the
+	 *  app may record "previous" on a same-profile switch, which would turn
+	 *  Back into a self-loop. */
+	readonly dispatchedAt: number;
 };
 
 export type EnterResult = "entered" | "unsupported" | "unresolved" | "switch-failed" | "already-active";
@@ -57,6 +69,12 @@ type NavigatorDeps = {
 	switchProfile: SwitchProfileFn;
 	/** Re-render hook; fired after any state change for a device. */
 	onChanged?: (deviceId: string) => void;
+	/** SYNCHRONOUS repaint hook fired by leave() BEFORE the restore is
+	 *  dispatched. Frames sent after switchToProfile land on a profile the
+	 *  app is already tearing down and never reach its per-key image cache
+	 *  (hardware-observed), so the blackout must beat the switch onto the
+	 *  wire or the next entry replays stale faces. */
+	onLeaving?: (deviceId: string) => void;
 	log?: { info(msg: string): void; warn(msg: string): void };
 	/** Entry never confirmed by an appearing slot after this long: drop it. */
 	pendingExpiryMs?: number;
@@ -73,8 +91,16 @@ const DISAPPEAR_GRACE_MS = 2_500;
 
 /** Repeat Back presses inside this window are one hop, not two: the app
  * takes a beat to actually switch, and a double-tap during it would hop
- * "previous" twice (the second hop from the detail profile itself). */
+ * "previous" twice (the second hop from the detail profile itself). The
+ * same window guards repeat ENTRIES: a double-tapped opener must not
+ * dispatch a second switch while the first is still landing. */
 const LEAVE_DEBOUNCE_MS = 1_500;
+
+/** How long after a pending expiry a late-appearing surface still means
+ * "the user finally accepted the install prompt": the slots appear with no
+ * session to serve them, so the only honest move is to back out to where
+ * they came from instead of stranding them on an idle page. */
+const PENDING_TOMBSTONE_MS = 10 * 60_000;
 
 export class DetailNavigator {
 	private readonly states = new Map<string, DeviceDetailState>();
@@ -83,6 +109,9 @@ export class DetailNavigator {
 	private readonly entering = new Set<string>();
 	/** Last leave per device, for the double-press debounce. */
 	private readonly leftAt = new Map<string, number>();
+	/** Pending sessions that expired unconfirmed (declined-or-ignored
+	 *  install prompt), so a late accept can be recognized and backed out. */
+	private readonly expiredPendingAt = new Map<string, number>();
 	private readonly deps: Required<Pick<NavigatorDeps, "switchProfile" | "pendingExpiryMs" | "disappearGraceMs" | "setTimer" | "clearTimer">> & NavigatorDeps;
 
 	constructor(deps: NavigatorDeps) {
@@ -127,18 +156,30 @@ export class DetailNavigator {
 	 * stays `pending` until a detail slot appears and quietly expires when
 	 * none ever does.
 	 */
-	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation; snapshot: SensorSnapshot | null }): Promise<EnterResult> {
-		const { deviceId, deviceType, grid, settings, snapshot } = request;
+	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
+		const { deviceId, deviceType, grid, settings, snapshot, openerCell } = request;
 		const profile = detailProfileFor(deviceType, grid);
 		if (profile === undefined) {
 			this.deps.log?.info(`Detail entry refused: no bundled profile for device type ${deviceType ?? "unknown"}`);
 			return "unsupported";
 		}
+		const now = (this.deps.now ?? Date.now)();
 		const existing = this.states.get(deviceId);
 		if (existing !== undefined && existing.surfaceCount > 0) {
 			// The detail surface is already live on this device; a second
 			// entry would nest profile history. Refuse rather than stack.
 			this.deps.log?.warn(`Detail entry refused: already active on ${deviceId}`);
+			return "already-active";
+		}
+		if (existing !== undefined && now - existing.dispatchedAt < LEAVE_DEBOUNCE_MS) {
+			// A switch for this device was dispatched moments ago and its
+			// slots have not appeared yet (the app's switch beat, or the
+			// install prompt just opened). A double-tapped opener must not
+			// dispatch again: switching to the already-active profile could
+			// set the app's "previous" register to the detail profile itself,
+			// turning Back into a self-loop. A pending session older than the
+			// beat stays retryable (the declined-install path).
+			this.deps.log?.warn(`Detail entry refused: switch just dispatched on ${deviceId}`);
 			return "already-active";
 		}
 		if (this.entering.has(deviceId)) {
@@ -153,6 +194,11 @@ export class DetailNavigator {
 			return "unresolved";
 		}
 		this.clearCleanupTimer(deviceId);
+		// A fresh session invalidates the last-leave debounce (Back on the
+		// new view must work immediately) and any expired-pending tombstone
+		// (the slots about to appear belong to THIS session).
+		this.leftAt.delete(deviceId);
+		this.expiredPendingAt.delete(deviceId);
 		const state: DeviceDetailState = {
 			deviceId,
 			profileName: profile.name,
@@ -162,7 +208,8 @@ export class DetailNavigator {
 				readingKey: settings.readingKey,
 				detailMode: settings.detailMode,
 				detailKeys: settings.detailKeys,
-				detailTitle: settings.detailTitle
+				detailTitle: settings.detailTitle,
+				detailFilter: settings.detailFilter
 			},
 			presentation: {
 				label: settings.label,
@@ -177,10 +224,13 @@ export class DetailNavigator {
 				alertBelow: settings.alertBelow
 			},
 			group,
+			openerCell: openerCell === undefined ? null : { column: openerCell.column, row: openerCell.row },
+			mirrorSlotIndex: null,
 			offset: 0,
 			statModes: new Map(),
 			surfaceCount: 0,
-			pending: true
+			pending: true,
+			dispatchedAt: now
 		};
 		this.states.set(deviceId, state);
 		this.entering.add(deviceId);
@@ -221,6 +271,17 @@ export class DetailNavigator {
 		if (had) {
 			this.deps.onChanged?.(deviceId);
 		}
+		// The blackout ships first, synchronously: with leftAt stamped and
+		// the state gone, this pass paints the still-visible surface pure
+		// black, and only then does the restore go out. Reversed, the black
+		// frames chase a switch already in flight and the app's image cache
+		// keeps the old faces for the next entry to flash. A cosmetic hook
+		// must never block the way out, so it cannot abort the restore.
+		try {
+			this.deps.onLeaving?.(deviceId);
+		} catch (err) {
+			this.deps.log?.warn(`Leave blackout failed on ${deviceId}: ${String(err)}`);
+		}
 		try {
 			await this.deps.switchProfile(deviceId);
 		} catch (err) {
@@ -246,13 +307,44 @@ export class DetailNavigator {
 		if (direction > 0 ? !page.hasNext : !page.hasPrevious) {
 			return;
 		}
-		state.offset = page.offset + direction * state.pageSize;
+		// The page's own step, not the raw capacity: a mirror Back tile
+		// costs one slot on EVERY page, so the stride shrinks with it.
+		state.offset = page.offset + direction * page.step;
 		this.deps.onChanged?.(deviceId);
 	}
 
 	/** The current logical page projection for a device's state. */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize);
+		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined);
+	}
+
+	/**
+	 * True inside the switch beat after a Back on this device. The
+	 * controller renders a just-left surface PURE BLACK instead of the
+	 * idle faces: the app caches each key's last image per profile and
+	 * replays it on the next entry, so idle frames painted here would
+	 * flash as "No detail selected" walls forever after. Past the beat
+	 * (the switch never happened, or a restart-shaped surface) the honest
+	 * idle faces return on the next tick.
+	 */
+	recentlyLeft(deviceId: string): boolean {
+		const last = this.leftAt.get(deviceId);
+		return last !== undefined && (this.deps.now ?? Date.now)() - last < LEAVE_DEBOUNCE_MS;
+	}
+
+	/**
+	 * Controller: the reading-slot index whose registered cell matches the
+	 * opener's own cell (the mirror Back tile), or null when none does.
+	 * Only the controller sees slot coordinates, so it feeds this; a
+	 * repaint follows only on a real change.
+	 */
+	setMirrorSlotIndex(deviceId: string, index: number | null): void {
+		const state = this.states.get(deviceId);
+		if (state === undefined || state.mirrorSlotIndex === index) {
+			return;
+		}
+		state.mirrorSlotIndex = index;
+		this.deps.onChanged?.(deviceId);
 	}
 
 	/** A detail slot press cycles that reading's session-local stat mode. */
@@ -292,7 +384,7 @@ export class DetailNavigator {
 		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]);
 		if (changed) {
 			state.group = group;
-			state.offset = pageOf(group.keys, state.offset, state.pageSize).offset;
+			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined).offset;
 		}
 	}
 
@@ -300,6 +392,20 @@ export class DetailNavigator {
 	surfaceSeen(deviceId: string): void {
 		const state = this.states.get(deviceId);
 		if (state === undefined) {
+			// No session owns this surface. If a pending entry expired here
+			// recently, this is the install prompt accepted LATE: the app
+			// just switched into the view, and idling there would strand the
+			// user on a page nobody asked for anymore. Back out to where
+			// they were; the next opener press enters normally (installed
+			// now, so no prompt). A stale tombstone changes nothing, and a
+			// plugin restart inside the view has no tombstone at all: both
+			// keep the honest idle surface.
+			const expiredAt = this.expiredPendingAt.get(deviceId);
+			if (expiredAt !== undefined && (this.deps.now ?? Date.now)() - expiredAt < PENDING_TOMBSTONE_MS) {
+				this.expiredPendingAt.delete(deviceId);
+				this.deps.log?.info(`Detail surface appeared after its pending entry expired on ${deviceId}: restoring the previous profile`);
+				void this.leave(deviceId);
+			}
 			return;
 		}
 		state.surfaceCount++;
@@ -327,6 +433,11 @@ export class DetailNavigator {
 
 	deviceDisconnected(deviceId: string): void {
 		this.clearCleanupTimer(deviceId);
+		// The debounce stamp and tombstone die with the device: neither may
+		// influence a session after a reconnect, and the maps must not grow
+		// with device churn.
+		this.leftAt.delete(deviceId);
+		this.expiredPendingAt.delete(deviceId);
 		if (this.states.delete(deviceId)) {
 			this.deps.log?.info(`Detail session dropped: ${deviceId} disconnected`);
 		}
@@ -337,6 +448,8 @@ export class DetailNavigator {
 			this.clearCleanupTimer(deviceId);
 		}
 		this.states.clear();
+		this.leftAt.clear();
+		this.expiredPendingAt.clear();
 	}
 
 	private armCleanupTimer(deviceId: string, ms: number, reason: string): void {
@@ -347,6 +460,13 @@ export class DetailNavigator {
 			// Slots came (back) meanwhile: the session is live again.
 			if (state === undefined || state.surfaceCount > 0) {
 				return;
+			}
+			if (state.pending) {
+				// The entry was never confirmed (install prompt declined or
+				// still open). Leave a tombstone so a LATE accept is
+				// recognized in surfaceSeen and backed out instead of
+				// stranding the user on an idle page.
+				this.expiredPendingAt.set(deviceId, (this.deps.now ?? Date.now)());
 			}
 			this.states.delete(deviceId);
 			this.deps.log?.info(`Detail session dropped on ${deviceId}: ${reason}`);

@@ -319,15 +319,67 @@
 	const detailListEl = document.getElementById("detail-list");
 	const DETAIL_KEYS_MAX = 128; // mirrors the plugin parser's cap
 	let detailKeys = [];
+	// This key's own sensor: the runtime shows it on the Back tile and
+	// filters it out of the list, so the panel must refuse to add it and
+	// must mark an adopted copy (hand-edited, or the opener re-picked onto
+	// a listed sensor) instead of showing chips the deck will not list.
+	let detailPrimaryKey = "";
 	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
+	const detailPrimaryBinding = detailListEl === null ? null : useSettings("readingKey", adoptDetailPrimary, null);
 
 	function adoptDetailKeys(value) {
 		// Mirror the plugin parser: duplicates drop at their first occurrence
 		// (hand-edited settings could hold them, and indexOf-based move and
-		// remove need one chip per key).
+		// remove need one chip per key), and the same cap applies, so the
+		// panel never shows chips past what the runtime lists.
 		const seen = new Set();
-		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)) : [];
+		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)).slice(0, DETAIL_KEYS_MAX) : [];
 		renderDetailList();
+	}
+
+	function adoptDetailPrimary(value) {
+		detailPrimaryKey = typeof value === "string" ? value : "";
+		renderDetailList(); // the "(Back tile)" mark follows the opener's sensor
+		detailPicker?.renderList();
+		updateFilterCount(); // the primary is excluded from filter matches too
+	}
+
+	// --- live filter match count (reading PI only) ---------------------------
+	// The panel already holds the sensor tree, so the filter field can say
+	// exactly what its pattern gathers before the user ever presses the key.
+	let detailFilterValue = "";
+
+	/** Mirrors compileDetailFilter in src/detail/detail-settings.ts (same
+	 * wildcard grammar, same source-plus-label candidate); keep in sync. */
+	function detailFilterMatcher(pattern) {
+		const anchored = /[*?]/.test(pattern) ? pattern : `*${pattern}*`;
+		const source = anchored.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+		const regex = new RegExp(`^${source}$`, "is");
+		return (candidate) => regex.test(candidate);
+	}
+
+	function updateFilterCount() {
+		const el = document.getElementById("detail-filter-count");
+		if (el === null) return;
+		const pattern = detailFilterValue.trim().slice(0, 128);
+		if (pattern === "") {
+			el.hidden = false;
+			el.textContent = "Type a pattern; the view refuses to open while it is empty.";
+			return;
+		}
+		if (tree === null) {
+			el.hidden = true;
+			return;
+		}
+		const matches = detailFilterMatcher(pattern);
+		let count = 0;
+		for (const group of tree) {
+			for (const reading of group.readings) {
+				if (reading.key !== detailPrimaryKey && matches(`${group.name} ${reading.label}`)) count++;
+			}
+		}
+		el.hidden = false;
+		el.textContent = count === 0 ? "Matches nothing right now; the view would open empty (0 / 0)." : `Matches ${count} reading${count === 1 ? "" : "s"} right now.`;
 	}
 
 	function writeDetailKeys() {
@@ -337,7 +389,9 @@
 	}
 
 	function addDetailKey(key) {
-		if (!key || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return;
+		// The primary is refused, not added-and-hidden: it already shows on
+		// the Back tile, and the runtime filters it out of the list.
+		if (!key || key === detailPrimaryKey || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return;
 		detailKeys.push(key);
 		writeDetailKeys();
 	}
@@ -345,7 +399,7 @@
 	function addDetailSource(group) {
 		let added = 0;
 		for (const reading of group.readings) {
-			if (!detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
+			if (reading.key !== detailPrimaryKey && !detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
 				detailKeys.push(reading.key);
 				added++;
 			}
@@ -366,6 +420,13 @@
 			name.textContent = label ?? key;
 			if (tree !== null && label === null) {
 				name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
+			}
+			if (key === detailPrimaryKey) {
+				// Adopted from settings (or the opener re-picked onto a listed
+				// sensor): the deck shows this one on the Back tile, not in
+				// the list, and the panel must say so.
+				name.textContent += " (Back tile)";
+				name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
 			}
 			const up = document.createElement("button");
 			up.type = "button";
@@ -723,7 +784,10 @@
 					list: document.getElementById("pickerd-list"),
 					onPick: addDetailKey,
 					onGroupAdd: addDetailSource,
-					inList: (key) => detailKeys.includes(key)
+					// The opener's own sensor carries the mark too: it is
+					// already in the view (the Back tile), and a click on it
+					// adds nothing.
+					inList: (key) => detailKeys.includes(key) || key === detailPrimaryKey
 				});
 
 	document.addEventListener("mousedown", (ev) => {
@@ -918,11 +982,17 @@
 			backRole = value === "back";
 			applyPressState();
 		});
+		const detailFilterEl = document.getElementById("detail-filter");
 		followSetting("detailMode", (value) => {
-			// The exact inverse of the plugin's parser: ONLY "custom" is
-			// custom, so a junk or future value never shows an editor whose
-			// list the runtime would ignore.
+			// The exact inverse of the plugin's parser: ONLY the exact marker
+			// shows its editor, so a junk or future value never surfaces
+			// controls the runtime would ignore.
 			if (detailCustomEl !== null) detailCustomEl.hidden = value !== "custom";
+			if (detailFilterEl !== null) detailFilterEl.hidden = value !== "filter";
+		});
+		followSetting("detailFilter", (value) => {
+			detailFilterValue = typeof value === "string" ? value : "";
+			updateFilterCount();
 		});
 		// One-shot support note: the plugin answers from its managed-profile
 		// registry, so the panel owns no device table of its own.
@@ -1188,6 +1258,7 @@
 			for (const picker of pickers) picker.onTree();
 			renderRotationSet(); // chip labels resolve once the tree is here
 			renderDetailList(); // detail chip labels too
+			updateFilterCount(); // and the live filter match count
 		} else if (p.event === "preview") {
 			renderPreview(p);
 			setHint(p.hint);
@@ -1223,6 +1294,7 @@
 			}
 		});
 		detailBinding[0]().then(adoptDetailKeys);
+		detailPrimaryBinding[0]().then(adoptDetailPrimary);
 	}
 	if (rotationBinding !== null) {
 		rotationSetEl.addEventListener("click", (ev) => {

@@ -191,6 +191,28 @@ describe("SnapshotParser — incremental fast path", () => {
 		assert.equal(swapped.readings[0]?.label, "Different");
 	});
 
+	it("rebuilds when a unit changes under an unchanged skeleton (runtime C to F flip)", () => {
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [TEMP]));
+		assert.equal(first.readings[0]?.unit, "°C".normalize());
+		// HWiNFO flipped to Fahrenheit: identical skeleton and identities, but
+		// the published unit and values are now Fahrenheit. A stale °C unit
+		// makes the display layer convert an already-converted value.
+		const flipped = parser.parse(compose([CPU], [{ ...TEMP, unit: "°F", value: 131.9, min: 104, max: 194, avg: 140 }]));
+		assert.equal(flipped.readings[0]?.unit, "°F".normalize());
+		assert.equal(flipped.readings[0]?.value, 131.9);
+		assert.equal(flipped.readings[0]?.valueMax, 194);
+	});
+
+	it("rebuilds when only the UTF-8 unit tail changes (HWiNFO ≥ 7.x layout)", () => {
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [{ ...TEMP, unitUtf8: "°C" }], { utf8: true }));
+		assert.equal(first.readings[0]?.unit, "°C");
+		const flipped = parser.parse(compose([CPU], [{ ...TEMP, unitUtf8: "°F", value: 131.9 }], { utf8: true }));
+		assert.equal(flipped.readings[0]?.unit, "°F");
+		assert.equal(flipped.readings[0]?.value, 131.9);
+	});
+
 	it("fast path works across classic AND utf8 strides", () => {
 		for (const utf8 of [false, true]) {
 			const parser = new SnapshotParser();

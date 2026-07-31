@@ -49,7 +49,7 @@ describe("state-screens: stale recovery hint follows the source", () => {
 
 describe("state-screens: every unavailable reason has its own guidance", () => {
 	const unavailable = (reason: HwinfoUnavailableReason): PollerStatus => ({ state: "unavailable", reason, message: "" });
-	const REASONS: readonly HwinfoUnavailableReason[] = ["unsupported-platform", "not-running", "gadget-empty", "access-denied", "disabled", "invalid", "bridge-failed"];
+	const REASONS: readonly HwinfoUnavailableReason[] = ["unsupported-platform", "not-running", "busy", "gadget-empty", "access-denied", "disabled", "invalid", "bridge-failed"];
 
 	it("key, dial and PI sentence cover all reasons", () => {
 		for (const reason of REASONS) {
@@ -58,6 +58,17 @@ describe("state-screens: every unavailable reason has its own guidance", () => {
 			assert.ok((statusDialText(status)?.title ?? "") !== "", reason);
 			assert.ok(statusSentence(status).length > 20, reason);
 		}
+	});
+
+	it("open-time contention never claims HWiNFO is not running", () => {
+		// A held consistency mutex means HWiNFO IS running; telling the user
+		// to start software that is running in front of them is a lie.
+		const status = unavailable("busy");
+		assert.deepEqual(statusScreen(status)?.lines, ["HWiNFO busy", "retrying"]);
+		assert.equal(statusDialText(status)?.title, "HWiNFO busy");
+		assert.doesNotMatch(statusScreen(status)?.lines.join(" ") ?? "", /Start HWiNFO/);
+		assert.doesNotMatch(statusSentence(status), /not running|Start HWiNFO|restart HWiNFO/);
+		assert.match(statusSentence(status), /busy|retr/i);
 	});
 
 	it("a bridge load failure says reinstall, never restart HWiNFO", () => {

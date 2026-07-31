@@ -3,12 +3,18 @@
  * {@link SharedMemorySession.read}) into a typed {@link SensorSnapshot},
  * joining each reading to its sensor source via `sensorIndex`.
  *
- * The layout (sensor list, labels, units, keys) is static for the lifetime of
- * an HWiNFO session — between restarts only the value doubles and pollTime
- * move. {@link SnapshotParser} therefore decodes the full skeleton once and
- * on subsequent ticks only re-reads the volatile doubles into the same
+ * The layout (sensor list, labels, keys) is static for the lifetime of an
+ * HWiNFO session: between restarts, mostly only the value doubles and
+ * pollTime move. One in-place rewrite matters enough to detect: flipping
+ * HWiNFO's unit settings (°C to °F) rewrites the unit strings and value
+ * scale under an unchanged skeleton, and a stale unit displays a wrong
+ * number. {@link SnapshotParser} therefore decodes the full skeleton once
+ * and on subsequent ticks only re-reads the volatile doubles into the same
  * structures, verifying per entry that the identity words (type, sensor
- * index, id) still match. Any header or identity change ⇒ full rebuild.
+ * index, id) AND the raw unit bytes still match. Any header, identity, or
+ * unit change ⇒ full rebuild. A mid-session label rename is also possible
+ * and is knowingly NOT detected (stale label until the next rebuild): a
+ * stale name is cosmetic, a stale unit is a wrong number.
  */
 import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
 import { HwinfoError, SensorType, type SensorSnapshot, type SensorSource } from "./types";
@@ -70,6 +76,12 @@ interface MutableSnapshot {
 	byKey: ReadonlyMap<string, MutableReading>;
 }
 
+/** Each 16-byte unit field compares as 4 little-endian words; every entry
+ * carries two fields (ANSI, then the UTF-8 tail, zeros on the classic
+ * stride). */
+const UNIT_FIELD_WORDS = 4;
+const UNIT_WORDS_PER_ENTRY = UNIT_FIELD_WORDS * 2;
+
 /** Header fields (beyond pollTime) that define the skeleton. */
 const HEADER_KEY_OFFSETS = [
 	HEADER.version,
@@ -93,6 +105,10 @@ export class SnapshotParser {
 	private readonly headerKey = new Uint32Array(HEADER_KEY_OFFSETS.length);
 	/** [type, sensorIndex, id] per entry — cheap per-tick identity check. */
 	private identity = new Uint32Array(0);
+	/** Raw unit bytes per entry as little-endian words (the ANSI field, then
+	 * the UTF-8 tail or zeros): a stale unit displays a wrong number, so the
+	 * fast path must notice a unit rewrite as cheaply as an id change. */
+	private unitWords = new Uint32Array(0);
 	private snapshot: MutableSnapshot | null = null;
 	// DataView beats Buffer.read* in the hot loop: its accessors are TurboFan
 	// intrinsics, so reads stay unboxed (readDoubleLE allocates a HeapNumber
@@ -123,15 +139,18 @@ export class SnapshotParser {
 	}
 
 	/**
-	 * Fast path: re-read pollTime + the four doubles per entry. Stores are
-	 * conditional — writing a double field boxes a fresh HeapNumber, so
-	 * skipping unchanged values keeps steady-state ticks alloc-free.
+	 * Fast path: verify identity + unit bytes, then re-read pollTime + the
+	 * four doubles per entry. Stores are conditional — writing a double field
+	 * boxes a fresh HeapNumber, so skipping unchanged values keeps
+	 * steady-state ticks alloc-free (the guards are raw word compares).
 	 */
 	private refresh(dv: DataView, snap: MutableSnapshot): boolean {
 		const entrySectionOffset = dv.getUint32(HEADER.entrySectionOffset, true);
 		const entryElementSize = dv.getUint32(HEADER.entryElementSize, true);
+		const entryHasUtf8 = entryElementSize >= ENTRY_UTF8_SIZE;
 		const readings = snap.readings;
 		const identity = this.identity;
+		const unitWords = this.unitWords;
 		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			if (
 				dv.getUint32(o + ENTRY.type, true) !== identity[i * 3] ||
@@ -139,6 +158,18 @@ export class SnapshotParser {
 				dv.getUint32(o + ENTRY.id, true) !== identity[i * 3 + 2]
 			) {
 				return false; // layout changed under an unchanged header — rebuild
+			}
+			for (let w = 0; w < UNIT_FIELD_WORDS; w++) {
+				if (dv.getUint32(o + ENTRY.unit + w * 4, true) !== unitWords[i * UNIT_WORDS_PER_ENTRY + w]) {
+					return false; // unit rewritten in place (units flipped in HWiNFO): rebuild
+				}
+			}
+			if (entryHasUtf8) {
+				for (let w = 0; w < UNIT_FIELD_WORDS; w++) {
+					if (dv.getUint32(o + ENTRY.unitUtf8 + w * 4, true) !== unitWords[i * UNIT_WORDS_PER_ENTRY + UNIT_FIELD_WORDS + w]) {
+						return false;
+					}
+				}
 			}
 			const r = readings[i] as MutableReading;
 			const value = dv.getFloat64(o + ENTRY.value, true);
@@ -204,6 +235,7 @@ export class SnapshotParser {
 		const readings: MutableReading[] = new Array<MutableReading>(entryElementCount);
 		const byKey = new Map<string, MutableReading>();
 		const identity = new Uint32Array(entryElementCount * 3);
+		const unitWords = new Uint32Array(entryElementCount * UNIT_WORDS_PER_ENTRY);
 		for (let i = 0; i < entryElementCount; i++) {
 			const o = entrySectionOffset + i * entryElementSize;
 			const type = buf.readUInt32LE(o + ENTRY.type);
@@ -212,6 +244,14 @@ export class SnapshotParser {
 			identity[i * 3] = type;
 			identity[i * 3 + 1] = sensorIndex;
 			identity[i * 3 + 2] = id;
+			for (let w = 0; w < UNIT_FIELD_WORDS; w++) {
+				unitWords[i * UNIT_WORDS_PER_ENTRY + w] = buf.readUInt32LE(o + ENTRY.unit + w * 4);
+			}
+			if (entryHasUtf8) {
+				for (let w = 0; w < UNIT_FIELD_WORDS; w++) {
+					unitWords[i * UNIT_WORDS_PER_ENTRY + UNIT_FIELD_WORDS + w] = buf.readUInt32LE(o + ENTRY.unitUtf8 + w * 4);
+				}
+			}
 			const orig = cstr(buf, o + ENTRY.labelOrig, 128, "latin1");
 			const user = cstr(buf, o + ENTRY.labelUser, 128, "latin1");
 			const utf8 = entryHasUtf8 ? cstr(buf, o + ENTRY.labelUtf8, 128, "utf8") : "";
@@ -250,6 +290,7 @@ export class SnapshotParser {
 			this.headerKey[i] = buf.readUInt32LE(HEADER_KEY_OFFSETS[i] as number);
 		}
 		this.identity = identity;
+		this.unitWords = unitWords;
 		this.snapshot = { pollTime, version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}

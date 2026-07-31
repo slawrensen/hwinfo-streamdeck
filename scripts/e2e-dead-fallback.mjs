@@ -8,6 +8,12 @@
 //   present DEAD mapping + populated gadget, auto → live gadget value
 //   value keeps updating past the upgrade-probe interval (no clobber)
 //
+// Phase B (busy-at-open): with the SAME populated gadget key, a LIVE mapping
+// whose consistency mutex is held at the instant the plugin opens must show
+// "HWiNFO busy" and retry shared memory, never silently fall back to gadget
+// (whose key namespace differs, so a shared-memory key would read "Sensor
+// missing" until the upgrade probe swung back).
+//
 // Combines fake-hwinfo.mjs (the DEAD mapping) with a synthetic HKCU gadget key.
 // Run with `npm run e2e:dead-fallback` (after `npm run build`).
 import { execSync, spawn } from "node:child_process";
@@ -24,6 +30,8 @@ const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;
 const VSB_SUBKEY = `Software\\HwinfoDead_VSB_${process.pid}`;
 const REG_PATH = `HKCU\\${VSB_SUBKEY}`;
 const READING_KEY = "g:Test Source:Test Temp"; // gadget-format key
+const SM_READING_KEY = "f0001234:0:1000001"; // the same reading, shared-memory identity
+let phase = "dead"; // which plugin instance willAppear configures
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frames = [];
@@ -74,13 +82,18 @@ wss.on("connection", (ws) => {
 			send({
 				event: "willAppear",
 				action: "com.lawrensen.hwinfo.reading",
-				context: "ctx-dead",
+				context: `ctx-${phase}`,
 				device: "dev1",
-				payload: { settings: { readingKey: READING_KEY }, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false }
+				payload: {
+					settings: { readingKey: phase === "busy" ? SM_READING_KEY : READING_KEY },
+					coordinates: { column: 0, row: 0 },
+					controller: "Keypad",
+					isInMultiAction: false
+				}
 			});
 		} else if (msg.event === "getGlobalSettings") {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } }); // source defaults to auto
-		} else if (msg.event === "setImage" && msg.context === "ctx-dead") {
+		} else if (msg.event === "setImage" && msg.context === `ctx-${phase}`) {
 			const image = msg.payload?.image ?? "";
 			if (image.startsWith("data:image/svg+xml,")) {
 				frames.push(decodeURIComponent(image.slice("data:image/svg+xml,".length)));
@@ -114,14 +127,29 @@ function startFakeDead() {
 	});
 }
 
-try {
-	// Gadget populated + present DEAD shared-memory mapping, BEFORE the plugin runs.
-	publish(47.5);
-	await startFakeDead();
+/** Waits for the fake provider to echo a command's confirmation line. */
+function fakeCmd(cmd, expectEcho) {
+	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => {
+			fake?.stdout.off("data", onData);
+			reject(new Error(`fake did not echo ${expectEcho}`));
+		}, 5000);
+		const onData = (d) => {
+			if (d.toString().includes(expectEcho)) {
+				clearTimeout(timer);
+				fake.stdout.off("data", onData);
+				resolve();
+			}
+		};
+		fake.stdout.on("data", onData);
+		fake.stdin.write(`${cmd}\n`);
+	});
+}
 
-	const plugin = spawn(
+function spawnPlugin(uuid) {
+	return spawn(
 		process.execPath,
-		["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-dead-fallback", "-registerEvent", "registerPlugin", "-info",
+		["bin/plugin.js", "-port", String(PORT), "-pluginUUID", uuid, "-registerEvent", "registerPlugin", "-info",
 			JSON.stringify({
 				application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
 				colors: {},
@@ -143,6 +171,14 @@ try {
 			stdio: ["ignore", "inherit", "inherit"]
 		}
 	);
+}
+
+try {
+	// Gadget populated + present DEAD shared-memory mapping, BEFORE the plugin runs.
+	publish(47.5);
+	await startFakeDead();
+
+	const plugin = spawnPlugin("e2e-dead-fallback");
 	try {
 		// 1. Present DEAD mapping must not block the gadget fallback in auto mode.
 		//    (Pre-fix: SharedMemoryProvider.open() "succeeds" on the dead mapping,
@@ -161,6 +197,27 @@ try {
 		clearInterval(updater);
 	} finally {
 		plugin.kill();
+	}
+
+	// --- Phase B: busy-at-open must not silently downgrade to gadget ----------
+	// The mapping goes live but its consistency mutex is HELD at the instant a
+	// fresh plugin opens. The gadget key is still populated, so a fallback
+	// would "succeed" and this key's shared-memory identity would read
+	// "Sensor missing" until the upgrade probe swung back. The poller must
+	// surface "HWiNFO busy" and retry shared memory instead.
+	phase = "busy";
+	await fakeCmd("alive", "MODE alive");
+	await fakeCmd("hold", "HELD");
+	const busyStart = frames.length;
+	const plugin2 = spawnPlugin("e2e-busy-open");
+	try {
+		await expectFrame("mutex held at open → 'HWiNFO busy' screen", (svg) => svg.includes("HWiNFO busy"), 9000);
+		fake.stdin.write("release\n");
+		await expectFrame("mutex released → live shared-memory value", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 9000);
+		const missing = frames.slice(busyStart).filter((svg) => svg.includes("Sensor missing"));
+		check("no silent gadget downgrade ('Sensor missing' never shown)", missing.length === 0, `${missing.length} such frame(s)`);
+	} finally {
+		plugin2.kill();
 	}
 } finally {
 	fake?.stdin.write("exit\n");

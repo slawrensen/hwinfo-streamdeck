@@ -175,8 +175,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 
 	override onWillDisappear(ev: WillDisappearEvent<ReadingSettings>): void {
 		if (this.instances.delete(ev.action.id)) {
-			// The ring stays tracked: history keeps collecting off-screen, so
-			// paging back after any absence shows a complete, current line.
+			// The ring stays tracked: history keeps collecting off-screen while
+			// anything else keeps the poller alive, and paging back resumes the
+			// line from the samples it already had.
 			poller.release();
 		}
 	}

@@ -6,6 +6,12 @@
 //   dead    write the "DEAD" magic (shared-memory support disabled)
 //   mutex   create the consistency mutex now (pairs with --no-mutex)
 //   grow    append a third reading (the published layout grows mid-run)
+//   fahrenheit / celsius   republish the temperature as °F / °C: unit string
+//           rewritten in place, values rescaled, layout unchanged (exactly
+//           what flipping HWiNFO's own unit setting does mid-session)
+//   hold / release   acquire / release the consistency mutex and keep it,
+//           simulating HWiNFO holding it at the instant a consumer opens
+//           (publishing still works: same-thread acquisition is recursive)
 //   exit    unmap, close handles, quit — the mapping disappears with us
 // `--no-mutex` starts WITHOUT the mutex: the reader must treat the mapping
 // as still starting up (never an unguarded read) until "mutex" creates it.
@@ -61,6 +67,8 @@ const buf = Buffer.alloc(SIZE);
 let value = 50;
 let mode = "alive"; // alive | freeze | dead
 let entryCount = 2;
+let unitF = false; // temperature published as °F (values rescaled)
+let holding = false; // "hold" keeps the mutex acquired between commands
 
 function cstr(offset, width, text) {
 	buf.fill(0, offset, offset + width);
@@ -87,18 +95,20 @@ function compose() {
 	cstr(s + 8, 128, "Test Source");
 	cstr(s + 136, 128, "Test Source");
 
-	// entry[0]: temperature that advances
+	// entry[0]: temperature that advances ("fahrenheit" republishes the same
+	// entry with the unit string rewritten and the doubles rescaled in place)
 	let e = HEADER_SIZE + SENSOR_SIZE;
+	const t = (celsius) => (unitF ? celsius * 1.8 + 32 : celsius);
 	buf.writeUInt32LE(1, e); // Temperature
 	buf.writeUInt32LE(0, e + 4); // sensorIndex
 	buf.writeUInt32LE(0x1000001, e + 8);
 	cstr(e + 12, 128, "Test Temp");
 	cstr(e + 140, 128, "Test Temp");
-	cstr(e + 268, 16, "°C");
-	buf.writeDoubleLE(value, e + 284);
-	buf.writeDoubleLE(40, e + 292);
-	buf.writeDoubleLE(90, e + 300);
-	buf.writeDoubleLE(55, e + 308);
+	cstr(e + 268, 16, unitF ? "°F" : "°C");
+	buf.writeDoubleLE(t(value), e + 284);
+	buf.writeDoubleLE(t(40), e + 292);
+	buf.writeDoubleLE(t(90), e + 300);
+	buf.writeDoubleLE(t(55), e + 308);
 
 	// entry[1]: fan
 	e += ENTRY_SIZE;
@@ -168,6 +178,23 @@ rl.on("line", (line) => {
 		compose();
 		publish();
 		console.log("GROWN");
+	} else if (cmd === "fahrenheit" || cmd === "celsius") {
+		unitF = cmd === "fahrenheit";
+		compose();
+		publish();
+		console.log(`UNIT ${unitF ? "F" : "C"}`);
+	} else if (cmd === "hold") {
+		if (hMutex !== null && !holding) {
+			WaitForSingleObject(hMutex, 2000);
+			holding = true;
+		}
+		console.log("HELD");
+	} else if (cmd === "release") {
+		if (hMutex !== null && holding) {
+			ReleaseMutex(hMutex);
+			holding = false;
+		}
+		console.log("RELEASED");
 	} else if (cmd === "exit") {
 		clearInterval(timer);
 		UnmapViewOfFile(view);

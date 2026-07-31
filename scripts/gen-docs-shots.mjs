@@ -36,6 +36,7 @@ const stale = (source) => statusScreen({ state: "stale", snapshot: {}, source, s
 async function statusBoard() {
 	const items = [
 		["not running", unavailable("not-running")],
+		["busy", unavailable("busy")],
 		["shared memory off", unavailable("disabled")],
 		["access denied", unavailable("access-denied")],
 		["gadget empty", unavailable("gadget-empty")],

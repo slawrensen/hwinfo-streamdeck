@@ -48,10 +48,12 @@ export interface Reading {
  * One consistent decode of the whole shared-memory region.
  *
  * Liveness: a provider may return the SAME snapshot instance on every tick
- * with the value fields updated in place (the skeleton — keys, labels,
- * units, sensors — is static per HWiNFO session). Read what you need when
- * the tick arrives; copy scalars you want to keep. Do not cache `Reading`
- * objects across ticks expecting historical values.
+ * with the value fields updated in place (the skeleton of keys, labels,
+ * units and sensors rarely changes within an HWiNFO session), or a FRESH
+ * instance when the skeleton did change (flipping HWiNFO's unit settings
+ * rewrites units in place; the parser detects it and rebuilds). Read what
+ * you need when the tick arrives; copy scalars you want to keep. Do not
+ * cache `Reading` objects across ticks expecting historical values.
  */
 export interface SensorSnapshot {
 	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */
@@ -70,6 +72,9 @@ export type HwinfoUnavailableReason =
 	| "unsupported-platform"
 	/** Mapping absent: HWiNFO isn't running, or Shared Memory Support is off. */
 	| "not-running"
+	/** Mapping and mutex exist but the consistency mutex stayed busy while
+	 * opening. HWiNFO IS running; momentary contention, retried next poll. */
+	| "busy"
 	/** Gadget registry exists but no sensor has "Report value in Gadget" ticked. */
 	| "gadget-empty"
 	/** Mapping exists but we may not read it (privilege mismatch). */

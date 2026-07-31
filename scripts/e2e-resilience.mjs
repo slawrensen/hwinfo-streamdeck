@@ -4,6 +4,7 @@
 //
 //   (no mapping)      → "Start HWiNFO"
 //   provider starts   → live "Test Temp" value
+//   units flip to °F  → face follows (in-place rewrite, no status flash)
 //   pollTime frozen   → "Not updating"
 //   provider resumes  → live value again
 //   DEAD magic        → "Shared Memory off"
@@ -130,6 +131,17 @@ try {
 	// 2. Provider appears → live value (recovery from unavailable).
 	await startFake();
 	await expectFrame("provider up → live 'Test Temp' value", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 8000);
+
+	// 2b. HWiNFO's unit setting flips mid-session: the unit string and value
+	// scale are rewritten in place under an unchanged layout. The parser must
+	// notice and rebuild; the face follows to °F with no status-screen flash.
+	const beforeFlip = frames.length;
+	fake.stdin.write("fahrenheit\n");
+	await expectFrame("units flipped in place → face shows °F", (svg) => svg.includes("°F"), 8000);
+	const flipFlash = frames.slice(beforeFlip).filter((svg) => svg.includes("HWiNFO error") || svg.includes("Start HWiNFO") || svg.includes("Not updating") || svg.includes("HWiNFO busy"));
+	check("no status frame during the unit flip", flipFlash.length === 0, `${flipFlash.length} status frames`);
+	fake.stdin.write("celsius\n");
+	await expectFrame("units restored → face shows °C again", (svg) => svg.includes("°C"), 8000);
 
 	// 3. pollTime frozen → stale screen.
 	fake.stdin.write("freeze\n");

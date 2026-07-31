@@ -101,8 +101,11 @@ HWSM_STATIC_ASSERT(offsetof(HwsmHeader, entryElementCount) == 40, off_entryEleme
 #define HWSM_MAX_REGION_BYTES (64u * 1024u * 1024u)
 #define HWSM_MAX_ELEMENT_COUNT 100000u
 
-/* Bounded open-time mutex wait; steady-state readInto uses 0 ms (skip tick). */
-#define HWSM_OPEN_WAIT_MS 500u
+/* Open-time mutex wait, 0 ms to match the read path: busy fails fast with
+ * HWSM_MUTEX_BUSY and the caller simply retries on its next poll. openSharedMemory
+ * runs synchronously on the event loop, so any positive wait here parks every
+ * key and dial for that long whenever HWiNFO holds the mutex at open time. */
+#define HWSM_OPEN_WAIT_MS 0u
 /* Bounded re-validate retries when the layout moves between open stages. */
 #define HWSM_OPEN_ATTEMPTS 3
 /* Kernel object names and registry subkeys are short; longer is caller error. */

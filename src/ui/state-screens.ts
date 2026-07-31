@@ -22,6 +22,10 @@ export function statusScreen(status: PollerStatus): StatusKeyOptions | null {
 	switch (status.reason) {
 		case "not-running":
 			return { icon: "power", accent: BLUE, lines: ["Start HWiNFO", "not detected"] };
+		case "busy":
+			// HWiNFO is running; its consistency mutex was held at the instant
+			// the plugin connected. Never tell the user to start it.
+			return { icon: "clock", accent: AMBER, lines: ["HWiNFO busy", "retrying"] };
 		case "gadget-empty":
 			return { icon: "target", accent: AMBER, lines: ["Tick sensors", "in Gadget"] };
 		case "disabled":
@@ -61,6 +65,8 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 	switch (status.reason) {
 		case "not-running":
 			return { title: "Start HWiNFO", value: "not detected" };
+		case "busy":
+			return { title: "HWiNFO busy", value: "retrying" };
 		case "gadget-empty":
 			return { title: "Gadget empty", value: "tick sensors" };
 		case "disabled":
@@ -89,6 +95,8 @@ export function statusSentence(status: PollerStatus): string {
 	switch (status.reason) {
 		case "not-running":
 			return "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget reporting on the free version (no 12-hour limit) and tick the sensors you need.";
+		case "busy":
+			return "HWiNFO is running, but its shared memory was busy at the moment the plugin connected. This is momentary contention; the plugin retries on the next poll with nothing to do on your side.";
 		case "gadget-empty":
 			return "HWiNFO's Gadget registry is enabled but empty. In the HWiNFO sensor window, right-click each value you want on the deck and tick \"Report value in Gadget\".";
 		case "disabled":
@@ -98,7 +106,7 @@ export function statusSentence(status: PollerStatus): string {
 		case "unsupported-platform":
 			return "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).";
 		case "bridge-failed":
-			return "The plugin's native HWiNFO bridge (bin/hwsm.node) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, restore or allow that file in your antivirus.";
+			return "The plugin's native HWiNFO bridge (bin/hwsm.node) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, check the file against the release's published SHA-256 (it is unsigned), then restore or allow it in your antivirus.";
 		default:
 			return "HWiNFO's shared memory did not validate; it may be mid-restart or an incompatible version. Usually clears on the next poll; if it persists, restart HWiNFO.";
 	}

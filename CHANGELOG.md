@@ -114,6 +114,27 @@ Elgato Marketplace listing is a separate track.
   one-line PowerShell command to verify it against each release's
   published SHA-256.
 
+## 1.4.93.0 - 2026-07-31
+
+- The second Back is now opt-in (@FattSlice's follow-up on the preview 3
+  behavior). By default the tile at the pressed key's position is an
+  ordinary listed reading again and the movable top-left Back is the one
+  way out; tick "Repeat Back under this key's own cell" in the key's
+  Press section to bring the tap-in, tap-out tile back, with the listed
+  readings flowing around it. Left off, a page runs its full reading
+  stride.
+- Fixes from two review passes over the merged drill-down: detail tiles
+  keep moving when HWiNFO polls faster than once a second, the picker's
+  "+ all" binds its source by position instead of display name, a NaN
+  value can no longer freeze the render gate, provider swaps can no
+  longer collide revision lines, a busy probe reopen no longer fakes
+  fresh data or doubles sparkline samples, leaving a view under a frozen
+  tick no longer strands a black surface, and a failed install retry no
+  longer eats the prompt's expiry tombstone.
+- The settings panel and the docs now show the second Back: the Press
+  section screenshot with the checkbox ticked, and a detail page
+  rendered with both Back tiles.
+
 ## 1.4.92.0 - 2026-07-30
 
 - A drill-down key can now shape its own page, so the one shared

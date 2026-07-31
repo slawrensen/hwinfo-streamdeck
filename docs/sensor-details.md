@@ -14,15 +14,15 @@ Practical consequences:
 - The first time you open details on a deck, the Stream Deck app asks to install that deck's detail profile. Accept once; later entries switch silently.
 - The page is a normal, editable profile: you can add your own keys to the free cells (Sensor Reading keys included) and configure the Back tile like any key. The plugin never repairs or overwrites your customizations. The shipped page holds no data of yours: every tile asks the plugin what to show at runtime.
 - The Stream Deck app never updates a profile that is already installed. When a plugin update changes the page itself, it ships as a new profile revision with a new name, the next drill-down asks once to install it, and the previously installed copy stays untouched in your profile list. Upgrading from the first preview (1.4.90.0) works exactly like that: the old "HWiNFO Details" copy stays until you remove it in the app yourself.
-- Back returns you to the profile you came from. After a full Stream Deck app restart the app's own notion of "previous profile" resets; if Back then lands on your default profile rather than the exact page you left long ago, that is the app's restore behavior, not stored state in this plugin.
+- Back returns you to the profile you came from. After a full Stream Deck app restart the app's own notion of "previous profile" resets, so where Back lands then (or whether it moves at all) is the app's restore behavior, not stored state in this plugin; if it does nothing, switch profiles from the Stream Deck app once and re-enter.
 
 ## Turning it on
 
 In the key's settings panel, under **Press**:
 
 - **Press does** picks the behavior. The default stays exactly as before: cycle current / min / max / avg. **Open sensor details** switches to the detail view on press. **Tap cycles; hold opens details** keeps the cycle on a short tap and opens details after holding half a second.
-- **Detail contains** picks the list. **All readings from this sensor source** (the default) lists every reading HWiNFO currently publishes for the pressed sensor's source, in HWiNFO's order. **Custom sensor list** lists exactly the readings you add, in the order you set.
-- **Detail title** (custom mode) names the view's title tile.
+- **Detail contains** picks the list. **All readings from this sensor source** (the default) lists every other reading HWiNFO currently publishes for the pressed sensor's source, in HWiNFO's order; the pressed reading itself rides on the Back tile and is not repeated in the list or the title's count. **Custom sensor list** lists exactly the readings you add, in the order you set (the opener's own sensor stays on the Back tile). **Readings matching a filter** lists everything whose source name and label, taken together, match a glob pattern, deck-wide and live: `*4090*` gathers every reading of an RTX 4090, `*gpu*fan*` just its fans, and the list re-resolves each poll so readings that appear or vanish in HWiNFO follow along. The pattern doubles as the title unless you set one, the panel shows a live match count under the field, and the grammar gets [its own section](#filter-patterns) below.
+- **Detail title** names the view's title tile in any mode, replacing the default (the source name, the filter pattern, or Custom set).
 
 Existing keys are untouched: a key without a Press setting behaves exactly as it always has.
 
@@ -33,9 +33,11 @@ Existing keys are untouched: a key without a Press setting behaves exactly as it
 Every detail page has the same furniture:
 
 - **Back** (always top left, where the native folder back key lives): a real Sensor Reading key whose press is fixed to leaving the view; a small return arrow in the tile's lower-left corner marks it. Fresh from install it shows the sensor you drilled down from, live, with that key's theme, text, units, decimals and thresholds. It stays pressable when HWiNFO is down, when the sensor is missing, and even right after a plugin restart.
+- **The key you pressed stays under your finger.** When the key that opened the view sits on a cell the detail page also uses for readings, that cell becomes a second Back tile showing the same opener face with the return arrow: tap in, tap out, without moving your hand. The readings flow around it (none are hidden), and the top-left Back always works regardless.
 - **Title** (all decks except the Mini): the source or custom title over the visible range, like `CPU Enhanced` over `1-11 / 46`.
 - **Previous / Next**: page through long lists. The chevron dims at either end. Paging happens inside the one profile page; nothing stacks.
-- **Reading tiles**: one live reading each, themed like the opener, with the type accent of their own reading. Pressing a tile cycles that tile's current / min / max / avg for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: a 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
+- **Reading tiles**: one live reading each, themed like the opener, with the type accent of their own reading. Pressing a tile cycles that tile's current / min / max / avg for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
+- **No sparklines on reading tiles, by design.** A sparkline needs a history buffer that fills over a minute or more, and a detail page shows up to 32 arbitrary readings that change with every page turn and every filter, so the lines would draw mostly empty while costing buffer churn on every visit. The tiles stay instant and scannable; your opener key keeps its own sparkline back on your page.
 
 If HWiNFO stops publishing while the view is open, the tiles show the same status screens as ordinary keys and recover on their own; Back keeps working throughout. If a listed reading disappears (custom mode), its tile shows **Sensor missing** in place, and the others do not shift.
 
@@ -47,6 +49,32 @@ The Back tile is an ordinary Sensor Reading key with one fixed job. Select it in
 - Until you pick a sensor, the tile shows the sensor you drilled down from, so a fresh page needs no setup. Once you pick one, the tile shows your pick, and a missing pick shows **Sensor missing** like any key would.
 
 Copying the Back tile elsewhere copies the fixed role with it: a pasted copy still returns to the previous profile when pressed. For an ordinary key, add a fresh Sensor Reading from the actions list instead.
+
+## Filter patterns
+
+The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one character, everything else is literal, and case never matters. Every reading is tested against one string: the source name, a single space, then the label. For the 4090's first fan that text is `dGPU [#0]: NVIDIA GeForce RTX 4090 GPU Fan1` (the middle of the source name is shortened here), which is why one pattern can select by card, by quantity, or across every source at once, and why anchored patterns must account for the source name at the front. Three rules cover all of it:
+
+1. **Plain text matches anywhere.** A pattern with no wildcard behaves as if wrapped in `*...*`, so `4090` and `*4090*` are the same filter.
+2. **One wildcard anchors the whole pattern.** The moment a pattern contains `*` or `?`, the automatic wrapping is off and the pattern must cover the entire combined text. `core*clock` matches nothing, because the text starts with the source name, not with "core"; `*core*clock*` is the form you want.
+3. **Spaces are literal.** Multi-word plain text works only when the words sit adjacent in the name: `gpu fan` finds the GPU fans, but `core clock` finds nothing because the cores are named `Core 0 Clock`. Span the gap with a star: `*core*clock*`.
+
+![The Press section of the settings panel with Detail contains set to Readings matching a filter: the Filter field holds the pattern star 4090 star, and a live hint under it reads Matches 79 readings right now, above the help text and the Detail title field.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
+
+Patterns I run on my own bench (512 readings across 21 sources), with their live match counts:
+
+| Pattern | Matches | What it gathers |
+| --- | ---: | --- |
+| `4090` | 79 | the whole RTX 4090, selected by its source name |
+| `gpu fan` | 4 | the card's fan readings (adjacent words, no wildcard needed) |
+| `*core*clock*` | 48 | every per-core clock on the CPU |
+| `*hot*spot*` | 2 | the CPU IOD hotspot and the GPU hot spot, across sources |
+| `tdie` | 3 | the Tdie temperatures, case-insensitive |
+| `*12v*` | 8 | every 12 V rail on the board and the PSU |
+| `*temperature*` | 18 | everything HWiNFO literally labels a temperature |
+| `?PU*` | 270 | sources whose name starts with any one character plus "PU" (anchored start) |
+| `*` | everything | the full deck-wide firehose, paginated |
+
+Two edges worth knowing: an empty pattern refuses entry with the alert cue (there is nothing to list), and a pattern that matches nothing opens an honest empty view reading `0 / 0`. Two more: leading and trailing spaces are trimmed (spaces only count inside the pattern), and everything past 128 characters is cut. The panel's live count reflects all of this before you press.
 
 ## Supported decks
 
@@ -62,7 +90,7 @@ One bundled profile per deck type. The layouts are generated from one table and 
 | Stream Deck + XL | 9x4 keys | 32 |
 | Virtual Stream Deck | your size | by fit (see below) |
 
-The Virtual Stream Deck's canvas is whatever size you gave it, so it borrows a layout instead of owning one: entry picks the richest keypad layout that fits its grid. A 10x10 virtual deck runs the XL layout (28 tiles per page), a 5x3 one the 15-key layout, down to the Mini layout at 3x2. Below 3x2 there is no room for Back plus the pagers, and entry refuses with the alert cue.
+The Virtual Stream Deck's canvas is whatever size you gave it, so it borrows a layout instead of owning one: entry picks the richest keypad layout that fits its grid. A 10x10 virtual deck runs the + XL layout (32 tiles per page; its baked dial bank is empty, so the page references no dials), a 5x3 one the 15-key layout, down to the Mini layout at 3x2. Below 3x2 there is no room for Back plus the pagers, and entry refuses with the alert cue.
 
 Mobile (variable canvas, no verified install flow), the Studio, the Galleon 100 SD, pedals and G-keys have no bundled detail profile. On those, the key itself keeps working normally; a press configured to open details shows the Stream Deck alert cue instead of switching, and the settings panel says so plainly.
 

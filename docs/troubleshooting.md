@@ -130,10 +130,11 @@ Other notes:
 The yellow Stream Deck alert cue on a drill-down press means entry was refused, on purpose. In order of likelihood:
 
 - **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Everything else about the key still works.
-- **HWiNFO is not publishing data** and the detail list is set to *All readings from this sensor source*: with no snapshot there is nothing to resolve. Fix the data (see the status screens above) and press again. A *Custom sensor list* opens even while HWiNFO is down.
+- **HWiNFO is not publishing data** and the detail list is set to *All readings from this sensor source* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only a *Custom sensor list* opens while HWiNFO is down.
 - **The selected sensor is missing** from HWiNFO's current output, so its source cannot be identified. Reopen settings and pick it again.
+- **The filter pattern is empty** (*Readings matching a filter*): there is nothing to list until you type one. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
 
-If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put (the plugin quietly forgets the attempt after 30 seconds; press again after accepting).
+If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put. The plugin quietly forgets the attempt after 30 seconds; accepting later than that returns you to where you were, and the next press opens the view directly (the profile is installed now, so there is no second prompt).
 
 ## The detail view says "No detail / selected"
 

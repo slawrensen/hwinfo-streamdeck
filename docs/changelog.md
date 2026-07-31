@@ -19,9 +19,9 @@ Elgato Marketplace listing is a separate track.
 - A sensor key can act like a folder. The Sensor Reading key's Press
   setting can open a detail view: the deck switches to a bundled
   one-page profile listing a whole group of readings, Previous and Next
-  page through a long group, a title tile shows the group and the
-  visible range, and pressing a listed reading cycles its current, min,
-  max and avg for that visit. Back returns to the profile and page you
+  page through a long group, a title tile (every deck but the Mini)
+  shows the group and the visible range, and pressing a listed reading
+  cycles its current, min, max and avg for that visit. Back returns to the profile and page you
   came from. One profile is installed per deck type, and what it shows
   is decided at press time by the key you pressed, so one key opens a
   CPU breakdown and the next a GPU one. (Requested by @FattSlice in
@@ -33,10 +33,10 @@ Elgato Marketplace listing is a separate track.
   `*gpu*fan*` just its fans. The panel shows a live match count under
   the field before you ever press, and a filtered page re-resolves
   every poll, so readings that appear or vanish in HWiNFO follow along.
-- The key you pressed is Back, under your finger. Inside the view, the
-  tile in the pressed key's own position shows the return face and
-  returns on press; the listed readings flow around it, and none are
-  hidden. The fixed top-left Back is still there, and it is an ordinary
+- The key you pressed is Back, under your finger. Inside the view, a
+  reading cell at the pressed key's own position shows the return face
+  and returns on press; the listed readings flow around it, and none
+  are hidden. The fixed top-left Back is still there, and it is an ordinary
   Sensor Reading key: give it a sensor, any of the four layouts, a
   theme, custom text, thresholds and the Show stat. Only its press is
   reserved. Left unconfigured it shows the sensor you drilled down from.
@@ -49,9 +49,9 @@ Elgato Marketplace listing is a separate track.
   the Virtual Stream Deck, which borrows whichever bundled layout fits
   its grid. Decks that cannot host a page (Mobile, Studio, Galleon,
   pedals, G-keys, virtual decks under 3x2) refuse the press with the
-  alert cue and keep the ordinary key behavior. The profiles are
-  generated deterministically from one layout table and carry no user
-  or sensor data.
+  alert cue; everything else about the key keeps working normally. The
+  profiles are generated deterministically from one layout table and
+  carry no user or sensor data.
 - Opening a view starts from black instead of flashing a stale page.
   The Stream Deck app repaints a profile from each key's last cached
   image, so the plugin paints pure black on the way out and the live
@@ -66,10 +66,10 @@ Elgato Marketplace listing is a separate track.
   unchanged polls skip rendering entirely; that skip is gated on a
   provider value revision rather than HWiNFO's one-second poll stamp, so
   an HWiNFO polling period set under a second keeps moving the detail
-  tiles (found by an automated review of the merged branch, which also
-  caught the picker's "+ all" button binding to its source by display
-  name: two identically named sources resolved to the first, and the
-  button now binds by position). The detail view rides the existing
+  tiles (found by an automated review of the merged branch). The same
+  review caught the picker's "+ all" button binding to its source by
+  display name: two identically named sources resolved to the first;
+  the button now binds by position. The detail view rides the existing
   single shared poller; the dense + XL page at the 250 ms poll option is
   measured in PERF.md.
 - The detail profile is named "HWiNFO Details". The Stream Deck app

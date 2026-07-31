@@ -104,7 +104,7 @@ like `*4090*` or `*gpu*fan*` (live match count in the panel). The key you
 pressed stays under your finger as a second way back when its cell maps onto
 the page. The top-left Back tile is a normal
 Sensor Reading key with its press fixed to returning: configure its sensor and
-any layout (or leave it showing the sensor you drilled down from),
+any layout (or leave it showing the sensor you drilled down from).
 Previous/Next page through long sources, and pressing a listed reading cycles
 its stat for that visit. Six editable profiles ship, one per deck type (Mini,
 15-key, Neo, +, XL, + XL); the Stream Deck app asks to install the right one

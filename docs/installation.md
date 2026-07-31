@@ -24,7 +24,7 @@ There are two ways to install, depending on where you got the plugin.
 **From a GitHub Release (`.streamDeckPlugin` file)**
 
 1. Download `com.lawrensen.hwinfo.streamDeckPlugin` from the [releases page](https://github.com/slawrensen/hwinfo-streamdeck/releases).
-2. Optional but worth the ten seconds, since the native addon inside is unsigned: verify the download against the pack SHA-256 printed in the release notes. In PowerShell: `Get-FileHash com.lawrensen.hwinfo.streamDeckPlugin -Algorithm SHA256`. More in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md).
+2. Optional: the native addon inside is unsigned, so verify the download against the pack SHA-256 printed in the release notes. In PowerShell: `Get-FileHash com.lawrensen.hwinfo.streamDeckPlugin -Algorithm SHA256`. More in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md).
 3. Double-click the file. The Stream Deck app opens and asks you to confirm the install.
 4. Confirm. **HWiNFO Sensors** appears in the actions list on the right, under its own **HWiNFO Sensors** category.
 

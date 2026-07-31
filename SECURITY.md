@@ -10,7 +10,7 @@ describe an exploitable problem in a public issue before I have had a
 chance to ship a fix.
 
 Fixes ship on the newest release of each line I still maintain (currently
-the 1.4.x line; a maintenance branch keeps 1.x patchable after 2.0 exists).
+the 1.5.x line; a maintenance branch keeps 1.x patchable after 2.0 exists).
 Anything older gets no fixes. The plugin has no update channel of its own;
 updates arrive through the Elgato Marketplace or the GitHub release page.
 

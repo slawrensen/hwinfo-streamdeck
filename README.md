@@ -100,9 +100,9 @@ layout). The warn/critical colors always track the *live* value.
 details* (or *Tap cycles; hold opens details*) and the press switches the deck
 to a bundled one-page detail view listing every reading of that sensor's
 HWiNFO source, a custom list you build, or everything matching a glob filter
-like `*4090*` or `*gpu*fan*` (live match count in the panel). The key you
-pressed stays under your finger as a second way back when its cell maps onto
-the page. The top-left Back tile is a normal
+like `*4090*` or `*gpu*fan*` (live match count in the panel). An optional
+per-key setting repeats Back under the key you pressed when its cell maps
+onto the page. The top-left Back tile is a normal
 Sensor Reading key with its press fixed to returning: configure its sensor and
 any layout (or leave it showing the sensor you drilled down from).
 Previous/Next page through long sources, and pressing a listed reading cycles

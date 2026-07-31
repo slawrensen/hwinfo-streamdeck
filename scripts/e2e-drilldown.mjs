@@ -446,13 +446,14 @@ async function scenario(send) {
 	await sleep(300);
 	results.r2AllBackWrites = setSettings.filter((s) => s.context === r2BackCtx || s.context === dev1BackCtx).length;
 
-	// T. Filter mode + the mirror Back, self-contained on its own device:
-	// a glob-driven group opens, the reading slot on the OPENER'S OWN CELL
-	// renders the opener face with the return mark, the readings flow
-	// around it (step shrinks, nothing hides), and pressing that cell
-	// leaves exactly like the canonical top-left Back.
+	// T. Filter mode + the OPT-IN mirror Back, self-contained on its own
+	// device: a glob-driven group opens, and with detailMirrorBack set the
+	// reading slot on the OPENER'S OWN CELL renders the opener face with
+	// the return mark, the readings flow around it (step shrinks, nothing
+	// hides), and pressing that cell leaves exactly like the canonical
+	// top-left Back.
 	const fltCells = profileCells("profiles/detail-r3-standard");
-	const fltOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
+	const fltOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailMirrorBack: true };
 	appearOpener(send, "ctx-flt", "devflt", fltOpener, { column: 2, row: 1 });
 	await sleep(300);
 	await keyPress(send, "ctx-flt", "devflt", fltOpener);
@@ -470,6 +471,37 @@ async function scenario(send) {
 	await sleep(500);
 	results.fltMirrorSwitch = switches.length > switchesBeforeMirror ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devflt", fltCells);
+	await sleep(300);
+
+	// U. The mirror is opt-in (issue #5 feedback): the same shape WITHOUT
+	// detailMirrorBack keeps the opener's cell as an ordinary reading slot,
+	// pressing it stays in the view, and the canonical top-left Back is
+	// the one way out.
+	const defOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
+	appearOpener(send, "ctx-def", "devdef", defOpener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-def", "devdef", defOpener);
+	await sleep(500);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-def", device: "devdef", payload: { settings: defOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devdef", fltCells);
+	await sleep(1600);
+	results.defOpenerCellFace = latestSvg(slotCtx("devdef", "2,1"));
+	results.defBackFace = latestSvg(slotCtx("devdef", fltCells.find((c) => c.settings.detailRole === "back").coord));
+	const defOpenerCell = fltCells.find((c) => c.coord === "2,1");
+	const switchesBeforeDef = switches.length;
+	slotPress(send, "devdef", defOpenerCell.coord, defOpenerCell.settings);
+	await sleep(400);
+	results.defCellPressSwitched = switches.length > switchesBeforeDef;
+	// The active-revision Back cell is a real Sensor Reading (detailRole),
+	// not a hidden slot binding: press it as the reading action.
+	const defBackCell = fltCells.find((c) => c.settings.detailRole === "back");
+	const defBackCtx = slotCtx("devdef", defBackCell.coord);
+	const [defBackCol, defBackRow] = defBackCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
+	await sleep(500);
+	results.defBackSwitch = switches.at(-1);
+	removeDetailSurface(send, "devdef", fltCells);
 	await sleep(300);
 
 	// Teardown: every action gone, the poller must idle, the process exit.
@@ -542,6 +574,10 @@ async function finish() {
 	check("filter title shows the glob range 1-2 / 2", typeof results.fltTitleFace === "string" && results.fltTitleFace.includes(">1-2 / 2<"), (results.fltTitleFace ?? "no frame").slice(0, 160));
 	check("readings flow around the mirror (slot 0 stays live)", typeof results.fltSlot0Face === "string" && results.fltSlot0Face.includes("<text"), (results.fltSlot0Face ?? "no frame").slice(0, 100));
 	check("pressing the mirror cell left the view (restore, name omitted)", results.fltMirrorSwitch !== undefined && results.fltMirrorSwitch.device === "devflt" && results.fltMirrorSwitch.profile === undefined, JSON.stringify(results.fltMirrorSwitch));
+	check("without the opt-in, the opener's cell carries no return mark", typeof results.defOpenerCellFace === "string" && !results.defOpenerCellFace.includes("M33 119"), (results.defOpenerCellFace ?? "no frame").slice(0, 140));
+	check("the canonical Back on that live surface still wears the mark", typeof results.defBackFace === "string" && results.defBackFace.includes("M33 119"), (results.defBackFace ?? "no frame").slice(0, 140));
+	check("without the opt-in, pressing that cell stays in the view", results.defCellPressSwitched === false, JSON.stringify(results.defCellPressSwitched));
+	check("the canonical Back still leaves (restore, name omitted)", results.defBackSwitch !== undefined && results.defBackSwitch.device === "devdef" && results.defBackSwitch.profile === undefined, JSON.stringify(results.defBackSwitch));
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -584,6 +620,7 @@ const info = {
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devflt", name: "Harness Deck C", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devdef", name: "Harness Deck D", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

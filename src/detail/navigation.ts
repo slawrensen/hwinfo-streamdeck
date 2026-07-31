@@ -42,9 +42,10 @@ export type DeviceDetailState = {
 	/** Last valid resolution; ridden on while HWiNFO restarts (transient
 	 *  recovery), replaced whenever the primary resolves again. */
 	group: DetailGroup;
-	/** The opener key's grid cell on ITS profile, when known. A detail
-	 *  reading slot at the same cell becomes a mirror Back tile, so the
-	 *  finger that pressed in presses right back out. */
+	/** The opener key's grid cell on ITS profile, captured only when the
+	 *  key opts into the mirror (detailMirrorBack): a detail reading slot
+	 *  at the same cell then becomes a second Back tile, so the finger
+	 *  that pressed in presses right back out. Null = no mirror. */
 	readonly openerCell: { readonly column: number; readonly row: number } | null;
 	/** The reading-slot index acting as the mirror Back (controller-fed
 	 *  from the registered slots' coordinates); null = no mirror. */

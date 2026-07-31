@@ -6,7 +6,7 @@
 import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
-import { detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
+import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
 import { deviceCapabilities } from "../devices";
@@ -98,6 +98,10 @@ export type ReadingSettings = {
 	detailKeys?: string[];
 	/** Optional title for the detail view's title tile. */
 	detailTitle?: string;
+	/** Exactly true: inside the view, the reading slot on this key's own
+	 * cell doubles as a second Back (the mirror). Off by default: one
+	 * movable Back beat two fixed ones for the issue #5 testers. */
+	detailMirrorBack?: boolean;
 	/**
 	 * Baked navigation role. The revision-2 detail profiles ship their
 	 * top-left cell as a normal Sensor Reading carrying exactly "back":
@@ -335,7 +339,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			snapshot: status.state === "unavailable" ? null : status.snapshot,
 			// The opener's own cell: a detail reading slot on the same cell
 			// becomes the mirror Back tile (tap in, tap out, one finger).
-			openerCell: act.coordinates === undefined ? undefined : { column: act.coordinates.column, row: act.coordinates.row }
+			// Opt-in per key; without it the cell is simply not captured and
+			// the whole mirror path stays inert.
+			openerCell: detailMirrorBackOf(state.settings) && act.coordinates !== undefined ? { column: act.coordinates.column, row: act.coordinates.row } : undefined
 		});
 		if (result !== "entered") {
 			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);

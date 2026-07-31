@@ -85,6 +85,16 @@ export function compileDetailFilter(pattern: string): (candidate: string) => boo
 }
 
 /**
+ * Whether the opener also becomes a Back tile at its own cell inside the
+ * view (the mirror). Off unless exactly true: testers found two Back
+ * tiles per page more confusing than one they can move, so the fixed
+ * top-left Back is the only default way out (issue #5 feedback).
+ */
+export function detailMirrorBackOf(settings: { detailMirrorBack?: unknown }): boolean {
+	return settings.detailMirrorBack === true;
+}
+
+/**
  * The baked navigation role, or undefined for an ordinary key. ONLY the
  * exact string "back" activates the role: absent, empty, malformed and
  * future values all behave as a plain Sensor Reading, are never

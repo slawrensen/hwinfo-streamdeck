@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { detailRoleOf, pressBehaviorOf } from "../src/detail/detail-settings";
+import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../src/detail/detail-settings";
 
 describe("detailRoleOf", () => {
 	it("activates on the exact marker only", () => {
@@ -33,6 +33,16 @@ describe("detailRoleOf", () => {
 	it("unknown future roles act as an ordinary key (forward compatibility)", () => {
 		assert.equal(detailRoleOf({ detailRole: "home" }), undefined);
 		assert.equal(detailRoleOf({ detailRole: "back-v2" }), undefined);
+	});
+
+	it("the mirror Back is opt-in: exactly true and nothing else", () => {
+		// Issue #5 feedback: two Back tiles per page beat one movable one for
+		// nobody, so the mirror is off unless the key asks for it.
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: true }), true);
+		for (const value of [undefined, false, "true", 1, null, {}, []] as unknown[]) {
+			assert.equal(detailMirrorBackOf({ detailMirrorBack: value } as { detailMirrorBack?: unknown }), false, JSON.stringify(value));
+		}
+		assert.equal(detailMirrorBackOf({}), false);
 	});
 
 	it("the role never affects pressBehavior parsing (separate axes)", () => {

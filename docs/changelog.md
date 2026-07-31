@@ -33,13 +33,18 @@ Elgato Marketplace listing is a separate track.
   `*gpu*fan*` just its fans. The panel shows a live match count under
   the field before you ever press, and a filtered page re-resolves
   every poll, so readings that appear or vanish in HWiNFO follow along.
-- The key you pressed is Back, under your finger. Inside the view, a
-  reading cell at the pressed key's own position shows the return face
-  and returns on press; the listed readings flow around it, and none
-  are hidden. The fixed top-left Back is still there, and it is an ordinary
-  Sensor Reading key: give it a sensor, any of the four layouts, a
-  theme, custom text, thresholds and the Show stat. Only its press is
-  reserved. Left unconfigured it shows the sensor you drilled down from.
+- The way out is an ordinary Sensor Reading key. The view's Back tile
+  is a real key: give it a sensor, any of the four layouts, a theme,
+  custom text, thresholds and the Show stat, and because the page is an
+  editable profile you can move it where you want it. Only its press is
+  reserved for returning. Left unconfigured it shows the sensor you
+  drilled down from.
+- A second Back under your finger, when a key asks for it. Tick "Repeat
+  Back under this key's own cell" on an opener and, inside the view, a
+  reading cell at the pressed key's position doubles as a second Back:
+  tap in, tap out without moving your hand, with the listed readings
+  flowing around it. Off by default: the issue #5 testers found one
+  movable Back better than two fixed ones.
 - Three press behaviors, default unchanged: cycle stats exactly as
   before, open details on press, or tap to cycle with a half-second
   hold opening details. A key that never touches the Press section

@@ -427,10 +427,14 @@ async function dialsBoard() {
 // ---------- the sensor-details drill-down page (docs/sensor-details.md) ----------
 
 /**
- * A full 15-key detail page exactly as the detail controller composes it
- * from the live snapshot: the opener's reading as the Back tile with the
- * return mark, the title tile with the source range, dimmed/live pagers,
- * and the first page of the source's readings in the shipped layout.
+ * Two full 15-key detail pages exactly as the detail controller composes
+ * them from the live snapshot. detail-view.png is the default: the opener's
+ * reading as the Back tile with the return mark, the title tile with the
+ * source range, dimmed/live pagers, and the first page of the source's
+ * readings in the shipped layout. detail-second-back.png is the same page
+ * with the opener's "Repeat Back under this key's own cell" ticked: pageOf
+ * reserves the opener's slot (the center cell 2,1), the readings flow
+ * around it, and the reserved cell renders the identical Back face.
  */
 async function detailBoard() {
 	const primary = byKey(K.cpuTemp);
@@ -439,19 +443,6 @@ async function detailBoard() {
 		throw new Error("detail board: the live CPU reading did not resolve");
 	}
 	const profile = DETAIL_PROFILES.find((p) => p.key === "standard");
-	const state = {
-		deviceId: "docs",
-		profileName: profile.name,
-		pageSize: profile.layout.readings.length,
-		primaryKey: primary.key,
-		groupSettings: { readingKey: primary.key },
-		presentation: {},
-		group,
-		offset: 0,
-		statModes: new Map(),
-		surfaceCount: 1,
-		pending: false
-	};
 	const ctx = {
 		config,
 		deckThemeId: "void",
@@ -460,36 +451,57 @@ async function detailBoard() {
 		text: effectiveTextSettings(parseTextSettings({}), null)
 	};
 	const status = { state: "ok", snapshot, source: "shared-memory" };
-	const page = pageOf(group.keys, 0, state.pageSize);
-	const faceAt = (column, row) => {
-		const nav = profile.layout.nav;
-		if (nav.back.column === column && nav.back.row === row) return composeBackFace(state, status, ctx);
-		if (nav.title !== null && nav.title.column === column && nav.title.row === row) return composeTitleFace(state, page, ctx);
-		if (nav.previous !== null && nav.previous.column === column && nav.previous.row === row) return composePagerFace("previous", page, state, ctx);
-		if (nav.next !== null && nav.next.column === column && nav.next.row === row) return composePagerFace("next", page, state, ctx);
-		const index = profile.layout.readings.findIndex((c) => c.column === column && c.row === row);
-		const key = page.slots[index];
-		const mode = index === 1 ? "max" : "current"; // one tile shows a cycled stat
-		return composeReadingFace(state, key, key === undefined ? "current" : mode, status, ctx);
+
+	const render = async (outName, mirrorIndex) => {
+		const state = {
+			deviceId: "docs",
+			profileName: profile.name,
+			pageSize: profile.layout.readings.length,
+			primaryKey: primary.key,
+			groupSettings: { readingKey: primary.key },
+			presentation: {},
+			group,
+			offset: 0,
+			statModes: new Map(),
+			surfaceCount: 1,
+			pending: false,
+			mirrorSlotIndex: mirrorIndex ?? null
+		};
+		const page = pageOf(group.keys, 0, state.pageSize, mirrorIndex);
+		const faceAt = (column, row) => {
+			const nav = profile.layout.nav;
+			if (nav.back.column === column && nav.back.row === row) return composeBackFace(state, status, ctx);
+			if (nav.title !== null && nav.title.column === column && nav.title.row === row) return composeTitleFace(state, page, ctx);
+			if (nav.previous !== null && nav.previous.column === column && nav.previous.row === row) return composePagerFace("previous", page, state, ctx);
+			if (nav.next !== null && nav.next.column === column && nav.next.row === row) return composePagerFace("next", page, state, ctx);
+			const index = profile.layout.readings.findIndex((c) => c.column === column && c.row === row);
+			if (mirrorIndex !== undefined && index === mirrorIndex) return composeBackFace(state, status, ctx);
+			const key = page.slots[index];
+			const mode = mirrorIndex === undefined && index === 1 ? "max" : "current"; // one tile shows a cycled stat
+			return composeReadingFace(state, key, key === undefined ? "current" : mode, status, ctx);
+		};
+
+		const KEY = 216;
+		const GAP = 14;
+		const COLS = profile.layout.columns;
+		const ROWS = profile.layout.rows;
+		const W = COLS * KEY + (COLS + 1) * GAP;
+		const H = ROWS * KEY + (ROWS + 1) * GAP;
+		const mask = Buffer.from(`<svg width="${KEY}" height="${KEY}"><rect width="${KEY}" height="${KEY}" rx="20" ry="20" fill="#fff"/></svg>`);
+		const layers = [];
+		for (let row = 0; row < ROWS; row++) {
+			for (let column = 0; column < COLS; column++) {
+				const face = await sharp(Buffer.from(faceAt(column, row))).resize(KEY, KEY).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+				layers.push({ input: face, left: GAP + column * (KEY + GAP), top: GAP + row * (KEY + GAP) });
+			}
+		}
+		const outFile = path.join(outDir, outName);
+		writeFileSync(outFile, await sharp({ create: { width: W, height: H, channels: 3, background: BOARD_BG } }).composite(layers).png().toBuffer());
+		console.log(`wrote ${outFile} (${W}x${H})`);
 	};
 
-	const KEY = 216;
-	const GAP = 14;
-	const COLS = profile.layout.columns;
-	const ROWS = profile.layout.rows;
-	const W = COLS * KEY + (COLS + 1) * GAP;
-	const H = ROWS * KEY + (ROWS + 1) * GAP;
-	const mask = Buffer.from(`<svg width="${KEY}" height="${KEY}"><rect width="${KEY}" height="${KEY}" rx="20" ry="20" fill="#fff"/></svg>`);
-	const layers = [];
-	for (let row = 0; row < ROWS; row++) {
-		for (let column = 0; column < COLS; column++) {
-			const face = await sharp(Buffer.from(faceAt(column, row))).resize(KEY, KEY).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
-			layers.push({ input: face, left: GAP + column * (KEY + GAP), top: GAP + row * (KEY + GAP) });
-		}
-	}
-	const outFile = path.join(outDir, "detail-view.png");
-	writeFileSync(outFile, await sharp({ create: { width: W, height: H, channels: 3, background: BOARD_BG } }).composite(layers).png().toBuffer());
-	console.log(`wrote ${outFile} (${W}x${H})`);
+	await render("detail-view.png", undefined);
+	await render("detail-second-back.png", 4); // reading slot 4 = cell 2,1
 }
 
 // ---------- the HWiNFO Control key face (the shipped action image) ----------

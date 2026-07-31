@@ -25,6 +25,8 @@ In the key's settings panel, under **Press**:
 - **Detail title** names the view's title tile in any mode, replacing the default (the source name, the filter pattern, or Custom set).
 - **Repeat Back under this key's own cell** adds the optional second Back tile described [below](#the-detail-page); leave it off and the movable top-left Back is the one way out.
 
+![The Press section of the settings panel: Press does set to Open sensor details, Detail contains on All readings from this sensor source, an empty Detail title field, and the Second Back checkbox ticked, reading Repeat Back under this key's own cell.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
+
 Existing keys are untouched: a key without a Press setting behaves exactly as it always has.
 
 ## The detail page
@@ -39,6 +41,8 @@ Every detail page has the same furniture:
 - **Previous / Next**: page through long lists. The chevron dims at either end. Paging happens inside the one profile page; nothing stacks.
 - **Reading tiles**: one live reading each, themed like the opener, with the type accent of their own reading. Pressing a tile cycles that tile's current / min / max / avg for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
 - **No sparklines on reading tiles, by design.** A sparkline needs a history buffer that fills over a minute or more, and a detail page shows up to 32 arbitrary readings that change with every page turn and every filter, so the lines would draw mostly empty while costing buffer churn on every visit. The tiles stay instant and scannable; your opener key keeps its own sparkline back on your page.
+
+![The same 15-key detail page with the second Back enabled: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
 
 If HWiNFO stops publishing while the view is open, the tiles show the same status screens as ordinary keys and recover on their own; Back keeps working throughout. If a listed reading disappears (custom mode), its tile shows **Sensor missing** in place, and the others do not shift.
 
@@ -59,7 +63,7 @@ The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one c
 2. **One wildcard anchors the whole pattern.** The moment a pattern contains `*` or `?`, the automatic wrapping is off and the pattern must cover the entire combined text. `core*clock` matches nothing, because the text starts with the source name, not with "core"; `*core*clock*` is the form you want.
 3. **Spaces are literal.** Multi-word plain text works only when the words sit adjacent in the name: `gpu fan` finds the GPU fans, but `core clock` finds nothing because the cores are named `Core 0 Clock`. Span the gap with a star: `*core*clock*`.
 
-![The Press section of the settings panel with Detail contains set to Readings matching a filter: the Filter field holds the pattern star 4090 star, and a live hint under it reads Matches 79 readings right now, above the help text and the Detail title field.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
+![The Press section of the settings panel with Detail contains set to Readings matching a filter: the Filter field holds the pattern star 4090 star, and a live hint under it reads Matches 79 readings right now, above the help text, the Detail title field and the unticked Second Back checkbox.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
 
 Patterns I run on my own bench (512 readings across 21 sources), with their live match counts:
 

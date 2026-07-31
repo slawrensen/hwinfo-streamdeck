@@ -1,9 +1,10 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Eighteen states: the key PI's settings view,
+// the theme gallery are present. Nineteen states: the key PI's settings view,
 // open picker (marketplace shot 3), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, the Press section on Open
-// sensor details and the custom detail list mid-build (collector rows added,
+// sensor details, the same block with the Second Back checkbox ticked, the
+// custom detail list mid-build (collector rows added,
 // ordered chips with move arrows), dual, triple and quad layouts
 // (quad with the cell-colors row); the dial PI's rotation-set picker with ticked
 // rows, a chip open mid-rename beside two already-renamed chips,
@@ -238,6 +239,33 @@ try {
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
 	})()`));
+
+	// ---- key PI: the Second Back checkbox ticked (the opt-in second Back) ----
+	expectOk("second-back ticked", await evaluate(`(() => {
+		const el = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]');
+		if (!el) return "missing";
+		const input = (el.shadowRoot ?? el).querySelector("input[type=checkbox]");
+		if (!input) return "no input";
+		input.click();
+		return input.checked === true ? "ok" : "did not tick";
+	})()`));
+	await sleep(600); // the setting echo settles so the tick is stored state, not a mid-write frame
+	await captureClipped("pi-key-detail-back.png", await evaluate(`(() => {
+		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
+		const block = document.getElementById("detail-config");
+		if (!sel || !block) return "missing";
+		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
+		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
+	})()`));
+	// Untick: every later state shows the default-off panel.
+	expectOk("second-back cleared", await evaluate(`(() => {
+		const input = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]').shadowRoot.querySelector("input[type=checkbox]");
+		input.click();
+		return input.checked === false ? "ok" : "still ticked";
+	})()`));
+	await sleep(400);
 
 	// ---- key PI: the custom detail list mid-build (collector + ordered chips) ----
 	await setSelect("detailMode", "custom");
@@ -621,7 +649,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 18 PI states to ${outDir}`);
+	console.log(`captured 19 PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

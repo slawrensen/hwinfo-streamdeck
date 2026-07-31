@@ -3,6 +3,43 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.4.92.0 - 2026-07-30
+
+- A drill-down key can now shape its own page, so the one shared
+  detail profile behaves like a folder per key (issue #5, shaped by
+  @FattSlice's testing). Detail contains picks the list: every reading
+  of the key's sensor source (the default), a custom list you build by
+  hand, or a new glob filter matched against source name and label
+  taken together. `*4090*` gathers everything the card publishes,
+  `*gpu*fan*` just its fans; the panel shows a live match count under
+  the field before you ever press, and a filtered page re-resolves
+  every poll so readings that appear or vanish in HWiNFO follow along.
+- The key you pressed is Back under your finger. Inside the view, the
+  tile sitting in the pressed key's position shows the return face and
+  returns on press, alongside the fixed top-left Back; listed readings
+  flow around it.
+- Opening a view starts from a black beat instead of a stale flash.
+  The Stream Deck app repaints a profile from each key's last cached
+  image, so the plugin now paints pure black on the way out and the
+  live faces paint over black on the way in.
+- A Virtual Stream Deck sized 9x4 or larger now borrows the + XL page:
+  32 reading tiles per page instead of the XL page's 28. Its dial bank
+  is empty on a virtual deck, and the app installs it cleanly on a
+  deck without encoders.
+- Hardening from an adversarial review pass: entry cannot dispatch
+  twice on a double press, a profile install accepted after the prompt
+  expires bounces back out instead of stranding a dead view,
+  unplugging a deck mid-view cleans up its session, and hostile filter
+  patterns (regex metacharacters, emoji, 500-character strings)
+  compile safely under a 128-character cap. Repaints coalesce into one
+  pass and unchanged polls skip rendering entirely.
+- The updated page ships as profile revision "HWiNFO Details"; the
+  numbered names end with this cut. The first drill-down after
+  upgrading asks once per deck to install it. Copies from earlier
+  previews stay in your profile list until you remove them, and if a
+  preview 1 copy still holds the name, the app installs the new one as
+  "HWiNFO Details copy".
+
 ## 1.4.91.0 - 2026-07-29
 
 - The detail view's Back tile is now a normal Sensor Reading key you

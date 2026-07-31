@@ -173,24 +173,27 @@ export class SnapshotParser {
 					}
 				}
 			}
+			// Object.is, not !==: a NaN entry would otherwise read as changed
+			// on every tick, re-boxing the double and bumping the revision on
+			// identical bytes (which would defeat the detail render gate).
 			const r = readings[i] as MutableReading;
 			const value = dv.getFloat64(o + ENTRY.value, true);
-			if (r.value !== value) {
+			if (!Object.is(r.value, value)) {
 				r.value = value;
 				changed = true;
 			}
 			const valueMin = dv.getFloat64(o + ENTRY.valueMin, true);
-			if (r.valueMin !== valueMin) {
+			if (!Object.is(r.valueMin, valueMin)) {
 				r.valueMin = valueMin;
 				changed = true;
 			}
 			const valueMax = dv.getFloat64(o + ENTRY.valueMax, true);
-			if (r.valueMax !== valueMax) {
+			if (!Object.is(r.valueMax, valueMax)) {
 				r.valueMax = valueMax;
 				changed = true;
 			}
 			const valueAvg = dv.getFloat64(o + ENTRY.valueAvg, true);
-			if (r.valueAvg !== valueAvg) {
+			if (!Object.is(r.valueAvg, valueAvg)) {
 				r.valueAvg = valueAvg;
 				changed = true;
 			}
@@ -201,9 +204,8 @@ export class SnapshotParser {
 			changed = true;
 		}
 		if (changed) {
-			// pollTime has one-second grain, so sub-second HWiNFO polls rewrite
-			// values under an unchanged stamp; this is the counter that still
-			// moves (SensorSnapshot.valueRevision).
+			// See SensorSnapshot.valueRevision: the change counter pollTime's
+			// one-second grain cannot carry.
 			snap.valueRevision++;
 		}
 		return true;

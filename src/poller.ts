@@ -73,6 +73,8 @@ class HwinfoPoller extends EventEmitter {
 	private lastPollTime = -1;
 	private lastAdvanceAt = 0;
 	private lastReopenProbeAt = 0;
+	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
+	private heldFreshness: { pollTime: number; advanceAt: number } | null = null;
 	private lastUpgradeProbeAt = 0;
 	/** Nonzero while a transient failure is being ridden out on held values. */
 	private holdingSince = 0;
@@ -185,6 +187,7 @@ class HwinfoPoller extends EventEmitter {
 			this.timer = null;
 		}
 		this.dropProvider();
+		this.heldFreshness = null;
 		// Info on purpose: the e2e exit-hygiene check greps for this line to
 		// prove the poller idles (timer cleared, provider closed) with no keys.
 		this.logger.info("Stopped (no visible actions)");
@@ -239,7 +242,16 @@ class HwinfoPoller extends EventEmitter {
 		try {
 			if (this.provider === null) {
 				this.provider = this.openProvider();
-				this.lastAdvanceAt = Date.now();
+				if (this.heldFreshness !== null) {
+					// A failed stale probe dropped the provider last tick; the
+					// source is the same frozen one, so restore its freshness
+					// instead of letting the reopen pose as an advance.
+					this.lastPollTime = this.heldFreshness.pollTime;
+					this.lastAdvanceAt = this.heldFreshness.advanceAt;
+					this.heldFreshness = null;
+				} else {
+					this.lastAdvanceAt = Date.now();
+				}
 				this.logger.info(`Opened HWiNFO data source: ${this.provider.source}`);
 			}
 			this.maybeUpgradeToSharedMemory();
@@ -335,8 +347,15 @@ class HwinfoPoller extends EventEmitter {
 		const prev = this.provider;
 		const prevPollTime = this.lastPollTime;
 		const prevAdvanceAt = this.lastAdvanceAt;
+		// Stashed on the instance too: when openProvider throws here (a busy
+		// mutex at the probe instant), these locals die with the probe, and
+		// the next tick's cold reopen would otherwise mint a fresh advance
+		// for a still-frozen source: a false ok window plus duplicate
+		// sparkline samples, repeating while HWiNFO stays paused.
+		this.heldFreshness = { pollTime: prevPollTime, advanceAt: prevAdvanceAt };
 		this.dropProvider();
 		this.provider = this.openProvider(); // HwinfoError propagates to tick()
+		this.heldFreshness = null;
 		// Preserve freshness across the swap: dropProvider resets lastPollTime
 		// and a fresh gadget provider resets its digest — either would let a
 		// frozen source pose as advancing for one stale window (ok↔stale flap).

@@ -112,7 +112,9 @@ export class DetailNavigator {
 	/** Pending sessions that expired unconfirmed (declined-or-ignored
 	 *  install prompt), so a late accept can be recognized and backed out. */
 	private readonly expiredPendingAt = new Map<string, number>();
-	private readonly deps: Required<Pick<NavigatorDeps, "switchProfile" | "pendingExpiryMs" | "disappearGraceMs" | "setTimer" | "clearTimer">> & NavigatorDeps;
+	/** One-shot post-leave repaints, keyed by device (see leave()). */
+	private readonly leaveRepaintTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private readonly deps: Required<Pick<NavigatorDeps, "switchProfile" | "pendingExpiryMs" | "disappearGraceMs" | "setTimer" | "clearTimer" | "now">> & NavigatorDeps;
 
 	constructor(deps: NavigatorDeps) {
 		this.deps = {
@@ -122,6 +124,7 @@ export class DetailNavigator {
 			// alive after the app closes the socket (exit hygiene).
 			setTimer: (fn, ms) => setTimeout(fn, ms).unref(),
 			clearTimer: (h) => clearTimeout(h),
+			now: Date.now,
 			...deps
 		};
 	}
@@ -163,7 +166,7 @@ export class DetailNavigator {
 			this.deps.log?.info(`Detail entry refused: no bundled profile for device type ${deviceType ?? "unknown"}`);
 			return "unsupported";
 		}
-		const now = (this.deps.now ?? Date.now)();
+		const now = this.deps.now();
 		const existing = this.states.get(deviceId);
 		if (existing !== undefined && existing.surfaceCount > 0) {
 			// The detail surface is already live on this device; a second
@@ -194,10 +197,14 @@ export class DetailNavigator {
 			return "unresolved";
 		}
 		this.clearCleanupTimer(deviceId);
+		this.clearLeaveRepaint(deviceId);
 		// A fresh session invalidates the last-leave debounce (Back on the
 		// new view must work immediately) and any expired-pending tombstone
-		// (the slots about to appear belong to THIS session).
+		// (the slots about to appear belong to THIS session). The tombstone
+		// is captured first: a failed dispatch below must put it back, or a
+		// late accept of the prompt it tracked would strand the idle page.
 		this.leftAt.delete(deviceId);
+		const priorTombstone = this.expiredPendingAt.get(deviceId);
 		this.expiredPendingAt.delete(deviceId);
 		const state: DeviceDetailState = {
 			deviceId,
@@ -241,6 +248,9 @@ export class DetailNavigator {
 			// a newer session that replaced this one meanwhile.
 			if (this.states.get(deviceId) === state) {
 				this.states.delete(deviceId);
+				if (priorTombstone !== undefined) {
+					this.expiredPendingAt.set(deviceId, priorTombstone);
+				}
 			}
 			this.deps.log?.warn(`Detail profile switch failed on ${deviceId}: ${String(err)}`);
 			return "switch-failed";
@@ -260,12 +270,22 @@ export class DetailNavigator {
 	 * user meant; a later stateless Back (past the window) still works.
 	 */
 	async leave(deviceId: string): Promise<void> {
-		const now = (this.deps.now ?? Date.now)();
+		const now = this.deps.now();
 		const last = this.leftAt.get(deviceId);
 		if (last !== undefined && now - last < LEAVE_DEBOUNCE_MS) {
 			return;
 		}
 		this.leftAt.set(deviceId, now);
+		// If the restore below no-ops (a restart-shaped surface with an empty
+		// previous register), the blacked-out slots stay visible with nothing
+		// left to repaint them: the tick gate holds still while HWiNFO is
+		// down or stale. One shot past the beat restores honest idle faces;
+		// a real restore removes the slots first and it repaints nothing.
+		this.clearLeaveRepaint(deviceId);
+		this.leaveRepaintTimers.set(deviceId, this.deps.setTimer(() => {
+			this.leaveRepaintTimers.delete(deviceId);
+			this.deps.onChanged?.(deviceId);
+		}, LEAVE_DEBOUNCE_MS));
 		this.clearCleanupTimer(deviceId);
 		const had = this.states.delete(deviceId);
 		if (had) {
@@ -329,7 +349,7 @@ export class DetailNavigator {
 	 */
 	recentlyLeft(deviceId: string): boolean {
 		const last = this.leftAt.get(deviceId);
-		return last !== undefined && (this.deps.now ?? Date.now)() - last < LEAVE_DEBOUNCE_MS;
+		return last !== undefined && this.deps.now() - last < LEAVE_DEBOUNCE_MS;
 	}
 
 	/**
@@ -401,7 +421,7 @@ export class DetailNavigator {
 			// plugin restart inside the view has no tombstone at all: both
 			// keep the honest idle surface.
 			const expiredAt = this.expiredPendingAt.get(deviceId);
-			if (expiredAt !== undefined && (this.deps.now ?? Date.now)() - expiredAt < PENDING_TOMBSTONE_MS) {
+			if (expiredAt !== undefined && this.deps.now() - expiredAt < PENDING_TOMBSTONE_MS) {
 				this.expiredPendingAt.delete(deviceId);
 				this.deps.log?.info(`Detail surface appeared after its pending entry expired on ${deviceId}: restoring the previous profile`);
 				void this.leave(deviceId);
@@ -433,6 +453,7 @@ export class DetailNavigator {
 
 	deviceDisconnected(deviceId: string): void {
 		this.clearCleanupTimer(deviceId);
+		this.clearLeaveRepaint(deviceId);
 		// The debounce stamp and tombstone die with the device: neither may
 		// influence a session after a reconnect, and the maps must not grow
 		// with device churn.
@@ -446,6 +467,9 @@ export class DetailNavigator {
 	shutdown(): void {
 		for (const deviceId of [...this.cleanupTimers.keys()]) {
 			this.clearCleanupTimer(deviceId);
+		}
+		for (const deviceId of [...this.leaveRepaintTimers.keys()]) {
+			this.clearLeaveRepaint(deviceId);
 		}
 		this.states.clear();
 		this.leftAt.clear();
@@ -466,7 +490,7 @@ export class DetailNavigator {
 				// still open). Leave a tombstone so a LATE accept is
 				// recognized in surfaceSeen and backed out instead of
 				// stranding the user on an idle page.
-				this.expiredPendingAt.set(deviceId, (this.deps.now ?? Date.now)());
+				this.expiredPendingAt.set(deviceId, this.deps.now());
 			}
 			this.states.delete(deviceId);
 			this.deps.log?.info(`Detail session dropped on ${deviceId}: ${reason}`);
@@ -480,6 +504,14 @@ export class DetailNavigator {
 		if (handle !== undefined) {
 			this.deps.clearTimer(handle);
 			this.cleanupTimers.delete(deviceId);
+		}
+	}
+
+	private clearLeaveRepaint(deviceId: string): void {
+		const handle = this.leaveRepaintTimers.get(deviceId);
+		if (handle !== undefined) {
+			this.deps.clearTimer(handle);
+			this.leaveRepaintTimers.delete(deviceId);
 		}
 	}
 }

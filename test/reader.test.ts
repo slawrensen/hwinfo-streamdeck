@@ -196,6 +196,18 @@ describe("SnapshotParser — incremental fast path", () => {
 		assert.ok((grown.valueRevision ?? 0) > (subSecond.valueRevision ?? 0), "a rebuild bumps past the fast-path line");
 	});
 
+	it("a NaN value never bumps valueRevision on identical bytes", () => {
+		// NaN !== NaN: a plain !== guard would read a NaN entry as changed on
+		// every tick, defeating the detail render gate for as long as HWiNFO
+		// publishes one. The guards compare with Object.is.
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [{ ...TEMP, value: NaN }]));
+		const rev = first.valueRevision;
+		const again = parser.parse(compose([CPU], [{ ...TEMP, value: NaN }]));
+		assert.equal(again, first);
+		assert.equal(again.valueRevision, rev);
+	});
+
 	it("rebuilds when the header changes (entry count)", () => {
 		const parser = new SnapshotParser();
 		const first = parser.parse(compose([CPU], [TEMP]));

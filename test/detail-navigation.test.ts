@@ -402,6 +402,45 @@ describe("switch-beat and late-accept seams", () => {
 		assert.equal(switches.filter((s) => s.profileName === undefined).length, 0);
 	});
 
+	it("a retry whose switch call fails puts the expiry tombstone back", async () => {
+		const { nav, switches, fireTimers, advance, settleSwitch } = bed({ deferSwitch: true });
+		const first = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		settleSwitch();
+		assert.equal(await first, "entered");
+		fireTimers(); // 30 s: the unconfirmed entry expires into a tombstone
+		advance(2_000);
+		const retry = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		settleSwitch(true); // the app rejects the retry's dispatch
+		assert.equal(await retry, "switch-failed");
+		// The ORIGINAL prompt is still out there; a late accept must bounce
+		// out, which only works if the rollback restored the tombstone.
+		nav.surfaceSeen("dev1");
+		assert.deepEqual(switches.at(-1), { deviceId: "dev1", profileName: undefined, page: undefined });
+	});
+
+	it("leave arms a one-shot repaint so a no-op restore cannot leave the blackout up", async () => {
+		const { nav, changed, fireTimers, pendingTimers } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		await nav.leave("dev1");
+		changed.length = 0;
+		assert.equal(pendingTimers(), 1, "the repaint shot is armed");
+		fireTimers();
+		assert.deepEqual(changed, ["dev1"]);
+		assert.equal(pendingTimers(), 0);
+	});
+
+	it("a fresh entry replaces the post-leave repaint with its own expiry timer", async () => {
+		const { nav, pendingTimers, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		nav.surfaceSeen("dev1");
+		await nav.leave("dev1");
+		assert.equal(pendingTimers(), 1); // the repaint shot
+		advance(2_000);
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		assert.equal(pendingTimers(), 1); // the new entry's expiry only
+	});
+
 	it("a fresh entry after an expiry claims the appearing surface (no bounce)", async () => {
 		const { nav, switches, fireTimers, advance } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
@@ -503,6 +542,11 @@ describe("tickSignature — the detail render gate", () => {
 		assert.equal(moved.pollTime, snap.pollTime);
 		assert.equal(moved.readings.length, snap.readings.length);
 		assert.notEqual(tickSignature(ok(moved)), tickSignature(ok(snap)));
+	});
+
+	it("the source is part of the ok line, so a provider swap can never replay a spent string", () => {
+		const snap = { ...snapshotOf([reading("cpu:0:0", 0)], ["CPU"]), valueRevision: 1 };
+		assert.notEqual(tickSignature({ state: "ok", snapshot: snap, source: "gadget" }), tickSignature(ok(snap)));
 	});
 
 	it("a provider without revisions still gates on pollTime, and states keep their own lines", () => {

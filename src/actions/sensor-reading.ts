@@ -3,9 +3,13 @@
  * thresholds, stat modes and a sparkline. Pressing the key cycles the stat
  * mode (current → min → max → avg).
  */
-import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyDownEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
+import { PressEngine } from "../detail/press-engine";
+import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
+import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
@@ -13,6 +17,7 @@ import { alertLevel, convertUnit, isStatMode, parseThreshold, STAT_BADGE, STAT_M
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
+import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
 import { appliedTextMode, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, mixToward, resolveTextColors, type TextColors, type TextSettings } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, getDeckTheme, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
@@ -78,6 +83,30 @@ export type ReadingSettings = {
 	/** Per-slot identity colors, four #RRGGBB entries. Salvaged per entry:
 	 * an invalid entry falls back to that slot's default alone. */
 	quadColors?: string[];
+	/**
+	 * What a key press does (issue #5): "cycle-stat" (the unchanged
+	 * default), "open-details" (switch this device to its bundled detail
+	 * profile), or "tap-cycle-hold-details" (short tap cycles, a held
+	 * press opens details). Absent or unrecognized values behave exactly
+	 * as cycle-stat, so rolled-back and hand-edited profiles never break.
+	 */
+	pressBehavior?: string;
+	/** What the detail view lists: "source" (every reading of this
+	 * sensor's HWiNFO source, the default) or "custom" (detailKeys). */
+	detailMode?: string;
+	/** Custom detail list: stable reading keys in display order. */
+	detailKeys?: string[];
+	/** Optional title for the detail view's title tile. */
+	detailTitle?: string;
+	/**
+	 * Baked navigation role. The revision-2 detail profiles ship their
+	 * top-left cell as a normal Sensor Reading carrying exactly "back":
+	 * that tile configures like any key (sensor, layouts, theme,
+	 * thresholds) while its press stays pinned to returning to the
+	 * previous profile. Absent, malformed and future values behave as an
+	 * ordinary key; the value is never normalized or rewritten.
+	 */
+	detailRole?: string;
 };
 
 type InstanceState = {
@@ -113,8 +142,12 @@ function quadColorsOf(settings: ReadingSettings): readonly [string, string, stri
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
 export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	private readonly instances = new Map<string, InstanceState>();
+	/** Tap-vs-hold sessions for the "tap cycles; hold opens" behavior. */
+	private readonly presses = new PressEngine((contextId, outcome) => {
+		void (outcome === "hold" ? this.openDetails(contextId) : this.cycleStat(contextId));
+	});
 
-	constructor() {
+	constructor(private readonly detailNavigator: DetailNavigator) {
 		super();
 		// Isolated so a rendering bug in one action class can't starve the other
 		// listeners on the shared "tick" event.
@@ -147,7 +180,11 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (firstSighting) {
 			poller.retain();
 		}
-		decideLegacyDefault(Object.values(ev.payload.settings).some((v) => v !== undefined));
+		// The baked Back marker ships inside the revision-2 profiles (1.4.91+),
+		// so its presence can never signal a pre-theme install: without this
+		// exclusion, a first launch that starts inside a detail profile would
+		// wrongly migrate a fresh install onto the legacy graphite theme.
+		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && v !== undefined));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
 		if (firstSighting) {
@@ -174,6 +211,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<ReadingSettings>): void {
+		// A key that vanishes mid-press (profile switch, page nav) must never
+		// fire a late hold or tap — the session dies with the visibility.
+		this.presses.cancel(ev.action.id);
 		if (this.instances.delete(ev.action.id)) {
 			// The ring stays tracked: history keeps collecting off-screen while
 			// anything else keeps the poller alive, and paging back resumes the
@@ -199,20 +239,118 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			state.subscribedKey = nextSub;
 		}
 		state.settings = ev.payload.settings;
+		if (detailRoleOf(state.settings) === "back") {
+			// A visible key that became a Back tile mid-press must not
+			// resolve its armed tap/hold session under the new role.
+			this.presses.cancel(ev.action.id);
+		}
 		this.renderAll(poller.getStatus());
 	}
 
-	/** Key press cycles the displayed stat: current → min → max → avg. */
+	/**
+	 * Key press behavior (issue #5). A baked Back role wins outright: the
+	 * press asks the navigator for the previous profile and nothing else
+	 * (no stat cycle, no detail entry, no tap/hold arming). Otherwise the
+	 * default "cycle-stat" keeps the original semantics exactly: cycle
+	 * current → min → max → avg on key DOWN. "open-details" enters the
+	 * detail view on key down instead, and "tap-cycle-hold-details" arms
+	 * the press engine (tap cycles on release, a 500 ms hold opens details
+	 * once). Malformed or future pressBehavior values take the cycle-stat
+	 * path.
+	 */
 	override async onKeyDown(ev: KeyDownEvent<ReadingSettings>): Promise<void> {
 		const state = this.instances.get(ev.action.id);
-		if (state === undefined || state.settings.readingKey === undefined) {
+		if (state === undefined) {
+			return;
+		}
+		if (detailRoleOf(state.settings) === "back") {
+			// Any stale tap/hold session dies first so its timer can never
+			// fire a ghost hold; the navigator stays the only authority for
+			// profile navigation (device-scoped, debounced).
+			this.presses.cancel(ev.action.id);
+			await this.detailNavigator.leave(ev.action.device.id);
+			return;
+		}
+		const behavior = pressBehaviorOf(state.settings);
+		if (behavior === "open-details") {
+			await this.openDetails(ev.action.id);
+			return;
+		}
+		if (behavior === "tap-cycle-hold-details") {
+			this.presses.keyDown(ev.action.id);
+			return;
+		}
+		await this.cycleStat(ev.action.id);
+	}
+
+	override onKeyUp(ev: KeyUpEvent<ReadingSettings>): void {
+		const state = this.instances.get(ev.action.id);
+		if (state !== undefined && detailRoleOf(state.settings) === "back") {
+			// A Back tile's release does nothing; cancel defensively so a
+			// session armed before the role arrived can never resolve as a
+			// tap under the new role.
+			this.presses.cancel(ev.action.id);
+			return;
+		}
+		// Resolves only an armed tap/hold session; a no-session keyUp (the
+		// other behaviors, or a press that outlived its key) is a no-op.
+		this.presses.keyUp(ev.action.id);
+	}
+
+	/** The original press action, verbatim: cycle the stat and persist it. */
+	private async cycleStat(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined || state.settings.readingKey === undefined) {
 			return;
 		}
 		const current = isStatMode(state.settings.statMode) ? state.settings.statMode : "current";
 		const next = STAT_MODES[(STAT_MODES.indexOf(current) + 1) % STAT_MODES.length] as StatMode;
 		state.settings = { ...state.settings, statMode: next };
-		await ev.action.setSettings(state.settings);
+		await act.setSettings(state.settings);
 		this.renderAll(poller.getStatus());
+	}
+
+	/**
+	 * Opens the detail view for this key's device. Every refusal keeps the
+	 * key exactly as it was (no stat cycle as a fallback) and shows the
+	 * Stream Deck alert cue; the log names the device type, never a sensor.
+	 */
+	private async openDetails(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined) {
+			return;
+		}
+		const deviceId = act.device.id;
+		const caps = deviceCapabilities.get(deviceId);
+		const status = poller.getStatus();
+		const result = await this.detailNavigator.enter({
+			deviceId,
+			deviceType: caps.type,
+			// Variable-canvas guests (the Virtual Stream Deck) resolve their
+			// bundle by reported grid; fixed classes ignore it.
+			grid: { columns: caps.columns, rows: caps.rows },
+			settings: state.settings,
+			snapshot: status.state === "unavailable" ? null : status.snapshot,
+			// The opener's own cell: a detail reading slot on the same cell
+			// becomes the mirror Back tile (tap in, tap out, one finger).
+			openerCell: act.coordinates === undefined ? undefined : { column: act.coordinates.column, row: act.coordinates.row }
+		});
+		if (result !== "entered") {
+			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);
+			await act.showAlert();
+		}
+	}
+
+	/** The visible action proxy for a context (press outcomes arrive by id). */
+	private actionById(contextId: string): KeyAction<ReadingSettings> | undefined {
+		for (const act of this.actions) {
+			if (act.id === contextId && act.isKey()) {
+				return act;
+			}
+		}
+		return undefined;
 	}
 
 	override onSendToPlugin(ev: SendToPluginEvent<JsonValue, ReadingSettings>): void {
@@ -227,6 +365,14 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		pushPreviewToPi(status, this.manifestId, this.instances, true);
 	}
 
+	/** Repaint hook for detail-state changes (enter, leave, cleanup): a
+	 * Back tile's fallback face follows the device session, so it repaints
+	 * on the same signal the hidden slots do, not only on the next tick.
+	 * Frame dedupe makes a no-change call cost nothing. */
+	repaint(): void {
+		this.renderAll(poller.getStatus());
+	}
+
 	private renderAll(status: PollerStatus): void {
 		for (const act of this.actions) {
 			if (!act.isKey()) {
@@ -236,25 +382,77 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			if (state === undefined) {
 				continue;
 			}
-			const svg = compose(state, status);
+			const svg = this.composeFor(state, act.device.id, status);
 			if (svg !== state.lastSvg) {
 				state.lastSvg = svg;
 				void act.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);
 			}
 		}
 	}
+
+	/**
+	 * One instance's face. An ordinary key takes the unchanged compose
+	 * path. A Back-role tile takes the SAME path with the return hook:
+	 * configured tiles render their own settings (their missing sensor
+	 * shows the configured missing behavior, never the opener's), an
+	 * unconfigured tile falls back to the live session's opener so a
+	 * fresh profile works before any configuration, and with no session
+	 * at all the honest idle Back face keeps the way out obvious.
+	 */
+	private composeFor(state: InstanceState, deviceId: string, status: PollerStatus): string {
+		if (detailRoleOf(state.settings) !== "back") {
+			return compose(state.settings, status);
+		}
+		if (nonEmptyStringOf(state.settings.readingKey) !== undefined) {
+			return compose(state.settings, status, true);
+		}
+		const detail = this.detailNavigator.stateFor(deviceId);
+		if (detail === undefined) {
+			return renderDetailIdleBackKey();
+		}
+		return compose(backFallbackSettings(detail), status, true);
+	}
 }
 
-function compose(state: InstanceState, status: PollerStatus): string {
+/** The minimal synthetic settings for an unconfigured Back tile: the
+ * opener's primary reading under the opener's presentation, single
+ * layout, no strip, no stat — byte-equivalent to the hidden slot's
+ * composeBackFace output by construction (same formatting, theme, text
+ * and threshold authorities, statValue("current") = the live value).
+ * Exported for the equivalence test. */
+export function backFallbackSettings(detail: DeviceDetailState): ReadingSettings {
+	const p = detail.presentation;
+	return {
+		readingKey: detail.primaryKey,
+		label: p.label,
+		decimals: p.decimals,
+		fahrenheit: p.fahrenheit,
+		theme: p.theme,
+		textMode: p.textMode,
+		textColor: p.textColor,
+		textDimSecondary: p.textDimSecondary,
+		warnValue: p.warnValue,
+		critValue: p.critValue,
+		alertBelow: p.alertBelow
+	};
+}
+
+/**
+ * One key face from settings alone. `returnMark` rides every layout and
+ * status screen (the Back tile is this same composition with the hook);
+ * false keeps every output byte-identical to the pre-role renderer.
+ * Exported so the fallback's byte-equivalence to the hidden slot's
+ * composeBackFace is provable against the REAL path, not a copy.
+ */
+export function compose(settings: ReadingSettings, status: PollerStatus, returnMark = false): string {
 	const screen = statusScreen(status);
 	if (screen !== null) {
-		return renderStatusKey(screen);
+		return renderStatusKey({ ...screen, returnMark });
 	}
 	const { snapshot } = status as Extract<PollerStatus, { state: "ok" }>;
-	const settings = state.settings;
 	const primaryKey = nonEmptyStringOf(settings.readingKey);
 	if (primaryKey === undefined) {
-		return renderStatusKey(noSelectionScreen());
+		return renderStatusKey({ ...noSelectionScreen(), returnMark });
 	}
 	// The dual layout needs BOTH the exact "dual" marker and a usable second
 	// reading; every other combination (absent, junk, rolled-back settings)
@@ -268,22 +466,22 @@ function compose(state: InstanceState, status: PollerStatus): string {
 	if (settings.keyLayout === "quad") {
 		const slotKeys = [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3), nonEmptyStringOf(settings.quadReadingKey4)];
 		if (slotKeys.filter((k) => k !== undefined).length >= 2) {
-			return composeQuad(settings, snapshot, slotKeys);
+			return composeQuad(settings, snapshot, slotKeys, returnMark);
 		}
 	}
 	// Same gate as the quad above, over its first three slots.
 	if (settings.keyLayout === "triple") {
 		const slotKeys = [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3)];
 		if (slotKeys.filter((k) => k !== undefined).length >= 2) {
-			return composeTriple(settings, snapshot, slotKeys);
+			return composeTriple(settings, snapshot, slotKeys, returnMark);
 		}
 	}
 	if (settings.keyLayout === "dual" && secondaryKey !== undefined) {
-		return composeDual(settings, snapshot, primaryKey, secondaryKey);
+		return composeDual(settings, snapshot, primaryKey, secondaryKey, returnMark);
 	}
 	const reading = snapshot.byKey.get(primaryKey);
 	if (reading === undefined) {
-		return renderStatusKey(missingReadingScreen());
+		return renderStatusKey({ ...missingReadingScreen(), returnMark });
 	}
 
 	const fahrenheit = settings.fahrenheit === true;
@@ -309,7 +507,8 @@ function compose(state: InstanceState, status: PollerStatus): string {
 		history: display === "sparkline" ? poller.getSeries(primaryKey) : undefined,
 		gauge: display === "bar" || display === "ring" ? { kind: display, ...keyGauge(settings, reading, fahrenheit, config, palette.bg) } : undefined,
 		palette,
-		text
+		text,
+		returnMark
 	});
 }
 
@@ -379,11 +578,11 @@ function primaryContext(settings: ReadingSettings, primary: Reading | undefined,
  * labels keep their full width; only rows whose stat differs carry their
  * own badge, inline after the unit.
  */
-function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primaryKey: string, secondaryKey: string): string {
+function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primaryKey: string, secondaryKey: string, returnMark = false): string {
 	const primary = snapshot.byKey.get(primaryKey);
 	const secondary = snapshot.byKey.get(secondaryKey);
 	if (primary === undefined && secondary === undefined) {
-		return renderStatusKey(missingReadingScreen());
+		return renderStatusKey({ ...missingReadingScreen(), returnMark });
 	}
 	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
@@ -399,7 +598,8 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 		bottom: dualRow(secondary, settings.secondaryLabel, bottomMode, shared, measureOpts),
 		sharedBadge: shared ? STAT_BADGE[topMode] : "",
 		palette,
-		text: resolveTextColors(palette, effectiveTextFor(settings), level)
+		text: resolveTextColors(palette, effectiveTextFor(settings), level),
+		returnMark
 	});
 }
 
@@ -416,10 +616,10 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
  * the normal measurement path — the rows have room for full values, so the
  * quad's 4-glyph compaction would only cost precision.
  */
-function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slotKeys: ReadonlyArray<string | undefined>): string {
+function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slotKeys: ReadonlyArray<string | undefined>, returnMark = false): string {
 	const readings = slotKeys.map((key) => (key === undefined ? undefined : snapshot.byKey.get(key)));
 	if (readings.every((r) => r === undefined)) {
-		return renderStatusKey(missingReadingScreen());
+		return renderStatusKey({ ...missingReadingScreen(), returnMark });
 	}
 	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
@@ -431,7 +631,8 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 		rows: slotKeys.map((key, i) => (key === undefined ? null : tripleRow(readings[i], customLabels[i], mode, measureOpts))),
 		sharedBadge: STAT_BADGE[mode],
 		palette,
-		text: resolveTextColors(palette, effectiveTextFor(settings), level)
+		text: resolveTextColors(palette, effectiveTextFor(settings), level),
+		returnMark
 	});
 }
 
@@ -456,10 +657,10 @@ function tripleRow(reading: Reading | undefined, customLabel: string | undefined
  * Every slot shows the same stat (statMode; the key press cycles it),
  * badged once at the cross intersection. Per-slot pins are dual-only.
  */
-function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKeys: ReadonlyArray<string | undefined>): string {
+function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKeys: ReadonlyArray<string | undefined>, returnMark = false): string {
 	const readings = slotKeys.map((key) => (key === undefined ? undefined : snapshot.byKey.get(key)));
 	if (readings.every((r) => r === undefined)) {
-		return renderStatusKey(missingReadingScreen());
+		return renderStatusKey({ ...missingReadingScreen(), returnMark });
 	}
 	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
@@ -481,7 +682,8 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 		labels: labeled,
 		sharedBadge: STAT_BADGE[mode],
 		palette,
-		text
+		text,
+		returnMark
 	});
 }
 

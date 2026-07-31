@@ -126,6 +126,21 @@ Other notes:
 - On **dials**, the alert lands wherever the face has room. In the **One reading** view the range bar's fill flips to the alert color, and with **Warn at** or **Critical at** set the bar's track marks those zones in muted amber and red whatever the value is doing. The **two-row and three-row overviews** have no bar, so an alerting row shows its **value** in the alert color instead. Either way the rest of the touchscreen stays themed; the slot is too small for a full field flip. On **keys**, the whole key flips (amber field at warn, red field at critical).
 - Leave a field blank to disable that level. Both accept a locale decimal comma (`70,5`).
 
+## A press set to open details shows the alert triangle
+
+The yellow Stream Deck alert cue on a drill-down press means entry was refused, on purpose. In order of likelihood:
+
+- **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Everything else about the key still works.
+- **HWiNFO is not publishing data** and the detail list is set to *All readings from this sensor source* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only a *Custom sensor list* opens while HWiNFO is down.
+- **The selected sensor is missing** from HWiNFO's current output, so its source cannot be identified. Reopen settings and pick it again.
+- **The filter pattern is empty** (*Readings matching a filter*): there is nothing to list until you type one. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
+
+If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put. The plugin quietly forgets the attempt after 30 seconds; accepting later than that returns you to where you were, and the next press opens the view directly (the profile is installed now, so there is no second prompt).
+
+## The detail view says "No detail / selected"
+
+The detail profile is visible but the plugin was restarted underneath it (plugin update, crash recovery), so it no longer knows which sensor opened the view. Press the Back tile (top left) to return to your profile, then open details again. Back always works there, even in this state.
+
 ## Dial gestures do nothing
 
 1. **You're on a plain Stream Deck, not a Stream Deck + or + XL.** The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL encoder (dial + touchscreen). Regular keys use the **Sensor Reading** action instead.

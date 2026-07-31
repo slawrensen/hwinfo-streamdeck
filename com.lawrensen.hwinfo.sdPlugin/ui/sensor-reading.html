@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.4.0.0" />
+		<link rel="stylesheet" href="pi.css?v=1.4.91.0" />
 	</head>
 	<body>
 		<details class="hw-setup" data-fold="setup">
@@ -18,6 +18,8 @@
 				3. Pick a sensor below. That's it.
 			</p>
 		</details>
+
+		<div class="hw-hint" id="role-note" hidden>Back tile: configure its sensor and layout normally. Pressing it always returns to the previous profile.</div>
 
 		<div class="hw-section">Sensor</div>
 
@@ -52,7 +54,7 @@
 				<option value="avg">Average (since HWiNFO start)</option>
 			</sdpi-select>
 		</sdpi-item>
-		<div class="hw-help">Pressing the key cycles current → min → max → avg.</div>
+		<div class="hw-help" id="show-help">Pressing the key cycles current → min → max → avg.</div>
 
 		<sdpi-item label="Decimals">
 			<sdpi-select setting="decimals" default="auto">
@@ -67,6 +69,49 @@
 		<sdpi-item label="Unit">
 			<sdpi-checkbox setting="fahrenheit" label="Show temperatures in °F"></sdpi-checkbox>
 		</sdpi-item>
+
+		<div id="press-block">
+		<div class="hw-section">Press</div>
+
+		<sdpi-item label="Press does">
+			<sdpi-select setting="pressBehavior" default="">
+				<option value="">Cycle current / min / max / avg</option>
+				<option value="open-details">Open sensor details</option>
+				<option value="tap-cycle-hold-details">Tap cycles; hold opens details</option>
+			</sdpi-select>
+		</sdpi-item>
+		<div id="detail-config" class="hw-cond" hidden>
+			<sdpi-item label="Detail contains">
+				<sdpi-select setting="detailMode" default="source">
+					<option value="source">All readings from this sensor source</option>
+					<option value="custom">Custom sensor list</option>
+					<option value="filter">Readings matching a filter</option>
+				</sdpi-select>
+			</sdpi-item>
+			<div id="detail-custom" class="hw-cond" hidden>
+				<sdpi-item label="Add sensor">
+					<div class="hw-picker">
+						<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
+						<button id="pickerd-refresh" type="button" title="Reload sensor list">⟳</button>
+						<div class="hw-picker-list" id="pickerd-list" hidden></div>
+					</div>
+				</sdpi-item>
+				<div id="detail-list" class="hw-set"></div>
+			</div>
+			<div id="detail-filter" class="hw-cond" hidden>
+				<sdpi-item label="Filter">
+					<sdpi-textfield setting="detailFilter" placeholder="*4090*   (* spans anything, ? one character)"></sdpi-textfield>
+				</sdpi-item>
+				<div class="hw-hint" id="detail-filter-count" hidden></div>
+				<div class="hw-help">Lists every reading whose source name and label, taken together, match the pattern, deck-wide and live against HWiNFO's current layout. Plain text matches anywhere; * spans anything and ? matches one character (*gpu*fan* style).</div>
+			</div>
+			<sdpi-item label="Detail title">
+				<sdpi-textfield setting="detailTitle" placeholder="Title tile text (optional)"></sdpi-textfield>
+			</sdpi-item>
+			<div class="hw-hint" id="detail-unsupported" hidden></div>
+			<div class="hw-help" id="detail-help">Details open as a plugin-managed profile, not a native folder: the deck switches to a bundled one-page view with this key's sensor as the live Back tile (top left), and Stream Deck asks to install it once per deck type on first use. Previous and Next page through long lists; pressing a listed reading cycles its stat for that visit.</div>
+		</div>
+		</div>
 
 		<div class="hw-section">Appearance</div>
 
@@ -268,7 +313,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.4.0.0"></script>
-		<script src="pi-control.js?v=1.4.0.0"></script>
+		<script src="pi-common.js?v=1.4.91.0"></script>
+		<script src="pi-control.js?v=1.4.91.0"></script>
 	</body>
 </html>

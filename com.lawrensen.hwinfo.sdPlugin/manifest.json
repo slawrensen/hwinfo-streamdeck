@@ -2,7 +2,7 @@
 	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
 	"UUID": "com.lawrensen.hwinfo",
 	"Name": "HWiNFO Sensors",
-	"Version": "1.4.0.0",
+	"Version": "1.4.92.0",
 	"Author": "Stephen Lawrensen",
 	"Description": "Live HWiNFO sensor readings on your Stream Deck: temperatures, clocks, fan speeds, voltages, power and usage, rendered with seven display themes, sensor-type accents, warn/critical alert colors, sparklines, bar and ring gauges with threshold zones, and stat modes, plus dial and touchscreen support on the Stream Deck + and Stream Deck + XL. A key can stack two readings, list three as compact rows, or show four in a quad grid with per-cell colors, and a dial's touchscreen can list the rotation set as an overview: three compact rows, or two rows with big values and trend sparklines. A Text setting picks the text color per key, per dial or deck-wide, and data units render decimal (MB, Mbps) or binary (MiB, MiB/s). Requires HWiNFO with Shared Memory Support or Gadget reporting enabled; auto mode picks the best available source and recovers on its own when HWiNFO restarts.",
 	"Category": "HWiNFO Sensors",
@@ -28,7 +28,7 @@
 			"Name": "Sensor Reading",
 			"UUID": "com.lawrensen.hwinfo.reading",
 			"Icon": "imgs/actions/reading/icon",
-			"Tooltip": "Display up to four live HWiNFO sensor readings on a key, with alert thresholds on every layout and a sparkline, bar or ring on the single layout.",
+			"Tooltip": "Display up to four live HWiNFO sensor readings on a key: single, stacked, three rows or a quad grid, with alert thresholds on every layout and a sparkline, bar or ring on the single layout.",
 			"PropertyInspectorPath": "ui/sensor-reading.html",
 			"Controllers": [
 				"Keypad"
@@ -58,6 +58,25 @@
 			]
 		},
 		{
+			"Name": "Sensor Detail Slot",
+			"UUID": "com.lawrensen.hwinfo.detail-slot",
+			"Icon": "imgs/actions/reading/icon",
+			"Tooltip": "Internal tile of the plugin-managed sensor detail view. Not placeable by hand: it appears only inside the bundled detail profiles.",
+			"PropertyInspectorPath": "ui/detail-slot.html",
+			"VisibleInActionsList": false,
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/reading/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		},
+		{
 			"Name": "Sensor Dial",
 			"UUID": "com.lawrensen.hwinfo.dial",
 			"Icon": "imgs/actions/dial/icon",
@@ -82,6 +101,239 @@
 					"Image": "imgs/actions/dial/dial"
 				}
 			]
+		}
+	],
+	"Profiles": [
+		{
+			"Name": "profiles/detail-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": true
+		},
+		{
+			"Name": "profiles/detail-r2-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r2-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/detail-r3-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
 		}
 	]
 }

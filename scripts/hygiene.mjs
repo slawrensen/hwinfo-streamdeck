@@ -77,6 +77,8 @@ const steps = [
 	["e2e:dead-fallback", () => run("e2e:dead-fallback", ["scripts/e2e-dead-fallback.mjs"])],
 	["e2e:native-edge", () => run("e2e:native-edge", ["scripts/e2e-native-edge.mjs"])],
 	["e2e:load", () => run("e2e:load", ["scripts/e2e-load.mjs"], { env: { ...process.env, LOAD_SOAK_SEC: "45" } })],
+	["e2e:drilldown", () => run("e2e:drilldown", ["scripts/e2e-drilldown.mjs"])],
+	["e2e:pi", () => run("e2e:pi", ["scripts/e2e-pi-persistence.mjs"])],
 	// After the timing-sensitive UI suites: its 10k-read soak saturates a
 	// core, which can flake the frame-timing assertions above.
 	["test:native", () => run("test:native", ["--import", "tsx", "--test", "test/native-hwsm.test.ts"])],

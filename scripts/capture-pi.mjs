@@ -1,8 +1,10 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Sixteen states: the key PI's settings view,
+// the theme gallery are present. Eighteen states: the key PI's settings view,
 // open picker (marketplace shot 3), Display selector on Bar, Text set to
-// Custom with the color well and dim checkbox, dual, triple and quad layouts
+// Custom with the color well and dim checkbox, the Press section on Open
+// sensor details and the custom detail list mid-build (collector rows added,
+// ordered chips with move arrows), dual, triple and quad layouts
 // (quad with the cell-colors row); the dial PI's rotation-set picker with ticked
 // rows, a chip open mid-rename beside two already-renamed chips,
 // rows and chips, the rotation-group editor (two named groups with the
@@ -221,6 +223,65 @@ try {
 	// Back to the deck default so the later shots show the plain panel.
 	await setSelect("textMode", "");
 	await sleep(600);
+
+	// ---- key PI: Press on Open sensor details (the drill-down rows) ----
+	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await setSelect("pressBehavior", "open-details");
+	await sleep(900); // the press poll reveals #detail-config within 400 ms
+	expectOk("detail config revealed", await evaluate(`document.getElementById("detail-config").hidden === false ? "ok" : "hidden"`));
+	await captureClipped("pi-key-press.png", await evaluate(`(() => {
+		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
+		const block = document.getElementById("detail-config");
+		if (!sel || !block) return "missing";
+		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
+		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
+	})()`));
+
+	// ---- key PI: the custom detail list mid-build (collector + ordered chips) ----
+	await setSelect("detailMode", "custom");
+	await sleep(900);
+	expectOk("custom detail editor revealed", await evaluate(`document.getElementById("detail-custom").hidden === false ? "ok" : "hidden"`));
+	await evaluate(`(() => { const el = document.getElementById("pickerd-search"); el.focus(); el.value = "gpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	await sleep(700);
+	expectOk("collector rows added", await evaluate(`(() => {
+		const rows = [...document.querySelectorAll("#pickerd-list .hw-row")].slice(0, 3);
+		if (rows.length === 0) return "missing";
+		for (const row of rows) {
+			row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+		}
+		return "ok";
+	})()`));
+	await sleep(700);
+	await captureClipped("pi-key-detail-custom.png", await evaluate(`(() => {
+		const block = document.getElementById("detail-config");
+		if (!block) return "missing";
+		const r = block.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
+	})()`));
+	// ---- key PI: the filter mode with its live match count ----
+	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await setSelect("detailMode", "filter");
+	await sleep(900);
+	expectOk("filter editor revealed", await evaluate(`document.getElementById("detail-filter").hidden === false ? "ok" : "hidden"`));
+	// sdpi-textfield: drive the shadow input (the property path throws on
+	// plain strings; same gotcha as the placeholder).
+	await evaluate(`(() => { const input = document.querySelector('sdpi-textfield[setting="detailFilter"]').shadowRoot.querySelector("input"); input.focus(); input.value = "*4090*"; input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	await sleep(1200); // the setting echo, the 400 ms follow poll, the count
+	expectOk("live match count shown", await evaluate(`(() => { const el = document.getElementById("detail-filter-count"); return el && !el.hidden && /Matches \\d+ readings right now/.test(el.textContent) ? "ok" : (el ? "text: " + el.textContent : "missing"); })()`));
+	await captureClipped("pi-key-detail-filter.png", await evaluate(`(() => {
+		const block = document.getElementById("detail-config");
+		if (!block) return "missing";
+		const r = block.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
+	})()`));
+
+	// Back to the plain panel so the later layout shots stay untouched.
+	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await setSelect("detailMode", "source");
+	await setSelect("pressBehavior", "");
+	await sleep(700);
 
 	// ---- key PI: dual layout (second picker + label + stat, Display row hidden) ----
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
@@ -560,7 +621,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 16 PI states to ${outDir}`);
+	console.log(`captured 18 PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

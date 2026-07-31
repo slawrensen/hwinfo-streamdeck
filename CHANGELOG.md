@@ -3,6 +3,98 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.4.92.0 - 2026-07-30
+
+- A drill-down key can now shape its own page, so the one shared
+  detail profile behaves like a folder per key (issue #5, shaped by
+  @FattSlice's testing). Detail contains picks the list: every reading
+  of the key's sensor source (the default), a custom list you build by
+  hand, or a new glob filter matched against source name and label
+  taken together. `*4090*` gathers everything the card publishes,
+  `*gpu*fan*` just its fans; the panel shows a live match count under
+  the field before you ever press, and a filtered page re-resolves
+  every poll so readings that appear or vanish in HWiNFO follow along.
+- The key you pressed is Back under your finger. Inside the view, the
+  tile sitting in the pressed key's position shows the return face and
+  returns on press, alongside the fixed top-left Back; listed readings
+  flow around it.
+- Opening a view starts from a black beat instead of a stale flash.
+  The Stream Deck app repaints a profile from each key's last cached
+  image, so the plugin now paints pure black on the way out and the
+  live faces paint over black on the way in.
+- A Virtual Stream Deck sized 9x4 or larger now borrows the + XL page:
+  32 reading tiles per page instead of the XL page's 28. Its dial bank
+  is empty on a virtual deck, and the app installs it cleanly on a
+  deck without encoders.
+- Hardening from an adversarial review pass: entry cannot dispatch
+  twice on a double press, a profile install accepted after the prompt
+  expires bounces back out instead of stranding a dead view,
+  unplugging a deck mid-view cleans up its session, and hostile filter
+  patterns (regex metacharacters, emoji, 500-character strings)
+  compile safely under a 128-character cap. Repaints coalesce into one
+  pass and unchanged polls skip rendering entirely.
+- The updated page ships as profile revision "HWiNFO Details"; the
+  numbered names end with this cut. The first drill-down after
+  upgrading asks once per deck to install it. Copies from earlier
+  previews stay in your profile list until you remove them, and if a
+  preview 1 copy still holds the name, the app installs the new one as
+  "HWiNFO Details copy".
+
+## 1.4.91.0 - 2026-07-29
+
+- The detail view's Back tile is now a normal Sensor Reading key you
+  can configure: pick its sensor, use the single, dual, triple or quad
+  layout, themes, custom text, thresholds and the Show stat, exactly
+  like any other key. Pressing it is still fixed to returning to the
+  profile you came from, and a small return hook stays visible on
+  every layout so the way out is never ambiguous. Left unconfigured,
+  the tile keeps showing the sensor you drilled down from. (Requested
+  by @FattSlice in issue #5.)
+- The bundled detail profiles are editable now instead of read-only,
+  so you can add your own keys to the detail page and configure the
+  Back tile in place. Stream Deck never updates a profile that is
+  already installed, so this ships as a second profile revision named
+  "HWiNFO Details 2": the first drill-down after upgrading asks once
+  to install it, and a copy installed from the previous preview stays
+  untouched in your profile list (remove it there if you no longer
+  want it).
+- Ordinary keys are unaffected: a key without the internal Back marker
+  behaves exactly as before, settings are never rewritten, and the
+  marker survives every panel edit.
+
+## 1.4.90.0 - 2026-07-29
+
+- A sensor key can act like a folder. The Sensor Reading key's new
+  Press setting can open a drill-down detail view: the deck switches
+  to a bundled one-page profile listing every reading of that sensor's
+  HWiNFO source (or a custom ordered list you build in the panel),
+  with the pressed key staying live as the Back tile, top left, where
+  the native folder back key sits. Previous and Next page through long
+  sources, a title tile shows the source and visible range, and
+  pressing a listed reading cycles its current / min / max / avg for
+  that visit. Back returns to the profile you came from. (Requested by
+  @FattSlice in issue #5.)
+- Three press behaviors, default unchanged: cycle stats exactly as
+  before, open details on press, or tap-to-cycle with a half-second
+  hold opening details. Keys that never touch the Press section
+  behave byte-for-byte as they did in 1.4.
+- Six read-only detail profiles ship, one per deck type: Mini (3x2),
+  15-key (5x3), Neo (4x2), + (4x2 keys), XL (8x4) and + XL (9x4
+  keys). The Virtual Stream Deck borrows whichever keypad layout fits
+  its user-sized grid (a 10x10 virtual deck runs the XL layout, a 3x2
+  one the Mini layout). The Stream Deck app asks to install the
+  matching profile the first time details open on a deck; unsupported
+  decks (Mobile, Studio, Galleon, pedals, G-keys, virtual decks under
+  3x2) refuse the press honestly with the alert cue and keep the
+  ordinary key behavior. The profiles are generated deterministically
+  from one layout table and carry no user or sensor data.
+- The detail view rides the existing single shared poller and dedupes
+  identical frames; the dense + XL page (32 live tiles) at the 250 ms
+  poll option is measured in PERF.md. HWiNFO stopping mid-view
+  degrades the tiles to the ordinary status screens with Back still
+  working, and recovery is automatic; a plugin restart inside the view
+  renders honest "No detail selected" tiles instead of stale data.
+
 ## 1.4.0.0 - 2026-07-25
 
 - Three readings on one key. The key Layout setting gains "Three

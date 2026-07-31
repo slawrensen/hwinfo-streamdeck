@@ -27,6 +27,48 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-07-29: the drill-down detail view (1.4.90.0 preview, issue #5)
+
+Two questions: does a dense detail page cost anything at the fastest
+poll, and does holding the view leak. Neither harness is perf-report.mjs
+because the workload is new; both are in the repo.
+
+Dense page, mock app (`node scripts/perf-detail.mjs`, 8 min): the real
+shipped detail-plus-xl surface (32 reading tiles + 4 nav tiles) on a
+mock + XL against live HWiNFO (516 readings) at the 250 ms poll option.
+
+| Metric | Value |
+| --- | ---: |
+| CPU avg / p95 (per 15 s sample) | 0.05% / 0.20% |
+| setImage frames after dedupe | 330 over 489 s (0.7/s) |
+| Handles | 209 -> 209 |
+| switchToProfile calls | 1 (the entry) |
+
+The frame number is the dedupe working: 36 tiles at 4 ticks/s would be
+144 potential frames/s, but HWiNFO itself advances about every 2 s and
+identical faces are skipped, so under one frame per second actually
+crosses the socket. p95 CPU sits far under the 1% line that would have
+forced a detail-render cadence floor, so there is none: detail tiles
+repaint at the poll rate like every other key.
+
+Held view, real app and hardware (`node scripts/soak-monitor.mjs
+--interval 30`, two windows back to back, retail install on the
+physical + XL showing the 36-tile detail view at the default 1 s poll):
+
+| Window | RSS slope | Handles | Avg CPU | Restarts | WARN/ERROR |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0-35 min (process start) | +5.28 MB/30 min | 175 flat | 0.03% | 0 | 0 |
+| 35-65 min (warm) | +3.71 MB/30 min | 175 flat | 0.17% | 0 | 0 |
+
+The slopes decay, not compound: within the warm window the first half
+ran +9.3 and the second half -1.5 MB/30 min, with RSS settling around
+47 MB and coming back down (44.1 to 48.1 over the window, max 50.8).
+That is heap high-water maturation, not growth: handles never moved,
+no restarts, no log noise. The multi-hour steady-state soak of the
+kind that gated 1.4.0 (worst +0.11 MB/30 min over 48 h) stays a
+final-release gate; these preview windows show where the process
+settles, not a leak.
+
 ### 2026-07-04 20:21: baseline (v1.0, commit 3d70076)
 
 | Artifact | Bytes | gzip |

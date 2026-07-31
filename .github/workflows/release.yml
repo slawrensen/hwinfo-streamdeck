@@ -27,9 +27,9 @@ jobs:
   release:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
@@ -72,9 +72,13 @@ jobs:
           node scripts/validate-native.mjs
 
       # The pack script shells out to the Elgato CLI (`streamdeck pack`); it is a
-      # global tool, not a project dependency, so install it here (pinned major).
+      # global tool, not a project dependency, so install it here. Pinned to an
+      # exact top-level version so a new CLI publish is a reviewed diff here,
+      # not a silent change to what packs the release. Known limit: `npm i -g`
+      # has no lockfile, so the CLI's transitive dependencies still resolve at
+      # job time. Bumped by hand; Dependabot cannot see a `run:` install.
       - name: Install Elgato Stream Deck CLI
-        run: npm install -g @elgato/cli@1
+        run: npm install -g @elgato/cli@1.7.4
 
       - name: Pack plugin
         run: npm run pack
@@ -106,8 +110,14 @@ jobs:
           "nativesha=$($native.sha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Output "pack SHA-256 $sha ($size bytes); hwsm.node SHA-256 $($native.sha256)"
 
+      # Pinned to a commit SHA: this is the only third-party action in the
+      # repo and it runs inside the contents:write job that publishes the
+      # binary, so a moving tag here would hand that job to whatever the tag
+      # points at tomorrow. Pins freeze the version their major pointed at
+      # when written; Dependabot proposes newer versions (including new
+      # majors) by PR, where the bump is a reviewed diff.
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: HWiNFO Sensors ${{ steps.verify.outputs.ver }}
           files: |
@@ -121,5 +131,7 @@ jobs:
 
             **Pack SHA-256:** `${{ steps.hash.outputs.sha }}` (${{ steps.hash.outputs.size }} bytes)
             **Native hwsm.node SHA-256:** `${{ steps.hash.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
+
+            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.ref_name }}/SECURITY.md).
 
             Install: download the `.streamDeckPlugin` below and double-click it, or install from the Elgato Marketplace once approved. See the [documentation](https://docs.slawrensen.com/hwinfo-streamdeck/) for setup and troubleshooting.

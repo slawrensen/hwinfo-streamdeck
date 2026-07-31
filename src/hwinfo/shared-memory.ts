@@ -27,9 +27,13 @@ function reasonFor(code: string): HwinfoUnavailableReason {
 	switch (code) {
 		case "HWSM_NOT_FOUND":
 		case "HWSM_MUTEX_NOT_FOUND": // producer mid-startup: mapping before mutex
-		case "HWSM_MUTEX_BUSY": // open-time contention; transient
 		case "HWSM_MAP_FAILED":
 			return "not-running";
+		case "HWSM_MUTEX_BUSY":
+			// Open-time contention: the mapping and mutex exist, so HWiNFO is
+			// running. Folding this into "not-running" put a "Start HWiNFO"
+			// screen in front of software that was already started.
+			return "busy";
 		case "HWSM_ACCESS_DENIED":
 			return "access-denied";
 		case "HWSM_DISABLED":

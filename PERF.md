@@ -1,11 +1,15 @@
 # Performance log
 
-Every entry below is emitted by `node scripts/perf-report.mjs <label>`: one
+Most entries below are emitted by `node scripts/perf-report.mjs <label>`: one
 command that measures pack/bundle sizes (raw + gzip), per-component disk
 usage, the live plugin process (PID attributed by command line, never by
 process name; Discord also runs a `plugin.js` under node.exe), and the
 parse-path microbenchmark against the **live** HWiNFO mapping
-(`scripts/bench-parse.ts`, 1,000 iterations).
+(`scripts/bench-parse.ts`, 1,000 iterations). The exceptions name their
+harness inline: the every-sensor load test (`npm run e2e:load`), the
+sparkline ring bench, the externally sampled soaks
+(`scripts/soak-monitor.mjs`), and a few hand-run measurements described
+where they appear.
 
 Metric notes:
 
@@ -275,72 +279,21 @@ is part of `npm run suite:full` (45 s soak variant). On-device coverage:
 two injected "HWiNFO test" pages on the live deck hold one key per sensor
 source (all 21) across all seven themes with threshold/°F/stat variants.
 
-### 2026-07-04 18:15: live page-cycling proof (real Stream Deck app)
+### 2026-07-04 18:15 to 21:15: competitor comparison entries (removed 2026-07-25)
 
-Full 13-key pages of each HWiNFO plugin cycled against an empty page in the
-REAL app (page clicks via the app UI, verified on screen; 10 s process
-sampling; competitor plugins installed side by side):
-
-| Phase | ours CPU / RSS | shayne CPU / RSS | 5e CPU / RSS |
-| --- | --- | --- | --- |
-| own page visible | 0.08 % / 37.8 MB | 1.44 % / 43.9 MB | 0.67 % / 41.6 MB |
-| everything hidden | **0.00 % / 37.3 MB** | 1.90–2.15 % / 44.2→47.0 MB | 0.59 % / 44.6 MB |
-| 10 min later | flat / 38.3 MB | 2.03 % / 44.9 MB (never released) | 0.68 % / 44.4 MB (never released) |
-
-Ours is the only plugin that goes to zero CPU with flat RSS when its keys
-leave the screen; poller log "Stopped (no visible actions)"/"Started"
-timestamps match every page click. Both competitors keep polling forever
-after first render and hold peak RSS; shayne burns more CPU hidden than
-visible. (Headless 5-min controlled run, same day: ours 0.10 % CPU / 57 MB /
-6-of-6 keys vs shayne 0.90 % / 72 MB / 5-of-6 vs 5e 0.20 % / 55.5 MB / 6-of-6.)
-
-### 2026-07-04 20:30: competitor sweep round 2 (scaling, startup, resilience, shutdown)
-
-30 keys / 120 s headless (identical settings each): ours 0.3 s CPU (0.25 %) /
-54.9 MB / 2,247 frames (dedup); shayne 170.8 s CPU (**142 %, 1.4 cores**) /
-103 MB / 3,660 frames; 5e 0.8 s (0.67 %) / 59.8 MB / 3,630. Cold start to
-first frame: ours 135 ms, shayne 1,097 ms, 5e 63 ms.
-
-Live HWiNFO kill (real app, screenshots): ours flipped every key to the
-amber "Not updating" screen and (with a leftover frozen VSB key present)
-fell back to gadget while STILL flagging staleness; auto-recovered and
-auto-upgraded back to shared memory on HWiNFO restart. shayne showed
-"Please Launch HWINFO64" and recovered via its app monitor. 5e displayed
-7-minute-dead frozen registry values as live with no staleness indication.
-
-Shutdown: real app stop cleans all three trees (job object, 0/0/0
-survivors). Harness socket-close (app-crash sim): ours + 5e linger
-passively while keys are visible (ours: poller timer holds the loop;
-production-mitigated by the job object, noted for future hardening);
-shayne's watchdog RESPAWNS a fresh two-process pair: active orphans.
-
-### 2026-07-04 21:05: cold-start correction (event-driven re-measure)
-
-The round-2 "first frame: ours 135 ms vs 5e 63 ms" was a measurement
-artifact (50 ms polling in the harness) plus a classification error.
-Event-driven re-measure, 3 runs each, first-frame CONTENT decoded:
-
-| spawn → | ours | 5e | shayne |
-| --- | --- | --- | --- |
-| register | ~55 ms | ~53 ms | ~73 ms |
-| first DATA frame | **~60 ms** (value digits verified in the SVG) | ~1,070 ms | ~1,087 ms |
-
-Ours renders real data 5 ms after willAppear (open mapping + 240 KB copy +
-full 518-reading parse + theme resolve + SVG render + send). 5e's instant
-~59 ms frame is a BLANK placeholder; its first real graph waits for its
-~1 s poll; shayne's first paint waits for its 1 s ticker. Vendored koffi
-import costs only ~8 ms (measured in isolation), inside the ~55 ms Node
-boot both Node plugins pay. Ours is first-to-data by ~17×. Artifact updated.
-
-### 2026-07-04 21:15: benchmark scaffolding removed
-
-Competitor plugins uninstalled (com.exension.hwinfo, com.5e.hwinfo-reader)
-and test pages 43–46 removed from the deck profile (backup in session
-scratchpad); the 40 all-reading coverage pages stay. Post-strip: only our
-plugin process under the app, ring 42 pages, suite:full ALL GREEN with
-zero orphans, no VSB key, poller live on shared memory. To reproduce the
-benchmark: packs at the URLs in the 3-way entries above; shayne settings
-schema + VSB-bridge pattern documented in the session ledger.
+Four entries here compared this plugin against two rival HWiNFO plugins
+measured on 2026-07-04: page-cycling CPU/RSS in the real app, a 30-key
+headless sweep, cold-start timing, and the benchmark teardown. I removed
+them in the 1.4.1 honesty pass. They recorded no version for either rival,
+the comparison harness was never committed to this repo, and the teardown
+note pointed at pack URLs and a session ledger that are not in the repo
+either, so nobody, including me, can rerun or verify those numbers today.
+The claims about this plugin's own behavior that they illustrated stand on
+what the repo itself proves: the poller stops when no Sensor Reading key or Sensor Dial is
+visible (`src/poller.ts`, logged as "Stopped (no visible actions)") and
+first-frame rendering is covered by the e2e harness. One finding from that
+session survives as its own entry below: the 21:40 parent-liveness
+watchdog, which hardened this plugin regardless of what it was compared to.
 
 ### 2026-07-04 21:40: 1.1.1.0 parent-liveness watchdog
 
@@ -478,7 +431,9 @@ the swap costs the hot path nothing; ui/ grew with the sdpi vendor and the
 four PI panels since v1.0, and bin/node_modules is now empty. The quality
 review re-verified the bridge (error-5, quarantine and dlopen paths), added
 the bridge-failed status screen and unified the loader's two load paths;
-sizes above are the post-review build. VirusTotal on this hwsm.node: 0/70.
+sizes above are the post-review build. VirusTotal on this entry's build of
+hwsm.node at the time: 0/70; releases attach each build's own SHA-256 in
+`release-native-manifest.json` for anyone re-checking.
 
 ### 2026-07-22 19:56: hwsm becomes a capability API (opaque sessions, mandatory mutex)
 
@@ -525,8 +480,10 @@ provider instead of allocating a Node Buffer per registry value.
 ### 2026-07-23 03:45: sparkline rings collect for the process lifetime
 
 The 60 s series eviction (shipped since 1.1.6.0) is gone: the poller now
-feeds every tracked ring on every fresh snapshot, on screen or not, so a
-page returns to a complete, current line after any absence. Cost at full
+feeds every tracked ring on every fresh snapshot, on screen or not, for as
+long as a Sensor Reading key or Sensor Dial keeps the poller alive; with none visible the
+poller still stops entirely, and a returning page resumes its line from the
+samples it already had. Cost at full
 saturation, measured with a 520-ring feed loop over the production
 pushSample shape (20,000 iterations, Node 24): 12.2 µs per tick, 0.0012 %
 of one core at the 1 s poll and 0.0049 % at the 250 ms floor. Ring count
@@ -568,10 +525,11 @@ fake a negative slope). Gates: RSS slope under +1 MB/30 min on every stretch
 of 6 h or more: PASS, worst is +0.11. Private-bytes slopes match RSS: PASS.
 Handles drift at most 2 inside any stretch, and the last stretch ends net
 negative: PASS. CPU 0.18 to 0.27% lifetime average per stretch with no upward
-trend across consecutive stretches; the 0.07% precedent above was v1.1's
-idle-stop poller over 35 min, while these builds collect sparkline history
-for the plugin lifetime (03:45 entry) and drove the full Stream Deck + XL
-day and night, so the comparable precedent is the 7 h live-deck 0.18%
+trend across consecutive stretches; the 0.07% precedent above was v1.1
+over a 35 min window, while these builds keep sparkline rings for the
+process lifetime (03:45 entry; the poller still stops with nothing
+visible) and drove the full Stream Deck + XL day and night, so the
+comparable precedent is the 7 h live-deck 0.18%
 (2026-07-16 entry): PASS. The four sub-6-h dev stretches (74428 3 min, 72260
 2.7 h, 41696 33 min, 70144 1.8 h) sat under heavy local suite activity and
 are below the gate floor; their endpoint deltas are unremarkable.
@@ -617,3 +575,44 @@ Events, every one timestamped and attributed:
 
 Verdict: every soak gate PASS with margin. Nothing in 48.1 h of external
 observation blocks promoting the preview 2 bytes to 1.4.0.0.
+
+### 2026-07-25 20:56: unit-guard re-measure (1.4.1 fast path)
+
+The 1.4.1 stale-unit fix adds up to 8 unit-word compares per entry to the
+fast path (`SnapshotParser.refresh`). Re-measured with the documented
+invocation, `node --expose-gc --import tsx scripts/bench-parse.ts`, against
+the live mapping (520 readings, region 247,480 B): tick mean 10.5 µs, p50
+9.4, p95 13.8; alloc/tick 411 B (measurement floor); retained 3.5 KB across
+the 1,000-iteration pass (noise). The pre-guard figure was 5.8 µs mean at
+516 readings, so the guard costs about 5 µs per tick, roughly 0.001% of one
+core at the 1 s poll, and steady-state allocation stays at the floor.
+
+### 2026-07-29 15:05: adversarial soak (1.4.1 deployed retail build)
+
+First run of the paired soak harness: `node scripts/soak-monitor.mjs
+--interval 30` observing the deployed 1.4.1 plugin (stock log level, no
+debug env), with `node scripts/soak-adversary.mjs` injecting real faults
+against the live stack and `--events` folding its verdicts into the
+summary. Window 21:08 to 22:04Z (0.9 h, 113 samples), CSV
+`release/soak-20260729-adversarial.csv`, events
+`release/soak-adversary-20260729.jsonl`.
+
+All five injected faults survived, 5/5 PASS:
+
+- 6 s and 8 s consistency-mutex holds (inside the 15 s grace): silent
+  ride-through, zero log lines, values held, no restart.
+- 25 s mutex hold (past grace): degraded to WARN "HWiNFO unavailable
+  [busy]", reopened shared memory on its own after release, same PID. The
+  1.4.1 busy path proven against the real provider.
+- plugin kill: the app restarted it (PID 38272 to 15212), fresh instance
+  reopened the source.
+- app restart: full stack back (app 22052 to 34044, plugin 22828).
+
+Monitor corroboration: exactly 2 restarts, both within one sample of an
+injected kill, none spontaneous; exactly 1 WARN, the provoked busy line; 0
+ERROR; 0 HWiNFO-absent samples; handles 176 to 175 (max 189); CPU 0.21%.
+RSS 47.3 to 48.0 MB (max 51.3). The +3.70 MB/30 min RSS slope over the
+longest same-PID segment (75 samples) is warmup-dominated by construction:
+the adversary restarts the process mid-window, so the segment starts at
+boot. Steady-state leak behavior is owned by the 48 h soak above (+0.11
+MB/30 min); this entry's claim is fault recovery, not slope.

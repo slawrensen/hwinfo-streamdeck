@@ -8,11 +8,23 @@
  * over a 1.3.0 install (issue #3); this gate makes that unrepeatable.
  *
  * Rule: manifest Version must compare strictly greater than the newest v*
- * tag, all four segments (a vX.Y.Z tag counts as X.Y.Z.0). Preview builds
- * use the 1.X.9n.0 band above the stable they branched from (runbook,
- * "Preview releases"), so the following stable upgrades every preview.
- * When no v* tags are visible (shallow CI checkout) this warns and passes;
- * the release workflow has its own manifest-matches-tag gate.
+ * tag reachable from HEAD, all four segments (a vX.Y.Z tag counts as
+ * X.Y.Z.0). Preview builds use the 1.X.9n.0 band above the stable they
+ * branched from (runbook, "Preview releases"), so the following stable
+ * upgrades every preview. When no v* tags are visible (shallow CI checkout)
+ * this warns and passes; the release workflow has its own
+ * manifest-matches-tag gate.
+ *
+ * Only tags on this line of history count (`--merged HEAD`): the floor is
+ * "the newest release this commit descends from". Flooring against every
+ * tag in the repo would make the 1.x maintenance line unreleasable the day
+ * v2.0.0 is tagged on main (1.4.1.0 never clears 2.0.0.0), even though a
+ * 1.4.1 pack built from release/1.4.x upgrades every install on its own
+ * line. The tradeoff is deliberate and known: Stream Deck compares a pack
+ * against whatever is INSTALLED, not against git history, so a pack cut
+ * from a stale branch could still no-op over a newer installed release.
+ * This gate cannot see that case; the release workflow's
+ * manifest-matches-tag check and the runbook's bump discipline own it.
  *
  * Tags pointing at HEAD are excluded from the comparison. Pushing `vX.Y.Z`
  * is what triggers the release workflow, so by the time it packs, the tag
@@ -45,8 +57,18 @@ if (packed === null) {
 	process.exit(1);
 }
 
-const tags = execSync('git tag --list "v*"', { cwd: ROOT, encoding: "utf8" })
-	.split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
+let scoped = true;
+let tagList;
+try {
+	tagList = execSync('git tag --list "v*" --merged HEAD', { cwd: ROOT, encoding: "utf8" });
+} catch {
+	// A checkout whose HEAD cannot be resolved (unborn or orphan branch)
+	// cannot answer --merged; floor against every tag instead. Stricter than
+	// scoping, never weaker, and the messages below say which floor applied.
+	scoped = false;
+	tagList = execSync('git tag --list "v*"', { cwd: ROOT, encoding: "utf8" });
+}
+const tags = tagList.split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
 let headTags = new Set();
 try {
 	headTags = new Set(
@@ -68,11 +90,12 @@ if (released.length === 0) {
 	process.exit(0);
 }
 
+const floor = scoped ? "on this line" : "in the repo (HEAD did not resolve, so every tag counted)";
 const newest = released[released.length - 1];
 if (compare(packed, newest) <= 0) {
-	console.error(`verify-pack-version: manifest Version ${manifest.Version} does not clear the newest release (${newest.join(".")}).`);
+	console.error(`verify-pack-version: manifest Version ${manifest.Version} does not clear the newest release ${floor} (${newest.join(".")}).`);
 	console.error("Stream Deck replaces an installed plugin only when the pack's version is higher, so this pack would install as a no-op.");
 	console.error("Bump the version first: previews use the 1.X.9n.0 band, stable releases match their tag.");
 	process.exit(1);
 }
-console.error(`verify-pack-version: ${manifest.Version} clears the newest release (${newest.join(".")})`);
+console.error(`verify-pack-version: ${manifest.Version} clears the newest release ${floor} (${newest.join(".")})`);

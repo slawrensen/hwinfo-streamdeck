@@ -160,8 +160,8 @@ type InstanceState = {
 	pendingAlertUnitStamp: boolean;
 	/** Readings this instance holds poller series subscriptions for (the
 	 * two-row view's sparklines); synced each tick, released on disappear.
-	 * Not restored across hiding: the poller's grace window keeps the rings
-	 * warm and the first tick back resubscribes. */
+	 * Not restored across hiding: poller subscriptions are permanent for the
+	 * process, so the rings stay warm and the first tick back resubscribes. */
 	rowSeries: Set<string>;
 };
 
@@ -253,7 +253,8 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		}
 		poller.release();
 		// The rows' rings stay tracked in the poller: history keeps
-		// collecting off-screen, so the two-row view returns complete.
+		// collecting off-screen while the poller stays alive, so the two-row
+		// view resumes its lines on return.
 		state.rowSeries.clear();
 		// A press cannot span a disappearance; drop any half-tracked gesture
 		// and its overlay timer, then park the state for the action's return.
@@ -576,9 +577,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 
 	/**
 	 * Keeps the poller series subscriptions matched to the two-row view's
-	 * visible rows (they feed the row sparklines). The poller's grace window
-	 * carries the rings across window moves and quick page flips, so a row
-	 * scrolling back within a minute keeps its history.
+	 * visible rows (they feed the row sparklines). Poller rings live for the
+	 * process once subscribed, so a row scrolling away and back keeps its
+	 * history as long as polling stayed alive in between.
 	 */
 	private syncRowSeries(state: InstanceState, snapshot: SensorSnapshot): void {
 		const desired = new Set<string>();

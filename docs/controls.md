@@ -61,7 +61,7 @@ Pause and pin survive page switches and profile changes for up to 30 minutes off
 
 ## Session stats are per reading
 
-Each reading keeps its own session min/max/average, keyed by HWiNFO's stable sensor identity. Rotate away and back and you find that reading's own session numbers again, not the neighbor's. Stats keep accumulating for every rotation-set member while other members are on screen, and while the dial is on another page (within the same 30-minute hidden window as pause and pin). One prerequisite: the plugin's poller only runs while at least one of its keys or dials is on screen somewhere, so a page with none of them pauses the accumulation too.
+Each reading keeps its own session min/max/average, keyed by HWiNFO's stable sensor identity. Rotate away and back and you find that reading's own session numbers again, not the neighbor's. Stats keep accumulating for every rotation-set member while other members are on screen, and while the dial is on another page (within the same 30-minute hidden window as pause and pin). One prerequisite: the plugin's poller only runs while a Sensor Reading key or Sensor Dial is on screen somewhere, so a page with none of them pauses the accumulation too.
 
 ## Thresholds and mixed units
 

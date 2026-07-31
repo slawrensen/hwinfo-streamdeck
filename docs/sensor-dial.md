@@ -92,7 +92,7 @@ Rotation also protects your selection when HWiNFO temporarily stops publishing t
 
 Unlike keys (which read HWiNFO's own min/max/average), the dial tracks its **session** stats itself, and it keeps a separate session per reading, keyed by HWiNFO's stable sensor identity:
 
-- Rotate away and back, and you find that reading's own session numbers again; no reading ever shows another one's min/max. Stats for your rotation-set members keep accumulating while they are off screen (as long as any of the plugin's keys or dials is on screen to keep the poller running), and the whole set survives page switches and profile changes for up to 30 minutes off screen (see [controls](controls.md#pause-pin-and-reset-reach)).
+- Rotate away and back, and you find that reading's own session numbers again; no reading ever shows another one's min/max. Stats for your rotation-set members keep accumulating while they are off screen (as long as a Sensor Reading key or Sensor Dial is on screen to keep the poller running), and the whole set survives page switches and profile changes for up to 30 minutes off screen (see [controls](controls.md#pause-pin-and-reset-reach)).
 - **Push** resets the current reading's stats (the **Reset reach** setting can widen that to the set or every dial).
 - On the **Gadget** data source there is no HWiNFO min/max/avg at all, but the dial's session stats still work because it computes them from the live stream. See [Data sources](data-sources.md).
 
@@ -146,12 +146,13 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | Touchscreen | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO** / not detected | HWiNFO isn't publishing on either interface. Start it (Shared Memory Support or Gadget reporting). |
+| **HWiNFO busy** / retrying | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll. |
 | **Shared Memory off** / enable in HWiNFO | HWiNFO reports sharing disabled. Re-enable it, or rely on the Gadget fallback in Auto mode. |
 | **HWiNFO stalled** / check sharing | Values frozen (Sensors window closed or HWiNFO stopped polling). When the dial is on the Gadget source this reads **check Gadget** instead. |
 | **Gadget empty** / tick sensors | Gadget reporting is on but no values are ticked. Right-click sensors in HWiNFO → "Report value in Gadget". |
 | **Access denied** / un-elevate HWiNFO | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **HWiNFO error** / restart HWiNFO | Shared memory didn't validate (mid-restart or an incompatible version). |
-| **Plugin damaged** / reinstall it | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing, was blocked from loading (usually an antivirus quarantine), or doesn't match this plugin version. Reinstall the plugin; restarting HWiNFO won't clear this one. |
+| **Plugin damaged** / reinstall it | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing, was blocked from loading (usually an antivirus quarantine), or doesn't match this plugin version. Reinstall the plugin; restarting HWiNFO won't clear this one. The file is unsigned, so check it against the release's published SHA-256 before allowing it ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.
 

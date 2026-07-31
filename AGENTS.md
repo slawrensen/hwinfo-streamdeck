@@ -115,8 +115,9 @@ Dev loop: `streamdeck link com.lawrensen.hwinfo.sdPlugin` once, then
 - **A version bump touches four files together**: `package.json`, the
   manifest (`X.Y.Z.0`), `CHANGELOG.md`, and `package-lock.json`
   (`npm install --package-lock-only`); CI's `npm ci` fails on a stale lock.
-- Performance claims are backed by measurements in `PERF.md`
-  (`node scripts/perf-report.mjs` regenerates the numbers).
+- Performance claims are backed by measurements in `PERF.md`; each entry
+  names its harness (`node scripts/perf-report.mjs` for most, plus the e2e
+  load test and `scripts/soak-monitor.mjs` for soaks).
 
 ## Verifying a change
 
@@ -132,6 +133,13 @@ For release soaks, `node scripts/soak-monitor.mjs` watches the live plugin
 from outside the process (kernel-level sampling plus a log tail, nothing
 in-process, so the soaked build stays the exact shipping configuration) and
 prints a PERF.md-ready summary: RSS/handle slopes, restarts, and gaps.
+For an adversarial soak, run `node scripts/soak-adversary.mjs` alongside it:
+a timed program of real faults against the live stack (consistency-mutex
+holds under and past the staleness grace, a plugin kill, an app restart),
+each verified from stock-level log markers and process identities, with
+verdicts streamed to a JSONL file that the monitor's `--events` flag folds
+into its summary. The monitor observes, the adversary injects; keep that
+split so soak numbers stay honest.
 
 ## Distribution
 

@@ -231,6 +231,63 @@ describe("hwsm native suite", { skip: !onWindows ? "win32-x64 only" : false }, (
 		});
 	});
 
+	describe("B2. open-time mutex contention", () => {
+		test("held mutex -> open fails fast with HWSM_MUTEX_BUSY, never parking the event loop", async () => {
+			const { p, mapping, mutex } = await producerWith({});
+			await p.send({ cmd: "hold" });
+			try {
+				const start = performance.now();
+				const code = codeOf(() => b.openSharedMemory(mapping, mutex));
+				const elapsed = performance.now() - start;
+				assert.equal(code, "HWSM_MUTEX_BUSY");
+				// The read path treats a busy mutex as 0 ms + skip this tick; the
+				// open path must match it instead of blocking the event loop for
+				// HWSM_OPEN_WAIT_MS while keys and dials go unserviced. The bound
+				// sits well under the old 500 ms wait while leaving headroom for
+				// a preempted CI runner.
+				assert.ok(elapsed < 400, `open with a held mutex took ${Math.round(elapsed)} ms`);
+			} finally {
+				await p.send({ cmd: "release" });
+			}
+			// Ownership untouched: the very next open succeeds and reads.
+			const s = b.openSharedMemory(mapping, mutex);
+			const dest = Buffer.alloc(s.byteLength);
+			assert.equal(s.readInto(dest), DEFAULT_REQUIRED);
+			s.close();
+		});
+
+		test("SharedMemorySession maps open-time busy to reason 'busy', not 'not-running'", async () => {
+			const { p, mapping, mutex } = await producerWith({});
+			const prevName = process.env.HWINFO_SM2_NAME;
+			const prevMutex = process.env.HWINFO_SM2_MUTEX_NAME;
+			process.env.HWINFO_SM2_NAME = mapping;
+			process.env.HWINFO_SM2_MUTEX_NAME = mutex;
+			try {
+				// Dynamic import AFTER the env override: the module captures the
+				// effective names at load time.
+				const { SharedMemorySession } = await import("../src/hwinfo/shared-memory");
+				const { HwinfoError } = await import("../src/hwinfo/types");
+				await p.send({ cmd: "hold" });
+				try {
+					assert.throws(
+						() => SharedMemorySession.open(),
+						(e: unknown) => e instanceof HwinfoError && e.reason === "busy",
+						"a held mutex means HWiNFO is running; 'not-running' would tell the user to start it"
+					);
+				} finally {
+					await p.send({ cmd: "release" });
+				}
+				const session = SharedMemorySession.open();
+				session.close();
+			} finally {
+				if (prevName === undefined) delete process.env.HWINFO_SM2_NAME;
+				else process.env.HWINFO_SM2_NAME = prevName;
+				if (prevMutex === undefined) delete process.env.HWINFO_SM2_MUTEX_NAME;
+				else process.env.HWINFO_SM2_MUTEX_NAME = prevMutex;
+			}
+		});
+	});
+
 	describe("C. exact source bounds", () => {
 		test("sub-page mapping with unwritten (zero) header -> HWSM_INVALID_LAYOUT", async () => {
 			// Windows rounds sections up to page granularity, so a 16-byte

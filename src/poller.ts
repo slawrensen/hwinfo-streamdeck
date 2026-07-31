@@ -81,8 +81,9 @@ class HwinfoPoller extends EventEmitter {
 	// not in per-key action state, so it outlives every willAppear (the action
 	// wiped its own history on each appear — page-nav / reconnect / wake all
 	// reset the sparkline). Once tracked, a ring is fed on every fresh
-	// snapshot and lives for the process: paging away for any length of time
-	// returns to a complete, current line. A ring only exists for readings a
+	// snapshot and lives for the process: paging away keeps the line as long
+	// as something else keeps the poller running (with nothing visible it
+	// stops, and the ring resumes where it left off). A ring only exists for readings a
 	// visible key or dial row asked for at least once, and holds at most the
 	// sparkline's sample cap, so the whole map stays kilobytes-small. Native
 	// values; converted only at render.
@@ -113,8 +114,8 @@ class HwinfoPoller extends EventEmitter {
 	/** An action subscribes a reading so the poller collects that sparkline's
 	 *  history. Keys subscribe their selection; dials subscribe the two-row
 	 *  view's visible rows. The ring then lives for the process lifetime;
-	 *  there is no unsubscribe, so the line is complete whenever the reading
-	 *  comes back on screen. */
+	 *  there is no unsubscribe, so a reading that comes back on screen
+	 *  resumes its line from the samples the ring already holds. */
 	subscribeSeries(key: string): void {
 		if (!this.series.has(key)) {
 			this.series.set(key, []);
@@ -206,6 +207,14 @@ class HwinfoPoller extends EventEmitter {
 		try {
 			return SharedMemoryProvider.open();
 		} catch (primary) {
+			// Open-time mutex contention proves shared memory exists and HWiNFO
+			// is running: retry it next tick instead of switching the deck to
+			// the Gadget namespace, whose reading keys differ, so every
+			// shared-memory key would read "Sensor missing" until the upgrade
+			// probe swung back (up to 15 s for a millisecond collision).
+			if (primary instanceof HwinfoError && primary.reason === "busy") {
+				throw primary;
+			}
 			try {
 				return GadgetRegistryProvider.open();
 			} catch (fallback) {
@@ -286,11 +295,12 @@ class HwinfoPoller extends EventEmitter {
 			this.dropProvider();
 			if (err instanceof HwinfoError) {
 				// Transient classes (a poisoned session whose reopen has not
-				// landed yet, or a source mid-recreate) ride on the last rendered
-				// status; anything else, or anything outliving the same freshness
-				// window that gates staleness, surfaces immediately. A held
-				// status always postdates an advance, so lastAdvanceAt is set.
-				const transient = err.reason === "invalid" || err.reason === "not-running";
+				// landed yet, a source mid-recreate, or open-time mutex
+				// contention) ride on the last rendered status; anything else,
+				// or anything outliving the same freshness window that gates
+				// staleness, surfaces immediately. A held status always
+				// postdates an advance, so lastAdvanceAt is set.
+				const transient = err.reason === "invalid" || err.reason === "not-running" || err.reason === "busy";
 				if (transient && this.status.state !== "unavailable" && Date.now() - this.lastAdvanceAt <= STALE_AFTER_MS) {
 					if (this.holdingSince === 0) {
 						this.holdingSince = Date.now();

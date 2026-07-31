@@ -86,6 +86,7 @@ const PROSE_FILES = [
 	"MARKETPLACE.md",
 	"NOTICE.md",
 	"PERF.md",
+	"SECURITY.md",
 	"native/hwsm/TESTING.md",
 	...mdFilesUnder("docs").filter((f) => !f.replaceAll("\\", "/").endsWith(RULES_DOC.slice(5))),
 	"docs/_config.yml",
@@ -159,7 +160,7 @@ if (manifest && exists("MARKETPLACE.md") && !read("MARKETPLACE.md").includes(man
 // 4. Release collateral: legal files, docs, marketing assets at portal specs.
 // ---------------------------------------------------------------------------
 
-for (const f of ["LICENSE", "NOTICE.md", "README.md", "CHANGELOG.md",
+for (const f of ["LICENSE", "NOTICE.md", "README.md", "CHANGELOG.md", "SECURITY.md",
 	"docs/release/RELEASE_RUNBOOK.md", "docs/release/STREAM_DECK_MARKETPLACE.md", "docs/release/COPY_RULES.md"]) {
 	if (!exists(f)) fail(f, 0, "required release file missing");
 }

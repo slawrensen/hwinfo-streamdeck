@@ -6,7 +6,13 @@
 //
 //   node scripts/soak-monitor.mjs [--interval 60] [--duration <sec>]
 //       [--out release/soak-<stamp>.csv] [--pattern <cmdline regex>]
-//       [--logs <dir>] [--summary <existing.csv>]
+//       [--logs <dir>] [--summary <existing.csv>] [--events <adversary.jsonl>]
+//
+// --events takes the JSONL file written by scripts/soak-adversary.mjs and
+// only annotates the summary (injected faults merged into the event list,
+// plus a pass count), so provoked WARN/restart entries are attributable at
+// a glance. It changes nothing about sampling; observation stays the whole
+// contract.
 //
 // Each sample is one CSV row: plugin PID, RSS, private bytes, handles,
 // threads, cumulative CPU seconds, Stream Deck app PID, HWiNFO process
@@ -35,12 +41,13 @@ const { values: args } = parseArgs({
 		pattern: { type: "string" },
 		logs: { type: "string" },
 		summary: { type: "string" },
+		events: { type: "string" },
 		help: { type: "boolean", default: false }
 	}
 });
 
 if (args.help) {
-	console.log("usage: node scripts/soak-monitor.mjs [--interval sec] [--duration sec] [--out file.csv] [--pattern regex] [--logs dir] [--summary file.csv]");
+	console.log("usage: node scripts/soak-monitor.mjs [--interval sec] [--duration sec] [--out file.csv] [--pattern regex] [--logs dir] [--summary file.csv] [--events file.jsonl]");
 	process.exit(0);
 }
 
@@ -176,6 +183,31 @@ function parseCsv(file) {
 	});
 }
 
+/** Adversary events (soak-adversary.mjs JSONL): annotation only. */
+function loadAdversaryEvents(file) {
+	const lines = fs.readFileSync(file, "utf8").split(/\r?\n/).filter((l) => l.length > 0);
+	const events = [];
+	let pass = 0;
+	let total = 0;
+	for (const line of lines) {
+		let e;
+		try {
+			e = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		if (e.name === "program-start" || e.name === "program-end") {
+			continue;
+		}
+		total++;
+		if (e.verdict === "PASS") {
+			pass++;
+		}
+		events.push(`${e.tsIso} adversary ${e.name}: ${e.verdict} (${e.detail})`);
+	}
+	return { events, pass, total };
+}
+
 /** Least-squares slope of (tsMs, bytes) rows, reported as MB per 30 min. */
 function slopeMbPer30Min(rows, field) {
 	const pts = rows.filter((r) => r[field] !== null);
@@ -288,7 +320,7 @@ function computeSummary(rows) {
 	};
 }
 
-function printSummary(s, csvFile) {
+function printSummary(s, csvFile, adversary = null) {
 	const mb = (v) => (v === null ? "n/a" : v.toFixed(1));
 	const slope = (v) => (v === null ? "n/a: fewer than 2 samples in the longest run" : `${v >= 0 ? "+" : ""}${v.toFixed(2)} MB/30 min`);
 	console.log(`\n### ${localStamp()}: soak summary (${path.basename(csvFile)})\n`);
@@ -302,13 +334,17 @@ function printSummary(s, csvFile) {
 	console.log(`| Avg CPU, same run | ${s.cpuPct === null ? "n/a" : s.cpuPct.toFixed(2) + "%"} |`);
 	console.log(`| Plugin restarts / HWiNFO-absent samples | ${s.restarts} / ${s.hwinfoAbsentSamples} |`);
 	console.log(`| New log WARN / ERROR lines | ${s.warnTotal} / ${s.errorTotal} |`);
-	if (s.events.length > 0) {
+	if (adversary !== null) {
+		console.log(`| Adversary events (injected faults survived) | ${adversary.pass}/${adversary.total} |`);
+	}
+	const events = [...s.events, ...(adversary?.events ?? [])].sort();
+	if (events.length > 0) {
 		console.log("\nEvents:");
-		for (const e of s.events.slice(0, 30)) {
+		for (const e of events.slice(0, 40)) {
 			console.log(`- ${e}`);
 		}
-		if (s.events.length > 30) {
-			console.log(`- (${s.events.length - 30} more in the CSV)`);
+		if (events.length > 40) {
+			console.log(`- (${events.length - 40} more in the CSV and events files)`);
 		}
 	}
 }
@@ -317,6 +353,14 @@ function printSummary(s, csvFile) {
 // Modes.
 // ---------------------------------------------------------------------------
 
+const adversaryEvents = () => {
+	if (args.events === undefined) {
+		return null;
+	}
+	const file = path.resolve(args.events);
+	return fs.existsSync(file) ? loadAdversaryEvents(file) : { events: [`(events file missing: ${file})`], pass: 0, total: 0 };
+};
+
 if (args.summary) {
 	const rows = parseCsv(path.resolve(args.summary));
 	const s = computeSummary(rows);
@@ -324,7 +368,7 @@ if (args.summary) {
 		console.error("soak-monitor: the CSV has no samples");
 		process.exit(1);
 	}
-	printSummary(s, args.summary);
+	printSummary(s, args.summary, adversaryEvents());
 	process.exit(0);
 }
 
@@ -407,7 +451,7 @@ function finish() {
 	try {
 		const s = computeSummary(parseCsv(outPath));
 		if (s !== null) {
-			printSummary(s, outPath);
+			printSummary(s, outPath, adversaryEvents());
 		}
 		console.log(`\nCSV: ${outPath}`);
 	} catch (err) {

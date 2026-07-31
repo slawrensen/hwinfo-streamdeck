@@ -167,8 +167,8 @@ The zones are **fixed landmarks**, drawn as muted shades so they read as markers
 
 Sparkline notes:
 
-- It holds the last **36 samples** and fills at **HWiNFO's own update rate** (default 2 s), not the plugin's poll rate: one new point per genuinely fresh HWiNFO snapshot.
-- History **survives leaving the page entirely**: once a key has asked for a reading's history, the plugin keeps collecting it while the key is off screen, so switching pages, waking the machine, or the app reconnecting returns you to a complete, current line no matter how long you were away. (Before 1.4 a page unviewed for over a minute rebuilt its graphs from scratch.) History lives in plugin memory, so a plugin restart or Stream Deck app restart starts the lines fresh.
+- It holds the last **36 samples**: one new point per genuinely fresh HWiNFO snapshot, at the slower of HWiNFO's own polling period (default 2 s) and the plugin's poll interval, never faster than one point per second.
+- History **survives leaving the page**: once a key has asked for a reading's history, the plugin keeps collecting it while the key is off screen, as long as a Sensor Reading key or Sensor Dial stays visible somewhere. With none visible (or the machine asleep) the poller stops entirely, so collection pauses and resumes from the same samples when a key comes back; the ring is spaced by sample, not by clock, so after a long pause the old samples sit next to the new ones until the line refills. (Before 1.4 a page unviewed for over a minute rebuilt its graphs from scratch.) History lives in plugin memory, so a plugin restart or Stream Deck app restart starts the lines fresh.
 - It **survives a °C/°F toggle** unchanged (same data, just relabelled), and a frozen HWiNFO holds the line's last real shape instead of flattening it.
 - The sparkline self-scales to its own visible min/max, so the shape reflects recent variation, not absolute magnitude.
 
@@ -207,13 +207,14 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | Key shows | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
+| **HWiNFO busy / retrying** | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll; held values stay up meanwhile. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
 | **Not updating / check sharing** *(or* **check Gadget***)* | Values are frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. The sub-line names the source in use. (The free version's 12-hour expiry shows **Shared Memory / is off** instead, or falls back to Gadget in Auto mode.) |
 | **Tick sensors / in Gadget** | Gadget reporting is on but no sensors are ticked. Right-click values in HWiNFO and choose "Report value in Gadget". |
 | **Access denied / un-elevate** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
-| **Plugin damaged / reinstall** | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, allow that file in your antivirus. |
+| **Plugin damaged / reinstall** | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, allow that file in your antivirus after checking its hash against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)); it is unsigned, so the hash is the check. |
 | **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
 | **HWiNFO error / restart HWiNFO** | Rare. The shared memory did not validate. It usually clears on the next poll; if it persists, restart HWiNFO. |
 

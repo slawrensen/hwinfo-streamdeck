@@ -59,6 +59,23 @@ const TREE = {
 				{ key: "cpu:0:1", label: "CPU Power", unit: "W", value: 120, type: 5, display: "120.0 W" },
 				{ key: "gpu:0:0", label: "GPU Temp", unit: "°C", value: 60, type: 1, display: "60.0 °C" }
 			]
+		},
+		// Two sources sharing one display name (twin hardware, user renames in
+		// HWiNFO, or the "Unknown sensor" orphan fallback): their + all buttons
+		// must stay distinguishable, which a lookup by name cannot do.
+		{
+			name: "Twin Sensor",
+			readings: [
+				{ key: "twin:0:0", label: "Twin A Temp", unit: "°C", value: 40, type: 1, display: "40.0 °C" },
+				{ key: "twin:0:1", label: "Twin A Fan", unit: "RPM", value: 900, type: 3, display: "900 RPM" }
+			]
+		},
+		{
+			name: "Twin Sensor",
+			readings: [
+				{ key: "twin:1:0", label: "Twin B Temp", unit: "°C", value: 41, type: 1, display: "41.0 °C" },
+				{ key: "twin:1:1", label: "Twin B Fan", unit: "RPM", value: 950, type: 3, display: "950 RPM" }
+			]
 		}
 	],
 	state: "ok",
@@ -439,6 +456,45 @@ try {
 	check("ordinary key: unknown nested field preserved", deepEqual(lastPlain.futureBlob, FUTURE_BLOB), JSON.stringify(lastPlain.futureBlob));
 	check("ordinary key: no role marker appeared from nowhere", !("detailRole" in lastPlain), JSON.stringify(lastPlain.detailRole));
 	check("ordinary key: existing fields intact", lastPlain.warnValue === "80" && lastPlain.readingKey === "cpu:0:0", JSON.stringify(lastPlain).slice(0, 160));
+
+	// ---- run 2b: "+ all" on the SECOND of two same-named sources ---------
+	// Source display names are not unique; the button must bind by position
+	// in the rendered tree, or the second twin silently adds the first's
+	// readings (found by the Codex review on PR #6).
+	await setSelect("pressBehavior", "open-details");
+	await sleep(700);
+	await setSelect("detailMode", "custom");
+	await sleep(700);
+	const customVisible = await evaluate(`document.getElementById("detail-custom")?.hidden`);
+	check("custom detail block visible", customVisible.result?.value === false, String(customVisible.result?.value));
+
+	mark = writes.length;
+	const focused = await evaluate(`(() => {
+		const input = document.getElementById("pickerd-search");
+		if (!input) return "no search input";
+		input.focus();
+		// Headless Chrome does not reliably fire focus events on an unfocused
+		// window; the picker opens from its focus listener, so fire it by hand.
+		input.dispatchEvent(new Event("focus"));
+		return "ok";
+	})()`);
+	check("detail picker opened", focused.result?.value === "ok", String(focused.result?.value));
+	await sleep(900); // ws round trip + renderList
+	const twinAdd = await evaluate(`(() => {
+		const buttons = Array.from(document.querySelectorAll("#pickerd-list .hw-group-add"));
+		if (buttons.length !== 3) return "expected 3 add-all buttons, got " + buttons.length;
+		// DOM order mirrors tree order: CPU, twin A, twin B. Press twin B's.
+		// The list acts on mousedown (it preventDefaults ahead of blur), so a
+		// plain click() would not reach it.
+		buttons[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+		return "ok";
+	})()`);
+	check("+ all pressed on the second twin", twinAdd.result?.value === "ok", String(twinAdd.result?.value));
+	await sleep(700);
+	const twinWrites = writes.slice(mark);
+	const lastTwin = writes.at(-1) ?? {};
+	check("+ all wrote the custom list", twinWrites.length >= 1, `${twinWrites.length} writes`);
+	check("+ all added the SECOND twin's readings, not the first's", deepEqual(lastTwin.detailKeys, ["twin:1:0", "twin:1:1"]), JSON.stringify(lastTwin.detailKeys));
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

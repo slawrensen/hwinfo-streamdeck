@@ -18,6 +18,7 @@ import { composeBackFace, composeIdleFace, composePagerFace, composeReadingFace,
 import type { DetailPage } from "./detail-group";
 import type { DetailNavigator, DeviceDetailState } from "./navigation";
 import { parseSlotBinding, type DetailSlotBinding } from "./slot-bindings";
+import { tickSignature } from "./tick-signature";
 
 export type SlotHandle = {
 	setImage(svg: string): void;
@@ -180,15 +181,18 @@ export class DetailController {
 	 * two seconds while the poll option goes down to 250 ms, so most ticks
 	 * carry the identical snapshot and every face would compose to the
 	 * identical bytes the dedupe then drops. Skipping those passes outright
-	 * removes the compose cost too. Every face is a pure function of this
-	 * signature: session changes repaint via requestRender, theme changes
-	 * via renderAll, new slots via registerSlot, and no status face renders
-	 * wall-clock time (staleForMs is deliberately not displayed).
+	 * removes the compose cost too (tick-signature.ts owns what "changed"
+	 * means; the provider's valueRevision keeps sub-second HWiNFO polls
+	 * visible through pollTime's one-second grain). Every face is a pure
+	 * function of this signature: session changes repaint via
+	 * requestRender, theme changes via renderAll, new slots via
+	 * registerSlot, and no status face renders wall-clock time (staleForMs
+	 * is deliberately not displayed).
 	 */
 	private lastTickSignature = "";
 
 	onTick(status: PollerStatus): void {
-		const signature = status.state === "ok" ? `ok:${status.snapshot.pollTime}:${status.snapshot.readings.length}` : status.state === "stale" ? `stale:${status.source}` : `unavailable:${status.reason}`;
+		const signature = tickSignature(status);
 		if (signature === this.lastTickSignature) {
 			return;
 		}

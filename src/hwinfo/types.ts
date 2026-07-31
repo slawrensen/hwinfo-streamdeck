@@ -58,6 +58,15 @@ export interface Reading {
 export interface SensorSnapshot {
 	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */
 	readonly pollTime: number;
+	/**
+	 * Bumped by the provider whenever any value actually changed or the
+	 * snapshot was rebuilt. pollTime alone cannot carry this: it has
+	 * one-second grain, and HWiNFO polling faster than 1 Hz rewrites
+	 * values in place under an unchanged stamp. Consumers gating work on
+	 * "did the data move" key on this; absent means the provider cannot
+	 * tell, and pollTime granularity is the honest fallback.
+	 */
+	readonly valueRevision?: number;
 	readonly version: number;
 	readonly revision: number;
 	readonly sensors: readonly SensorSource[];

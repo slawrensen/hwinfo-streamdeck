@@ -174,6 +174,28 @@ describe("SnapshotParser — incremental fast path", () => {
 		assert.equal(second.byKey.get("f0000501:0:1000000")?.value, 77.25);
 	});
 
+	it("valueRevision moves on a same-second in-place rewrite, holds on identical bytes, and survives a rebuild", () => {
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [TEMP]));
+		const rev = first.valueRevision;
+		assert.ok(typeof rev === "number", "the shared-memory provider always stamps a revision");
+		// Identical bytes: nothing moved, nothing bumps.
+		const idle = parser.parse(compose([CPU], [TEMP]));
+		assert.equal(idle, first);
+		assert.equal(idle.valueRevision, rev);
+		// HWiNFO polling faster than 1 Hz: values rewritten in place while the
+		// one-second pollTime stamp cannot move. The revision is the only
+		// signal a repaint gate has left.
+		const subSecond = parser.parse(compose([CPU], [{ ...TEMP, value: 77.25 }]));
+		assert.equal(subSecond, first, "still the fast path");
+		assert.equal(subSecond.pollTime, first.pollTime, "stamp did not move");
+		assert.equal(subSecond.valueRevision, (rev ?? 0) + 1, "the data move is still visible");
+		// A rebuild (entry added) continues the same revision line upward.
+		const grown = parser.parse(compose([CPU], [{ ...TEMP, value: 77.25 }, { ...TEMP, id: 0x1000001, orig: "Core", value: 3 }]));
+		assert.notEqual(grown, first);
+		assert.ok((grown.valueRevision ?? 0) > (subSecond.valueRevision ?? 0), "a rebuild bumps past the fast-path line");
+	});
+
 	it("rebuilds when the header changes (entry count)", () => {
 		const parser = new SnapshotParser();
 		const first = parser.parse(compose([CPU], [TEMP]));

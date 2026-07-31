@@ -63,9 +63,15 @@ Elgato Marketplace listing is a separate track.
   no longer groups every other orphan with it, and hostile filter
   patterns (regex metacharacters, emoji, 500-character strings) compile
   safely under a 128-character cap. Repaints coalesce into one pass and
-  unchanged polls skip rendering entirely. The detail view rides the
-  existing single shared poller; the dense + XL page at the 250 ms poll
-  option is measured in PERF.md.
+  unchanged polls skip rendering entirely; that skip is gated on a
+  provider value revision rather than HWiNFO's one-second poll stamp, so
+  an HWiNFO polling period set under a second keeps moving the detail
+  tiles (found by an automated review of the merged branch, which also
+  caught the picker's "+ all" button binding to its source by display
+  name: two identically named sources resolved to the first, and the
+  button now binds by position). The detail view rides the existing
+  single shared poller; the dense + XL page at the 250 ms poll option is
+  measured in PERF.md.
 - The detail profile is named "HWiNFO Details". The Stream Deck app
   never updates a profile that is already installed, so the first
   drill-down after upgrading asks once per deck to install it. If you

@@ -75,6 +75,10 @@ export class GadgetRegistryProvider {
 	readonly source = "gadget";
 
 	private lastDigest = "";
+	/** Counts digest changes: the same fact valueRevision carries for shared
+	 * memory, so two registry rewrites within one second stay distinguishable
+	 * even though the synthesized pollTime cannot move twice in it. */
+	private valueRevision = 0;
 	private lastChangeSec = Math.floor(Date.now() / 1000);
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
@@ -175,9 +179,10 @@ export class GadgetRegistryProvider {
 		if (digest !== this.lastDigest) {
 			this.lastDigest = digest;
 			this.lastChangeSec = Math.floor(Date.now() / 1000);
+			this.valueRevision++;
 		}
 
-		return { pollTime: this.lastChangeSec, version: 0, revision: 0, sensors, readings, byKey };
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, version: 0, revision: 0, sensors, readings, byKey };
 	}
 
 	close(): void {
@@ -192,5 +197,6 @@ export class GadgetRegistryProvider {
 	adoptFreshness(from: GadgetRegistryProvider): void {
 		this.lastDigest = from.lastDigest;
 		this.lastChangeSec = from.lastChangeSec;
+		this.valueRevision = from.valueRevision;
 	}
 }

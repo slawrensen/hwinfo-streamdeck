@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { DetailNavigator } from "../src/detail/navigation";
+import { tickSignature } from "../src/detail/tick-signature";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -479,5 +480,36 @@ describe("surface lifecycle", () => {
 		nav.shutdown();
 		assert.equal(pendingTimers(), 0);
 		assert.equal(nav.stateFor("dev2"), undefined);
+	});
+});
+
+describe("tickSignature — the detail render gate", () => {
+	const ok = (snapshot: SensorSnapshot) => ({ state: "ok", snapshot, source: "shared-memory" }) as const;
+
+	it("holds still while nothing moves, and follows pollTime", () => {
+		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
+		assert.equal(tickSignature(ok(snap)), tickSignature(ok(snap)));
+		const later = { ...snap, pollTime: snap.pollTime + 1 };
+		assert.notEqual(tickSignature(ok(later)), tickSignature(ok(snap)));
+	});
+
+	it("a valueRevision bump repaints even under an unchanged pollTime second", () => {
+		// HWiNFO polling faster than 1 Hz: same stamp, same count, new values.
+		// The provider bumps valueRevision; the gate must see it (the Codex
+		// review caught the old pollTime:count signature capping the detail
+		// view at 1 Hz while ordinary keys tracked every change).
+		const snap = { ...snapshotOf([reading("cpu:0:0", 0)], ["CPU"]), valueRevision: 7 };
+		const moved = { ...snap, valueRevision: 8 };
+		assert.equal(moved.pollTime, snap.pollTime);
+		assert.equal(moved.readings.length, snap.readings.length);
+		assert.notEqual(tickSignature(ok(moved)), tickSignature(ok(snap)));
+	});
+
+	it("a provider without revisions still gates on pollTime, and states keep their own lines", () => {
+		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
+		assert.equal(snap.valueRevision, undefined);
+		assert.equal(tickSignature(ok(snap)), tickSignature(ok({ ...snap })));
+		assert.notEqual(tickSignature({ state: "stale", snapshot: snap, source: "shared-memory", staleForMs: 20_000 }), tickSignature(ok(snap)));
+		assert.notEqual(tickSignature({ state: "unavailable", reason: "busy", message: "" }), tickSignature({ state: "unavailable", reason: "not-running", message: "" }));
 	});
 });

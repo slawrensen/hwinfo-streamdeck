@@ -551,7 +551,8 @@
 			const frag = document.createDocumentFragment();
 			let shown = 0;
 			let hidden = 0;
-			for (const group of tree) {
+			for (let gi = 0; gi < tree.length; gi++) {
+				const group = tree[gi];
 				const groupLower = group.name.toLowerCase();
 				let header = null;
 				for (const reading of group.readings) {
@@ -571,7 +572,11 @@
 							const addAll = document.createElement("button");
 							addAll.type = "button";
 							addAll.className = "hw-group-add";
-							addAll.dataset.group = group.name;
+							// Bound by position in the rendered tree, not by name:
+							// source names are not unique (identical hardware, user
+							// renames, the "Unknown sensor" orphan fallback), and a
+							// name lookup would always resolve to the first twin.
+							addAll.dataset.groupIndex = String(gi);
 							addAll.title = "Add every reading of this source";
 							addAll.textContent = "+ all";
 							header.appendChild(addAll);
@@ -690,7 +695,7 @@
 			const groupAdd = ev.target.closest(".hw-group-add");
 			if (groupAdd !== null && config.onGroupAdd !== undefined) {
 				ev.preventDefault();
-				const group = (tree ?? []).find((g) => g.name === groupAdd.dataset.group);
+				const group = (tree ?? [])[Number(groupAdd.dataset.groupIndex)];
 				if (group !== undefined) {
 					config.onGroupAdd(group);
 					renderList();

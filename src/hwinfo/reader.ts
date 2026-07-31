@@ -69,6 +69,7 @@ interface MutableReading {
 
 interface MutableSnapshot {
 	pollTime: number;
+	valueRevision: number;
 	version: number;
 	revision: number;
 	sensors: readonly SensorSource[];
@@ -151,6 +152,7 @@ export class SnapshotParser {
 		const readings = snap.readings;
 		const identity = this.identity;
 		const unitWords = this.unitWords;
+		let changed = false;
 		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			if (
 				dv.getUint32(o + ENTRY.type, true) !== identity[i * 3] ||
@@ -175,23 +177,34 @@ export class SnapshotParser {
 			const value = dv.getFloat64(o + ENTRY.value, true);
 			if (r.value !== value) {
 				r.value = value;
+				changed = true;
 			}
 			const valueMin = dv.getFloat64(o + ENTRY.valueMin, true);
 			if (r.valueMin !== valueMin) {
 				r.valueMin = valueMin;
+				changed = true;
 			}
 			const valueMax = dv.getFloat64(o + ENTRY.valueMax, true);
 			if (r.valueMax !== valueMax) {
 				r.valueMax = valueMax;
+				changed = true;
 			}
 			const valueAvg = dv.getFloat64(o + ENTRY.valueAvg, true);
 			if (r.valueAvg !== valueAvg) {
 				r.valueAvg = valueAvg;
+				changed = true;
 			}
 		}
 		const pollTime = readPollTime(dv);
 		if (snap.pollTime !== pollTime) {
 			snap.pollTime = pollTime;
+			changed = true;
+		}
+		if (changed) {
+			// pollTime has one-second grain, so sub-second HWiNFO polls rewrite
+			// values under an unchanged stamp; this is the counter that still
+			// moves (SensorSnapshot.valueRevision).
+			snap.valueRevision++;
 		}
 		return true;
 	}
@@ -291,7 +304,10 @@ export class SnapshotParser {
 		}
 		this.identity = identity;
 		this.unitWords = unitWords;
-		this.snapshot = { pollTime, version, revision, sensors, readings, byKey };
+		// A rebuild is a data change by definition (layout growth, unit flip),
+		// even when pollTime and the reading count happen to match: carry the
+		// revision line forward and bump it.
+		this.snapshot = { pollTime, valueRevision: (this.snapshot?.valueRevision ?? 0) + 1, version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}
 }

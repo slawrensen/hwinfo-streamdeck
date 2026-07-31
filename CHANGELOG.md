@@ -3,6 +3,106 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.5.0.0 - 2026-07-30
+
+- A sensor key can act like a folder. The Sensor Reading key's Press
+  setting can open a detail view: the deck switches to a bundled
+  one-page profile listing a whole group of readings, Previous and Next
+  page through a long group, a title tile shows the group and the
+  visible range, and pressing a listed reading cycles its current, min,
+  max and avg for that visit. Back returns to the profile and page you
+  came from. One profile is installed per deck type, and what it shows
+  is decided at press time by the key you pressed, so one key opens a
+  CPU breakdown and the next a GPU one. (Requested by @FattSlice in
+  issue #5 and shaped by three rounds of his testing.)
+- Each key picks its own grouping. Detail contains offers every reading
+  of the key's sensor source (the default), a custom list you order by
+  hand, or a glob filter matched against source name and label taken
+  together: `*4090*` gathers everything that card publishes,
+  `*gpu*fan*` just its fans. The panel shows a live match count under
+  the field before you ever press, and a filtered page re-resolves
+  every poll, so readings that appear or vanish in HWiNFO follow along.
+- The key you pressed is Back, under your finger. Inside the view, the
+  tile in the pressed key's own position shows the return face and
+  returns on press; the listed readings flow around it, and none are
+  hidden. The fixed top-left Back is still there, and it is an ordinary
+  Sensor Reading key: give it a sensor, any of the four layouts, a
+  theme, custom text, thresholds and the Show stat. Only its press is
+  reserved. Left unconfigured it shows the sensor you drilled down from.
+- Three press behaviors, default unchanged: cycle stats exactly as
+  before, open details on press, or tap to cycle with a half-second
+  hold opening details. A key that never touches the Press section
+  behaves byte for byte as it did in 1.4.
+- Detail pages ship for the Mini (3x2), every 15-key (5x3), the Neo
+  (4x2), Stream Deck + (4x2 keys), XL (8x4) and + XL (9x4 keys), plus
+  the Virtual Stream Deck, which borrows whichever bundled layout fits
+  its grid. Decks that cannot host a page (Mobile, Studio, Galleon,
+  pedals, G-keys, virtual decks under 3x2) refuse the press with the
+  alert cue and keep the ordinary key behavior. The profiles are
+  generated deterministically from one layout table and carry no user
+  or sensor data.
+- Opening a view starts from black instead of flashing a stale page.
+  The Stream Deck app repaints a profile from each key's last cached
+  image, so the plugin paints pure black on the way out and the live
+  faces paint over black on the way in.
+- Hardening from an adversarial review of the navigation: entry cannot
+  dispatch twice on a double press, a profile install accepted after
+  the prompt expires bounces back out instead of stranding a dead view,
+  unplugging a deck mid-view cleans up its session, an orphaned sensor
+  no longer groups every other orphan with it, and hostile filter
+  patterns (regex metacharacters, emoji, 500-character strings) compile
+  safely under a 128-character cap. Repaints coalesce into one pass and
+  unchanged polls skip rendering entirely. The detail view rides the
+  existing single shared poller; the dense + XL page at the 250 ms poll
+  option is measured in PERF.md.
+- The detail profile is named "HWiNFO Details". The Stream Deck app
+  never updates a profile that is already installed, so the first
+  drill-down after upgrading asks once per deck to install it. If you
+  tested a preview, remove its detail profiles first, or this one
+  installs alongside them as "HWiNFO Details copy".
+- Flipping HWiNFO's own unit setting (Fahrenheit, and any other unit it
+  rewrites in place) now updates the keys and dials on the next poll.
+  The snapshot parser's fast path re-checked only reading identities and
+  values, never units, so a mid-session flip left the old unit on screen
+  and, with the plugin's "Show temperatures in °F" also on, converted an
+  already-converted value: 80 °C became 348.8 °F. The parser now treats a
+  unit rewrite like an identity change and rebuilds. The conversion and
+  alert-threshold functions gained their first direct tests, and the
+  resilience e2e now flips units mid-run against the built plugin.
+- Opening HWiNFO's shared memory no longer blocks. The native open path
+  waited up to 500 ms, twice, on HWiNFO's consistency mutex while keys and
+  dials went unserviced; it now fails fast like the read path always has
+  and simply retries on the next poll (native addon 1.1.0).
+- A busy HWiNFO no longer shows "Start HWiNFO". Open-time contention used
+  to be folded into the not-running screen, telling you to start software
+  that was running in front of you. It now has its own transient state:
+  the keys say "HWiNFO busy, retrying" and values hold in the meantime.
+  In auto mode a busy open retries shared memory on the next poll
+  instead of silently switching to the Gadget source and back.
+- The pack-version floor is scoped to the release line being packed:
+  tags reachable from the commit, not every tag in the repository. Without
+  this, tagging v2.0.0 in the future would have silently made every 1.x
+  maintenance pack impossible. Covered by a new test suite that builds
+  throwaway repositories and proves the floor cases, the release-workflow
+  tag exclusion and the fallbacks for repositories git cannot answer.
+- An honesty pass over every published claim. Sparkline docs no longer
+  promise that history survives any absence (polling stops when no
+  Sensor Reading key or Sensor Dial is visible; the docs now say exactly what
+  survives and what pauses). The credited original plugin is no longer
+  called archived (it changed maintainers and is active again). PERF.md's
+  competitor comparison entries from 2026-07-04 were removed rather than
+  kept: they named rival builds without versions and their harness was
+  never committed, so they could not be verified by anyone, including me.
+- Trust a stranger can check: every GitHub Action is pinned to a commit
+  SHA (including the third-party release publisher, which runs with write
+  permissions), the Elgato CLI install in the release job is pinned to an
+  exact version (bumped by hand on purpose; Dependabot keeps the action
+  pins and the npm tree current), SECURITY.md documents a
+  private disclosure route, and the README, FAQ, install guide and release
+  notes now say plainly that `bin/hwsm.node` is unsigned and show the
+  one-line PowerShell command to verify it against each release's
+  published SHA-256.
+
 ## 1.4.92.0 - 2026-07-30
 
 - A drill-down key can now shape its own page, so the one shared

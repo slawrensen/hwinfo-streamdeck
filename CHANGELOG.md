@@ -28,11 +28,13 @@ Elgato Marketplace listing is a separate track.
   sparkline riding its session maximum used to draw over the unit's
   descenders; the spark strip is now inset so its worst-case ink stops
   at the band edge, and the unit clears it. (Measured, see PERF.md.)
-- Sparkline history collects for as long as the plugin runs. The
+- Sparkline history lives for as long as the plugin runs. The
   poller keeps a ring for every reading a key or dial row has asked
-  for and feeds it on every fresh snapshot, on screen or not, so
-  paging back to a key returns a complete, current line instead of one
-  that rebuilds from scratch. Changing the poll interval still clears
+  for and feeds it on every fresh snapshot, on screen or not, while a
+  Sensor Reading key or Sensor Dial stays visible somewhere, so
+  paging back to a key returns its line instead of one that rebuilds
+  from scratch. With none visible, polling stops and collection pauses
+  until a key returns. Changing the poll interval still clears
   the history, because the ring is spaced by sample, not by clock, and
   a plugin restart still starts the lines fresh on purpose.
 - An HWiNFO layout change no longer flashes an error screen. Starting
@@ -61,7 +63,8 @@ Elgato Marketplace listing is a separate track.
   label sizes, the three-reading key layout, the stat badge under the
   title, the balanced unit corridor, the hwsm native bridge,
   reopen-in-place on HWiNFO layout changes, and sparkline history that
-  collects for the plugin lifetime.
+  lives for the plugin lifetime (collected while a Sensor Reading key
+  or Sensor Dial is visible).
 - Preview builds now version in the 1.3.9x band. The first preview
   reported 1.3.0.0, and Stream Deck keeps the installed copy when a
   plugin file's version is not higher than what is installed, so
@@ -246,7 +249,7 @@ Elgato Marketplace listing is a separate track.
   sensor identity: rotate away and back and that reading's own session
   min/max/average is still there, and no reading can ever show another
   one's numbers. Stats for rotation-set members keep accumulating while
-  they are off screen (whenever any of the plugin's actions is visible,
+  they are off screen (whenever a Sensor Reading key or Sensor Dial is visible,
   which is what keeps the poller running), and the whole set survives
   reconnects, wake replays, page switches and profile changes (up to 30
   minutes off screen).

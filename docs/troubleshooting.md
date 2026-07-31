@@ -16,6 +16,7 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | Key shows | Dial shows | Meaning |
 | --- | --- | --- |
 | **Start HWiNFO** / not detected | Start HWiNFO / not detected | Nothing found on either interface. |
+| **HWiNFO busy** / retrying | HWiNFO busy / retrying | HWiNFO is running but its shared memory was locked at that instant; the plugin retries on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
 | **Not updating** / check sharing *(or)* check Gadget | HWiNFO stalled / check sharing *(or)* check Gadget | Values frozen; the sub-line names the source in use. |
 | **Access denied** / un-elevate | Access denied / un-elevate HWiNFO | Privilege mismatch between HWiNFO and Stream Deck. |
@@ -24,9 +25,9 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | **Sensor missing** / pick again | Sensor missing / waiting | The saved sensor isn't in HWiNFO's current output. |
 | **Needs x64** / Windows | Needs x64 Windows | 32-bit or Windows-on-ARM: unsupported. |
 | **HWiNFO error** / restart HWiNFO | HWiNFO error / restart HWiNFO | Header didn't validate (mid-restart or incompatible build). |
-| **Plugin damaged** / reinstall | Plugin damaged / reinstall it | The plugin's native bridge (`bin/hwsm.node`) would not load: missing, blocked by antivirus, or a version mismatch. Reinstall the plugin. |
+| **Plugin damaged** / reinstall | Plugin damaged / reinstall it | The plugin's native bridge (`bin/hwsm.node`) would not load: missing, blocked by antivirus, or a version mismatch. Reinstall the plugin. The file is unsigned; before allowing it in your antivirus, check it against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). |
 
-![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})
+![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})
 
 ---
 

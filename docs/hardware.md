@@ -33,7 +33,7 @@ And the same claim as a photograph, not a render: my Stream Deck + XL running th
 
 ## Page swipe
 
-Sideways swipes on the touch strip are page navigation and belong to the Stream Deck app; there is no plugin swipe event to receive. The plugin's job is narrower and it does it: selection and labels always survive the swipe away and back (they are persisted settings), and session stats, pause and pin state survive for up to 30 minutes off screen. Sparkline history is not on that clock: the poller keeps collecting it for a key or a dial overview row that is off screen, for as long as any of the plugin's actions is visible somewhere to keep polling running, so a line comes back complete after any absence. Changing the poll interval is what starts the lines fresh, not paging away.
+Sideways swipes on the touch strip are page navigation and belong to the Stream Deck app; there is no plugin swipe event to receive. The plugin's job is narrower and it does it: selection and labels always survive the swipe away and back (they are persisted settings), and session stats, pause and pin state survive for up to 30 minutes off screen. Sparkline history is not on that clock: the poller keeps collecting it for a key or a dial overview row that is off screen, for as long as a Sensor Reading key or Sensor Dial is visible somewhere to keep polling running, so a line swiped away and back under that condition comes back complete; with nothing visible, polling stops and the line resumes where it left off. Changing the poll interval is what starts the lines fresh, not paging away.
 
 ## Hardware test procedure
 

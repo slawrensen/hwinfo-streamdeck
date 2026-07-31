@@ -28,7 +28,7 @@
 			"Name": "Sensor Reading",
 			"UUID": "com.lawrensen.hwinfo.reading",
 			"Icon": "imgs/actions/reading/icon",
-			"Tooltip": "Display one or two live HWiNFO sensor readings on a key, with thresholds and sparkline.",
+			"Tooltip": "Display up to four live HWiNFO sensor readings on a key, with alert thresholds on every layout and a sparkline, bar or ring on the single layout.",
 			"PropertyInspectorPath": "ui/sensor-reading.html",
 			"Controllers": [
 				"Keypad"

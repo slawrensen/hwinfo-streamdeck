@@ -11,11 +11,12 @@ When a key or dial can't show a live reading, it shows a **status screen** inste
 
 Each key screen is two short lines. The first names the state; the second is the fix.
 
-![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing]({{ '/assets/img/status-screens.png' | relative_url }})
+![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing]({{ '/assets/img/status-screens.png' | relative_url }})
 
 | Key shows | What it means | How to fix it |
 | --- | --- | --- |
 | **Start HWiNFO** / *not detected* | HWiNFO isn't running, or isn't publishing on either interface. | Start HWiNFO in Sensors-only mode with **Shared Memory Support** enabled; or, on the free version, enable **Gadget reporting** (no 12-hour limit) and tick the sensors you need. |
+| **HWiNFO busy** / *retrying* | HWiNFO is running, but its shared memory was locked by another reader at the instant the plugin connected. Momentary contention, not a fault. | Nothing to do. The plugin retries on the next poll; held values stay on screen in the meantime. |
 | **Shared Memory** / *is off* | HWiNFO reports Shared Memory Support as disabled. | Re-enable it in HWiNFO **Settings**. On the free version it switches off after 12 hours. In **Auto** mode the plugin also falls back to the Gadget registry on its own; no action strictly required. |
 | **Not updating** / *check sharing* | Data is frozen: the same values keep coming back. Shown when reading **Shared Memory**. | The Sensors window was closed or HWiNFO stopped polling. Reopen the Sensors window; if it keeps happening, restart HWiNFO. (The free version's 12-hour expiry shows **Shared Memory off** instead, or falls back to Gadget in Auto mode.) |
 | **Not updating** / *check Gadget* | Same frozen state, but shown when reading the **Gadget registry**. | Check that HWiNFO is still running with Gadget reporting enabled. |
@@ -25,7 +26,7 @@ Each key screen is two short lines. The first names the state; the second is the
 | **Pick a sensor** / *in settings* | The key works, but no sensor is selected yet. | Open the key's settings and choose a sensor from the picker. |
 | **Sensor missing** / *pick again* | The saved sensor isn't in HWiNFO's current output. | A hardware/driver change or a renamed sensor profile dropped it. Open settings and pick the sensor again. |
 | **HWiNFO error** / *restart HWiNFO* | Rare. The shared memory didn't validate: HWiNFO may be mid-restart or an incompatible/corrupt layout. | Usually clears on the next poll; if it persists, restart HWiNFO. |
-| **Plugin damaged** / *reinstall* | The plugin's own native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, most often an antivirus quarantine or a half-finished install. | Reinstall the plugin by double-clicking the `.streamDeckPlugin` file. If it comes back, restore or allow `bin/hwsm.node` in your antivirus. Restarting HWiNFO cannot fix this one. |
+| **Plugin damaged** / *reinstall* | The plugin's own native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, most often an antivirus quarantine or a half-finished install. | Reinstall the plugin by double-clicking the `.streamDeckPlugin` file. If it comes back, restore or allow `bin/hwsm.node` in your antivirus; the file is unsigned, so check it first against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). Restarting HWiNFO cannot fix this one. |
 
 > **Note:** *Start HWiNFO*, *Not updating*, and the rest come from the data source (see [Data sources](data-sources.md)). *Pick a sensor* and *Sensor missing* are about this specific key's selection; the data source is fine. *Plugin damaged* is about the plugin's own install, not HWiNFO.
 
@@ -36,6 +37,7 @@ Dials show the same states in the touchscreen's two-slot layout (a title and a v
 | Dial title | Dial value |
 | --- | --- |
 | Start HWiNFO | not detected |
+| HWiNFO busy | retrying |
 | Shared Memory off | enable in HWiNFO |
 | HWiNFO stalled | check sharing *(shared memory)* / check Gadget *(gadget)* |
 | Access denied | un-elevate HWiNFO |

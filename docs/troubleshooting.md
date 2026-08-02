@@ -59,11 +59,22 @@ The reading stopped changing for more than ~15 seconds, so the plugin flags it s
 1. **HWiNFO's Sensors window was closed or HWiNFO was minimised to tray without sensor polling.** Reopen the Sensors window; HWiNFO must keep polling to update either interface.
 2. **Not the free version's 12-hour timer.** Expiry doesn't freeze values: it marks the shared-memory mapping `DEAD`, which shows **"Shared Memory off"** or silently falls back to the Gadget registry in Auto mode. (Pro removes the limit.)
 3. **HWiNFO itself crashed or hung.** Restart it. The plugin re-probes a fresh handle every 5 seconds while stale and recovers automatically.
+4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
 4. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.
+
+## Keys freeze, and only closing the Stream Deck app brings them back
+
+Different from **"Not updating"** above: there is no status screen at all. The keys sit on their last reading, the settings panel's **Copy support report** button does nothing, restarting HWiNFO changes nothing, and closing the Stream Deck app and reopening it fixes it for a while. In the app's own key preview the keys show the plain **HWiNFO 62 °C** action icon rather than live values.
+
+That combination means the plugin process is not running. Every symptom follows from it: the deck keeps showing the last picture it was sent, the app falls back to the action's icon, and nothing is left to answer the support report.
+
+Two causes, both fixed in **1.5.0.0**. A safety check that exists to clean up if the Stream Deck app ever crashes could decide the app was gone whenever it was unable to inspect it, which on some machines is always, and shut the plugin down about 30 seconds after every start. Separately, if the app's connection to the plugin died while keys were on screen, the plugin kept running with nowhere to draw, so the keys froze until the app was restarted. Update, and both stop.
+
+On an older build you can switch that check off: add a user environment variable `HWINFO_PARENT_CHECK_MS` with the value `999999999`, then close and reopen the Stream Deck app. The only cost is that if the app ever crashes outright, a leftover `node.exe` may need ending in Task Manager.
 
 ## Keys show "Access denied"
 
-Windows refused to open HWiNFO's shared memory. This is **always** a privilege mismatch: specifically **HWiNFO is running elevated ("Run as administrator") while Stream Deck is not**.
+Windows refused to open HWiNFO's shared memory. Almost always that is a privilege mismatch: **HWiNFO is running elevated ("Run as administrator") while Stream Deck is not**.
 
 The fix is to make the two match:
 
@@ -77,6 +88,8 @@ The fix is to make the two match:
 Easiest fix: **restart HWiNFO without "Run as administrator."** If you genuinely need HWiNFO elevated (some low-level sensors require it), run Stream Deck elevated too.
 
 > **Free-version escape hatch:** the **Gadget registry** lives in `HKCU` and is readable across privilege levels, so enabling Gadget reporting sidesteps this mismatch entirely.
+
+There is one other way to land here: **HWiNFO running as a different Windows user**, for example started by Task Scheduler under another account, or left running in another session with Fast User Switching. The shared-memory object belongs to whoever created it, so no elevation change will help; the Gadget registry does not help either, because it lives in that other user's `HKCU`. Start HWiNFO as the same user that runs Stream Deck.
 
 ## Keys show "Sensor missing"
 
@@ -190,6 +203,9 @@ Useful lines to look for:
 - `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid` or `not-running`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
 - `Deck theme = … (source: …)`: the resolved deck-wide theme.
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
+- `Parent probe failed [<code>]`: the plugin could not inspect the Stream Deck app's process. It keeps running; the code names why (`EPERM` means the app is there but sealed off, anything else is unusual).
+- `Parent watchdog disabled` / `watchdog standing down`: the app-liveness check found it cannot answer reliably on this machine and switched itself off, which is the safe direction.
+- `Parent process gone, and the app did not answer: exiting.`: the app was absent by both the process check and a direct question, so the plugin exited rather than poll for nobody. Seeing this while the app is plainly running is a bug worth reporting.
 
 > **Note:** The log is local-only: the plugin has **no telemetry** and never uploads anything. You choose what to share.
 

@@ -3,8 +3,61 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
-## 1.5.0.0 - 2026-07-30
+## 1.5.0.0 - 2026-08-02
 
+- The plugin could quit on its own about half a minute after every start,
+  leaving every key frozen on its last reading until the Stream Deck app
+  was closed and reopened. A safety check that exists to clean up after an
+  app crash decided the app was gone whenever it could not inspect it,
+  which on some machines is always, so it shut the plugin down 30 seconds
+  into every session. That check now treats "cannot inspect" as what it
+  is, never arms at all on a machine that cannot answer the question,
+  waits for two sightings in a row, and asks the app directly before
+  quitting: if the app answers, the check stands down for the rest of the
+  session. It also logs why, so the next report needs no guesswork. The
+  behaviour it protects against is unchanged: when the app really is gone,
+  the plugin still exits instead of polling for nobody. This was wrong
+  from 1.1.1.0 onwards. (Reported by @zekkragnos in issue #17, who sent
+  the log that proved it.)
+- "Copy support report" now says "Plugin not responding" if nothing
+  answers within three seconds, instead of sitting there disabled. The
+  report is built by the plugin, so a plugin that is not running could
+  never answer, and the one button meant to diagnose that looked simply
+  broken.
+- A key or dial no longer keeps a stale picture after the Stream Deck app
+  reconnects or the machine wakes. Both skip redrawing when the new face
+  is identical to the last one they sent, and they were carrying that
+  memory across a replayed appearance, which is exactly when the app's own
+  image cache can be cold. A key showing a status screen, or a reading
+  that sits on the same number, could stay on the old picture
+  indefinitely. The detail view already did this correctly; now the key
+  and dial do too, with the end-to-end suite parking both on a sensor
+  HWiNFO does not publish, so the face cannot change by itself and the
+  repaint is the only thing that can produce a frame.
+- Two support paths that were dead ends: the sentence explaining WHY the
+  native bridge was rejected went to a console nobody can read, so it now
+  travels with the error into the log, and "Access denied" no longer
+  insists the cause is always elevation. HWiNFO running as a different
+  Windows user produces the identical error, and no amount of
+  un-elevating fixes that one.
+- An empty `HWINFO_SM2_NAME`, `HWINFO_SM2_MUTEX_NAME` or `HWINFO_VSB_KEY`
+  environment variable is now treated as "not set" rather than as an empty
+  name, which the native layer rejected and which left the keys stuck on
+  "HWiNFO error" until the variable was deleted.
+- A plugin whose connection to the Stream Deck app died while keys were on
+  screen used to keep running: it went on reading HWiNFO and drawing
+  frames into a closed pipe, forever, with nothing in the log. The app is
+  now the only thing keeping the plugin alive, so a dead connection ends
+  it and the app can start a fresh one. A new test covers exactly that
+  case; the existing ones only ever closed the connection after the keys
+  had already gone.
+- "Not updating" could fail to appear on a machine whose clock stepped
+  backwards, which happens on VM resume, on the first time sync after a
+  boot with a flat CMOS battery, and on Windows and Linux dual boots that
+  disagree about UTC. Elapsed time was measured against the wall clock, so
+  a correction of an hour meant an hour in which frozen readings could not
+  be reported as frozen. It is measured with a clock that only ever moves
+  forwards now.
 - A sensor key can act like a folder. The Sensor Reading key's Press
   setting can open a detail view: the deck switches to a bundled
   one-page profile listing a whole group of readings, Previous and Next

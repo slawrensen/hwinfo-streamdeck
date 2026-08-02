@@ -591,6 +591,33 @@ async function scenario(send) {
 	await sleep(300);
 	results.reappearFirstFrame = decodeSvg((results.images.filter((i) => i.context === "ctx-key")[keyFramesBefore] ?? {}).image);
 
+	// A REPLAYED willAppear (no willDisappear before it) must repaint, even
+	// though the composed bytes have not changed. Stream Deck replays appear
+	// on reconnect and on wake, and the app's own image cache can be cold
+	// there, so a plugin that dedupes against the frame it still remembers
+	// leaves the key on the action's static icon until the bytes happen to
+	// change — which for a status screen or a steady reading is never.
+	// Both are parked on a sensor HWiNFO does not publish first, on purpose:
+	// that face is a constant status screen, so the composed bytes cannot
+	// change by themselves and the ONLY thing that can produce a frame here
+	// is the appear clearing the dedupe key. Against live values this check
+	// would pass either way (the reading moves between paints), which is
+	// exactly the trap that makes a test look green while proving nothing.
+	const GHOST = "ffffffff:0:9999999";
+	const ghostKeyAppear = { event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", device: "dev1", payload: { settings: { readingKey: GHOST }, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } };
+	const ghostDialAppear = { event: "willAppear", action: "com.lawrensen.hwinfo.dial", context: "ctx-dial", device: "devxl", payload: { settings: { readingKey: GHOST }, coordinates: { column: 5, row: 0 }, controller: "Encoder", isInMultiAction: false } };
+	send(ghostKeyAppear);
+	send(ghostDialAppear);
+	await sleep(1500); // settle onto the constant face
+
+	const beforeKeyReplay = results.images.filter((i) => i.context === "ctx-key").length;
+	const beforeDialReplay = results.feedbacks.filter((f) => f.context === "ctx-dial").length;
+	send(ghostKeyAppear); // byte-identical replay, no willDisappear before it
+	send(ghostDialAppear);
+	await sleep(900);
+	results.keyReplayFrames = results.images.filter((i) => i.context === "ctx-key").length - beforeKeyReplay;
+	results.dialReplayFrames = results.feedbacks.filter((f) => f.context === "ctx-dial").length - beforeDialReplay;
+
 	// Exit hygiene: with every action gone the poller must go idle (zero
 	// further frames) and the process must then exit on socket close alone.
 	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", device: "dev1" });
@@ -1019,6 +1046,11 @@ async function finish() {
 	if (forcedLogLevel) {
 		check("HWINFO_LOG_LEVEL=trace falls back to debug on a normal launch", loggedThisRun("Log level = debug (HWINFO_LOG_LEVEL asked for trace"));
 	}
+
+	// A replayed appear must repaint even when the face is unchanged: the
+	// app's image cache can be cold on reconnect and wake.
+	check("a replayed willAppear repaints the key despite unchanged bytes", results.keyReplayFrames > 0, `frames after the bare replay: ${results.keyReplayFrames}`);
+	check("a replayed willAppear repaints the dial despite unchanged bytes", results.dialReplayFrames > 0, `feedbacks after the bare replay: ${results.dialReplayFrames}`);
 
 	// Exit hygiene.
 	check("poller idles when no actions visible", results.idleDelta === 0, `frames in 3 s after willDisappear: ${results.idleDelta}`);

@@ -209,7 +209,14 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		this.instances.set(ev.action.id, {
 			settings: ev.payload.settings,
 			subscribedKey,
-			lastSvg: existing?.lastSvg ?? ""
+			// Never carry the dedupe key across an appear. A replayed one
+			// (reconnect, wake) can arrive with the app's own image cache cold,
+			// and remembering our last frame would skip the repaint that fills
+			// it: the key then sits on the action's static icon until the
+			// composed bytes happen to change, which for a status screen or a
+			// steady reading is never. DetailController does the same at its
+			// own replay (controller.ts registerSlot).
+			lastSvg: ""
 		});
 		this.renderAll(poller.getStatus());
 	}

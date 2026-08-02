@@ -227,7 +227,10 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			settings: ev.payload.settings,
 			stats: restored?.stats ?? new SessionStatsStore(),
 			statMode: restored !== undefined && restored.settings.readingKey === ev.payload.settings.readingKey ? restored.statMode : "current",
-			lastFeedback: restored?.lastFeedback ?? "",
+			// Empty on purpose, even when state is restored: a replayed appear
+			// can come with the app's touchscreen cache cold, and remembering
+			// the last payload would skip the repaint that fills it.
+			lastFeedback: "",
 			nextCycleAt: null,
 			cyclePaused: restored?.cyclePaused ?? false,
 			pinned: restored?.pinned ?? false,

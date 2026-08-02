@@ -9,6 +9,7 @@ import { DetailNavigator } from "./detail/navigation";
 import { deviceCapabilities } from "./devices";
 import { registerDiagnostics } from "./diagnostics";
 import { initHwsm } from "./hwinfo/hwsm-loader";
+import { classifyProbeError, ParentLiveness, type ParentProbe, probeErrorCode } from "./parent-liveness";
 import { parsePollInterval, parseSourceMode, poller } from "./poller";
 import { hashId, traceEnabled } from "./recorder";
 import { applyGlobalThemeSettings, decideLegacyDefault, onThemeChange } from "./ui/theme-store";
@@ -69,15 +70,69 @@ initHwsm();
 // would keep this process alive — polling for nobody. Watch the parent and
 // leave when it does. The watchdog also covers closes the socket never sees.
 // unref'd so the timer itself never holds the event loop open.
+//
+// A parent PID is a hint, never proof: on the machine in issue #17 this probe
+// throws while the app runs normally, and the old catch-all exited 30 seconds
+// after every launch. The rules now live in parent-liveness.ts, and the app
+// itself gets the last word before anything exits (see confirmAppIsGone).
 const parentPid = process.ppid;
 const PARENT_CHECK_MS = Number(process.env.HWINFO_PARENT_CHECK_MS ?? "") || 30_000;
-setInterval(() => {
+/** How long the app gets to answer before we accept that it is gone. Generous
+ *  on purpose: a live app that is merely busy (a profile switch, an install
+ *  prompt) must never be mistaken for a dead one, and a genuinely dead socket
+ *  never answers however long we wait. */
+const APP_ANSWER_MS = 15_000;
+
+function probeParent(): ParentProbe {
 	try {
 		process.kill(parentPid, 0); // signal 0 = existence probe
-	} catch {
-		streamDeck.logger.info("Parent process gone — exiting.");
-		process.exit(0);
+		return "alive";
+	} catch (err) {
+		const probe = classifyProbeError(err);
+		streamDeck.logger.warn(`Parent probe failed [${probeErrorCode(err)}] — treating as ${probe === "gone" ? "gone" : "unanswered"}.`);
+		return probe;
 	}
+}
+
+/** Ask the app directly: a round trip that returns proves it is there,
+ *  whatever the PID says. Read-only. An answer disarms the watchdog for the
+ *  rest of the process, and no answer exits, so this runs once in practice. */
+async function appAnswers(): Promise<boolean> {
+	try {
+		await Promise.race([
+			streamDeck.settings.getGlobalSettings(),
+			new Promise((_resolve, reject) => {
+				setTimeout(() => reject(new Error("no answer")), APP_ANSWER_MS).unref();
+			})
+		]);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+const parentLiveness = new ParentLiveness(probeParent());
+if (!parentLiveness.armed) {
+	streamDeck.logger.info("Parent watchdog disabled: this machine cannot probe the parent process.");
+}
+setInterval(() => {
+	if (!parentLiveness.armed) {
+		return;
+	}
+	if (parentLiveness.observe(probeParent()) !== "confirm-with-app") {
+		return;
+	}
+	void appAnswers().then((alive) => {
+		if (alive) {
+			// The PID says gone, the app says otherwise: the PID signal is
+			// wrong on this machine, so stop consulting it entirely.
+			parentLiveness.disarm();
+			streamDeck.logger.warn("Parent PID is gone but the Stream Deck app still answers — watchdog standing down.");
+			return;
+		}
+		streamDeck.logger.info("Parent process gone, and the app did not answer: exiting.");
+		process.exit(0);
+	});
 }, PARENT_CHECK_MS).unref();
 
 // Drill-down navigation (issue #5): one device-scoped navigator (entry,

@@ -186,8 +186,13 @@ export function getHwsm(): HwsmBridge {
 				const mod = requireBridge();
 				const mismatch = bridgeProtocolFailure(mod);
 				if (mismatch !== null) {
+					// The reason rides the error, not console.error: the SDK only
+					// attaches a console target under a debug launch, so a
+					// console line never reaches the log file a support user
+					// sends. This is the one sentence that separates a stale
+					// addon from a quarantined one, so it has to survive.
 					console.error(`hwsm bridge rejected: ${mismatch}`);
-					failure = new HwinfoError("bridge-failed", "The plugin's native HWiNFO bridge (bin/hwsm.node) does not match this plugin version: reinstall the plugin.");
+					failure = new HwinfoError("bridge-failed", `The plugin's native HWiNFO bridge (bin/hwsm.node) does not match this plugin version: reinstall the plugin. [${mismatch}]`);
 				} else {
 					cached = mod as HwsmBridge;
 					return cached;

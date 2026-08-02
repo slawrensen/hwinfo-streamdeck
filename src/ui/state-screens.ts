@@ -102,7 +102,7 @@ export function statusSentence(status: PollerStatus): string {
 		case "disabled":
 			return "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.";
 		case "access-denied":
-			return "Windows denied access to HWiNFO's shared memory: HWiNFO is running elevated (\"Run as administrator\") while Stream Deck is not. Restart HWiNFO without elevation, or run both elevated. On the free version, Gadget reporting also works across privilege levels.";
+			return "Windows denied access to HWiNFO's shared memory. Usually HWiNFO is running elevated (\"Run as administrator\") while Stream Deck is not: restart HWiNFO without elevation, or run both elevated. It also happens when HWiNFO runs as a different Windows user, for example started by Task Scheduler under another account. On the free version, Gadget reporting works across privilege levels.";
 		case "unsupported-platform":
 			return "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).";
 		case "bridge-failed":

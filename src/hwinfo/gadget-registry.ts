@@ -19,7 +19,7 @@ import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader"
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
 /** Overridable so the gadget e2e can point at a synthetic key. */
-const VSB_SUBKEY = process.env.HWINFO_VSB_KEY ?? "Software\\HWiNFO64\\VSB";
+const VSB_SUBKEY = process.env.HWINFO_VSB_KEY || "Software\\HWiNFO64\\VSB";
 
 const MAX_ENTRIES = 1024;
 /** Win32 ERROR_KEY_DELETED: the key vanished under our open handle. */

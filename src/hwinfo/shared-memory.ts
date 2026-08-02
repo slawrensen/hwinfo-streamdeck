@@ -14,8 +14,11 @@ import { HwinfoError, type HwinfoUnavailableReason } from "./types";
 
 // Overridable so the resilience e2e can point the reader at a synthetic
 // mapping it controls (scripts/fake-hwinfo.mjs). Production uses the defaults.
-const EFFECTIVE_MAPPING_NAME = process.env.HWINFO_SM2_NAME ?? MAPPING_NAME;
-const EFFECTIVE_MUTEX_NAME = process.env.HWINFO_SM2_MUTEX_NAME ?? MUTEX_NAME;
+// `||`, not `??`: a variable that exists but is empty is "", which the native
+// argument check rejects, and the resulting "HWiNFO error" would never clear.
+// An empty override means "no override".
+const EFFECTIVE_MAPPING_NAME = process.env.HWINFO_SM2_NAME || MAPPING_NAME;
+const EFFECTIVE_MUTEX_NAME = process.env.HWINFO_SM2_MUTEX_NAME || MUTEX_NAME;
 
 /**
  * Maps a native HWSM_* failure to the status-screen reason. Layout and

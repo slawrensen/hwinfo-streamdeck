@@ -27,6 +27,7 @@
 import streamDeck from "@elgato/streamdeck";
 import { EventEmitter } from "node:events";
 
+import { monotonicNow } from "./clock";
 import { GadgetRegistryProvider } from "./hwinfo/gadget-registry";
 import { SharedMemoryProvider, type SnapshotProvider, type SnapshotSource } from "./hwinfo/provider";
 import { HwinfoError, type HwinfoUnavailableReason, type SensorSnapshot } from "./hwinfo/types";
@@ -105,7 +106,7 @@ class HwinfoPoller extends EventEmitter {
 			intervalMs: this.intervalMs,
 			polling: this.timer !== null,
 			retained: this.refs,
-			sampleAgeMs: this.lastAdvanceAt === 0 ? null : Date.now() - this.lastAdvanceAt
+			sampleAgeMs: this.lastAdvanceAt === 0 ? null : monotonicNow() - this.lastAdvanceAt
 		};
 	}
 
@@ -156,7 +157,7 @@ class HwinfoPoller extends EventEmitter {
 		this.logger.info(`Poll interval set to ${ms} ms`);
 		if (this.timer !== null) {
 			clearInterval(this.timer);
-			this.timer = setInterval(() => this.tick(), this.intervalMs);
+			this.timer = setInterval(() => this.tick(), this.intervalMs).unref(); // see start()
 		}
 	}
 
@@ -177,7 +178,14 @@ class HwinfoPoller extends EventEmitter {
 			return;
 		}
 		this.logger.info(`Started (${this.intervalMs} ms interval)`);
-		this.timer = setInterval(() => this.tick(), this.intervalMs);
+		// unref'd: the Stream Deck socket is what keeps this process alive, and
+		// it should be the ONLY thing. The SDK has no close handler and never
+		// reconnects, and ws drops sends after a close without raising, so a
+		// socket that dies while keys are visible would otherwise leave a
+		// plugin polling HWiNFO forever, painting into nothing, with no log
+		// line. With the timer unref'd the loop drains and the process exits,
+		// which is exactly what the e2e already asserts for the idle case.
+		this.timer = setInterval(() => this.tick(), this.intervalMs).unref();
 		this.tick();
 	}
 
@@ -250,7 +258,7 @@ class HwinfoPoller extends EventEmitter {
 					this.lastAdvanceAt = this.heldFreshness.advanceAt;
 					this.heldFreshness = null;
 				} else {
-					this.lastAdvanceAt = Date.now();
+					this.lastAdvanceAt = monotonicNow();
 				}
 				this.logger.info(`Opened HWiNFO data source: ${this.provider.source}`);
 			}
@@ -274,7 +282,7 @@ class HwinfoPoller extends EventEmitter {
 			this.holdingSince = 0;
 			if (snapshot !== null && snapshot.pollTime !== this.lastPollTime) {
 				this.lastPollTime = snapshot.pollTime;
-				this.lastAdvanceAt = Date.now();
+				this.lastAdvanceAt = monotonicNow();
 				// Feed every tracked ring, on-screen or not, but only on a
 				// genuinely fresh snapshot: a frozen or stale source must never
 				// push duplicate points (that would flatten the line in place
@@ -289,7 +297,7 @@ class HwinfoPoller extends EventEmitter {
 			}
 			// Freshness is judged even when the read was skipped (mutex busy) —
 			// a consumer wedged on the mutex must not freeze us at "ok" forever.
-			const staleForMs = Date.now() - this.lastAdvanceAt;
+			const staleForMs = monotonicNow() - this.lastAdvanceAt;
 			if (staleForMs > STALE_AFTER_MS) {
 				// The data is frozen. If HWiNFO exited we would never notice through
 				// our held handles — probe a fresh open.
@@ -313,9 +321,9 @@ class HwinfoPoller extends EventEmitter {
 				// staleness, surfaces immediately. A held status always
 				// postdates an advance, so lastAdvanceAt is set.
 				const transient = err.reason === "invalid" || err.reason === "not-running" || err.reason === "busy";
-				if (transient && this.status.state !== "unavailable" && Date.now() - this.lastAdvanceAt <= STALE_AFTER_MS) {
+				if (transient && this.status.state !== "unavailable" && monotonicNow() - this.lastAdvanceAt <= STALE_AFTER_MS) {
 					if (this.holdingSince === 0) {
-						this.holdingSince = Date.now();
+						this.holdingSince = monotonicNow();
 						this.logger.info(`Holding last values while the data source reopens [${err.reason}]: ${err.message}`);
 					}
 				} else {
@@ -336,7 +344,7 @@ class HwinfoPoller extends EventEmitter {
 
 	/** While stale: swap to a freshly opened provider (throws when HWiNFO is gone). */
 	private probeReopen(): void {
-		const now = Date.now();
+		const now = monotonicNow();
 		if (now - this.lastReopenProbeAt < REOPEN_PROBE_MS) {
 			return;
 		}
@@ -371,7 +379,7 @@ class HwinfoPoller extends EventEmitter {
 		if (this.mode !== "auto" || this.provider === null || this.provider.source !== "gadget") {
 			return;
 		}
-		const now = Date.now();
+		const now = monotonicNow();
 		if (now - this.lastUpgradeProbeAt < UPGRADE_PROBE_MS) {
 			return;
 		}

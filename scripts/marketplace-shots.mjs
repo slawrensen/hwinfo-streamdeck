@@ -7,8 +7,12 @@
 import path from "node:path";
 import sharp from "sharp";
 
-import { renderDial } from "../src/ui/dial-renderer";
-import { renderReadingKey } from "../src/ui/key-renderer";
+import { composeBackFace, composePagerFace, composeReadingFace, composeTitleFace } from "../src/detail/detail-faces";
+import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
+import { DETAIL_PROFILES } from "../src/detail/managed-profiles";
+import { effectiveTextSettings, parseTextSettings } from "../src/ui/text-colors";
+import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
+import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
 import { formatValue } from "../src/ui/format";
 import { SharedMemoryProvider } from "../src/hwinfo/provider";
 import { classifyTypeAccent, loadThemes, resolvePalette } from "../src/ui/themes";
@@ -298,6 +302,221 @@ async function dials() {
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-5-dials.png"));
 }
 
+// ---------- shot 6: more than one reading per key ----------
+// The three multi-reading layouts at a size where the type is readable,
+// each drawn by its production renderer from live values.
+async function multiKeys() {
+	const pal = (key, level = "normal") => {
+		const r = byKey(key);
+		return resolvePalette(config, "void", classifyTypeAccent(r.type, r.unit, r.label), level);
+	};
+	const val = (key, forced) => formatValue(forced ?? byKey(key).value, "auto");
+
+	const dual = renderDualKey({
+		top: { label: "CPU", valueText: val(K.cpuTemp, 71.4), unitText: "°C", statBadge: "" },
+		bottom: { label: "GPU", valueText: val(K.gpuTemp, 76.2), unitText: "°C", statBadge: "" },
+		palette: pal(K.cpuTemp)
+	});
+	const triple = renderTripleKey({
+		rows: [
+			{ label: "CCD1", valueText: val(K.ccd1, 66.9), unitText: "°C" },
+			{ label: "CCD2", valueText: val(K.cpuTemp, 64.1), unitText: "°C" },
+			{ label: "Core Max", valueText: val(K.cpuTemp, 71.4), unitText: "°C" }
+		],
+		palette: pal(K.cpuTemp)
+	});
+	const quad = renderQuadKey({
+		cells: [
+			{ label: "CPU", valueText: val(K.cpuTemp, 71.4), unitText: "°C", color: QUAD_DEFAULT_COLORS[0] },
+			{ label: "GPU", valueText: val(K.gpuTemp, 76.2), unitText: "°C", color: QUAD_DEFAULT_COLORS[1] },
+			{ label: "PUMP", valueText: val(K.pump), unitText: "RPM", color: QUAD_DEFAULT_COLORS[2] },
+			{ label: "VRAM", valueText: val(K.vram, 14200), unitText: "MB", color: QUAD_DEFAULT_COLORS[3] }
+		],
+		labels: true,
+		palette: pal(K.cpuTemp)
+	});
+
+	const KEY = 260;
+	const GAP = 92;
+	const captions = ["Two, stacked", "Three, as rows", "Four, in a grid"];
+	const subs = ["one press cycles both", "label left, value right", "a color per slot"];
+	const rowY = 330;
+	const totalW = 3 * KEY + 2 * GAP;
+	const startX = Math.round((W - totalW) / 2);
+
+	const chrome = [
+		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">One key does not mean one reading.</text>`,
+		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">Stack two, list three, or split four across a single key. Every row keeps its own sensor, label and unit.</text>`,
+		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+	];
+	captions.forEach((c, i) => {
+		const cx = startX + i * (KEY + GAP) + KEY / 2;
+		chrome.push(`<text x="${cx}" y="${rowY + KEY + 58}" text-anchor="middle" font-family="${FONT}" font-size="27" font-weight="600" fill="${HEADLINE}">${esc(c)}</text>`);
+		chrome.push(`<text x="${cx}" y="${rowY + KEY + 94}" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">${esc(subs[i])}</text>`);
+	});
+
+	const composites = [];
+	const faces = [dual, triple, quad];
+	for (let i = 0; i < faces.length; i++) {
+		composites.push({ input: await roundedKey(faces[i], KEY, 30, "#26282E"), left: startX + i * (KEY + GAP), top: rowY });
+	}
+	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-6-multi.png"));
+}
+
+// ---------- shot 8: a key that opens a page ----------
+// The opener on the left, the page it opens on the right, both composed by
+// the detail view's own face renderers from a live group.
+async function drilldown() {
+	const primary = byKey(K.gpuTemp);
+	const group = resolveDetailGroup(snapshot, { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" });
+	if (group === null) {
+		throw new Error("drilldown shot: the filter resolved nothing");
+	}
+	const profile = DETAIL_PROFILES.find((p) => p.key === "standard");
+	const ctx = {
+		config,
+		deckThemeId: "void",
+		typeAccents: true,
+		measure: { decimals: "auto", fahrenheit: false, dataUnits: "decimal" },
+		text: effectiveTextSettings(parseTextSettings({}), null)
+	};
+	const status = { state: "ok", snapshot, source: "shared-memory" };
+	const state = {
+		deviceId: "marketing",
+		profileName: profile.name,
+		pageSize: profile.layout.readings.length,
+		primaryKey: primary.key,
+		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" },
+		presentation: {},
+		group,
+		offset: 0,
+		statModes: new Map(),
+		surfaceCount: 1,
+		pending: false,
+		mirrorSlotIndex: null
+	};
+	const page = pageOf(group.keys, 0, state.pageSize, undefined);
+	const faceAt = (column, row) => {
+		const nav = profile.layout.nav;
+		if (nav.back.column === column && nav.back.row === row) return composeBackFace(state, status, ctx);
+		if (nav.title !== null && nav.title.column === column && nav.title.row === row) return composeTitleFace(state, page, ctx);
+		if (nav.previous !== null && nav.previous.column === column && nav.previous.row === row) return composePagerFace("previous", page, state, ctx);
+		if (nav.next !== null && nav.next.column === column && nav.next.row === row) return composePagerFace("next", page, state, ctx);
+		const index = profile.layout.readings.findIndex((c) => c.column === column && c.row === row);
+		return composeReadingFace(state, page.slots[index], "current", status, ctx);
+	};
+
+	// Live value, not the hero shot's under-load figure: the Back tile inside
+	// the page draws the same reading from the same snapshot, and the two
+	// must agree on screen.
+	const opener = face({ key: K.gpuTemp, label: "GPU Temp" });
+	const OPEN_KEY = 220;
+	const openerX = 300;
+	const openerY = 400;
+	const KEY = 138;
+	const GAP = 11;
+	const boardW = profile.layout.columns * KEY + (profile.layout.columns - 1) * GAP;
+	const boardH = profile.layout.rows * KEY + (profile.layout.rows - 1) * GAP;
+	const boardX = W - boardW - 160;
+	const boardY = Math.round(openerY + OPEN_KEY / 2 - boardH / 2);
+
+	const chrome = [
+		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">Press one key. Get the whole sensor.</text>`,
+		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">A key can open a page of related readings, with paging and a way back. Each key decides its own group.</text>`,
+		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">press</text>`,
+		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">any Sensor Reading key</text>`,
+		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *4090*, paged</text>`,
+		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">or one source, or a list you order by hand</text>`,
+		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+	];
+	// The arrow between the two, on the shared centre line.
+	const arrowY = openerY + OPEN_KEY / 2;
+	const arrowFrom = openerX + OPEN_KEY + 52;
+	const arrowTo = boardX - 52;
+	chrome.push(`<path d="M${arrowFrom},${arrowY} L${arrowTo - 18},${arrowY}" stroke="${CYAN}" stroke-width="3" stroke-linecap="round" opacity="0.85"/>`);
+	chrome.push(`<path d="M${arrowTo - 26},${arrowY - 13} L${arrowTo},${arrowY} L${arrowTo - 26},${arrowY + 13} Z" fill="${CYAN}" opacity="0.85"/>`);
+
+	const composites = [{ input: await roundedKey(opener, OPEN_KEY, 23, "#26282E"), left: openerX, top: openerY }];
+	for (let row = 0; row < profile.layout.rows; row++) {
+		for (let column = 0; column < profile.layout.columns; column++) {
+			composites.push({
+				input: await roundedKey(faceAt(column, row), KEY, 14, "#22242A"),
+				left: boardX + column * (KEY + GAP),
+				top: boardY + row * (KEY + GAP)
+			});
+		}
+	}
+	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-8-drilldown.png"));
+}
+
+// ---------- shot 7: the dial touchscreen, two and three at a time ----------
+async function dialViews() {
+	const row = (key, label, forced, selected) => {
+		const r = byKey(key);
+		const palette = resolvePalette(config, "void", classifyTypeAccent(r.type, r.unit, r.label), "normal");
+		return {
+			label,
+			valueText: formatValue(forced ?? r.value, "auto"),
+			unitText: r.unit,
+			selected,
+			valueColor: palette.accent,
+			history: walk(key + label, Math.min(r.valueMin, forced ?? r.value), Math.max(r.valueMax, forced ?? r.value), forced ?? r.value)
+		};
+	};
+	const base = resolvePalette(config, "void", classifyTypeAccent(byKey(K.cpuTemp).type, "°C", "CPU"), "normal");
+
+	const three = renderDialOverview({
+		rows: [row(K.cpuTemp, "CPU Temp", 71.4, true), row(K.gpuTemp, "GPU Temp", 76.2, false), row(K.pump, "Pump", undefined, false)],
+		contextText: "Loop",
+		statsText: "▼ 51.0 ▲ 79.0",
+		palette: base
+	});
+	const two = renderDialTwoRow({
+		rows: [row(K.gpuPower, "GPU Power", 316.4, true), row(K.gpuLoad, "GPU Load", 98, false)],
+		footerText: "▼ 64.5 ▲ 349 session",
+		palette: base
+	});
+	const one = renderDial({
+		title: "GPU Hot Spot",
+		valueText: formatValue(106.2, "auto"),
+		unitText: "°C · MAX",
+		statsText: "▼ 50.2   ▲ 106   session",
+		fraction: 0.97,
+		palette: base,
+		barColor: config.alerts.crit.bg
+	});
+
+	const SLOT_W = 480;
+	const SLOT_H = 240;
+	const GAP = 76;
+	const totalW = 3 * SLOT_W + 2 * GAP;
+	const startX = Math.round((W - totalW) / 2);
+	const slotY = 340;
+	const captions = ["Three readings", "Two, with history", "One, with range"];
+	const subs = ["rotate moves the rail", "sparkline per row", "session bar and stats"];
+
+	const chrome = [
+		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">The dial screen holds a whole group.</text>`,
+		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">Stream Deck + and + XL: three views of the same rotation set, switched per dial. Rotate to move, push to reset.</text>`,
+		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+	];
+	captions.forEach((c, i) => {
+		const cx = startX + i * (SLOT_W + GAP) + SLOT_W / 2;
+		chrome.push(`<text x="${cx}" y="${slotY + SLOT_H + 56}" text-anchor="middle" font-family="${FONT}" font-size="27" font-weight="600" fill="${HEADLINE}">${esc(c)}</text>`);
+		chrome.push(`<text x="${cx}" y="${slotY + SLOT_H + 92}" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">${esc(subs[i])}</text>`);
+	});
+
+	const composites = [];
+	const faces = [three, two, one];
+	for (let i = 0; i < faces.length; i++) {
+		const png = await rasterize(faces[i], SLOT_W / 200, 200, 100);
+		const mask = Buffer.from(`<svg width="${SLOT_W}" height="${SLOT_H}"><rect width="${SLOT_W}" height="${SLOT_H}" rx="14" fill="#fff"/></svg>`);
+		const framed = await sharp(png).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+		composites.push({ input: framed, left: startX + i * (SLOT_W + GAP), top: slotY });
+	}
+	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-7-dial-views.png"));
+}
+
 // ---------- shot 3: settings panel (from capture-pi.mjs screenshots) ----------
 async function settings(piDir) {
 	const panels = [
@@ -377,6 +596,9 @@ async function thumbnail() {
 await hero();
 await themes();
 await dials();
+await multiKeys();
+await dialViews();
+await drilldown();
 await thumbnail();
 const piDir = process.argv[3];
 if (piDir !== undefined) {

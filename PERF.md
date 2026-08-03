@@ -27,6 +27,39 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-08-03: dense detail tiles (readings per tile, issue #5 follow-up)
+
+The detail view's tiles can now carry up to four readings, so the two
+costs that scale with density got measured before shipping: face
+payloads grow (dual/triple/quad SVG vs one reading), and every tile now
+redraws when ANY of its readings moves. Harness:
+`node scripts/perf-detail.mjs` (8 min per run, mock + XL, live HWiNFO
+with 511 readings, 250 ms poll option, the real shipped detail-plus-xl
+surface), with `PERF_DETAIL_FILTER="*"` so all 31 reading tiles are
+LIVE at every density (source mode leaves most tiles blank when the
+first source is small, which is what the 2026-07-29 row measured). The
+unfiltered control run reproduced that row (0.04% avg / 0.20% p95,
+1.0 frames/s), so the harness line is unbroken.
+
+| Config (filter `*`) | CPU avg / p95 per 15 s | setImage frames | Handles |
+| --- | ---: | ---: | ---: |
+| density 1 | 0.05% / 0.20% | 5,245 over 490 s (10.7/s) | 215 flat |
+| density 2 | 0.09% / 0.41% | 6,380 over 489 s (13.0/s) | 215 flat |
+| density 3 | 0.12% / 0.41% | 7,079 over 489 s (14.5/s) | 215 flat |
+| density 4 | 0.09% / 0.20% | 7,219 over 489 s (14.8/s) | 215 flat |
+
+Frames saturate near the live-tile count times HWiNFO's ~2 s value
+cadence (~15/s on 31 live tiles), not at the 250 ms poll: the tick
+gate and byte dedupe still discard everything that did not actually
+change, and packing four readings per tile costs at most a doubling of
+average CPU against the same page at density 1, with p95 never past
+0.41% of one core. Nothing here approaches the 1% line that would have
+forced a detail-render cadence floor, so density ships without one.
+RSS across each 8-minute window shows the same warmup high-water
+pattern the 2026-07-29 entry describes (55-57 start to 61-65 MB end);
+the steady-state slope judgment stays with the soak entries, not these
+short windows.
+
 ### 2026-07-29: the drill-down detail view (1.4.90.0 preview, issue #5)
 
 Two questions: does a dense detail page cost anything at the fastest

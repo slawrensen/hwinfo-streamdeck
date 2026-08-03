@@ -95,10 +95,12 @@ function pageBase(w, h, elements) {
 }
 
 // ---------- key face builders ----------
-function face({ key, label, level = "normal", forceValue, statBadge = "", spark = true, theme = "void", fahrenheitLabel }) {
+function face({ key, label, level = "normal", forceValue, statBadge = "", spark = true, theme = "void", fahrenheitLabel, accents = true }) {
 	const r = byKey(key);
 	const value = forceValue ?? r.value;
-	const accent = classifyTypeAccent(r.type, r.unit, r.label);
+	// accents:false is the deck's "Type accents: off" setting, where the
+	// theme's own accent colors the line instead of the sensor's type.
+	const accent = accents ? classifyTypeAccent(r.type, r.unit, r.label) : null;
 	const palette = resolvePalette(config, theme, accent, level);
 	return renderReadingKey({
 		label: label ?? r.label,
@@ -224,32 +226,32 @@ async function hero() {
 	// many people look at, and a grid of single readings would sell the
 	// commodity claim instead of the product. A dual, a triple and a quad sit
 	// among the singles exactly as they would on a real deck.
+	// Ten keys, not fifteen: at the size a gallery image is actually viewed,
+	// a 5x3 wall shrinks the quad's four values to mush. Two rows keep the
+	// deck-wall read, stay distinct from the thumbnail's single row, and
+	// leave the sparkline colors (pink, green, purple, cyan, blue) visible
+	// beside all three multi-reading layouts and both alert states.
 	const faces = [
 		face({ key: K.cpuTemp, label: "CPU Temp", forceValue: 71.4 }),
 		multi.dual,
 		face({ key: K.coreClock, label: "Core 1 Clock", forceValue: 5625 }),
 		face({ key: K.cpuLoad, label: "CPU Load", forceValue: 87.4 }),
-		face({ key: K.memLoad, label: "Memory Load", spark: false }),
 		face({ key: K.gpuTemp, label: "GPU Temp", level: "warn", forceValue: 84.6 }),
 		// "GPU Hot" fits the badge-shortened label band without truncation.
 		face({ key: K.gpuHot, label: "GPU Hot", level: "crit", forceValue: 106.2, statBadge: "MAX" }),
 		multi.quad,
-		face({ key: K.gpuLoad, label: "GPU Load", forceValue: 98 }),
-		face({ key: K.vram, label: "VRAM Alloc", spark: false, forceValue: 14206 }),
-		face({ key: K.pump, label: "Pump" }),
 		multi.triple,
-		face({ key: K.ccd1, label: "CCD1 (X3D)", forceValue: 66.9 }),
-		face({ key: K.netDown, label: "Net Down", forceValue: 48700 }),
-		face({ key: K.netUp, label: "Net Up" })
+		face({ key: K.pump, label: "Pump" }),
+		face({ key: K.netDown, label: "Net Down", forceValue: 48700 })
 	];
 
-	const KEY = 158;
-	const GAP = 13;
-	const PAD = 38;
-	const SLOT_W = 268;
-	const SLOT_H = 134;
+	const KEY = 196;
+	const GAP = 14;
+	const PAD = 40;
+	const SLOT_W = 336;
+	const SLOT_H = 168;
 	const deckW = 5 * KEY + 4 * GAP + 2 * PAD;
-	const deckH = 3 * KEY + 2 * GAP + 30 + SLOT_H + 2 * PAD;
+	const deckH = 2 * KEY + GAP + 32 + SLOT_H + 2 * PAD;
 	const deckX = W - deckW - 96;
 	const deckY = Math.round((H - deckH) / 2);
 	// The touchscreens carry the same argument as the keys: several readings
@@ -278,7 +280,7 @@ async function hero() {
 	}
 	const slotsW = slots.length * SLOT_W + (slots.length - 1) * GAP;
 	const slotsX = deckX + Math.round((deckW - slotsW) / 2);
-	const slotsY = deckY + PAD + 3 * KEY + 2 * GAP + 30;
+	const slotsY = deckY + PAD + 2 * KEY + GAP + 32;
 	for (let i = 0; i < slots.length; i++) {
 		const png = await rasterize(slots[i], SLOT_W / 200, 200, 100);
 		const mask = Buffer.from(`<svg width="${SLOT_W}" height="${SLOT_H}"><rect width="${SLOT_W}" height="${SLOT_H}" rx="11" fill="#fff"/></svg>`);
@@ -299,6 +301,8 @@ async function themes() {
 	const chrome = [
 		`<text x="960" y="96" text-anchor="middle" font-family="${FONT}" font-size="52" font-weight="700" fill="${HEADLINE}">Seven themes. One instrument.</text>`,
 		`<text x="960" y="142" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Per key or deck-wide. Anchors never move, only the palette changes.</text>`,
+		`<text x="960" y="${rowY[0] - 62}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">type accents ON: the line follows the sensor type, the same red in every theme</text>`,
+		`<text x="960" y="${rowY[1] - 30}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">type accents OFF: the line follows the theme instead</text>`,
 		`<text x="960" y="${rowY[1] + KEY + 64}" text-anchor="middle" font-family="${FONT}" font-size="21" fill="${BODY}">Alerts are global and never themed: amber field with black text at warn, red with white at critical.</text>`
 	];
 
@@ -308,7 +312,7 @@ async function themes() {
 		const x = startX + i * (KEY + GAP);
 		chrome.push(`<text x="${x + KEY / 2}" y="${rowY[0] - 26}" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${theme === "void" ? CYAN : MUTED}">${theme}${theme === "void" ? " · default" : ""}</text>`);
 		composites.push({ input: await roundedKey(face({ key: K.cpuTemp, label: "CPU Temp", theme }), KEY, 22, "#26282E"), left: x, top: rowY[0] });
-		composites.push({ input: await roundedKey(face({ key: K.gpuPower, label: "GPU Power", theme, statBadge: "AVG" }), KEY, 22, "#26282E"), left: x, top: rowY[1] });
+		composites.push({ input: await roundedKey(face({ key: K.gpuPower, label: "GPU Power", theme, statBadge: "AVG", accents: false }), KEY, 22, "#26282E"), left: x, top: rowY[1] });
 	}
 
 	// centered warn/crit pair under the wall

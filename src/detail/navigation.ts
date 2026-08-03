@@ -12,6 +12,7 @@
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, STAT_MODES, type DecimalsSetting, type StatMode } from "../ui/format";
 import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
+import { detailDensityOf, type DetailDensity } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
 
 export type SwitchProfileFn = (deviceId: string, profileName?: string, page?: number) => Promise<void>;
@@ -35,6 +36,8 @@ export type DeviceDetailState = {
 	readonly deviceId: string;
 	readonly profileName: string;
 	readonly pageSize: number;
+	/** Readings per tile for this session (the opener's detailDensity). */
+	readonly density: DetailDensity;
 	readonly primaryKey: string;
 	/** The opener's group settings, kept for source-mode re-resolution. */
 	readonly groupSettings: DetailGroupSettings;
@@ -140,11 +143,12 @@ export class DetailNavigator {
 	}
 
 	/** Redacted facts for diagnostics (device IDs are hashed by the report). */
-	diagnostics(): Array<{ deviceId: string; mode: string; pageSize: number; keys: number; offset: number; pending: boolean; surfaceCount: number }> {
+	diagnostics(): Array<{ deviceId: string; mode: string; pageSize: number; density: number; keys: number; offset: number; pending: boolean; surfaceCount: number }> {
 		return [...this.states.values()].map((s) => ({
 			deviceId: s.deviceId,
 			mode: s.group.mode,
 			pageSize: s.pageSize,
+			density: s.density,
 			keys: s.group.keys.length,
 			offset: s.offset,
 			pending: s.pending,
@@ -160,7 +164,7 @@ export class DetailNavigator {
 	 * stays `pending` until a detail slot appears and quietly expires when
 	 * none ever does.
 	 */
-	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
+	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation & { detailDensity?: unknown }; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
 		const { deviceId, deviceType, grid, settings, snapshot, openerCell } = request;
 		const profile = detailProfileFor(deviceType, grid);
 		if (profile === undefined) {
@@ -211,6 +215,7 @@ export class DetailNavigator {
 			deviceId,
 			profileName: profile.name,
 			pageSize: readingSlotCapacity(profile),
+			density: detailDensityOf(settings),
 			primaryKey: group.primaryKey,
 			groupSettings: {
 				readingKey: settings.readingKey,
@@ -336,7 +341,7 @@ export class DetailNavigator {
 
 	/** The current logical page projection for a device's state. */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined);
+		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density);
 	}
 
 	/**
@@ -368,16 +373,21 @@ export class DetailNavigator {
 		this.deps.onChanged?.(deviceId);
 	}
 
-	/** A detail slot press cycles that reading's session-local stat mode. */
-	cycleSlotStat(deviceId: string, readingKey: string): void {
+	/** A detail tile press cycles its readings' session-local stat mode:
+	 * the whole chunk moves together (a dense tile shows one shared badge,
+	 * so per-reading modes inside one tile could not be displayed
+	 * honestly), and the tile's current mode derives from its FIRST
+	 * reading, the same cell the badge and type accent follow. */
+	cycleChunkStat(deviceId: string, readingKeys: readonly string[]): void {
 		const state = this.states.get(deviceId);
-		if (state === undefined) {
+		const first = readingKeys[0];
+		if (state === undefined || first === undefined) {
 			return;
 		}
-		const current = state.statModes.get(readingKey) ?? "current";
-		const mode = isStatMode(current) ? current : "current";
-		const next = STAT_MODES[(STAT_MODES.indexOf(mode) + 1) % STAT_MODES.length] as StatMode;
-		state.statModes.set(readingKey, next);
+		const next = STAT_MODES[(STAT_MODES.indexOf(this.statModeFor(state, first)) + 1) % STAT_MODES.length] as StatMode;
+		for (const key of readingKeys) {
+			state.statModes.set(key, next);
+		}
 		this.deps.onChanged?.(deviceId);
 	}
 
@@ -405,7 +415,7 @@ export class DetailNavigator {
 		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]);
 		if (changed) {
 			state.group = group;
-			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined).offset;
+			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density).offset;
 		}
 	}
 

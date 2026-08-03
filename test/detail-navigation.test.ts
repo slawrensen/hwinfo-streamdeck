@@ -256,7 +256,7 @@ describe("leaving", () => {
 		const { nav } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
 		nav.surfaceSeen("dev1");
-		nav.cycleSlotStat("dev1", "cpu:0:1");
+		nav.cycleChunkStat("dev1", ["cpu:0:1"]);
 		const before = nav.stateFor("dev1");
 		assert.equal(before === undefined ? "" : nav.statModeFor(before, "cpu:0:1"), "min");
 		await nav.leave("dev1");
@@ -293,10 +293,67 @@ describe("paging and stats", () => {
 			assert.fail("no state");
 		}
 		for (const expected of ["min", "max", "avg", "current"]) {
-			nav.cycleSlotStat("dev1", "cpu:0:2");
+			nav.cycleChunkStat("dev1", ["cpu:0:2"]);
 			assert.equal(nav.statModeFor(state, "cpu:0:2"), expected);
 		}
 		assert.equal(nav.statModeFor(state, "cpu:0:3"), "current"); // untouched reading unaffected
+	});
+
+	it("enter parses the opener's density; the page chunks and steps by it", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "3" }, snapshot });
+		const state = nav.stateFor("dev1");
+		assert.notEqual(state, undefined);
+		if (state === undefined) return;
+		assert.equal(state.density, 3);
+		const page = nav.pageFor(state);
+		assert.equal(page.step, 33); // 11 tiles * 3 readings
+		assert.equal(page.chunks[0]?.length, 3);
+		assert.equal(page.rangeText, "1-13 / 13"); // readings, not tiles
+		assert.equal(page.hasNext, false);
+	});
+
+	it("junk density enters at 1 and reproduces the one-reading page", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "lots" }, snapshot });
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		assert.equal(state.density, 1);
+		assert.deepEqual(nav.pageFor(state).chunks[0], ["cpu:0:1"]); // the primary rides the Back tile
+	});
+
+	it("a chunk press cycles every reading together, derived from the first", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "2" }, snapshot });
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		nav.cycleChunkStat("dev1", ["cpu:0:2"]); // the first reading moves to MIN alone
+		assert.equal(nav.statModeFor(state, "cpu:0:2"), "min");
+		assert.equal(nav.statModeFor(state, "cpu:0:3"), "current");
+		nav.cycleChunkStat("dev1", ["cpu:0:2", "cpu:0:3"]); // derives from cpu:0:2 (min), moves BOTH to max
+		assert.equal(nav.statModeFor(state, "cpu:0:2"), "max");
+		assert.equal(nav.statModeFor(state, "cpu:0:3"), "max");
+		nav.cycleChunkStat("dev1", []); // an empty tile press is a no-op
+		assert.equal(nav.statModeFor(state, "cpu:0:2"), "max");
+	});
+
+	it("the mirror costs one tile per page at any density", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "2" }, snapshot });
+		nav.setMirrorSlotIndex("dev1", 4);
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		const page = nav.pageFor(state);
+		assert.equal(page.step, 20); // (11 tiles - 1 mirrored) * 2
+		assert.deepEqual(page.chunks[4], []);
+		assert.equal(page.chunks[5]?.[0], "cpu:0:9"); // readings flow around the mirror
+		assert.equal(page.rangeText, "1-13 / 13");
 	});
 
 	it("two devices hold independent groups, pages and stats", async () => {
@@ -305,7 +362,7 @@ describe("paging and stats", () => {
 		await nav.enter({ deviceId: "devxl", deviceType: 13, settings: { readingKey: "gpu:0:1" }, snapshot });
 		assert.equal(switches[1]?.profileName, "profiles/detail-r3-plus-xl");
 		nav.pageNext("dev1");
-		nav.cycleSlotStat("dev1", "cpu:0:1");
+		nav.cycleChunkStat("dev1", ["cpu:0:1"]);
 		const xl = nav.stateFor("devxl");
 		assert.equal(xl?.offset, 0);
 		assert.equal(xl === undefined ? "" : nav.statModeFor(xl, "cpu:0:1"), "current");

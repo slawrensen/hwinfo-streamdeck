@@ -12,13 +12,13 @@
  * a power or clock reading), so they always render at the normal level.
  */
 import type { PollerStatus } from "../poller";
-import type { Reading } from "../hwinfo/types";
+import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
-import { alertLevel, convertUnit, parseThreshold, STAT_BADGE } from "../ui/format";
-import { renderReadingKey, renderStatusKey } from "../ui/key-renderer";
-import { formatMeasurement, type MeasureOptions } from "../ui/measure";
+import { alertLevel, convertUnit, parseThreshold, STAT_BADGE, statValue } from "../ui/format";
+import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
+import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { keyLabel, missingReadingScreen, statusScreen } from "../ui/state-screens";
-import { resolveTextColors, type TextSettings } from "../ui/text-colors";
+import { quadIdentityColor, resolveTextColors, type TextSettings } from "../ui/text-colors";
 import { classifyTypeAccent, resolvePalette, type Palette, type ThemesConfig } from "../ui/themes";
 import type { DetailPage } from "./detail-group";
 import type { DetailNavRole } from "./managed-profiles";
@@ -107,6 +107,122 @@ export function composeReadingFace(state: DeviceDetailState, key: string | undef
 		valueText: measured.valueText,
 		unitText: measured.unitText,
 		statBadge: STAT_BADGE[mode],
+		palette,
+		text
+	});
+}
+
+/**
+ * Micro-labels for one dense quad tile: the leading tokens every present
+ * label shares are stripped, so a chunk of "GPU Memory Junction
+ * Temperature / GPU Hot Spot Temperature / GPU Thermal Limit / GPU Core
+ * Voltage" reads MEMO / HOT / THER / CORE instead of GPU four times, and
+ * "Core 0..3 VID" reads 0 / 1 / 2 / 3. Every label keeps at least one
+ * token, missing readings (undefined) sit out the comparison, and with
+ * fewer than two present labels nothing is stripped, which is exactly
+ * the standalone quad's first-word fallback. The renderer's 4-code-point
+ * uppercase cut still applies downstream. Exported for the unit suite.
+ */
+export function chunkMicroLabels(labels: readonly (string | undefined)[]): string[] {
+	const tokenized = labels.map((label) => (label === undefined ? null : label.split(/\s+/).filter((t) => t !== "")));
+	const present = tokenized.filter((t): t is string[] => t !== null && t.length > 0);
+	let shared = 0;
+	if (present.length >= 2) {
+		const cap = Math.min(...present.map((t) => t.length)) - 1;
+		const first = present[0] as string[];
+		while (shared < cap && present.every((t) => (t[shared] as string).toUpperCase() === (first[shared] as string).toUpperCase())) {
+			shared++;
+		}
+	}
+	return tokenized.map((t) => (t === null || t.length === 0 ? "" : (t[Math.min(shared, t.length - 1)] ?? "")));
+}
+
+/** One dense tile's row/cell inputs, resolved against the snapshot. */
+type ChunkCell = { reading: Reading | undefined };
+
+function chunkCells(snapshot: SensorSnapshot, keys: readonly string[]): ChunkCell[] {
+	return keys.map((key) => ({ reading: snapshot.byKey.get(key) }));
+}
+
+function chunkRow(cell: ChunkCell, mode: StatMode, measure: MeasureOptions): DualKeyRow & TripleKeyRow {
+	if (cell.reading === undefined) {
+		// A configured reading the snapshot does not publish keeps its cell
+		// (custom-mode order is positional); the placeholder value is the
+		// key face's one permitted em dash.
+		return { label: "Sensor missing", valueText: "—", unitText: "", statBadge: "" };
+	}
+	const measured = formatMeasurement(statValue(cell.reading, mode), cell.reading.unit, measure);
+	return { label: keyLabel(undefined, cell.reading.label), valueText: measured.valueText, unitText: measured.unitText, statBadge: "" };
+}
+
+/**
+ * One dense reading tile: a chunk of the group's readings on a single
+ * physical key, rendered through the standalone dual/triple/quad
+ * renderers (issue #5 follow-up). The layout follows what the chunk
+ * actually holds, so a page's trailing tile renders two readings as a
+ * dual face rather than a quad with dead quadrants, and a one-reading
+ * chunk takes composeReadingFace's exact path, byte for byte, which is
+ * what keeps every density-1 page identical to the pre-density plugin.
+ *
+ * Tile policies, decided for issue #5's dense pages:
+ * - The whole tile shows ONE stat (the shared badge; a press cycles the
+ *   whole chunk together) derived from its first reading's session mode.
+ * - The type accent follows the FIRST reading, exactly like the
+ *   standalone multi-reading layouts follow their first sensor.
+ * - No thresholds at any density: reading tiles never inherit the
+ *   opener's warn/crit levels (see the module doc), so chunks always
+ *   render at the normal level.
+ * - Quad chunks draw shared-token-stripped micro-labels in the quad's
+ *   identity colors: four bare color-coded values would be unreadable on
+ *   auto-picked readings, and first words alone collapse on real HWiNFO
+ *   groups ("GPU" four times, with a constant limit posing as a live
+ *   temperature).
+ */
+export function composeChunkFace(state: DeviceDetailState, keys: readonly string[], mode: StatMode, status: PollerStatus, ctx: DetailFaceContext): string {
+	if (keys.length <= 1) {
+		return composeReadingFace(state, keys[0], mode, status, ctx);
+	}
+	const screen = statusScreen(status);
+	if (screen !== null) {
+		return renderStatusKey(screen);
+	}
+	const { snapshot } = status as Extract<PollerStatus, { state: "ok" }>;
+	const cells = chunkCells(snapshot, keys);
+	const first = cells[0]?.reading;
+	const accent = ctx.typeAccents && first !== undefined ? classifyTypeAccent(first.type, first.unit, first.label) : null;
+	const palette = themePaletteFor(state, ctx, accent, "normal");
+	const text = resolveTextColors(palette, ctx.text, "normal");
+	const sharedBadge = STAT_BADGE[mode];
+	if (keys.length === 2) {
+		return renderDualKey({
+			top: chunkRow(cells[0] as ChunkCell, mode, ctx.measure),
+			bottom: chunkRow(cells[1] as ChunkCell, mode, ctx.measure),
+			sharedBadge,
+			palette,
+			text
+		});
+	}
+	if (keys.length === 3) {
+		return renderTripleKey({
+			rows: cells.map((cell) => chunkRow(cell, mode, ctx.measure)),
+			sharedBadge,
+			palette,
+			text
+		});
+	}
+	const micros = chunkMicroLabels(cells.map((cell) => cell.reading?.label));
+	return renderQuadKey({
+		cells: cells.slice(0, 4).map((cell, i): QuadKeyCell => {
+			const color = quadIdentityColor(QUAD_DEFAULT_COLORS[i] as string, true, ctx.text, text, palette);
+			if (cell.reading === undefined) {
+				// The same positional placeholder as the rows above.
+				return { label: micros[i] ?? "", valueText: "—", unitText: "", color };
+			}
+			const measured = formatQuadMeasurement(statValue(cell.reading, mode), cell.reading.unit, ctx.measure);
+			return { label: micros[i] ?? "", valueText: measured.valueText, unitText: measured.unitText, color };
+		}),
+		labels: true,
+		sharedBadge,
 		palette,
 		text
 	});

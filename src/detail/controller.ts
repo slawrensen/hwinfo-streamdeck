@@ -14,7 +14,7 @@ import type { PollerStatus } from "../poller";
 import type { SensorSnapshot } from "../hwinfo/types";
 import { effectiveTextFor, getDeckTheme, measureOptionsFrom, typeAccentsEnabled } from "../ui/theme-store";
 import { loadThemes } from "../ui/themes";
-import { composeBackFace, composeIdleFace, composePagerFace, composeReadingFace, composeTitleFace, composeVoidFace, type DetailFaceContext } from "./detail-faces";
+import { composeBackFace, composeChunkFace, composeIdleFace, composePagerFace, composeTitleFace, composeVoidFace, type DetailFaceContext } from "./detail-faces";
 import type { DetailPage } from "./detail-group";
 import type { DetailNavigator, DeviceDetailState } from "./navigation";
 import { parseSlotBinding, type DetailSlotBinding } from "./slot-bindings";
@@ -163,9 +163,10 @@ export class DetailController {
 				void this.navigator.leave(slot.deviceId);
 				return;
 			}
-			const key = this.navigator.pageFor(state).slots[binding.index];
-			if (key !== undefined) {
-				this.navigator.cycleSlotStat(slot.deviceId, key);
+			const chunk = this.navigator.pageFor(state).chunks[binding.index];
+			if (chunk !== undefined && chunk.length > 0) {
+				// The whole tile cycles together, like a standalone dense key.
+				this.navigator.cycleChunkStat(slot.deviceId, chunk);
 			}
 		}
 		// "title" is informational; a press does nothing.
@@ -284,9 +285,11 @@ export class DetailController {
 					// Back: the opener's live reading plus the return mark.
 					return composeBackFace(state, status, ctx);
 				}
-				const key = page.slots[binding.index];
-				const mode = key === undefined ? "current" : this.navigator.statModeFor(state, key);
-				return composeReadingFace(state, key, mode, status, ctx);
+				const chunk = page.chunks[binding.index] ?? [];
+				// The tile's stat derives from its first reading (the cell the
+				// badge and accent follow); a press keeps the chunk in step.
+				const mode = chunk[0] === undefined ? "current" : this.navigator.statModeFor(state, chunk[0]);
+				return composeChunkFace(state, chunk, mode, status, ctx);
 			}
 		}
 	}

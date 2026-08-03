@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { clampOffset, pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { DETAIL_KEYS_MAX, detailKeysOf, detailModeOf, detailTitleOf, pressBehaviorOf } from "../src/detail/detail-settings";
+import { DETAIL_KEYS_MAX, detailDensityOf, detailKeysOf, detailModeOf, detailTitleOf, pressBehaviorOf } from "../src/detail/detail-settings";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -64,6 +64,24 @@ describe("detail settings parsing", () => {
 		assert.equal(detailTitleOf({ detailTitle: "  My CPU  " }), "My CPU");
 		assert.equal(detailTitleOf({ detailTitle: "   " }), undefined);
 		assert.equal(detailTitleOf({ detailTitle: 42 }), undefined);
+	});
+
+	it("detailDensity: only the exact 2/3/4 markers (string or number) leave 1", () => {
+		assert.equal(detailDensityOf({}), 1);
+		assert.equal(detailDensityOf({ detailDensity: "1" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "2" }), 2);
+		assert.equal(detailDensityOf({ detailDensity: "3" }), 3);
+		assert.equal(detailDensityOf({ detailDensity: "4" }), 4);
+		assert.equal(detailDensityOf({ detailDensity: 2 }), 2);
+		assert.equal(detailDensityOf({ detailDensity: 3 }), 3);
+		assert.equal(detailDensityOf({ detailDensity: 4 }), 4);
+		assert.equal(detailDensityOf({ detailDensity: "5" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: 0 }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "2.0" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: " 2" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: null }), 1);
+		assert.equal(detailDensityOf({ detailDensity: [2] }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "quad" }), 1);
 	});
 });
 
@@ -220,5 +238,78 @@ describe("pagination", () => {
 		assert.equal(pageOf(["a", "b"], 0, 2, -1).step, 2);
 		assert.equal(pageOf(["a"], 0, 1, 0).step, 1);
 		assert.equal(pageOf(["a", "b"], 0, 2, 1.5).step, 2);
+	});
+});
+
+describe("dense pagination (readings per tile)", () => {
+	const keys = Array.from({ length: 25 }, (_, i) => `k${i}`);
+
+	it("density 1 produces exactly the one-reading page: every chunk is its slot", () => {
+		for (const [offset, reserved] of [
+			[0, undefined],
+			[11, undefined],
+			[0, 1]
+		] as const) {
+			const explicit = pageOf(keys, offset, 11, reserved, 1);
+			const defaulted = pageOf(keys, offset, 11, reserved);
+			assert.deepEqual(explicit, defaulted);
+			assert.deepEqual(
+				explicit.chunks,
+				explicit.slots.map((s) => (s === undefined ? [] : [s]))
+			);
+		}
+	});
+
+	it("each tile carries `density` readings and the range counts READINGS", () => {
+		const page = pageOf(keys, 0, 5, undefined, 3);
+		assert.equal(page.step, 15);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2"]);
+		assert.deepEqual(page.chunks[4], ["k12", "k13", "k14"]);
+		assert.equal(page.rangeText, "1-15 / 25");
+		assert.equal(page.hasNext, true);
+		assert.equal(page.slots[0], "k0"); // legacy view: first reading per tile
+		assert.equal(page.slots[4], "k12");
+	});
+
+	it("the last page holds the remainder: a partial chunk, then empty tiles", () => {
+		const page = pageOf(keys, 15, 5, undefined, 3);
+		assert.equal(page.rangeText, "16-25 / 25");
+		assert.deepEqual(page.chunks[2], ["k21", "k22", "k23"]);
+		assert.deepEqual(page.chunks[3], ["k24"]);
+		assert.deepEqual(page.chunks[4], []);
+		assert.equal(page.slots[3], "k24");
+		assert.equal(page.slots[4], undefined);
+		assert.equal(page.hasNext, false);
+	});
+
+	it("the mirror reserve costs one TILE, so its page loses `density` readings", () => {
+		const page = pageOf(keys, 0, 5, 1, 4);
+		assert.equal(page.step, 16); // (5 tiles - 1 mirrored) * 4
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], []); // the mirror tile
+		assert.equal(page.slots[1], undefined);
+		assert.deepEqual(page.chunks[2], ["k4", "k5", "k6", "k7"]);
+		assert.equal(page.rangeText, "1-16 / 25");
+		const second = pageOf(keys, page.offset + page.step, 5, 1, 4);
+		assert.equal(second.rangeText, "17-25 / 25");
+		assert.deepEqual(second.chunks[4], []); // 9 remaining fill 2 full + 1 single tile
+		assert.deepEqual(second.chunks[3], ["k24"]);
+	});
+
+	it("offsets clamp onto dense step boundaries", () => {
+		const page = pageOf(keys, 999, 5, undefined, 4);
+		assert.equal(page.step, 20);
+		assert.equal(page.offset, 20);
+		assert.equal(page.rangeText, "21-25 / 25");
+		assert.equal(pageOf(keys, 7, 5, undefined, 4).offset, 0);
+	});
+
+	it("a dense group smaller than one page disables paging", () => {
+		const page = pageOf(["a", "b", "c"], 0, 5, undefined, 2);
+		assert.deepEqual(page.chunks[0], ["a", "b"]);
+		assert.deepEqual(page.chunks[1], ["c"]);
+		assert.equal(page.rangeText, "1-3 / 3");
+		assert.equal(page.hasPrevious, false);
+		assert.equal(page.hasNext, false);
 	});
 });

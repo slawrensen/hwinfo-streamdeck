@@ -513,9 +513,13 @@ async function scenario(send) {
 	// three dual tiles and the title counts READINGS.
 	fake.stdin.write("cores\n");
 	await sleep(2600);
-	const den2Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "2" };
+	// The opener is itself a QUAD-layout key: a multi-reading key opening a
+	// drill-down was always allowed by the code but never covered or
+	// pressed anywhere until now.
+	const den2Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "2", keyLayout: "quad", secondaryReadingKey: keys[1].key, quadReadingKey3: keys[1].key };
 	appearOpener(send, "ctx-den2", "devden2", den2Opener, { column: 2, row: 1 });
-	await sleep(300);
+	await sleep(600);
+	results.den2OpenerFace = latestSvg("ctx-den2");
 	await keyPress(send, "ctx-den2", "devden2", den2Opener);
 	await sleep(500);
 	results.den2Switch = switches.at(-1);
@@ -660,7 +664,12 @@ async function finish() {
 	// Dense tiles (readings per tile). Every asserted face is CONSTANT by
 	// construction (the fake's fan, volt and core readings never move).
 	const microLabelsOf = (svg) => (typeof svg === "string" ? [...svg.matchAll(/letter-spacing="0\.5" fill="#[0-9A-Fa-f]{6}">([^<]*)</g)].map((m) => m[1]) : []);
-	check("density 2 entry switched devden2 to the class profile", results.den2Switch?.device === "devden2" && results.den2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den2Switch));
+	check(
+		"the opener itself renders as a quad key (multi-reading opener)",
+		typeof results.den2OpenerFace === "string" && results.den2OpenerFace.includes('<rect x="71" y="12" width="2" height="120"'),
+		(results.den2OpenerFace ?? "no frame").slice(0, 160)
+	);
+	check("a multi-reading opener's press still entered the class profile", results.den2Switch?.device === "devden2" && results.den2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den2Switch));
 	check("density 2 title counts READINGS (1-6 / 6 on 11 tiles)", typeof results.den2TitleFace === "string" && results.den2TitleFace.includes(">1-6 / 6<"), (results.den2TitleFace ?? "no frame").slice(0, 160));
 	check(
 		"density 2 tile 0 rows fan and volt together (constant values)",

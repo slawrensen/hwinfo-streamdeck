@@ -129,42 +129,140 @@ const K = {
 	netUp: "f000ea00:0:8000003"
 };
 
+// ---------- the multi-reading layouts, shared by the hero, thumbnail and shot 6 ----------
+const multiPalette = (key, level = "normal") => {
+	const r = byKey(key);
+	return resolvePalette(config, "void", classifyTypeAccent(r.type, r.unit, r.label), level);
+};
+const multiValue = (key, forced) => formatValue(forced ?? byKey(key).value, "auto");
+/** The three-row rotation overview: the same "more than one reading"
+ *  argument on the touchscreen, shared by the hero and the thumbnail. */
+function dialThreeRow() {
+	const mk = (key, label, forced) => {
+		const r = byKey(key);
+		return {
+			label,
+			valueText: formatValue(forced ?? r.value, "auto"),
+			unitText: r.unit,
+			selected: label === "CPU Temp",
+			valueColor: multiPalette(key).accent
+		};
+	};
+	return renderDialOverview({
+		rows: [mk(K.cpuTemp, "CPU Temp", 71.4), mk(K.gpuTemp, "GPU Temp", 76.2), mk(K.pump, "Pump")],
+		contextText: "Loop",
+		statsText: "▼ 51.0 ▲ 79.0",
+		palette: multiPalette(K.cpuTemp)
+	});
+}
+
+/** Two rows with a sparkline each: the middle density on the touchscreen. */
+function dialTwoRow() {
+	const mk = (key, label, forced) => {
+		const r = byKey(key);
+		const value = forced ?? r.value;
+		return {
+			label,
+			valueText: formatValue(value, "auto"),
+			unitText: r.unit,
+			selected: label === "GPU Power",
+			valueColor: multiPalette(key).accent,
+			history: walk(key + label, Math.min(r.valueMin, value), Math.max(r.valueMax, value), value)
+		};
+	};
+	return renderDialTwoRow({
+		rows: [mk(K.gpuPower, "GPU Power", 316.4), mk(K.gpuLoad, "GPU Load", 98)],
+		footerText: "▼ 64.5 ▲ 349 session",
+		palette: multiPalette(K.gpuPower)
+	});
+}
+
+/** The single view, kept alongside so the range bar and session stats show. */
+function dialSingle() {
+	const r = byKey(K.gpuHot);
+	return renderDial({
+		title: "GPU Hot Spot",
+		valueText: formatValue(106.2, "auto"),
+		unitText: "°C · MAX",
+		statsText: `▼ ${formatValue(r.valueMin, "auto")}   ▲ 106.2   session`,
+		fraction: 0.97,
+		palette: multiPalette(K.gpuHot),
+		barColor: config.alerts.crit.bg
+	});
+}
+
+const multi = {
+	dual: renderDualKey({
+		top: { label: "CPU", valueText: multiValue(K.cpuTemp, 71.4), unitText: "°C", statBadge: "" },
+		bottom: { label: "GPU", valueText: multiValue(K.gpuTemp, 76.2), unitText: "°C", statBadge: "" },
+		palette: multiPalette(K.cpuTemp)
+	}),
+	triple: renderTripleKey({
+		rows: [
+			{ label: "CCD1", valueText: multiValue(K.ccd1, 66.9), unitText: "°C" },
+			{ label: "CCD2", valueText: multiValue(K.cpuTemp, 64.1), unitText: "°C" },
+			{ label: "Core Max", valueText: multiValue(K.cpuTemp, 71.4), unitText: "°C" }
+		],
+		palette: multiPalette(K.cpuTemp)
+	}),
+	quad: renderQuadKey({
+		cells: [
+			{ label: "CPU", valueText: multiValue(K.cpuTemp, 71.4), unitText: "°C", color: QUAD_DEFAULT_COLORS[0] },
+			{ label: "GPU", valueText: multiValue(K.gpuTemp, 76.2), unitText: "°C", color: QUAD_DEFAULT_COLORS[1] },
+			{ label: "PUMP", valueText: multiValue(K.pump), unitText: "RPM", color: QUAD_DEFAULT_COLORS[2] },
+			{ label: "VRAM", valueText: multiValue(K.vram, 14200), unitText: "MB", color: QUAD_DEFAULT_COLORS[3] }
+		],
+		labels: true,
+		palette: multiPalette(K.cpuTemp)
+	})
+};
+
 // ---------- shot 1: hero ----------
 async function hero() {
 	// An "under load" scenario — every face is still drawn by the real renderer.
+	// The wall deliberately MIXES layouts: gallery slot 1 is the only image
+	// many people look at, and a grid of single readings would sell the
+	// commodity claim instead of the product. A dual, a triple and a quad sit
+	// among the singles exactly as they would on a real deck.
 	const faces = [
 		face({ key: K.cpuTemp, label: "CPU Temp", forceValue: 71.4 }),
-		face({ key: K.cpuPower, label: "CPU Power", forceValue: 142.8 }),
+		multi.dual,
 		face({ key: K.coreClock, label: "Core 1 Clock", forceValue: 5625 }),
 		face({ key: K.cpuLoad, label: "CPU Load", forceValue: 87.4 }),
 		face({ key: K.memLoad, label: "Memory Load", spark: false }),
 		face({ key: K.gpuTemp, label: "GPU Temp", level: "warn", forceValue: 84.6 }),
 		// "GPU Hot" fits the badge-shortened label band without truncation.
 		face({ key: K.gpuHot, label: "GPU Hot", level: "crit", forceValue: 106.2, statBadge: "MAX" }),
-		face({ key: K.gpuPower, label: "GPU Power", forceValue: 316.4 }),
+		multi.quad,
 		face({ key: K.gpuLoad, label: "GPU Load", forceValue: 98 }),
 		face({ key: K.vram, label: "VRAM Alloc", spark: false, forceValue: 14206 }),
 		face({ key: K.pump, label: "Pump" }),
-		face({ key: K.cpuFan, label: "CPU Fan", spark: false, forceValue: 1466 }),
+		multi.triple,
 		face({ key: K.ccd1, label: "CCD1 (X3D)", forceValue: 66.9 }),
 		face({ key: K.netDown, label: "Net Down", forceValue: 48700 }),
 		face({ key: K.netUp, label: "Net Up" })
 	];
 
-	const KEY = 176;
-	const GAP = 14;
-	const PAD = 42;
+	const KEY = 158;
+	const GAP = 13;
+	const PAD = 38;
+	const SLOT_W = 268;
+	const SLOT_H = 134;
 	const deckW = 5 * KEY + 4 * GAP + 2 * PAD;
-	const deckH = 3 * KEY + 2 * GAP + 2 * PAD;
+	const deckH = 3 * KEY + 2 * GAP + 30 + SLOT_H + 2 * PAD;
 	const deckX = W - deckW - 96;
 	const deckY = Math.round((H - deckH) / 2);
+	// The touchscreens carry the same argument as the keys: several readings
+	// at once, not one value per slot.
+	const slots = [dialThreeRow(), dialTwoRow(), dialSingle()];
 
 	const chrome = [
 		`<rect x="${deckX}" y="${deckY}" width="${deckW}" height="${deckH}" rx="34" fill="#131418" stroke="#26282E" stroke-width="1.5"/>`,
 		`<text x="96" y="392" font-family="${FONT}" font-size="66" font-weight="700" fill="${HEADLINE}">HWiNFO Sensors</text>`,
 		`<text x="96" y="446" font-family="${FONT}" font-size="26" font-weight="400" fill="${BODY}">Live hardware readings on your Stream Deck.</text>`,
 		`<text x="96" y="522" font-family="${MONO}" font-size="17" fill="${CYAN}">temperatures · clocks · fans · power · load · network</text>`,
-		`<text x="96" y="560" font-family="${MONO}" font-size="17" fill="${MUTED}">7 themes · type accents · sparklines · aviation-style alerts</text>`,
+		`<text x="96" y="560" font-family="${MONO}" font-size="17" fill="${MUTED}">up to four readings per key · up to three per dial</text>`,
+		`<text x="96" y="598" font-family="${MONO}" font-size="17" fill="${MUTED}">7 themes · type accents · sparklines · aviation-style alerts</text>`,
 		`<text x="96" y="912" font-family="${MONO}" font-size="15" fill="${MUTED}">every key face above is real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
 	];
 
@@ -177,6 +275,14 @@ async function hero() {
 			left: deckX + PAD + col * (KEY + GAP),
 			top: deckY + PAD + row * (KEY + GAP)
 		});
+	}
+	const slotsW = slots.length * SLOT_W + (slots.length - 1) * GAP;
+	const slotsX = deckX + Math.round((deckW - slotsW) / 2);
+	const slotsY = deckY + PAD + 3 * KEY + 2 * GAP + 30;
+	for (let i = 0; i < slots.length; i++) {
+		const png = await rasterize(slots[i], SLOT_W / 200, 200, 100);
+		const mask = Buffer.from(`<svg width="${SLOT_W}" height="${SLOT_H}"><rect width="${SLOT_W}" height="${SLOT_H}" rx="11" fill="#fff"/></svg>`);
+		composites.push({ input: await sharp(png).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer(), left: slotsX + i * (SLOT_W + GAP), top: slotsY });
 	}
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-1-hero.png"));
 }
@@ -553,16 +659,18 @@ async function thumbnail() {
 	// legible text — one row of real key faces + a real dial slot.
 	const KEY = 220;
 	const GAP = 18;
+	// One single, one alerting, then the three multi-reading layouts: the card
+	// has to say "more than one reading per key" before anyone clicks.
 	const faces = [
 		face({ key: K.cpuTemp, label: "CPU Temp", forceValue: 71.4 }),
 		face({ key: K.gpuTemp, label: "GPU Temp", level: "warn", forceValue: 84.6 }),
-		face({ key: K.cpuPower, label: "CPU Power", forceValue: 142.8 }),
-		face({ key: K.gpuLoad, label: "GPU Load", forceValue: 98 }),
-		face({ key: K.pump, label: "Pump" })
+		multi.dual,
+		multi.triple,
+		multi.quad
 	];
 	const rowW = faces.length * KEY + (faces.length - 1) * GAP;
 	const rowX = Math.round((W - rowW) / 2);
-	const rowY = 404;
+	const rowY = 378;
 
 	const r = byKey(K.gpuHot);
 	const palette = resolvePalette(config, "void", classifyTypeAccent(r.type, r.unit, r.label), "normal");
@@ -586,10 +694,18 @@ async function thumbnail() {
 	for (let i = 0; i < faces.length; i++) {
 		composites.push({ input: await roundedKey(faces[i], KEY, 24, "#26282E"), left: rowX + i * (KEY + GAP), top: rowY });
 	}
-	// centered dial slot under the key row
-	const dialPng = await rasterize(dial, 1.6, 200, 100);
-	const dialMask = Buffer.from(`<svg width="320" height="160"><rect width="320" height="160" rx="12" fill="#fff"/></svg>`);
-	composites.push({ input: await sharp(dialPng).composite([{ input: dialMask, blend: "dest-in" }]).png().toBuffer(), left: 960 - 160, top: rowY + KEY + 44 });
+	// Two dial screens under the key row: the touchscreen carries several
+	// readings at once too, which one single-value slot never showed.
+	const SLOT_W = 360;
+	const SLOT_H = 180;
+	const slots = [dialThreeRow(), dial];
+	const slotsW = slots.length * SLOT_W + (slots.length - 1) * 40;
+	const slotsX = Math.round((W - slotsW) / 2);
+	for (let i = 0; i < slots.length; i++) {
+		const png = await rasterize(slots[i], SLOT_W / 200, 200, 100);
+		const mask = Buffer.from(`<svg width="${SLOT_W}" height="${SLOT_H}"><rect width="${SLOT_W}" height="${SLOT_H}" rx="13" fill="#fff"/></svg>`);
+		composites.push({ input: await sharp(png).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer(), left: slotsX + i * (SLOT_W + 40), top: rowY + KEY + 44 });
+	}
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "thumbnail.png"));
 }
 

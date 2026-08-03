@@ -26,6 +26,9 @@ export const DETAIL_FILTER_MAX = 128;
  *  ignored rather than erroring, so a hand-edited long list still works. */
 export const DETAIL_KEYS_MAX = 128;
 
+/** Readings per detail tile: 1 keeps the original one-reading faces. */
+export type DetailDensity = 1 | 2 | 3 | 4;
+
 /** How long a key must stay down to count as a hold (tap-cycle-hold-details). */
 export const HOLD_THRESHOLD_MS = 500;
 
@@ -82,6 +85,27 @@ export function compileDetailFilter(pattern: string): (candidate: string) => boo
 	}
 	COMPILED_FILTER_CACHE.set(pattern, matcher);
 	return matcher;
+}
+
+/**
+ * How many readings one detail tile carries. The panel's select writes
+ * the option value as a string; a hand-edited number counts the same.
+ * Only the exact markers 2, 3 and 4 leave the original one-reading
+ * tiles: absent, junk and future values all stay at 1, so rolled-back
+ * and hand-edited profiles keep the faces they always had.
+ */
+export function detailDensityOf(settings: { detailDensity?: unknown }): DetailDensity {
+	const raw = settings.detailDensity;
+	if (raw === 2 || raw === "2") {
+		return 2;
+	}
+	if (raw === 3 || raw === "3") {
+		return 3;
+	}
+	if (raw === 4 || raw === "4") {
+		return 4;
+	}
+	return 1;
 }
 
 /**

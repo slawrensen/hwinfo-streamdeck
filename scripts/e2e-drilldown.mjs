@@ -504,6 +504,84 @@ async function scenario(send) {
 	removeDetailSurface(send, "devdef", fltCells);
 	await sleep(300);
 
+	// V. Dense tiles, two readings per tile (issue #5 follow-up). The fake
+	// first gains four CONSTANT per-core voltages (min = max = avg), so
+	// every face asserted below is parked: it cannot move on its own, and
+	// a content assertion cannot pass by accident against broken code the
+	// way a "did it redraw" check would. Filter "*" over the grown layout
+	// is fan + volt + four cores = 6 readings; density 2 packs them onto
+	// three dual tiles and the title counts READINGS.
+	fake.stdin.write("cores\n");
+	await sleep(2600);
+	const den2Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "2" };
+	appearOpener(send, "ctx-den2", "devden2", den2Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-den2", "devden2", den2Opener);
+	await sleep(500);
+	results.den2Switch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den2", device: "devden2", payload: { settings: den2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden2", fltCells);
+	await sleep(1600);
+	results.den2TitleFace = latestSvg(slotCtx("devden2", cellOfRole(fltCells, "title").coord));
+	results.den2Slot0Face = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 0).coord));
+	results.den2Slot1Face = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 1).coord));
+	// One press on the tile cycles BOTH of its readings to MIN together.
+	slotPress(send, "devden2", cellOfIndex(fltCells, 0).coord, cellOfIndex(fltCells, 0).settings);
+	await sleep(900);
+	results.den2Slot0Min = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 0).coord));
+	const den2BackCell = fltCells.find((c) => c.settings.detailRole === "back");
+	const den2BackCtx = slotCtx("devden2", den2BackCell.coord);
+	const [den2BackCol, den2BackRow] = den2BackCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: den2BackCtx, device: "devden2", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: den2BackCtx, device: "devden2", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devden2", fltCells);
+	await sleep(300);
+
+	// W. Four per tile: the "*core*" glob gathers exactly the four VIDs on
+	// ONE quad tile, whose micro-labels drop the shared "Core" token (the
+	// live-machine failure was four cells all reading "GPU" with a constant
+	// limit posing as a live temperature).
+	const den4Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*core*", detailDensity: "4" };
+	appearOpener(send, "ctx-den4", "devden4", den4Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-den4", "devden4", den4Opener);
+	await sleep(500);
+	results.den4Switch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den4", device: "devden4", payload: { settings: den4Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden4", fltCells);
+	await sleep(1600);
+	results.den4TitleFace = latestSvg(slotCtx("devden4", cellOfRole(fltCells, "title").coord));
+	results.den4Slot0Face = latestSvg(slotCtx("devden4", cellOfIndex(fltCells, 0).coord));
+	const den4BackCtx = slotCtx("devden4", den2BackCell.coord);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: den4BackCtx, device: "devden4", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: den4BackCtx, device: "devden4", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devden4", fltCells);
+	await sleep(300);
+
+	// X. Three per tile PLUS the opt-in mirror: the mirror still costs one
+	// TILE (the readings flow around it), the first tile rows three
+	// readings, and pressing the mirror cell leaves exactly like Back.
+	const den3Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "3", detailMirrorBack: true };
+	appearOpener(send, "ctx-den3", "devden3", den3Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-den3", "devden3", den3Opener);
+	await sleep(500);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den3", device: "devden3", payload: { settings: den3Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden3", fltCells);
+	await sleep(1600);
+	results.den3TitleFace = latestSvg(slotCtx("devden3", cellOfRole(fltCells, "title").coord));
+	results.den3Slot0Face = latestSvg(slotCtx("devden3", cellOfIndex(fltCells, 0).coord));
+	results.den3MirrorFace = latestSvg(slotCtx("devden3", "2,1"));
+	const den3MirrorCell = fltCells.find((c) => c.coord === "2,1");
+	const switchesBeforeDen3 = switches.length;
+	slotPress(send, "devden3", den3MirrorCell.coord, den3MirrorCell.settings);
+	await sleep(500);
+	results.den3MirrorSwitch = switches.length > switchesBeforeDen3 ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devden3", fltCells);
+	await sleep(300);
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -578,6 +656,52 @@ async function finish() {
 	check("the canonical Back on that live surface still wears the mark", typeof results.defBackFace === "string" && results.defBackFace.includes("M33 119"), (results.defBackFace ?? "no frame").slice(0, 140));
 	check("without the opt-in, pressing that cell stays in the view", results.defCellPressSwitched === false, JSON.stringify(results.defCellPressSwitched));
 	check("the canonical Back still leaves (restore, name omitted)", results.defBackSwitch !== undefined && results.defBackSwitch.device === "devdef" && results.defBackSwitch.profile === undefined, JSON.stringify(results.defBackSwitch));
+
+	// Dense tiles (readings per tile). Every asserted face is CONSTANT by
+	// construction (the fake's fan, volt and core readings never move).
+	const microLabelsOf = (svg) => (typeof svg === "string" ? [...svg.matchAll(/letter-spacing="0\.5" fill="#[0-9A-Fa-f]{6}">([^<]*)</g)].map((m) => m[1]) : []);
+	check("density 2 entry switched devden2 to the class profile", results.den2Switch?.device === "devden2" && results.den2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den2Switch));
+	check("density 2 title counts READINGS (1-6 / 6 on 11 tiles)", typeof results.den2TitleFace === "string" && results.den2TitleFace.includes(">1-6 / 6<"), (results.den2TitleFace ?? "no frame").slice(0, 160));
+	check(
+		"density 2 tile 0 rows fan and volt together (constant values)",
+		typeof results.den2Slot0Face === "string" && results.den2Slot0Face.includes(">Test Fan<") && results.den2Slot0Face.includes(">Test Volt<") && results.den2Slot0Face.includes(">1200<") && results.den2Slot0Face.includes(">12.1<"),
+		(results.den2Slot0Face ?? "no frame").slice(0, 200)
+	);
+	check(
+		"density 2 tile 1 carries the next chunk (Core 0 + Core 1)",
+		typeof results.den2Slot1Face === "string" && results.den2Slot1Face.includes(">Core 0 VID<") && results.den2Slot1Face.includes(">Core 1 VID<") && results.den2Slot1Face.includes(">1.05<") && results.den2Slot1Face.includes(">1.15<"),
+		(results.den2Slot1Face ?? "no frame").slice(0, 200)
+	);
+	check(
+		"one press cycles the WHOLE tile to MIN (both min values, one badge)",
+		typeof results.den2Slot0Min === "string" && results.den2Slot0Min.includes(">800<") && results.den2Slot0Min.includes(">11.9<") && (results.den2Slot0Min.match(/>MIN</g) ?? []).length === 1,
+		(results.den2Slot0Min ?? "no frame").slice(0, 200)
+	);
+	check("density 4 title counts the four matches (1-4 / 4)", typeof results.den4TitleFace === "string" && results.den4TitleFace.includes(">1-4 / 4<"), (results.den4TitleFace ?? "no frame").slice(0, 160));
+	check(
+		"density 4 quad drops the shared Core token: micro-labels 0/1/2/3",
+		JSON.stringify(microLabelsOf(results.den4Slot0Face)) === JSON.stringify(["0", "1", "2", "3"]),
+		JSON.stringify(microLabelsOf(results.den4Slot0Face))
+	);
+	check(
+		"density 4 quad shows the four constant voltages",
+		typeof results.den4Slot0Face === "string" && [">1.05<", ">1.15<", ">1.25<", ">1.35<"].every((v) => results.den4Slot0Face.includes(v)),
+		(results.den4Slot0Face ?? "no frame").slice(0, 200)
+	);
+	check("density 3 + mirror keeps the READING count honest (1-6 / 6)", typeof results.den3TitleFace === "string" && results.den3TitleFace.includes(">1-6 / 6<"), (results.den3TitleFace ?? "no frame").slice(0, 160));
+	check(
+		// The three CONSTANT row values plus both separators prove three
+		// readings on one tile; labels are free to ellipsize (the triple
+		// ladder's own tests lock that behavior).
+		"density 3 tile 0 rows three readings around the mirror",
+		typeof results.den3Slot0Face === "string" &&
+			[">1200<", ">12.1<", ">1.05<"].every((v) => results.den3Slot0Face.includes(v)) &&
+			(results.den3Slot0Face.match(/<rect x="12" y="(?:47|95)" width="120" height="2"/g) ?? []).length === 2,
+		(results.den3Slot0Face ?? "no frame").slice(0, 300)
+	);
+	check("the mirror rides the opener's cell at density 3 (return mark)", typeof results.den3MirrorFace === "string" && results.den3MirrorFace.includes("M33 119"), (results.den3MirrorFace ?? "no frame").slice(0, 140));
+	check("pressing the dense mirror leaves (restore, name omitted)", results.den3MirrorSwitch !== undefined && results.den3MirrorSwitch.device === "devden3" && results.den3MirrorSwitch.profile === undefined, JSON.stringify(results.den3MirrorSwitch));
+
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -621,6 +745,9 @@ const info = {
 		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devflt", name: "Harness Deck C", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devdef", name: "Harness Deck D", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden2", name: "Harness Deck E", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden3", name: "Harness Deck F", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden4", name: "Harness Deck G", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

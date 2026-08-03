@@ -35,6 +35,7 @@ function stateOf(presentation: DeviceDetailState["presentation"] = {}, primaryKe
 		deviceId: "dev1",
 		profileName: "profiles/detail-r3-standard",
 		pageSize: 11,
+		density: 1,
 		primaryKey,
 		groupSettings: { readingKey: primaryKey },
 		presentation,

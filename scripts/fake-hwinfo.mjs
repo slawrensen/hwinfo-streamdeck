@@ -6,6 +6,11 @@
 //   dead    write the "DEAD" magic (shared-memory support disabled)
 //   mutex   create the consistency mutex now (pairs with --no-mutex)
 //   grow    append a third reading (the published layout grows mid-run)
+//   cores   append four "Core N VID" readings with distinct CONSTANT
+//           values (min = max = avg): dense-tile e2e legs assert exact
+//           face content against them, immune to the advancing values
+//           trap, and their shared "Core" token exercises the quad
+//           micro-label strip end to end
 //   fahrenheit / celsius   republish the temperature as °F / °C: unit string
 //           rewritten in place, values rescaled, layout unchanged (exactly
 //           what flipping HWiNFO's own unit setting does mid-session)
@@ -137,6 +142,25 @@ function compose() {
 		buf.writeDoubleLE(12.3, e + 300);
 		buf.writeDoubleLE(12.1, e + 308);
 	}
+
+	if (entryCount >= 7) {
+		// entries[3..6]: constant per-core voltages, present after "cores".
+		// value = min = max = avg, so a face built from them never moves.
+		const volts = [1.05, 1.15, 1.25, 1.35];
+		for (let core = 0; core < 4; core++) {
+			e += ENTRY_SIZE;
+			buf.writeUInt32LE(2, e); // Voltage
+			buf.writeUInt32LE(0, e + 4);
+			buf.writeUInt32LE(0x1000004 + core, e + 8);
+			cstr(e + 12, 128, `Core ${core} VID`);
+			cstr(e + 140, 128, `Core ${core} VID`);
+			cstr(e + 268, 16, "V");
+			buf.writeDoubleLE(volts[core], e + 284);
+			buf.writeDoubleLE(volts[core], e + 292);
+			buf.writeDoubleLE(volts[core], e + 300);
+			buf.writeDoubleLE(volts[core], e + 308);
+		}
+	}
 }
 
 function publish() {
@@ -178,6 +202,11 @@ rl.on("line", (line) => {
 		compose();
 		publish();
 		console.log("GROWN");
+	} else if (cmd === "cores") {
+		entryCount = 7;
+		compose();
+		publish();
+		console.log("CORES");
 	} else if (cmd === "fahrenheit" || cmd === "celsius") {
 		unitF = cmd === "fahrenheit";
 		compose();

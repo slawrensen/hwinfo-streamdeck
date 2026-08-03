@@ -5,7 +5,7 @@
  * projections; never touches the SDK or the poller.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
-import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailMode } from "./detail-settings";
+import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailDensity, type DetailMode } from "./detail-settings";
 
 /**
  * A resolved detail group. `keys` never contains the primary (the opener's
@@ -118,15 +118,25 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 
 /** One logical page of a group under a device's reading-slot capacity. */
 export type DetailPage = {
-	/** Keys for slot indices 0..pageSize-1; undefined = empty slot. */
+	/** The readings each physical tile carries, tile indices 0..pageSize-1
+	 *  in page order: `density` keys per tile, fewer on the page's last
+	 *  filled tile, empty for a tile past the group end or reserved for
+	 *  the mirror Back. */
+	readonly chunks: readonly (readonly string[])[];
+	/** Each tile's FIRST reading; undefined = empty or reserved tile. At
+	 *  density 1 this is exactly the pre-density shape (one key per tile),
+	 *  which the docs/marketing shot scripts still read. */
 	readonly slots: readonly (string | undefined)[];
 	/** Clamped page offset actually shown (multiple of the step). */
 	readonly offset: number;
-	/** Keys consumed per page: the capacity, minus a reserved slot. */
+	/** READINGS consumed per page: the non-reserved tiles times the
+	 *  density, so the mirror Back costs one TILE per page, not one
+	 *  reading. */
 	readonly step: number;
 	readonly hasPrevious: boolean;
 	readonly hasNext: boolean;
-	/** "3-7 / 12" style range text; "0 / 0" for an empty group. */
+	/** "3-7 / 12" style range text counting READINGS, never tiles;
+	 *  "0 / 0" for an empty group. */
 	readonly rangeText: string;
 };
 
@@ -144,26 +154,31 @@ export function clampOffset(totalKeys: number, offset: number, pageSize: number)
  * Projects one logical page; pure math, safe for any offset. An optional
  * RESERVED slot index (the mirror Back tile riding on the opener's own
  * cell) is skipped by the key mapping: readings flow around it, every
- * page pays exactly one slot for it, and no reading is ever hidden. A
+ * page pays exactly one TILE for it, and no reading is ever hidden. A
  * reserved index outside 0..pageSize-1 (or a one-slot page) is ignored.
+ * `density` readings ride on each tile (issue #5 follow-up); the default
+ * 1 reproduces the original one-reading pages exactly, chunk for chunk.
  */
-export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlot?: number): DetailPage {
+export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlot?: number, density: DetailDensity = 1): DetailPage {
 	const safeSize = Math.max(1, Math.trunc(pageSize));
 	const reserved = reservedSlot !== undefined && Number.isInteger(reservedSlot) && reservedSlot >= 0 && reservedSlot < safeSize && safeSize > 1 ? reservedSlot : null;
-	const step = reserved === null ? safeSize : safeSize - 1;
+	const step = (reserved === null ? safeSize : safeSize - 1) * density;
 	const start = clampOffset(keys.length, offset, step);
-	const slots: (string | undefined)[] = [];
+	const chunks: (readonly string[])[] = [];
 	for (let i = 0; i < safeSize; i++) {
 		if (reserved !== null && i === reserved) {
-			slots.push(undefined);
+			chunks.push([]);
 		} else {
-			slots.push(keys[start + (reserved !== null && i > reserved ? i - 1 : i)]);
+			const ordinal = reserved !== null && i > reserved ? i - 1 : i;
+			const from = start + ordinal * density;
+			chunks.push(keys.slice(from, from + density));
 		}
 	}
 	const shown = Math.min(step, Math.max(0, keys.length - start));
 	const rangeText = keys.length === 0 ? "0 / 0" : `${start + 1}-${start + shown} / ${keys.length}`;
 	return {
-		slots,
+		chunks,
+		slots: chunks.map((chunk) => chunk[0]),
 		offset: start,
 		step,
 		hasPrevious: start > 0,

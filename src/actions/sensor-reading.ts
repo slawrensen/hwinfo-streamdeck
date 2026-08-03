@@ -19,7 +19,7 @@ import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from ".
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
-import { appliedTextMode, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, mixToward, resolveTextColors, type TextColors, type TextSettings } from "../ui/text-colors";
+import { quadIdentityColor, resolveTextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, getDeckTheme, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
@@ -98,6 +98,11 @@ export type ReadingSettings = {
 	detailKeys?: string[];
 	/** Optional title for the detail view's title tile. */
 	detailTitle?: string;
+	/** Readings per detail tile: "2", "3" or "4" stack that many readings
+	 * on each tile of the view (dual, triple and quad faces); anything
+	 * else keeps the original one-reading tiles. The panel's select
+	 * writes strings; the parser also takes the bare numbers. */
+	detailDensity?: string;
 	/** Exactly true: inside the view, the reading slot on this key's own
 	 * cell doubles as a second Back (the mirror). Off by default: one
 	 * movable Back beat two fixed ones for the issue #5 testers. */
@@ -691,30 +696,13 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	const colors = quadColorsOf(settings);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3, settings.quadLabel4];
 	return renderQuadKey({
-		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadSlotColor(colors[i] as string, labeled, textSettings, text, palette)))),
+		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as string, labeled, textSettings, text, palette)))),
 		labels: labeled,
 		sharedBadge: STAT_BADGE[mode],
 		palette,
 		text,
 		returnMark
 	});
-}
-
-/**
- * A quad slot's identity color under the effective Text setting. The slot
- * colors are textual (the value glyphs, or the micro-label), so Custom
- * governs them too: the exact color for values, the secondary shade for
- * micro-labels. Dim lowers the identity hues themselves; Theme keeps them.
- */
-function quadSlotColor(identity: string, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
-	const mode = appliedTextMode(settings);
-	if (mode === "custom") {
-		return labeled ? text.label : text.value;
-	}
-	if (mode === "dim") {
-		return mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND);
-	}
-	return identity;
 }
 
 function quadCell(reading: Reading | undefined, customLabel: string | undefined, labeled: boolean, mode: StatMode, measureOpts: MeasureOptions, color: string): QuadKeyCell {

@@ -5,7 +5,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { composeBackFace, composeIdleFace, composePagerFace, composeReadingFace, composeTitleFace, type DetailFaceContext } from "../src/detail/detail-faces";
+import { createHash } from "node:crypto";
+
+import { chunkMicroLabels, composeBackFace, composeChunkFace, composeIdleFace, composePagerFace, composeReadingFace, composeTitleFace, type DetailFaceContext } from "../src/detail/detail-faces";
 import { pageOf } from "../src/detail/detail-group";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
@@ -19,7 +21,19 @@ function reading(key: string, value: number, unit = "°C", label = key): Reading
 }
 
 const snapshot: SensorSnapshot = (() => {
-	const readings = [reading("cpu:0:0", 55, "°C", "CPU Tctl"), reading("cpu:0:1", 120, "W", "CPU Power"), reading("cpu:0:2", 42, "°C", "CPU CCD1")];
+	const readings = [
+		reading("cpu:0:0", 55, "°C", "CPU Tctl"),
+		reading("cpu:0:1", 120, "W", "CPU Power"),
+		reading("cpu:0:2", 42, "°C", "CPU CCD1"),
+		// The live dGPU labels this machine publishes, the group that
+		// collapses the quad micro-labels to "GPU" four times under the
+		// first-word rule (the Thermal Limit constant then poses as a live
+		// temperature).
+		reading("gpu:0:1", 38, "°C", "GPU Memory Junction Temperature"),
+		reading("gpu:0:2", 44, "°C", "GPU Hot Spot Temperature"),
+		reading("gpu:0:3", 84, "°C", "GPU Thermal Limit"),
+		reading("gpu:0:4", 0.88, "V", "GPU Core Voltage")
+	];
 	return { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0, instance: 0, name: "CPU [#0]" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
 })();
 
@@ -31,6 +45,7 @@ function stateOf(overrides?: Partial<DeviceDetailState> & { presentation?: Devic
 		deviceId: "dev1",
 		profileName: "profiles/detail-standard",
 		pageSize: 11,
+		density: 1,
 		primaryKey: "cpu:0:0",
 		groupSettings: { readingKey: "cpu:0:0" },
 		presentation: {},
@@ -146,6 +161,133 @@ describe("title and pagers", () => {
 	it("idle faces say so, and the idle Back stays a back affordance", () => {
 		assert.match(composeIdleFace("reading"), /No detail/);
 		assert.match(composeIdleFace("back"), />Back</);
+	});
+});
+
+describe("dense reading tiles (composeChunkFace)", () => {
+	it("a one-reading chunk is BYTE-IDENTICAL to the single face; an empty tile to the blank", () => {
+		for (const status of [ok, down]) {
+			for (const mode of ["current", "min"] as const) {
+				assert.equal(composeChunkFace(stateOf(), ["cpu:0:1"], mode, status, ctxOf()), composeReadingFace(stateOf(), "cpu:0:1", mode, status, ctxOf()));
+				assert.equal(composeChunkFace(stateOf(), ["not-there:0:0"], mode, status, ctxOf()), composeReadingFace(stateOf(), "not-there:0:0", mode, status, ctxOf()));
+				assert.equal(composeChunkFace(stateOf(), [], mode, status, ctxOf()), composeReadingFace(stateOf(), undefined, mode, status, ctxOf()));
+			}
+		}
+	});
+
+	it("two readings: the dual face with full labels, stat values and ONE shared badge", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "min", ok, ctxOf());
+		assert.match(svg, />CPU Power</);
+		assert.match(svg, />CPU CCD1</);
+		assert.match(svg, />110(\.0)?</); // 120 W at MIN
+		assert.match(svg, />32(\.0)?</); // 42 °C at MIN
+		assert.equal((svg.match(/>MIN</g) ?? []).length, 1, "exactly one shared badge");
+		const live = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
+		assert.doesNotMatch(live, />MIN</);
+		assert.match(live, />120(\.0)?</);
+	});
+
+	it("three readings: rows, with a missing reading holding its row as the placeholder", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "not-there:0:0", "cpu:0:2"], "current", ok, ctxOf());
+		assert.match(svg, />CPU Power</);
+		assert.match(svg, /Sensor missing/);
+		assert.match(svg, />—</);
+		assert.match(svg, />CPU CCD1</);
+	});
+
+	it("four readings: the labeled quad with shared-token-stripped micro-labels", () => {
+		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf());
+		for (const micro of [">MEMO<", ">HOT<", ">THER<", ">CORE<"]) {
+			assert.ok(svg.includes(micro), `expected micro-label ${micro}`);
+		}
+		assert.ok(!svg.includes(">GPU<"), "the shared GPU token must not survive");
+		assert.match(svg, />84(\.0)?</); // the Thermal Limit constant, now labeled THER
+		assert.match(svg, />0\.88</);
+		assert.match(svg, />°C</);
+		assert.match(svg, />V</);
+	});
+
+	it("micro-labels fall back to first words when the chunk shares no leading token", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "gpu:0:1", "cpu:0:2", "gpu:0:2"], "current", ok, ctxOf());
+		assert.match(svg, />CPU</);
+		assert.match(svg, />GPU</);
+	});
+
+	it("the tile's type accent follows its FIRST reading", () => {
+		const config = loadThemes();
+		const powerFirst = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
+		const tempFirst = composeChunkFace(stateOf(), ["cpu:0:2", "cpu:0:1"], "current", ok, ctxOf());
+		assert.notEqual(powerFirst, tempFirst);
+		const powerAccentBg = resolvePalette(config, config.defaultTheme, "power", "normal").bg;
+		assert.ok(powerFirst.includes(powerAccentBg), "power accent expected from the first reading");
+	});
+
+	it("never inherits the opener's thresholds at any density", () => {
+		const state = stateOf({ presentation: { warnValue: "50" } });
+		const config = loadThemes();
+		const warnBg = resolvePalette(config, config.defaultTheme, null, "warn").bg;
+		for (const chunk of [["cpu:0:1", "cpu:0:2"], ["cpu:0:1", "cpu:0:2", "gpu:0:1"], ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"]]) {
+			const svg = composeChunkFace(state, chunk, "current", ok, ctxOf());
+			assert.equal(svg.includes(warnBg), false, `chunk of ${chunk.length} recolored by the opener's threshold`);
+		}
+	});
+
+	it("status screens ride every density", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:1"], "current", down, ctxOf());
+		assert.match(svg, /Start HWiNFO/);
+	});
+});
+
+describe("chunk micro-label stripping", () => {
+	it("strips the tokens every present label shares, keeping one token minimum", () => {
+		assert.deepEqual(chunkMicroLabels(["Core 0 VID", "Core 1 VID", "Core 2 VID", "Core 3 VID"]), ["0", "1", "2", "3"]);
+		assert.deepEqual(chunkMicroLabels(["GPU Memory Junction Temperature", "GPU Hot Spot Temperature", "GPU Thermal Limit", "GPU Core Voltage"]), ["Memory", "Hot", "Thermal", "Core"]);
+		assert.deepEqual(chunkMicroLabels(["Performance Limit - Power", "Performance Limit - Thermal"]), ["Power", "Thermal"]);
+	});
+
+	it("identical labels strip to their last token and stay identical", () => {
+		assert.deepEqual(chunkMicroLabels(["GPU Fan1", "GPU Fan1"]), ["Fan1", "Fan1"]);
+	});
+
+	it("missing readings sit out; fewer than two present labels strip nothing", () => {
+		assert.deepEqual(chunkMicroLabels(["Core 0 VID", undefined, "Core 2 VID", "Core 3 VID"]), ["0", "", "2", "3"]);
+		assert.deepEqual(chunkMicroLabels(["GPU Hot Spot Temperature", undefined, undefined, undefined]), ["GPU", "", "", ""]);
+		assert.deepEqual(chunkMicroLabels([undefined, undefined]), ["", ""]);
+	});
+
+	it("unshared or one-token labels keep their first words (the standalone quad rule)", () => {
+		assert.deepEqual(chunkMicroLabels(["Vcore", "VSOC", "VDDIO", "VDD18"]), ["Vcore", "VSOC", "VDDIO", "VDD18"]);
+		assert.deepEqual(chunkMicroLabels(["CPU Package", "GPU Power"]), ["CPU", "GPU"]);
+	});
+
+	it("a shorter label caps the strip so it never empties", () => {
+		assert.deepEqual(chunkMicroLabels(["Core 0", "Core 0 Effective Clock"]), ["0", "0"]);
+	});
+});
+
+describe("dense tile goldens", () => {
+	// Byte-locks for the three new face families, like the archive pins in
+	// detail-profiles.test.ts: same fixed snapshot, default theme, default
+	// measure. A hash move means the composed bytes changed for everyone;
+	// change it ONLY alongside a deliberate face change.
+	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
+
+	it("dual chunk", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
+		assert.match(svg, />CPU Power</);
+		assert.equal(golden(svg), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+	});
+
+	it("triple chunk", () => {
+		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
+		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
+		assert.equal(golden(svg), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+	});
+
+	it("quad chunk with the shared badge", () => {
+		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
+		assert.match(svg, />MAX</);
+		assert.equal(golden(svg), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

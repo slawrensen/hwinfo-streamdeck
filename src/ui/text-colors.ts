@@ -93,6 +93,24 @@ export function themeTextColors(palette: Palette): TextColors {
 }
 
 /**
+ * A quad cell's identity color under the effective Text setting. The slot
+ * colors are textual (the value glyphs, or the micro-label), so Custom
+ * governs them too: the exact color for values, the secondary shade for
+ * micro-labels. Dim lowers the identity hues themselves; Theme keeps them.
+ * Shared by the standalone quad layout and the detail view's dense tiles.
+ */
+export function quadIdentityColor(identity: string, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
+	const mode = appliedTextMode(settings);
+	if (mode === "custom") {
+		return labeled ? text.label : text.value;
+	}
+	if (mode === "dim") {
+		return mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND);
+	}
+	return identity;
+}
+
+/**
  * Resolves the final textual fills. Alert faces always return the (alert)
  * palette's own tokens: warn/critical presentation outranks every text mode.
  * The main value in Custom is the exact selected color, never adjusted.

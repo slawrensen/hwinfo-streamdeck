@@ -4,6 +4,14 @@
 // plugin process (CPU cumulative seconds, RSS, handles) every 15 s via
 // CIM and prints a PERF.md-ready summary plus per-sample CSV lines.
 //   node scripts/perf-detail.mjs          (PERF_DETAIL_SEC=480 default)
+//   PERF_DETAIL_DENSITY=2|3|4  readings per tile (detailDensity); at 4
+//                              every tile composes a quad face and one
+//                              page carries up to 128 readings
+//   PERF_DETAIL_FILTER="*"     open a filter group instead of the first
+//                              reading's source, so every tile is FULL
+//                              at any density (the honest worst case;
+//                              source mode may leave trailing tiles
+//                              blank when the source is small)
 import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -64,7 +72,14 @@ async function scenario(send) {
 	if (first === undefined) {
 		throw new Error("no live readings; is HWiNFO running?");
 	}
-	const settings = { readingKey: first, pressBehavior: "open-details" };
+	const density = process.env.PERF_DETAIL_DENSITY ?? "";
+	const filter = process.env.PERF_DETAIL_FILTER ?? "";
+	const settings = {
+		readingKey: first,
+		pressBehavior: "open-details",
+		...(density === "" ? {} : { detailDensity: density }),
+		...(filter === "" ? {} : { detailMode: "filter", detailFilter: filter })
+	};
 	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "perf-opener", device: "devxl", payload: { settings, coordinates: { column: 1, row: 1 }, isInMultiAction: false } });
 	await sleep(300);
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "perf-opener", device: "devxl", payload: { settings, coordinates: { column: 1, row: 1 } } });
@@ -81,7 +96,7 @@ async function scenario(send) {
 			payload: { settings: cell.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false }
 		});
 	}
-	console.log(`# dense surface up: ${cells.length} slots, poll 250 ms, ${DURATION_SEC} s run`);
+	console.log(`# dense surface up: ${cells.length} slots, density ${density === "" ? 1 : density}, ${filter === "" ? "source mode" : `filter ${JSON.stringify(filter)}`}, poll 250 ms, ${DURATION_SEC} s run`);
 }
 
 async function sampleProcess(pid) {
@@ -141,7 +156,7 @@ if (ok) {
 	const rssLast = samples[samples.length - 1].rss / 1048576;
 	const minutes = (samples[samples.length - 1].at - samples[0].at) / 60;
 	const lastFrames = samples[samples.length - 1].frames;
-	console.log(`# SUMMARY dense +XL detail @250ms over ${Math.round(samples[samples.length - 1].at)}s: CPU avg ${avg.toFixed(2)}% p95 ${p95.toFixed(2)}%, RSS ${rssFirst.toFixed(1)} -> ${rssLast.toFixed(1)} MB (${(((rssLast - rssFirst) / minutes) * 30).toFixed(2)} MB/30min), handles ${samples[0].handles} -> ${samples[samples.length - 1].handles}, ${lastFrames} frames (${(lastFrames / samples[samples.length - 1].at).toFixed(1)}/s), switches ${switches}`);
+	console.log(`# SUMMARY dense +XL detail @250ms density=${process.env.PERF_DETAIL_DENSITY ?? "1"}${(process.env.PERF_DETAIL_FILTER ?? "") === "" ? "" : ` filter=${process.env.PERF_DETAIL_FILTER}`} over ${Math.round(samples[samples.length - 1].at)}s: CPU avg ${avg.toFixed(2)}% p95 ${p95.toFixed(2)}%, RSS ${rssFirst.toFixed(1)} -> ${rssLast.toFixed(1)} MB (${(((rssLast - rssFirst) / minutes) * 30).toFixed(2)} MB/30min), handles ${samples[0].handles} -> ${samples[samples.length - 1].handles}, ${lastFrames} frames (${(lastFrames / samples[samples.length - 1].at).toFixed(1)}/s), switches ${switches}`);
 } else {
 	console.error(`# FAILED: exited=${pluginExited} scenario=${scenarioFailed ?? "ok"} samples=${samples.length}`);
 }

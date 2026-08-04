@@ -1668,7 +1668,40 @@
 			}
 			const remove = ev.target.closest(".hw-set-remove");
 			if (remove !== null) {
-				detailKeys = detailKeys.filter((k) => k !== remove.dataset.key);
+				// Removing a cell from a HAND-GROUPED tile shrinks that tile
+				// with it: its other cells and every tile below keep their
+				// readings (the next reading must never flow up to restaff a
+				// quad someone curated), and the tile's + refills the freed
+				// cell. Only the uniform fill past the plan still flows.
+				const removedKey = remove.dataset.key;
+				const idx = detailKeys.indexOf(removedKey);
+				if (idx >= 0) {
+					const walk = detailTileWalk();
+					const tileIdx = walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
+					if (tileIdx >= 0 && walk[tileIdx].spec !== null) {
+						const cell = idx - walk[tileIdx].head;
+						const next = materializedTiles(tileIdx);
+						if (next[tileIdx].size <= 1) {
+							// The tile's only cell: the tile leaves with it, and
+							// an aim at or past it re-anchors.
+							next.splice(tileIdx, 1);
+							if (detailArm !== null && detailArm.tileIdx === tileIdx) {
+								detailArm = null;
+								const search = detailSearchEl();
+								if (search !== null) search.placeholder = "Search sensors to add…";
+							} else if (detailArm !== null && detailArm.tileIdx > tileIdx) {
+								detailArm = { tileIdx: detailArm.tileIdx - 1 };
+							}
+						} else {
+							next[tileIdx].size -= 1;
+							next[tileIdx].labels.splice(cell, 1);
+							next[tileIdx].colors.splice(cell, 1);
+						}
+						detailTiles = next;
+						detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+					}
+				}
+				detailKeys = detailKeys.filter((k) => k !== removedKey);
 				writeDetailKeys();
 			}
 		});

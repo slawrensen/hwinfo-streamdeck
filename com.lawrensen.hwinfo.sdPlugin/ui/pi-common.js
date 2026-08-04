@@ -459,26 +459,31 @@
 		detailPicker?.renderList(); // "added" row marks follow the edit
 	}
 
-	// The armed per-tile add: clicking a tile's + aims the collector at
-	// that tile, and the next picks land inside it (growing it to four),
+	// The armed per-tile add: clicking a tile's + marker aims the collector
+	// at that tile, and the next picks land inside it (growing it to four),
 	// instead of appending to the end of the list. null = plain append.
+	// The marker itself sits at the exact cell the next pick fills, so the
+	// landing point is always painted, never guessed.
 	let detailArm = null;
+	// The reading key that just landed (pick, drop, arrow move): its chip
+	// re-renders with a short flash and is scrolled into view, then the
+	// receipt clears. Purely visual; never persisted.
+	let detailLanded = "";
 
 	function detailSearchEl() {
 		return document.getElementById("pickerd-search");
 	}
 
 	function armDetailAdd(tileIdx) {
-		detailArm = detailArm !== null && detailArm.tileIdx === tileIdx ? null : { tileIdx };
+		detailArm = tileIdx === null || (detailArm !== null && detailArm.tileIdx === tileIdx) ? null : { tileIdx };
+		// Render first, focus second: focusing opens the list, whose
+		// onOpenChange scrolls the FRESH armed marker into view.
+		renderDetailList();
 		const search = detailSearchEl();
 		if (search !== null) {
-			search.placeholder = detailArm === null ? "Search sensors to add…" : `Adding into tile ${tileIdx + 1}; pick sensors above…`;
-			if (detailArm !== null) {
-				search.scrollIntoView({ block: "center" });
-				search.focus();
-			}
+			search.placeholder = detailArm === null ? "Search sensors to add…" : `Adding into tile ${detailArm.tileIdx + 1}; click its + again to finish.`;
+			search.focus({ preventScroll: true });
 		}
-		renderDetailList();
 	}
 
 	function addDetailKey(key) {
@@ -502,13 +507,17 @@
 				detailTiles = next;
 				detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
 				if (Math.min(next[detailArm.tileIdx].size, detailKeys.length - tile.head) >= 4) {
-					armDetailAdd(detailArm.tileIdx); // full quad: disarm, placeholder restores
+					armDetailAdd(detailArm.tileIdx); // full quad: disarm, and the end marker lights
 				}
+				// After the possible disarm re-render, so the receipt survives
+				// onto the write's own render.
+				detailLanded = key;
 				writeDetailKeys();
 				return;
 			}
 			detailArm = null;
 		}
+		detailLanded = key;
 		detailKeys.push(key);
 		writeDetailKeys();
 	}
@@ -519,6 +528,7 @@
 		if (from < 0 || to < 0 || to > detailKeys.length) return;
 		detailKeys.splice(from, 1);
 		detailKeys.splice(to > from ? to - 1 : to, 0, key);
+		detailLanded = key;
 		writeDetailKeys();
 	}
 
@@ -527,6 +537,7 @@
 		for (const reading of group.readings) {
 			if (reading.key !== detailPrimaryKey && !detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
 				detailKeys.push(reading.key);
+				detailLanded = reading.key; // the block's last chip carries the flash
 				added++;
 			}
 		}
@@ -547,19 +558,32 @@
 			ev.dataTransfer.effectAllowed = "move";
 			chip.classList.add("dragging");
 		});
-		chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+		chip.addEventListener("dragend", () => {
+			// The drop may have landed anywhere (or nowhere): sweep every
+			// indicator so no caret or lit frame outlives the gesture.
+			for (const el of detailListEl.querySelectorAll(".dragging, .drop-before, .drop-after, .drop-append")) {
+				el.classList.remove("dragging", "drop-before", "drop-after", "drop-append");
+			}
+		});
 		chip.addEventListener("dragover", (ev) => {
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
-			chip.classList.add("drop-target");
+			// An honest caret: the midpoint decides before or after, and the
+			// edge bar (box-shadow, layout-neutral) marks the true index.
+			const rect = chip.getBoundingClientRect();
+			const after = ev.clientX > rect.left + rect.width / 2;
+			chip.classList.toggle("drop-after", after);
+			chip.classList.toggle("drop-before", !after);
 		});
-		chip.addEventListener("dragleave", () => chip.classList.remove("drop-target"));
+		chip.addEventListener("dragleave", () => chip.classList.remove("drop-before", "drop-after"));
 		chip.addEventListener("drop", (ev) => {
 			ev.preventDefault();
 			ev.stopPropagation();
-			chip.classList.remove("drop-target");
+			const rect = chip.getBoundingClientRect();
+			const after = ev.clientX > rect.left + rect.width / 2;
+			chip.classList.remove("drop-before", "drop-after");
 			const dragged = ev.dataTransfer.getData("text/plain");
-			if (dragged !== "" && dragged !== key) moveDetailKey(dragged, index);
+			if (dragged !== "" && dragged !== key) moveDetailKey(dragged, after ? index + 1 : index);
 		});
 		const name = document.createElement("span");
 		name.className = "hw-set-name hw-detail-name";
@@ -574,19 +598,24 @@
 			name.textContent += " (Back tile)";
 			name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
 		}
-		// The tile's per-cell label override, one small field per chip.
-		// Writes only on commit (change), like every other edit here.
-		const custom = document.createElement("input");
-		custom.type = "text";
-		custom.className = "hw-tile-label";
-		custom.placeholder = "Label";
-		custom.title = "This cell's label on the tile (empty keeps the reading's own)";
-		custom.value = tile.spec !== null ? (tile.spec.labels[cellIdx] ?? "") : "";
-		custom.addEventListener("change", () => {
-			const next = materializedTiles(tileIdx);
-			next[tileIdx].labels[cellIdx] = custom.value.trim();
-			writeDetailTiles(next);
-		});
+		// The cell's label override lives ON the name (click to rename, the
+		// rotation-chip idiom) instead of an always-visible input: the chip
+		// stays narrow enough for a pair to read as a pair. The missing and
+		// Back-tile titles set above outrank the rename hint, and the Back
+		// suffix is never repainted.
+		chip.dataset.tile = String(tileIdx);
+		chip.dataset.cell = String(cellIdx);
+		const override = tile.spec !== null ? (tile.spec.labels[cellIdx] ?? "") : "";
+		if (override !== "" && key !== detailPrimaryKey) {
+			name.textContent = override;
+			name.classList.add("renamed");
+		}
+		if (name.title === "") {
+			name.title = "This cell's label on the tile. Click to edit; empty keeps the reading's own.";
+		}
+		if (key === detailLanded) {
+			chip.classList.add("landed");
+		}
 		const up = document.createElement("button");
 		up.type = "button";
 		up.className = "hw-detail-move";
@@ -607,7 +636,7 @@
 		remove.dataset.key = key;
 		remove.title = "Remove from the detail list";
 		remove.textContent = "×";
-		chip.append(name, custom);
+		chip.append(name);
 		if (tile.size === 4) {
 			// Quad cells carry identity colors, like a standalone quad key.
 			const well = document.createElement("input");
@@ -626,20 +655,47 @@
 		return chip;
 	}
 
+	/** The + marker sitting at the exact cell the next pick would fill in
+	 * its tile. `lit` marks THE current landing point (one at a time);
+	 * `armed` marks the aimed tile. Full quads render no marker at all. */
+	function detailAddMarker(arm, armed, lit) {
+		const add = document.createElement("button");
+		add.type = "button";
+		add.className = "hw-add" + (armed ? " armed" : "") + (lit ? " lit" : "");
+		add.dataset.arm = arm;
+		add.title = armed ? "Picks land here. Click again to finish." : lit ? "New picks land here." : "Send the next picks into this tile. It can grow to four cells.";
+		add.textContent = "+";
+		return add;
+	}
+
 	function renderDetailList() {
 		if (detailListEl === null) return;
+		// A tree echo or preview tick must never destroy an in-progress
+		// cell rename (the rotation editor holds the same line).
+		const active = document.activeElement;
+		if (active !== null && active.classList !== undefined && active.classList.contains("hw-cell-rename")) return;
 		const frag = document.createDocumentFragment();
 		const walk = detailTileWalk();
+		// The unarmed landing point: the last tile with a free cell, else
+		// the trailing ghost tile that stands for "a new tile at the end".
+		const lastTile = walk.length > 0 ? walk[walk.length - 1] : null;
+		const lastHasRoom = lastTile !== null && detailKeys.length - lastTile.head < lastTile.size;
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
-			// A drop on the tile itself (not a chip) moves to the tile's end.
+			// A drop on the tile itself (not a chip) appends at its end; the
+			// frame lights only for true tile-chrome hovers, not bubbled
+			// chip dragovers.
 			holder.addEventListener("dragover", (ev) => {
 				ev.preventDefault();
 				ev.dataTransfer.dropEffect = "move";
+				holder.classList.toggle("drop-append", ev.target.closest(".hw-set-chip") === null);
 			});
+			holder.addEventListener("dragleave", () => holder.classList.remove("drop-append"));
 			holder.addEventListener("drop", (ev) => {
 				ev.preventDefault();
+				holder.classList.remove("drop-append");
+				if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
 				const dragged = ev.dataTransfer.getData("text/plain");
 				const occupied = Math.min(tile.size, detailKeys.length - tile.head);
 				if (dragged !== "") moveDetailKey(dragged, tile.head + occupied);
@@ -651,15 +707,6 @@
 			size.title = "Readings on this tile; click to cycle 1, 2, 3, 4";
 			size.textContent = `×${tile.size}`;
 			holder.appendChild(size);
-			const add = document.createElement("button");
-			add.type = "button";
-			add.className = "hw-tile-add" + (detailArm !== null && detailArm.tileIdx === tileIdx ? " armed" : "");
-			add.dataset.arm = String(tileIdx);
-			const full = tile.size >= 4 && detailKeys.length - tile.head >= 4;
-			add.disabled = full;
-			add.title = full ? "This tile is a full quad" : "Add the next picked sensors INTO this tile (grows it up to four)";
-			add.textContent = "+";
-			holder.appendChild(add);
 			if (tile.size === 4) {
 				const abc = document.createElement("button");
 				abc.type = "button";
@@ -676,16 +723,47 @@
 				if (key === undefined) break;
 				holder.appendChild(detailChip(key, index, tile, tileIdx, c));
 			}
+			const occupied = Math.min(tile.size, detailKeys.length - tile.head);
+			const fullQuad = tile.size >= 4 && occupied >= 4;
+			if (!fullQuad) {
+				const armed = detailArm !== null && detailArm.tileIdx === tileIdx;
+				const lit = detailArm === null && tileIdx === walk.length - 1 && lastHasRoom;
+				holder.appendChild(detailAddMarker(String(tileIdx), armed, lit));
+			}
 			frag.appendChild(holder);
 		});
+		if (walk.length === 0 || !lastHasRoom) {
+			// Appending would start a NEW tile: say so with a ghost tile whose
+			// marker is the landing point.
+			const ghost = document.createElement("span");
+			ghost.className = "hw-tile ghost";
+			ghost.addEventListener("dragover", (ev) => {
+				ev.preventDefault();
+				ev.dataTransfer.dropEffect = "move";
+				ghost.classList.add("drop-append");
+			});
+			ghost.addEventListener("dragleave", () => ghost.classList.remove("drop-append"));
+			ghost.addEventListener("drop", (ev) => {
+				ev.preventDefault();
+				ghost.classList.remove("drop-append");
+				const dragged = ev.dataTransfer.getData("text/plain");
+				if (dragged !== "") moveDetailKey(dragged, detailKeys.length);
+			});
+			ghost.appendChild(detailAddMarker("end", false, detailArm === null));
+			frag.appendChild(ghost);
+		}
 		frag.appendChild(
 			setNote(
 				detailKeys.length === 0
 					? "Empty: add readings above, in the order the detail view should list them."
-					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting. This key's own sensor shows on the Back tile, not in the list.`
+					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
 			)
 		);
 		detailListEl.replaceChildren(frag);
+		if (detailLanded !== "") {
+			detailListEl.querySelector(".hw-set-chip.landed")?.scrollIntoView({ block: "nearest" });
+			detailLanded = "";
+		}
 	}
 
 	// --- sensor pickers -------------------------------------------------------
@@ -855,12 +933,15 @@
 			renderList();
 			const sel = listEl.querySelector(".hw-row.selected");
 			if (sel) sel.scrollIntoView({ block: "center" });
+			config.onOpenChange?.(true);
 		}
 
 		function closeList() {
+			const was = listOpen;
 			listOpen = false;
 			listEl.hidden = true;
 			showSelection();
+			if (was) config.onOpenChange?.(false);
 		}
 
 		function selectRow(row) {
@@ -958,6 +1039,10 @@
 		const picker = {
 			root: searchEl.closest(".hw-picker"),
 			list: listEl,
+			/** A second DOM region treated as "inside" by the outside-click
+			 * closer: the detail collector keeps its list open while the user
+			 * aims, renames or reorders in the tile list below it. */
+			alsoWithin: config.alsoWithin ?? null,
 			isOpen: () => listOpen,
 			close: closeList,
 			selectedKey: () => selectedKey,
@@ -1016,6 +1101,17 @@
 					list: document.getElementById("pickerd-list"),
 					onPick: addDetailKey,
 					onGroupAdd: addDetailSource,
+					// Aiming, renaming and reordering in the tile list must not
+					// close the results: the list below the dock counts as
+					// inside the picker.
+					alsoWithin: detailListEl,
+					// While picking, the Add sensor row pins to the top and the
+					// landing marker is brought on screen, so results and the
+					// slot they fill stay co-visible.
+					onOpenChange: (open) => {
+						document.getElementById("detail-custom")?.classList.toggle("picking", open);
+						if (open) detailListEl.querySelector(".hw-add.armed, .hw-add.lit")?.scrollIntoView({ block: "nearest" });
+					},
 					// The opener's own sensor carries the mark too: it is
 					// already in the view (the Back tile), and a click on it
 					// adds nothing.
@@ -1029,7 +1125,7 @@
 		// Checked per picker so opening one never strands the other open.
 		const path = ev.composedPath();
 		for (const picker of pickers) {
-			if (picker.isOpen() && !path.includes(picker.root)) picker.close();
+			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) picker.close();
 		}
 	});
 
@@ -1514,13 +1610,38 @@
 				const to = from + Number(move.dataset.move);
 				if (from >= 0 && to >= 0 && to < detailKeys.length) {
 					[detailKeys[from], detailKeys[to]] = [detailKeys[to], detailKeys[from]];
+					detailLanded = key; // the moved chip flashes at its new cell
 					writeDetailKeys();
 				}
 				return;
 			}
-			const arm = ev.target.closest(".hw-tile-add");
-			if (arm !== null && !arm.disabled) {
-				armDetailAdd(Number(arm.dataset.arm));
+			const add = ev.target.closest(".hw-add");
+			if (add !== null) {
+				armDetailAdd(add.dataset.arm === "end" ? null : Number(add.dataset.arm));
+				return;
+			}
+			const nameEl = ev.target.closest(".hw-set-name");
+			if (nameEl !== null) {
+				// Cell rename, the rotation-chip idiom: the name swaps to an
+				// input prefilled with the override; the placeholder shows
+				// the reading's own label; commit on change, Enter blurs.
+				const chip = nameEl.closest(".hw-set-chip");
+				const chipKey = chip?.dataset.key;
+				if (chip === undefined || chip === null || chipKey === undefined || chipKey === detailPrimaryKey) return;
+				const tileIdx = Number(chip.dataset.tile);
+				const cellIdx = Number(chip.dataset.cell);
+				const spec = detailTiles[tileIdx];
+				const input = document.createElement("input");
+				input.type = "text";
+				input.className = "hw-group-name hw-chip-rename hw-cell-rename";
+				input.dataset.tile = String(tileIdx);
+				input.dataset.cell = String(cellIdx);
+				input.value = spec !== undefined ? (spec.labels[cellIdx] ?? "") : "";
+				input.placeholder = readingLabelOf(chipKey) ?? chipKey;
+				input.spellcheck = false;
+				nameEl.replaceWith(input);
+				input.focus();
+				input.select();
 				return;
 			}
 			const size = ev.target.closest(".hw-tile-size");
@@ -1549,6 +1670,32 @@
 			if (remove !== null) {
 				detailKeys = detailKeys.filter((k) => k !== remove.dataset.key);
 				writeDetailKeys();
+			}
+		});
+		// Arming must not steal focus from the search: with focus intact the
+		// results stay open and the pick flow never restarts.
+		detailListEl.addEventListener("mousedown", (ev) => {
+			if (ev.target.closest(".hw-add") !== null) ev.preventDefault();
+		});
+		// Cell-rename commit and teardown, byte-parallel to the rotation
+		// chips: change writes once, blur without an edit restores the span,
+		// Enter blurs. The quad color well keeps its own change listener;
+		// the class guard keeps the two apart.
+		detailListEl.addEventListener("change", (ev) => {
+			const input = ev.target;
+			if (!(input instanceof HTMLInputElement) || !input.classList.contains("hw-cell-rename")) return;
+			const next = materializedTiles(Number(input.dataset.tile));
+			next[Number(input.dataset.tile)].labels[Number(input.dataset.cell)] = input.value.trim();
+			writeDetailTiles(next);
+		});
+		detailListEl.addEventListener("focusout", (ev) => {
+			if (ev.target instanceof HTMLInputElement && ev.target.classList.contains("hw-cell-rename")) {
+				setTimeout(renderDetailList, 0);
+			}
+		});
+		detailListEl.addEventListener("keydown", (ev) => {
+			if (ev.key === "Enter" && ev.target instanceof HTMLInputElement && ev.target.classList.contains("hw-cell-rename")) {
+				ev.target.blur();
 			}
 		});
 		detailBinding[0]().then(adoptDetailKeys);

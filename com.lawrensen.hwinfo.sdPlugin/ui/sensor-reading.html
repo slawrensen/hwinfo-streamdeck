@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0-5" />
+		<link rel="stylesheet" href="pi.css?v=1.5.0.0-6" />
 	</head>
 	<body>
 		<details class="hw-setup" data-fold="setup">
@@ -89,16 +89,18 @@
 				</sdpi-select>
 			</sdpi-item>
 			<div id="detail-custom" class="hw-cond" hidden>
-				<sdpi-item label="Add sensor">
-					<div class="hw-picker">
-						<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
-						<button id="pickerd-refresh" type="button" title="Reload sensor list">⟳</button>
-						<!-- Inline, not an overlay: results push the tile list down
-						     instead of covering it, so what you are adding TO stays
-						     visible while you pick. -->
-						<div class="hw-picker-list hw-inline" id="pickerd-list" hidden></div>
-					</div>
-				</sdpi-item>
+				<div id="detail-add-dock">
+					<sdpi-item label="Add sensor">
+						<div class="hw-picker">
+							<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
+							<!-- Inline, not an overlay: results push the tile list down
+							     instead of covering it, and the whole row pins to the
+							     top while the list is open, so what you are adding TO
+							     stays visible while you pick. -->
+							<div class="hw-picker-list hw-inline" id="pickerd-list" hidden></div>
+						</div>
+					</sdpi-item>
+				</div>
 				<div id="detail-list" class="hw-set"></div>
 			</div>
 			<div id="detail-filter" class="hw-cond" hidden>
@@ -328,7 +330,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0-5"></script>
-		<script src="pi-control.js?v=1.5.0.0-5"></script>
+		<script src="pi-common.js?v=1.5.0.0-6"></script>
+		<script src="pi-control.js?v=1.5.0.0-6"></script>
 	</body>
 </html>

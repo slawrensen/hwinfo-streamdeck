@@ -586,6 +586,56 @@ async function scenario(send) {
 	removeDetailSurface(send, "devden3", fltCells);
 	await sleep(300);
 
+	// Z. Hand-grouped custom tiles (issue #5 follow-up): a single with a
+	// custom label, a dressed quad (identity color + custom micro-label),
+	// and a trailing reading flowing at the default density, all on one
+	// page. The readings are the CONSTANT ones, so every assertion is
+	// against a face that cannot move on its own.
+	appearOpener(send, "ctx-tree", "devgrp", {}, { column: 4, row: 2 });
+	await sleep(600);
+	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp" });
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", payload: { event: "getSensorTree" } });
+	await sleep(600);
+	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp" });
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp", payload: { settings: {}, coordinates: { column: 4, row: 2 }, controller: "Keypad", isInMultiAction: false } });
+	const allReadings = (results.tree?.groups ?? []).flatMap((g) => g.readings.map((r) => ({ key: r.key, label: r.label })));
+	const keyOf = (label) => allReadings.find((r) => r.label === label)?.key;
+	const grpOpener = {
+		readingKey: primary.key,
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailTitle: "Grouped bench",
+		detailKeys: [keyOf("Test Fan"), keyOf("Test Volt"), keyOf("Core 0 VID"), keyOf("Core 1 VID"), keyOf("Core 2 VID"), keyOf("Core 3 VID")],
+		detailTiles: [
+			{ size: 1, labels: ["Fan spin"] },
+			{ size: 4, labels: ["", "", "", "Dcell"], colors: ["#ABCDEF", null, null, null], cellLabels: true }
+		]
+	};
+	results.grpKeysResolved = grpOpener.detailKeys.every((k) => typeof k === "string" && k !== "");
+	appearOpener(send, "ctx-grp", "devgrp", grpOpener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-grp", "devgrp", grpOpener);
+	await sleep(500);
+	results.grpSwitch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-grp", device: "devgrp", payload: { settings: grpOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devgrp", fltCells);
+	await sleep(1600);
+	results.grpTitleFace = latestSvg(slotCtx("devgrp", cellOfRole(fltCells, "title").coord));
+	results.grpSingleFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 0).coord));
+	results.grpQuadFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 1).coord));
+	results.grpTailFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 2).coord));
+	// One press on the dressed quad cycles ALL FOUR readings together.
+	slotPress(send, "devgrp", cellOfIndex(fltCells, 1).coord, cellOfIndex(fltCells, 1).settings);
+	await sleep(900);
+	results.grpQuadMin = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 1).coord));
+	const grpBackCell = fltCells.find((c) => c.settings.detailRole === "back");
+	const [grpBackCol, grpBackRow] = grpBackCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: slotCtx("devgrp", grpBackCell.coord), device: "devgrp", payload: { settings: grpBackCell.settings, coordinates: { column: grpBackCol, row: grpBackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: slotCtx("devgrp", grpBackCell.coord), device: "devgrp", payload: { settings: grpBackCell.settings, coordinates: { column: grpBackCol, row: grpBackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devgrp", fltCells);
+	await sleep(300);
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -711,6 +761,31 @@ async function finish() {
 	check("the mirror rides the opener's cell at density 3 (return mark)", typeof results.den3MirrorFace === "string" && results.den3MirrorFace.includes("M33 119"), (results.den3MirrorFace ?? "no frame").slice(0, 140));
 	check("pressing the dense mirror leaves (restore, name omitted)", results.den3MirrorSwitch !== undefined && results.den3MirrorSwitch.device === "devden3" && results.den3MirrorSwitch.profile === undefined, JSON.stringify(results.den3MirrorSwitch));
 
+	// Hand-grouped custom tiles.
+	check("grouping leg resolved every constant reading key", results.grpKeysResolved === true);
+	check("grouped entry switched devgrp to the class profile", results.grpSwitch?.device === "devgrp" && results.grpSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.grpSwitch));
+	check("grouped title counts readings across mixed tiles (1-6 / 6)", typeof results.grpTitleFace === "string" && results.grpTitleFace.includes(">1-6 / 6<"), (results.grpTitleFace ?? "no frame").slice(0, 160));
+	check(
+		"tile one is a SINGLE wearing its custom label",
+		typeof results.grpSingleFace === "string" && results.grpSingleFace.includes(">Fan spin<") && results.grpSingleFace.includes(">1200<") && !results.grpSingleFace.includes(">Test Fan<"),
+		(results.grpSingleFace ?? "no frame").slice(0, 200)
+	);
+	check(
+		"tile two is a QUAD dressed per cell (identity color + custom micro)",
+		typeof results.grpQuadFace === "string" && results.grpQuadFace.includes('fill="#ABCDEF">TEST<') && results.grpQuadFace.includes(">DCEL<") && results.grpQuadFace.includes(">12.1<"),
+		(results.grpQuadFace ?? "no frame").slice(0, 240)
+	);
+	check(
+		"the trailing reading flows on as a default single",
+		typeof results.grpTailFace === "string" && /Core 3 VID/.test(results.grpTailFace) && results.grpTailFace.includes(">1.35<"),
+		(results.grpTailFace ?? "no frame").slice(0, 200)
+	);
+	check(
+		"one press cycles the dressed quad's four readings together",
+		typeof results.grpQuadMin === "string" && results.grpQuadMin.includes(">11.9<") && (results.grpQuadMin.match(/>MIN</g) ?? []).length === 1,
+		(results.grpQuadMin ?? "no frame").slice(0, 240)
+	);
+
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -757,6 +832,7 @@ const info = {
 		{ id: "devden2", name: "Harness Deck E", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devden3", name: "Harness Deck F", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devden4", name: "Harness Deck G", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devgrp", name: "Harness Deck H", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

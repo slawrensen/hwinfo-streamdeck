@@ -649,3 +649,60 @@ details .hw-section {
 	color: #4a4a4a;
 	cursor: default;
 }
+
+/* Hand-grouped detail tiles: one bordered run per tile, its size cycler
+   in front, chips (with their per-cell label fields and quad color
+   wells) inside. A planned tile reads slightly brighter than the
+   uniform fill so the hand-made part is visible at a glance. */
+.hw-tile {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin: 2px 4px 2px 0;
+	padding: 2px 3px;
+	border: 1px solid #3a3f46;
+	border-radius: 6px;
+	max-width: 100%;
+	flex-wrap: wrap;
+}
+
+.hw-tile.planned {
+	border-color: #4a5563;
+	background: #22262c;
+}
+
+.hw-tile-size,
+.hw-tile-abc {
+	background: #2c313a;
+	border: none;
+	border-radius: 4px;
+	color: #c9d1d9;
+	cursor: pointer;
+	font-size: 8pt;
+	padding: 2px 5px;
+}
+
+.hw-tile-size:hover,
+.hw-tile-abc:hover {
+	background: #3a4250;
+}
+
+.hw-tile-label {
+	width: 56px;
+	background: #1b1e23;
+	border: 1px solid #3a3f46;
+	border-radius: 3px;
+	color: inherit;
+	font-size: 8pt;
+	padding: 1px 3px;
+}
+
+.hw-tile-color {
+	flex: 0 0 20px;
+	width: 20px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: pointer;
+}

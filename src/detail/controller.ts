@@ -289,7 +289,7 @@ export class DetailController {
 				// The tile's stat derives from its first reading (the cell the
 				// badge and accent follow); a press keeps the chunk in step.
 				const mode = chunk[0] === undefined ? "current" : this.navigator.statModeFor(state, chunk[0]);
-				return composeChunkFace(state, chunk, mode, status, ctx);
+				return composeChunkFace(state, chunk, mode, status, ctx, page.specs[binding.index]);
 			}
 		}
 	}

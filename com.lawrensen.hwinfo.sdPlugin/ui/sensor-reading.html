@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.5.0.0-4" />
 	</head>
 	<body>
 		<details class="hw-setup" data-fold="setup">
@@ -113,7 +113,7 @@
 					<option value="4">Four readings, quad grid</option>
 				</sdpi-select>
 			</sdpi-item>
-			<div class="hw-help">Packs that many readings onto each tile of the detail view, using the same stacked, row and quad faces regular keys have. Pressing a dense tile cycles the stat for all of its readings together.</div>
+			<div class="hw-help">Packs that many readings onto each tile of the detail view, using the same stacked, row and quad faces regular keys have. Pressing a dense tile cycles the stat for all of its readings together; a Custom sensor list can also group and dress its tiles one by one below.</div>
 			<sdpi-item label="Detail title">
 				<sdpi-textfield setting="detailTitle" placeholder="Title tile text (optional)"></sdpi-textfield>
 			</sdpi-item>
@@ -325,7 +325,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0-3"></script>
-		<script src="pi-control.js?v=1.5.0.0-3"></script>
+		<script src="pi-common.js?v=1.5.0.0-4"></script>
+		<script src="pi-control.js?v=1.5.0.0-4"></script>
 	</body>
 </html>

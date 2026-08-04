@@ -22,7 +22,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-8";
+	const PI_BUILD = "1.5.0.0-9";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -596,15 +596,20 @@
 	}
 
 	function addDetailSource(group) {
-		let added = 0;
+		let landed = "";
 		for (const reading of group.readings) {
 			if (reading.key !== detailPrimaryKey && !detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
 				detailKeys.push(reading.key);
-				detailLanded = reading.key; // the block's last chip carries the flash
-				added++;
+				landed = reading.key; // the block's last chip carries the flash
 			}
 		}
-		if (added > 0) writeDetailKeys();
+		if (landed === "") return;
+		// The block appends; a standing aim would claim a landing that never
+		// happened. Disarm before the receipt so the disarm re-render cannot
+		// eat the flash (the addDetailKey order).
+		if (detailArm !== null) armDetailAdd(detailArm.tileIdx);
+		detailLanded = landed;
+		writeDetailKeys();
 	}
 
 	function detailChip(key, index, tile, tileIdx, cellIdx) {
@@ -830,9 +835,10 @@
 	}
 
 	// --- sensor pickers -------------------------------------------------------
-	// One factory, one instance per search box. The tree is shared; rotation
-	// ticks exist only on the dial PI's primary picker. Each picker owns its
-	// open/typed state so the reading PI's two pickers never fight.
+	// One factory, one instance per search box. The tree is shared; membership
+	// ticks render wherever a config supplies tick/onTick (the dial's rotation
+	// list, the reading PI's collector). Each picker owns its open/typed state
+	// so the reading PI's pickers never fight.
 	const pickers = [];
 
 	function createPicker(config) {

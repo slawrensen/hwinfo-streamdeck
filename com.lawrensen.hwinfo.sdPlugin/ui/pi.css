@@ -194,9 +194,10 @@ details > summary:hover {
 	font-style: italic;
 }
 
-/* Rotation set (dial PI): membership ticks in the picker rows + removable
-   chips under the picker. The label flexes so the tick/label/value row keeps
-   the label left-aligned (harmless on the key PI's tick-less rows). */
+/* Membership ticks in picker rows (the dial's rotation set and the reading
+   PI's drill-down collector share the one pattern) + removable chips under
+   the picker. The label flexes so the tick/label/value row keeps the label
+   left-aligned. */
 
 .hw-row .hw-tick {
 	/* Explicit box: the webview's native checkbox otherwise shrinks with the
@@ -597,14 +598,9 @@ details .hw-section {
 	color: #d8d8d8;
 }
 
-/* Detail list (reading PI): the collector picker marks rows already in the
-   list, group headers grow an add-all button, and the ordered chips carry
-   move arrows (no rename here: labels come from HWiNFO). */
-
-.hw-row.added .hw-label::after {
-	content: " ✓";
-	color: #38cd89;
-}
+/* Detail list (reading PI): the collector rows carry the same membership
+   checkbox as the rotation set (one pattern everywhere), group headers grow
+   an add-all button, and the ordered chips carry move arrows. */
 
 .hw-group-add {
 	float: right;

@@ -19,6 +19,13 @@
 (() => {
 	"use strict";
 
+	// Build stamp: the panel names the code it actually runs, because the
+	// webview outlives on-disk refreshes and caches sub-resources. Read
+	// window.__hwPiVersion (or the console line) before trusting a repro.
+	const PI_BUILD = "1.5.0.0-8";
+	window.__hwPiVersion = PI_BUILD;
+	console.log(`hwinfo PI build ${PI_BUILD}`);
+
 	const { streamDeckClient, useSettings, useGlobalSettings } = SDPIComponents;
 
 	const previewValueEl = document.getElementById("preview-value");
@@ -332,6 +339,12 @@
 	let detailTiles = [];
 	let detailUniform = 1;
 	const detailTilesBinding = detailListEl === null ? null : useSettings("detailTiles", adoptDetailTiles, null);
+	// Merge-only sibling of the tiles binding (no callback, no debounce, no
+	// save): it stages detailTiles into the shared settings store so the
+	// following detailKeys write persists BOTH fields in ONE setSettings
+	// frame. Two staggered frames leave a window where only one half of a
+	// list edit survives (a torn pair is exactly the restaffed-quad bug).
+	const detailTilesStage = detailListEl === null ? null : useSettings("detailTiles", undefined, null, false);
 	const detailUniformBinding = detailListEl === null ? null : useSettings("detailDensity", adoptDetailUniform, null);
 
 	const TILE_COLOR = /^#[0-9A-Fa-f]{6}$/;
@@ -386,6 +399,17 @@
 		return next;
 	}
 
+	/** Every list or tile edit persists through here: detailTiles staged
+	 * (merged, unsaved), detailKeys saved, so the app stores one frame
+	 * carrying BOTH fields. Solo edits re-assert the other field for free,
+	 * which also self-heals a store that went stale. */
+	function writeDetailState() {
+		detailTilesStage[1](detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+		detailBinding[1]([...detailKeys]);
+		renderDetailList();
+		detailPicker?.renderList(); // membership ticks follow the edit
+	}
+
 	function writeDetailTiles(next) {
 		// Trailing entries that only restate the uniform fill are noise:
 		// prune them so the stored plan stays exactly the hand-made part.
@@ -394,8 +418,7 @@
 			next.pop();
 		}
 		detailTiles = next;
-		detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
-		renderDetailList();
+		writeDetailState();
 	}
 
 	function adoptDetailKeys(value) {
@@ -406,6 +429,7 @@
 		const seen = new Set();
 		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)).slice(0, DETAIL_KEYS_MAX) : [];
 		renderDetailList();
+		detailPicker?.renderList(); // membership ticks follow external writes too
 	}
 
 	function adoptDetailPrimary(value) {
@@ -454,9 +478,7 @@
 	}
 
 	function writeDetailKeys() {
-		detailBinding[1]([...detailKeys]);
-		renderDetailList();
-		detailPicker?.renderList(); // "added" row marks follow the edit
+		writeDetailState();
 	}
 
 	// The armed per-tile add: clicking a tile's + marker aims the collector
@@ -504,8 +526,7 @@
 				}
 				const cell = Math.min(occupied, next[detailArm.tileIdx].size - 1);
 				detailKeys.splice(tile.head + cell, 0, key);
-				detailTiles = next;
-				detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+				detailTiles = next; // staged and saved together in writeDetailKeys
 				if (Math.min(next[detailArm.tileIdx].size, detailKeys.length - tile.head) >= 4) {
 					armDetailAdd(detailArm.tileIdx); // full quad: disarm, and the end marker lights
 				}
@@ -520,6 +541,48 @@
 		detailLanded = key;
 		detailKeys.push(key);
 		writeDetailKeys();
+	}
+
+	/** Removing a reading shrinks the tile that held it, whatever built
+	 * that tile (hand-grouped or uniform fill): the readings below must
+	 * never flow up to restaff a layout the user is looking at. The freed
+	 * cell comes back deliberately, through the tile's +. A touched fill
+	 * tile materializes into the plan first, the same freeze the size
+	 * cycler applies; a tile losing its only cell leaves the plan with it. */
+	function removeDetailKey(key) {
+		const idx = detailKeys.indexOf(key);
+		if (idx < 0) {
+			return;
+		}
+		const walk = detailTileWalk();
+		const tileIdx = walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
+		let next = null;
+		if (tileIdx >= 0) {
+			const cell = idx - walk[tileIdx].head;
+			next = materializedTiles(tileIdx);
+			if (next[tileIdx].size <= 1) {
+				// The tile's only cell: the tile goes with it, and an aim at
+				// or past it re-anchors.
+				next.splice(tileIdx, 1);
+				if (detailArm !== null && detailArm.tileIdx === tileIdx) {
+					detailArm = null;
+					const search = detailSearchEl();
+					if (search !== null) search.placeholder = "Search sensors to add…";
+				} else if (detailArm !== null && detailArm.tileIdx > tileIdx) {
+					detailArm = { tileIdx: detailArm.tileIdx - 1 };
+				}
+			} else {
+				next[tileIdx].size -= 1;
+				next[tileIdx].labels.splice(cell, 1);
+				next[tileIdx].colors.splice(cell, 1);
+			}
+		}
+		detailKeys = detailKeys.filter((k) => k !== key);
+		if (next !== null) {
+			writeDetailTiles(next);
+		} else {
+			writeDetailKeys();
+		}
 	}
 
 	/** Drag reorder: move `key` so it sits at list position `to`. */
@@ -891,12 +954,17 @@
 					const row = document.createElement("div");
 					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "") + (config.inList?.(reading.key) === true ? " added" : "");
 					row.dataset.key = reading.key;
-					if (config.withTicks) {
+					if (config.tick !== undefined) {
+						// One membership pattern wherever a list HAS membership
+						// (the rotation set and the drill-down list): a checkbox
+						// at the row head. The old ✓ glyph is gone with it.
+						const state = config.tick(reading.key);
 						const tick = document.createElement("input");
 						tick.type = "checkbox";
 						tick.className = "hw-tick";
-						tick.checked = memberOfRotation(reading.key);
-						tick.title = rotationGroups === null ? "Include in the rotation set" : "Include in the marked rotation group";
+						tick.checked = state.on;
+						tick.disabled = state.disabled === true;
+						tick.title = state.title;
 						row.appendChild(tick);
 					}
 					const label = document.createElement("span");
@@ -947,7 +1015,7 @@
 		function selectRow(row) {
 			if (!row || !row.dataset.key) return;
 			if (config.onPick !== undefined) {
-				// Collector mode: a row click ADDS the reading and keeps the
+				// Collector mode: a row click toggles membership and keeps the
 				// list open, so building a custom detail list is one click per
 				// reading instead of reopen-search-click cycles.
 				config.onPick(row.dataset.key);
@@ -1019,12 +1087,12 @@
 			selectRow(row);
 		});
 
-		if (config.withTicks) {
+		if (config.onTick !== undefined) {
 			// The checkbox's own activation already flipped it; adopt its new state.
 			listEl.addEventListener("click", (ev) => {
-				if (!ev.target.classList.contains("hw-tick")) return;
+				if (!ev.target.classList.contains("hw-tick") || ev.target.disabled) return;
 				const row = ev.target.closest(".hw-row");
-				setRotationMembership(row?.dataset.key, ev.target.checked);
+				if (row?.dataset.key) config.onTick(row.dataset.key, ev.target.checked);
 			});
 		}
 
@@ -1064,14 +1132,21 @@
 		return picker;
 	}
 
-	const primaryPicker = createPicker({
+	const primaryConfig = {
 		search: document.getElementById("picker-search"),
 		refresh: document.getElementById("picker-refresh"),
 		list: document.getElementById("picker-list"),
 		setting: "readingKey",
-		withTicks: rotationSetEl !== null,
 		onSelectionEcho: renderRotationSet
-	});
+	};
+	if (rotationSetEl !== null) {
+		primaryConfig.tick = (key) => ({
+			on: memberOfRotation(key),
+			title: rotationGroups === null ? "Include in the rotation set" : "Include in the marked rotation group"
+		});
+		primaryConfig.onTick = setRotationMembership;
+	}
+	const primaryPicker = createPicker(primaryConfig);
 
 	// The extra-slot pickers (reading PI only in the markup): slot 2 serves
 	// the dual AND quad layouts, slots 3 and 4 are quad-only.
@@ -1099,7 +1174,22 @@
 					search: document.getElementById("pickerd-search"),
 					refresh: document.getElementById("pickerd-refresh"),
 					list: document.getElementById("pickerd-list"),
-					onPick: addDetailKey,
+					// The row body is the same toggle as its checkbox: one
+					// affordance, two hit areas. Adds respect the armed tile;
+					// removals shrink the tile that held the reading.
+					onPick: (key) => {
+						if (key === detailPrimaryKey) return;
+						if (detailKeys.includes(key)) removeDetailKey(key);
+						else addDetailKey(key);
+					},
+					tick: (key) =>
+						key === detailPrimaryKey
+							? { on: true, disabled: true, title: "This key's own sensor: the Back tile already shows it." }
+							: { on: detailKeys.includes(key), title: "Ticked readings are in the view. Untick to remove; the tile that held it shrinks." },
+					onTick: (key, next) => {
+						if (next) addDetailKey(key);
+						else removeDetailKey(key);
+					},
 					onGroupAdd: addDetailSource,
 					// Aiming, renaming and reordering in the tile list must not
 					// close the results: the list below the dock counts as
@@ -1668,41 +1758,7 @@
 			}
 			const remove = ev.target.closest(".hw-set-remove");
 			if (remove !== null) {
-				// Removing a cell from a HAND-GROUPED tile shrinks that tile
-				// with it: its other cells and every tile below keep their
-				// readings (the next reading must never flow up to restaff a
-				// quad someone curated), and the tile's + refills the freed
-				// cell. Only the uniform fill past the plan still flows.
-				const removedKey = remove.dataset.key;
-				const idx = detailKeys.indexOf(removedKey);
-				if (idx >= 0) {
-					const walk = detailTileWalk();
-					const tileIdx = walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
-					if (tileIdx >= 0 && walk[tileIdx].spec !== null) {
-						const cell = idx - walk[tileIdx].head;
-						const next = materializedTiles(tileIdx);
-						if (next[tileIdx].size <= 1) {
-							// The tile's only cell: the tile leaves with it, and
-							// an aim at or past it re-anchors.
-							next.splice(tileIdx, 1);
-							if (detailArm !== null && detailArm.tileIdx === tileIdx) {
-								detailArm = null;
-								const search = detailSearchEl();
-								if (search !== null) search.placeholder = "Search sensors to add…";
-							} else if (detailArm !== null && detailArm.tileIdx > tileIdx) {
-								detailArm = { tileIdx: detailArm.tileIdx - 1 };
-							}
-						} else {
-							next[tileIdx].size -= 1;
-							next[tileIdx].labels.splice(cell, 1);
-							next[tileIdx].colors.splice(cell, 1);
-						}
-						detailTiles = next;
-						detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
-					}
-				}
-				detailKeys = detailKeys.filter((k) => k !== removedKey);
-				writeDetailKeys();
+				removeDetailKey(remove.dataset.key);
 			}
 		});
 		// Arming must not steal focus from the search: with focus intact the

@@ -40,7 +40,19 @@ function check(name, ok, detail = "") {
 const FUTURE_BLOB = { nested: { deep: [1, "two", { three: 3 }] }, keep: "yes" };
 const SEEDS = {
 	back: { readingKey: "cpu:0:0", detailRole: "back", futureBlob: FUTURE_BLOB },
-	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB }
+	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
+	// A grouped custom list: one hand-dressed quad in the plan, then the
+	// uniform fill at density 4. Exercises the shrink-on-remove rules and
+	// the one-frame-per-edit invariant.
+	grouped: {
+		readingKey: "cpu:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailDensity: "4",
+		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"],
+		detailTiles: [{ size: 4, labels: ["", "", "", "MINE"], colors: ["#FF00AA", null, null, null], cellLabels: true }],
+		futureBlob: FUTURE_BLOB
+	}
 };
 
 let mode = "back";
@@ -76,6 +88,10 @@ const TREE = {
 				{ key: "twin:1:0", label: "Twin B Temp", unit: "°C", value: 41, type: 1, display: "41.0 °C" },
 				{ key: "twin:1:1", label: "Twin B Fan", unit: "RPM", value: 950, type: 3, display: "950 RPM" }
 			]
+		},
+		{
+			name: "Bench Source",
+			readings: Array.from({ length: 9 }, (_, i) => ({ key: `bench:0:${i}`, label: `Bench ${i}`, unit: "V", value: 1.2, type: 2, display: "1.20 V" }))
 		}
 	],
 	state: "ok",
@@ -148,7 +164,7 @@ function bootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|grouped)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -481,8 +497,8 @@ try {
 	await sleep(900); // ws round trip + renderList
 	const twinAdd = await evaluate(`(() => {
 		const buttons = Array.from(document.querySelectorAll("#pickerd-list .hw-group-add"));
-		if (buttons.length !== 3) return "expected 3 add-all buttons, got " + buttons.length;
-		// DOM order mirrors tree order: CPU, twin A, twin B. Press twin B's.
+		if (buttons.length !== 4) return "expected 4 add-all buttons, got " + buttons.length;
+		// DOM order mirrors tree order: CPU, twin A, twin B, Bench. Press twin B's.
 		// The list acts on mousedown (it preventDefaults ahead of blur), so a
 		// plain click() would not reach it.
 		buttons[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
@@ -494,6 +510,99 @@ try {
 	const lastTwin = writes.at(-1) ?? {};
 	check("+ all wrote the custom list", twinWrites.length >= 1, `${twinWrites.length} writes`);
 	check("+ all added the SECOND twin's readings, not the first's", deepEqual(lastTwin.detailKeys, ["twin:1:0", "twin:1:1"]), JSON.stringify(lastTwin.detailKeys));
+
+	// ---- run 3: grouped list edits are atomic and shrink their tile ------
+	// Every list or tile edit must land as ONE setSettings frame carrying
+	// BOTH detailKeys and detailTiles: two staggered frames leave a window
+	// where only half the edit survives (the restaffed-quad bug), and a
+	// removal must shrink the tile that held the reading whether the plan
+	// or the uniform fill built it.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("grouped: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+
+	const clickChipRemove = async (key) =>
+		(await evaluate(`(() => {
+			const x = document.querySelector('#detail-list .hw-set-chip[data-key="${key}"] .hw-set-remove');
+			if (!x) return "missing";
+			x.click();
+			return "ok";
+		})()`)).result?.value;
+	const atomic = (name, fresh) => {
+		check(`${name}: exactly one frame`, fresh.length === 1, `${fresh.length} frames`);
+		const frame = fresh.at(-1) ?? {};
+		check(`${name}: frame carries both fields`, Array.isArray(frame.detailKeys) && Array.isArray(frame.detailTiles), Object.keys(frame).join(","));
+		check(`${name}: unknown nested field preserved`, deepEqual(frame.futureBlob, FUTURE_BLOB), JSON.stringify(frame.futureBlob));
+		return frame;
+	};
+
+	mark = writes.length;
+	check("× on a planned-quad cell clicked", (await clickChipRemove("bench:0:1")) === "ok");
+	await sleep(700);
+	let frame = atomic("planned ×", writes.slice(mark));
+	check("planned ×: quad shrank to 3", frame.detailTiles?.[0]?.size === 3, JSON.stringify(frame.detailTiles?.[0]));
+	check("planned ×: dressing followed the cell out", deepEqual(frame.detailTiles?.[0]?.labels, ["", "", "MINE"]) && deepEqual(frame.detailTiles?.[0]?.colors, ["#FF00AA", null, null]), JSON.stringify(frame.detailTiles?.[0]));
+	check("planned ×: key left the list", frame.detailKeys?.length === 7 && !frame.detailKeys.includes("bench:0:1"), JSON.stringify(frame.detailKeys));
+
+	mark = writes.length;
+	check("× on a uniform-fill cell clicked", (await clickChipRemove("bench:0:5")) === "ok");
+	await sleep(700);
+	frame = atomic("uniform ×", writes.slice(mark));
+	check("uniform ×: the fill tile materialized and shrank", frame.detailTiles?.length === 2 && frame.detailTiles?.[1]?.size === 3, JSON.stringify(frame.detailTiles));
+	check("uniform ×: key left the list", frame.detailKeys?.length === 6 && !frame.detailKeys.includes("bench:0:5"), JSON.stringify(frame.detailKeys));
+
+	// The membership checkbox is the same control the rotation list uses:
+	// untick removes (tile shrinks), tick adds, the opener's row is fixed on.
+	const openCollector = async () => {
+		await evaluate(`(() => {
+			const input = document.getElementById("pickerd-search");
+			input.focus();
+			input.dispatchEvent(new Event("focus"));
+			return "ok";
+		})()`);
+		await sleep(600);
+	};
+	await openCollector();
+	mark = writes.length;
+	const untick = await evaluate(`(() => {
+		const tick = document.querySelector('#pickerd-list .hw-row[data-key="bench:0:4"] .hw-tick');
+		if (!tick) return "missing";
+		if (!tick.checked) return "not checked";
+		tick.click();
+		return "ok";
+	})()`);
+	check("member row shows a checked tick; unticked it", untick.result?.value === "ok", String(untick.result?.value));
+	await sleep(700);
+	frame = atomic("tick remove", writes.slice(mark));
+	check("tick remove: its tile shrank again", frame.detailTiles?.[1]?.size === 2, JSON.stringify(frame.detailTiles?.[1]));
+	check("tick remove: key left the list", frame.detailKeys?.length === 5 && !frame.detailKeys.includes("bench:0:4"), JSON.stringify(frame.detailKeys));
+
+	mark = writes.length;
+	const tickAdd = await evaluate(`(() => {
+		const tick = document.querySelector('#pickerd-list .hw-row[data-key="bench:0:8"] .hw-tick');
+		if (!tick) return "missing";
+		if (tick.checked) return "already checked";
+		tick.click();
+		return "ok";
+	})()`);
+	check("non-member row shows an unticked box; ticked it", tickAdd.result?.value === "ok", String(tickAdd.result?.value));
+	await sleep(700);
+	frame = atomic("tick add", writes.slice(mark));
+	check("tick add: key joined the list", frame.detailKeys?.length === 6 && frame.detailKeys.includes("bench:0:8"), JSON.stringify(frame.detailKeys));
+
+	mark = writes.length;
+	const primaryTick = await evaluate(`(() => {
+		const tick = document.querySelector('#pickerd-list .hw-row[data-key="cpu:0:0"] .hw-tick');
+		if (!tick) return "missing";
+		const state = { checked: tick.checked, disabled: tick.disabled };
+		tick.click();
+		return JSON.stringify(state);
+	})()`);
+	const primaryState = JSON.parse(primaryTick.result?.value?.startsWith("{") ? primaryTick.result.value : "{}");
+	check("opener's row is fixed on and disabled", primaryState.checked === true && primaryState.disabled === true, String(primaryTick.result?.value));
+	await sleep(500);
+	check("clicking the fixed tick wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

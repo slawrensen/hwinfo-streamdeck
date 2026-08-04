@@ -476,8 +476,11 @@ details .hw-section {
 	padding-top: 6px;
 }
 
-/* The first header after the setup fold: the fold's edge is rule enough. */
-.hw-setup + .hw-section {
+/* The first header after the setup fold: the fold's edge is rule enough.
+   The reading PI parks the usually hidden role note between them, so the
+   hint-interposed form is the same first header. */
+.hw-setup + .hw-section,
+.hw-setup + .hw-hint + .hw-section {
 	border-top: none;
 	margin-top: 6px;
 	padding-top: 0;

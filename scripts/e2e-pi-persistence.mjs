@@ -10,7 +10,11 @@
 //      pick, quad colors + micro-labels), thresholds and Display,
 //   3. a marked Back tile hides the whole Press section, shows the
 //      fixed-role note, and keeps the Show help truthful, while an
-//      ordinary key's panel stays byte-for-byte the stock experience.
+//      ordinary key's panel stays byte-for-byte the stock experience,
+//   4. the grouped collector's edits are positional and atomic: armed
+//      picks land at the aimed cell, + all appends one frame and
+//      disarms, a cell rename touches exactly one label, drag reorder
+//      lands at the midpoint index.
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -508,7 +512,7 @@ try {
 	await sleep(700);
 	const twinWrites = writes.slice(mark);
 	const lastTwin = writes.at(-1) ?? {};
-	check("+ all wrote the custom list", twinWrites.length >= 1, `${twinWrites.length} writes`);
+	check("+ all wrote the custom list in one frame", twinWrites.length === 1, `${twinWrites.length} writes`);
 	check("+ all added the SECOND twin's readings, not the first's", deepEqual(lastTwin.detailKeys, ["twin:1:0", "twin:1:1"]), JSON.stringify(lastTwin.detailKeys));
 
 	// ---- run 3: grouped list edits are atomic and shrink their tile ------
@@ -603,6 +607,178 @@ try {
 	check("opener's row is fixed on and disabled", primaryState.checked === true && primaryState.disabled === true, String(primaryTick.result?.value));
 	await sleep(500);
 	check("clicking the fixed tick wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+
+	// ---- run 3 continued: collector mechanics ----------------------------
+	// Arming, armed picks (splice pin, grow, auto-disarm), armed + all
+	// (append in one frame and disarm), the cell rename commit and abandon,
+	// and drag reorder's insert arithmetic. Entering state: detailKeys
+	// [b0,b2,b3,b6,b7,b8], plan [{3, MINE-dressed},{2}], density 4, so the
+	// walk is 3/3 + 2/2 + a fill tile holding bench:0:8 (1 of 4).
+	const clickAdd = async (arm) =>
+		(await evaluate(`(() => {
+			const add = document.querySelector('#detail-list .hw-add[data-arm="${arm}"]');
+			if (!add) return "missing";
+			add.click();
+			return "ok";
+		})()`)).result?.value;
+	const placeholderNow = async () => (await evaluate(`document.getElementById("pickerd-search")?.placeholder ?? "gone"`)).result?.value;
+
+	// Leg A: arming writes nothing and paints the aim.
+	mark = writes.length;
+	check("leg A: armed tile 1's +", (await clickAdd("0")) === "ok");
+	await sleep(400);
+	check("leg A: arming wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+	check("leg A: placeholder names the aim", (await placeholderNow()) === "Adding into tile 1; click its + again to finish.", await placeholderNow());
+	const armedMark = await evaluate(`document.querySelector('#detail-list .hw-add.armed[data-arm="0"]') !== null`);
+	check("leg A: the aimed + is lit armed", armedMark.result?.value === true, String(armedMark.result?.value));
+
+	// Leg B: the armed pick grows the size-3 tile to a quad at the freed
+	// cell and auto-disarms at four (the docs' freed-cell promise).
+	await openCollector();
+	mark = writes.length;
+	const armedPick = await evaluate(`(() => {
+		const tick = document.querySelector('#pickerd-list .hw-row[data-key="bench:0:1"] .hw-tick');
+		if (!tick || tick.checked) return "bad row";
+		tick.click();
+		return "ok";
+	})()`);
+	check("leg B: ticked into the armed tile", armedPick.result?.value === "ok", String(armedPick.result?.value));
+	await sleep(700);
+	frame = atomic("leg B armed pick", writes.slice(mark));
+	check("leg B: key landed at the aimed cell, not the end", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "bench:0:6", "bench:0:7", "bench:0:8"]), JSON.stringify(frame.detailKeys));
+	check("leg B: the tile grew to a quad keeping its dressing", deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF00AA", null, null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
+	check("leg B: the neighbor tile is untouched", frame.detailTiles?.[1]?.size === 2, JSON.stringify(frame.detailTiles?.[1]));
+	check("leg B: full quad auto-disarmed", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
+	check("leg B: placeholder reset", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+
+	// Leg C: aiming at the under-occupied fill tail materializes it on the
+	// pick and keeps the aim until toggled off by hand.
+	check("leg C: armed the fill tile's +", (await clickAdd("2")) === "ok");
+	await sleep(400);
+	check("leg C: aim names tile 3", (await placeholderNow()) === "Adding into tile 3; click its + again to finish.", await placeholderNow());
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:4"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("leg C fill pick", writes.slice(mark));
+	check("leg C: key landed in the fill tile", frame.detailKeys?.length === 8 && frame.detailKeys?.[7] === "bench:0:4", JSON.stringify(frame.detailKeys));
+	check("leg C: the fill tile materialized into the plan", frame.detailTiles?.length === 3 && deepEqual(frame.detailTiles?.[2], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[2]));
+	check("leg C: the aim persists while the tile has room", (await evaluate(`document.querySelector('#detail-list .hw-add.armed[data-arm="2"]') !== null`)).result?.value === true);
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
+	await sleep(400);
+	check("leg C: manual toggle-off wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+	check("leg C: toggle-off reset the placeholder", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+
+	// Leg D: + all under a standing aim appends in ONE frame and disarms,
+	// so the lit marker never claims a landing that did not happen.
+	check("leg D: armed tile 2's +", (await clickAdd("1")) === "ok");
+	await sleep(400);
+	check("leg D: aim armed", (await evaluate(`document.querySelector('#detail-list .hw-add.armed[data-arm="1"]') !== null`)).result?.value === true);
+	await openCollector();
+	mark = writes.length;
+	const armedGroupAdd = await evaluate(`(() => {
+		const buttons = Array.from(document.querySelectorAll("#pickerd-list .hw-group-add"));
+		if (buttons.length !== 4) return "expected 4 add-all buttons, got " + buttons.length;
+		buttons[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+		return "ok";
+	})()`);
+	check("leg D: + all pressed while armed", armedGroupAdd.result?.value === "ok", String(armedGroupAdd.result?.value));
+	await sleep(700);
+	frame = atomic("leg D armed + all", writes.slice(mark));
+	check("leg D: the block appended at the end", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0", "twin:1:1"]), JSON.stringify(frame.detailKeys));
+	check("leg D: the plan rode through unchanged", frame.detailTiles?.length === 3 && frame.detailTiles?.[0]?.size === 4 && frame.detailTiles?.[1]?.size === 2 && frame.detailTiles?.[2]?.size === 4, JSON.stringify(frame.detailTiles?.map((t) => t.size)));
+	check("leg D: + all disarmed the stale aim", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
+	check("leg D: placeholder no longer claims the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+
+	// Leg E: the cell rename commit touches exactly one label; the dressed
+	// quad beside it is the index-slip tripwire. The commit also prunes the
+	// now-trailing all-default fill tile (deliberate, pinned).
+	const renameOpen = await evaluate(`(() => {
+		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:6"] .hw-set-name');
+		if (!name) return "missing";
+		name.click();
+		const input = document.querySelector("#detail-list input.hw-cell-rename");
+		if (!input) return "no input";
+		return JSON.stringify({ tile: input.dataset.tile, cell: input.dataset.cell, value: input.value, ph: input.placeholder });
+	})()`);
+	const renameState = JSON.parse(renameOpen.result?.value?.startsWith("{") ? renameOpen.result.value : "{}");
+	check("leg E: rename input plumbs tile 1 cell 0", renameState.tile === "1" && renameState.cell === "0" && renameState.value === "" && renameState.ph === "Bench 6", String(renameOpen.result?.value));
+	mark = writes.length;
+	await evaluate(`(() => {
+		const input = document.querySelector("#detail-list input.hw-cell-rename");
+		input.value = "Renamed";
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+		input.blur();
+		// Headless Chrome's unfocused window makes focus()/blur() unreliable
+		// (the search-box idiom above): fire the teardown event by hand.
+		input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+		return "ok";
+	})()`);
+	await sleep(700);
+	frame = atomic("leg E rename commit", writes.slice(mark));
+	check("leg E: exactly the aimed label changed", deepEqual(frame.detailTiles?.[1]?.labels, ["Renamed", ""]), JSON.stringify(frame.detailTiles?.[1]));
+	check("leg E: the dressed quad beside it is byte-equal", deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF00AA", null, null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
+	check("leg E: the trailing all-default fill tile pruned", frame.detailTiles?.length === 2, `${frame.detailTiles?.length} entries`);
+	check("leg E: keys untouched by a rename", frame.detailKeys?.length === 10, `${frame.detailKeys?.length} keys`);
+	check("leg E: the chip repainted renamed", (await evaluate(`(() => {
+		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:6"] .hw-set-name');
+		return JSON.stringify({ cls: name?.classList.contains("renamed"), text: name?.textContent });
+	})()`)).result?.value === JSON.stringify({ cls: true, text: "Renamed" }));
+
+	// Leg F: Enter with the value untouched abandons the rename: no frame,
+	// the span restored.
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:7"] .hw-set-name')?.click()`);
+	mark = writes.length;
+	await evaluate(`(() => {
+		const input = document.querySelector("#detail-list input.hw-cell-rename");
+		if (!input) return "no input";
+		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); // headless blur stand-in
+		return "ok";
+	})()`);
+	await sleep(500);
+	check("leg F: abandoning a rename wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+	check("leg F: the span came back untouched", (await evaluate(`(() => {
+		const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:7"]');
+		return chip?.querySelector("input.hw-cell-rename") === null && chip?.querySelector(".hw-set-name")?.textContent === "Bench 7";
+	})()`)).result?.value === true);
+
+	// Leg G: drag reorder pins the midpoint decision and the to - 1 insert
+	// correction; the ghost appends; the arrow cross-checks the same order.
+	check("leg G: the ghost tile guards the full walk", (await evaluate(`document.querySelector("#detail-list .hw-tile.ghost") !== null`)).result?.value === true);
+	const dragDrop = async (srcKey, targetSel, side) =>
+		(await evaluate(`(() => {
+			const src = document.querySelector('#detail-list .hw-set-chip[data-key="${srcKey}"]');
+			const target = document.querySelector('${targetSel}');
+			if (!src || !target) return "missing";
+			const dt = new DataTransfer();
+			src.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			const r = target.getBoundingClientRect();
+			const x = ${JSON.stringify("left")} === "${side}" ? r.left + 2 : r.right - 2;
+			target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: r.top + 2 }));
+			src.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value;
+	mark = writes.length;
+	check("leg G1: dropped before the midpoint", (await dragDrop("twin:1:1", '#detail-list .hw-set-chip[data-key="bench:0:6"]', "left")) === "ok");
+	await sleep(700);
+	frame = atomic("leg G1 drop-before", writes.slice(mark));
+	check("leg G1: inserted before the target", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
+	mark = writes.length;
+	check("leg G2: dropped after the midpoint moving forward", (await dragDrop("bench:0:0", '#detail-list .hw-set-chip[data-key="bench:0:3"]', "right")) === "ok");
+	await sleep(700);
+	frame = atomic("leg G2 drop-after", writes.slice(mark));
+	check("leg G2: the to - 1 correction landed it after the target", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:3", "bench:0:0", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
+	mark = writes.length;
+	check("leg G3: dropped on the ghost tile", (await dragDrop("bench:0:2", "#detail-list .hw-tile.ghost", "left")) === "ok");
+	await sleep(700);
+	frame = atomic("leg G3 ghost append", writes.slice(mark));
+	check("leg G3: the ghost appends to the end", frame.detailKeys?.at(-1) === "bench:0:2", JSON.stringify(frame.detailKeys?.slice(-2)));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-detail-move[data-move="-1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg G4 arrow move", writes.slice(mark));
+	check("leg G4: the arrow swaps the same order", frame.detailKeys?.[8] === "bench:0:2" && frame.detailKeys?.[9] === "twin:1:0", JSON.stringify(frame.detailKeys?.slice(-2)));
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

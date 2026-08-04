@@ -459,11 +459,66 @@
 		detailPicker?.renderList(); // "added" row marks follow the edit
 	}
 
+	// The armed per-tile add: clicking a tile's + aims the collector at
+	// that tile, and the next picks land inside it (growing it to four),
+	// instead of appending to the end of the list. null = plain append.
+	let detailArm = null;
+
+	function detailSearchEl() {
+		return document.getElementById("pickerd-search");
+	}
+
+	function armDetailAdd(tileIdx) {
+		detailArm = detailArm !== null && detailArm.tileIdx === tileIdx ? null : { tileIdx };
+		const search = detailSearchEl();
+		if (search !== null) {
+			search.placeholder = detailArm === null ? "Search sensors to add…" : `Adding into tile ${tileIdx + 1}; pick sensors above…`;
+			if (detailArm !== null) {
+				search.scrollIntoView({ block: "center" });
+				search.focus();
+			}
+		}
+		renderDetailList();
+	}
+
 	function addDetailKey(key) {
 		// The primary is refused, not added-and-hidden: it already shows on
 		// the Back tile, and the runtime filters it out of the list.
 		if (!key || key === detailPrimaryKey || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return;
+		if (detailArm !== null) {
+			const walk = detailTileWalk();
+			const tile = walk[detailArm.tileIdx];
+			if (tile !== undefined) {
+				const occupied = Math.min(tile.size, detailKeys.length - tile.head);
+				const next = materializedTiles(detailArm.tileIdx);
+				if (occupied >= next[detailArm.tileIdx].size && next[detailArm.tileIdx].size < 4) {
+					// The tile is full but can grow: the pick becomes its next cell.
+					next[detailArm.tileIdx].size += 1;
+					next[detailArm.tileIdx].labels.push("");
+					next[detailArm.tileIdx].colors.push(null);
+				}
+				const cell = Math.min(occupied, next[detailArm.tileIdx].size - 1);
+				detailKeys.splice(tile.head + cell, 0, key);
+				detailTiles = next;
+				detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+				if (Math.min(next[detailArm.tileIdx].size, detailKeys.length - tile.head) >= 4) {
+					armDetailAdd(detailArm.tileIdx); // full quad: disarm, placeholder restores
+				}
+				writeDetailKeys();
+				return;
+			}
+			detailArm = null;
+		}
 		detailKeys.push(key);
+		writeDetailKeys();
+	}
+
+	/** Drag reorder: move `key` so it sits at list position `to`. */
+	function moveDetailKey(key, to) {
+		const from = detailKeys.indexOf(key);
+		if (from < 0 || to < 0 || to > detailKeys.length) return;
+		detailKeys.splice(from, 1);
+		detailKeys.splice(to > from ? to - 1 : to, 0, key);
 		writeDetailKeys();
 	}
 
@@ -483,6 +538,29 @@
 		const chip = document.createElement("span");
 		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
 		chip.dataset.key = key;
+		// Real-mouse drag between tiles (the arrows stay for keyboards and
+		// synthetic input, which native drag never registers for). Dropping
+		// ON a chip inserts before it; state writes only on a real drop.
+		chip.draggable = true;
+		chip.addEventListener("dragstart", (ev) => {
+			ev.dataTransfer.setData("text/plain", key);
+			ev.dataTransfer.effectAllowed = "move";
+			chip.classList.add("dragging");
+		});
+		chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+		chip.addEventListener("dragover", (ev) => {
+			ev.preventDefault();
+			ev.dataTransfer.dropEffect = "move";
+			chip.classList.add("drop-target");
+		});
+		chip.addEventListener("dragleave", () => chip.classList.remove("drop-target"));
+		chip.addEventListener("drop", (ev) => {
+			ev.preventDefault();
+			ev.stopPropagation();
+			chip.classList.remove("drop-target");
+			const dragged = ev.dataTransfer.getData("text/plain");
+			if (dragged !== "" && dragged !== key) moveDetailKey(dragged, index);
+		});
 		const name = document.createElement("span");
 		name.className = "hw-set-name hw-detail-name";
 		name.textContent = label ?? key;
@@ -555,6 +633,17 @@
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
+			// A drop on the tile itself (not a chip) moves to the tile's end.
+			holder.addEventListener("dragover", (ev) => {
+				ev.preventDefault();
+				ev.dataTransfer.dropEffect = "move";
+			});
+			holder.addEventListener("drop", (ev) => {
+				ev.preventDefault();
+				const dragged = ev.dataTransfer.getData("text/plain");
+				const occupied = Math.min(tile.size, detailKeys.length - tile.head);
+				if (dragged !== "") moveDetailKey(dragged, tile.head + occupied);
+			});
 			const size = document.createElement("button");
 			size.type = "button";
 			size.className = "hw-tile-size";
@@ -562,6 +651,15 @@
 			size.title = "Readings on this tile; click to cycle 1, 2, 3, 4";
 			size.textContent = `×${tile.size}`;
 			holder.appendChild(size);
+			const add = document.createElement("button");
+			add.type = "button";
+			add.className = "hw-tile-add" + (detailArm !== null && detailArm.tileIdx === tileIdx ? " armed" : "");
+			add.dataset.arm = String(tileIdx);
+			const full = tile.size >= 4 && detailKeys.length - tile.head >= 4;
+			add.disabled = full;
+			add.title = full ? "This tile is a full quad" : "Add the next picked sensors INTO this tile (grows it up to four)";
+			add.textContent = "+";
+			holder.appendChild(add);
 			if (tile.size === 4) {
 				const abc = document.createElement("button");
 				abc.type = "button";
@@ -1418,6 +1516,11 @@
 					[detailKeys[from], detailKeys[to]] = [detailKeys[to], detailKeys[from]];
 					writeDetailKeys();
 				}
+				return;
+			}
+			const arm = ev.target.closest(".hw-tile-add");
+			if (arm !== null && !arm.disabled) {
+				armDetailAdd(Number(arm.dataset.arm));
 				return;
 			}
 			const size = ev.target.closest(".hw-tile-size");

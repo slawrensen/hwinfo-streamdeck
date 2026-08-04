@@ -706,3 +706,47 @@ details .hw-section {
 	background: none;
 	cursor: pointer;
 }
+
+/* The detail collector's results render INLINE (the shared picker list
+   is an overlay): adding sensors must not bury the tile list you are
+   adding into. */
+.hw-picker-list.hw-inline {
+	position: static;
+	max-height: 220px;
+	margin-top: 4px;
+}
+
+/* Per-tile add: armed = the collector's next picks land in this tile. */
+.hw-tile-add {
+	background: #2c313a;
+	border: none;
+	border-radius: 4px;
+	color: #c9d1d9;
+	cursor: pointer;
+	font-size: 9pt;
+	padding: 2px 6px;
+}
+
+.hw-tile-add:hover {
+	background: #3a4250;
+}
+
+.hw-tile-add.armed {
+	background: #2660aa;
+	color: #ffffff;
+}
+
+.hw-tile-add:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+/* Drag reorder affordances. */
+.hw-set-chip.dragging {
+	opacity: 0.5;
+}
+
+.hw-set-chip.drop-target {
+	outline: 1px dashed #2660aa;
+	outline-offset: 1px;
+}

@@ -326,6 +326,77 @@
 	let detailPrimaryKey = "";
 	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
 	const detailPrimaryBinding = detailListEl === null ? null : useSettings("readingKey", adoptDetailPrimary, null);
+	// The hand-grouped tile plan (detailTiles) and the uniform density it
+	// falls back to past its end. The plan is POSITIONAL: sizes stay put
+	// while readings flow through them, exactly like the list's ordering.
+	let detailTiles = [];
+	let detailUniform = 1;
+	const detailTilesBinding = detailListEl === null ? null : useSettings("detailTiles", adoptDetailTiles, null);
+	const detailUniformBinding = detailListEl === null ? null : useSettings("detailDensity", adoptDetailUniform, null);
+
+	const TILE_COLOR = /^#[0-9A-Fa-f]{6}$/;
+
+	function adoptDetailTiles(value) {
+		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
+		// salvage, so the panel always shows what the runtime would build.
+		detailTiles = !Array.isArray(value)
+			? []
+			: value.slice(0, DETAIL_KEYS_MAX).map((entry) => {
+					const raw = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? entry : {};
+					const size = raw.size === 2 || raw.size === "2" ? 2 : raw.size === 3 || raw.size === "3" ? 3 : raw.size === 4 || raw.size === "4" ? 4 : 1;
+					const labels = [];
+					const colors = [];
+					for (let i = 0; i < size; i++) {
+						labels.push(typeof (raw.labels ?? [])[i] === "string" ? raw.labels[i].trim() : "");
+						colors.push(typeof (raw.colors ?? [])[i] === "string" && TILE_COLOR.test(raw.colors[i]) ? raw.colors[i] : null);
+					}
+					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
+				});
+		renderDetailList();
+	}
+
+	function adoptDetailUniform(value) {
+		detailUniform = value === 2 || value === "2" ? 2 : value === 3 || value === "3" ? 3 : value === 4 || value === "4" ? 4 : 1;
+		renderDetailList(); // the implicit fill grouping follows Tile shows
+	}
+
+	/** The whole list as tiles: explicit plan entries, then the uniform
+	 * fill, each { head chipIndex, size, spec|null }. */
+	function detailTileWalk() {
+		const tiles = [];
+		let cursor = 0;
+		while (cursor < detailKeys.length) {
+			const spec = tiles.length < detailTiles.length ? detailTiles[tiles.length] : null;
+			const size = spec !== null ? spec.size : detailUniform;
+			tiles.push({ head: cursor, size, spec });
+			cursor += size;
+		}
+		return tiles;
+	}
+
+	/** Extends the plan with default entries (at the fill sizes the walk
+	 * already shows) so tile `through` exists explicitly and can be edited. */
+	function materializedTiles(through) {
+		const walk = detailTileWalk();
+		const next = detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
+		for (let t = detailTiles.length; t <= through; t++) {
+			const size = t < walk.length ? walk[t].size : detailUniform;
+			next.push({ size, labels: Array.from({ length: size }, () => ""), colors: Array.from({ length: size }, () => null), cellLabels: true });
+		}
+		return next;
+	}
+
+	function writeDetailTiles(next) {
+		// Trailing entries that only restate the uniform fill are noise:
+		// prune them so the stored plan stays exactly the hand-made part.
+		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c) => c === null);
+		while (next.length > 0 && isDefault(next[next.length - 1])) {
+			next.pop();
+		}
+		detailTiles = next;
+		detailTilesBinding[1](next.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+		renderDetailList();
+	}
 
 	function adoptDetailKeys(value) {
 		// Mirror the plugin parser: duplicates drop at their first occurrence
@@ -407,55 +478,113 @@
 		if (added > 0) writeDetailKeys();
 	}
 
+	function detailChip(key, index, tile, tileIdx, cellIdx) {
+		const label = readingLabelOf(key);
+		const chip = document.createElement("span");
+		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
+		chip.dataset.key = key;
+		const name = document.createElement("span");
+		name.className = "hw-set-name hw-detail-name";
+		name.textContent = label ?? key;
+		if (tree !== null && label === null) {
+			name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
+		}
+		if (key === detailPrimaryKey) {
+			// Adopted from settings (or the opener re-picked onto a listed
+			// sensor): the deck shows this one on the Back tile, not in
+			// the list, and the panel must say so.
+			name.textContent += " (Back tile)";
+			name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
+		}
+		// The tile's per-cell label override, one small field per chip.
+		// Writes only on commit (change), like every other edit here.
+		const custom = document.createElement("input");
+		custom.type = "text";
+		custom.className = "hw-tile-label";
+		custom.placeholder = "Label";
+		custom.title = "This cell's label on the tile (empty keeps the reading's own)";
+		custom.value = tile.spec !== null ? (tile.spec.labels[cellIdx] ?? "") : "";
+		custom.addEventListener("change", () => {
+			const next = materializedTiles(tileIdx);
+			next[tileIdx].labels[cellIdx] = custom.value.trim();
+			writeDetailTiles(next);
+		});
+		const up = document.createElement("button");
+		up.type = "button";
+		up.className = "hw-detail-move";
+		up.dataset.move = "-1";
+		up.title = "Move up the list";
+		up.textContent = "↑";
+		up.disabled = index === 0;
+		const down = document.createElement("button");
+		down.type = "button";
+		down.className = "hw-detail-move";
+		down.dataset.move = "1";
+		down.title = "Move down the list";
+		down.textContent = "↓";
+		down.disabled = index === detailKeys.length - 1;
+		const remove = document.createElement("button");
+		remove.type = "button";
+		remove.className = "hw-set-remove";
+		remove.dataset.key = key;
+		remove.title = "Remove from the detail list";
+		remove.textContent = "×";
+		chip.append(name, custom);
+		if (tile.size === 4) {
+			// Quad cells carry identity colors, like a standalone quad key.
+			const well = document.createElement("input");
+			well.type = "color";
+			well.className = "hw-tile-color";
+			well.title = "This cell's identity color on the quad tile";
+			well.value = (tile.spec !== null ? tile.spec.colors[cellIdx] : null) ?? ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"][cellIdx] ?? "#4CC2FF";
+			well.addEventListener("change", () => {
+				const next = materializedTiles(tileIdx);
+				next[tileIdx].colors[cellIdx] = well.value;
+				writeDetailTiles(next);
+			});
+			chip.append(well);
+		}
+		chip.append(up, down, remove);
+		return chip;
+	}
+
 	function renderDetailList() {
 		if (detailListEl === null) return;
 		const frag = document.createDocumentFragment();
-		detailKeys.forEach((key, index) => {
-			const label = readingLabelOf(key);
-			const chip = document.createElement("span");
-			chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
-			chip.dataset.key = key;
-			const name = document.createElement("span");
-			name.className = "hw-set-name hw-detail-name";
-			name.textContent = label ?? key;
-			if (tree !== null && label === null) {
-				name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
+		const walk = detailTileWalk();
+		walk.forEach((tile, tileIdx) => {
+			const holder = document.createElement("span");
+			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
+			const size = document.createElement("button");
+			size.type = "button";
+			size.className = "hw-tile-size";
+			size.dataset.tile = String(tileIdx);
+			size.title = "Readings on this tile; click to cycle 1, 2, 3, 4";
+			size.textContent = `×${tile.size}`;
+			holder.appendChild(size);
+			if (tile.size === 4) {
+				const abc = document.createElement("button");
+				abc.type = "button";
+				abc.className = "hw-tile-abc";
+				abc.dataset.tile = String(tileIdx);
+				const on = tile.spec === null ? true : tile.spec.cellLabels;
+				abc.title = on ? "Cell labels shown; click for color-coded bare values" : "Bare values; click to show cell labels";
+				abc.textContent = on ? "Abc" : "123";
+				holder.appendChild(abc);
 			}
-			if (key === detailPrimaryKey) {
-				// Adopted from settings (or the opener re-picked onto a listed
-				// sensor): the deck shows this one on the Back tile, not in
-				// the list, and the panel must say so.
-				name.textContent += " (Back tile)";
-				name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
+			for (let c = 0; c < tile.size; c++) {
+				const index = tile.head + c;
+				const key = detailKeys[index];
+				if (key === undefined) break;
+				holder.appendChild(detailChip(key, index, tile, tileIdx, c));
 			}
-			const up = document.createElement("button");
-			up.type = "button";
-			up.className = "hw-detail-move";
-			up.dataset.move = "-1";
-			up.title = "Move up the list";
-			up.textContent = "↑";
-			up.disabled = index === 0;
-			const down = document.createElement("button");
-			down.type = "button";
-			down.className = "hw-detail-move";
-			down.dataset.move = "1";
-			down.title = "Move down the list";
-			down.textContent = "↓";
-			down.disabled = index === detailKeys.length - 1;
-			const remove = document.createElement("button");
-			remove.type = "button";
-			remove.className = "hw-set-remove";
-			remove.dataset.key = key;
-			remove.title = "Remove from the detail list";
-			remove.textContent = "×";
-			chip.append(name, up, down, remove);
-			frag.appendChild(chip);
+			frag.appendChild(holder);
 		});
 		frag.appendChild(
 			setNote(
 				detailKeys.length === 0
 					? "Empty: add readings above, in the order the detail view should list them."
-					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"}, listed in this order. This key's own sensor shows on the Back tile, not in the list.`
+					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting. This key's own sensor shows on the Back tile, not in the list.`
 			)
 		);
 		detailListEl.replaceChildren(frag);
@@ -1291,6 +1420,28 @@
 				}
 				return;
 			}
+			const size = ev.target.closest(".hw-tile-size");
+			if (size !== null) {
+				// Cycling a tile's size materializes the plan through it, so
+				// an implicit fill tile becomes editable the moment it is
+				// touched; a wrap back to the uniform default prunes itself.
+				const tileIdx = Number(size.dataset.tile);
+				const next = materializedTiles(tileIdx);
+				const grown = next[tileIdx].size === 4 ? 1 : next[tileIdx].size + 1;
+				next[tileIdx].size = grown;
+				next[tileIdx].labels = Array.from({ length: grown }, (_, i) => next[tileIdx].labels[i] ?? "");
+				next[tileIdx].colors = Array.from({ length: grown }, (_, i) => next[tileIdx].colors[i] ?? null);
+				writeDetailTiles(next);
+				return;
+			}
+			const abc = ev.target.closest(".hw-tile-abc");
+			if (abc !== null) {
+				const tileIdx = Number(abc.dataset.tile);
+				const next = materializedTiles(tileIdx);
+				next[tileIdx].cellLabels = !next[tileIdx].cellLabels;
+				writeDetailTiles(next);
+				return;
+			}
 			const remove = ev.target.closest(".hw-set-remove");
 			if (remove !== null) {
 				detailKeys = detailKeys.filter((k) => k !== remove.dataset.key);
@@ -1299,6 +1450,8 @@
 		});
 		detailBinding[0]().then(adoptDetailKeys);
 		detailPrimaryBinding[0]().then(adoptDetailPrimary);
+		detailTilesBinding[0]().then(adoptDetailTiles);
+		detailUniformBinding[0]().then(adoptDetailUniform);
 	}
 	if (rotationBinding !== null) {
 		rotationSetEl.addEventListener("click", (ev) => {

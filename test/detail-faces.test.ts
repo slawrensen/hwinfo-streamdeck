@@ -11,7 +11,7 @@ import { chunkMicroLabels, composeBackFace, composeChunkFace, composeIdleFace, c
 import { pageOf } from "../src/detail/detail-group";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
-import { renderReadingKey, renderStatusKey } from "../src/ui/key-renderer";
+import { QUAD_DEFAULT_COLORS, renderReadingKey, renderStatusKey } from "../src/ui/key-renderer";
 import { effectiveTextSettings, parseTextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
@@ -46,6 +46,7 @@ function stateOf(overrides?: Partial<DeviceDetailState> & { presentation?: Devic
 		profileName: "profiles/detail-standard",
 		pageSize: 11,
 		density: 1,
+		tilePlan: [],
 		primaryKey: "cpu:0:0",
 		groupSettings: { readingKey: "cpu:0:0" },
 		presentation: {},
@@ -235,6 +236,47 @@ describe("dense reading tiles (composeChunkFace)", () => {
 	it("status screens ride every density", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:1"], "current", down, ctxOf());
 		assert.match(svg, /Start HWiNFO/);
+	});
+});
+
+describe("hand-grouped tile specs (composeChunkFace + spec)", () => {
+	const spec = (size: 1 | 2 | 3 | 4, extra: Partial<import("../src/detail/detail-settings").DetailTileSpec> = {}): import("../src/detail/detail-settings").DetailTileSpec => ({
+		size,
+		labels: Array.from({ length: size }, () => ""),
+		colors: Array.from({ length: size }, () => null),
+		cellLabels: true,
+		...extra
+	});
+
+	it("no spec means byte-identical uniform faces at every size", () => {
+		for (const chunk of [["cpu:0:1"], ["cpu:0:1", "cpu:0:2"], ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"]]) {
+			assert.equal(composeChunkFace(stateOf(), chunk, "current", ok, ctxOf(), undefined), composeChunkFace(stateOf(), chunk, "current", ok, ctxOf()));
+		}
+	});
+
+	it("per-cell labels override at every size, missing cells included", () => {
+		const single = composeChunkFace(stateOf(), ["cpu:0:1"], "current", ok, ctxOf(), spec(1, { labels: ["Package W"] }));
+		assert.match(single, />Package W</);
+		assert.doesNotMatch(single, />CPU Power</);
+		const dual = composeChunkFace(stateOf(), ["cpu:0:1", "not-there:0:0"], "current", ok, ctxOf(), spec(2, { labels: ["Top", "Gone"] }));
+		assert.match(dual, />Top</);
+		assert.match(dual, />Gone</); // the placeholder row keeps the custom label
+		const quad = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { labels: ["", "SPOT", "", ""] }));
+		assert.match(quad, />SPOT</);
+		assert.match(quad, />MEMO</); // unlabeled cells keep the stripped fallback
+		assert.match(quad, />THER</);
+	});
+
+	it("quad identity colors override per cell; junk stays default", () => {
+		const dressed = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { colors: ["#ABCDEF", null, null, null] }));
+		assert.ok(dressed.includes('fill="#ABCDEF">MEMO<'), "custom color carries the first micro-label");
+		assert.ok(dressed.includes(QUAD_DEFAULT_COLORS[1] as string), "unset cells keep the default identity");
+	});
+
+	it("cellLabels false renders the color-coded bare-value variant", () => {
+		const bare = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { cellLabels: false }));
+		assert.doesNotMatch(bare, />MEMO</);
+		assert.ok(bare.includes(`fill="${QUAD_DEFAULT_COLORS[0] as string}">38`), "values wear the identity colors");
 	});
 });
 

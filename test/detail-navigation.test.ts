@@ -307,7 +307,7 @@ describe("paging and stats", () => {
 		if (state === undefined) return;
 		assert.equal(state.density, 3);
 		const page = nav.pageFor(state);
-		assert.equal(page.step, 33); // 11 tiles * 3 readings
+		assert.equal(page.step, 13); // one page: it consumes the whole group
 		assert.equal(page.chunks[0]?.length, 3);
 		assert.equal(page.rangeText, "1-13 / 13"); // readings, not tiles
 		assert.equal(page.hasNext, false);
@@ -350,8 +350,7 @@ describe("paging and stats", () => {
 			assert.fail("no state");
 		}
 		const page = nav.pageFor(state);
-		assert.equal(page.step, 20); // (11 tiles - 1 mirrored) * 2
-		assert.deepEqual(page.chunks[4], []);
+		assert.deepEqual(page.chunks[4], []); // the mirror tile carries nothing
 		assert.equal(page.chunks[5]?.[0], "cpu:0:9"); // readings flow around the mirror
 		assert.equal(page.rangeText, "1-13 / 13");
 	});

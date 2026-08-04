@@ -109,6 +109,61 @@ export function detailDensityOf(settings: { detailDensity?: unknown }): DetailDe
 }
 
 /**
+ * One tile of a hand-grouped custom page (issue #5 follow-up): how many
+ * of the custom list's readings it takes and how it dresses them, the
+ * same knobs a standalone multi-reading key has at this size. Cell
+ * labels ride every size (a row label on stacked and rows faces, the
+ * micro-label on the quad, the main label on a single); identity colors
+ * and the cell-labels variant are quad concerns like they are on a
+ * normal key.
+ */
+export type DetailTileSpec = {
+	readonly size: DetailDensity;
+	/** Per-cell label overrides; "" means "use the reading's own". */
+	readonly labels: readonly string[];
+	/** Per-cell #RRGGBB quad identity overrides; null keeps the default. */
+	readonly colors: readonly (string | null)[];
+	/** The quad micro-label variant; false shows color-coded bare values. */
+	readonly cellLabels: boolean;
+};
+
+/** The most grouped tiles an opener may describe (the list caps there too). */
+export const DETAIL_TILES_MAX = 128;
+
+const TILE_COLOR = /^#[0-9A-Fa-f]{6}$/;
+
+/**
+ * The hand-grouped tile plan for custom mode, walked over detailKeys in
+ * order: tile one takes the first `size` readings, tile two the next,
+ * and readings past the plan flow on at the uniform density. Absent or
+ * junk entries salvage per field (size to 1, labels to "", colors to
+ * null, cellLabels to true), a non-array is no plan at all, and nothing
+ * is ever rewritten. Positional by design: the pattern stays put while
+ * keys flow through it, exactly like the list's own ordering.
+ */
+export function detailTilesOf(settings: { detailTiles?: unknown }): readonly DetailTileSpec[] {
+	const raw = settings.detailTiles;
+	if (!Array.isArray(raw)) {
+		return [];
+	}
+	const tiles: DetailTileSpec[] = [];
+	for (const entry of raw.slice(0, DETAIL_TILES_MAX)) {
+		const record = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? (entry as { size?: unknown; labels?: unknown; colors?: unknown; cellLabels?: unknown }) : {};
+		const size = detailDensityOf({ detailDensity: record.size });
+		const rawLabels = Array.isArray(record.labels) ? record.labels : [];
+		const rawColors = Array.isArray(record.colors) ? record.colors : [];
+		const labels: string[] = [];
+		const colors: (string | null)[] = [];
+		for (let i = 0; i < size; i++) {
+			labels.push(typeof rawLabels[i] === "string" ? (rawLabels[i] as string).trim() : "");
+			colors.push(typeof rawColors[i] === "string" && TILE_COLOR.test(rawColors[i] as string) ? (rawColors[i] as string) : null);
+		}
+		tiles.push({ size, labels, colors, cellLabels: record.cellLabels !== false });
+	}
+	return tiles;
+}
+
+/**
  * Whether the opener also becomes a Back tile at its own cell inside the
  * view (the mirror). Off unless exactly true: testers found two Back
  * tiles per page more confusing than one they can move, so the fixed

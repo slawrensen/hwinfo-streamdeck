@@ -12,7 +12,7 @@
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, STAT_MODES, type DecimalsSetting, type StatMode } from "../ui/format";
 import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
-import { detailDensityOf, type DetailDensity } from "./detail-settings";
+import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
 
 export type SwitchProfileFn = (deviceId: string, profileName?: string, page?: number) => Promise<void>;
@@ -38,6 +38,9 @@ export type DeviceDetailState = {
 	readonly pageSize: number;
 	/** Readings per tile for this session (the opener's detailDensity). */
 	readonly density: DetailDensity;
+	/** The hand-grouped tile plan (custom mode only): explicit sizes and
+	 *  per-tile dressing walked over the list, before the uniform fill. */
+	readonly tilePlan: readonly DetailTileSpec[];
 	readonly primaryKey: string;
 	/** The opener's group settings, kept for source-mode re-resolution. */
 	readonly groupSettings: DetailGroupSettings;
@@ -164,7 +167,7 @@ export class DetailNavigator {
 	 * stays `pending` until a detail slot appears and quietly expires when
 	 * none ever does.
 	 */
-	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation & { detailDensity?: unknown }; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
+	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation & { detailDensity?: unknown; detailTiles?: unknown }; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
 		const { deviceId, deviceType, grid, settings, snapshot, openerCell } = request;
 		const profile = detailProfileFor(deviceType, grid);
 		if (profile === undefined) {
@@ -216,6 +219,10 @@ export class DetailNavigator {
 			profileName: profile.name,
 			pageSize: readingSlotCapacity(profile),
 			density: detailDensityOf(settings),
+			// Positional grouping needs the positional list: source and
+			// filter groups reshuffle with HWiNFO's layout, so specs there
+			// would dress the wrong readings mid-session.
+			tilePlan: detailModeOf(settings) === "custom" ? detailTilesOf(settings) : [],
 			primaryKey: group.primaryKey,
 			groupSettings: {
 				readingKey: settings.readingKey,
@@ -333,15 +340,17 @@ export class DetailNavigator {
 		if (direction > 0 ? !page.hasNext : !page.hasPrevious) {
 			return;
 		}
-		// The page's own step, not the raw capacity: a mirror Back tile
-		// costs one slot on EVERY page, so the stride shrinks with it.
-		state.offset = page.offset + direction * page.step;
+		// Forward adds THIS page's stride (a mirror Back costs one tile on
+		// every page, and hand-grouped tiles make strides vary); backward
+		// must land on the previous page's own start, which only the
+		// projection knows.
+		state.offset = direction > 0 ? page.offset + page.step : page.previousOffset;
 		this.deps.onChanged?.(deviceId);
 	}
 
 	/** The current logical page projection for a device's state. */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density);
+		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan);
 	}
 
 	/**
@@ -415,7 +424,7 @@ export class DetailNavigator {
 		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]);
 		if (changed) {
 			state.group = group;
-			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density).offset;
+			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan).offset;
 		}
 	}
 

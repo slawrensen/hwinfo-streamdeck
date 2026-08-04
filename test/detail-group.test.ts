@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { clampOffset, pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { DETAIL_KEYS_MAX, detailDensityOf, detailKeysOf, detailModeOf, detailTitleOf, pressBehaviorOf } from "../src/detail/detail-settings";
+import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
+import { DETAIL_KEYS_MAX, detailDensityOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -187,11 +187,11 @@ describe("pagination", () => {
 	});
 
 	it("clamps arbitrary offsets onto page boundaries", () => {
-		assert.equal(clampOffset(25, 999, 11), 22);
-		assert.equal(clampOffset(25, -5, 11), 0);
-		assert.equal(clampOffset(25, 13, 11), 11);
-		assert.equal(clampOffset(0, 7, 11), 0);
-		assert.equal(clampOffset(25, Number.NaN, 11), 0);
+		assert.equal(pageOf(keys, 999, 11).offset, 22);
+		assert.equal(pageOf(keys, -5, 11).offset, 0);
+		assert.equal(pageOf(keys, 13, 11).offset, 11);
+		assert.equal(pageOf([], 7, 11).offset, 0);
+		assert.equal(pageOf(keys, Number.NaN, 11).offset, 0);
 	});
 
 	it("the last page shows the remainder and disables next", () => {
@@ -298,8 +298,9 @@ describe("dense pagination (readings per tile)", () => {
 
 	it("offsets clamp onto dense step boundaries", () => {
 		const page = pageOf(keys, 999, 5, undefined, 4);
-		assert.equal(page.step, 20);
 		assert.equal(page.offset, 20);
+		assert.equal(page.step, 5); // the LAST page consumes what remains
+		assert.equal(page.previousOffset, 0);
 		assert.equal(page.rangeText, "21-25 / 25");
 		assert.equal(pageOf(keys, 7, 5, undefined, 4).offset, 0);
 	});
@@ -311,5 +312,98 @@ describe("dense pagination (readings per tile)", () => {
 		assert.equal(page.rangeText, "1-3 / 3");
 		assert.equal(page.hasPrevious, false);
 		assert.equal(page.hasNext, false);
+	});
+});
+
+describe("detailTiles parsing (hand-grouped custom pages)", () => {
+	it("salvages per entry per field, sizing the label and color arrays", () => {
+		const tiles = detailTilesOf({
+			detailTiles: [
+				{ size: 4, labels: ["A", 7, "  C  "], colors: ["#FFAA00", "orange", null, "#0011ff"], cellLabels: false },
+				{ size: "2", labels: ["only"] },
+				{ size: 99 },
+				"junk",
+				null
+			]
+		});
+		assert.equal(tiles.length, 5);
+		assert.deepEqual(tiles[0], { size: 4, labels: ["A", "", "C", ""], colors: ["#FFAA00", null, null, "#0011ff"], cellLabels: false });
+		assert.deepEqual(tiles[1], { size: 2, labels: ["only", ""], colors: [null, null], cellLabels: true });
+		assert.equal(tiles[2]?.size, 1);
+		assert.equal(tiles[3]?.size, 1); // junk entries degrade to plain singles
+		assert.equal(tiles[4]?.cellLabels, true);
+	});
+
+	it("a non-array is no plan at all", () => {
+		assert.deepEqual(detailTilesOf({}), []);
+		assert.deepEqual(detailTilesOf({ detailTiles: "4,2,1" }), []);
+	});
+});
+
+describe("hand-grouped pagination (mixed tile sizes)", () => {
+	const keys = Array.from({ length: 10 }, (_, i) => `k${i}`);
+	const tile = (size: DetailDensity, extra: Partial<DetailTileSpec> = {}): DetailTileSpec => ({ size, labels: Array.from({ length: size }, () => ""), colors: Array.from({ length: size }, () => null), cellLabels: true, ...extra });
+
+	it("plan tiles take their own sizes, the rest flow at the uniform density", () => {
+		const page = pageOf(keys, 0, 6, undefined, 2, [tile(4), tile(1)]);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], ["k4"]);
+		assert.deepEqual(page.chunks[2], ["k5", "k6"]); // uniform fill past the plan
+		assert.deepEqual(page.chunks[3], ["k7", "k8"]);
+		assert.deepEqual(page.chunks[4], ["k9"]);
+		assert.deepEqual(page.chunks[5], []);
+		assert.equal(page.rangeText, "1-10 / 10");
+	});
+
+	it("specs ride onto the page parallel to their chunks", () => {
+		const labeled = tile(2, { labels: ["Top", "Bottom"] });
+		const page = pageOf(keys, 0, 6, undefined, 1, [labeled]);
+		assert.deepEqual(page.specs[0], labeled);
+		assert.equal(page.specs[1], undefined);
+	});
+
+	it("pages with VARIABLE strides: forward adds this page's step, backward lands on previousOffset", () => {
+		// Two tiles per page: page one holds 4+1=5 readings, page two 1+1=2,
+		// page three the rest.
+		const plan = [tile(4), tile(1), tile(1), tile(1)];
+		const first = pageOf(keys, 0, 2, undefined, 1, plan);
+		assert.equal(first.step, 5);
+		assert.equal(first.rangeText, "1-5 / 10");
+		assert.equal(first.hasNext, true);
+		const second = pageOf(keys, first.offset + first.step, 2, undefined, 1, plan);
+		assert.equal(second.offset, 5);
+		assert.equal(second.rangeText, "6-7 / 10");
+		assert.equal(second.previousOffset, 0);
+		const third = pageOf(keys, second.offset + second.step, 2, undefined, 1, plan);
+		assert.equal(third.rangeText, "8-9 / 10");
+		assert.equal(third.previousOffset, 5); // NOT third.offset - third.step
+		const fourth = pageOf(keys, third.offset + third.step, 2, undefined, 1, plan);
+		assert.equal(fourth.rangeText, "10-10 / 10");
+		assert.equal(fourth.hasNext, false);
+	});
+
+	it("an arbitrary offset snaps DOWN onto a variable page boundary", () => {
+		const plan = [tile(4), tile(1), tile(1), tile(1)];
+		assert.equal(pageOf(keys, 6, 2, undefined, 1, plan).offset, 5);
+		assert.equal(pageOf(keys, 4, 2, undefined, 1, plan).offset, 0);
+		assert.equal(pageOf(keys, 999, 2, undefined, 1, plan).offset, 9);
+	});
+
+	it("the mirror still reserves a TILE among grouped tiles", () => {
+		const page = pageOf(keys, 0, 3, 1, 1, [tile(4), tile(2), tile(4)]);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], []); // the mirror
+		assert.equal(page.specs[1], undefined);
+		assert.deepEqual(page.chunks[2], ["k4", "k5"]);
+		assert.equal(page.step, 6);
+		assert.equal(page.hasNext, true);
+	});
+
+	it("a plan longer than the list mints no styled empties", () => {
+		const page = pageOf(["a"], 0, 4, undefined, 1, [tile(2), tile(4), tile(4)]);
+		assert.deepEqual(page.chunks[0], ["a"]);
+		assert.deepEqual(page.chunks[1], []);
+		assert.equal(page.specs[1], undefined);
+		assert.equal(page.rangeText, "1-1 / 1");
 	});
 });

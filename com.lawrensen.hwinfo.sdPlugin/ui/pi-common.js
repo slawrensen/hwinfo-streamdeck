@@ -22,7 +22,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-9";
+	const PI_BUILD = "1.5.0.0-10";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -387,14 +387,13 @@
 		return tiles;
 	}
 
-	/** Extends the plan with default entries (at the fill sizes the walk
-	 * already shows) so tile `through` exists explicitly and can be edited. */
+	/** Extends the plan with default entries (at the uniform fill size,
+	 * the size every tile past the plan renders at) so tile `through`
+	 * exists explicitly and can be edited. */
 	function materializedTiles(through) {
-		const walk = detailTileWalk();
 		const next = detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
 		for (let t = detailTiles.length; t <= through; t++) {
-			const size = t < walk.length ? walk[t].size : detailUniform;
-			next.push({ size, labels: Array.from({ length: size }, () => ""), colors: Array.from({ length: size }, () => null), cellLabels: true });
+			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true });
 		}
 		return next;
 	}
@@ -404,6 +403,15 @@
 	 * carrying BOTH fields. Solo edits re-assert the other field for free,
 	 * which also self-heals a store that went stale. */
 	function writeDetailState() {
+		// An edit can shorten the walk out from under a standing aim (a
+		// shrink consuming the last tile, a size cycle swallowing the
+		// fill): an aim past the new end has no cell to land in, so it
+		// disarms here, the one funnel every list and tile edit passes.
+		if (detailArm !== null && detailArm.tileIdx >= detailTileWalk().length) {
+			detailArm = null;
+			const search = detailSearchEl();
+			if (search !== null) search.placeholder = "Search sensors to add…";
+		}
 		detailTilesStage[1](detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
 		detailBinding[1]([...detailKeys]);
 		renderDetailList();
@@ -508,10 +516,12 @@
 		}
 	}
 
+	/** False when the add was refused (the primary, a duplicate, or the
+	 * 128 cap): the tick that triggered it repaints instead of lying. */
 	function addDetailKey(key) {
 		// The primary is refused, not added-and-hidden: it already shows on
 		// the Back tile, and the runtime filters it out of the list.
-		if (!key || key === detailPrimaryKey || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return;
+		if (!key || key === detailPrimaryKey || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return false;
 		if (detailArm !== null) {
 			const walk = detailTileWalk();
 			const tile = walk[detailArm.tileIdx];
@@ -534,13 +544,14 @@
 				// onto the write's own render.
 				detailLanded = key;
 				writeDetailKeys();
-				return;
+				return true;
 			}
 			detailArm = null;
 		}
 		detailLanded = key;
 		detailKeys.push(key);
 		writeDetailKeys();
+		return true;
 	}
 
 	/** Removing a reading shrinks the tile that held it, whatever built
@@ -824,7 +835,9 @@
 			setNote(
 				detailKeys.length === 0
 					? "Empty: add readings above, in the order the detail view should list them."
-					: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
+					: detailKeys.length >= DETAIL_KEYS_MAX
+						? `${detailKeys.length} readings across ${walk.length} tiles. That is the cap; remove one to add another.`
+						: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
 			)
 		);
 		detailListEl.replaceChildren(frag);
@@ -902,7 +915,11 @@
 				searchEl.classList.add("missing");
 			} else {
 				searchEl.value = "";
-				searchEl.placeholder = "Search sensors…";
+				// The collector never holds a selection (no bound setting), and
+				// its placeholder is owned by the HTML resting text and
+				// armDetailAdd's aim line: the generic reset here would wipe a
+				// standing aim's receipt on every close and tree echo.
+				if (config.setting !== undefined) searchEl.placeholder = "Search sensors…";
 				searchEl.classList.remove("missing");
 			}
 		}
@@ -958,7 +975,7 @@
 						frag.appendChild(header);
 					}
 					const row = document.createElement("div");
-					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "") + (config.inList?.(reading.key) === true ? " added" : "");
+					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "");
 					row.dataset.key = reading.key;
 					if (config.tick !== undefined) {
 						// One membership pattern wherever a list HAS membership
@@ -1178,7 +1195,6 @@
 			? null
 			: createPicker({
 					search: document.getElementById("pickerd-search"),
-					refresh: document.getElementById("pickerd-refresh"),
 					list: document.getElementById("pickerd-list"),
 					// The row body is the same toggle as its checkbox: one
 					// affordance, two hit areas. Adds respect the armed tile;
@@ -1193,8 +1209,14 @@
 							? { on: true, disabled: true, title: "This key's own sensor: the Back tile already shows it." }
 							: { on: detailKeys.includes(key), title: "Ticked readings are in the view. Untick to remove; the tile that held it shrinks." },
 					onTick: (key, next) => {
-						if (next) addDetailKey(key);
-						else removeDetailKey(key);
+						if (next) {
+							// A refused add (the 128 cap) leaves the native
+							// checkbox flipped: repaint the rows so the box
+							// shows the membership that exists.
+							if (addDetailKey(key) === false) detailPicker.renderList();
+						} else {
+							removeDetailKey(key);
+						}
 					},
 					onGroupAdd: addDetailSource,
 					// Aiming, renaming and reordering in the tile list must not
@@ -1207,11 +1229,7 @@
 					onOpenChange: (open) => {
 						document.getElementById("detail-custom")?.classList.toggle("picking", open);
 						if (open) detailListEl.querySelector(".hw-add.armed, .hw-add.lit")?.scrollIntoView({ block: "nearest" });
-					},
-					// The opener's own sensor carries the mark too: it is
-					// already in the view (the Back tile), and a click on it
-					// adds nothing.
-					inList: (key) => detailKeys.includes(key) || key === detailPrimaryKey
+					}
 				});
 
 	document.addEventListener("mousedown", (ev) => {

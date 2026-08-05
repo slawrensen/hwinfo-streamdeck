@@ -14,7 +14,11 @@
 //   4. the grouped collector's edits are positional and atomic: armed
 //      picks land at the aimed cell, + all appends one frame and
 //      disarms, a cell rename touches exactly one label, drag reorder
-//      lands at the midpoint index.
+//      lands at the midpoint index,
+//   5. the aim's receipt stays truthful and the cap refuses loudly: a
+//      list close never repaints a standing aim's placeholder, an edit
+//      that consumes the aimed tile disarms it, and at 128 readings a
+//      refused tick repaints unchecked while the list note names the cap.
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -55,6 +59,15 @@ const SEEDS = {
 		detailDensity: "4",
 		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"],
 		detailTiles: [{ size: 4, labels: ["", "", "", "MINE"], colors: ["#FF00AA", null, null, null], cellLabels: true }],
+		futureBlob: FUTURE_BLOB
+	},
+	// A list parked exactly at the 128-reading cap (the plugin parser's
+	// limit): the tick-refusal feedback and the cap note are the surface.
+	cap: {
+		readingKey: "cpu:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailKeys: Array.from({ length: 128 }, (_, i) => `cap:0:${i}`),
 		futureBlob: FUTURE_BLOB
 	}
 };
@@ -168,7 +181,7 @@ function bootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|grouped)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|grouped|cap)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -525,6 +538,10 @@ try {
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
 	await sleep(3500);
 	check("grouped: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	// The boot sensorTree echo runs every picker's showSelection; the
+	// collector's HTML resting text must survive it (placeholder ownership).
+	const restingPh = (await evaluate(`document.getElementById("pickerd-search")?.placeholder ?? "gone"`)).result?.value;
+	check("grouped: the boot tree echo kept the collector's resting placeholder", restingPh === "Search sensors to add…", String(restingPh));
 
 	const clickChipRemove = async (key) =>
 		(await evaluate(`(() => {
@@ -779,6 +796,86 @@ try {
 	await sleep(700);
 	frame = atomic("leg G4 arrow move", writes.slice(mark));
 	check("leg G4: the arrow swaps the same order", frame.detailKeys?.[8] === "bench:0:2" && frame.detailKeys?.[9] === "twin:1:0", JSON.stringify(frame.detailKeys?.slice(-2)));
+
+	// Leg H: the aim's placeholder survives a list close (outside click).
+	// The collector never holds a selection, so showSelection's generic
+	// reset must leave its placeholder alone: only the HTML resting text
+	// and armDetailAdd own it.
+	await openCollector();
+	mark = writes.length;
+	check("leg H: armed tile 2's +", (await clickAdd("1")) === "ok");
+	await sleep(400);
+	check("leg H: aim names tile 2", (await placeholderNow()) === "Adding into tile 2; click its + again to finish.", await placeholderNow());
+	await evaluate(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await sleep(400);
+	check("leg H: the outside click closed the list", (await evaluate(`document.getElementById("pickerd-list")?.hidden`)).result?.value === true);
+	check("leg H: the close kept the aim's placeholder", (await placeholderNow()) === "Adding into tile 2; click its + again to finish.", await placeholderNow());
+	check("leg H: the armed marker survived the close", (await evaluate(`document.querySelector('#detail-list .hw-add.armed[data-arm="1"]') !== null`)).result?.value === true);
+	check("leg H: none of it wrote", writes.length === mark, `${writes.length - mark} frames`);
+	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
+	await sleep(400);
+	check("leg H: manual disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+
+	// Leg I: an edit that consumes the aimed tile disarms the aim, so the
+	// placeholder never claims a tile the walk no longer has (the shrink
+	// branch used to leave detailArm dangling past the end).
+	await openCollector();
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="cpu:0:1"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("leg I seed pick", writes.slice(mark));
+	check("leg I: the pick opened a fourth tile", frame.detailKeys?.length === 11 && frame.detailKeys?.at(-1) === "cpu:0:1", JSON.stringify(frame.detailKeys?.slice(-2)));
+	check("leg I: armed the fourth tile's +", (await clickAdd("3")) === "ok");
+	await sleep(400);
+	check("leg I: aim names tile 4", (await placeholderNow()) === "Adding into tile 4; click its + again to finish.", await placeholderNow());
+	mark = writes.length;
+	check("leg I: × on the aimed tile's only chip", (await clickChipRemove("cpu:0:1")) === "ok");
+	await sleep(700);
+	frame = atomic("leg I aimed-tile removal", writes.slice(mark));
+	check("leg I: no armed marker outlives the vanished tile", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
+	check("leg I: the placeholder dropped the stale claim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("leg I follow-up pick", writes.slice(mark));
+	check("leg I: the next pick appends at the end, not into a ghost aim", frame.detailKeys?.length === 11 && frame.detailKeys?.at(-1) === "gpu:0:0", JSON.stringify(frame.detailKeys?.slice(-2)));
+
+	// ---- run 4: the 128-reading cap refuses loudly -----------------------
+	// At the cap the tick's native flip must not survive as a lying
+	// checkbox (the add was refused and nothing re-rendered), and the
+	// list note names the cap; freeing one slot lands the same tick.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/cap`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("cap: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const capNote = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
+	check("cap: the list note names the cap", String(capNote).includes("That is the cap"), String(capNote));
+	await openCollector();
+	mark = writes.length;
+	const capTick = await evaluate(`(() => {
+		const tick = document.querySelector('#pickerd-list .hw-row[data-key="bench:0:0"] .hw-tick');
+		if (!tick) return "missing";
+		if (tick.checked) return "already checked";
+		tick.click();
+		return "ok";
+	})()`);
+	check("cap: ticked a new reading at the cap", capTick.result?.value === "ok", String(capTick.result?.value));
+	await sleep(700);
+	check("cap: the refused add wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+	const capBox = await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:0"] .hw-tick')?.checked`);
+	check("cap: the refused tick repainted unchecked", capBox.result?.value === false, String(capBox.result?.value));
+	mark = writes.length;
+	check("cap: removed one chip", (await clickChipRemove("cap:0:5")) === "ok");
+	await sleep(700);
+	frame = atomic("cap removal", writes.slice(mark));
+	check("cap: 127 left", frame.detailKeys?.length === 127, `${frame.detailKeys?.length} keys`);
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:0"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("cap re-add", writes.slice(mark));
+	check("cap: the freed slot took the tick", frame.detailKeys?.length === 128 && frame.detailKeys?.includes("bench:0:0"), `${frame.detailKeys?.length} keys`);
+	const capNote2 = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
+	check("cap: back at the cap the note says so again", String(capNote2).includes("That is the cap"), String(capNote2));
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

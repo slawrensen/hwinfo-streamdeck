@@ -474,6 +474,25 @@ describe("switch-beat and late-accept seams", () => {
 		assert.deepEqual(switches.at(-1), { deviceId: "dev1", profileName: undefined, page: undefined });
 	});
 
+	it("a failed retry that replaced a STILL-PENDING entry leaves a tombstone for its prompt", async () => {
+		const { nav, switches, advance, settleSwitch } = bed({ deferSwitch: true });
+		const first = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		settleSwitch();
+		assert.equal(await first, "entered");
+		// Past the beat, before the 30 s expiry: the pending entry is
+		// retryable and its install prompt is still open. The retry killed
+		// the predecessor's expiry timer, so no tombstone exists yet.
+		advance(2_000);
+		const retry = nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		settleSwitch(true); // the app rejects the retry's dispatch
+		assert.equal(await retry, "switch-failed");
+		assert.equal(nav.stateFor("dev1"), undefined);
+		// The predecessor's prompt is still out there; accepting it late
+		// must bounce out, exactly like the expired-tombstone path above.
+		nav.surfaceSeen("dev1");
+		assert.deepEqual(switches.at(-1), { deviceId: "dev1", profileName: undefined, page: undefined });
+	});
+
 	it("leave arms a one-shot repaint so a no-op restore cannot leave the blackout up", async () => {
 		const { nav, changed, fireTimers, pendingTimers } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });

@@ -69,6 +69,17 @@ const SEEDS = {
 		detailMode: "custom",
 		detailKeys: Array.from({ length: 128 }, (_, i) => `cap:0:${i}`),
 		futureBlob: FUTURE_BLOB
+	},
+	// Hand-edited junk shapes the plugin parser rejects: labels as a string,
+	// colors as an object. The panel's mirror must reject them the same way
+	// or it shows renames and colors the deck never renders.
+	salvage: {
+		readingKey: "cpu:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"],
+		detailTiles: [{ size: 4, labels: "ABCD", colors: { 0: "#FF00AA" }, cellLabels: true }],
+		futureBlob: FUTURE_BLOB
 	}
 };
 
@@ -83,6 +94,7 @@ const TREE = {
 	groups: [
 		{
 			name: "CPU [#0]",
+			matchName: "CPU [#0]",
 			readings: [
 				{ key: "cpu:0:0", label: "CPU Tctl", unit: "°C", value: 55, type: 1, display: "55.0 °C" },
 				{ key: "cpu:0:1", label: "CPU Power", unit: "W", value: 120, type: 5, display: "120.0 W" },
@@ -94,6 +106,7 @@ const TREE = {
 		// must stay distinguishable, which a lookup by name cannot do.
 		{
 			name: "Twin Sensor",
+			matchName: "Twin Sensor",
 			readings: [
 				{ key: "twin:0:0", label: "Twin A Temp", unit: "°C", value: 40, type: 1, display: "40.0 °C" },
 				{ key: "twin:0:1", label: "Twin A Fan", unit: "RPM", value: 900, type: 3, display: "900 RPM" }
@@ -101,6 +114,7 @@ const TREE = {
 		},
 		{
 			name: "Twin Sensor",
+			matchName: "Twin Sensor",
 			readings: [
 				{ key: "twin:1:0", label: "Twin B Temp", unit: "°C", value: 41, type: 1, display: "41.0 °C" },
 				{ key: "twin:1:1", label: "Twin B Fan", unit: "RPM", value: 950, type: 3, display: "950 RPM" }
@@ -108,7 +122,16 @@ const TREE = {
 		},
 		{
 			name: "Bench Source",
+			matchName: "Bench Source",
 			readings: Array.from({ length: 9 }, (_, i) => ({ key: `bench:0:${i}`, label: `Bench ${i}`, unit: "V", value: 1.2, type: 2, display: "1.20 V" }))
+		},
+		// An orphan source (SHM row past the sensor table): the tree shows the
+		// "Unknown sensor" display fallback while matchName carries the raw
+		// empty source name the runtime filter actually matches against.
+		{
+			name: "Unknown sensor",
+			matchName: "",
+			readings: [{ key: "orphan:0:0", label: "Orphan Vcore", unit: "V", value: 1.0, type: 2, display: "1.00 V" }]
 		}
 	],
 	state: "ok",
@@ -181,7 +204,7 @@ function bootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|grouped|cap)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|grouped|cap|salvage)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -514,10 +537,10 @@ try {
 	await sleep(900); // ws round trip + renderList
 	const twinAdd = await evaluate(`(() => {
 		const buttons = Array.from(document.querySelectorAll("#pickerd-list .hw-group-add"));
-		if (buttons.length !== 4) return "expected 4 add-all buttons, got " + buttons.length;
-		// DOM order mirrors tree order: CPU, twin A, twin B, Bench. Press twin B's.
-		// The list acts on mousedown (it preventDefaults ahead of blur), so a
-		// plain click() would not reach it.
+		if (buttons.length !== 5) return "expected 5 add-all buttons, got " + buttons.length;
+		// DOM order mirrors tree order: CPU, twin A, twin B, Bench, orphan.
+		// Press twin B's. The list acts on mousedown (it preventDefaults
+		// ahead of blur), so a plain click() would not reach it.
 		buttons[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 		return "ok";
 	})()`);
@@ -527,6 +550,23 @@ try {
 	const lastTwin = writes.at(-1) ?? {};
 	check("+ all wrote the custom list in one frame", twinWrites.length === 1, `${twinWrites.length} writes`);
 	check("+ all added the SECOND twin's readings, not the first's", deepEqual(lastTwin.detailKeys, ["twin:1:0", "twin:1:1"]), JSON.stringify(lastTwin.detailKeys));
+
+	// ---- run 2c: the live filter count uses the RUNTIME's candidate ------
+	// The deck matches `${sourceName} ${label}` with "" for an orphan source
+	// (detail-group.ts); the panel must count with the same candidate, not
+	// the tree's "Unknown sensor" display fallback, or the counter promises
+	// readings the opened view will not list.
+	await setSelect("detailMode", "filter");
+	await sleep(700);
+	check("filter block visible", (await evaluate(`document.getElementById("detail-filter")?.hidden`)).result?.value === false);
+	await setTextfield("detailFilter", "*unknown*vcore*");
+	await sleep(1000); // the write plus the 400 ms followSetting poll
+	const countText = (await evaluate(`document.getElementById("detail-filter-count")?.textContent ?? "gone"`)).result?.value;
+	check("a display-name pattern counts 0, matching what the deck resolves", String(countText).startsWith("Matches nothing right now"), String(countText));
+	await setTextfield("detailFilter", "*orphan*");
+	await sleep(1000);
+	const countText2 = (await evaluate(`document.getElementById("detail-filter-count")?.textContent ?? "gone"`)).result?.value;
+	check("a label pattern still counts the orphan reading", String(countText2) === "Matches 1 reading right now.", String(countText2));
 
 	// ---- run 3: grouped list edits are atomic and shrink their tile ------
 	// Every list or tile edit must land as ONE setSettings frame carrying
@@ -695,7 +735,7 @@ try {
 	mark = writes.length;
 	const armedGroupAdd = await evaluate(`(() => {
 		const buttons = Array.from(document.querySelectorAll("#pickerd-list .hw-group-add"));
-		if (buttons.length !== 4) return "expected 4 add-all buttons, got " + buttons.length;
+		if (buttons.length !== 5) return "expected 5 add-all buttons, got " + buttons.length;
 		buttons[2].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 		return "ok";
 	})()`);
@@ -876,6 +916,25 @@ try {
 	check("cap: the freed slot took the tick", frame.detailKeys?.length === 128 && frame.detailKeys?.includes("bench:0:0"), `${frame.detailKeys?.length} keys`);
 	const capNote2 = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
 	check("cap: back at the cap the note says so again", String(capNote2).includes("That is the cap"), String(capNote2));
+
+	// ---- run 5: the tile-plan mirror rejects what the plugin parser rejects
+	// detailTilesOf takes labels/colors only as ARRAYS; a hand-edited string
+	// or object must salvage to "no overrides" in the panel too, or the
+	// chips wear renames and colors the deck never renders.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/salvage`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("salvage: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const salvage = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		renamed: document.querySelectorAll("#detail-list .hw-set-name.renamed").length,
+		first: document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-set-name')?.textContent ?? "gone",
+		well: document.querySelector("#detail-list .hw-tile-color")?.value ?? "gone"
+	})`)).result?.value ?? "{}"
+	);
+	check("salvage: a labels string yields no renamed chips", salvage.renamed === 0, `${salvage.renamed} renamed`);
+	check("salvage: the chip keeps the reading's own label", salvage.first === "Bench 0", String(salvage.first));
+	check("salvage: a colors object yields the default well", salvage.well === "#4cc2ff", String(salvage.well));
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

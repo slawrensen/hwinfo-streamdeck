@@ -5,10 +5,10 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0-10" />
+		<link rel="stylesheet" href="pi.css?v=1.5.0.0-11" />
 	</head>
 	<body>
-		<details class="hw-setup" data-fold="setup">
+		<details class="hw-setup">
 			<summary>First time? HWiNFO setup</summary>
 			<p>
 				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
@@ -53,7 +53,7 @@
 		<sdpi-item label="Rotation set">
 			<div class="hw-set" id="rotation-set"></div>
 		</sdpi-item>
-		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those. Click a chip's name to rename that reading on this dial.</div>
+		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those.</div>
 
 		<sdpi-item label="Bump guard">
 			<sdpi-checkbox setting="rotationDisabled" label="Ignore turns (protects against accidental bumps)"></sdpi-checkbox>
@@ -298,7 +298,7 @@
 					<sdpi-checkbox setting="textDimSecondary" global label="Dim labels, units and stats"></sdpi-checkbox>
 				</sdpi-item>
 			</div>
-			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color. Keys and dials with their own Text setting keep it. Warn and critical colors always win.</div>
+			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color, and keys or dials with their own Text setting keep it. Warn and critical colors always win.</div>
 			<sdpi-item label="Type accents">
 				<sdpi-select setting="typeAccents" global default="on">
 					<option value="on">On (accent color by sensor type)</option>
@@ -335,7 +335,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0-10"></script>
-		<script src="pi-control.js?v=1.5.0.0-10"></script>
+		<script src="pi-common.js?v=1.5.0.0-11"></script>
+		<script src="pi-control.js?v=1.5.0.0-11"></script>
 	</body>
 </html>

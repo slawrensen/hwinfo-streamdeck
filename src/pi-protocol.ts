@@ -45,6 +45,10 @@ export type PreviewSettings = {
 
 type TreeGroup = {
 	name: string;
+	/** The raw source name ("" for an orphan reading): what the runtime's
+	 * detail filter matches against, so the PI's live match counter can
+	 * use the same candidate while `name` keeps the display fallback. */
+	matchName: string;
 	readings: TreeReading[];
 };
 
@@ -142,8 +146,8 @@ export function buildSensorTree(status: PollerStatus): SensorTreePayload {
 		for (const reading of snapshot.readings) {
 			let group = byIndex.get(reading.sensorIndex);
 			if (group === undefined) {
-				const name = snapshot.sensors[reading.sensorIndex]?.name ?? "Unknown sensor";
-				group = { name, readings: [] };
+				const source = snapshot.sensors[reading.sensorIndex]?.name;
+				group = { name: source ?? "Unknown sensor", matchName: source ?? "", readings: [] };
 				byIndex.set(reading.sensorIndex, group);
 				groups.push(group);
 			}

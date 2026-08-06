@@ -6,6 +6,7 @@
 import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { readingRow } from "../detail/detail-faces";
 import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
@@ -16,7 +17,7 @@ import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { alertLevel, convertUnit, isStatMode, parseThreshold, STAT_BADGE, STAT_MODES, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
-import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
+import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
 import { quadIdentityColor, resolveTextColors } from "../ui/text-colors";
@@ -92,7 +93,8 @@ export type ReadingSettings = {
 	 */
 	pressBehavior?: string;
 	/** What the detail view lists: "source" (every reading of this
-	 * sensor's HWiNFO source, the default) or "custom" (detailKeys). */
+	 * sensor's HWiNFO source, the default), "custom" (detailKeys), or
+	 * "filter" (readings matching the detailFilter glob). */
 	detailMode?: string;
 	/** Custom detail list: stable reading keys in display order. */
 	detailKeys?: string[];
@@ -196,14 +198,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && v !== undefined));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
-		if (firstSighting) {
-			if (key !== undefined) {
-				poller.subscribeSeries(key);
-			}
-			subscribedKey = key;
-		} else if (subscribedKey !== key) {
-			// A replayed willAppear can carry settings that changed while the
-			// action was out of sight — track the new key's ring exactly like
+		if (subscribedKey !== key) {
+			// Covers the first sighting (subscribedKey starts undefined) and a
+			// replayed willAppear whose settings changed while the action was
+			// out of sight — track the new key's ring exactly like
 			// onDidReceiveSettings, or it never fills and the sparkline goes
 			// permanently blank. The old ring stays warm by design.
 			if (key !== undefined) {
@@ -612,8 +610,8 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	const bottomMode = isStatMode(settings.secondaryStatMode) ? settings.secondaryStatMode : topMode;
 	const shared = topMode === bottomMode;
 	return renderDualKey({
-		top: dualRow(primary, settings.label, topMode, shared, measureOpts),
-		bottom: dualRow(secondary, settings.secondaryLabel, bottomMode, shared, measureOpts),
+		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : STAT_BADGE[topMode]),
+		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : STAT_BADGE[bottomMode]),
 		sharedBadge: shared ? STAT_BADGE[topMode] : "",
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
@@ -646,21 +644,12 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 	const palette = resolvePalette(loadThemes(), themeId, accent, level);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3];
 	return renderTripleKey({
-		rows: slotKeys.map((key, i) => (key === undefined ? null : tripleRow(readings[i], customLabels[i], mode, measureOpts))),
+		rows: slotKeys.map((key, i) => (key === undefined ? null : readingRow(readings[i], mode, measureOpts, customLabels[i]))),
 		sharedBadge: STAT_BADGE[mode],
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
 	});
-}
-
-function tripleRow(reading: Reading | undefined, customLabel: string | undefined, mode: StatMode, measureOpts: MeasureOptions): TripleKeyRow {
-	if (reading === undefined) {
-		// The one permitted em dash: the key face's "no value" placeholder.
-		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "" };
-	}
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measureOpts);
-	return { label: keyLabel(customLabel, reading.label), valueText: measured.valueText, unitText: measured.unitText };
 }
 
 /**
@@ -718,16 +707,3 @@ function quadCell(reading: Reading | undefined, customLabel: string | undefined,
 	return { label, valueText: measured.valueText, unitText: measured.unitText, color };
 }
 
-function dualRow(reading: Reading | undefined, customLabel: string | undefined, mode: StatMode, shared: boolean, measureOpts: MeasureOptions): DualKeyRow {
-	if (reading === undefined) {
-		// The one permitted em dash: the key face's "no value" placeholder.
-		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "", statBadge: "" };
-	}
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measureOpts);
-	return {
-		label: keyLabel(customLabel, reading.label),
-		valueText: measured.valueText,
-		unitText: measured.unitText,
-		statBadge: shared ? "" : STAT_BADGE[mode]
-	};
-}

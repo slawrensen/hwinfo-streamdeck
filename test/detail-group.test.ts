@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { DETAIL_KEYS_MAX, detailDensityOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
+import { DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -58,6 +58,19 @@ describe("detail settings parsing", () => {
 		const parsed = detailKeysOf({ detailKeys: many });
 		assert.equal(parsed.length, DETAIL_KEYS_MAX);
 		assert.equal(parsed[0], "k0");
+	});
+
+	it("detailFilter: trimmed and truncated at the cap, not errored", () => {
+		const long = `ab${"c".repeat(DETAIL_FILTER_MAX * 2)}`;
+		assert.equal(detailFilterOf({ detailFilter: long })?.length, DETAIL_FILTER_MAX);
+		assert.equal(detailFilterOf({ detailFilter: "  gpu fan  " }), "gpu fan");
+		assert.equal(detailFilterOf({ detailFilter: "   " }), undefined);
+		assert.equal(detailFilterOf({ detailFilter: 42 }), undefined);
+	});
+
+	it("detailTiles: capped without erroring", () => {
+		const many = Array.from({ length: DETAIL_TILES_MAX + 40 }, () => ({ size: 2 }));
+		assert.equal(detailTilesOf({ detailTiles: many }).length, DETAIL_TILES_MAX);
 	});
 
 	it("detailTitle: trimmed, whitespace-only and non-strings unset", () => {

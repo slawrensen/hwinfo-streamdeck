@@ -73,7 +73,7 @@ payloads grow (dual/triple/quad SVG vs one reading), and every tile now
 redraws when ANY of its readings moves. Harness:
 `node scripts/perf-detail.mjs` (8 min per run, mock + XL, live HWiNFO
 with 511 readings, 250 ms poll option, the real shipped detail-plus-xl
-surface), with `PERF_DETAIL_FILTER="*"` so all 31 reading tiles are
+surface), with `PERF_DETAIL_FILTER="*"` so all 32 reading tiles are
 LIVE at every density (source mode leaves most tiles blank when the
 first source is small, which is what the 2026-07-29 row measured). The
 unfiltered control run reproduced that row (0.04% avg / 0.20% p95,
@@ -87,7 +87,7 @@ unfiltered control run reproduced that row (0.04% avg / 0.20% p95,
 | density 4 | 0.09% / 0.20% | 7,219 over 489 s (14.8/s) | 215 flat |
 
 Frames saturate near the live-tile count times HWiNFO's ~2 s value
-cadence (~15/s on 31 live tiles), not at the 250 ms poll: the tick
+cadence (~16/s on 32 live tiles), not at the 250 ms poll: the tick
 gate and byte dedupe still discard everything that did not actually
 change, and packing four readings per tile costs at most a doubling of
 average CPU against the same page at density 1, with p95 never past

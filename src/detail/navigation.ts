@@ -214,6 +214,11 @@ export class DetailNavigator {
 		this.leftAt.delete(deviceId);
 		const priorTombstone = this.expiredPendingAt.get(deviceId);
 		this.expiredPendingAt.delete(deviceId);
+		// A retry can replace a STILL-PENDING predecessor whose install
+		// prompt is still open; clearCleanupTimer above killed its expiry
+		// timer, so if the retry's dispatch fails, the rollback must leave
+		// the tombstone that timer would have written.
+		const replacedPending = existing !== undefined && existing.pending;
 		const state: DeviceDetailState = {
 			deviceId,
 			profileName: profile.name,
@@ -263,6 +268,8 @@ export class DetailNavigator {
 				this.states.delete(deviceId);
 				if (priorTombstone !== undefined) {
 					this.expiredPendingAt.set(deviceId, priorTombstone);
+				} else if (replacedPending) {
+					this.expiredPendingAt.set(deviceId, this.deps.now());
 				}
 			}
 			this.deps.log?.warn(`Detail profile switch failed on ${deviceId}: ${String(err)}`);

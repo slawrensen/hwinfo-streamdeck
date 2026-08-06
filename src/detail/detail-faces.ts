@@ -12,7 +12,7 @@
  * a power or clock reading), so they always render at the normal level.
  */
 import type { PollerStatus } from "../poller";
-import type { Reading, SensorSnapshot } from "../hwinfo/types";
+import type { Reading } from "../hwinfo/types";
 import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
 import { alertLevel, convertUnit, parseThreshold, STAT_BADGE, statValue } from "../ui/format";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
@@ -140,22 +140,20 @@ export function chunkMicroLabels(labels: readonly (string | undefined)[]): strin
 	return tokenized.map((t) => (t === null || t.length === 0 ? "" : (t[Math.min(shared, t.length - 1)] ?? "")));
 }
 
-/** One dense tile's row/cell inputs, resolved against the snapshot. */
-type ChunkCell = { reading: Reading | undefined };
-
-function chunkCells(snapshot: SensorSnapshot, keys: readonly string[]): ChunkCell[] {
-	return keys.map((key) => ({ reading: snapshot.byKey.get(key) }));
-}
-
-function chunkRow(cell: ChunkCell, mode: StatMode, measure: MeasureOptions, customLabel?: string): DualKeyRow & TripleKeyRow {
-	if (cell.reading === undefined) {
-		// A configured reading the snapshot does not publish keeps its cell
-		// (custom-mode order is positional); the placeholder value is the
-		// key face's one permitted em dash.
+/**
+ * One row of a multi-reading face, shared by the standalone dual and
+ * triple layouts and the dense detail tiles: label fallback, stat-mode
+ * value through the measurement path, and the positional "Sensor
+ * missing" placeholder (its value is the key face's one permitted em
+ * dash). `statBadge` stays "" everywhere except a dual row pinned to a
+ * stat of its own; a missing reading never badges.
+ */
+export function readingRow(reading: Reading | undefined, mode: StatMode, measure: MeasureOptions, customLabel?: string, statBadge = ""): DualKeyRow & TripleKeyRow {
+	if (reading === undefined) {
 		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "", statBadge: "" };
 	}
-	const measured = formatMeasurement(statValue(cell.reading, mode), cell.reading.unit, measure);
-	return { label: keyLabel(customLabel, cell.reading.label), valueText: measured.valueText, unitText: measured.unitText, statBadge: "" };
+	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measure);
+	return { label: keyLabel(customLabel, reading.label), valueText: measured.valueText, unitText: measured.unitText, statBadge };
 }
 
 /** A hand-grouped tile's label override for one cell; "" means none. */
@@ -202,16 +200,16 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 		return renderStatusKey(screen);
 	}
 	const { snapshot } = status as Extract<PollerStatus, { state: "ok" }>;
-	const cells = chunkCells(snapshot, keys);
-	const first = cells[0]?.reading;
+	const readings = keys.map((key) => snapshot.byKey.get(key));
+	const first = readings[0];
 	const accent = ctx.typeAccents && first !== undefined ? classifyTypeAccent(first.type, first.unit, first.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, "normal");
 	const text = resolveTextColors(palette, ctx.text, "normal");
 	const sharedBadge = STAT_BADGE[mode];
 	if (keys.length === 2) {
 		return renderDualKey({
-			top: chunkRow(cells[0] as ChunkCell, mode, ctx.measure, specLabel(spec, 0)),
-			bottom: chunkRow(cells[1] as ChunkCell, mode, ctx.measure, specLabel(spec, 1)),
+			top: readingRow(readings[0], mode, ctx.measure, specLabel(spec, 0)),
+			bottom: readingRow(readings[1], mode, ctx.measure, specLabel(spec, 1)),
 			sharedBadge,
 			palette,
 			text
@@ -219,23 +217,23 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 	}
 	if (keys.length === 3) {
 		return renderTripleKey({
-			rows: cells.map((cell, i) => chunkRow(cell, mode, ctx.measure, specLabel(spec, i))),
+			rows: readings.map((reading, i) => readingRow(reading, mode, ctx.measure, specLabel(spec, i))),
 			sharedBadge,
 			palette,
 			text
 		});
 	}
 	const labeled = spec === undefined ? true : spec.cellLabels;
-	const micros = chunkMicroLabels(cells.map((cell) => cell.reading?.label));
+	const micros = chunkMicroLabels(readings.map((reading) => reading?.label));
 	return renderQuadKey({
-		cells: cells.slice(0, 4).map((cell, i): QuadKeyCell => {
+		cells: readings.slice(0, 4).map((reading, i): QuadKeyCell => {
 			const color = quadIdentityColor(spec?.colors[i] ?? (QUAD_DEFAULT_COLORS[i] as string), labeled, ctx.text, text, palette);
 			const label = specLabel(spec, i) ?? micros[i] ?? "";
-			if (cell.reading === undefined) {
+			if (reading === undefined) {
 				// The same positional placeholder as the rows above.
 				return { label, valueText: "—", unitText: "", color };
 			}
-			const measured = formatQuadMeasurement(statValue(cell.reading, mode), cell.reading.unit, ctx.measure);
+			const measured = formatQuadMeasurement(statValue(reading, mode), reading.unit, ctx.measure);
 			return { label, valueText: measured.valueText, unitText: measured.unitText, color };
 		}),
 		labels: labeled,

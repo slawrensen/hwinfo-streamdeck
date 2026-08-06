@@ -1,20 +1,9 @@
 /* Shared property-inspector logic: the searchable sensor picker(s), the live
    preview line, and the status hint. Persists selections through
    SDPIComponents.useSettings so sdpi-managed fields are never clobbered.
-
-   Expected DOM (see sensor-reading.html / sensor-dial.html):
-     #picker-search, #picker-refresh, #picker-list, #preview-value,
-     #preview-stats, #status-hint, #theme-gallery
-   Optional (sensor-reading.html dual and quad layouts, Display select):
-     #picker2-search, #picker2-refresh, #picker2-list, #second-slot,
-     #dual-rows, #display-item, #display-mode, #quad-rows, #picker3-*,
-     #picker4-*, #quad-color-preset, #quad-color-1..4
-   Optional (both sensor PIs, Text setting):
-     #text-custom, #text-color, #deck-text-custom, #deck-text-color
-   Optional (sensor-dial.html overview views):
-     #overview-rows, #overview-three-rows
-   Optional (sensor-dial.html single-view bar range):
-     #bar-range                                                        */
+   The DOM contract lives in the panels that load this file
+   (sensor-reading.html, sensor-dial.html): every element is looked up by
+   id here, and a panel without a section simply leaves it inert. */
 /* global SDPIComponents */
 (() => {
 	"use strict";
@@ -22,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-10";
+	const PI_BUILD = "1.5.0.0-11";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -265,7 +254,7 @@
 		help.textContent =
 			rotationGroups === null
 				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those."
-				: "Ticks land in the group marked by the radio. Plain rotate stays inside a group; a gesture set to “Switch sensor or group” (Elite press+rotate) jumps between groups and shows the group name on the dial. Legacy rotates through all groups as one list.";
+				: "Ticks land in the group marked by the radio. Plain rotate stays inside a group; “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name, and Legacy rotates through all groups as one list.";
 	}
 
 	function renderRotationSet() {
@@ -357,11 +346,15 @@
 			: value.slice(0, DETAIL_KEYS_MAX).map((entry) => {
 					const raw = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? entry : {};
 					const size = raw.size === 2 || raw.size === "2" ? 2 : raw.size === 3 || raw.size === "3" ? 3 : raw.size === 4 || raw.size === "4" ? 4 : 1;
+					// Arrays only, like the parser: a hand-edited string or
+					// object must not salvage into dressing the deck ignores.
+					const rawLabels = Array.isArray(raw.labels) ? raw.labels : [];
+					const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
 					const labels = [];
 					const colors = [];
 					for (let i = 0; i < size; i++) {
-						labels.push(typeof (raw.labels ?? [])[i] === "string" ? raw.labels[i].trim() : "");
-						colors.push(typeof (raw.colors ?? [])[i] === "string" && TILE_COLOR.test(raw.colors[i]) ? raw.colors[i] : null);
+						labels.push(typeof rawLabels[i] === "string" ? rawLabels[i].trim() : "");
+						colors.push(typeof rawColors[i] === "string" && TILE_COLOR.test(rawColors[i]) ? rawColors[i] : null);
 					}
 					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
 				});
@@ -387,15 +380,29 @@
 		return tiles;
 	}
 
+	/** One deep copy of a tile plan: materialization and the staged write
+	 * both need one, and the model must never be mutated in place. */
+	function cloneTiles(tiles) {
+		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
+	}
+
 	/** Extends the plan with default entries (at the uniform fill size,
 	 * the size every tile past the plan renders at) so tile `through`
 	 * exists explicitly and can be edited. */
 	function materializedTiles(through) {
-		const next = detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
+		const next = cloneTiles(detailTiles);
 		for (let t = detailTiles.length; t <= through; t++) {
 			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true });
 		}
 		return next;
+	}
+
+	/** Materializes the plan through `tileIdx`, hands that tile to
+	 * `mutate`, persists: every per-tile control funnels through here. */
+	function editTile(tileIdx, mutate) {
+		const next = materializedTiles(tileIdx);
+		mutate(next[tileIdx]);
+		writeDetailTiles(next);
 	}
 
 	/** Every list or tile edit persists through here: detailTiles staged
@@ -408,11 +415,9 @@
 		// fill): an aim past the new end has no cell to land in, so it
 		// disarms here, the one funnel every list and tile edit passes.
 		if (detailArm !== null && detailArm.tileIdx >= detailTileWalk().length) {
-			detailArm = null;
-			const search = detailSearchEl();
-			if (search !== null) search.placeholder = "Search sensors to add…";
+			disarmDetailAim();
 		}
-		detailTilesStage[1](detailTiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels })));
+		detailTilesStage[1](cloneTiles(detailTiles));
 		detailBinding[1]([...detailKeys]);
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow the edit
@@ -477,16 +482,16 @@
 		const matches = detailFilterMatcher(pattern);
 		let count = 0;
 		for (const group of tree) {
+			// matchName is the RAW source name ("" for orphans), the exact
+			// candidate the runtime filter matches; group.name may carry the
+			// "Unknown sensor" display fallback the runtime never sees.
+			const sourceName = group.matchName ?? group.name;
 			for (const reading of group.readings) {
-				if (reading.key !== detailPrimaryKey && matches(`${group.name} ${reading.label}`)) count++;
+				if (reading.key !== detailPrimaryKey && matches(`${sourceName} ${reading.label}`)) count++;
 			}
 		}
 		el.hidden = false;
 		el.textContent = count === 0 ? "Matches nothing right now; the view would open empty (0 / 0)." : `Matches ${count} reading${count === 1 ? "" : "s"} right now.`;
-	}
-
-	function writeDetailKeys() {
-		writeDetailState();
 	}
 
 	// The armed per-tile add: clicking a tile's + marker aims the collector
@@ -495,6 +500,17 @@
 	// The marker itself sits at the exact cell the next pick fills, so the
 	// landing point is always painted, never guessed.
 	let detailArm = null;
+
+	const DETAIL_RESTING_PLACEHOLDER = "Search sensors to add…";
+
+	/** Quietly drops a standing aim and restores the resting search text
+	 * (no focus, no render): writeDetailState's past-end check, the splice
+	 * re-anchor and a stale-aim append all disarm through here. */
+	function disarmDetailAim() {
+		detailArm = null;
+		const search = detailSearchEl();
+		if (search !== null) search.placeholder = DETAIL_RESTING_PLACEHOLDER;
+	}
 	// The reading key that just landed (pick, drop, arrow move): its chip
 	// re-renders with a short flash and is scrolled into view, then the
 	// receipt clears. Purely visual; never persisted.
@@ -511,7 +527,7 @@
 		renderDetailList();
 		const search = detailSearchEl();
 		if (search !== null) {
-			search.placeholder = detailArm === null ? "Search sensors to add…" : `Adding into tile ${detailArm.tileIdx + 1}; click its + again to finish.`;
+			search.placeholder = detailArm === null ? DETAIL_RESTING_PLACEHOLDER : `Adding into tile ${detailArm.tileIdx + 1}; click its + again to finish.`;
 			search.focus({ preventScroll: true });
 		}
 	}
@@ -536,21 +552,21 @@
 				}
 				const cell = Math.min(occupied, next[detailArm.tileIdx].size - 1);
 				detailKeys.splice(tile.head + cell, 0, key);
-				detailTiles = next; // staged and saved together in writeDetailKeys
+				detailTiles = next; // staged and saved together in writeDetailState
 				if (Math.min(next[detailArm.tileIdx].size, detailKeys.length - tile.head) >= 4) {
 					armDetailAdd(detailArm.tileIdx); // full quad: disarm, and the end marker lights
 				}
 				// After the possible disarm re-render, so the receipt survives
 				// onto the write's own render.
 				detailLanded = key;
-				writeDetailKeys();
+				writeDetailState();
 				return true;
 			}
-			detailArm = null;
+			disarmDetailAim();
 		}
 		detailLanded = key;
 		detailKeys.push(key);
-		writeDetailKeys();
+		writeDetailState();
 		return true;
 	}
 
@@ -576,9 +592,7 @@
 				// or past it re-anchors.
 				next.splice(tileIdx, 1);
 				if (detailArm !== null && detailArm.tileIdx === tileIdx) {
-					detailArm = null;
-					const search = detailSearchEl();
-					if (search !== null) search.placeholder = "Search sensors to add…";
+					disarmDetailAim();
 				} else if (detailArm !== null && detailArm.tileIdx > tileIdx) {
 					detailArm = { tileIdx: detailArm.tileIdx - 1 };
 				}
@@ -592,7 +606,7 @@
 		if (next !== null) {
 			writeDetailTiles(next);
 		} else {
-			writeDetailKeys();
+			writeDetailState();
 		}
 	}
 
@@ -603,7 +617,7 @@
 		detailKeys.splice(from, 1);
 		detailKeys.splice(to > from ? to - 1 : to, 0, key);
 		detailLanded = key;
-		writeDetailKeys();
+		writeDetailState();
 	}
 
 	function addDetailSource(group) {
@@ -620,7 +634,7 @@
 		// eat the flash (the addDetailKey order).
 		if (detailArm !== null) armDetailAdd(detailArm.tileIdx);
 		detailLanded = landed;
-		writeDetailKeys();
+		writeDetailState();
 	}
 
 	function detailChip(key, index, tile, tileIdx, cellIdx) {
@@ -665,7 +679,7 @@
 			if (dragged !== "" && dragged !== key) moveDetailKey(dragged, after ? index + 1 : index);
 		});
 		const name = document.createElement("span");
-		name.className = "hw-set-name hw-detail-name";
+		name.className = "hw-set-name";
 		name.textContent = label ?? key;
 		if (tree !== null && label === null) {
 			name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
@@ -724,14 +738,33 @@
 			well.title = "This cell's identity color on the quad tile";
 			well.value = (tile.spec !== null ? tile.spec.colors[cellIdx] : null) ?? ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"][cellIdx] ?? "#4CC2FF";
 			well.addEventListener("change", () => {
-				const next = materializedTiles(tileIdx);
-				next[tileIdx].colors[cellIdx] = well.value;
-				writeDetailTiles(next);
+				editTile(tileIdx, (t) => {
+					t.colors[cellIdx] = well.value;
+				});
 			});
 			chip.append(well);
 		}
 		chip.append(up, down, remove);
 		return chip;
+	}
+
+	/** A drop on tile chrome (not a chip) appends at `dropIndex()`: the
+	 * real holders and the trailing ghost share the wiring, and the chip
+	 * guards are simply vacuous on the chipless ghost. */
+	function wireAppendDrop(el, dropIndex) {
+		el.addEventListener("dragover", (ev) => {
+			ev.preventDefault();
+			ev.dataTransfer.dropEffect = "move";
+			el.classList.toggle("drop-append", ev.target.closest(".hw-set-chip") === null);
+		});
+		el.addEventListener("dragleave", () => el.classList.remove("drop-append"));
+		el.addEventListener("drop", (ev) => {
+			ev.preventDefault();
+			el.classList.remove("drop-append");
+			if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
+			const dragged = ev.dataTransfer.getData("text/plain");
+			if (dragged !== "") moveDetailKey(dragged, dropIndex());
+		});
 	}
 
 	/** The + marker sitting at the exact cell the next pick would fill in
@@ -752,7 +785,7 @@
 		// A tree echo or preview tick must never destroy an in-progress
 		// cell rename (the rotation editor holds the same line).
 		const active = document.activeElement;
-		if (active !== null && active.classList !== undefined && active.classList.contains("hw-cell-rename")) return;
+		if (active !== null && active.classList.contains("hw-cell-rename")) return;
 		const frag = document.createDocumentFragment();
 		const walk = detailTileWalk();
 		// The unarmed landing point: the last tile with a free cell, else
@@ -765,25 +798,12 @@
 			// A drop on the tile itself (not a chip) appends at its end; the
 			// frame lights only for true tile-chrome hovers, not bubbled
 			// chip dragovers.
-			holder.addEventListener("dragover", (ev) => {
-				ev.preventDefault();
-				ev.dataTransfer.dropEffect = "move";
-				holder.classList.toggle("drop-append", ev.target.closest(".hw-set-chip") === null);
-			});
-			holder.addEventListener("dragleave", () => holder.classList.remove("drop-append"));
-			holder.addEventListener("drop", (ev) => {
-				ev.preventDefault();
-				holder.classList.remove("drop-append");
-				if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
-				const dragged = ev.dataTransfer.getData("text/plain");
-				const occupied = Math.min(tile.size, detailKeys.length - tile.head);
-				if (dragged !== "") moveDetailKey(dragged, tile.head + occupied);
-			});
+			wireAppendDrop(holder, () => tile.head + Math.min(tile.size, detailKeys.length - tile.head));
 			const size = document.createElement("button");
 			size.type = "button";
 			size.className = "hw-tile-size";
 			size.dataset.tile = String(tileIdx);
-			size.title = "Readings on this tile; click to cycle 1, 2, 3, 4";
+			size.title = "Cells on this tile; click to cycle 1, 2, 3, 4";
 			size.textContent = `×${tile.size}`;
 			holder.appendChild(size);
 			if (tile.size === 4) {
@@ -816,18 +836,7 @@
 			// marker is the landing point.
 			const ghost = document.createElement("span");
 			ghost.className = "hw-tile ghost";
-			ghost.addEventListener("dragover", (ev) => {
-				ev.preventDefault();
-				ev.dataTransfer.dropEffect = "move";
-				ghost.classList.add("drop-append");
-			});
-			ghost.addEventListener("dragleave", () => ghost.classList.remove("drop-append"));
-			ghost.addEventListener("drop", (ev) => {
-				ev.preventDefault();
-				ghost.classList.remove("drop-append");
-				const dragged = ev.dataTransfer.getData("text/plain");
-				if (dragged !== "") moveDetailKey(dragged, detailKeys.length);
-			});
+			wireAppendDrop(ghost, () => detailKeys.length);
 			ghost.appendChild(detailAddMarker("end", false, detailArm === null));
 			frag.appendChild(ghost);
 		}
@@ -1725,7 +1734,7 @@
 				if (from >= 0 && to >= 0 && to < detailKeys.length) {
 					[detailKeys[from], detailKeys[to]] = [detailKeys[to], detailKeys[from]];
 					detailLanded = key; // the moved chip flashes at its new cell
-					writeDetailKeys();
+					writeDetailState();
 				}
 				return;
 			}
@@ -1741,7 +1750,7 @@
 				// the reading's own label; commit on change, Enter blurs.
 				const chip = nameEl.closest(".hw-set-chip");
 				const chipKey = chip?.dataset.key;
-				if (chip === undefined || chip === null || chipKey === undefined || chipKey === detailPrimaryKey) return;
+				if (chip === null || chipKey === undefined || chipKey === detailPrimaryKey) return;
 				const tileIdx = Number(chip.dataset.tile);
 				const cellIdx = Number(chip.dataset.cell);
 				const spec = detailTiles[tileIdx];
@@ -1763,21 +1772,19 @@
 				// Cycling a tile's size materializes the plan through it, so
 				// an implicit fill tile becomes editable the moment it is
 				// touched; a wrap back to the uniform default prunes itself.
-				const tileIdx = Number(size.dataset.tile);
-				const next = materializedTiles(tileIdx);
-				const grown = next[tileIdx].size === 4 ? 1 : next[tileIdx].size + 1;
-				next[tileIdx].size = grown;
-				next[tileIdx].labels = Array.from({ length: grown }, (_, i) => next[tileIdx].labels[i] ?? "");
-				next[tileIdx].colors = Array.from({ length: grown }, (_, i) => next[tileIdx].colors[i] ?? null);
-				writeDetailTiles(next);
+				editTile(Number(size.dataset.tile), (t) => {
+					const grown = t.size === 4 ? 1 : t.size + 1;
+					t.size = grown;
+					t.labels = Array.from({ length: grown }, (_, i) => t.labels[i] ?? "");
+					t.colors = Array.from({ length: grown }, (_, i) => t.colors[i] ?? null);
+				});
 				return;
 			}
 			const abc = ev.target.closest(".hw-tile-abc");
 			if (abc !== null) {
-				const tileIdx = Number(abc.dataset.tile);
-				const next = materializedTiles(tileIdx);
-				next[tileIdx].cellLabels = !next[tileIdx].cellLabels;
-				writeDetailTiles(next);
+				editTile(Number(abc.dataset.tile), (t) => {
+					t.cellLabels = !t.cellLabels;
+				});
 				return;
 			}
 			const remove = ev.target.closest(".hw-set-remove");
@@ -1797,9 +1804,9 @@
 		detailListEl.addEventListener("change", (ev) => {
 			const input = ev.target;
 			if (!(input instanceof HTMLInputElement) || !input.classList.contains("hw-cell-rename")) return;
-			const next = materializedTiles(Number(input.dataset.tile));
-			next[Number(input.dataset.tile)].labels[Number(input.dataset.cell)] = input.value.trim();
-			writeDetailTiles(next);
+			editTile(Number(input.dataset.tile), (t) => {
+				t.labels[Number(input.dataset.cell)] = input.value.trim();
+			});
 		});
 		detailListEl.addEventListener("focusout", (ev) => {
 			if (ev.target instanceof HTMLInputElement && ev.target.classList.contains("hw-cell-rename")) {

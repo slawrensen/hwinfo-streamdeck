@@ -160,6 +160,10 @@ async function scenario(send) {
 	await sleep(200);
 	const keys = (results.tree?.groups ?? []).flatMap((g) => g.readings.map((r) => ({ key: r.key, label: r.label })));
 	check("fake tree offers two readings", keys.length === 2, `got ${keys.length}`);
+	// The filter counter matches on the RAW source name (empty for orphans),
+	// not the "Unknown sensor" display fallback; the payload must carry it.
+	const treeGroups = results.tree?.groups ?? [];
+	check("sensorTree groups carry matchName for the filter counter", treeGroups.length > 0 && treeGroups.every((g) => typeof g.matchName === "string"), JSON.stringify(treeGroups.map((g) => g.matchName)));
 	if (keys.length < 2) {
 		return finish();
 	}

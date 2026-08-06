@@ -91,17 +91,6 @@ describe("press engine", () => {
 		assert.deepEqual(outcomes, [{ id: "ctx", outcome: "hold" }]);
 	});
 
-	it("cancelAll (shutdown, wholesale profile change) sweeps every session", () => {
-		const { engine, outcomes, fire } = harness();
-		engine.keyDown("a");
-		engine.keyDown("b");
-		engine.cancelAll();
-		fire();
-		engine.keyUp("a");
-		engine.keyUp("b");
-		assert.equal(outcomes.length, 0);
-	});
-
 	it("two contexts stay independent", () => {
 		const { engine, outcomes, fire } = harness();
 		engine.keyDown("a");

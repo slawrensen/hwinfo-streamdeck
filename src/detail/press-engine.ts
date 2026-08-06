@@ -82,13 +82,6 @@ export class PressEngine {
 		}
 	}
 
-	/** Kills every session (plugin shutdown, wholesale profile change). */
-	cancelAll(): void {
-		for (const contextId of [...this.sessions.keys()]) {
-			this.cancel(contextId);
-		}
-	}
-
 	/** True while a session is armed or consumed-but-unreleased. */
 	hasSession(contextId: string): boolean {
 		return this.sessions.has(contextId);

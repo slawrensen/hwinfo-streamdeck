@@ -324,6 +324,32 @@ describe("paging and stats", () => {
 		assert.deepEqual(nav.pageFor(state).chunks[0], ["cpu:0:1"]); // the primary rides the Back tile
 	});
 
+	it("a source-mode opener's lingering detailTiles never become the tile plan", async () => {
+		const { nav } = bed();
+		// The opener once ran custom mode and switched back to source: the
+		// grouped-tile plan lingers in its settings. Positional specs must
+		// not dress a source group, whose keys reshuffle with HWiNFO's
+		// layout, so entry must drop the plan, not just underuse it.
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailTiles: [{ size: 4 }] }, snapshot });
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		assert.deepEqual(state.tilePlan, []);
+		assert.deepEqual(nav.pageFor(state).chunks[0], ["cpu:0:1"]); // a single reading, not a quad
+	});
+
+	it("filter mode drops a lingering tile plan the same way", async () => {
+		const { nav } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { readingKey: "cpu:0:0", detailMode: "filter", detailFilter: "*cpu*", detailTiles: [{ size: 4 }] }, snapshot });
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		assert.deepEqual(state.tilePlan, []);
+		assert.deepEqual(nav.pageFor(state).chunks[0], ["cpu:0:1"]);
+	});
+
 	it("a chunk press cycles every reading together, derived from the first", async () => {
 		const { nav } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "2" }, snapshot });

@@ -55,7 +55,10 @@ export function getDataUnits(): DataUnitsPref {
  * deck-wide data-unit preference, the one policy every face and the PI
  * preview format with. */
 export function measureOptionsFrom(settings: { decimals?: DecimalsSetting; fahrenheit?: boolean }): MeasureOptions {
-	return { decimals: settings.decimals ?? "auto", fahrenheit: settings.fahrenheit === true, dataUnits };
+	// Settings are untyped JSON at runtime: a hand-edited decimals outside
+	// the PI's exact values would reach toFixed and throw mid-render.
+	const decimals = settings.decimals;
+	return { decimals: decimals === "0" || decimals === "1" || decimals === "2" || decimals === "3" ? decimals : "auto", fahrenheit: settings.fahrenheit === true, dataUnits };
 }
 
 /** Re-render hook for the action classes. */

@@ -43,7 +43,6 @@ const down: PollerStatus = { state: "unavailable", reason: "not-running", messag
 function stateOf(overrides?: Partial<DeviceDetailState> & { presentation?: DeviceDetailState["presentation"] }): DeviceDetailState {
 	return {
 		deviceId: "dev1",
-		profileName: "profiles/detail-standard",
 		pageSize: 11,
 		density: 1,
 		tilePlan: [],

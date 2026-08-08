@@ -103,8 +103,7 @@ export function composeReadingFace(state: DeviceDetailState, key: string | undef
 	const accent = ctx.typeAccents ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, "normal");
 	const text = resolveTextColors(palette, ctx.text, "normal");
-	const value = mode === "min" ? reading.valueMin : mode === "max" ? reading.valueMax : mode === "avg" ? reading.valueAvg : reading.value;
-	const measured = formatMeasurement(value, reading.unit, ctx.measure);
+	const measured = formatMeasurement(statValue(reading, mode), reading.unit, ctx.measure);
 	return renderReadingKey({
 		label: keyLabel(customLabel, reading.label),
 		valueText: measured.valueText,

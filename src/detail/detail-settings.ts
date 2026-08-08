@@ -99,8 +99,11 @@ function foldedUnits(text: string): number[] {
 /**
  * Iterative two-pointer glob match over folded code units, anchored at
  * both ends: `?` takes exactly one unit, `*` any run, everything else
- * is literal. On a mismatch it retries from the most recent `*` with
- * one more unit consumed, so the worst case is O(pattern * candidate).
+ * is literal. The literal branch skips the star unit, so a candidate's
+ * own literal `*` (user-renamed sensor text) can never swallow the
+ * wildcard before its backtrack anchor is recorded. On a mismatch it
+ * retries from the most recent `*` with one more unit consumed, so the
+ * worst case is O(pattern * candidate).
  * The previous `*` -> `.*` regex translation backtracked exponentially
  * (one adversarial .test inside the 128 cap ran >88 s, re-run every
  * poll), which is why this is not a RegExp.
@@ -111,7 +114,7 @@ function globMatch(pattern: readonly number[], candidate: readonly number[]): bo
 	let star = -1;
 	let mark = 0;
 	while (ci < candidate.length) {
-		if (pi < pattern.length && (pattern[pi] === QUERY || pattern[pi] === candidate[ci])) {
+		if (pi < pattern.length && (pattern[pi] === QUERY || (pattern[pi] !== STAR && pattern[pi] === candidate[ci]))) {
 			pi++;
 			ci++;
 		} else if (pi < pattern.length && pattern[pi] === STAR) {

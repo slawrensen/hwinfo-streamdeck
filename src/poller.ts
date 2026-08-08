@@ -151,9 +151,16 @@ class HwinfoPoller extends EventEmitter {
 			return;
 		}
 		this.intervalMs = ms;
-		// The ring is index-spaced, not timestamped, so it cannot honestly span a
-		// cadence change — reset it. Subscriptions persist and repopulate.
-		this.series.clear();
+		// The ring is index-spaced, not timestamped, so it cannot honestly
+		// span a cadence change: empty every ring in place. The map KEYS are
+		// the subscriptions (see subscribeSeries), so clearing the map would
+		// end collection for every visible key until its action replayed;
+		// nothing resubscribes a static visible key, and the globals response
+		// lands after the first willAppear subscriptions, so a saved
+		// non-default interval also fired this once on every launch.
+		for (const ring of this.series.values()) {
+			ring.length = 0;
+		}
 		this.logger.info(`Poll interval set to ${ms} ms`);
 		if (this.timer !== null) {
 			clearInterval(this.timer);

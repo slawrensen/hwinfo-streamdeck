@@ -99,15 +99,23 @@ describe("detail settings parsing", () => {
 });
 
 describe("compileDetailFilter (glob matching)", () => {
-	it("an adversarial wildcard run matches in linear time, not by regex backtracking", { timeout: 5000 }, () => {
+	it("an adversarial wildcard run matches in linear time, not by regex backtracking", () => {
 		// "*?a" repeated 16 times drove the old `*` -> `.*` regex
 		// translation into exponential backtracking: this one call took
-		// >6 s, and >88 s near the 128-char cap, re-run every poll. The
-		// timeout option turns a regression into a failed test instead of
-		// a hung suite; no wall-clock assertion (those flake).
+		// >6 s, and >88 s near the 128-char cap, re-run every poll. A
+		// node:test timeout option CANNOT catch that regression: timeouts
+		// only interrupt at await points, so a synchronous 100 s match
+		// completes and records a pass, just slower (proven in a shadow
+		// revert). The wall clock is the only honest guard; the budget is
+		// ~200x the linear walk's worst observed cost, so it cannot
+		// meaningfully flake, while the regex regression overshoots it
+		// by another ~50x.
 		const evil = compileDetailFilter("*?a".repeat(16));
+		const started = performance.now();
 		assert.equal(evil("xa".repeat(34) + "b"), false); // trailing "b" defeats the anchored "...a"
 		assert.equal(evil("xa".repeat(34)), true); // the same shape, satisfiable
+		const elapsed = performance.now() - started;
+		assert.ok(elapsed < 2000, `adversarial match took ${elapsed.toFixed(0)} ms; the linear walk stays in single-digit milliseconds`);
 	});
 
 	it("a candidate containing literal wildcard characters still matches: the star stays a wildcard", () => {

@@ -271,6 +271,10 @@ async function scenario(send) {
 	await keyPress(send, "ctx-gone", "dev1", { readingKey: "no-such:0:0", pressBehavior: "open-details" });
 	await waitUntil(() => showAlerts.includes("ctx-gone"), 400);
 	results.goneAlerted = showAlerts.includes("ctx-gone");
+	// refusalSwitches is a nothing-happened assertion: it needs the full
+	// window after the alert, not a wait that ends the moment the alert
+	// arrives (a switch emitted just after would escape it).
+	await sleep(400);
 	results.refusalSwitches = switches.length - switchesBeforeRefusals;
 
 	// I. Tap/hold: a short tap cycles once; a hold enters once and its

@@ -334,6 +334,83 @@
 			"AutoInstall": false,
 			"DontAutoSwitchWhenInstalled": false,
 			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-mini",
+			"DeviceType": 1,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-standard",
+			"DeviceType": 0,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-neo",
+			"DeviceType": 9,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-plus",
+			"DeviceType": 7,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-xl",
+			"DeviceType": 2,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-plus-xl",
+			"DeviceType": 13,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-mini",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-standard",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-neo",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
+		},
+		{
+			"Name": "profiles/workspace-plus-xl",
+			"DeviceType": 11,
+			"AutoInstall": false,
+			"DontAutoSwitchWhenInstalled": false,
+			"Readonly": false
 		}
 	]
 }

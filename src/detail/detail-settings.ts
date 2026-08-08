@@ -19,7 +19,7 @@ export type DetailRole = "back";
 export type DetailMode = "source" | "custom" | "filter";
 
 /** The longest accepted filter pattern; longer hand-edited values are
- *  truncated rather than erroring (bounds the derived regex too). */
+ *  truncated rather than erroring (bounds the compiled matcher too). */
 export const DETAIL_FILTER_MAX = 128;
 
 /** The most custom detail keys an opener may carry; later entries are
@@ -58,7 +58,8 @@ export function detailFilterOf(settings: { detailFilter?: unknown }): string | u
  * (`4090` behaves as `*4090*`), so the obvious thing typed does the
  * obvious thing. Tested against the source name and reading label
  * TOGETHER, which the resolver documents and the panel help states.
- * The panel's live match counter mirrors this translation; change both.
+ * The panel's live match counter (`detailFilterMatcher` in
+ * ui/pi-common.js) mirrors this matcher; keep the two in sync.
  *
  * Memoized: source-mode groups re-resolve every fresh snapshot and a
  * filter session does the same, so the same pattern would otherwise
@@ -68,15 +69,77 @@ export function detailFilterOf(settings: { detailFilter?: unknown }): string | u
 const COMPILED_FILTER_CACHE = new Map<string, (candidate: string) => boolean>();
 const COMPILED_FILTER_CACHE_MAX = 16;
 
+const STAR = 42; // "*".charCodeAt(0)
+const QUERY = 63; // "?".charCodeAt(0)
+
+/** Case-folds one UTF-16 code unit the way the old non-unicode `i` regex
+ *  canonicalized: uppercase, except a non-ASCII unit never folds onto an
+ *  ASCII one, so the regex-to-glob swap is observation-equal. No letter
+ *  uppercases to `*` or `?`, so folded patterns keep their wildcards. */
+function foldCodeUnit(code: number): number {
+	if (code < 128) {
+		return code >= 97 && code <= 122 ? code - 32 : code;
+	}
+	const upper = String.fromCharCode(code).toUpperCase();
+	if (upper.length !== 1) {
+		return code;
+	}
+	const upperCode = upper.charCodeAt(0);
+	return upperCode < 128 ? code : upperCode;
+}
+
+function foldedUnits(text: string): number[] {
+	const units: number[] = new Array<number>(text.length);
+	for (let i = 0; i < text.length; i++) {
+		units[i] = foldCodeUnit(text.charCodeAt(i));
+	}
+	return units;
+}
+
+/**
+ * Iterative two-pointer glob match over folded code units, anchored at
+ * both ends: `?` takes exactly one unit, `*` any run, everything else
+ * is literal. On a mismatch it retries from the most recent `*` with
+ * one more unit consumed, so the worst case is O(pattern * candidate).
+ * The previous `*` -> `.*` regex translation backtracked exponentially
+ * (one adversarial .test inside the 128 cap ran >88 s, re-run every
+ * poll), which is why this is not a RegExp.
+ */
+function globMatch(pattern: readonly number[], candidate: readonly number[]): boolean {
+	let pi = 0;
+	let ci = 0;
+	let star = -1;
+	let mark = 0;
+	while (ci < candidate.length) {
+		if (pi < pattern.length && (pattern[pi] === QUERY || pattern[pi] === candidate[ci])) {
+			pi++;
+			ci++;
+		} else if (pi < pattern.length && pattern[pi] === STAR) {
+			star = pi;
+			pi++;
+			mark = ci;
+		} else if (star !== -1) {
+			pi = star + 1;
+			mark++;
+			ci = mark;
+		} else {
+			return false;
+		}
+	}
+	while (pi < pattern.length && pattern[pi] === STAR) {
+		pi++;
+	}
+	return pi === pattern.length;
+}
+
 export function compileDetailFilter(pattern: string): (candidate: string) => boolean {
 	const cached = COMPILED_FILTER_CACHE.get(pattern);
 	if (cached !== undefined) {
 		return cached;
 	}
 	const anchored = /[*?]/.test(pattern) ? pattern : `*${pattern}*`;
-	const source = anchored.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
-	const regex = new RegExp(`^${source}$`, "is");
-	const matcher = (candidate: string): boolean => regex.test(candidate);
+	const compiled = foldedUnits(anchored);
+	const matcher = (candidate: string): boolean => globMatch(compiled, foldedUnits(candidate));
 	if (COMPILED_FILTER_CACHE.size >= COMPILED_FILTER_CACHE_MAX) {
 		const oldest = COMPILED_FILTER_CACHE.keys().next().value;
 		if (oldest !== undefined) {

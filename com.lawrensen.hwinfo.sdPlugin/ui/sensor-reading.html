@@ -78,6 +78,7 @@
 				<option value="">Cycle current / min / max / avg</option>
 				<option value="open-details">Open sensor details</option>
 				<option value="tap-cycle-hold-details">Tap cycles; hold opens details</option>
+				<option value="open-workspace">Open a workspace page</option>
 			</sdpi-select>
 		</sdpi-item>
 		<div id="detail-config" class="hw-cond" hidden>
@@ -127,6 +128,18 @@
 			</sdpi-item>
 			<div class="hw-hint" id="detail-unsupported" hidden></div>
 			<div class="hw-help">Details open as a plugin-managed profile, not a native folder: the deck switches to a bundled one-page view with this key's sensor as the live Back tile (top left), and Stream Deck asks to install it once per deck type on first use. Previous and Next page through long lists; pressing a listed reading cycles its stat for that visit.</div>
+		</div>
+		<div id="workspace-config" class="hw-cond" hidden>
+			<sdpi-item label="Workspace page">
+				<sdpi-select setting="workspacePage" default="0">
+					<option value="0">Workspace page 1</option>
+					<option value="1">Workspace page 2</option>
+					<option value="2">Workspace page 3</option>
+					<option value="3">Workspace page 4</option>
+				</sdpi-select>
+			</sdpi-item>
+			<div class="hw-hint" id="workspace-unsupported" hidden></div>
+			<div class="hw-help">Pressing the key switches the deck to that workspace page of the bundled HWiNFO Workspace profile, a blank canvas where you place and arrange your own keys; each page ships empty except a Back key that returns exactly to where you pressed. Stream Deck asks to install the workspace once per deck type on first use.</div>
 		</div>
 		</div>
 

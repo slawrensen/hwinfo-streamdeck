@@ -31,7 +31,7 @@
 		"e2e:pi": "node scripts/e2e-pi-persistence.mjs",
 		"e2e:socket-close": "node scripts/e2e-socket-close.mjs",
 		"suite:full": "node scripts/hygiene.mjs",
-		"icons": "node scripts/gen-icons.mjs",
+		"icons": "tsx scripts/gen-icons.mjs",
 		"profiles:detail": "tsx scripts/build-detail-profiles.ts",
 		"release:validate": "npm run lint && npm run typecheck && npm test && node scripts/validate-release-copy.mjs && node scripts/validate-native.mjs",
 		"pack": "node scripts/verify-pack-version.mjs && streamdeck pack com.lawrensen.hwinfo.sdPlugin --output release --force"

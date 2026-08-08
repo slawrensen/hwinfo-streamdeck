@@ -158,7 +158,11 @@ describe("managed profile registry", () => {
 
 describe("manifest agreement", () => {
 	it("registers both revisions for each owner and its guests, nothing else, with the intended flags", () => {
-		const entries = manifest.Profiles ?? [];
+		// Scoped to the detail family: the workspace family's registrations
+		// (profiles/workspace-*) are validated by test/workspace.test.ts,
+		// which also proves the two families PARTITION the manifest (no
+		// stray entry escapes both tests).
+		const entries = (manifest.Profiles ?? []).filter((e) => e.Name.startsWith("profiles/detail-"));
 		const expected: Array<{ name: string; deviceType: number; readonly: boolean }> = [];
 		for (const revision of REVISIONS) {
 			for (const profile of DETAIL_PROFILES) {
@@ -207,7 +211,9 @@ describe("manifest agreement", () => {
 				assert.equal(existsExact(`${detailProfileNameFor(profile.key, revision)}.streamDeckProfile`), true, `${profile.key} r${revision}`);
 			}
 		}
-		const shipped = fs.readdirSync(path.join(pluginDir, "profiles")).filter((f) => f.endsWith(".streamDeckProfile"));
+		// Detail-family files only; test/workspace.test.ts owns the
+		// workspace-* files and proves the directory splits exactly in two.
+		const shipped = fs.readdirSync(path.join(pluginDir, "profiles")).filter((f) => f.endsWith(".streamDeckProfile") && f.startsWith("detail-"));
 		const expected = REVISIONS.flatMap((revision) => DETAIL_PROFILES.map((p) => `${path.basename(detailProfileNameFor(p.key, revision))}.streamDeckProfile`));
 		assert.deepEqual(shipped.sort(), expected.sort());
 	});

@@ -718,4 +718,3 @@ function quadCell(reading: Reading | undefined, customLabel: string | undefined,
 	const measured = formatQuadMeasurement(statValue(reading, mode), reading.unit, measureOpts);
 	return { label, valueText: measured.valueText, unitText: measured.unitText, color };
 }
-

@@ -26,6 +26,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
+import { buildInfo, makeCheck, sleep } from "./lib/e2e-common.mjs";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
@@ -34,14 +35,8 @@ const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = { errors: [] };
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) {
-		results.errors.push(name);
-	}
-}
+const check = makeCheck((name) => results.errors.push(name));
 
 // The unknown future field a newer plugin version might store: it must
 // ride through every edit untouched, nesting and all.
@@ -49,6 +44,9 @@ const FUTURE_BLOB = { nested: { deep: [1, "two", { three: 3 }] }, keep: "yes" };
 const SEEDS = {
 	back: { readingKey: "cpu:0:0", detailRole: "back", futureBlob: FUTURE_BLOB },
 	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
+	// The dial panel-truth leg: Custom preset with two touch zones (the
+	// dead-tap configuration) on the overview view (no bar to promise).
+	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview" },
 	// A grouped custom list: one hand-dressed quad in the plan, then the
 	// uniform fill at density 4. Exercises the shrink-on-remove rules and
 	// the one-frame-per-edit invariant.
@@ -183,13 +181,7 @@ wss.on("connection", (ws) => {
 	});
 });
 
-const info = {
-	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-	colors: {},
-	devicePixelRatio: 1,
-	devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-};
+const info = buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] });
 function bootstrap() {
 	const actionInfo = {
 		action: "com.lawrensen.hwinfo.reading",
@@ -201,10 +193,22 @@ function bootstrap() {
 <script>window.addEventListener("load",()=>{connectElgatoStreamDeckSocket(String(${WS_PORT}),"pi-ctx","registerPropertyInspector",${JSON.stringify(JSON.stringify(info))},${JSON.stringify(JSON.stringify(actionInfo))});});</script>`;
 }
 
+/** The dial PI's bootstrap: same wiring, encoder actionInfo. */
+function dialBootstrap() {
+	const actionInfo = {
+		action: "com.lawrensen.hwinfo.dial",
+		context: `ctx-${mode}`,
+		device: "dev1",
+		payload: { settings: store.settings, coordinates: { column: 0, row: 0 }, controller: "Encoder" }
+	};
+	return `<style>body{background:#2d2d2d;margin:0;padding:8px 0;}</style>
+<script>window.addEventListener("load",()=>{connectElgatoStreamDeckSocket(String(${WS_PORT}),"pi-ctx","registerPropertyInspector",${JSON.stringify(JSON.stringify(info))},${JSON.stringify(JSON.stringify(actionInfo))});});</script>`;
+}
+
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|grouped|cap|salvage)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|cap|salvage)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -221,6 +225,8 @@ const server = createServer((req, res) => {
 		let body = readFileSync(file);
 		if (file.endsWith("sensor-reading.html")) {
 			body = Buffer.from(body.toString("utf8").replace("</head>", `${bootstrap()}</head>`));
+		} else if (file.endsWith("sensor-dial.html")) {
+			body = Buffer.from(body.toString("utf8").replace("</head>", `${dialBootstrap()}</head>`));
 		}
 		res.writeHead(200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }).end(body);
 	} catch {
@@ -935,6 +941,28 @@ try {
 	check("salvage: a labels string yields no renamed chips", salvage.renamed === 0, `${salvage.renamed} renamed`);
 	check("salvage: the chip keeps the reading's own label", salvage.first === "Bench 0", String(salvage.first));
 	check("salvage: a colors object yields the default well", salvage.well === "#4cc2ff", String(salvage.well));
+
+	// ---- run 6: the dial panel tells the runtime truth -------------------
+	// Custom preset + two touch zones is the dead-tap configuration
+	// (gestures.ts maps the whole strip to left/right), and the overview
+	// view draws no bar for the alert placeholders to promise. The panel
+	// must say both; a zero-write open stays law on this PI too.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/dial`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	check("dial: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const dialTruth = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		zonesHelp: document.querySelector("#controls-zones .hw-help")?.textContent ?? null,
+		zonesShown: document.getElementById("controls-zones")?.hidden === false,
+		warnPlaceholder: document.querySelector('sdpi-textfield[setting="warnValue"]')?.getAttribute("placeholder") ?? "gone",
+		rotationHelp: document.getElementById("rotation-help")?.textContent ?? "gone"
+	})`)).result?.value ?? "{}"
+	);
+	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));
+	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
+	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
+	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

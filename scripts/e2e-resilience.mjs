@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, makeCheck, makeExpectFrame, pluginArgv, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28998;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,31 +26,13 @@ const MAPPING_NAME = `Local\\HwinfoE2E_SM2_${process.pid}`;
 const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;
 const READING_KEY = "f0001234:0:1000001"; // "Test Temp" in the fake provider
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frames = []; // decoded SVG frames for ctx-res, in arrival order
 let failures = 0;
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) failures++;
-}
-
-/** Waits until a frame arriving from `fromIndex` on matches, or times out. */
-async function expectFrame(name, predicate, timeoutMs) {
-	const start = Date.now();
-	let from = frames.length;
-	while (Date.now() - start < timeoutMs) {
-		while (from < frames.length) {
-			if (predicate(frames[from])) {
-				check(name, true, `after ${((Date.now() - start) / 1000).toFixed(1)}s`);
-				return;
-			}
-			from++;
-		}
-		await sleep(150);
-	}
-	check(name, false, `no matching frame within ${timeoutMs / 1000}s (last: ${frames.at(-1)?.slice(0, 160) ?? "none"})`);
-}
+const check = makeCheck(() => {
+	failures += 1;
+});
+const expectFrame = makeExpectFrame(frames, check);
 
 // --- mock Stream Deck -------------------------------------------------------
 const wss = new WebSocketServer({ host: "127.0.0.1", port: PORT });
@@ -98,14 +81,7 @@ function startFake() {
 
 const plugin = spawn(
 	process.execPath,
-	["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-resilience", "-registerEvent", "registerPlugin", "-info",
-		JSON.stringify({
-			application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-			colors: {},
-			devicePixelRatio: 1,
-			devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-			plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-		})],
+	pluginArgv(PORT, "e2e-resilience", buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] })),
 	{
 		cwd: pluginDir,
 		env: {

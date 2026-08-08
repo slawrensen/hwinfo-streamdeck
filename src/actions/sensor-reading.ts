@@ -9,19 +9,20 @@ import type { JsonValue } from "@elgato/utils";
 import { readingRow } from "../detail/detail-faces";
 import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
+import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
 import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
-import { alertLevel, convertUnit, isStatMode, parseThreshold, STAT_BADGE, STAT_MODES, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, STAT_BADGE, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
 import { quadIdentityColor, resolveTextColors } from "../ui/text-colors";
-import { decideLegacyDefault, effectiveTextFor, getDeckTheme, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
+import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
 /** Persisted per-key settings (written by the PI; all optional). */
@@ -221,7 +222,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// own replay (controller.ts registerSlot).
 			lastSvg: ""
 		});
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<ReadingSettings>): void {
@@ -258,7 +259,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// resolve its armed tap/hold session under the new role.
 			this.presses.cancel(ev.action.id);
 		}
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	/**
@@ -319,10 +320,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			return;
 		}
 		const current = isStatMode(state.settings.statMode) ? state.settings.statMode : "current";
-		const next = STAT_MODES[(STAT_MODES.indexOf(current) + 1) % STAT_MODES.length] as StatMode;
+		const next = nextStatMode(current);
 		state.settings = { ...state.settings, statMode: next };
 		await act.setSettings(state.settings);
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), contextId);
 	}
 
 	/**
@@ -373,11 +374,22 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		handlePiRequest(ev.payload);
 	}
 
+	private lastTickSignature = "";
+
 	private onPollerTick(status: PollerStatus): void {
 		// The sparkline rings are filled by the poller now (once per fresh
 		// snapshot, keyed by reading) so it survives this action's appear churn —
 		// here we only render and feed the open PI's live preview.
-		this.renderAll(status);
+		// Same gate as DetailController: an unchanged tick signature means every
+		// key face would compose to the bytes the dedupe already holds, so skip
+		// the compose itself, not just the setImage. Theme flips, settings
+		// receipts, appears and detail-session changes repaint through their own
+		// renderAll calls, never through this gate.
+		const signature = tickSignature(status);
+		if (signature !== this.lastTickSignature) {
+			this.lastTickSignature = signature;
+			this.renderAll(status);
+		}
 		pushPreviewToPi(status, this.manifestId, this.instances, true);
 	}
 
@@ -389,9 +401,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		this.renderAll(poller.getStatus());
 	}
 
-	private renderAll(status: PollerStatus): void {
+	private renderAll(status: PollerStatus, only?: string): void {
 		for (const act of this.actions) {
-			if (!act.isKey()) {
+			if (!act.isKey() || (only !== undefined && act.id !== only)) {
 				continue;
 			}
 			const state = this.instances.get(act.id);
@@ -574,7 +586,7 @@ function primaryContext(settings: ReadingSettings, primary: Reading | undefined,
 		primary !== undefined
 			? alertLevel(convertUnit(primary.value, primary.unit, fahrenheit).value, parseThreshold(settings.warnValue), parseThreshold(settings.critValue), settings.alertBelow === true)
 			: "normal";
-	const themeId = settings.theme !== undefined && settings.theme !== "" ? settings.theme : getDeckTheme();
+	const themeId = effectiveThemeFor(settings);
 	const accent = primary !== undefined && typeAccentsEnabled() ? classifyTypeAccent(primary.type, primary.unit, primary.label) : null;
 	return { level, themeId, accent };
 }

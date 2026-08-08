@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-11";
+	const PI_BUILD = "1.5.0.0-12";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -28,6 +28,11 @@
 
 	const MAX_ROWS = 150;
 	const SENSOR_TYPE_NAMES = ["", "Temp", "Voltage", "Fan", "Current", "Power", "Clock", "Usage"];
+	// One hex gate for every color field, mirroring the plugin parsers it
+	// stands in for (detail-settings.ts, sensor-reading.ts, text-colors.ts).
+	const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+	// Mirrors QUAD_DEFAULT_COLORS in src/ui/key-renderer.ts.
+	const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
 
 	let tree = null; // [{ name, readings: [{ key, label, unit, value, type }] }]
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
@@ -253,8 +258,8 @@
 		// in sensor-dial.html (empty-set default leads).
 		help.textContent =
 			rotationGroups === null
-				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those."
-				: "Ticks land in the group marked by the radio. Plain rotate stays inside a group; “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name, and Legacy rotates through all groups as one list.";
+				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them."
+				: "Ticks land in the group marked by the radio. “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name and keeps plain rotate inside one; any control map without that gesture (Legacy always, Custom until you map it) rotates through all groups as one flat list.";
 	}
 
 	function renderRotationSet() {
@@ -336,8 +341,6 @@
 	const detailTilesStage = detailListEl === null ? null : useSettings("detailTiles", undefined, null, false);
 	const detailUniformBinding = detailListEl === null ? null : useSettings("detailDensity", adoptDetailUniform, null);
 
-	const TILE_COLOR = /^#[0-9A-Fa-f]{6}$/;
-
 	function adoptDetailTiles(value) {
 		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
 		// salvage, so the panel always shows what the runtime would build.
@@ -354,7 +357,7 @@
 					const colors = [];
 					for (let i = 0; i < size; i++) {
 						labels.push(typeof rawLabels[i] === "string" ? rawLabels[i].trim() : "");
-						colors.push(typeof rawColors[i] === "string" && TILE_COLOR.test(rawColors[i]) ? rawColors[i] : null);
+						colors.push(typeof rawColors[i] === "string" && HEX_COLOR.test(rawColors[i]) ? rawColors[i] : null);
 					}
 					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
 				});
@@ -736,7 +739,7 @@
 			well.type = "color";
 			well.className = "hw-tile-color";
 			well.title = "This cell's identity color on the quad tile";
-			well.value = (tile.spec !== null ? tile.spec.colors[cellIdx] : null) ?? ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"][cellIdx] ?? "#4CC2FF";
+			well.value = (tile.spec !== null ? tile.spec.colors[cellIdx] : null) ?? QUAD_DEFAULT_COLORS[cellIdx] ?? "#4CC2FF";
 			well.addEventListener("change", () => {
 				editTile(tileIdx, (t) => {
 					t.colors[cellIdx] = well.value;
@@ -1302,6 +1305,18 @@
 		setInterval(() => get().then(apply), 400);
 	};
 
+	// Drive an sdpi textfield's placeholder: attribute so the markup stays
+	// truthful, rendered input for the repaint (the component's placeholder
+	// property wants a localized-message object and throws on plain strings,
+	// and its attribute observer never repaints a changed value). Callers'
+	// 400 ms polls re-assert it if the component re-renders over it.
+	const setPlaceholder = (el, hint) => {
+		if (el === null) return;
+		if (el.getAttribute("placeholder") !== hint) el.setAttribute("placeholder", hint);
+		const input = (el.shadowRoot ?? el).querySelector("input");
+		if (input !== null && input.placeholder !== hint) input.placeholder = hint;
+	};
+
 	// Control preset (dial PI only): the custom gesture rows only exist for
 	// "custom", the touch-zone picker for anything beyond legacy.
 	if (controlsCustomEl !== null) {
@@ -1358,21 +1373,17 @@
 		const thirdLabelEl = document.getElementById("third-label");
 		const quadRowsEl = document.getElementById("quad-rows");
 		const displayItemEl = document.getElementById("display-item");
-		// quadLabel3 doubles as the triple's third-row label: full length
-		// there, first 4 characters in the quad grid. Swap the placeholder
-		// with the mode. The sdpi textfield can't be driven through its own
-		// placeholder property (it wants a localized-message object; a plain
-		// string throws inside its update cycle and wedges the whole panel)
-		// and its attribute observer never repaints a changed value, so
-		// write the rendered input directly; the 400 ms layout poll
-		// re-asserts it if the component re-renders over it. The host
-		// attribute is kept in sync so the markup stays truthful.
-		const thirdLabelHint = (quad) => {
-			if (thirdLabelEl === null) return;
+		const layoutHintEl = document.getElementById("layout-hint");
+		// quadLabel3 doubles as the triple's third-row label, and in the quad
+		// grid the Label and Second label fields feed the top two cells: all
+		// of them hard-cut to 4 characters there, so every field's promise
+		// swaps with the mode (the static placeholders stay the non-quad
+		// truth; setPlaceholder carries the sdpi drive).
+		const mainLabelEl = document.querySelector('sdpi-textfield[setting="label"]');
+		const secondLabelEl = document.querySelector('sdpi-textfield[setting="secondaryLabel"]');
+		const labelHints = (quad) => {
 			const hint = quad ? "Short name; 4 characters show" : "Custom label (default: sensor name)";
-			if (thirdLabelEl.getAttribute("placeholder") !== hint) thirdLabelEl.setAttribute("placeholder", hint);
-			const input = (thirdLabelEl.shadowRoot ?? thirdLabelEl).querySelector("input");
-			if (input !== null && input.placeholder !== hint) input.placeholder = hint;
+			for (const el of [thirdLabelEl, mainLabelEl, secondLabelEl]) setPlaceholder(el, hint);
 		};
 		const applyLayout = (value) => {
 			const dual = value === "dual";
@@ -1384,7 +1395,12 @@
 			if (tripleHelpEl !== null) tripleHelpEl.hidden = !triple;
 			if (quadRowsEl !== null) quadRowsEl.hidden = !quad;
 			if (displayItemEl !== null) displayItemEl.hidden = dual || triple || quad;
-			thirdLabelHint(quad);
+			labelHints(quad);
+			// The face silently keeps its single layout until the extra slots
+			// hold a pick (deliberate rollback-safe degrade); the panel says
+			// why instead of letting the select look broken.
+			const picked = (p) => p !== null && p.selectedKey() !== "";
+			if (layoutHintEl !== null) layoutHintEl.hidden = !((dual && !picked(secondaryPicker)) || (triple && !picked(secondaryPicker) && !picked(quadPicker3)) || (quad && !picked(secondaryPicker) && !picked(quadPicker3) && !picked(quadPicker4)));
 		};
 		followSetting("keyLayout", applyLayout);
 	}
@@ -1490,10 +1506,18 @@
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
 		const barRangeEl = document.getElementById("bar-range");
+		const warnEl = document.querySelector('sdpi-textfield[setting="warnValue"]');
+		const critEl = document.querySelector('sdpi-textfield[setting="critValue"]');
 		const applyView = (value) => {
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
 			if (barRangeEl !== null) barRangeEl.hidden = value === "tworow" || value === "overview";
+			// The multi-row views draw no bar: alerts tint the row VALUE
+			// there (the dial renderer's alert indicator), so the threshold
+			// placeholders must promise the mechanism the view really has.
+			const single = value !== "tworow" && value !== "overview";
+			setPlaceholder(warnEl, single ? "bar turns amber (display units)" : "row value turns amber (display units)");
+			setPlaceholder(critEl, single ? "bar turns red (display units)" : "row value turns red (display units)");
 		};
 		followSetting("dialView", applyView);
 	}
@@ -1504,19 +1528,16 @@
 	// snaps to "Custom" whenever the wells match no preset.
 	const quadPresetEl = document.getElementById("quad-color-preset");
 	if (quadPresetEl !== null) {
-		// Mirrors QUAD_DEFAULT_COLORS in src/ui/key-renderer.ts.
-		const QUAD_DEFAULTS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
 		const QUAD_PRESETS = {
-			signal: QUAD_DEFAULTS,
+			signal: QUAD_DEFAULT_COLORS,
 			pairs: ["#4CC2FF", "#4CC2FF", "#FF7E8E", "#FF7E8E"],
 			uniform: ["#4CC2FF", "#4CC2FF", "#4CC2FF", "#4CC2FF"]
 		};
-		const QUAD_HEX = /^#[0-9A-Fa-f]{6}$/;
 		const cellInputs = [1, 2, 3, 4].map((n) => document.getElementById(`quad-color-${n}`));
-		let quadColors = [...QUAD_DEFAULTS];
+		let quadColors = [...QUAD_DEFAULT_COLORS];
 		const adoptQuadColors = (value) => {
 			const raw = Array.isArray(value) ? value : [];
-			quadColors = QUAD_DEFAULTS.map((fallback, i) => (typeof raw[i] === "string" && QUAD_HEX.test(raw[i]) ? raw[i] : fallback));
+			quadColors = QUAD_DEFAULT_COLORS.map((fallback, i) => (typeof raw[i] === "string" && HEX_COLOR.test(raw[i]) ? raw[i] : fallback));
 		};
 		const showQuadColors = () => {
 			cellInputs.forEach((input, i) => {
@@ -1610,12 +1631,18 @@
 		return chip;
 	}
 
+	// The RESOLVED deck default: effectiveDeckTheme when the payload knows
+	// it, else the spec default. Callers null-guard themesConfig first.
+	// The plugin resolves the effective deck default (theme store, incl.
+	// legacy migration); never guess it from raw global settings here.
+	function resolvedDeckId() {
+		return themesConfig.themes[themesConfig.effectiveDeckTheme] ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
+	}
+
 	function renderGallery() {
 		if (themesConfig === null) return;
 		const frag = document.createDocumentFragment();
-		// The plugin resolves the effective deck default (theme store, incl.
-		// legacy migration); never guess it from raw global settings here.
-		const deckId = themesConfig.themes[themesConfig.effectiveDeckTheme] ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
+		const deckId = resolvedDeckId();
 		const deckDisplay = deckId.charAt(0).toUpperCase() + deckId.slice(1);
 		const deckChip = themeChip("", themesConfig.themes[deckId], "Deck default", themeOverride === "");
 		deckChip.title = "Deck default · " + deckDisplay;
@@ -1650,12 +1677,9 @@
 	// scope, and binds the color wells. Wells write only on change, so absent
 	// settings stay absent; an unset well shows the resolved theme's value
 	// color: the truthful "custom starts from what you see" seed.
-	const TEXT_HEX = /^#[0-9A-Fa-f]{6}$/;
-
 	function themeValueSeed() {
 		if (themesConfig === null) return "#ffffff";
-		const deckId = themesConfig.themes[themesConfig.effectiveDeckTheme] ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
-		const palette = themesConfig.themes[themeOverride] ?? themesConfig.themes[deckId];
+		const palette = themesConfig.themes[themeOverride] ?? themesConfig.themes[resolvedDeckId()];
 		return palette ? palette.value.toLowerCase() : "#ffffff";
 	}
 
@@ -1669,7 +1693,7 @@
 			});
 			getColor().then((color) => {
 				if (document.activeElement === colorEl) return; // picker open: don't fight it
-				const shown = typeof color === "string" && TEXT_HEX.test(color) ? color.toLowerCase() : themeValueSeed();
+				const shown = typeof color === "string" && HEX_COLOR.test(color) ? color.toLowerCase() : themeValueSeed();
 				if (colorEl.value !== shown) colorEl.value = shown;
 			});
 		};

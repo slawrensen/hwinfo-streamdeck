@@ -8,6 +8,7 @@
  * then settled at 114 when the spark span was inset for its stroke);
  * value and label glyph sizes flex with content.
  */
+import { HISTORY_LENGTH } from "../series";
 import { estimateKeyTextWidth, fitTextLadder, truncateLabel, type FittedText } from "./format";
 import { themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
@@ -45,7 +46,6 @@ export function svgOpen(w: number, h: number, bg: string): string[] {
 const SPARK = { x: 8, y: 122, w: 128, h: 12 } as const;
 /** Accent polyline stroke; the spec's absolute minimum is 3. */
 const SPARK_STROKE = 4;
-const SPARK_SAMPLES = 36;
 
 /** Bar gauge track: raised above the sparkline strip's row and inset from
  * the sides, because the physical key's lens crops the outer ~10 px of the
@@ -308,7 +308,7 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		stripDrawn = true;
 	}
 	if (gauge === undefined && history !== undefined) {
-		const samples = history.slice(-SPARK_SAMPLES);
+		const samples = history.slice(-HISTORY_LENGTH);
 		const points = sparklinePoints(samples, SPARK.x, SPARK.y, SPARK.w, SPARK.h);
 		if (points.length > 0) {
 			parts.push(...sparklineSvg(points, SPARK.y + SPARK.h, SPARK_STROKE, 5, palette));

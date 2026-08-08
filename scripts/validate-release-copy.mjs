@@ -94,6 +94,7 @@ const PROSE_FILES = [
 	`${SD}/ui/sensor-reading.html`,
 	`${SD}/ui/sensor-dial.html`,
 	`${SD}/ui/control.html`,
+	`${SD}/ui/detail-slot.html`,
 ];
 for (const f of PROSE_FILES) checkCopy(f);
 checkCopy(RULES_DOC, { emDashOnly: true });

@@ -8,12 +8,18 @@
  * previous profile by OMITTING the profile name (the SDK's single-level
  * previous-profile hop), and pagination never switches profiles at all —
  * it only moves plugin state inside the one active page.
+ *
+ * The same navigator also owns WORKSPACE entry (enterWorkspace): the
+ * bundled freeform profiles share the switch pipeline, the in-flight
+ * guard and the one canonical Back, but hold no session state at all.
+ * There is deliberately no second navigation stack.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
 import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
-import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
+import { detailDensityOf, detailModeOf, detailTilesOf, WORKSPACE_PAGE_COUNT, type DetailDensity, type DetailTileSpec } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
+import { workspaceProfileFor } from "./workspace-profiles";
 
 export type SwitchProfileFn = (deviceId: string, profileName?: string, page?: number) => Promise<void>;
 
@@ -118,6 +124,10 @@ export class DetailNavigator {
 	/** Pending sessions that expired unconfirmed (declined-or-ignored
 	 *  install prompt), so a late accept can be recognized and backed out. */
 	private readonly expiredPendingAt = new Map<string, number>();
+	/** Last workspace switch dispatch per device (double-tap guard). The
+	 *  workspace flow holds NO session state (see enterWorkspace), so its
+	 *  dispatch stamp cannot live on a state object like detail's does. */
+	private readonly workspaceDispatchedAt = new Map<string, number>();
 	/** One-shot post-leave repaints, keyed by device (see leave()). */
 	private readonly leaveRepaintTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private readonly deps: Required<Pick<NavigatorDeps, "switchProfile" | "pendingExpiryMs" | "disappearGraceMs" | "setTimer" | "clearTimer" | "now">> & NavigatorDeps;
@@ -277,6 +287,93 @@ export class DetailNavigator {
 		}
 		this.armCleanupTimer(deviceId, this.deps.pendingExpiryMs, "entry never confirmed");
 		this.deps.onChanged?.(deviceId);
+		return "entered";
+	}
+
+	/**
+	 * Opens one page of the bundled workspace profile for a device (issue
+	 * #5 follow-up): a freeform canvas of ordinary user-placed keys.
+	 * Unlike detail entry there is no group to resolve, no plugin-painted
+	 * surface, and therefore NO session state: what the two entries share
+	 * is the injected switchProfile, the per-device in-flight guard, the
+	 * dispatch debounce, and the ONE canonical Back (each workspace page
+	 * bakes the same Back key, and leave() already works stateless).
+	 *
+	 * The page index is ALWAYS passed explicitly: an omitted page would
+	 * restore whatever page was last visible in the profile, and the
+	 * opener's configured page must win every time.
+	 *
+	 * The app's own install prompt covers first use (AutoInstall false),
+	 * and a declined prompt surfaces no error, exactly like detail entry.
+	 * Deliberately absent: the pending/tombstone machinery. Its
+	 * confirmation signal (a detail slot registering) does not exist on a
+	 * workspace page, and neither does its hazard: a late-accepted
+	 * install lands the user on a live page whose Back is baked in, not
+	 * on a wall of orphaned plugin-fed slots. Entry must always come from
+	 * OUTSIDE the workspace profile; a same-profile jump (an opener
+	 * placed on a workspace page targeting another page) is unsupported,
+	 * because the app may record "previous" on a same-profile switch and
+	 * turn Back into a self-loop (live-unproven either way).
+	 */
+	async enterWorkspace(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; page: number }): Promise<Exclude<EnterResult, "unresolved">> {
+		const { deviceId, deviceType, grid } = request;
+		const profile = workspaceProfileFor(deviceType, grid);
+		if (profile === undefined) {
+			this.deps.log?.info(`Workspace entry refused: no bundled workspace for device type ${deviceType ?? "unknown"}`);
+			return "unsupported";
+		}
+		const now = this.deps.now();
+		const detail = this.states.get(deviceId);
+		if (detail !== undefined && detail.surfaceCount > 0) {
+			// A live detail view on this device means the opener sits on the
+			// detail page itself: switching away would orphan that session
+			// and chain the previous-profile register through the detail
+			// profile. Refuse; the user leaves the detail view first.
+			this.deps.log?.warn(`Workspace entry refused: detail view active on ${deviceId}`);
+			return "already-active";
+		}
+		if (detail !== undefined && now - detail.dispatchedAt < LEAVE_DEBOUNCE_MS) {
+			// A detail switch is still landing on this device; racing it with
+			// a second switch call mid-beat has no defined outcome. The same
+			// rule detail applies to itself.
+			this.deps.log?.warn(`Workspace entry refused: detail switch just dispatched on ${deviceId}`);
+			return "already-active";
+		}
+		const last = this.workspaceDispatchedAt.get(deviceId);
+		if (last !== undefined && now - last < LEAVE_DEBOUNCE_MS) {
+			// A double-tapped opener inside the app's switch beat must not
+			// dispatch again: a switch to the already-active profile could
+			// set "previous" to the workspace itself and self-loop Back.
+			this.deps.log?.warn(`Workspace entry refused: switch just dispatched on ${deviceId}`);
+			return "already-active";
+		}
+		if (this.entering.has(deviceId)) {
+			this.deps.log?.warn(`Workspace entry refused: switch in flight on ${deviceId}`);
+			return "already-active";
+		}
+		// A fresh navigation invalidates the last-leave debounce, same as
+		// detail entry: Back on the new page must work immediately.
+		this.leftAt.delete(deviceId);
+		// The parser already clamps; clamp again here so the navigator can
+		// never dispatch a page the shipped bundle does not have, whatever
+		// the caller passed.
+		const page = Number.isSafeInteger(request.page) ? Math.min(Math.max(request.page, 0), WORKSPACE_PAGE_COUNT - 1) : 0;
+		this.workspaceDispatchedAt.set(deviceId, now);
+		this.entering.add(deviceId);
+		try {
+			await this.deps.switchProfile(deviceId, profile.name, page);
+		} catch (err) {
+			// A failed dispatch must not hold the debounce against an
+			// immediate retry (only OUR stamp is cleared: a newer dispatch
+			// meanwhile keeps its own).
+			if (this.workspaceDispatchedAt.get(deviceId) === now) {
+				this.workspaceDispatchedAt.delete(deviceId);
+			}
+			this.deps.log?.warn(`Workspace profile switch failed on ${deviceId}: ${String(err)}`);
+			return "switch-failed";
+		} finally {
+			this.entering.delete(deviceId);
+		}
 		return "entered";
 	}
 
@@ -479,11 +576,12 @@ export class DetailNavigator {
 	deviceDisconnected(deviceId: string): void {
 		this.clearCleanupTimer(deviceId);
 		this.clearLeaveRepaint(deviceId);
-		// The debounce stamp and tombstone die with the device: neither may
+		// The debounce stamps and tombstone die with the device: none may
 		// influence a session after a reconnect, and the maps must not grow
 		// with device churn.
 		this.leftAt.delete(deviceId);
 		this.expiredPendingAt.delete(deviceId);
+		this.workspaceDispatchedAt.delete(deviceId);
 		if (this.states.delete(deviceId)) {
 			this.deps.log?.info(`Detail session dropped: ${deviceId} disconnected`);
 		}
@@ -499,6 +597,7 @@ export class DetailNavigator {
 		this.states.clear();
 		this.leftAt.clear();
 		this.expiredPendingAt.clear();
+		this.workspaceDispatchedAt.clear();
 	}
 
 	private armCleanupTimer(deviceId: string, ms: number, reason: string): void {

@@ -1539,6 +1539,7 @@
 	const detailConfigEl = document.getElementById("detail-config");
 	if (detailConfigEl !== null) {
 		const detailCustomEl = document.getElementById("detail-custom");
+		const workspaceConfigEl = document.getElementById("workspace-config");
 		const showHelpEl = document.getElementById("show-help");
 		const pressBlockEl = document.getElementById("press-block");
 		const roleNoteEl = document.getElementById("role-note");
@@ -1548,7 +1549,9 @@
 		// last still leaves the panel consistent.
 		const applyPressState = () => {
 			const details = !backRole && (pressValue === "open-details" || pressValue === "tap-cycle-hold-details");
+			const workspace = !backRole && pressValue === "open-workspace";
 			detailConfigEl.hidden = !details;
+			if (workspaceConfigEl !== null) workspaceConfigEl.hidden = !workspace;
 			if (pressBlockEl !== null) pressBlockEl.hidden = backRole;
 			if (roleNoteEl !== null) roleNoteEl.hidden = !backRole;
 			if (showHelpEl !== null) {
@@ -1558,7 +1561,9 @@
 						? "Pressing the key opens the sensor details view; Show picks the stat on this key's own face."
 						: pressValue === "tap-cycle-hold-details"
 							? "A short tap cycles current → min → max → avg; holding half a second opens sensor details."
-							: "Pressing the key cycles current → min → max → avg.";
+							: pressValue === "open-workspace"
+								? "Pressing the key opens your workspace page; Show picks the stat on this key's own face."
+								: "Pressing the key cycles current → min → max → avg.";
 			}
 		};
 		followSetting("pressBehavior", (value) => {
@@ -1838,12 +1843,20 @@
 			return;
 		}
 		if (p.event === "detailSupport") {
-			// The note starts hidden and empty; the one-shot reply only ever
-			// needs to reveal it on an unsupported deck.
+			// The notes start hidden and empty; the one-shot reply only ever
+			// needs to reveal them on an unsupported deck. The workspace
+			// bundles ship for exactly the device classes the detail bundles
+			// do (the registry derives from the same table), so the one
+			// support answer serves both notes truthfully.
 			const note = document.getElementById("detail-unsupported");
 			if (note !== null && p.supported !== true) {
 				note.hidden = false;
 				note.textContent = `Sensor details are not available on this deck (${p.model ?? "unsupported device"}): no bundled detail view fits its layout. Everything else on this key keeps working normally.`;
+			}
+			const workspaceNote = document.getElementById("workspace-unsupported");
+			if (workspaceNote !== null && p.supported !== true) {
+				workspaceNote.hidden = false;
+				workspaceNote.textContent = `Workspace pages are not available on this deck (${p.model ?? "unsupported device"}): no bundled workspace fits its layout. Everything else on this key keeps working normally.`;
 			}
 			return;
 		}

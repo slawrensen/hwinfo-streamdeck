@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { alertLevel, convertUnit, type DecimalsSetting } from "../src/ui/format";
+import { alertLevel, convertUnit, fitTextLadder, type DecimalsSetting } from "../src/ui/format";
 import { formatMeasurement } from "../src/ui/measure";
 import { measureOptionsFrom } from "../src/ui/theme-store";
 
@@ -98,5 +98,24 @@ describe("measureOptionsFrom salvages hand-edited decimals", () => {
 
 	it("a legal fixed setting keeps its exact rendering", () => {
 		assert.deepEqual(formatMeasurement(48.7, "°C", measureOptionsFrom({ decimals: "2" })), { valueText: "48.70", unitText: "°C" });
+	});
+});
+
+describe("fitTextLadder stays bounded on pathological labels", () => {
+	it("a multi-kilobyte label ellipsizes through the pre-cut, identical to the cut input and in bounded time", () => {
+		// Nothing caps label length before the renderer (panel paste,
+		// hand-edited profile JSON, or a registry label up to ~32k units),
+		// and the ellipsis fallback walks prefixes from the far end: without
+		// the pre-cut that walk is quadratic (16.8 s measured at 40k chars,
+		// synchronous inside the tick). The budget here is ~1000x the fixed
+		// walk's cost; a reintroduced quadratic overshoots it by ~10x.
+		const huge = "GPU Memory Junction Temperature ".repeat(1250).trimEnd() + "X";
+		const started = performance.now();
+		const fitted = fitTextLadder(huge, 120, [20, 18, 16]);
+		const elapsed = performance.now() - started;
+		assert.deepEqual(fitted, fitTextLadder(huge.slice(0, 200), 120, [20, 18, 16]));
+		assert.equal(fitted.fontSize, 16);
+		assert.ok(fitted.text.endsWith("…"));
+		assert.ok(elapsed < 2000, `pathological label took ${elapsed.toFixed(0)} ms; the pre-cut keeps it in single-digit milliseconds`);
 	});
 });

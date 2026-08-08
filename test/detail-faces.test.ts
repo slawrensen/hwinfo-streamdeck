@@ -347,3 +347,24 @@ describe("returnMark stays additive", () => {
 		assert.match(renderStatusKey({ ...base, returnMark: true }), /M33 119/);
 	});
 });
+
+describe("hostile text degrades instead of aborting the encode", () => {
+	// A lone surrogate can arrive via JSON-escaped settings or a raw
+	// registry label; every face's text must survive the data-URI encode.
+	it("a lone surrogate in the opener label, a reading label, or a tile spec label never throws", () => {
+		const hostile = [
+			reading("cpu:0:0", 55, "°C", "CPU\uD800Tctl"),
+			reading("cpu:0:1", 120, "W", "CPU Power")
+		];
+		const snap: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0, instance: 0, name: "CPU [#0]" }], readings: hostile, byKey: new Map(hostile.map((r) => [r.key, r])) };
+		const hostileOk: PollerStatus = { state: "ok", snapshot: snap, source: "shared-memory" };
+		const openerLabel = composeBackFace(stateOf({ presentation: { label: "My\uD800CPU" } }), ok, ctxOf());
+		assert.doesNotThrow(() => encodeURIComponent(openerLabel));
+		const readingLabel = composeReadingFace(stateOf(), "cpu:0:0", "current", hostileOk, ctxOf());
+		assert.doesNotThrow(() => encodeURIComponent(readingLabel));
+		assert.match(readingLabel, /�/);
+		const specLabel = composeChunkFace(stateOf(), ["cpu:0:1"], "current", hostileOk, ctxOf(), { size: 1, labels: ["X\uD800"], colors: [null], cellLabels: true });
+		assert.doesNotThrow(() => encodeURIComponent(specLabel));
+		assert.match(specLabel, /�/);
+	});
+});

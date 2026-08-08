@@ -363,7 +363,16 @@ export function fitTextLadder(text: string, maxWidth: number, sizes: readonly nu
 		}
 	}
 	const chars = Array.from(text);
-	for (let i = chars.length - 1; i > 0; i--) {
+	// Pre-cut the prefix walk: the narrowest glyph advance is 2.9px at
+	// size 12 (scaled by the floor, less any negative letter spacing), so
+	// no prefix longer than budget/perChar can ever fit. Without the cut,
+	// the walk from the far end of an unbounded label (a panel paste, a
+	// hand-edited profile, a registry label) is quadratic: 16.8 s at 40k
+	// chars, synchronous inside the tick.
+	const spacing = options?.letterSpacing ?? 0;
+	const perChar = (2.9 * floor) / 12 + Math.min(0, spacing);
+	const maxFit = perChar > 0 ? Math.max(1, Math.ceil(budget / perChar) + 2) : chars.length - 1;
+	for (let i = Math.min(chars.length - 1, maxFit); i > 0; i--) {
 		const candidate = `${chars.slice(0, i).join("").trimEnd()}…`;
 		if (estimateKeyTextWidth(candidate, floor, options) <= budget) {
 			return { text: candidate, fontSize: floor };

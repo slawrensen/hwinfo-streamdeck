@@ -90,7 +90,11 @@ const BADGE_GAP_Y = 38;
 const BADGE_TEXT_Y = 48;
 
 export function escapeXml(text: string): string {
-	return text.replace(/[<>&'"]/g, (c) => {
+	// Fold unpaired surrogates first: settings text arrives through JSON
+	// escapes and registry labels as raw UTF-16, so a lone unit can reach
+	// face text, and encodeURIComponent throws URIError on one mid-render.
+	// U+FFFD keeps the face rendering; real pairs pass through untouched.
+	return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�").replace(/[<>&'"]/g, (c) => {
 		switch (c) {
 			case "<":
 				return "&lt;";

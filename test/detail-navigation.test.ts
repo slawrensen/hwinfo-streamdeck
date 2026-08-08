@@ -650,6 +650,29 @@ describe("tickSignature — the detail render gate", () => {
 		assert.notEqual(tickSignature({ state: "ok", snapshot: snap, source: "gadget" }), tickSignature(ok(snap)));
 	});
 
+	it("a stale line names its source, so a mid-stale provider swap still repaints", () => {
+		// While stale in auto mode, probeReopen can swap shared-memory for
+		// the Gadget registry (the registry persists after HWiNFO exits, so
+		// the reopen succeeds on frozen values) and the stale screen's
+		// sub-line flips between "check sharing" and "check Gadget" under
+		// otherwise frozen data. The source member is what repaints it.
+		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
+		assert.notEqual(
+			tickSignature({ state: "stale", snapshot: snap, source: "shared-memory", staleForMs: 20_000 }),
+			tickSignature({ state: "stale", snapshot: snap, source: "gadget", staleForMs: 20_000 })
+		);
+	});
+
+	it("the reading count guards a revision-less rebuild that keeps the other numbers", () => {
+		// A provider without valueRevision can rebuild inside one pollTime
+		// second; the count member is the only thing that moves.
+		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
+		const grown = { ...snap, readings: [...snap.readings, reading("cpu:0:1", 1)] };
+		assert.equal(snap.valueRevision, undefined);
+		assert.equal(grown.pollTime, snap.pollTime);
+		assert.notEqual(tickSignature(ok(grown)), tickSignature(ok(snap)));
+	});
+
 	it("a provider without revisions still gates on pollTime, and states keep their own lines", () => {
 		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
 		assert.equal(snap.valueRevision, undefined);

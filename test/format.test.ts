@@ -3,11 +3,15 @@
  * decide what number a key shows and what color it wears. Neither had a
  * single test before 1.4.1; both can put a wrong number or a wrong color on
  * a hardware monitor, which is the one thing this product must never do.
+ * Also the decimals salvage at the measureOptionsFrom seam: hand-edited
+ * settings must degrade to "auto", never throw mid-render.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { alertLevel, convertUnit } from "../src/ui/format";
+import { alertLevel, convertUnit, type DecimalsSetting } from "../src/ui/format";
+import { formatMeasurement } from "../src/ui/measure";
+import { measureOptionsFrom } from "../src/ui/theme-store";
 
 describe("convertUnit", () => {
 	it("converts °C to °F when Fahrenheit is on", () => {
@@ -76,5 +80,23 @@ describe("alertLevel, degenerate inputs stay safe", () => {
 	it("crit wins when the user sets crit below warn", () => {
 		// Misconfigured but representable: crit 60, warn 70, value 65.
 		assert.equal(alertLevel(65, 70, 60, false), "crit");
+	});
+});
+
+describe("measureOptionsFrom salvages hand-edited decimals", () => {
+	// Settings are untyped JSON at runtime: the PI only ever writes
+	// "auto"/"0"/"1"/"2"/"3", but a hand-edited decimals outside toFixed's
+	// [0,100] range would throw RangeError from the render path (keys,
+	// dials, detail faces and the PI preview all format through this seam).
+	const auto = formatMeasurement(48.7, "°C", { decimals: "auto", fahrenheit: false, dataUnits: "decimal" });
+
+	it("junk values render as auto instead of throwing", () => {
+		for (const junk of ["101", "-1", "1e3", 500, null] as unknown as DecimalsSetting[]) {
+			assert.deepEqual(formatMeasurement(48.7, "°C", measureOptionsFrom({ decimals: junk })), auto);
+		}
+	});
+
+	it("a legal fixed setting keeps its exact rendering", () => {
+		assert.deepEqual(formatMeasurement(48.7, "°C", measureOptionsFrom({ decimals: "2" })), { valueText: "48.70", unitText: "°C" });
 	});
 });

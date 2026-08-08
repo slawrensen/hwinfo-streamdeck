@@ -7,7 +7,7 @@ import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type
 import type { JsonValue } from "@elgato/utils";
 
 import { readingRow } from "../detail/detail-faces";
-import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
+import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf, workspacePageOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
 import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
@@ -88,11 +88,18 @@ export type ReadingSettings = {
 	/**
 	 * What a key press does (issue #5): "cycle-stat" (the unchanged
 	 * default), "open-details" (switch this device to its bundled detail
-	 * profile), or "tap-cycle-hold-details" (short tap cycles, a held
-	 * press opens details). Absent or unrecognized values behave exactly
-	 * as cycle-stat, so rolled-back and hand-edited profiles never break.
+	 * profile), "tap-cycle-hold-details" (short tap cycles, a held press
+	 * opens details), or "open-workspace" (switch to one page of the
+	 * bundled freeform workspace profile). Absent or unrecognized values
+	 * behave exactly as cycle-stat, so rolled-back and hand-edited
+	 * profiles never break.
 	 */
 	pressBehavior?: string;
+	/** Which workspace page an "open-workspace" press shows, zero-indexed.
+	 * The panel's select writes strings ("0".."3"); bare numbers count
+	 * the same, junk degrades to page 0, and integers outside the shipped
+	 * range clamp to the nearest page (see workspacePageOf). */
+	workspacePage?: string;
 	/** What the detail view lists: "source" (every reading of this
 	 * sensor's HWiNFO source, the default), "custom" (detailKeys), or
 	 * "filter" (readings matching the detailFilter glob). */
@@ -267,7 +274,8 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	 * (no stat cycle, no detail entry, no tap/hold arming). Otherwise the
 	 * default "cycle-stat" keeps the original semantics exactly: cycle
 	 * current → min → max → avg on key DOWN. "open-details" enters the
-	 * detail view on key down instead, and "tap-cycle-hold-details" arms
+	 * detail view on key down instead, "open-workspace" switches to the
+	 * key's configured workspace page, and "tap-cycle-hold-details" arms
 	 * the press engine (tap cycles on release, a 500 ms hold opens details
 	 * once). Malformed or future pressBehavior values take the cycle-stat
 	 * path.
@@ -288,6 +296,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		const behavior = pressBehaviorOf(state.settings);
 		if (behavior === "open-details") {
 			await this.openDetails(ev.action.id);
+			return;
+		}
+		if (behavior === "open-workspace") {
+			await this.openWorkspace(ev.action.id);
 			return;
 		}
 		if (behavior === "tap-cycle-hold-details") {
@@ -355,6 +367,34 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		});
 		if (result !== "entered") {
 			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);
+			await act.showAlert();
+		}
+	}
+
+	/**
+	 * Opens the key's configured workspace page on this key's device. The
+	 * same refusal contract as openDetails: every refusal keeps the key
+	 * exactly as it was and shows the alert cue, and the log names the
+	 * device type, never a sensor. The page index is parsed here (salvage
+	 * plus clamp) and passed EXPLICITLY so the app can never substitute a
+	 * remembered page.
+	 */
+	private async openWorkspace(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined) {
+			return;
+		}
+		const deviceId = act.device.id;
+		const caps = deviceCapabilities.get(deviceId);
+		const result = await this.detailNavigator.enterWorkspace({
+			deviceId,
+			deviceType: caps.type,
+			grid: { columns: caps.columns, rows: caps.rows },
+			page: workspacePageOf(state.settings)
+		});
+		if (result !== "entered") {
+			streamDeck.logger.info(`Workspace entry ${result} (device type ${caps.type ?? "unknown"})`);
 			await act.showAlert();
 		}
 	}

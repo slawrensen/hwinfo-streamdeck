@@ -37,6 +37,15 @@ export function effectiveTextFor(raw: { textMode?: unknown; textColor?: unknown;
 	return effectiveTextSettings(parseTextSettings(raw), deckText);
 }
 
+/** One scope's effective theme id: the action's own non-empty string, else
+ * the deck default. Settings are untyped JSON at runtime, so a non-string
+ * theme is junk and follows the deck default exactly like an absent one;
+ * the loose call sites this replaced sent junk to the SPEC default via
+ * resolvePalette instead, forking from detail-faces' strict guard. */
+export function effectiveThemeFor(settings: { theme?: unknown }): string {
+	return typeof settings.theme === "string" && settings.theme !== "" ? settings.theme : getDeckTheme();
+}
+
 /** The deck-wide data-unit preference (absent/malformed: decimal). */
 export function getDataUnits(): DataUnitsPref {
 	return dataUnits;

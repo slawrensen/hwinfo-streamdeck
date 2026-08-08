@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0-11" />
+		<link rel="stylesheet" href="pi.css?v=1.5.0.0-12" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -53,7 +53,7 @@
 		<sdpi-item label="Rotation set">
 			<div class="hw-set" id="rotation-set"></div>
 		</sdpi-item>
-		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those.</div>
+		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them.</div>
 
 		<sdpi-item label="Bump guard">
 			<sdpi-checkbox setting="rotationDisabled" label="Ignore turns (protects against accidental bumps)"></sdpi-checkbox>
@@ -255,6 +255,7 @@
 						<option value="three">Three: left/right switch, center taps</option>
 					</sdpi-select>
 				</sdpi-item>
+				<div class="hw-help">Two zones split the whole strip into previous and next, so the tap command (Touch tap in Custom, stat cycling in Elite) no longer fires. Three keeps a center tap.</div>
 			</div>
 			<sdpi-item label="Reset reach">
 				<sdpi-select setting="resetScope" default="current">
@@ -335,7 +336,7 @@
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0-11"></script>
-		<script src="pi-control.js?v=1.5.0.0-11"></script>
+		<script src="pi-common.js?v=1.5.0.0-12"></script>
+		<script src="pi-control.js?v=1.5.0.0-12"></script>
 	</body>
 </html>

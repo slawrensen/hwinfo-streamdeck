@@ -35,12 +35,12 @@ import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, groupReadings, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource, type RotationGroup } from "../rotation";
 import { SessionStatsStore, type SessionStats } from "../stats";
 import { FOOTER_PX, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
-import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, parseThreshold, STAT_BADGE, STAT_MODES, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
 import { statusDialText } from "../ui/state-screens";
 import { resolveTextColors, type TextColors } from "../ui/text-colors";
-import { decideLegacyDefault, effectiveTextFor, getDeckTheme, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
+import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
 
 /** Persisted per-dial settings (written by the PI; all optional). */
@@ -245,7 +245,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (ev.action.isDial()) {
 			this.pushTriggerDescriptions(ev.action, ev.payload.settings);
 		}
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<DialSettings>): void {
@@ -303,7 +303,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (ev.action.isDial()) {
 			this.pushTriggerDescriptions(ev.action, state.settings);
 		}
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	/** Rotate: routed by the scheme (legacy: step, whether pressed or not). */
@@ -763,7 +763,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 	private executeStateCommand(state: InstanceState, command: DialControlCommand): void {
 		switch (command.command) {
 			case "cycleStat":
-				state.statMode = STAT_MODES[(STAT_MODES.indexOf(state.statMode) + 1) % STAT_MODES.length] as StatMode;
+				state.statMode = nextStatMode(state.statMode);
 				return;
 			case "showCurrent":
 			case "backToCurrent":
@@ -831,9 +831,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		void action.setTriggerDescription(scheme.preset === "legacy" ? undefined : triggerDescriptions(scheme, rotationGroupsOf(settings.rotationGroups) !== undefined));
 	}
 
-	private renderAll(status: PollerStatus): void {
+	private renderAll(status: PollerStatus, only?: string): void {
 		for (const act of this.actions) {
-			if (!act.isDial()) {
+			if (!act.isDial() || (only !== undefined && act.id !== only)) {
 				continue;
 			}
 			const state = this.instances.get(act.id);
@@ -960,7 +960,7 @@ function parseAutoCycleMs(raw: string | undefined): number | null {
 function composeDialSvg(state: InstanceState, status: PollerStatus): string {
 	const settings = state.settings;
 	const config = loadThemes();
-	const themeId = settings.theme !== undefined && settings.theme !== "" ? settings.theme : getDeckTheme();
+	const themeId = effectiveThemeFor(settings);
 	// Dial faces stay themed while alerting, so the Text setting resolves at
 	// level "normal" here; the alert expression (bar fill, alerting row
 	// values) is fixed separately and custom text never recolors it.

@@ -18,6 +18,11 @@ export function isStatMode(value: unknown): value is StatMode {
 	return typeof value === "string" && (STAT_MODES as readonly string[]).includes(value);
 }
 
+/** The press-cycle successor: current, min, max, avg, wrapping. */
+export function nextStatMode(mode: StatMode): StatMode {
+	return STAT_MODES[(STAT_MODES.indexOf(mode) + 1) % STAT_MODES.length] as StatMode;
+}
+
 export function statValue(reading: Reading, mode: StatMode): number {
 	switch (mode) {
 		case "min":

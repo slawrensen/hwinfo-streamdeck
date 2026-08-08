@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, latestSvg as latestSvgIn, makeCheck, sleep, waitUntil } from "./lib/e2e-common.mjs";
 import { profileCells as sharedProfileCells } from "./lib/profile-cells.mjs";
 
 const PORT = 28994;
@@ -19,15 +20,9 @@ const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 const MAPPING_NAME = `Local\\HwinfoE2E_SM2_${process.pid}`;
 const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = { errors: [] };
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) {
-		results.errors.push(name);
-	}
-}
+const check = makeCheck((name) => results.errors.push(name));
 
 const profileCells = (name) => sharedProfileCells(pluginDir, name);
 
@@ -37,8 +32,7 @@ const switches = []; // { device, profile, page }
 const setSettings = []; // { context, payload }
 const showAlerts = []; // context
 
-const svgOf = (image) => (typeof image === "string" && image.startsWith("data:image/svg+xml,") ? decodeURIComponent(image.slice("data:image/svg+xml,".length)) : null);
-const latestSvg = (context) => images.filter((i) => i.context === context).map((i) => svgOf(i.svg)).filter((s) => s !== null).at(-1);
+const latestSvg = (context) => latestSvgIn(images, context);
 
 let fake = null;
 let finished = false;
@@ -155,7 +149,7 @@ async function scenario(send) {
 	await sleep(1800);
 	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1" });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: OPENER, payload: { event: "getSensorTree" } });
-	await sleep(600);
+	await waitUntil(() => results.tree !== undefined, 600);
 	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1" });
 	await sleep(200);
 	const keys = (results.tree?.groups ?? []).flatMap((g) => g.readings.map((r) => ({ key: r.key, label: r.label })));
@@ -183,8 +177,9 @@ async function scenario(send) {
 	const openerSettings = { readingKey: primary.key, statMode: "current", pressBehavior: "open-details" };
 	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1", payload: { settings: openerSettings, coordinates: { column: 2, row: 1 }, isInMultiAction: false } });
 	await sleep(300);
+	const switchesBeforeEnter = switches.length;
 	await keyPress(send, OPENER, "dev1", openerSettings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeEnter, 500);
 	results.enterSwitch = switches.at(-1);
 	// The app now shows the (installed) profile: the opener leaves, the
 	// baked cells of the real shipped archive appear.
@@ -199,7 +194,7 @@ async function scenario(send) {
 
 	// C. A reading slot press cycles that slot's session stat.
 	slotPress(send, "dev1", cellOfIndex(standardCells, 0).coord, cellOfIndex(standardCells, 0).settings);
-	await sleep(900);
+	await waitUntil(() => (latestSvg(slot0Ctx) ?? "").includes("MIN"), 900);
 	results.slot0Min = latestSvg(slot0Ctx);
 
 	// D. Layout growth: a third reading joins the source mid-view.
@@ -226,7 +221,7 @@ async function scenario(send) {
 		device: "dev1",
 		payload: { settings: slot0Cell.settings, coordinates: { column: rc, row: rr }, controller: "Keypad", isInMultiAction: false }
 	});
-	await sleep(900);
+	await waitUntil(() => images.filter((i) => i.context === slot0Ctx).length > framesBeforeReplay, 900);
 	results.replayRepaint = images.filter((i) => i.context === slot0Ctx).length > framesBeforeReplay;
 	fake.stdin.write("alive\n");
 	await sleep(3200);
@@ -239,6 +234,8 @@ async function scenario(send) {
 	// keeps its face, so the way out never blinks away.
 	const switchesBeforeBack = switches.length;
 	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
+	// Fixed on purpose: leg G's idle-face read leans on this full window
+	// (the post-leave idle repaint lands a beat after the leave debounce).
 	await sleep(500);
 	results.backSwitch = switches.length > switchesBeforeBack ? switches.at(-1) : undefined;
 	results.leftSlotFace = latestSvg(slot0Ctx);
@@ -256,7 +253,7 @@ async function scenario(send) {
 	results.idleBackFace = latestSvg(backCtx);
 	const switchesBeforeIdleBack = switches.length;
 	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeIdleBack, 500);
 	results.idleBackSwitch = switches.length > switchesBeforeIdleBack ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "dev1", standardCells);
 	await sleep(300);
@@ -267,12 +264,12 @@ async function scenario(send) {
 	appearOpener(send, "ctx-ped", "devped", { readingKey: primary.key, pressBehavior: "open-details" }, { column: 0, row: 0 });
 	await sleep(300);
 	await keyPress(send, "ctx-ped", "devped", { readingKey: primary.key, pressBehavior: "open-details" });
-	await sleep(400);
+	await waitUntil(() => showAlerts.includes("ctx-ped"), 400);
 	results.pedAlerted = showAlerts.includes("ctx-ped");
 	appearOpener(send, "ctx-gone", "dev1", { readingKey: "no-such:0:0", pressBehavior: "open-details" }, { column: 3, row: 1 });
 	await sleep(300);
 	await keyPress(send, "ctx-gone", "dev1", { readingKey: "no-such:0:0", pressBehavior: "open-details" });
-	await sleep(400);
+	await waitUntil(() => showAlerts.includes("ctx-gone"), 400);
 	results.goneAlerted = showAlerts.includes("ctx-gone");
 	results.refusalSwitches = switches.length - switchesBeforeRefusals;
 
@@ -298,8 +295,9 @@ async function scenario(send) {
 	const xlOpener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-xl", "devxl", xlOpener, { column: 1, row: 1 });
 	await sleep(300);
+	const switchesBeforeXl = switches.length;
 	await keyPress(send, "ctx-xl", "devxl", xlOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeXl, 500);
 	results.xlSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-xl", device: "devxl", payload: { settings: xlOpener, coordinates: { column: 1, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devxl", xlCells);
@@ -319,8 +317,9 @@ async function scenario(send) {
 	const vsdOpener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-vsd", "devvsd", vsdOpener, { column: 0, row: 0 });
 	await sleep(300);
+	const switchesBeforeVsd = switches.length;
 	await keyPress(send, "ctx-vsd", "devvsd", vsdOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeVsd, 500);
 	results.vsdSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-vsd", device: "devvsd", payload: { settings: vsdOpener, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 	await sleep(200);
@@ -337,8 +336,9 @@ async function scenario(send) {
 	const r2Opener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-r2", "devr2", r2Opener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeR2 = switches.length;
 	await keyPress(send, "ctx-r2", "devr2", r2Opener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeR2, 500);
 	results.r2Switch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-r2", device: "devr2", payload: { settings: r2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devr2", r2Cells);
@@ -411,7 +411,7 @@ async function scenario(send) {
 	const switchesBeforeIdle = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeIdle, 500);
 	results.r2IdleBackSwitch = switches.length > switchesBeforeIdle ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devr2", r2Cells);
 	await sleep(300);
@@ -440,7 +440,7 @@ async function scenario(send) {
 	const switchesBeforeDev1 = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeDev1, 500);
 	results.r2Dev1Switch = switches.length > switchesBeforeDev1 ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "dev1", r2Cells, "-r2");
 	await sleep(300);
@@ -460,8 +460,9 @@ async function scenario(send) {
 	const fltOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailMirrorBack: true };
 	appearOpener(send, "ctx-flt", "devflt", fltOpener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeFlt = switches.length;
 	await keyPress(send, "ctx-flt", "devflt", fltOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeFlt, 500);
 	results.fltSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-flt", device: "devflt", payload: { settings: fltOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devflt", fltCells);
@@ -472,7 +473,7 @@ async function scenario(send) {
 	results.fltSlot0Face = latestSvg(slotCtx("devflt", cellOfIndex(fltCells, 0).coord));
 	const switchesBeforeMirror = switches.length;
 	slotPress(send, "devflt", fltMirrorCell.coord, fltMirrorCell.settings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeMirror, 500);
 	results.fltMirrorSwitch = switches.length > switchesBeforeMirror ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devflt", fltCells);
 	await sleep(300);
@@ -501,9 +502,10 @@ async function scenario(send) {
 	const defBackCell = fltCells.find((c) => c.settings.detailRole === "back");
 	const defBackCtx = slotCtx("devdef", defBackCell.coord);
 	const [defBackCol, defBackRow] = defBackCell.coord.split(",").map(Number);
+	const switchesBeforeDefBack = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeDefBack, 500);
 	results.defBackSwitch = switches.at(-1);
 	removeDetailSurface(send, "devdef", fltCells);
 	await sleep(300);
@@ -585,7 +587,7 @@ async function scenario(send) {
 	const den3MirrorCell = fltCells.find((c) => c.coord === "2,1");
 	const switchesBeforeDen3 = switches.length;
 	slotPress(send, "devden3", den3MirrorCell.coord, den3MirrorCell.settings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeDen3, 500);
 	results.den3MirrorSwitch = switches.length > switchesBeforeDen3 ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devden3", fltCells);
 	await sleep(300);
@@ -824,10 +826,7 @@ async function finish() {
 }
 
 // --- boot ----------------------------------------------------------------
-const info = {
-	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-	colors: {},
-	devicePixelRatio: 1,
+const info = buildInfo({
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
@@ -840,9 +839,8 @@ const info = {
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }
-	],
-	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-};
+	]
+});
 
 fake = spawn(process.execPath, [path.join(repoRoot, "scripts", "fake-hwinfo.mjs")], {
 	stdio: ["pipe", "pipe", "inherit"],

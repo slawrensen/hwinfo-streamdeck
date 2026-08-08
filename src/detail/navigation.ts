@@ -10,7 +10,7 @@
  * it only moves plugin state inside the one active page.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
-import { isStatMode, STAT_MODES, type DecimalsSetting, type StatMode } from "../ui/format";
+import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
 import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
 import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
@@ -34,7 +34,6 @@ export type DetailPresentation = {
 
 export type DeviceDetailState = {
 	readonly deviceId: string;
-	readonly profileName: string;
 	readonly pageSize: number;
 	/** Readings per tile for this session (the opener's detailDensity). */
 	readonly density: DetailDensity;
@@ -221,7 +220,6 @@ export class DetailNavigator {
 		const replacedPending = existing !== undefined && existing.pending;
 		const state: DeviceDetailState = {
 			deviceId,
-			profileName: profile.name,
 			pageSize: readingSlotCapacity(profile),
 			density: detailDensityOf(settings),
 			// Positional grouping needs the positional list: source and
@@ -400,7 +398,7 @@ export class DetailNavigator {
 		if (state === undefined || first === undefined) {
 			return;
 		}
-		const next = STAT_MODES[(STAT_MODES.indexOf(this.statModeFor(state, first)) + 1) % STAT_MODES.length] as StatMode;
+		const next = nextStatMode(this.statModeFor(state, first));
 		for (const key of readingKeys) {
 			state.statModes.set(key, next);
 		}

@@ -17,6 +17,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, pluginArgv, sleep } from "./lib/e2e-common.mjs";
 import { profileCells } from "./lib/profile-cells.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -25,7 +26,6 @@ const DURATION_SEC = Number(process.env.PERF_DETAIL_SEC ?? "") || 480;
 const SAMPLE_SEC = 15;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const cells = profileCells(pluginDir, "profiles/detail-plus-xl");
 
@@ -110,14 +110,8 @@ async function sampleProcess(pid) {
 	return { rss: Number(row.WorkingSetSize), handles: Number(row.HandleCount), threads: Number(row.ThreadCount), cpuS: (Number(row.KernelModeTime) + Number(row.UserModeTime)) / 1e7 };
 }
 
-const info = {
-	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-	colors: {},
-	devicePixelRatio: 1,
-	devices: [{ id: "devxl", name: "Perf + XL", size: { columns: 9, rows: 4 }, type: 13 }],
-	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-};
-const plugin = spawn(process.execPath, ["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "perf-detail", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
+const info = buildInfo({ devices: [{ id: "devxl", name: "Perf + XL", size: { columns: 9, rows: 4 }, type: 13 }] });
+const plugin = spawn(process.execPath, pluginArgv(PORT, "perf-detail", info), {
 	cwd: pluginDir,
 	stdio: ["ignore", "inherit", "inherit"]
 });

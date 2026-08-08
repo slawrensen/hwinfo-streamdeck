@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-12";
+	const PI_BUILD = "1.5.0.0-13";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -322,14 +322,19 @@
 	let detailKeys = [];
 	// This key's own sensor: the runtime shows it on the Back tile and
 	// filters it out of the list, so the panel must refuse to add it and
-	// must mark an adopted copy (hand-edited, or the opener re-picked onto
-	// a listed sensor) instead of showing chips the deck will not list.
+	// must park an adopted copy (hand-edited, or the opener re-picked onto
+	// a listed sensor) outside the tile walk instead of dressing chips the
+	// deck will not list. Followed via followSetting at init: the primary
+	// picker's own re-pick is never echoed back, so a subscription alone
+	// goes stale the moment the user re-picks in this very panel.
 	let detailPrimaryKey = "";
 	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
-	const detailPrimaryBinding = detailListEl === null ? null : useSettings("readingKey", adoptDetailPrimary, null);
 	// The hand-grouped tile plan (detailTiles) and the uniform density it
 	// falls back to past its end. The plan is POSITIONAL: sizes stay put
 	// while readings flow through them, exactly like the list's ordering.
+	// detailDensity is followed via followSetting at init for the same
+	// reason as the primary: the Tile shows select's own write is never
+	// echoed back to this panel.
 	let detailTiles = [];
 	let detailUniform = 1;
 	const detailTilesBinding = detailListEl === null ? null : useSettings("detailTiles", adoptDetailTiles, null);
@@ -339,7 +344,6 @@
 	// frame. Two staggered frames leave a window where only one half of a
 	// list edit survives (a torn pair is exactly the restaffed-quad bug).
 	const detailTilesStage = detailListEl === null ? null : useSettings("detailTiles", undefined, null, false);
-	const detailUniformBinding = detailListEl === null ? null : useSettings("detailDensity", adoptDetailUniform, null);
 
 	function adoptDetailTiles(value) {
 		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
@@ -365,16 +369,36 @@
 	}
 
 	function adoptDetailUniform(value) {
-		detailUniform = value === 2 || value === "2" ? 2 : value === 3 || value === "3" ? 3 : value === 4 || value === "4" ? 4 : 1;
+		const next = value === 2 || value === "2" ? 2 : value === 3 || value === "3" ? 3 : value === 4 || value === "4" ? 4 : 1;
+		// followSetting polls every 400 ms: a no-op tick must not rebuild
+		// #detail-list under an in-flight chip drag or landing flash.
+		if (next === detailUniform) return;
+		detailUniform = next;
 		renderDetailList(); // the implicit fill grouping follows Tile shows
 	}
 
-	/** The whole list as tiles: explicit plan entries, then the uniform
-	 * fill, each { head chipIndex, size, spec|null }. */
+	/** The list as the DECK builds it: detailKeys minus the adopted
+	 * primary (detail-group.ts filters it onto the Back tile), the only
+	 * order the tile walk, cell indices and the note may count in. */
+	function listedDetailKeys() {
+		return detailKeys.filter((k) => k !== detailPrimaryKey);
+	}
+
+	/** A listed position back to its detailKeys slot: positions at or
+	 * past the adopted primary's raw slot shift one to step over it;
+	 * identity when the primary is not in the list. */
+	function rawDetailIndex(listedIdx) {
+		const primaryAt = detailKeys.indexOf(detailPrimaryKey);
+		return primaryAt >= 0 && listedIdx >= primaryAt ? listedIdx + 1 : listedIdx;
+	}
+
+	/** The whole LISTED list as tiles: explicit plan entries, then the
+	 * uniform fill, each { head listedIndex, size, spec|null }. */
 	function detailTileWalk() {
 		const tiles = [];
+		const listed = listedDetailKeys();
 		let cursor = 0;
-		while (cursor < detailKeys.length) {
+		while (cursor < listed.length) {
 			const spec = tiles.length < detailTiles.length ? detailTiles[tiles.length] : null;
 			const size = spec !== null ? spec.size : detailUniform;
 			tiles.push({ head: cursor, size, spec });
@@ -449,8 +473,12 @@
 	}
 
 	function adoptDetailPrimary(value) {
-		detailPrimaryKey = typeof value === "string" ? value : "";
-		renderDetailList(); // the "(Back tile)" mark follows the opener's sensor
+		const next = typeof value === "string" ? value : "";
+		// Same no-op guard as adoptDetailUniform: the 400 ms follow poll
+		// re-delivers the unchanged key forever.
+		if (next === detailPrimaryKey) return;
+		detailPrimaryKey = next;
+		renderDetailList(); // the parked Back-tile chip follows the opener's sensor
 		detailPicker?.renderList();
 		updateFilterCount(); // the primary is excluded from filter matches too
 	}
@@ -461,12 +489,67 @@
 	let detailFilterValue = "";
 
 	/** Mirrors compileDetailFilter in src/detail/detail-settings.ts (same
-	 * wildcard grammar, same source-plus-label candidate); keep in sync. */
+	 * wildcard grammar, same source-plus-label candidate, same iterative
+	 * two-pointer walk, same code-unit fold); keep in sync. Not a RegExp:
+	 * the `*` to `.*` translation backtracks exponentially on hostile
+	 * patterns ("*?a" repeated stalls one test for minutes within the
+	 * 128-char caps), while this walk is O(pattern x candidate). Case
+	 * folds per UTF-16 code unit the way the runtime's old non-unicode
+	 * `i` regex canonicalized: uppercase, except a non-ASCII unit never
+	 * folds onto an ASCII one (so the panel count and the deck view
+	 * agree on µ, ß, and friends); `?` eats exactly one unit, `*` any
+	 * run, and a wildcard-free pattern matches as a substring. */
+	const GLOB_STAR = 42; // "*".charCodeAt(0)
+	const GLOB_QUERY = 63; // "?".charCodeAt(0)
+
+	function foldCodeUnit(code) {
+		if (code < 128) {
+			return code >= 97 && code <= 122 ? code - 32 : code;
+		}
+		const upper = String.fromCharCode(code).toUpperCase();
+		if (upper.length !== 1) return code;
+		const upperCode = upper.charCodeAt(0);
+		return upperCode < 128 ? code : upperCode;
+	}
+
+	function foldedUnits(text) {
+		const units = new Array(text.length);
+		for (let i = 0; i < text.length; i++) {
+			units[i] = foldCodeUnit(text.charCodeAt(i));
+		}
+		return units;
+	}
+
 	function detailFilterMatcher(pattern) {
 		const anchored = /[*?]/.test(pattern) ? pattern : `*${pattern}*`;
-		const source = anchored.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
-		const regex = new RegExp(`^${source}$`, "is");
-		return (candidate) => regex.test(candidate);
+		const p = foldedUnits(anchored);
+		return (candidate) => {
+			const s = foldedUnits(candidate);
+			let pi = 0;
+			let si = 0;
+			let star = -1;
+			let mark = 0;
+			while (si < s.length) {
+				if (pi < p.length && (p[pi] === GLOB_QUERY || p[pi] === s[si])) {
+					pi++;
+					si++;
+				} else if (pi < p.length && p[pi] === GLOB_STAR) {
+					star = pi;
+					pi++;
+					mark = si;
+				} else if (star !== -1) {
+					// Backtrack to the last star, retrying one candidate
+					// unit later: linear, never nested.
+					pi = star + 1;
+					mark++;
+					si = mark;
+				} else {
+					return false;
+				}
+			}
+			while (pi < p.length && p[pi] === GLOB_STAR) pi++;
+			return pi === p.length;
+		};
 	}
 
 	function updateFilterCount() {
@@ -545,7 +628,7 @@
 			const walk = detailTileWalk();
 			const tile = walk[detailArm.tileIdx];
 			if (tile !== undefined) {
-				const occupied = Math.min(tile.size, detailKeys.length - tile.head);
+				const occupied = Math.min(tile.size, listedDetailKeys().length - tile.head);
 				const next = materializedTiles(detailArm.tileIdx);
 				if (occupied >= next[detailArm.tileIdx].size && next[detailArm.tileIdx].size < 4) {
 					// The tile is full but can grow: the pick becomes its next cell.
@@ -554,9 +637,11 @@
 					next[detailArm.tileIdx].colors.push(null);
 				}
 				const cell = Math.min(occupied, next[detailArm.tileIdx].size - 1);
-				detailKeys.splice(tile.head + cell, 0, key);
+				// tile.head and cell are LISTED positions; the splice lands
+				// at the matching detailKeys slot, past a parked primary.
+				detailKeys.splice(rawDetailIndex(tile.head + cell), 0, key);
 				detailTiles = next; // staged and saved together in writeDetailState
-				if (Math.min(next[detailArm.tileIdx].size, detailKeys.length - tile.head) >= 4) {
+				if (Math.min(next[detailArm.tileIdx].size, listedDetailKeys().length - tile.head) >= 4) {
 					armDetailAdd(detailArm.tileIdx); // full quad: disarm, and the end marker lights
 				}
 				// After the possible disarm re-render, so the receipt survives
@@ -580,12 +665,14 @@
 	 * tile materializes into the plan first, the same freeze the size
 	 * cycler applies; a tile losing its only cell leaves the plan with it. */
 	function removeDetailKey(key) {
-		const idx = detailKeys.indexOf(key);
-		if (idx < 0) {
+		if (!detailKeys.includes(key)) {
 			return;
 		}
+		// The tile lookup runs in LISTED space: the parked primary has no
+		// listed position (idx -1), so removing its chip shrinks no tile.
+		const idx = listedDetailKeys().indexOf(key);
 		const walk = detailTileWalk();
-		const tileIdx = walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
+		const tileIdx = idx < 0 ? -1 : walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
 		let next = null;
 		if (tileIdx >= 0) {
 			const cell = idx - walk[tileIdx].head;
@@ -613,12 +700,18 @@
 		}
 	}
 
-	/** Drag reorder: move `key` so it sits at list position `to`. */
+	/** Drag reorder: move `key` so it sits at LISTED position `to` (the
+	 * indices the chips render at). The parked primary is itself never
+	 * movable (listed index -1); a move crossing it may shift its raw
+	 * detailKeys slot by one, which nothing observes (the runtime
+	 * filters it out wherever it sits, the panel parks it first). */
 	function moveDetailKey(key, to) {
-		const from = detailKeys.indexOf(key);
-		if (from < 0 || to < 0 || to > detailKeys.length) return;
-		detailKeys.splice(from, 1);
-		detailKeys.splice(to > from ? to - 1 : to, 0, key);
+		const from = listedDetailKeys().indexOf(key);
+		if (from < 0 || to < 0 || to > listedDetailKeys().length) return;
+		const rawFrom = detailKeys.indexOf(key);
+		const rawTo = rawDetailIndex(to);
+		detailKeys.splice(rawFrom, 1);
+		detailKeys.splice(rawTo > rawFrom ? rawTo - 1 : rawTo, 0, key);
 		detailLanded = key;
 		writeDetailState();
 	}
@@ -687,22 +780,16 @@
 		if (tree !== null && label === null) {
 			name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
 		}
-		if (key === detailPrimaryKey) {
-			// Adopted from settings (or the opener re-picked onto a listed
-			// sensor): the deck shows this one on the Back tile, not in
-			// the list, and the panel must say so.
-			name.textContent += " (Back tile)";
-			name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
-		}
 		// The cell's label override lives ON the name (click to rename, the
 		// rotation-chip idiom) instead of an always-visible input: the chip
-		// stays narrow enough for a pair to read as a pair. The missing and
-		// Back-tile titles set above outrank the rename hint, and the Back
-		// suffix is never repainted.
+		// stays narrow enough for a pair to read as a pair. The missing
+		// title set above outranks the rename hint. An adopted primary
+		// never reaches here: the walk runs over listedDetailKeys and its
+		// chip parks outside the tiles (parkedPrimaryChip).
 		chip.dataset.tile = String(tileIdx);
 		chip.dataset.cell = String(cellIdx);
 		const override = tile.spec !== null ? (tile.spec.labels[cellIdx] ?? "") : "";
-		if (override !== "" && key !== detailPrimaryKey) {
+		if (override !== "") {
 			name.textContent = override;
 			name.classList.add("renamed");
 		}
@@ -725,7 +812,7 @@
 		down.dataset.move = "1";
 		down.title = "Move down the list";
 		down.textContent = "↓";
-		down.disabled = index === detailKeys.length - 1;
+		down.disabled = index === listedDetailKeys().length - 1;
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "hw-set-remove";
@@ -749,6 +836,34 @@
 		}
 		chip.append(up, down, remove);
 		return chip;
+	}
+
+	/** The adopted primary's chip, parked in its own holder OUTSIDE the
+	 * tile flow: the deck shows this reading on the Back tile and builds
+	 * the tiles over the list WITHOUT it, so it may not occupy a cell,
+	 * shift any dressing or count in the note. Remove works (no tile
+	 * shrinks; see removeDetailKey); rename stays refused and reorder,
+	 * overrides and colors do not apply (it has no cell). */
+	function parkedPrimaryChip() {
+		const label = readingLabelOf(detailPrimaryKey);
+		const holder = document.createElement("span");
+		holder.className = "hw-parked";
+		const chip = document.createElement("span");
+		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
+		chip.dataset.key = detailPrimaryKey;
+		const name = document.createElement("span");
+		name.className = "hw-set-name";
+		name.textContent = `${label ?? detailPrimaryKey} (Back tile)`;
+		name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
+		const remove = document.createElement("button");
+		remove.type = "button";
+		remove.className = "hw-set-remove";
+		remove.dataset.key = detailPrimaryKey;
+		remove.title = "Remove from the detail list";
+		remove.textContent = "×";
+		chip.append(name, remove);
+		holder.appendChild(chip);
+		return holder;
 	}
 
 	/** A drop on tile chrome (not a chip) appends at `dropIndex()`: the
@@ -790,18 +905,23 @@
 		const active = document.activeElement;
 		if (active !== null && active.classList.contains("hw-cell-rename")) return;
 		const frag = document.createDocumentFragment();
+		const listed = listedDetailKeys();
 		const walk = detailTileWalk();
+		// The parked primary leads, the way the Back tile leads the view.
+		if (detailPrimaryKey !== "" && detailKeys.includes(detailPrimaryKey)) {
+			frag.appendChild(parkedPrimaryChip());
+		}
 		// The unarmed landing point: the last tile with a free cell, else
 		// the trailing ghost tile that stands for "a new tile at the end".
 		const lastTile = walk.length > 0 ? walk[walk.length - 1] : null;
-		const lastHasRoom = lastTile !== null && detailKeys.length - lastTile.head < lastTile.size;
+		const lastHasRoom = lastTile !== null && listed.length - lastTile.head < lastTile.size;
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
 			// A drop on the tile itself (not a chip) appends at its end; the
 			// frame lights only for true tile-chrome hovers, not bubbled
 			// chip dragovers.
-			wireAppendDrop(holder, () => tile.head + Math.min(tile.size, detailKeys.length - tile.head));
+			wireAppendDrop(holder, () => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head));
 			const size = document.createElement("button");
 			size.type = "button";
 			size.className = "hw-tile-size";
@@ -821,11 +941,11 @@
 			}
 			for (let c = 0; c < tile.size; c++) {
 				const index = tile.head + c;
-				const key = detailKeys[index];
+				const key = listed[index];
 				if (key === undefined) break;
 				holder.appendChild(detailChip(key, index, tile, tileIdx, c));
 			}
-			const occupied = Math.min(tile.size, detailKeys.length - tile.head);
+			const occupied = Math.min(tile.size, listed.length - tile.head);
 			const fullQuad = tile.size >= 4 && occupied >= 4;
 			if (!fullQuad) {
 				const armed = detailArm !== null && detailArm.tileIdx === tileIdx;
@@ -839,17 +959,20 @@
 			// marker is the landing point.
 			const ghost = document.createElement("span");
 			ghost.className = "hw-tile ghost";
-			wireAppendDrop(ghost, () => detailKeys.length);
+			wireAppendDrop(ghost, () => listedDetailKeys().length);
 			ghost.appendChild(detailAddMarker("end", false, detailArm === null));
 			frag.appendChild(ghost);
 		}
+		// The note counts what the deck lists (the parked primary is on the
+		// Back tile, not a tile cell); the cap stays on the RAW length, the
+		// exact bound the runtime parser applies to detailKeys.
 		frag.appendChild(
 			setNote(
-				detailKeys.length === 0
+				listed.length === 0
 					? "Empty: add readings above, in the order the detail view should list them."
 					: detailKeys.length >= DETAIL_KEYS_MAX
-						? `${detailKeys.length} readings across ${walk.length} tiles. That is the cap; remove one to add another.`
-						: `${detailKeys.length} reading${detailKeys.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
+						? `${listed.length} readings across ${walk.length} tiles. That is the cap; remove one to add another.`
+						: `${listed.length} reading${listed.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
 			)
 		);
 		detailListEl.replaceChildren(frag);
@@ -1753,10 +1876,14 @@
 			const move = ev.target.closest(".hw-detail-move");
 			if (move !== null && !move.disabled) {
 				const key = move.closest(".hw-set-chip")?.dataset.key;
-				const from = detailKeys.indexOf(key);
+				// Neighbors in LISTED order: swapping their raw slots swaps
+				// the chips while a parked primary between them stays put.
+				const from = listedDetailKeys().indexOf(key);
 				const to = from + Number(move.dataset.move);
-				if (from >= 0 && to >= 0 && to < detailKeys.length) {
-					[detailKeys[from], detailKeys[to]] = [detailKeys[to], detailKeys[from]];
+				if (from >= 0 && to >= 0 && to < listedDetailKeys().length) {
+					const rawFrom = rawDetailIndex(from);
+					const rawTo = rawDetailIndex(to);
+					[detailKeys[rawFrom], detailKeys[rawTo]] = [detailKeys[rawTo], detailKeys[rawFrom]];
 					detailLanded = key; // the moved chip flashes at its new cell
 					writeDetailState();
 				}
@@ -1843,9 +1970,14 @@
 			}
 		});
 		detailBinding[0]().then(adoptDetailKeys);
-		detailPrimaryBinding[0]().then(adoptDetailPrimary);
 		detailTilesBinding[0]().then(adoptDetailTiles);
-		detailUniformBinding[0]().then(adoptDetailUniform);
+		// The opener's sensor and the uniform density are edited by OTHER
+		// controls in this panel (the primary picker, the Tile shows
+		// select), and the app never echoes a PI's own writes: follow the
+		// local store so the parked chip, the collector gates and the fill
+		// walk track those edits while the panel is open.
+		followSetting("readingKey", adoptDetailPrimary);
+		followSetting("detailDensity", adoptDetailUniform);
 	}
 	if (rotationBinding !== null) {
 		rotationSetEl.addEventListener("click", (ev) => {

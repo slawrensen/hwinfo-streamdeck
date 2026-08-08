@@ -18,7 +18,13 @@
 //   5. the aim's receipt stays truthful and the cap refuses loudly: a
 //      list close never repaints a standing aim's placeholder, an edit
 //      that consumes the aimed tile disarms it, and at 128 readings a
-//      refused tick repaints unchecked while the list note names the cap.
+//      refused tick repaints unchecked while the list note names the cap,
+//   6. the Tile shows density change regroups the walk in place, and the
+//      next removal persists the plan the NEW walk built,
+//   7. a primary adopted into the list parks outside the walk (dressing
+//      and renames stay positional over the listed readings, removing
+//      the parked chip leaves the plan untouched), and a live re-pick
+//      moves the Back-tile mark and the collector's gates at once.
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -78,6 +84,39 @@ const SEEDS = {
 		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"],
 		detailTiles: [{ size: 4, labels: "ABCD", colors: { 0: "#FF00AA" }, cellLabels: true }],
 		futureBlob: FUTURE_BLOB
+	},
+	// Density follow (leg J): a plain uniform list with no plan. Changing
+	// Tile shows must regroup the walk live, and the next removal must
+	// persist the plan the NEW walk built, not the stale one.
+	density: {
+		readingKey: "cpu:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailDensity: "1",
+		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"],
+		futureBlob: FUTURE_BLOB
+	},
+	// An adopted primary (leg K phase 1): the opener's own sensor sits in
+	// detailKeys. The deck lists only the other three, so the panel must
+	// park that chip outside the tiles and flow the dressing over the
+	// listed readings alone.
+	adopted: {
+		readingKey: "bench:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"],
+		detailTiles: [{ size: 2, labels: ["L1", "L2"] }, { size: 2, labels: ["L3", "L4"] }],
+		futureBlob: FUTURE_BLOB
+	},
+	// A live primary re-pick (leg K phase 2): the seeded primary exists in
+	// the tree but not in the list; re-picking onto a listed reading must
+	// move the Back-tile mark and the collector's gates without a reload.
+	repick: {
+		readingKey: "bench:0:9",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailKeys: ["bench:0:1", "bench:0:2", "bench:0:3"],
+		futureBlob: FUTURE_BLOB
 	}
 };
 
@@ -121,7 +160,9 @@ const TREE = {
 		{
 			name: "Bench Source",
 			matchName: "Bench Source",
-			readings: Array.from({ length: 9 }, (_, i) => ({ key: `bench:0:${i}`, label: `Bench ${i}`, unit: "V", value: 1.2, type: 2, display: "1.20 V" }))
+			// 10 rows: bench:0:9 serves as a primary that exists in the tree
+			// while staying out of every seeded detail list (run 7).
+			readings: Array.from({ length: 10 }, (_, i) => ({ key: `bench:0:${i}`, label: `Bench ${i}`, unit: "V", value: 1.2, type: 2, display: "1.20 V" }))
 		},
 		// An orphan source (SHM row past the sensor table): the tree shows the
 		// "Unknown sensor" display fallback while matchName carries the raw
@@ -208,7 +249,7 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|cap|salvage)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|cap|salvage|density|adopted|repick)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -258,10 +299,10 @@ function killChromeTree() {
 	}
 }
 const watchdog = setTimeout(() => {
-	console.error("[pi-persistence] watchdog: 180s elapsed — aborting");
+	console.error("[pi-persistence] watchdog: 240s elapsed, aborting");
 	killChromeTree();
 	process.exit(2);
-}, 180000);
+}, 240000);
 watchdog.unref();
 
 let cdpSocket = null;
@@ -356,6 +397,25 @@ try {
 			return "ok";
 		})()`);
 		check(`sdpi-checkbox ${setting} clicked`, res.result?.value === "ok", String(res.result?.value));
+	};
+	/** Bounded DOM poll over CDP (the waitUntil idiom with an async
+	 * predicate): passes the check as soon as `expr` evaluates true, and a
+	 * timeout fails loud with `detailExpr`'s value so the FAIL line names
+	 * what the DOM actually showed instead of a bare timeout. */
+	const waitDom = async (name, expr, timeoutMs, detailExpr = expr) => {
+		const start = Date.now();
+		for (;;) {
+			if ((await evaluate(expr)).result?.value === true) {
+				check(name, true, `after ${((Date.now() - start) / 1000).toFixed(1)}s`);
+				return;
+			}
+			if (Date.now() - start >= timeoutMs) {
+				const seen = (await evaluate(detailExpr)).result?.value;
+				check(name, false, `not within ${timeoutMs / 1000}s (saw: ${String(seen).slice(0, 160)})`);
+				return;
+			}
+			await sleep(100);
+		}
 	};
 
 	// ---- run 1: the marked Back tile ------------------------------------
@@ -886,6 +946,40 @@ try {
 	frame = atomic("leg I follow-up pick", writes.slice(mark));
 	check("leg I: the next pick appends at the end, not into a ghost aim", frame.detailKeys?.length === 11 && frame.detailKeys?.at(-1) === "gpu:0:0", JSON.stringify(frame.detailKeys?.slice(-2)));
 
+	// ---- run 3b: the Tile shows change regroups the walk live (leg J) ----
+	// The density select used to change only the STORED setting: the walk
+	// kept its old grouping until a reload, and the next removal persisted
+	// a plan built from the stale density (an empty plan here). The select
+	// must re-render the walk in place, and the removal must shrink the
+	// tile the NEW walk holds the reading in.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg J: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const tileSizesNow = `JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`;
+	const densityBefore = (await evaluate(tileSizesNow)).result?.value;
+	check("leg J: density 1 walks four x1 tiles", densityBefore === JSON.stringify(["×1", "×1", "×1", "×1"]), String(densityBefore));
+	mark = writes.length;
+	await setSelect("detailDensity", "4");
+	await waitDom(
+		"leg J: the walk regrouped to ONE x4 tile without a reload",
+		`(() => { const s = Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent); return s.length === 1 && s[0] === "×4"; })()`,
+		2000,
+		tileSizesNow
+	);
+	await sleep(700); // the select's own settings write settles
+	const densityFresh = writes.slice(mark);
+	check("leg J: the density edit produced a write", densityFresh.length >= 1, `${densityFresh.length} writes`);
+	const densityLast = writes.at(-1) ?? {};
+	check("leg J: the density landed", densityLast.detailDensity === "4", JSON.stringify(densityLast.detailDensity));
+	check("leg J: unknown nested field preserved", deepEqual(densityLast.futureBlob, FUTURE_BLOB), JSON.stringify(densityLast.futureBlob));
+	mark = writes.length;
+	check("leg J: × on the second cell of the regrouped quad", (await clickChipRemove("bench:0:1")) === "ok");
+	await sleep(700);
+	frame = atomic("leg J removal", writes.slice(mark));
+	check("leg J: the removal persisted the REGROUPED plan", deepEqual(frame.detailTiles, [{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
+	check("leg J: key left the list", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+
 	// ---- run 4: the 128-reading cap refuses loudly -----------------------
 	// At the cap the tick's native flip must not survive as a lying
 	// checkbox (the add was refused and nothing re-rendered), and the
@@ -942,7 +1036,152 @@ try {
 	check("salvage: the chip keeps the reading's own label", salvage.first === "Bench 0", String(salvage.first));
 	check("salvage: a colors object yields the default well", salvage.well === "#4cc2ff", String(salvage.well));
 
-	// ---- run 6: the dial panel tells the runtime truth -------------------
+	// ---- run 6: an adopted primary parks OUTSIDE the walk (leg K.1) ------
+	// The opener's own sensor can sit in detailKeys (hand-edited settings,
+	// or the opener re-picked onto a listed reading). The deck shows it on
+	// the Back tile and lists only the rest, so the panel must park that
+	// chip outside the tiles, flow the dressing over the LISTED readings
+	// only, count only them, aim renames at the walk's own cells, and let
+	// the parked chip's removal leave the plan untouched.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("adopted: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const adopted = JSON.parse(
+		(await evaluate(`JSON.stringify((() => {
+		const chip = (k) => document.querySelector('#detail-list .hw-set-chip[data-key="' + k + '"]');
+		const cell = (k) => {
+			const c = chip(k);
+			const n = c?.querySelector(".hw-set-name");
+			return c ? { tile: c.dataset.tile, cell: c.dataset.cell, text: n?.textContent, renamed: n?.classList.contains("renamed"), inTile: c.closest(".hw-tile") !== null } : null;
+		};
+		const parked = chip("bench:0:0");
+		return {
+			a: cell("bench:0:1"), b: cell("bench:0:2"), c: cell("bench:0:3"),
+			parkedInTile: parked === null ? "gone" : parked.closest(".hw-tile") !== null,
+			parkedMark: parked?.querySelector(".hw-set-name")?.textContent ?? "gone",
+			parkedRemovable: Array.from(parked?.querySelectorAll("button") ?? []).some((b) => (b.title ?? "").startsWith("Remove")),
+			note: document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"
+		};
+	})())`)).result?.value ?? "{}"
+	);
+	check("adopted: tile 1 wears [L1, L2] over the listed readings", deepEqual(adopted.a, { tile: "0", cell: "0", text: "L1", renamed: true, inTile: true }) && deepEqual(adopted.b, { tile: "0", cell: "1", text: "L2", renamed: true, inTile: true }), JSON.stringify([adopted.a, adopted.b]));
+	check("adopted: tile 2 holds the third listed reading as L3", deepEqual(adopted.c, { tile: "1", cell: "0", text: "L3", renamed: true, inTile: true }), JSON.stringify(adopted.c));
+	check("adopted: the primary's chip is parked outside every tile", adopted.parkedInTile === false, JSON.stringify(adopted.parkedInTile));
+	check("adopted: the parked chip wears the Back-tile mark", String(adopted.parkedMark).includes("(Back tile)"), String(adopted.parkedMark));
+	check("adopted: the parked chip stays removable", adopted.parkedRemovable === true, JSON.stringify(adopted.parkedRemovable));
+	check("adopted: the note counts listed readings only", String(adopted.note).startsWith("3 readings across 2 tiles"), String(adopted.note));
+
+	// Renaming the first LISTED chip must write labels[0]: counting the
+	// parked primary as tile 1 cell 0 used to shove the rename into
+	// labels[1] and dress the wrong cell on the deck.
+	const adoptedRename = await evaluate(`(() => {
+		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name');
+		if (!name) return "missing";
+		name.click();
+		const input = document.querySelector("#detail-list input.hw-cell-rename");
+		if (!input) return "no input";
+		return JSON.stringify({ tile: input.dataset.tile, cell: input.dataset.cell });
+	})()`);
+	const adoptedRenameState = JSON.parse(adoptedRename.result?.value?.startsWith("{") ? adoptedRename.result.value : "{}");
+	check("adopted: the rename input plumbs tile 0 cell 0, not the parked offset", adoptedRenameState.tile === "0" && adoptedRenameState.cell === "0", String(adoptedRename.result?.value));
+	mark = writes.length;
+	await evaluate(`(() => {
+		const input = document.querySelector("#detail-list input.hw-cell-rename");
+		if (!input) return "no input";
+		input.value = "Renamed A";
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+		input.blur();
+		input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); // headless blur stand-in
+		return "ok";
+	})()`);
+	await sleep(700);
+	frame = atomic("adopted rename", writes.slice(mark));
+	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
+	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[1]));
+	check("adopted: the parked key stays in the stored list", frame.detailKeys?.length === 4 && frame.detailKeys?.[0] === "bench:0:0", JSON.stringify(frame.detailKeys));
+
+	// Removing the PARKED chip edits the list only: no tile held it, so
+	// shrinking tile 1 for it (the pre-fix behavior) stole a cell from a
+	// listed reading.
+	mark = writes.length;
+	const parkedRemove = await evaluate(`(() => {
+		const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"]');
+		const x = Array.from(chip?.querySelectorAll("button") ?? []).find((b) => (b.title ?? "").startsWith("Remove"));
+		if (!x) return "missing";
+		x.click();
+		return "ok";
+	})()`);
+	check("adopted: removed the parked chip", parkedRemove.result?.value === "ok", String(parkedRemove.result?.value));
+	await sleep(700);
+	frame = atomic("adopted parked removal", writes.slice(mark));
+	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }, { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
+	check("adopted: only the parked key left the list", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+
+	// ---- run 7: a live primary re-pick moves the Back-tile gates (leg K.2)
+	// Re-picking the opener's sensor onto a listed reading used to leave
+	// the panel's primary stale until a reload: the "(Back tile)" mark
+	// never moved, the old primary's collector row stayed locked and the
+	// new primary's stayed tickable. The pick must move mark and gates in
+	// place.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/repick`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("repick: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	check("repick: no chip wears the Back-tile mark yet", (await evaluate(`Array.from(document.querySelectorAll("#detail-list .hw-set-name")).every((n) => !(n.textContent ?? "").includes("(Back tile)"))`)).result?.value === true);
+	const repickGates = async () =>
+		JSON.parse(
+			(await evaluate(`JSON.stringify(["bench:0:9", "bench:0:2"].map((k) => {
+			const t = document.querySelector('#pickerd-list .hw-row[data-key="' + k + '"] .hw-tick');
+			return t === null ? "gone" : { checked: t.checked, disabled: t.disabled };
+		}))`)).result?.value ?? "[]"
+		);
+	await openCollector();
+	let gates = await repickGates();
+	check("repick: the seeded primary's row starts locked", deepEqual(gates[0], { checked: true, disabled: true }), JSON.stringify(gates[0]));
+	check("repick: the listed reading's row starts tickable", deepEqual(gates[1], { checked: true, disabled: false }), JSON.stringify(gates[1]));
+
+	mark = writes.length;
+	const repickOpen = await evaluate(`(() => {
+		const input = document.getElementById("picker-search");
+		if (!input) return "no search input";
+		input.focus();
+		input.dispatchEvent(new Event("focus")); // headless focus stand-in
+		return "ok";
+	})()`);
+	check("repick: primary picker opened", repickOpen.result?.value === "ok", String(repickOpen.result?.value));
+	await sleep(600);
+	const repickRow = await evaluate(`(() => {
+		const row = document.querySelector('#picker-list .hw-row[data-key="bench:0:2"]');
+		if (!row) return "missing";
+		row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+		return "ok";
+	})()`);
+	check("repick: picked a listed reading as the primary", repickRow.result?.value === "ok", String(repickRow.result?.value));
+	await waitDom(
+		"repick: the Back-tile mark moved to the new primary's chip",
+		`(() => { const n = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-set-name'); return n !== null && n.textContent.includes("(Back tile)"); })()`,
+		1200,
+		`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-set-name')?.textContent ?? "gone"`
+	);
+	await sleep(700); // the pick's settings write settles
+	const repickFresh = writes.slice(mark);
+	check("repick: the pick produced a write", repickFresh.length >= 1, `${repickFresh.length} writes`);
+	const repickLast = writes.at(-1) ?? {};
+	check("repick: the pick wrote readingKey", repickLast.readingKey === "bench:0:2", JSON.stringify(repickLast.readingKey));
+	check("repick: the pick left the list alone", deepEqual(repickLast.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(repickLast.detailKeys));
+	check("repick: unknown nested field preserved", deepEqual(repickLast.futureBlob, FUTURE_BLOB), JSON.stringify(repickLast.futureBlob));
+
+	await openCollector();
+	gates = await repickGates();
+	check("repick: the OLD primary's row unlocked", deepEqual(gates[0], { checked: false, disabled: false }), JSON.stringify(gates[0]));
+	check("repick: the NEW primary's row is fixed on", deepEqual(gates[1], { checked: true, disabled: true }), JSON.stringify(gates[1]));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:2"] .hw-tick')?.click()`);
+	await sleep(500);
+	check("repick: ticking the new primary is refused", writes.length === mark, `${writes.length - mark} frames`);
+
+	// ---- run 8: the dial panel tells the runtime truth -------------------
 	// Custom preset + two touch zones is the dead-tap configuration
 	// (gestures.ts maps the whole strip to left/right), and the overview
 	// view draws no bar for the alert placeholders to promise. The panel

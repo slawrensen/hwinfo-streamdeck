@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
+import { compileDetailFilter, DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -95,6 +95,37 @@ describe("detail settings parsing", () => {
 		assert.equal(detailDensityOf({ detailDensity: null }), 1);
 		assert.equal(detailDensityOf({ detailDensity: [2] }), 1);
 		assert.equal(detailDensityOf({ detailDensity: "quad" }), 1);
+	});
+});
+
+describe("compileDetailFilter (glob matching)", () => {
+	it("an adversarial wildcard run matches in linear time, not by regex backtracking", { timeout: 5000 }, () => {
+		// "*?a" repeated 16 times drove the old `*` -> `.*` regex
+		// translation into exponential backtracking: this one call took
+		// >6 s, and >88 s near the 128-char cap, re-run every poll. The
+		// timeout option turns a regression into a failed test instead of
+		// a hung suite; no wall-clock assertion (those flake).
+		const evil = compileDetailFilter("*?a".repeat(16));
+		assert.equal(evil("xa".repeat(34) + "b"), false); // trailing "b" defeats the anchored "...a"
+		assert.equal(evil("xa".repeat(34)), true); // the same shape, satisfiable
+	});
+
+	it("wildcards anchor to the whole candidate, plain text substring-wraps, ? spans any character", () => {
+		assert.equal(compileDetailFilter("?PU")("GPU"), true);
+		assert.equal(compileDetailFilter("?PU")("GPU Temp"), false); // a wildcard pattern must cover the whole name
+		assert.equal(compileDetailFilter("pu")("GPU Temp"), true); // no wildcard: behaves as *pu*
+		assert.equal(compileDetailFilter("*?a")("GPU Vista"), true); // ends with the one-char-then-a shape
+		assert.equal(compileDetailFilter("a?c")("a\nc"), true); // ? crosses newlines like the old dotAll regex
+	});
+
+	it("case folds per code unit like the old non-unicode i regex, hand-mirrored in the panel", () => {
+		// The fold is duplicated in ui/pi-common.js detailFilterMatcher;
+		// these pin the mirror-sensitive non-ASCII rules on this side.
+		assert.equal(compileDetailFilter("µ")("rail μV noise"), true); // micro sign folds onto Greek mu
+		assert.equal(compileDetailFilter("μ")("rail µV noise"), true); // and the reverse
+		assert.equal(compileDetailFilter("ß")("GROSS RAIL"), false); // eszett never folds onto ASCII SS
+		assert.equal(compileDetailFilter("k")("Kelvin probe"), false); // nor Kelvin sign onto ASCII k
+		assert.equal(compileDetailFilter("K")("kelvin probe"), false);
 	});
 });
 

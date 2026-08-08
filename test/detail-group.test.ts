@@ -110,6 +110,19 @@ describe("compileDetailFilter (glob matching)", () => {
 		assert.equal(evil("xa".repeat(34)), true); // the same shape, satisfiable
 	});
 
+	it("a candidate containing literal wildcard characters still matches: the star stays a wildcard", () => {
+		// HWiNFO sensor names and labels are user-renamable free text, so a
+		// literal "*" can appear in the candidate. The pattern's star must
+		// not be consumed as that plain character (the shipped 1.5.0 regex
+		// matcher got these right; the walk's literal branch must skip the
+		// star unit or the backtrack anchor is never recorded).
+		assert.equal(compileDetailFilter("*")("*k"), true);
+		assert.equal(compileDetailFilter("*")("*"), true);
+		assert.equal(compileDetailFilter("4090")("RTX 4090* GPU Temperature"), true);
+		assert.equal(compileDetailFilter("oc")("GPU *OC* Temp"), true);
+		assert.equal(compileDetailFilter("g?u*")("g*u stars *everywhere*"), true);
+	});
+
 	it("wildcards anchor to the whole candidate, plain text substring-wraps, ? spans any character", () => {
 		assert.equal(compileDetailFilter("?PU")("GPU"), true);
 		assert.equal(compileDetailFilter("?PU")("GPU Temp"), false); // a wildcard pattern must cover the whole name

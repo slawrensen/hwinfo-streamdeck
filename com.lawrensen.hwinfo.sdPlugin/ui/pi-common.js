@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.0.0-13";
+	const PI_BUILD = "1.5.0.0-14";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -530,7 +530,10 @@
 			let star = -1;
 			let mark = 0;
 			while (si < s.length) {
-				if (pi < p.length && (p[pi] === GLOB_QUERY || p[pi] === s[si])) {
+				// The literal branch skips the star unit: a candidate's own
+				// literal "*" must never swallow the wildcard before its
+				// backtrack anchor is recorded (mirrors the runtime fix).
+				if (pi < p.length && (p[pi] === GLOB_QUERY || (p[pi] !== GLOB_STAR && p[pi] === s[si]))) {
 					pi++;
 					si++;
 				} else if (pi < p.length && p[pi] === GLOB_STAR) {

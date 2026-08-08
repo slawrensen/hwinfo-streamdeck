@@ -3,6 +3,25 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.5.90.0 - 2026-08-08
+
+Preview build for the issue #5 follow-up, cut from the detail-density
+branch for tester validation ahead of the next release. Not a general
+release.
+
+- "Tile shows" on a detail opener packs 1 to 4 readings onto each tile
+  of the detail view, using the same stacked, row and quad faces
+  regular keys have. Pressing a dense tile cycles the stat for all of
+  its readings together, and a quad's micro labels drop the leading
+  tokens all four cells share.
+- A Custom sensor list can group its tiles one by one: per-tile size,
+  per-cell labels and quad identity colors, edited in the key's sensor
+  list with drag, an armed plus marker, and inline pick results.
+- The detail filter matches in linear time and now survives sensor
+  names that carry their own literal wildcard characters; hostile text
+  in labels (an unpaired surrogate, a very long paste) degrades to a
+  safe face instead of freezing a tile or stalling a poll tick.
+
 ## 1.5.0.0 - 2026-08-02
 
 - The plugin could quit on its own about half a minute after every start,

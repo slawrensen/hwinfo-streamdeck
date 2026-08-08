@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import { formatQuadValue } from "../src/ui/format";
 import {
 	dualValueFontSize,
+	escapeXml,
 	KEY_TEXT_LADDERS,
 	QUAD_DEFAULT_COLORS,
 	quadValueFontSize,
@@ -1053,5 +1054,27 @@ describe("triple hardening", () => {
 		assert.match(svg, />A&amp;B&lt;C&gt;</);
 		assert.match(svg, />1&quot;2</);
 		assert.match(svg, />&apos;u</);
+	});
+});
+
+describe("escapeXml folds lone surrogates", () => {
+	// Settings text arrives through JSON escapes and registry labels arrive
+	// as raw UTF-16, so an unpaired surrogate can reach face text; the SVG
+	// data URI encode throws URIError on one. The escape chokepoint folds
+	// lone units to U+FFFD so no settable text can abort a render pass.
+	it("folds lone high and low units, keeps real pairs byte-identical", () => {
+		assert.equal(escapeXml("CPU\uD800"), "CPU�");
+		assert.equal(escapeXml("\uDC00x"), "�x");
+		assert.equal(escapeXml("😀 ok"), "😀 ok");
+		// The trap: a lone high unit directly before a valid pair folds
+		// alone; the pair behind it survives untouched.
+		assert.equal(escapeXml("\uD800😀"), "�😀");
+		assert.equal(escapeXml("a<\uD800>b"), "a&lt;�&gt;b");
+	});
+
+	it("every folded result survives the data-URI encode", () => {
+		for (const hostile of ["CPU\uD800", "\uDC00x", "\uD800😀", "x\uDBFF"]) {
+			assert.doesNotThrow(() => encodeURIComponent(escapeXml(hostile)));
+		}
 	});
 });

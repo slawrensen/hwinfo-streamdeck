@@ -106,10 +106,14 @@ onto the page. The top-left Back tile is a normal
 Sensor Reading key with its press fixed to returning: configure its sensor and
 any layout (or leave it showing the sensor you drilled down from).
 Previous/Next page through long sources, and pressing a listed reading cycles
-its stat for that visit. Six editable profiles ship, one per deck type (Mini,
-15-key, Neo, +, XL, + XL); the Stream Deck app asks to install the right one
-the first time you open details on a deck, and you can add your own keys to
-the page. This is a plugin-managed profile, not a native folder; details in
+its stat for that visit. A Tile shows setting packs two, three or four
+readings onto each tile using the same stacked, row and quad faces, and a
+custom list can group and dress its tiles one by one. Six editable profiles
+ship, one per deck type (Mini, 15-key, Neo, +, XL, + XL); the Stream Deck app
+asks to install the right one the first time you open details on a deck, and
+the page ships with every cell filled, so adding a key of your own means
+replacing one of those tiles, which sticks. This is a plugin-managed profile,
+not a native folder; details in
 [the docs](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html).
 
 <p align="center">

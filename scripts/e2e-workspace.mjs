@@ -50,6 +50,14 @@ function workspacePages(name) {
 let finished = false;
 const wss = new WebSocketServer({ host: "127.0.0.1", port: PORT });
 
+// A port already held (a previous run's plugin still exiting, another suite
+// mid-teardown) otherwise surfaces as a bare stack trace with no suite name
+// in it, which reads like a product failure inside hygiene's output.
+wss.on("error", (err) => {
+	console.error(`E2E WORKSPACE: cannot listen on 127.0.0.1:${PORT} — ${String(err)}`);
+	process.exit(1);
+});
+
 wss.on("connection", (ws) => {
 	const send = (obj) => ws.send(JSON.stringify(obj));
 	ws.on("message", async (data) => {

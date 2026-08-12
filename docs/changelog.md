@@ -14,7 +14,7 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
-## 1.5.90.0 - 2026-08-08
+## 1.5.90.0 - 2026-08-11
 
 Preview build for the issue #5 follow-up, cut from the detail-density
 branch for tester validation ahead of the next release. Not a general

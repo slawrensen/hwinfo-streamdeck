@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildDetailProfileArchive, SENSOR_READING_UUID, unzipStore, type DetailProfileRevision } from "../scripts/lib/detail-profile-archive";
 import { buildWorkspaceProfileArchive, WORKSPACE_PROFILE_DISPLAY_NAME } from "../scripts/lib/workspace-profile-archive";
+import { looksConfiguredForLegacyProbe } from "../src/actions/sensor-reading";
 import { detailDensityOf, detailModeOf, detailRoleOf, isWorkspaceBack, pressBehaviorOf, WORKSPACE_PAGE_COUNT, workspacePageOf } from "../src/detail/detail-settings";
 import { DETAIL_PROFILES, detailProfileFor } from "../src/detail/managed-profiles";
 import { DetailNavigator } from "../src/detail/navigation";
@@ -603,6 +604,28 @@ describe("panel agreement", () => {
 		const values = [...((select as RegExpExecArray)[1] as string).matchAll(/<option value="(-?\d+)">/g)].map((m) => Number(m[1]));
 		// Exactly the shipped pages, zero-indexed on the wire, in order.
 		assert.deepEqual(values, Array.from({ length: WORKSPACE_PAGE_COUNT }, (_, i) => i));
+	});
+
+	it("the legacy-theme probe ignores every baked navigation marker", () => {
+		// Both managed families bake these into their shipped pages, so a
+		// first launch that starts on one must not read as a pre-theme
+		// install and migrate a fresh one onto the legacy graphite theme.
+		assert.equal(looksConfiguredForLegacyProbe({}), false);
+		assert.equal(looksConfiguredForLegacyProbe({ detailRole: "back" }), false);
+		assert.equal(looksConfiguredForLegacyProbe({ detailRole: "back", workspaceBack: true }), false);
+		// Tied to the REAL bytes: whatever the workspace bundle bakes today
+		// must feed the probe false, not just the literal above.
+		for (const profile of WORKSPACE_PROFILES) {
+			const files = unzipStore(buildWorkspaceProfileArchive(profile));
+			const names = [...files.keys()];
+			const page = JSON.parse((files.get(names[2] as string) as Buffer).toString("utf8")) as { Controllers: Array<{ Actions: Record<string, { Settings: Record<string, unknown> }> | null; Type: string }> };
+			const keypad = page.Controllers.find((c) => c.Type === "Keypad");
+			const baked = Object.values(keypad?.Actions ?? {})[0] as { Settings: Record<string, unknown> };
+			assert.equal(looksConfiguredForLegacyProbe(baked.Settings), false, profile.key);
+		}
+		// A real user setting still counts as configured.
+		assert.equal(looksConfiguredForLegacyProbe({ readingKey: "cpu:0:0" }), true);
+		assert.equal(looksConfiguredForLegacyProbe({ detailRole: "back", theme: "ember" }), true);
 	});
 
 	it("every panel asset busts its cache on the same token, and the build stamp says that token", () => {

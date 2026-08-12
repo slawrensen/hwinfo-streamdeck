@@ -205,13 +205,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (firstSighting) {
 			poller.retain();
 		}
-		// The baked Back markers ship inside the revision-2 detail profiles
-		// (1.4.91+) and every workspace page, so their presence can never
-		// signal a pre-theme install: without this exclusion, a first launch
-		// that starts inside either managed profile would wrongly migrate a
-		// fresh install onto the legacy graphite theme. Both baked keys are
-		// excluded, never just the one.
-		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && key !== "workspaceBack" && v !== undefined));
+		decideLegacyDefault(looksConfiguredForLegacyProbe(ev.payload.settings));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
 		if (subscribedKey !== key) {
@@ -481,6 +475,22 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		}
 		return backTileFace(state.settings, this.detailNavigator.stateFor(deviceId), status);
 	}
+}
+
+/**
+ * Whether a settings blob looks like a CONFIGURED key, for the legacy-theme
+ * migration probe only. Both managed families bake a navigation marker into
+ * their profiles (detailRole on every detail and workspace Back,
+ * workspaceBack on the workspace one), so a first launch that happens to
+ * start on one of those pages must not read as a pre-theme install and
+ * migrate a fresh install onto the legacy graphite theme.
+ *
+ * Exported so the exclusion list is pinned by test rather than by comment:
+ * every future baked marker has to be added here, and forgetting one is
+ * silent and user-visible.
+ */
+export function looksConfiguredForLegacyProbe(settings: Record<string, unknown>): boolean {
+	return Object.entries(settings).some(([key, v]) => key !== "detailRole" && key !== "workspaceBack" && v !== undefined);
 }
 
 /**

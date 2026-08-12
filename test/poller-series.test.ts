@@ -32,7 +32,10 @@ describe("setIntervalMs keeps series subscriptions", () => {
 		seam.tick();
 		assert.deepEqual([...(poller.getSeries("cpu:0:0") ?? [])], [11, 12]);
 		poller.setIntervalMs(2000);
-		assert.deepEqual([...(poller.getSeries("cpu:0:0") ?? [])], [], "the cadence reset must empty the ring");
+		// Asserted WITHOUT a ?? fallback: an emptied ring and a dropped
+		// subscription both read as "no samples" through one, and the
+		// dropped subscription is exactly the defect.
+		assert.deepEqual(poller.getSeries("cpu:0:0"), [], "the ring empties in place and the key stays subscribed");
 		seam.tick();
 		seam.tick();
 		assert.deepEqual([...(poller.getSeries("cpu:0:0") ?? [])], [13, 14], "collection must resume without a resubscribe");

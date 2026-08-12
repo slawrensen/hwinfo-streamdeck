@@ -3,6 +3,20 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.5.1.0 - 2026-08-11
+
+- Sparklines no longer disappear for good after a Poll interval change.
+  The poller reset its sample rings by dropping them entirely, and those
+  rings are what mark a reading as collected, so a key that was showing a
+  sparkline stopped collecting one the moment the interval changed and
+  never resumed until the key was reloaded. Bar and Ring keys lost the
+  same evidence for their session bounds, and a two-row dial lost its row
+  lines. The rings now empty in place: a cadence change still discards
+  samples from the old rhythm, but the readings stay subscribed. Starting
+  the plugin with a saved non-default interval hit the same path once per
+  launch, so a custom interval could cost the first sparkline of every
+  session.
+
 ## 1.5.0.0 - 2026-08-02
 
 - The plugin could quit on its own about half a minute after every start,

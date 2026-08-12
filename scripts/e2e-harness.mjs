@@ -591,6 +591,25 @@ async function scenario(send) {
 	await sleep(300);
 	results.reappearFirstFrame = decodeSvg((results.images.filter((i) => i.context === "ctx-key")[keyFramesBefore] ?? {}).image);
 
+	// Poll-interval change: the panel's Advanced section pushes new globals
+	// mid-session, and the poller resets its sample rings for the new
+	// cadence. The rings ARE the subscription registry, so a reset that
+	// dropped them ended collection for every visible key until its action
+	// reloaded (the 1.5.1 defect). Drive the real chain the panel drives:
+	// globals in, then prove a sparkline REBUILDS on the live key.
+	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt
+	// line needs two FRESH snapshots (~2 s each), the same budget the
+	// two-row dial leg above allows.
+	const intervalFramesBefore = results.images.filter((i) => i.context === "ctx-key").length;
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: 250 } } });
+	await sleep(6500);
+	results.sparklineAfterIntervalChange = results.images
+		.filter((i) => i.context === "ctx-key")
+		.slice(intervalFramesBefore)
+		.some((i) => decodeSvg(i.image).includes("<polyline"));
+	send({ event: "didReceiveGlobalSettings", payload: { settings: {} } }); // back to the default cadence
+	await sleep(400);
+
 	// A REPLAYED willAppear (no willDisappear before it) must repaint, even
 	// though the composed bytes have not changed. Stream Deck replays appear
 	// on reconnect and on wake, and the app's own image cache can be cold
@@ -720,6 +739,11 @@ async function finish() {
 	const value = valueMatch ? Number(valueMatch[1]) : NaN;
 	check("key SVG value is a plausible CPU temp", Number.isFinite(value) && value > 15 && value < 120, `value=${value}`);
 	check("key SVG includes sparkline polyline", keyImages.some((s) => s.includes("<polyline")));
+	check(
+		"sparkline rebuilds after a poll-interval change (subscriptions survive the cadence reset)",
+		results.sparklineAfterIntervalChange === true,
+		results.sparklineAfterIntervalChange === true ? "polyline returned" : "no sparkline after the interval changed"
+	);
 	check(
 		"sparkline survives nav away + back (history persisted in poller)",
 		typeof results.reappearFirstFrame === "string" && results.reappearFirstFrame.includes("<polyline"),
@@ -1093,10 +1117,15 @@ plugin.on("exit", (code) => {
 	}
 });
 
+// The scenario waits on HWiNFO's own ~2 s cadence in several legs, so it
+// runs near a minute on this machine; the guard exists to catch a plugin
+// that never finishes at all, not to police the budget. It sat at 60 s
+// while the run measured 57-58 s, so one added leg turned every failure
+// into an indistinguishable timeout.
 setTimeout(() => {
 	if (!finished) {
 		console.error("E2E: timeout — plugin never completed the scenario");
 		plugin.kill();
 		process.exit(1);
 	}
-}, 60000);
+}, 90000);

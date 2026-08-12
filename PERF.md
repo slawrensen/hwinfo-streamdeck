@@ -27,6 +27,44 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-08-11: 1.5.1 soak scope, and why this poller change did not get one
+
+The runbook requires a hardware soak for any release touching the poller,
+and 1.5.1 touches `src/poller.ts`, so this entry records the judgment
+instead of leaving the rule silently unanswered.
+
+The change is eight lines inside `setIntervalMs`, which runs only when a
+global-settings frame changes the interval, never in the tick path.
+`tick`, `probeReopen`, `openProvider` and the whole provider lifecycle are
+byte-identical to 1.5.0.0, and `git diff v1.5.0..HEAD -- native/` is
+empty, so the native bytes a soak exists to prove are the bytes the
+2026-07-31 48 h run already soaked (slope -0.01 MB/30 min, handles 196 to
+177, 0 WARN 0 ERROR). What the fix changes is which side of that soak the
+steady state sits on: before it, a poll-interval change silently dropped
+every sparkline ring, so the process held LESS state than a normal
+session; after it, the rings behave exactly as they do for a user who
+never touches the interval, which is every soaked session to date. The
+retained cost is bounded by the ring cap (36 samples per subscribed
+reading, measured at about 150 KB for 515 readings in the 2026-07-25
+entry).
+
+A 48 h RSS soak is therefore not proportionate here, but the claim the
+changelog makes is behavioral and no automated gate covers it end to end
+on real hardware, so it was checked live instead: install the pack, show
+a sparkline key, change Poll every, confirm the line rebuilds rather than
+dying, then restart the plugin with the non-default interval saved and
+confirm the first sparkline of the session still appears. The result is
+recorded with the 1.5.1.0 row in the submission log.
+
+Automated coverage added with the fix, both proven red against the
+reverted line: a unit leg that drives the real poller singleton and
+asserts the ring empties in place while the key stays subscribed, and an
+e2e leg that pushes a changed `pollIntervalMs` over the mock socket and
+asserts the sparkline polyline returns on the live key. The e2e scenario
+guard moved 60 s to 90 s in the same commit: the run already measured
+57 to 58 s, so any added leg turned an assertion failure into an
+indistinguishable timeout.
+
 ### 2026-07-29: the drill-down detail view (1.4.90.0 preview, issue #5)
 
 Two questions: does a dense detail page cost anything at the fastest

@@ -17,7 +17,7 @@ import { WebSocketServer } from "ws";
 import { buildInfo, makeCheck, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 import { unzipStore } from "./lib/profile-cells.mjs";
 
-const PORT = 28996;
+const PORT = 28992;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
@@ -196,7 +196,7 @@ async function scenario(send) {
 	// --- I. Back: the REAL baked cell out of the shipped archive leaves with
 	// the profile name omitted, which is what restores the previous profile.
 	const backSettings = stdPages[0][0].settings;
-	check("the baked Back cell carries exactly the back role marker", JSON.stringify(backSettings) === JSON.stringify({ detailRole: "back" }), JSON.stringify(backSettings));
+	check("the baked Back cell carries exactly the role and family markers", JSON.stringify(backSettings) === JSON.stringify({ detailRole: "back", workspaceBack: true }), JSON.stringify(backSettings));
 	const backCtx = "ctx-wback";
 	appearKey(send, backCtx, "wback", backSettings, { column: backCol, row: backRow });
 	await sleep(250);

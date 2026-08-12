@@ -426,6 +426,16 @@ export class DetailNavigator {
 		// entitled to (and answers it with the refusal cue), so retire it
 		// with the session.
 		this.workspaceDispatchedAt.delete(deviceId);
+		// A session still PENDING here never had its slots register, so the
+		// expiry timer just cleared was the only thing that would ever write
+		// its tombstone. Dropping both leaves a late-accepted install landing
+		// on a detail page no session owns and nothing backs out of, which is
+		// exactly what the tombstone exists to prevent. Leave the one the
+		// timer would have left.
+		const dropped = this.states.get(deviceId);
+		if (dropped !== undefined && dropped.pending) {
+			this.expiredPendingAt.set(deviceId, now);
+		}
 		const had = this.states.delete(deviceId);
 		if (had) {
 			this.deps.onChanged?.(deviceId);

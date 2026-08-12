@@ -562,6 +562,26 @@ describe("workspace navigation", () => {
 		assert.notEqual(nav.stateFor("dev1"), undefined);
 	});
 
+	it("Back off a workspace page leaves the pending detail entry's tombstone behind", async () => {
+		const { nav, switches, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		advance(2_000); // past the detail beat; that install prompt is still open
+		assert.equal(await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 }), "entered");
+		advance(2_000);
+		await nav.leave("dev1");
+		const afterBack = switches.length;
+		advance(2_000); // past the leave debounce, still inside the tombstone window
+		// The detail install is accepted LATE and its surface finally arrives.
+		// Back cleared the expiry timer that was the ONLY writer of this
+		// session's tombstone, so without one nothing backs the user off a
+		// page no session owns.
+		nav.surfaceSeen("dev1");
+		await Promise.resolve();
+		await Promise.resolve();
+		assert.equal(switches.length, afterBack + 1, "a late-accepted install must be backed out");
+		assert.equal(switches.at(-1)?.profileName, undefined);
+	});
+
 	it("detail entry refuses inside the workspace switch beat (one managed hop at a time)", async () => {
 		const { nav, switches } = bed();
 		await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 });

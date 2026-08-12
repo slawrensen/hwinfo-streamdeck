@@ -28,6 +28,7 @@
 		"e2e:native-edge": "node scripts/e2e-native-edge.mjs",
 		"e2e:load": "node scripts/e2e-load.mjs",
 		"e2e:drilldown": "node scripts/e2e-drilldown.mjs",
+		"e2e:workspace": "node scripts/e2e-workspace.mjs",
 		"e2e:pi": "node scripts/e2e-pi-persistence.mjs",
 		"e2e:socket-close": "node scripts/e2e-socket-close.mjs",
 		"suite:full": "node scripts/hygiene.mjs",

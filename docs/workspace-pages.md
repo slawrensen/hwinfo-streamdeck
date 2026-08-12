@@ -11,7 +11,7 @@ A workspace page is a page of a **plugin-managed profile**, not a native Stream 
 
 Practical consequences:
 
-- The first time you press a workspace key on a deck, the Stream Deck app asks to install that deck's workspace profile. If you accept, **that one press lands on page 1 whichever page the key is set to**, because the prompt consumes the original request; press the key again and it goes to the page you picked. If you decline, nothing switches and the key says so, and the next press asks again. Keys left on the default page 1 never see the difference, and at that moment all four pages are identical anyway.
+- The first time you press a workspace key on a deck, the Stream Deck app asks to install that deck's workspace profile. If you accept, **that one press lands on page 1 whichever page the key is set to**, because the prompt consumes the original request; press Back, then the key again, and it goes to the page you picked. If you decline, the deck simply stays where it is and the next press asks again; the plugin is never told you declined, so the key gives no cue. Keys left on the default page 1 never see the difference, and at that moment all four pages are identical anyway.
 - Every page ships empty except a Back key in the top-left cell. Everything else is yours to fill with ordinary keys, HWiNFO keys or anything else, in any layout.
 - The plugin never paints, repairs or overwrites a workspace page. It only ever asks the app to switch to one.
 - Back returns to the profile you came from. The app remembers one previous profile, not a trail, so if you hop from a workspace page into a drill-down and back, where the second Back lands is the app's restore behavior and not something this plugin stores.

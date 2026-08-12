@@ -84,7 +84,13 @@ export function buildWorkspaceProfileArchive(profile: ManagedWorkspaceProfile): 
 		// One baked cell per page: the canonical Back, distinct ActionID per
 		// page (distinct GUID names), identical settings marker everywhere.
 		const actions: Record<string, unknown> = {
-			[`${backCell.column},${backCell.row}`]: cellEntry(namespace, `page-${index}:nav:back`, "Sensor Reading", SENSOR_READING_UUID, { detailRole: "back" })
+			// The role marker the detail pages bake, PLUS a family marker.
+			// Without it the two bundles' Back cells are byte-identical, so
+			// nothing at runtime can tell which family's page is on screen
+			// and a workspace Back borrows whatever detail session the
+			// device is carrying. It has to ship in the FIRST released
+			// bytes: the freeze rule means it can never be added later.
+			[`${backCell.column},${backCell.row}`]: cellEntry(namespace, `page-${index}:nav:back`, "Sensor Reading", SENSOR_READING_UUID, { detailRole: "back", workspaceBack: true })
 		};
 		const controllers: Array<Record<string, unknown>> = [{ Actions: actions, Type: "Keypad" }];
 		if (profile.encoders > 0) {

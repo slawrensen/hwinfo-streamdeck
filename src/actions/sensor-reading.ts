@@ -7,7 +7,7 @@ import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type
 import type { JsonValue } from "@elgato/utils";
 
 import { readingRow } from "../detail/detail-faces";
-import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf, workspacePageOf } from "../detail/detail-settings";
+import { detailMirrorBackOf, detailRoleOf, isWorkspaceBack, pressBehaviorOf, workspacePageOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
 import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
@@ -127,6 +127,13 @@ export type ReadingSettings = {
 	 * ordinary key; the value is never normalized or rewritten.
 	 */
 	detailRole?: string;
+	/**
+	 * Baked into every workspace page's Back cell, and nowhere else. It
+	 * exists only so the runtime can tell a workspace page's Back from a
+	 * detail page's otherwise identical one; nothing writes it, and a
+	 * value other than exactly true is not a workspace Back.
+	 */
+	workspaceBack?: boolean;
 };
 
 type InstanceState = {
@@ -198,11 +205,13 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (firstSighting) {
 			poller.retain();
 		}
-		// The baked Back marker ships inside the revision-2 profiles (1.4.91+),
-		// so its presence can never signal a pre-theme install: without this
-		// exclusion, a first launch that starts inside a detail profile would
-		// wrongly migrate a fresh install onto the legacy graphite theme.
-		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && v !== undefined));
+		// The baked Back markers ship inside the revision-2 detail profiles
+		// (1.4.91+) and every workspace page, so their presence can never
+		// signal a pre-theme install: without this exclusion, a first launch
+		// that starts inside either managed profile would wrongly migrate a
+		// fresh install onto the legacy graphite theme. Both baked keys are
+		// excluded, never just the one.
+		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && key !== "workspaceBack" && v !== undefined));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
 		if (subscribedKey !== key) {
@@ -470,15 +479,28 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (detailRoleOf(state.settings) !== "back") {
 			return compose(state.settings, status);
 		}
-		if (nonEmptyStringOf(state.settings.readingKey) !== undefined) {
-			return compose(state.settings, status, true);
-		}
-		const detail = this.detailNavigator.stateFor(deviceId);
-		if (detail === undefined) {
-			return renderDetailIdleBackKey();
-		}
-		return compose(backFallbackSettings(detail), status, true);
+		return backTileFace(state.settings, this.detailNavigator.stateFor(deviceId), status);
 	}
+}
+
+/**
+ * The face a Back-role tile shows. Its own configured reading wins; a
+ * WORKSPACE Back always falls back to the honest idle face, because it
+ * belongs to no detail session and the fallback below is keyed on the
+ * DEVICE, so an unconfirmed session left on this deck (an install prompt
+ * still open, or one that expired) would otherwise lend the workspace
+ * page's only way out an abandoned opener's live sensor face. A detail
+ * Back with no session shows the same idle face. Exported so the face
+ * rules are testable without the action instance.
+ */
+export function backTileFace(settings: ReadingSettings, detail: DeviceDetailState | undefined, status: PollerStatus): string {
+	if (nonEmptyStringOf(settings.readingKey) !== undefined) {
+		return compose(settings, status, true);
+	}
+	if (isWorkspaceBack(settings) || detail === undefined) {
+		return renderDetailIdleBackKey();
+	}
+	return compose(backFallbackSettings(detail), status, true);
 }
 
 /** The minimal synthetic settings for an unconfigured Back tile: the

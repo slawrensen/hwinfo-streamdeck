@@ -210,6 +210,17 @@ export class DetailNavigator {
 			this.deps.log?.warn(`Detail entry refused: switch in flight on ${deviceId}`);
 			return "already-active";
 		}
+		const lastWorkspace = this.workspaceDispatchedAt.get(deviceId);
+		if (lastWorkspace !== undefined && now - lastWorkspace < LEAVE_DEBOUNCE_MS) {
+			// The mirror of the rule enterWorkspace already applies to a
+			// detail beat. The app's previous-profile register is SINGLE
+			// level, so stacking detail onto a workspace switch that is
+			// still landing pushes the true origin off the end and Back
+			// stops reaching it. Past the beat this is a deliberate press
+			// on a key the user placed, and it proceeds.
+			this.deps.log?.warn(`Detail entry refused: workspace switch just dispatched on ${deviceId}`);
+			return "already-active";
+		}
 		const group = resolveDetailGroup(snapshot, settings);
 		if (group === null) {
 			return "unresolved";
@@ -355,6 +366,14 @@ export class DetailNavigator {
 		// A fresh navigation invalidates the last-leave debounce, same as
 		// detail entry: Back on the new page must work immediately.
 		this.leftAt.delete(deviceId);
+		// A PENDING detail session is deliberately LEFT ALONE here. Dropping
+		// it looks tidy and is a trap: its expiry timer is what writes the
+		// tombstone surfaceSeen needs, and without one a late-accepted
+		// install lands the user on a detail page no session owns and
+		// nothing backs them out of. Letting it expire on its own is
+		// exactly what would have happened had this key never been pressed.
+		// The wrong-face symptom it used to cause is fixed where it belongs,
+		// on the workspace Back tile's own face (see isWorkspaceBack).
 		// The parser already clamps; clamp again here so the navigator can
 		// never dispatch a page the shipped bundle does not have, whatever
 		// the caller passed.
@@ -403,6 +422,11 @@ export class DetailNavigator {
 			this.deps.onChanged?.(deviceId);
 		}, LEAVE_DEBOUNCE_MS));
 		this.clearCleanupTimer(deviceId);
+		// The workspace stamp guarded exactly the switch this Back undoes.
+		// Holding it past the hop refuses an opener press the user is
+		// entitled to (and answers it with the refusal cue), so retire it
+		// with the session.
+		this.workspaceDispatchedAt.delete(deviceId);
 		const had = this.states.delete(deviceId);
 		if (had) {
 			this.deps.onChanged?.(deviceId);

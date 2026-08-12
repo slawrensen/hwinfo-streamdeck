@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { backFallbackSettings, compose } from "../src/actions/sensor-reading";
+import { backFallbackSettings, backTileFace, compose } from "../src/actions/sensor-reading";
 import { composeBackFace, type DetailFaceContext } from "../src/detail/detail-faces";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
@@ -175,6 +175,21 @@ describe("the idle Back face", () => {
 	it("stays the honest way out when no session exists", () => {
 		const svg = renderDetailIdleBackKey();
 		assert.match(svg, />Back</);
+	});
+
+	it("a workspace Back stays idle even while a detail session sits on the same deck", () => {
+		const session = stateOf();
+		// Exactly the settings the shipped workspace pages bake.
+		const workspaceBack = { detailRole: "back", workspaceBack: true };
+		// The detail fallback is keyed on the DEVICE, so an unconfirmed or
+		// expired session on this deck would otherwise dress the workspace
+		// page's only way out with the abandoned opener's sensor.
+		assert.equal(backTileFace(workspaceBack, session, ok), renderDetailIdleBackKey());
+		// A DETAIL Back with that same live session still borrows the
+		// opener's face: this is not a blanket change to Back tiles.
+		assert.equal(backTileFace({ detailRole: "back" }, session, ok), compose(backFallbackSettings(session), ok, true));
+		// A workspace Back the user gave a sensor keeps showing that sensor.
+		assert.match(backTileFace({ detailRole: "back", workspaceBack: true, readingKey: "cpu:0:1" }, session, ok), />CPU Power</);
 	});
 });
 

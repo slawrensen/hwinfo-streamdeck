@@ -285,6 +285,23 @@ export function detailRoleOf(settings: { detailRole?: unknown }): DetailRole | u
 }
 
 /**
+ * Whether a baked Back cell came from a WORKSPACE bundle rather than a
+ * detail one. Both families bake the identical `detailRole: "back"`
+ * marker, so without this the runtime cannot tell which family's page is
+ * on screen, and a workspace page's only key borrows the face of
+ * whatever detail session the device happens to be carrying.
+ *
+ * FROZEN WITH THE BUNDLE: installed profiles never auto-update, so this
+ * marker has to be in the workspace bytes from the first shipped copy.
+ * It can never be added afterwards without a new identity, which would
+ * strand every arranged page. Exact `true` only: a hand-edited or future
+ * value is not a workspace Back.
+ */
+export function isWorkspaceBack(settings: { workspaceBack?: unknown }): boolean {
+	return settings.workspaceBack === true;
+}
+
+/**
  * The configured custom reading keys: configured order preserved, exact
  * duplicates dropped after their first occurrence, non-string and empty
  * entries ignored, capped at {@link DETAIL_KEYS_MAX}. A non-array (or a

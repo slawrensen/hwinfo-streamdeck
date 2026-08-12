@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { buildDetailProfileArchive, SENSOR_READING_UUID, unzipStore, type DetailProfileRevision } from "../scripts/lib/detail-profile-archive";
 import { buildWorkspaceProfileArchive, WORKSPACE_PROFILE_DISPLAY_NAME } from "../scripts/lib/workspace-profile-archive";
-import { detailDensityOf, detailModeOf, detailRoleOf, pressBehaviorOf, WORKSPACE_PAGE_COUNT, workspacePageOf } from "../src/detail/detail-settings";
+import { detailDensityOf, detailModeOf, detailRoleOf, isWorkspaceBack, pressBehaviorOf, WORKSPACE_PAGE_COUNT, workspacePageOf } from "../src/detail/detail-settings";
 import { DETAIL_PROFILES, detailProfileFor } from "../src/detail/managed-profiles";
 import { DetailNavigator } from "../src/detail/navigation";
 import { WORKSPACE_PROFILES, workspaceProfileFor, workspaceProfileName } from "../src/detail/workspace-profiles";
@@ -224,10 +224,12 @@ describe("workspace archives", () => {
 				const back = actions[`${profile.backCell.column},${profile.backCell.row}`] as { ActionID: string; UUID: string; Name: string; Settings: unknown };
 				assert.equal(back.UUID, SENSOR_READING_UUID, profile.key);
 				assert.equal(back.Name, "Sensor Reading", profile.key);
-				// Exactly the role marker the detail Back bakes: no sensor
+				// The role marker the detail Back bakes, plus the family
+				// marker that tells the two apart at runtime: no sensor
 				// identity, no layout, no user data.
-				assert.deepEqual(back.Settings, { detailRole: "back" }, profile.key);
+				assert.deepEqual(back.Settings, { detailRole: "back", workspaceBack: true }, profile.key);
 				assert.equal(detailRoleOf(back.Settings as { detailRole?: unknown }), "back", profile.key);
+				assert.equal(isWorkspaceBack(back.Settings as { workspaceBack?: unknown }), true, profile.key);
 				actionIds.add(back.ActionID);
 				// Encoder-bearing classes carry an explicitly empty dial bank,
 				// like the detail pages (a dial-less virtual guest borrows the
@@ -534,6 +536,42 @@ describe("workspace navigation", () => {
 		assert.equal(await nav.enterWorkspace({ deviceId: "dev2", deviceType: 2, page: 3 }), "entered");
 		assert.deepEqual(switches[1], { deviceId: "dev2", profileName: "profiles/workspace-xl", page: 3 });
 	});
+
+	it("Back releases the workspace dispatch stamp so the opener works again at once", async () => {
+		const { nav, switches } = bed();
+		await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 });
+		await nav.leave("dev1");
+		// Same tick: Back, then the opener again. The stamp guarded exactly
+		// the switch Back has now undone, so holding it refuses a press the
+		// user is entitled to, and the key answers with the refusal cue.
+		assert.equal(await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 }), "entered");
+		assert.equal(switches.filter((s) => s.profileName === "profiles/workspace-standard").length, 2);
+	});
+
+	it("workspace entry leaves a pending detail session to expire on its own timer", async () => {
+		const { nav, advance } = bed();
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot });
+		assert.notEqual(nav.stateFor("dev1"), undefined);
+		advance(2_000);
+		assert.equal(await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 }), "entered");
+		// Dropping it here would look tidy and strand the user: the expiry
+		// timer is what writes the tombstone surfaceSeen needs, so a late
+		// accept of the detail install would land on a page no session owns
+		// and nothing backs out of. The wrong-face symptom is fixed on the
+		// Back tile's face instead, not by deleting session state.
+		assert.notEqual(nav.stateFor("dev1"), undefined);
+	});
+
+	it("detail entry refuses inside the workspace switch beat (one managed hop at a time)", async () => {
+		const { nav, switches } = bed();
+		await nav.enterWorkspace({ deviceId: "dev1", deviceType: 0, page: 1 });
+		// The mirror of the rule workspace entry already applies to a detail
+		// beat: stacking a second managed profile onto a switch still
+		// landing chains the app's SINGLE-level previous register, and the
+		// true origin is what falls off the end.
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings: opener, snapshot }), "already-active");
+		assert.equal(switches.length, 1);
+	});
 });
 
 describe("panel agreement", () => {
@@ -545,5 +583,26 @@ describe("panel agreement", () => {
 		const values = [...((select as RegExpExecArray)[1] as string).matchAll(/<option value="(-?\d+)">/g)].map((m) => Number(m[1]));
 		// Exactly the shipped pages, zero-indexed on the wire, in order.
 		assert.deepEqual(values, Array.from({ length: WORKSPACE_PAGE_COUNT }, (_, i) => i));
+	});
+
+	it("every panel asset busts its cache on the same token, and the build stamp says that token", () => {
+		const uiDir = path.join(pluginDir, "ui");
+		const tokens = new Set<string>();
+		for (const file of fs.readdirSync(uiDir).filter((f) => f.endsWith(".html"))) {
+			const html = fs.readFileSync(path.join(uiDir, file), "utf8");
+			for (const m of html.matchAll(/\?v=([0-9][^"']*)/g)) {
+				tokens.add(m[1] as string);
+			}
+		}
+		// One token across every panel: a file left behind keeps serving the
+		// browser's cached copy of code the rest of the panel has moved past.
+		assert.equal(tokens.size, 1, `mixed cache tokens: ${[...tokens].join(", ")}`);
+		const piCommon = fs.readFileSync(path.join(uiDir, "pi-common.js"), "utf8");
+		const stamp = /const PI_BUILD = "([^"]+)"/.exec(piCommon);
+		assert.notEqual(stamp, null, "PI_BUILD stamp missing");
+		// The stamp is the only thing a user can read back when a stale
+		// panel is suspected, so a stamp that disagrees with the token it
+		// shipped under is worse than no stamp at all.
+		assert.equal((stamp as RegExpExecArray)[1], [...tokens][0]);
 	});
 });

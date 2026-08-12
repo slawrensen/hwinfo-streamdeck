@@ -21,6 +21,9 @@ release.
   names that carry their own literal wildcard characters; hostile text
   in labels (an unpaired surrogate, a very long paste) degrades to a
   safe face instead of freezing a tile or stalling a poll tick.
+- Carries the sparkline fix that also ships in 1.5.1: changing the Poll
+  interval no longer stops sparklines from collecting, so this preview
+  is a superset of the current stable release.
 
 ## 1.5.0.0 - 2026-08-02
 

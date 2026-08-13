@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-1";
+	const PI_BUILD = "1.5.1.0-2";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -744,6 +744,58 @@
 		writeDetailState();
 	}
 
+	/** Drop an existing chip ON a tile: the chip joins that tile as its
+	 * last cell (the tile grows a cell), and the tile it left shrinks by
+	 * the cell it lost, the same membership-stable rule removal follows,
+	 * so no downstream tile is restaffed. A full quad cannot grow, and a
+	 * drop on the chip's own tile is a plain move to its end: both fall
+	 * back to the adjacent-landing reorder the tile chrome always
+	 * offered. */
+	function joinDetailTile(key, tileIdx) {
+		const listed = listedDetailKeys();
+		const from = listed.indexOf(key);
+		const walk = detailTileWalk();
+		const target = walk[tileIdx];
+		if (from < 0 || target === undefined) return;
+		const fromTileIdx = walk.findIndex((t) => from >= t.head && from < t.head + t.size);
+		const targetOccupied = Math.min(target.size, listed.length - target.head);
+		if (fromTileIdx === tileIdx || target.size >= 4) {
+			moveDetailKey(key, target.head + targetOccupied);
+			return;
+		}
+		const next = materializedTiles(Math.max(tileIdx, fromTileIdx));
+		const cell = from - walk[fromTileIdx].head;
+		let dissolved = false;
+		if (next[fromTileIdx].size <= 1) {
+			// The chip was its tile's only cell: the tile goes with it.
+			next.splice(fromTileIdx, 1);
+			dissolved = true;
+		} else {
+			next[fromTileIdx].size -= 1;
+			next[fromTileIdx].labels.splice(cell, 1);
+			next[fromTileIdx].colors.splice(cell, 1);
+		}
+		const targetAt = dissolved && fromTileIdx < tileIdx ? tileIdx - 1 : tileIdx;
+		next[targetAt].size += 1;
+		next[targetAt].labels.push("");
+		next[targetAt].colors.push(null);
+		// The landing slot in listed order: the target's end, minus the
+		// hole the chip left when it sat somewhere before the target.
+		const landAt = target.head + targetOccupied - (from < target.head ? 1 : 0);
+		detailKeys.splice(detailKeys.indexOf(key), 1);
+		detailKeys.splice(rawDetailIndex(landAt), 0, key);
+		if (dissolved) {
+			// Indices shifted under any standing aim: same rule as removal.
+			if (detailArm !== null && detailArm.tileIdx === fromTileIdx) {
+				disarmDetailAim();
+			} else if (detailArm !== null && detailArm.tileIdx > fromTileIdx) {
+				detailArm = { tileIdx: detailArm.tileIdx - 1 };
+			}
+		}
+		detailLanded = key;
+		writeDetailTiles(next);
+	}
+
 	/** Move a WHOLE tile: its members leave as one run and land in front
 	 * of the tile at `insertBefore` (walk indices before the move;
 	 * walk.length appends at the end). The dressing travels with its
@@ -954,7 +1006,7 @@
 	/** A drop on tile chrome (not a chip) appends at `dropIndex()`: the
 	 * real holders and the trailing ghost share the wiring, and the chip
 	 * guards are simply vacuous on the chipless ghost. */
-	function wireAppendDrop(el, dropIndex) {
+	function wireAppendDrop(el, dropIndex, joinTile) {
 		el.addEventListener("dragover", (ev) => {
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
@@ -973,7 +1025,11 @@
 			}
 			if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
 			const dragged = ev.dataTransfer.getData("text/plain");
-			if (dragged !== "") moveDetailKey(dragged, dropIndex());
+			if (dragged === "") return;
+			// On tile chrome, a dragged chip JOINS the tile; the ghost has
+			// no tile to grow, so it keeps the plain append.
+			if (joinTile !== undefined) joinDetailTile(dragged, joinTile());
+			else moveDetailKey(dragged, dropIndex());
 		});
 	}
 
@@ -1039,10 +1095,14 @@
 				moveDetailTile(detailTileDrag, after ? tileIdx + 1 : tileIdx);
 				detailTileDrag = null;
 			});
-			// A drop on the tile itself (not a chip) appends at its end; the
-			// frame lights only for true tile-chrome hovers, not bubbled
-			// chip dragovers.
-			wireAppendDrop(holder, () => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head));
+			// A drop on the tile itself (not a chip) makes the chip JOIN
+			// this tile; the frame lights only for true tile-chrome
+			// hovers, not bubbled chip dragovers.
+			wireAppendDrop(
+				holder,
+				() => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head),
+				() => tileIdx
+			);
 			const grip = document.createElement("button");
 			grip.type = "button";
 			grip.className = "hw-tile-grip";

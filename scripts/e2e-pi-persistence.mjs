@@ -1143,6 +1143,46 @@ try {
 	await sleep(700);
 	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
 
+	// Leg J7: dropping an existing chip ON a tile joins that tile: the
+	// target grows a cell and the chip's old tile shrinks by the cell it
+	// lost (dissolving at zero), so every other tile keeps its members.
+	// A full quad cannot grow: that drop falls back to the adjacent
+	// reorder. State here: keys [gpu, cpu, b0..b3], tiles [x1, x1, x4].
+	const chipToTile = async (key, tileIdx) =>
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="${key}"]');
+			const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
+			const holder = tiles[${tileIdx}];
+			if (!chip || !holder) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value;
+	mark = writes.length;
+	check("leg J7: dropped b0's chip on the first tile", (await chipToTile("bench:0:0", 0)) === "ok");
+	await sleep(700);
+	frame = atomic("leg J7 join", writes.slice(mark));
+	check("leg J7: the chip joined the tile it was dropped on", deepEqual(frame.detailKeys, ["gpu:0:0", "bench:0:0", "cpu:0:1", "bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg J7: the target grew and the source shrank, neighbors untouched",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [2, 1, 3]),
+		JSON.stringify(frame.detailTiles?.map((t) => t.size))
+	);
+	mark = writes.length;
+	check("leg J7: dropped cpu's chip on the third tile", (await chipToTile("cpu:0:1", 2)) === "ok");
+	await sleep(700);
+	frame = atomic("leg J7 dissolve", writes.slice(mark));
+	check("leg J7: the emptied source tile dissolved", deepEqual(frame.detailTiles?.map((t) => t.size), [2, 4]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
+	check("leg J7: membership stayed stable through the dissolve", deepEqual(frame.detailKeys, ["gpu:0:0", "bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "cpu:0:1"]), JSON.stringify(frame.detailKeys));
+	mark = writes.length;
+	check("leg J7: dropped gpu's chip on the full quad", (await chipToTile("gpu:0:0", 1)) === "ok");
+	await sleep(700);
+	frame = atomic("leg J7 full-quad fallback", writes.slice(mark));
+	check("leg J7: a full quad refused to grow and fell back to reorder", deepEqual(frame.detailTiles?.map((t) => t.size), [2, 4]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
+	check("leg J7: the fallback landed the chip adjacent", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "cpu:0:1", "gpu:0:0"]), JSON.stringify(frame.detailKeys));
+
 	const cellRenameOpen = (await evaluate(`(() => {
 		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name');
 		if (!name) return "missing";

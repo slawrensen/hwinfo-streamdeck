@@ -887,16 +887,44 @@ try {
 	await sleep(700);
 	frame = atomic("leg G1 drop-before", writes.slice(mark));
 	check("leg G1: inserted before the target", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg G1: the crossing chip grew its target at the dropped cell and shrank its source",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [4, 3, 3]) && deepEqual(frame.detailTiles?.[1]?.labels, ["", "Renamed", ""]),
+		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), labels: frame.detailTiles?.[1]?.labels })
+	);
 	mark = writes.length;
 	check("leg G2: dropped after the midpoint moving forward", (await dragDrop("bench:0:0", '#detail-list .hw-set-chip[data-key="bench:0:3"]', "right")) === "ok");
 	await sleep(700);
 	frame = atomic("leg G2 drop-after", writes.slice(mark));
 	check("leg G2: the to - 1 correction landed it after the target", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:3", "bench:0:0", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
+	check("leg G2: a move inside one tile left every tile alone", deepEqual(frame.detailTiles?.map((t) => t.size), [4, 3, 3]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
 	mark = writes.length;
-	check("leg G3: dropped on the ghost tile", (await dragDrop("bench:0:2", "#detail-list .hw-tile.ghost", "left")) === "ok");
+	check(
+		"leg G3: dropped the quad's head cell on the last tile's chrome",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"]');
+			const holder = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[2];
+			if (!chip || !holder) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value === "ok"
+	);
 	await sleep(700);
-	frame = atomic("leg G3 ghost append", writes.slice(mark));
-	check("leg G3: the ghost appends to the end", frame.detailKeys?.at(-1) === "bench:0:2", JSON.stringify(frame.detailKeys?.slice(-2)));
+	frame = atomic("leg G3 chrome join", writes.slice(mark));
+	check("leg G3: the chip joined the tail tile's end", frame.detailKeys?.at(-1) === "bench:0:2", JSON.stringify(frame.detailKeys?.slice(-2)));
+	check(
+		"leg G3: the quad shrank, the pink left with its cell, and the grown tail pruned to the uniform fill",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3]) && deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["", "MINE", ""], colors: [null, null, null], cellLabels: true }),
+		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), first: frame.detailTiles?.[0] })
+	);
+	check(
+		"leg G3: the walk still shows three tiles with a full quad tail",
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value === JSON.stringify(["×3", "×3", "×4"]),
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value
+	);
 	mark = writes.length;
 	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-detail-move[data-move="-1"]')?.click()`);
 	await sleep(700);
@@ -1179,9 +1207,35 @@ try {
 	mark = writes.length;
 	check("leg J7: dropped gpu's chip on the full quad", (await chipToTile("gpu:0:0", 1)) === "ok");
 	await sleep(700);
-	frame = atomic("leg J7 full-quad fallback", writes.slice(mark));
-	check("leg J7: a full quad refused to grow and fell back to reorder", deepEqual(frame.detailTiles?.map((t) => t.size), [2, 4]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
-	check("leg J7: the fallback landed the chip adjacent", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "cpu:0:1", "gpu:0:0"]), JSON.stringify(frame.detailKeys));
+	frame = atomic("leg J7 full-quad park", writes.slice(mark));
+	check(
+		"leg J7: a full target parks the chip beside it as its own box",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [1, 4]),
+		JSON.stringify(frame.detailTiles?.map((t) => t.size))
+	);
+	check("leg J7: the parked chip landed just past the quad", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "cpu:0:1", "gpu:0:0"]), JSON.stringify(frame.detailKeys));
+	mark = writes.length;
+	check(
+		"leg J7: dragged a quad cell onto the ghost",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="cpu:0:1"]');
+			const ghost = document.querySelector("#detail-list .hw-tile.ghost");
+			if (!chip || !ghost) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			ghost.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value === "ok"
+	);
+	await sleep(700);
+	frame = atomic("leg J7 ghost leave", writes.slice(mark));
+	check("leg J7: the ghost appends the leaver at the end", frame.detailKeys?.at(-1) === "cpu:0:1", JSON.stringify(frame.detailKeys?.slice(-2)));
+	check(
+		"leg J7: leaving for the ghost shrank the quad instead of restaffing it",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [1, 3]),
+		JSON.stringify(frame.detailTiles?.map((t) => t.size))
+	);
 
 	const cellRenameOpen = (await evaluate(`(() => {
 		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name');

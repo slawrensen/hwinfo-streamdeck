@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-2";
+	const PI_BUILD = "1.5.1.0-3";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -759,8 +759,14 @@
 		if (from < 0 || target === undefined) return;
 		const fromTileIdx = walk.findIndex((t) => from >= t.head && from < t.head + t.size);
 		const targetOccupied = Math.min(target.size, listed.length - target.head);
-		if (fromTileIdx === tileIdx || target.size >= 4) {
-			moveDetailKey(key, target.head + targetOccupied);
+		if (fromTileIdx === tileIdx) {
+			moveDetailKey(key, target.head + targetOccupied); // to its own end: cells shuffle, boundaries hold
+			return;
+		}
+		if (target.size >= 4) {
+			// A full tile cannot take the chip: park it just past the
+			// tile's last cell as its own box, the chip-drop rule.
+			moveDetailChip(key, listed[target.head + targetOccupied - 1], true);
 			return;
 		}
 		const next = materializedTiles(Math.max(tileIdx, fromTileIdx));
@@ -786,6 +792,81 @@
 		detailKeys.splice(rawDetailIndex(landAt), 0, key);
 		if (dissolved) {
 			// Indices shifted under any standing aim: same rule as removal.
+			if (detailArm !== null && detailArm.tileIdx === fromTileIdx) {
+				disarmDetailAim();
+			} else if (detailArm !== null && detailArm.tileIdx > fromTileIdx) {
+				detailArm = { tileIdx: detailArm.tileIdx - 1 };
+			}
+		}
+		detailLanded = key;
+		writeDetailTiles(next);
+	}
+
+	/** A chip dragged onto another CHIP, or onto the trailing ghost
+	 * (targetKey null). Inside one tile that is a plain cell reorder. A
+	 * chip CROSSING tiles used to be a flat list move: the tile it left
+	 * kept its size and swallowed the next reading, so every boundary
+	 * shifted and the chip seemed to land anywhere but where it was
+	 * dropped. Now the move is membership-stable, the same rule removal
+	 * and the tile join follow: the source tile shrinks by the cell it
+	 * lost (dissolving when emptied), and the target grows a cell at the
+	 * exact drop position. A FULL target cannot grow, so the chip parks
+	 * beside it as its own one-cell tile instead of teleporting the
+	 * flow; a ghost drop appends past the last tile, where the uniform
+	 * fill dresses the tail. */
+	function moveDetailChip(key, targetKey, after) {
+		const listed = listedDetailKeys();
+		const from = listed.indexOf(key);
+		if (from < 0) return;
+		const walk = detailTileWalk();
+		const tileOf = (idx) => walk.findIndex((t) => idx >= t.head && idx < t.head + t.size);
+		const fromTileIdx = tileOf(from);
+		const tIdx = targetKey === null ? -1 : listed.indexOf(targetKey);
+		if (targetKey !== null && tIdx < 0) return;
+		const targetTileIdx = targetKey === null ? -1 : tileOf(tIdx);
+		if (targetKey !== null && fromTileIdx === targetTileIdx) {
+			moveDetailKey(key, after ? tIdx + 1 : tIdx); // cell order inside one tile: boundaries cannot shear
+			return;
+		}
+		const next = materializedTiles(Math.max(fromTileIdx, targetTileIdx));
+		const cell = from - walk[fromTileIdx].head;
+		let dissolved = false;
+		if (next[fromTileIdx].size <= 1) {
+			next.splice(fromTileIdx, 1);
+			dissolved = true;
+		} else {
+			next[fromTileIdx].size -= 1;
+			next[fromTileIdx].labels.splice(cell, 1);
+			next[fromTileIdx].colors.splice(cell, 1);
+		}
+		let landAt;
+		if (targetKey === null) {
+			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
+		} else {
+			const target = walk[targetTileIdx];
+			const targetAt = dissolved && fromTileIdx < targetTileIdx ? targetTileIdx - 1 : targetTileIdx;
+			const cellInTarget = tIdx - target.head + (after ? 1 : 0);
+			if (target.size < 4) {
+				next[targetAt].size += 1;
+				next[targetAt].labels.splice(cellInTarget, 0, "");
+				next[targetAt].colors.splice(cellInTarget, 0, null);
+				landAt = tIdx + (after ? 1 : 0) - (from < tIdx + (after ? 1 : 0) ? 1 : 0);
+			} else {
+				// Full target: the chip becomes its own tile on the dropped
+				// side, and the spec splice keeps every later tile's members.
+				const sideBefore = !after && tIdx === target.head;
+				const spliceAt = sideBefore ? targetAt : targetAt + 1;
+				next.splice(spliceAt, 0, { size: 1, labels: [""], colors: [null], cellLabels: true });
+				const boundary = sideBefore ? target.head : target.head + Math.min(target.size, listed.length - target.head);
+				landAt = boundary - (from < boundary ? 1 : 0);
+				if (detailArm !== null && detailArm.tileIdx >= spliceAt) {
+					detailArm = { tileIdx: detailArm.tileIdx + 1 };
+				}
+			}
+		}
+		detailKeys.splice(detailKeys.indexOf(key), 1);
+		detailKeys.splice(rawDetailIndex(landAt), 0, key);
+		if (dissolved) {
 			if (detailArm !== null && detailArm.tileIdx === fromTileIdx) {
 				disarmDetailAim();
 			} else if (detailArm !== null && detailArm.tileIdx > fromTileIdx) {
@@ -899,7 +980,7 @@
 			const after = ev.clientX > rect.left + rect.width / 2;
 			chip.classList.remove("drop-before", "drop-after");
 			const dragged = ev.dataTransfer.getData("text/plain");
-			if (dragged !== "" && dragged !== key) moveDetailKey(dragged, after ? index + 1 : index);
+			if (dragged !== "" && dragged !== key) moveDetailChip(dragged, key, after);
 		});
 		const name = document.createElement("span");
 		name.className = "hw-set-name";
@@ -1027,9 +1108,10 @@
 			const dragged = ev.dataTransfer.getData("text/plain");
 			if (dragged === "") return;
 			// On tile chrome, a dragged chip JOINS the tile; the ghost has
-			// no tile to grow, so it keeps the plain append.
+			// no tile to grow, so the chip leaves its tile and appends past
+			// the tail, where the uniform fill dresses it.
 			if (joinTile !== undefined) joinDetailTile(dragged, joinTile());
-			else moveDetailKey(dragged, dropIndex());
+			else moveDetailChip(dragged, null, false);
 		});
 	}
 
@@ -1103,9 +1185,14 @@
 				() => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head),
 				() => tileIdx
 			);
-			const grip = document.createElement("button");
-			grip.type = "button";
+			// A span, not a button: this webview never starts an HTML5 drag
+			// from a button element (chips are spans and drag fine), so a
+			// button grip is a handle that cannot grab. Keyboard access
+			// comes from tabIndex plus the delegated keydown.
+			const grip = document.createElement("span");
 			grip.className = "hw-tile-grip";
+			grip.setAttribute("role", "button");
+			grip.tabIndex = 0;
 			grip.dataset.tile = String(tileIdx);
 			grip.draggable = true;
 			grip.title = "Drag to move this whole tile; arrow keys move it too";

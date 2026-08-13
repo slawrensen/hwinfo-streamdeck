@@ -14,7 +14,7 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
-## 1.5.1.0 - 2026-08-09
+## 1.5.1.0 - 2026-08-11
 
 - Sparklines no longer disappear for good after a Poll interval change.
   The poller reset its sample rings by dropping them entirely, and those

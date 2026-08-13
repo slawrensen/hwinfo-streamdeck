@@ -1083,6 +1083,66 @@ try {
 	await sleep(400);
 	const noteLive = (await evaluate(`document.querySelector('#detail-list .hw-set-note')?.getAttribute("aria-live") ?? "none"`)).result?.value;
 	check("leg J5: the list note is a live region", noteLive === "polite", String(noteLive));
+	// Leg J6: a whole tile drags (and arrow-keys) as one unit: its members
+	// travel as a run, its dressing travels with them, a partial spec
+	// shrinks to what it fills instead of swallowing a neighbor's head,
+	// and a standing aim (tile indices now mean different tiles) disarms.
+	// State here: keys [b0..b3, gpu:0:0, cpu:0:1], density 1, plan [x4],
+	// so the walk is [x4(b0-b3), x1(gpu), x1(cpu)].
+	const tileDrag = async (fromIdx, targetIdx, half) =>
+		(await evaluate(`(() => {
+			const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
+			const grip = tiles[${fromIdx}]?.querySelector(".hw-tile-grip");
+			const target = tiles[${targetIdx}];
+			if (!grip || !target) return "missing";
+			const dt = new DataTransfer();
+			grip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			const r = target.getBoundingClientRect();
+			const y = ${JSON.stringify("top")} === "${half}" ? r.top + 1 : r.bottom - 1;
+			target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 4, clientY: y }));
+			grip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value;
+	mark = writes.length;
+	check("leg J6: dragged the quad tile below the last tile", (await tileDrag(0, 2, "bottom")) === "ok");
+	await sleep(700);
+	frame = atomic("leg J6 tile drop", writes.slice(mark));
+	check("leg J6: the run moved as one unit", deepEqual(frame.detailKeys, ["gpu:0:0", "cpu:0:1", "bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg J6: the dressing traveled with its members",
+		Array.isArray(frame.detailTiles) && frame.detailTiles.length === 3 && frame.detailTiles[2]?.size === 4,
+		JSON.stringify(frame.detailTiles?.map((t) => t.size))
+	);
+	mark = writes.length;
+	const gripMove = (await evaluate(`(() => {
+		const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
+		const grip = tiles[2]?.querySelector(".hw-tile-grip");
+		if (!grip) return "missing";
+		grip.focus();
+		grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+		return "ok";
+	})()`)).result?.value;
+	check("leg J6: ArrowUp on the quad's grip", gripMove === "ok");
+	await sleep(700);
+	frame = atomic("leg J6 keyboard move", writes.slice(mark));
+	check("leg J6: the arrow moved the whole tile up", deepEqual(frame.detailKeys, ["gpu:0:0", "bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "cpu:0:1"]), JSON.stringify(frame.detailKeys));
+	const gripFocus = (await evaluate(`(() => {
+		const a = document.activeElement;
+		if (!a?.classList?.contains("hw-tile-grip")) return "not a grip";
+		const tiles = [...document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")];
+		return "tile " + tiles.indexOf(a.closest(".hw-tile"));
+	})()`)).result?.value;
+	check("leg J6: focus followed onto the moved tile's grip", gripFocus === "tile 1", String(gripFocus));
+	check("leg J6: armed tile 1's +", (await clickAdd("0")) === "ok");
+	await sleep(400);
+	check("leg J6: aim names tile 1", (await placeholderNow()) === "Adding into tile 1; click its + again to finish.", await placeholderNow());
+	await evaluate(`(() => {
+		const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
+		tiles[1]?.querySelector(".hw-tile-grip")?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+	})()`);
+	await sleep(700);
+	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+
 	const cellRenameOpen = (await evaluate(`(() => {
 		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name');
 		if (!name) return "missing";

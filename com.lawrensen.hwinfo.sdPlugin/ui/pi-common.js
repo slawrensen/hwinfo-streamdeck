@@ -625,6 +625,10 @@
 	// re-renders with a short flash and is scrolled into view, then the
 	// receipt clears. Purely visual; never persisted.
 	let detailLanded = "";
+	// The walk index of the tile being dragged whole, null outside a tile
+	// drag. dragover cannot read the payload (values hide until drop), so
+	// this is how tile drags and chip drags stay distinguishable mid-air.
+	let detailTileDrag = null;
 
 	function detailSearchEl() {
 		return document.getElementById("pickerd-search");
@@ -740,6 +744,51 @@
 		writeDetailState();
 	}
 
+	/** Move a WHOLE tile: its members leave as one run and land in front
+	 * of the tile at `insertBefore` (walk indices before the move;
+	 * walk.length appends at the end). The dressing travels with its
+	 * members, so grouping stays positional without restaffing: only the
+	 * final tile of a walk can be partial, and a partial spec crossing
+	 * other tiles would swallow their heads, so a partial tile shrinks
+	 * to the cells it actually fills before it travels, and a partial
+	 * tile being landed after shrinks the same way. A standing aim names
+	 * tiles by index and every index may now mean a different tile, so
+	 * the aim always disarms. */
+	function moveDetailTile(fromIdx, insertBefore) {
+		const walk = detailTileWalk();
+		const from = walk[fromIdx];
+		if (from === undefined || insertBefore < 0 || insertBefore > walk.length) return;
+		if (insertBefore === fromIdx || insertBefore === fromIdx + 1) return;
+		const listed = listedDetailKeys();
+		const members = listed.slice(from.head, Math.min(from.head + from.size, listed.length));
+		if (members.length === 0) return;
+		const shrunk = (tile, occupied) => {
+			const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
+			return occupied >= spec.size ? spec : { size: occupied, labels: spec.labels.slice(0, occupied), colors: spec.colors.slice(0, occupied), cellLabels: spec.cellLabels };
+		};
+		const specs = walk.map((tile) => shrunk(tile, Math.min(tile.size, listed.length - tile.head)));
+		const movedSpec = specs[fromIdx];
+		const finalIdx = insertBefore > fromIdx ? insertBefore - 1 : insertBefore;
+		specs.splice(fromIdx, 1);
+		specs.splice(finalIdx, 0, movedSpec);
+		// Landing offset in the REDUCED listed order: the tiles left of the
+		// landing slot keep their exact member counts (removing a whole
+		// run preserves every other tile's contiguity).
+		const reduced = walk.filter((_, i) => i !== fromIdx);
+		let landAt = 0;
+		for (let i = 0; i < finalIdx; i++) {
+			const tile = reduced[i];
+			landAt += Math.min(tile.size, listed.length - tile.head);
+		}
+		for (const k of members) {
+			detailKeys.splice(detailKeys.indexOf(k), 1);
+		}
+		detailKeys.splice(rawDetailIndex(landAt), 0, ...members);
+		disarmDetailAim();
+		detailLanded = members[0]; // the moved tile's first chip carries the flash
+		writeDetailTiles(specs);
+	}
+
 	function addDetailSource(group) {
 		let landed = "";
 		for (const reading of group.readings) {
@@ -779,6 +828,7 @@
 			}
 		});
 		chip.addEventListener("dragover", (ev) => {
+			if (detailTileDrag !== null) return; // a whole-tile drag targets tile boundaries, not cells
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
 			// An honest caret: the midpoint decides before or after, and the
@@ -790,6 +840,7 @@
 		});
 		chip.addEventListener("dragleave", () => chip.classList.remove("drop-before", "drop-after"));
 		chip.addEventListener("drop", (ev) => {
+			if (detailTileDrag !== null) return; // bubbles on to the holder's tile handler
 			ev.preventDefault();
 			ev.stopPropagation();
 			const rect = chip.getBoundingClientRect();
@@ -913,6 +964,13 @@
 		el.addEventListener("drop", (ev) => {
 			ev.preventDefault();
 			el.classList.remove("drop-append");
+			if (detailTileDrag !== null) {
+				// A whole tile dropped on the ghost moves to the end (the
+				// holders' own tile handlers run first and stop this one).
+				moveDetailTile(detailTileDrag, detailTileWalk().length);
+				detailTileDrag = null;
+				return;
+			}
 			if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
 			const dragged = ev.dataTransfer.getData("text/plain");
 			if (dragged !== "") moveDetailKey(dragged, dropIndex());
@@ -954,10 +1012,58 @@
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
+			// A whole-tile drag targets TILE boundaries: the holder's upper
+			// half lands the dragged tile before this one, the lower half
+			// after it. Registered before wireAppendDrop so a tile payload
+			// can stop the key-append path on the same element.
+			holder.addEventListener("dragover", (ev) => {
+				if (detailTileDrag === null) return;
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				ev.dataTransfer.dropEffect = "move";
+				const rect = holder.getBoundingClientRect();
+				const after = ev.clientY > rect.top + rect.height / 2;
+				holder.classList.toggle("drop-after", after);
+				holder.classList.toggle("drop-before", !after);
+			});
+			holder.addEventListener("dragleave", () => holder.classList.remove("drop-before", "drop-after"));
+			holder.addEventListener("drop", (ev) => {
+				if (detailTileDrag === null) return;
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+				// The same honest midpoint the dragover painted, recomputed
+				// from the drop itself (a synthetic drop has no dragover).
+				const rect = holder.getBoundingClientRect();
+				const after = ev.clientY > rect.top + rect.height / 2;
+				holder.classList.remove("drop-before", "drop-after");
+				moveDetailTile(detailTileDrag, after ? tileIdx + 1 : tileIdx);
+				detailTileDrag = null;
+			});
 			// A drop on the tile itself (not a chip) appends at its end; the
 			// frame lights only for true tile-chrome hovers, not bubbled
 			// chip dragovers.
 			wireAppendDrop(holder, () => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head));
+			const grip = document.createElement("button");
+			grip.type = "button";
+			grip.className = "hw-tile-grip";
+			grip.dataset.tile = String(tileIdx);
+			grip.draggable = true;
+			grip.title = "Drag to move this whole tile; arrow keys move it too";
+			grip.setAttribute("aria-label", `Move tile ${tileIdx + 1}; arrow keys reorder it from the keyboard`);
+			grip.textContent = "⠿";
+			grip.addEventListener("dragstart", (ev) => {
+				detailTileDrag = tileIdx;
+				ev.dataTransfer.setData("text/plain", `tile:${tileIdx}`);
+				ev.dataTransfer.effectAllowed = "move";
+				holder.classList.add("dragging");
+			});
+			grip.addEventListener("dragend", () => {
+				detailTileDrag = null;
+				for (const el of detailListEl.querySelectorAll(".dragging, .drop-before, .drop-after, .drop-append")) {
+					el.classList.remove("dragging", "drop-before", "drop-after", "drop-append");
+				}
+			});
+			holder.appendChild(grip);
 			const size = document.createElement("button");
 			size.type = "button";
 			size.className = "hw-tile-size";
@@ -1909,6 +2015,17 @@
 	if (quadPicker4 !== null) quadPicker4.init();
 	if (detailBinding !== null) {
 		detailListEl.addEventListener("keydown", (ev) => {
+			// The tile grip's keyboard leg: arrows move the whole tile the
+			// way a drag does, and focus follows the moved tile's grip.
+			const grip = ev.target instanceof Element ? ev.target.closest(".hw-tile-grip") : null;
+			if (grip !== null && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) {
+				ev.preventDefault(); // arrows scroll the panel otherwise
+				const idx = Number(grip.dataset.tile);
+				moveDetailTile(idx, ev.key === "ArrowUp" ? idx - 1 : idx + 2);
+				const moved = detailListEl.querySelector(".hw-set-chip.landed")?.closest(".hw-tile")?.querySelector(".hw-tile-grip");
+				if (moved !== null && moved !== undefined) moved.focus();
+				return;
+			}
 			// The rename affordance is a span; Enter/Space must reach the
 			// same swap the mouse gets, or renaming is pointer-only.
 			if (ev.key !== "Enter" && ev.key !== " ") return;

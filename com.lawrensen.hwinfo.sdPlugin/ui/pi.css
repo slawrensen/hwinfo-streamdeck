@@ -809,6 +809,35 @@ details .hw-section {
 	border-color: #4cc2ff;
 }
 
+/* Whole-tile drag: the grip is the handle, and the landing edge is the
+   tile's top or bottom, matching the chips' left/right bars. */
+.hw-tile-grip {
+	background: none;
+	border: none;
+	color: #7c8694;
+	cursor: grab;
+	padding: 0 2px;
+	font-size: 11px;
+	line-height: 1;
+}
+
+.hw-tile-grip:hover,
+.hw-tile-grip:focus-visible {
+	color: #e8eaed;
+}
+
+.hw-tile.dragging {
+	opacity: 0.5;
+}
+
+.hw-tile.drop-before {
+	box-shadow: 0 -3px 0 0 #4cc2ff;
+}
+
+.hw-tile.drop-after {
+	box-shadow: 0 3px 0 0 #4cc2ff;
+}
+
 .hw-tile.drop-append .hw-add {
 	border-color: #4cc2ff;
 	color: #4cc2ff;

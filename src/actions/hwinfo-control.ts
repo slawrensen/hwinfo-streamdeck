@@ -117,7 +117,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 				this.badgeTimers.delete(keyAction.id);
 				// No argument restores the manifest image.
 				void keyAction.setImage();
-			}, SUCCESS_BADGE_MS)
+			}, SUCCESS_BADGE_MS).unref()
 		);
 	}
 

@@ -493,7 +493,6 @@ async function drilldown() {
 	const status = { state: "ok", snapshot, source: "shared-memory" };
 	const state = {
 		deviceId: "marketing",
-		profileName: profile.name,
 		pageSize: profile.layout.readings.length,
 		primaryKey: primary.key,
 		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" },
@@ -741,5 +740,5 @@ if (piDir !== undefined) {
 	await settings(piDir);
 	console.log(`Rendered thumbnail + shots 1, 3, 4, 5 (${W}x${H}) to ${outDir}/`);
 } else {
-	console.log(`Rendered thumbnail + shots 1, 3, 5 (${W}x${H}) to ${outDir}/ (pass a capture dir with pi-settings.png + pi-picker.png for shot 4)`);
+	console.log(`Rendered thumbnail + shots 1, 3, 5 (${W}x${H}) to ${outDir}/ (pass a dir from scripts/capture-pi.mjs for shot 4)`);
 }

@@ -15,7 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, makeCheck, makeExpectFrame, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28995;
 const MISMATCH_PORT = 28994;
@@ -50,9 +50,9 @@ function makeServer(port, context, frames) {
 			} else if (msg.event === "getGlobalSettings") {
 				socket.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: {} } }));
 			} else if (msg.event === "setImage" && msg.context === context) {
-				const image = msg.payload?.image ?? "";
-				if (image.startsWith("data:image/svg+xml,")) {
-					frames.push(decodeURIComponent(image.slice("data:image/svg+xml,".length)));
+				const svg = decodeSvg(msg.payload?.image);
+				if (svg !== null) {
+					frames.push(svg);
 				}
 			}
 		});

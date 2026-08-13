@@ -1,7 +1,7 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
 // the theme gallery are present. Twenty-one states: the key PI's settings view,
-// open picker (marketplace shot 3), Display selector on Bar, Text set to
+// open picker (marketplace shot 4), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, the Press section on Open
 // sensor details, the same block with the Second Back checkbox ticked, the
 // custom detail list mid-build (collector rows added,
@@ -164,7 +164,7 @@ try {
 	await viewport(880);
 	await cdp("Page.enable");
 
-	// ---- key PI: settings view + open picker (marketplace shot 3) ----
+	// ---- key PI: settings view + open picker (marketplace shot 4) ----
 	log("navigating: sensor-reading");
 	await cdp("Page.navigate", { url: `${BASE}/sensor-reading.html` });
 	await sleep(8000); // real time: plugin ticks + sensor tree + themes payload
@@ -187,15 +187,15 @@ try {
 	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = "gpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(1500);
 	await capture("pi-picker.png");
-		// The same state clipped to end at the Press section instead of at
-		// whatever row a consumer's height budget lands on: cutting mid-swatch
-		// reads as a rendering fault rather than as a scrolled panel.
-		await captureClipped("pi-picker-block.png", await evaluate(`(() => {
-			const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
-			if (!sel) return "missing";
-			const item = sel.closest("sdpi-item") ?? sel;
-			return { y: 0, h: Math.ceil(item.getBoundingClientRect().bottom + window.scrollY + 14) };
-		})()`));
+	// The same state clipped to end at the Press section instead of at
+	// whatever row a consumer's height budget lands on: cutting mid-swatch
+	// reads as a rendering fault rather than as a scrolled panel.
+	await captureClipped("pi-picker-block.png", await evaluate(`(() => {
+		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
+		if (!sel) return "missing";
+		const item = sel.closest("sdpi-item") ?? sel;
+		return { y: 0, h: Math.ceil(item.getBoundingClientRect().bottom + window.scrollY + 14) };
+	})()`));
 
 	// ---- key PI: Display selector on Bar (the select + its help line) ----
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
@@ -405,20 +405,20 @@ try {
 	await viewport(Math.min(2400, Math.max(880, Number(quadHeight.result?.value ?? 880) + 16)));
 	await sleep(300);
 	await capture("pi-key-quad.png");
-		// The same state clipped to the Layout select and the four cell rows.
-		// The marketplace settings shot needs the part that does the work, not
-		// the whole panel scaled down until the labels stop reading.
-		await captureClipped("pi-key-quad-rows.png", await evaluate(`(() => {
-			const sel = document.querySelector('sdpi-select[setting="keyLayout"]');
-			const block = document.getElementById("quad-rows");
-			if (!sel || !block) return "missing";
-			const item = sel.closest("sdpi-item") ?? sel;
-			// Start at the "Layout" section heading: clipping from the item
-			// shears the heading in half (same lesson as the dial rename shot).
-			const heading = item.previousElementSibling?.classList.contains("hw-section") ? item.previousElementSibling : item;
-			const top = Math.min(heading.getBoundingClientRect().top, block.getBoundingClientRect().top) + window.scrollY;
-			const bottom = block.getBoundingClientRect().bottom + window.scrollY;
-			return { y: Math.max(0, Math.floor(top - 10)), h: Math.ceil(bottom - top + 22) };
+	// The same state clipped to the Layout select and the four cell rows.
+	// The marketplace settings shot needs the part that does the work, not
+	// the whole panel scaled down until the labels stop reading.
+	await captureClipped("pi-key-quad-rows.png", await evaluate(`(() => {
+		const sel = document.querySelector('sdpi-select[setting="keyLayout"]');
+		const block = document.getElementById("quad-rows");
+		if (!sel || !block) return "missing";
+		const item = sel.closest("sdpi-item") ?? sel;
+		// Start at the "Layout" section heading: clipping from the item
+		// shears the heading in half (same lesson as the dial rename shot).
+		const heading = item.previousElementSibling?.classList.contains("hw-section") ? item.previousElementSibling : item;
+		const top = Math.min(heading.getBoundingClientRect().top, block.getBoundingClientRect().top) + window.scrollY;
+		const bottom = block.getBoundingClientRect().bottom + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 10)), h: Math.ceil(bottom - top + 22) };
 		})()`));
 	await viewport(880);
 

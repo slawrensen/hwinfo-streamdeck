@@ -11,7 +11,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, latestSvg as latestSvgIn, makeCheck, sleep, waitUntil } from "./lib/e2e-common.mjs";
+import { buildInfo, latestSvg as latestSvgIn, makeCheck, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 import { profileCells as sharedProfileCells } from "./lib/profile-cells.mjs";
 
 const PORT = 28994;
@@ -862,7 +862,7 @@ const fakeReady = new Promise((resolve, reject) => {
 });
 await fakeReady;
 
-const plugin = spawn(process.execPath, ["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-drilldown", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
+const plugin = spawn(process.execPath, pluginArgv(PORT, "e2e-drilldown", info), {
 	cwd: pluginDir,
 	stdio: ["ignore", "inherit", "inherit"],
 	env: {

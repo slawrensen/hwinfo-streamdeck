@@ -319,6 +319,7 @@
 	// happen only on explicit edits: the list is never rewritten on read.
 	const detailListEl = document.getElementById("detail-list");
 	const DETAIL_KEYS_MAX = 128; // mirrors the plugin parser's cap
+	const DETAIL_TILES_MAX = 128; // mirrors detailTilesOf's own cap, distinct in the parser
 	let detailKeys = [];
 	// This key's own sensor: the runtime shows it on the Back tile and
 	// filters it out of the list, so the panel must refuse to add it and
@@ -350,7 +351,7 @@
 		// salvage, so the panel always shows what the runtime would build.
 		detailTiles = !Array.isArray(value)
 			? []
-			: value.slice(0, DETAIL_KEYS_MAX).map((entry) => {
+			: value.slice(0, DETAIL_TILES_MAX).map((entry) => {
 					const raw = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? entry : {};
 					const size = raw.size === 2 || raw.size === "2" ? 2 : raw.size === 3 || raw.size === "3" ? 3 : raw.size === 4 || raw.size === "4" ? 4 : 1;
 					// Arrays only, like the parser: a hand-edited string or
@@ -850,7 +851,6 @@
 	function parkedPrimaryChip() {
 		const label = readingLabelOf(detailPrimaryKey);
 		const holder = document.createElement("span");
-		holder.className = "hw-parked";
 		const chip = document.createElement("span");
 		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
 		chip.dataset.key = detailPrimaryKey;

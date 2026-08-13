@@ -16,7 +16,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, makeCheck, makeExpectFrame, pluginArgv, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, pluginArgv, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28998;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -52,9 +52,9 @@ wss.on("connection", (ws) => {
 		} else if (msg.event === "getGlobalSettings") {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
 		} else if (msg.event === "setImage" && msg.context === "ctx-res") {
-			const image = msg.payload?.image ?? "";
-			if (image.startsWith("data:image/svg+xml,")) {
-				frames.push(decodeURIComponent(image.slice("data:image/svg+xml,".length)));
+			const svg = decodeSvg(msg.payload?.image);
+			if (svg !== null) {
+				frames.push(svg);
 			}
 		}
 	});

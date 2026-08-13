@@ -20,6 +20,11 @@ import { fileURLToPath } from "node:url";
 
 const UI_DIR = fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/", import.meta.url));
 const FIRST_PARTY = /(?:href|src)="(pi\.css|pi-common\.js|pi-control\.js)(\?v=([^"]*))?"/g;
+// Any spelling of a first-party asset name, however it is quoted or
+// prefixed. Matched counts must agree with FIRST_PARTY or the gate is
+// being dodged by a ref it cannot parse (single quotes, ./ prefix, a
+// case change), which is exactly the silent-skip hole it must not have.
+const ANY_MENTION = /pi\.css|pi-common\.js|pi-control\.js/gi;
 
 function readBuildStamp(): string {
 	const source = readFileSync(join(UI_DIR, "pi-common.js"), "utf8");
@@ -53,6 +58,12 @@ describe("PI cache tokens agree with PI_BUILD", () => {
 				assert.ok(refs.length >= 3, `${panel}: expected the three first-party assets, found ${refs.length}`);
 			}
 			assert.ok(refs.length >= 1, `${panel}: no first-party asset reference found`);
+			const mentions = [...html.matchAll(ANY_MENTION)];
+			assert.equal(
+				mentions.length,
+				refs.length,
+				`${panel}: ${mentions.length} first-party asset mention(s) but only ${refs.length} parse as tokened refs; a reference is written in a form this gate cannot read`
+			);
 		});
 	}
 });

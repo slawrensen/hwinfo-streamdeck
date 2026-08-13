@@ -33,21 +33,22 @@ HWiNFO running:
 npx tsx scripts/marketplace-shots.mjs marketing
 ```
 
-Shot 4 composites two real property-inspector screenshots, so it needs a
+Shot 4 composites three real property-inspector screenshots, so it needs a
 capture directory. Full pipeline:
 
 ```bash
 npm run build
 node scripts/pi-harness.mjs                 # keep running in its own terminal
 node scripts/capture-pi.mjs <dir>           # captures: pi-settings, pi-picker,
-                                            # pi-dial-rotation, pi-dial-groups,
-                                            # pi-dial-presets, pi-dial-custom,
+                                            # pi-picker-block, pi-key-quad-rows,
+                                            # pi-key-detail-filter, the dial set,
                                             # pi-control
 npx tsx scripts/marketplace-shots.mjs marketing <dir>
 ```
 
-Shot 4 uses `pi-settings.png` and `pi-picker.png`; the dial/control captures
-feed the docs site (`docs/assets/img/`).
+Shot 4 uses `pi-picker-block.png`, `pi-key-quad-rows.png` and
+`pi-key-detail-filter.png`; the dial/control captures feed the docs site
+(`docs/assets/img/`).
 
 Shot 2 wraps the real-hardware photograph in the standard board chrome:
 

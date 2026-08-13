@@ -661,7 +661,15 @@ async function scenario(send) {
 	await finish();
 }
 
-const check = makeCheck((name) => results.errors.push(name));
+const baseCheck = makeCheck((name) => results.errors.push(name));
+// Every check name that actually ran: the finish block audits this so a
+// release-blocking leg cannot vanish in a refactor and leave a shorter,
+// still-green run behind.
+const checksRun = [];
+const check = (name, ok, detail = "") => {
+	checksRun.push(name);
+	baseCheck(name, ok, detail);
+};
 
 /** Closes the app-side sockets and waits for the plugin to exit BY ITSELF —
  * the headless equivalent of "Stream Deck stopped". With the poller idle
@@ -1068,6 +1076,12 @@ async function finish() {
 	check("poller logged idle stop", loggedThisRun("Stopped (no visible actions)"));
 	const shutdown = await shutdownPlugin();
 	check("plugin exits when the app socket closes", shutdown.clean, shutdown.detail);
+
+	// A deleted gate runs zero checks and everything left still passes:
+	// name the legs a merge must never lose and fail when one never ran.
+	for (const req of ["sparkline rebuilds after a poll-interval change", "PI got live preview for selected reading"]) {
+		check(`required gate ran: ${req}`, checksRun.some((n) => n.includes(req)));
+	}
 
 	console.log(results.errors.length === 0 ? "\nE2E: ALL CHECKS PASSED" : `\nE2E: ${results.errors.length} FAILURES`);
 	process.exit(results.errors.length === 0 ? 0 : 1);

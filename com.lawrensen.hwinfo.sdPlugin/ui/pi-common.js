@@ -206,6 +206,9 @@
 	function setNote(text) {
 		const note = document.createElement("div");
 		note.className = "hw-set-note";
+		// Counts, cap refusals and empty-list guidance change without focus
+		// moving; a live region is the only way that reaches a screen reader.
+		note.setAttribute("aria-live", "polite");
 		note.textContent = text;
 		return note;
 	}
@@ -366,6 +369,7 @@
 					}
 					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
 				});
+		revalidateDetailAim();
 		renderDetailList();
 	}
 
@@ -375,6 +379,7 @@
 		// #detail-list under an in-flight chip drag or landing flash.
 		if (next === detailUniform) return;
 		detailUniform = next;
+		revalidateDetailAim(); // the regrouped walk may have no cell for a standing aim
 		renderDetailList(); // the implicit fill grouping follows Tile shows
 	}
 
@@ -440,11 +445,8 @@
 	function writeDetailState() {
 		// An edit can shorten the walk out from under a standing aim (a
 		// shrink consuming the last tile, a size cycle swallowing the
-		// fill): an aim past the new end has no cell to land in, so it
-		// disarms here, the one funnel every list and tile edit passes.
-		if (detailArm !== null && detailArm.tileIdx >= detailTileWalk().length) {
-			disarmDetailAim();
-		}
+		// fill) or grow the aimed tile past what any marker paints.
+		revalidateDetailAim();
 		detailTilesStage[1](cloneTiles(detailTiles));
 		detailBinding[1]([...detailKeys]);
 		renderDetailList();
@@ -469,6 +471,7 @@
 		// panel never shows chips past what the runtime lists.
 		const seen = new Set();
 		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)).slice(0, DETAIL_KEYS_MAX) : [];
+		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
 	}
@@ -479,6 +482,7 @@
 		// re-delivers the unchanged key forever.
 		if (next === detailPrimaryKey) return;
 		detailPrimaryKey = next;
+		revalidateDetailAim(); // the walk excludes the primary, so a re-pick reshapes it
 		renderDetailList(); // the parked Back-tile chip follows the opener's sensor
 		detailPicker?.renderList();
 		updateFilterCount(); // the primary is excluded from filter matches too
@@ -600,6 +604,22 @@
 		detailArm = null;
 		const search = detailSearchEl();
 		if (search !== null) search.placeholder = DETAIL_RESTING_PLACEHOLDER;
+	}
+
+	/** An aim is only honest while its landing is painted. The walk can
+	 * reshape without passing writeDetailState (Tile shows and a primary
+	 * re-pick arrive through followSetting; external edits through the
+	 * adopt paths), and a funnel edit can grow the aimed tile into a FULL
+	 * quad, which renderDetailList paints no marker on. Every reshape
+	 * calls here: a stale aim otherwise keeps promising a tile the next
+	 * pick cannot honor. The full-quad test mirrors renderDetailList's
+	 * own occupied/fullQuad math. */
+	function revalidateDetailAim() {
+		if (detailArm === null) return;
+		const tile = detailTileWalk()[detailArm.tileIdx];
+		if (tile === undefined || (tile.size >= 4 && listedDetailKeys().length - tile.head >= 4)) {
+			disarmDetailAim();
+		}
 	}
 	// The reading key that just landed (pick, drop, arrow move): its chip
 	// re-renders with a short flash and is scrolled into view, then the
@@ -800,14 +820,23 @@
 		if (name.title === "") {
 			name.title = "This cell's label on the tile. Click to edit; empty keeps the reading's own.";
 		}
+		// The rename affordance must exist for keyboards too: the span
+		// joins the tab order and Enter/Space reach the same swap the
+		// click handler runs (the delegated keydown below forwards here).
+		name.tabIndex = 0;
+		name.setAttribute("role", "button");
 		if (key === detailLanded) {
 			chip.classList.add("landed");
 		}
+		// Buttons dressed as glyphs need names: without these every remove
+		// on the page announces as the same bare "×" to assistive tech.
+		const spokenName = label ?? key;
 		const up = document.createElement("button");
 		up.type = "button";
 		up.className = "hw-detail-move";
 		up.dataset.move = "-1";
 		up.title = "Move up the list";
+		up.setAttribute("aria-label", `Move ${spokenName} up the list`);
 		up.textContent = "↑";
 		up.disabled = index === 0;
 		const down = document.createElement("button");
@@ -815,6 +844,7 @@
 		down.className = "hw-detail-move";
 		down.dataset.move = "1";
 		down.title = "Move down the list";
+		down.setAttribute("aria-label", `Move ${spokenName} down the list`);
 		down.textContent = "↓";
 		down.disabled = index === listedDetailKeys().length - 1;
 		const remove = document.createElement("button");
@@ -822,6 +852,7 @@
 		remove.className = "hw-set-remove";
 		remove.dataset.key = key;
 		remove.title = "Remove from the detail list";
+		remove.setAttribute("aria-label", `Remove ${spokenName} from the detail list`);
 		remove.textContent = "×";
 		chip.append(name);
 		if (tile.size === 4) {
@@ -897,6 +928,8 @@
 		add.className = "hw-add" + (armed ? " armed" : "") + (lit ? " lit" : "");
 		add.dataset.arm = arm;
 		add.title = armed ? "Picks land here. Click again to finish." : lit ? "New picks land here." : "Send the next picks into this tile. It can grow to four cells.";
+		add.setAttribute("aria-label", arm === "end" ? "Send the next picks into a new tile" : `Send the next picks into tile ${Number(arm) + 1}`);
+		add.setAttribute("aria-pressed", armed ? "true" : "false"); // the armed state is otherwise class-and-title only
 		add.textContent = "+";
 		return add;
 	}
@@ -1875,6 +1908,15 @@
 	if (quadPicker3 !== null) quadPicker3.init();
 	if (quadPicker4 !== null) quadPicker4.init();
 	if (detailBinding !== null) {
+		detailListEl.addEventListener("keydown", (ev) => {
+			// The rename affordance is a span; Enter/Space must reach the
+			// same swap the mouse gets, or renaming is pointer-only.
+			if (ev.key !== "Enter" && ev.key !== " ") return;
+			const nameEl = ev.target instanceof Element ? ev.target.closest(".hw-set-name") : null;
+			if (nameEl === null) return;
+			ev.preventDefault(); // Space scrolls the panel otherwise
+			nameEl.click(); // re-enters the delegated click path below
+		});
 		detailListEl.addEventListener("click", (ev) => {
 			const move = ev.target.closest(".hw-detail-move");
 			if (move !== null && !move.disabled) {
@@ -1889,6 +1931,14 @@
 					[detailKeys[rawFrom], detailKeys[rawTo]] = [detailKeys[rawTo], detailKeys[rawFrom]];
 					detailLanded = key; // the moved chip flashes at its new cell
 					writeDetailState();
+					// The render destroyed the pressed arrow and focus fell to
+					// body; the arrows are the keyboard affordance, so chained
+					// moves (Enter, Enter) must keep working. Follow onto the
+					// landed chip's same arrow, or its twin at a list edge.
+					const landedChip = detailListEl.querySelector(".hw-set-chip.landed");
+					const sameArrow = landedChip?.querySelector(`.hw-detail-move[data-move="${move.dataset.move}"]`);
+					const followTo = sameArrow !== undefined && sameArrow !== null && !sameArrow.disabled ? sameArrow : (landedChip?.querySelector(".hw-detail-move:not([disabled])") ?? null);
+					if (followTo !== null) followTo.focus();
 				}
 				return;
 			}

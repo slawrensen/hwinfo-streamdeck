@@ -980,6 +980,122 @@ try {
 	check("leg J: the removal persisted the REGROUPED plan", deepEqual(frame.detailTiles, [{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
 	check("leg J: key left the list", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
 
+	// ---- run 3c: a walk reshape must never outlive the aim (legs J2-J5) --
+	// The disarm lived only in writeDetailState's past-end check, so the
+	// Tile shows select (followSetting -> adoptDetailUniform, no funnel)
+	// left a stale aim promising a tile the walk no longer had, and
+	// growing the aimed tile itself into a FULL quad passed the past-end
+	// check while no render paints a full quad's landing: the next pick
+	// then landed somewhere the panel never showed.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg J2: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	check("leg J2: armed tile 4's +", (await clickAdd("3")) === "ok");
+	await sleep(400);
+	check("leg J2: aim names tile 4", (await placeholderNow()) === "Adding into tile 4; click its + again to finish.", await placeholderNow());
+	mark = writes.length;
+	await setSelect("detailDensity", "4");
+	await waitDom(
+		"leg J2: the walk regrouped to ONE x4 tile",
+		`(() => { const s = Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent); return s.length === 1 && s[0] === "×4"; })()`,
+		2000,
+		tileSizesNow
+	);
+	await sleep(700);
+	check("leg J2: the reshape disarmed the dangling aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J2: no armed marker after the reshape", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
+	check("leg J2: the disarm itself wrote only the density edit", writes.slice(mark).every((w) => w.detailDensity === "4"), JSON.stringify(writes.slice(mark).length));
+
+	// Leg J3: the funnel's own edit can make the aimed tile unpaintable.
+	// Grow the aimed tile to a full quad through its size button; the aim
+	// must disarm the moment its landing stops being painted, and the next
+	// pick must append at the end, not splice invisibly into the quad.
+	await openCollector();
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="cpu:0:1"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("leg J3 seed pick", writes.slice(mark));
+	check("leg J3: the seed pick appended", frame.detailKeys?.length === 5 && frame.detailKeys?.at(-1) === "cpu:0:1", JSON.stringify(frame.detailKeys));
+	await setSelect("detailDensity", "1");
+	await sleep(700);
+	check("leg J3: armed tile 1's +", (await clickAdd("0")) === "ok");
+	await sleep(400);
+	check("leg J3: aim names tile 1", (await placeholderNow()) === "Adding into tile 1; click its + again to finish.", await placeholderNow());
+	const clickSize = `(() => { const b = document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size'); if (!b) return "missing"; b.click(); return "ok"; })()`;
+	for (let grow = 0; grow < 3; grow++) {
+		check(`leg J3: size cycle click ${grow + 1}`, (await evaluate(clickSize)).result?.value === "ok");
+		await sleep(500);
+	}
+	check(
+		"leg J3: tile 1 grew to a full quad",
+		(await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value === "×4",
+		String((await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value)
+	);
+	check("leg J3: the full-quad growth disarmed the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	mark = writes.length;
+	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
+	await sleep(700);
+	frame = atomic("leg J3 follow-up pick", writes.slice(mark));
+	check(
+		"leg J3: the pick landed at the end, not inside the quad",
+		frame.detailKeys?.length === 6 && frame.detailKeys?.at(-1) === "gpu:0:0",
+		JSON.stringify(frame.detailKeys)
+	);
+
+	// Leg J4: the arrows are the declared keyboard affordance, and every
+	// move re-render used to drop focus on body, so chained single-key
+	// moves were impossible. After a move, focus must sit on the landed
+	// chip's same-direction arrow.
+	mark = writes.length;
+	const moveResult = (await evaluate(`(() => {
+		const arrow = document.querySelector('#detail-list .hw-set-chip[data-key="gpu:0:0"] .hw-detail-move[data-move="-1"]');
+		if (!arrow || arrow.disabled) return "missing";
+		arrow.focus();
+		arrow.click();
+		return "ok";
+	})()`)).result?.value;
+	check("leg J4: clicked gpu:0:0's up arrow", moveResult === "ok", String(moveResult));
+	await sleep(700);
+	frame = atomic("leg J4 move", writes.slice(mark));
+	check("leg J4: the move landed", frame.detailKeys?.at(-2) === "gpu:0:0", JSON.stringify(frame.detailKeys?.slice(-3)));
+	const focusNow = (await evaluate(`(() => {
+		const a = document.activeElement;
+		if (!a || a === document.body) return "body";
+		if (!a.classList?.contains("hw-detail-move")) return a.tagName + "." + a.className;
+		const chip = a.closest(".hw-set-chip");
+		return (chip?.dataset.key ?? "?") + ":" + a.dataset.move + (a.disabled ? ":disabled" : "");
+	})()`)).result?.value;
+	check("leg J4: focus survived onto the landed chip's arrow", focusNow === "gpu:0:0:-1", String(focusNow));
+
+	// Leg J5: the bespoke editor must speak to assistive tech: arrows and
+	// removes name their reading, the armed + exposes its state, the list
+	// note announces itself, and renaming works from the keyboard.
+	const arrowLabel = (await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-detail-move[data-move="-1"]')?.getAttribute("aria-label") ?? "none"`)).result?.value;
+	check("leg J5: the up arrow names its reading", typeof arrowLabel === "string" && arrowLabel !== "none" && arrowLabel.length > 3 && arrowLabel !== "↑", String(arrowLabel));
+	const removeLabel = (await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-remove')?.getAttribute("aria-label") ?? "none"`)).result?.value;
+	check("leg J5: the remove names its reading", typeof removeLabel === "string" && removeLabel !== "none" && removeLabel.length > 3 && removeLabel !== "×", String(removeLabel));
+	check("leg J5: armed tile 2's +", (await clickAdd("1")) === "ok");
+	await sleep(400);
+	const pressedArmed = (await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.getAttribute("aria-pressed") ?? "none"`)).result?.value;
+	check("leg J5: the armed + says aria-pressed", pressedArmed === "true", String(pressedArmed));
+	check("leg J5: disarmed again", (await clickAdd("1")) === "ok");
+	await sleep(400);
+	const noteLive = (await evaluate(`document.querySelector('#detail-list .hw-set-note')?.getAttribute("aria-live") ?? "none"`)).result?.value;
+	check("leg J5: the list note is a live region", noteLive === "polite", String(noteLive));
+	const cellRenameOpen = (await evaluate(`(() => {
+		const name = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name');
+		if (!name) return "missing";
+		if (name.tabIndex !== 0) return "not focusable (tabIndex " + name.tabIndex + ")";
+		name.focus();
+		name.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		const input = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] input.hw-cell-rename');
+		return input !== null ? "ok" : "no rename input";
+	})()`)).result?.value;
+	check("leg J5: Enter on the name opens the rename input", cellRenameOpen === "ok", String(cellRenameOpen));
+	await evaluate(`document.querySelector('#detail-list input.hw-cell-rename')?.blur()`);
+	await sleep(400);
+
 	// ---- run 4: the 128-reading cap refuses loudly -----------------------
 	// At the cap the tick's native flip must not survive as a lying
 	// checkbox (the add was refused and nothing re-rendered), and the

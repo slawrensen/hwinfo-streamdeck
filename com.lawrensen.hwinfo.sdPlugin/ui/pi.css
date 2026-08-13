@@ -359,6 +359,50 @@ details > summary:hover {
 	font-family: "Segoe UI", Arial, sans-serif;
 }
 
+/* Config export/apply: the document is hand-edited JSON, so it reads in
+   a monospaced well and never wraps a line out of shape. */
+.hw-config {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+}
+
+.hw-config textarea {
+	width: 100%;
+	min-height: 120px;
+	resize: vertical;
+	box-sizing: border-box;
+	padding: 4px;
+	font-family: ui-monospace, Consolas, monospace;
+	font-size: 10px;
+	tab-size: 2;
+	white-space: pre;
+	background: #1c1f24;
+	color: #d7dae0;
+	border: 1px solid #3a3f46;
+	border-radius: 4px;
+}
+
+.hw-config-row {
+	display: flex;
+	gap: 6px;
+}
+
+.hw-config-row button {
+	background: #3d3d3d;
+	border: 1px solid #555555;
+	border-radius: 3px;
+	color: #d8d8d8;
+	cursor: pointer;
+	font-family: "Segoe UI", Arial, sans-serif;
+	padding: 2px 10px;
+}
+
+.hw-config-row button:hover {
+	background: #4a4a4a;
+}
+
 .hw-set-actions button {
 	font-size: 8pt;
 	padding: 2px 8px;

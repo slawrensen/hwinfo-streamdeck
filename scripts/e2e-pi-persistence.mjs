@@ -123,6 +123,7 @@ const SEEDS = {
 let mode = "back";
 const store = { settings: structuredClone(SEEDS.back) };
 const writes = []; // every setSettings payload, in arrival order
+const globalWrites = []; // every setGlobalSettings payload, same order
 let piWs = null;
 const toPi = (obj) => piWs?.send(JSON.stringify(obj));
 
@@ -196,7 +197,10 @@ wss.on("connection", (ws) => {
 				piWs = ws;
 				break;
 			case "getSettings":
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
+				// device rides along like the real app sends it: the sdpi
+				// client's getSettings filters replies on action, context
+				// AND device, and a missing field hangs that promise.
+				ws.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
 				break;
 			case "setSettings":
 				writes.push(structuredClone(msg.payload ?? {}));
@@ -204,6 +208,9 @@ wss.on("connection", (ws) => {
 				break;
 			case "getGlobalSettings":
 				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: { theme: "void" } } }));
+				break;
+			case "setGlobalSettings":
+				globalWrites.push(structuredClone(msg.payload ?? {}));
 				break;
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
@@ -1450,6 +1457,75 @@ try {
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:2"] .hw-tick')?.click()`);
 	await sleep(500);
 	check("repick: ticking the new primary is refused", writes.length === mark, `${writes.length - mark} frames`);
+
+	// ---- run 7b: config export and apply (the Advanced fold) -------------
+	// The document is the exact settings object, canonically ordered;
+	// filling is a read, refusal writes nothing, and Apply replaces the
+	// whole document in one frame then reloads the panel so every
+	// per-field store adopts the wholesale write.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("config: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	check("config: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(600);
+	const keyDocText = (await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value;
+	let keyDoc = null;
+	try {
+		keyDoc = JSON.parse(keyDocText);
+	} catch {
+		keyDoc = null;
+	}
+	check("config: the key document is the seeded settings, canonical", keyDoc !== null && keyDoc.readingKey === "cpu:0:0" && Array.isArray(keyDoc.detailTiles) && deepEqual(Object.keys(keyDoc), Object.keys(keyDoc).slice().sort()), String(keyDocText).slice(0, 120));
+	const deckDocText = (await evaluate(`document.getElementById("config-deck")?.value ?? "missing"`)).result?.value;
+	check("config: the deck document renders the globals", deckDocText === JSON.stringify({ theme: "void" }, null, "\t"), String(deckDocText));
+	check("config: filling both documents wrote nothing", writes.length === 0 && globalWrites.length === 0, `${writes.length}/${globalWrites.length}`);
+	mark = writes.length;
+	await evaluate(`(() => {
+		document.getElementById("config-key").value = "{nope";
+		document.getElementById("config-key-apply").click();
+	})()`);
+	await sleep(400);
+	check("config: garbage is refused by name", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value).startsWith("Refused: not JSON"), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	await evaluate(`(() => {
+		document.getElementById("config-key").value = "[1,2]";
+		document.getElementById("config-key-apply").click();
+	})()`);
+	await sleep(400);
+	check("config: a non-object document is refused", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value).includes("one JSON object"), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	check("config: refusals wrote nothing", writes.length === mark && globalWrites.length === 0, `${writes.length - mark}/${globalWrites.length}`);
+	mark = writes.length;
+	await evaluate(`(() => {
+		const doc = ${JSON.stringify(JSON.stringify({ detailKeys: ["bench:0:0", "bench:0:2"], detailMode: "custom", detailTiles: [{ size: 2, labels: ["A", "B"], colors: [null, null], cellLabels: true }], futureBlob: FUTURE_BLOB, label: "Restored", pressBehavior: "open-details", readingKey: "cpu:0:0", cfgBlob: { keep: "yes" } }))};
+		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key-apply").click();
+	})()`);
+	await sleep(700);
+	frame = atomic("config apply", writes.slice(mark));
+	check("config: Apply replaced the whole document in one frame", frame.label === "Restored" && deepEqual(frame.cfgBlob, { keep: "yes" }) && frame.detailTiles?.[0]?.labels?.[0] === "A", JSON.stringify(frame).slice(0, 160));
+	await sleep(1400); // the panel reloads itself after an apply
+	check("config: the reloaded panel adopted the applied document", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(600);
+	const reloadedText = (await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value;
+	check("config: the round trip preserved the unknown field", String(reloadedText).includes('"cfgBlob"') && String(reloadedText).includes('"Restored"'), String(reloadedText).slice(0, 120));
+	check("config: the editor rebuilt from the applied plan", (await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-set-name')?.textContent`)).result?.value === "A", String((await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key=\\"bench:0:0\\"] .hw-set-name')?.textContent`)).result?.value));
+	await evaluate(`(() => {
+		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper" });
+		document.getElementById("config-deck-apply").click();
+	})()`);
+	await sleep(700);
+	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
+	await sleep(1400); // second self-reload before the next run navigates
 
 	// ---- run 8: the dial panel tells the runtime truth -------------------
 	// Custom preset + two touch zones is the dead-tap configuration

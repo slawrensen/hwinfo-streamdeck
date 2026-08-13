@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.1.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.5.1.0-4" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -329,9 +329,30 @@
 				<button class="hw-support" id="support-report" type="button">Copy support report</button>
 			</sdpi-item>
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
+			<div class="hw-section">Config</div>
+			<sdpi-item label="This key">
+				<div class="hw-config">
+					<textarea id="config-key" spellcheck="false" autocomplete="off" aria-label="This key's configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-key-copy" type="button">Copy</button>
+						<button id="config-key-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<sdpi-item label="Deck">
+				<div class="hw-config">
+					<textarea id="config-deck" spellcheck="false" autocomplete="off" aria-label="Deck-wide configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-deck-copy" type="button">Copy</button>
+						<button id="config-deck-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<div class="hw-hint" id="config-note" aria-live="polite" hidden></div>
+			<div class="hw-help">The exact settings this key runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up; paste and Apply to restore it or to clone it onto another key, here or on another machine. Apply replaces the whole document and reloads this panel; fields this build does not know survive untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.1.0-3"></script>
-		<script src="pi-control.js?v=1.5.1.0-3"></script>
+		<script src="pi-common.js?v=1.5.1.0-4"></script>
+		<script src="pi-control.js?v=1.5.1.0-4"></script>
 	</body>
 </html>

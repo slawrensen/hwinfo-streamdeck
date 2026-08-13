@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-3";
+	const PI_BUILD = "1.5.1.0-4";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -2409,6 +2409,72 @@
 		rotationBinding[0]().then(adoptRotationKeys);
 		groupsBinding[0]().then(adoptRotationGroups);
 		namesBinding[0]().then(adoptRotationNames);
+	}
+
+	// --- config export and apply (any panel with #config-key) ------------
+	// The document IS the action's settings object, canonically ordered:
+	// no parallel schema to drift, and fields a build does not know ride
+	// along untouched (the futureBlob discipline). Apply replaces the
+	// whole document through the socket and reloads the panel: the
+	// per-field sdpi stores cache what they last saw, and a reload is the
+	// one honest way to make every control adopt a wholesale write.
+	const configKeyEl = document.getElementById("config-key");
+	if (configKeyEl !== null) {
+		const configDeckEl = document.getElementById("config-deck");
+		const configNote = document.getElementById("config-note");
+		const canonical = (doc) => {
+			const out = {};
+			for (const field of Object.keys(doc ?? {}).sort()) {
+				out[field] = doc[field];
+			}
+			return JSON.stringify(out, null, "\t");
+		};
+		const say = (text) => {
+			configNote.hidden = false;
+			configNote.textContent = text;
+		};
+		const fill = async () => {
+			// Asymmetric client shapes: getSettings resolves the payload
+			// envelope, getGlobalSettings resolves the bare settings object.
+			const own = await streamDeckClient.getSettings();
+			configKeyEl.value = canonical(own?.settings);
+			configDeckEl.value = canonical(await streamDeckClient.getGlobalSettings());
+		};
+		// Filling is a read; it happens when the fold opens, never a write.
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		fold?.addEventListener("toggle", () => {
+			if (fold.open) fill();
+		});
+		const copy = (el) => async () => {
+			const text = el.value;
+			try {
+				await navigator.clipboard.writeText(text);
+			} catch {
+				el.select();
+				document.execCommand("copy");
+			}
+			say("Copied.");
+		};
+		const apply = (el, write, what) => () => {
+			let doc;
+			try {
+				doc = JSON.parse(el.value);
+			} catch (err) {
+				say(`Refused: not JSON (${err.message}).`);
+				return;
+			}
+			if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
+				say("Refused: the document must be one JSON object.");
+				return;
+			}
+			write(doc);
+			say(`Applied the ${what} document; reloading the panel.`);
+			setTimeout(() => window.location.reload(), 350);
+		};
+		document.getElementById("config-key-copy")?.addEventListener("click", copy(configKeyEl));
+		document.getElementById("config-deck-copy")?.addEventListener("click", copy(configDeckEl));
+		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), "key"));
+		document.getElementById("config-deck-apply")?.addEventListener("click", apply(configDeckEl, (doc) => streamDeckClient.setGlobalSettings(doc), "deck"));
 	}
 	requestTree();
 })();

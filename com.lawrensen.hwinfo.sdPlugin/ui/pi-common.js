@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-4";
+	const PI_BUILD = "1.5.1.0-5";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -419,6 +419,16 @@
 		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
 	}
 
+	/** A walk tile's spec at exactly the cells it fills, always a fresh
+	 * copy: a fill tile becomes an explicit default entry, and a partial
+	 * trailing spec sheds the cells it does not fill (a partial spec
+	 * anywhere but the tail would swallow the next tile's head). */
+	function occupancySpec(tile, occupied) {
+		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
+		const size = Math.min(spec.size, occupied);
+		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels };
+	}
+
 	/** Extends the plan with default entries (at the uniform fill size,
 	 * the size every tile past the plan renders at) so tile `through`
 	 * exists explicitly and can be edited. */
@@ -728,92 +738,94 @@
 		}
 	}
 
+	/** The dressing sequence over the LISTED positions (spec cells where
+	 * the plan reaches, empty over the uniform fill), respliced exactly
+	 * like the keys and poured back over the same walk shape. Returns
+	 * the plan to persist, or null when no plan exists and none is
+	 * needed (a flat list stays flat: reordering plain chips must not
+	 * invent one). A fill tile materializes only when a traveling label
+	 * or color actually lands in it. */
+	function movedDressingPlan(from, to) {
+		const walk = detailTileWalk();
+		const listed = listedDetailKeys();
+		const occupiedOf = (tile) => Math.min(tile.size, listed.length - tile.head);
+		const dressing = [];
+		for (const tile of walk) {
+			for (let c = 0; c < occupiedOf(tile); c++) {
+				dressing.push(tile.spec !== null ? { label: tile.spec.labels[c] ?? "", color: tile.spec.colors[c] ?? null } : { label: "", color: null });
+			}
+		}
+		const [moved] = dressing.splice(from, 1);
+		dressing.splice(to > from ? to - 1 : to, 0, moved);
+		let through = detailTiles.length - 1;
+		let cursor = 0;
+		walk.forEach((tile, idx) => {
+			const occupied = occupiedOf(tile);
+			for (let c = 0; c < occupied; c++) {
+				const d = dressing[cursor + c];
+				if ((d.label !== "" || d.color !== null) && idx > through) through = idx;
+			}
+			cursor += occupied;
+		});
+		if (through < 0) return null;
+		const next = materializedTiles(through);
+		cursor = 0;
+		walk.forEach((tile, idx) => {
+			const occupied = occupiedOf(tile);
+			if (idx <= through) {
+				for (let c = 0; c < occupied; c++) {
+					next[idx].labels[c] = dressing[cursor + c].label;
+					next[idx].colors[c] = dressing[cursor + c].color;
+				}
+			}
+			cursor += occupied;
+		});
+		return next;
+	}
+
 	/** Drag reorder: move `key` so it sits at LISTED position `to` (the
 	 * indices the chips render at). The parked primary is itself never
 	 * movable (listed index -1); a move crossing it may shift its raw
 	 * detailKeys slot by one, which nothing observes (the runtime
-	 * filters it out wherever it sits, the panel parks it first). */
+	 * filters it out wherever it sits, the panel parks it first). Tile
+	 * sizes never change here, but a cell's label and color belong to
+	 * the CHIP in it, so the dressing rides the same splice the keys do,
+	 * through in-tile reorders and boundary-crossing walks alike. */
 	function moveDetailKey(key, to) {
 		const from = listedDetailKeys().indexOf(key);
 		if (from < 0 || to < 0 || to > listedDetailKeys().length) return;
+		if (to === from || to === from + 1) return; // dropped where it already sits: nothing to write
+		const plan = movedDressingPlan(from, to);
 		const rawFrom = detailKeys.indexOf(key);
 		const rawTo = rawDetailIndex(to);
 		detailKeys.splice(rawFrom, 1);
 		detailKeys.splice(rawTo > rawFrom ? rawTo - 1 : rawTo, 0, key);
 		detailLanded = key;
-		writeDetailState();
-	}
-
-	/** Drop an existing chip ON a tile: the chip joins that tile as its
-	 * last cell (the tile grows a cell), and the tile it left shrinks by
-	 * the cell it lost, the same membership-stable rule removal follows,
-	 * so no downstream tile is restaffed. A full quad cannot grow, and a
-	 * drop on the chip's own tile is a plain move to its end: both fall
-	 * back to the adjacent-landing reorder the tile chrome always
-	 * offered. */
-	function joinDetailTile(key, tileIdx) {
-		const listed = listedDetailKeys();
-		const from = listed.indexOf(key);
-		const walk = detailTileWalk();
-		const target = walk[tileIdx];
-		if (from < 0 || target === undefined) return;
-		const fromTileIdx = walk.findIndex((t) => from >= t.head && from < t.head + t.size);
-		const targetOccupied = Math.min(target.size, listed.length - target.head);
-		if (fromTileIdx === tileIdx) {
-			moveDetailKey(key, target.head + targetOccupied); // to its own end: cells shuffle, boundaries hold
-			return;
-		}
-		if (target.size >= 4) {
-			// A full tile cannot take the chip: park it just past the
-			// tile's last cell as its own box, the chip-drop rule.
-			moveDetailChip(key, listed[target.head + targetOccupied - 1], true);
-			return;
-		}
-		const next = materializedTiles(Math.max(tileIdx, fromTileIdx));
-		const cell = from - walk[fromTileIdx].head;
-		let dissolved = false;
-		if (next[fromTileIdx].size <= 1) {
-			// The chip was its tile's only cell: the tile goes with it.
-			next.splice(fromTileIdx, 1);
-			dissolved = true;
+		if (plan !== null) {
+			writeDetailTiles(plan);
 		} else {
-			next[fromTileIdx].size -= 1;
-			next[fromTileIdx].labels.splice(cell, 1);
-			next[fromTileIdx].colors.splice(cell, 1);
+			writeDetailState();
 		}
-		const targetAt = dissolved && fromTileIdx < tileIdx ? tileIdx - 1 : tileIdx;
-		next[targetAt].size += 1;
-		next[targetAt].labels.push("");
-		next[targetAt].colors.push(null);
-		// The landing slot in listed order: the target's end, minus the
-		// hole the chip left when it sat somewhere before the target.
-		const landAt = target.head + targetOccupied - (from < target.head ? 1 : 0);
-		detailKeys.splice(detailKeys.indexOf(key), 1);
-		detailKeys.splice(rawDetailIndex(landAt), 0, key);
-		if (dissolved) {
-			// Indices shifted under any standing aim: same rule as removal.
-			if (detailArm !== null && detailArm.tileIdx === fromTileIdx) {
-				disarmDetailAim();
-			} else if (detailArm !== null && detailArm.tileIdx > fromTileIdx) {
-				detailArm = { tileIdx: detailArm.tileIdx - 1 };
-			}
-		}
-		detailLanded = key;
-		writeDetailTiles(next);
 	}
 
-	/** A chip dragged onto another CHIP, or onto the trailing ghost
-	 * (targetKey null). Inside one tile that is a plain cell reorder. A
-	 * chip CROSSING tiles used to be a flat list move: the tile it left
+	/** A chip dragged onto another CHIP, onto tile chrome (the nearest
+	 * chip edge decides the cell), or onto the trailing ghost (targetKey
+	 * null). Inside one tile that is a plain cell reorder. A chip
+	 * CROSSING tiles used to be a flat list move: the tile it left
 	 * kept its size and swallowed the next reading, so every boundary
 	 * shifted and the chip seemed to land anywhere but where it was
 	 * dropped. Now the move is membership-stable, the same rule removal
-	 * and the tile join follow: the source tile shrinks by the cell it
-	 * lost (dissolving when emptied), and the target grows a cell at the
-	 * exact drop position. A FULL target cannot grow, so the chip parks
-	 * beside it as its own one-cell tile instead of teleporting the
-	 * flow; a ghost drop appends past the last tile, where the uniform
-	 * fill dresses the tail. */
+	 * and the whole-tile move follow: the source tile shrinks by the
+	 * cell it lost (dissolving when emptied), and the target grows a
+	 * cell at the exact drop position. A FULL target cannot grow, so the
+	 * chip parks beside it as its own one-cell tile instead of
+	 * teleporting the flow. The chip's label and color belong to the
+	 * CHIP, not the cell it sat in, so they travel with it wherever it
+	 * lands. A ghost drop appends past the last tile, where the uniform
+	 * fill dresses the tail; a DRESSED chip leaving for the ghost has
+	 * nothing past the plan to hold its label or color, so the walk
+	 * freezes into the plan (the same materialization any tile edit
+	 * applies) and the chip appends as its own one-cell tile. */
 	function moveDetailChip(key, targetKey, after) {
 		const listed = listedDetailKeys();
 		const from = listed.indexOf(key);
@@ -825,11 +837,17 @@
 		if (targetKey !== null && tIdx < 0) return;
 		const targetTileIdx = targetKey === null ? -1 : tileOf(tIdx);
 		if (targetKey !== null && fromTileIdx === targetTileIdx) {
-			moveDetailKey(key, after ? tIdx + 1 : tIdx); // cell order inside one tile: boundaries cannot shear
+			moveDetailKey(key, after ? tIdx + 1 : tIdx); // cell order inside one tile: boundaries cannot shear, dressing rides the same splice
 			return;
 		}
-		const next = materializedTiles(Math.max(fromTileIdx, targetTileIdx));
 		const cell = from - walk[fromTileIdx].head;
+		const fromSpec = walk[fromTileIdx].spec;
+		const dressing = { label: fromSpec !== null ? (fromSpec.labels[cell] ?? "") : "", color: fromSpec !== null ? (fromSpec.colors[cell] ?? null) : null };
+		const dressed = dressing.label !== "" || dressing.color !== null;
+		const next =
+			targetKey === null && dressed
+				? walk.map((tile) => occupancySpec(tile, Math.min(tile.size, listed.length - tile.head)))
+				: materializedTiles(Math.max(fromTileIdx, targetTileIdx));
 		let dissolved = false;
 		if (next[fromTileIdx].size <= 1) {
 			next.splice(fromTileIdx, 1);
@@ -842,21 +860,24 @@
 		let landAt;
 		if (targetKey === null) {
 			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
+			if (dressed) {
+				next.push({ size: 1, labels: [dressing.label], colors: [dressing.color], cellLabels: true });
+			}
 		} else {
 			const target = walk[targetTileIdx];
 			const targetAt = dissolved && fromTileIdx < targetTileIdx ? targetTileIdx - 1 : targetTileIdx;
 			const cellInTarget = tIdx - target.head + (after ? 1 : 0);
 			if (target.size < 4) {
 				next[targetAt].size += 1;
-				next[targetAt].labels.splice(cellInTarget, 0, "");
-				next[targetAt].colors.splice(cellInTarget, 0, null);
+				next[targetAt].labels.splice(cellInTarget, 0, dressing.label);
+				next[targetAt].colors.splice(cellInTarget, 0, dressing.color);
 				landAt = tIdx + (after ? 1 : 0) - (from < tIdx + (after ? 1 : 0) ? 1 : 0);
 			} else {
 				// Full target: the chip becomes its own tile on the dropped
 				// side, and the spec splice keeps every later tile's members.
 				const sideBefore = !after && tIdx === target.head;
 				const spliceAt = sideBefore ? targetAt : targetAt + 1;
-				next.splice(spliceAt, 0, { size: 1, labels: [""], colors: [null], cellLabels: true });
+				next.splice(spliceAt, 0, { size: 1, labels: [dressing.label], colors: [dressing.color], cellLabels: true });
 				const boundary = sideBefore ? target.head : target.head + Math.min(target.size, listed.length - target.head);
 				landAt = boundary - (from < boundary ? 1 : 0);
 				if (detailArm !== null && detailArm.tileIdx >= spliceAt) {
@@ -895,11 +916,7 @@
 		const listed = listedDetailKeys();
 		const members = listed.slice(from.head, Math.min(from.head + from.size, listed.length));
 		if (members.length === 0) return;
-		const shrunk = (tile, occupied) => {
-			const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
-			return occupied >= spec.size ? spec : { size: occupied, labels: spec.labels.slice(0, occupied), colors: spec.colors.slice(0, occupied), cellLabels: spec.cellLabels };
-		};
-		const specs = walk.map((tile) => shrunk(tile, Math.min(tile.size, listed.length - tile.head)));
+		const specs = walk.map((tile) => occupancySpec(tile, Math.min(tile.size, listed.length - tile.head)));
 		const movedSpec = specs[fromIdx];
 		const finalIdx = insertBefore > fromIdx ? insertBefore - 1 : insertBefore;
 		specs.splice(fromIdx, 1);
@@ -1084,34 +1101,93 @@
 		return holder;
 	}
 
-	/** A drop on tile chrome (not a chip) appends at `dropIndex()`: the
-	 * real holders and the trailing ghost share the wiring, and the chip
-	 * guards are simply vacuous on the chipless ghost. */
-	function wireAppendDrop(el, dropIndex, joinTile) {
-		el.addEventListener("dragover", (ev) => {
+	/** One caret at a time: clears every drop indicator in the list
+	 * except `keep`. Nearest-edge painting marks chips the pointer is
+	 * not over, which no per-element dragleave ever clears. */
+	function sweepCarets(keep) {
+		for (const el of detailListEl.querySelectorAll(".drop-before, .drop-after, .drop-append")) {
+			if (el !== keep) el.classList.remove("drop-before", "drop-after", "drop-append");
+		}
+	}
+
+	/** The insertion point a pointer over tile chrome honestly means:
+	 * the nearest chip edge. Same-row chips win (the vertical distance
+	 * dominates the metric), then the nearest by x; the midpoint picks
+	 * the side, exactly the rule a drop directly on a chip applies. The
+	 * dragged chip itself never counts. */
+	function nearestChipEdge(holder, x, y) {
+		let best = null;
+		for (const chip of holder.querySelectorAll(".hw-set-chip:not(.dragging)")) {
+			const rect = chip.getBoundingClientRect();
+			const dx = Math.max(rect.left - x, 0, x - rect.right);
+			const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+			const score = dy * 1000 + dx;
+			if (best === null || score < best.score) {
+				best = { chip, score, after: x > rect.left + rect.width / 2 };
+			}
+		}
+		return best;
+	}
+
+	/** Tile chrome routes a chip drag to the nearest chip edge: every
+	 * pixel of the tile is a drop zone whose landing is the painted
+	 * caret, never a hidden end-of-tile jump. Whole-tile drags bypass
+	 * this (the holder's boundary handlers run first and stop them). */
+	function wireTileChromeDrop(holder) {
+		holder.addEventListener("dragover", (ev) => {
+			if (detailTileDrag !== null) return;
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
-			el.classList.toggle("drop-append", ev.target.closest(".hw-set-chip") === null);
+			const overChip = ev.target instanceof Element ? ev.target.closest(".hw-set-chip") : null;
+			if (overChip !== null) {
+				sweepCarets(overChip); // its own dragover painted the caret
+				return;
+			}
+			const edge = nearestChipEdge(holder, ev.clientX, ev.clientY);
+			if (edge === null) {
+				sweepCarets(null);
+				return;
+			}
+			sweepCarets(edge.chip);
+			edge.chip.classList.toggle("drop-after", edge.after);
+			edge.chip.classList.toggle("drop-before", !edge.after);
 		});
-		el.addEventListener("dragleave", () => el.classList.remove("drop-append"));
-		el.addEventListener("drop", (ev) => {
+		holder.addEventListener("drop", (ev) => {
+			if (detailTileDrag !== null) return; // the boundary handler above stopped real tile drops already
+			if (ev.target instanceof Element && ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
 			ev.preventDefault();
-			el.classList.remove("drop-append");
+			sweepCarets(null);
+			const dragged = ev.dataTransfer.getData("text/plain");
+			if (dragged === "") return;
+			// The same honest nearest-edge the dragover painted, recomputed
+			// from the drop itself (a synthetic drop has no dragover).
+			const edge = nearestChipEdge(holder, ev.clientX, ev.clientY);
+			if (edge !== null) moveDetailChip(dragged, edge.chip.dataset.key, edge.after);
+		});
+	}
+
+	/** The trailing ghost: a chip dropped on it leaves its tile and
+	 * appends past the tail (its dressing deciding between the uniform
+	 * fill and a one-cell tile of its own; see moveDetailChip), and a
+	 * whole tile dropped on it moves to the end. */
+	function wireGhostDrop(ghost) {
+		ghost.addEventListener("dragover", (ev) => {
+			ev.preventDefault();
+			ev.dataTransfer.dropEffect = "move";
+			sweepCarets(ghost);
+			ghost.classList.add("drop-append");
+		});
+		ghost.addEventListener("dragleave", () => ghost.classList.remove("drop-append"));
+		ghost.addEventListener("drop", (ev) => {
+			ev.preventDefault();
+			ghost.classList.remove("drop-append");
 			if (detailTileDrag !== null) {
-				// A whole tile dropped on the ghost moves to the end (the
-				// holders' own tile handlers run first and stop this one).
 				moveDetailTile(detailTileDrag, detailTileWalk().length);
 				detailTileDrag = null;
 				return;
 			}
-			if (ev.target.closest(".hw-set-chip") !== null) return; // the chip's own drop handled it
 			const dragged = ev.dataTransfer.getData("text/plain");
-			if (dragged === "") return;
-			// On tile chrome, a dragged chip JOINS the tile; the ghost has
-			// no tile to grow, so the chip leaves its tile and appends past
-			// the tail, where the uniform fill dresses it.
-			if (joinTile !== undefined) joinDetailTile(dragged, joinTile());
-			else moveDetailChip(dragged, null, false);
+			if (dragged !== "") moveDetailChip(dragged, null, false);
 		});
 	}
 
@@ -1161,6 +1237,7 @@
 				ev.dataTransfer.dropEffect = "move";
 				const rect = holder.getBoundingClientRect();
 				const after = ev.clientY > rect.top + rect.height / 2;
+				sweepCarets(holder); // the gap fallback paints holders too; one caret at a time
 				holder.classList.toggle("drop-after", after);
 				holder.classList.toggle("drop-before", !after);
 			});
@@ -1177,14 +1254,10 @@
 				moveDetailTile(detailTileDrag, after ? tileIdx + 1 : tileIdx);
 				detailTileDrag = null;
 			});
-			// A drop on the tile itself (not a chip) makes the chip JOIN
-			// this tile; the frame lights only for true tile-chrome
-			// hovers, not bubbled chip dragovers.
-			wireAppendDrop(
-				holder,
-				() => tile.head + Math.min(tile.size, listedDetailKeys().length - tile.head),
-				() => tileIdx
-			);
+			// A drop on the tile itself (not a chip) lands at the nearest
+			// chip edge, the same caret the dragover paints: no pixel of
+			// the tile is a hidden jump to its end.
+			wireTileChromeDrop(holder);
 			// A span, not a button: this webview never starts an HTML5 drag
 			// from a button element (chips are spans and drag fine), so a
 			// button grip is a handle that cannot grab. Keyboard access
@@ -1248,7 +1321,7 @@
 			// marker is the landing point.
 			const ghost = document.createElement("span");
 			ghost.className = "hw-tile ghost";
-			wireAppendDrop(ghost, () => listedDetailKeys().length);
+			wireGhostDrop(ghost);
 			ghost.appendChild(detailAddMarker("end", false, detailArm === null));
 			frag.appendChild(ghost);
 		}
@@ -2181,20 +2254,92 @@
 			ev.preventDefault(); // Space scrolls the panel otherwise
 			nameEl.click(); // re-enters the delegated click path below
 		});
+		// Dead-zone insurance: the list's own padding, the gaps between
+		// tiles and the note are drop zones too. A chip drag routes to the
+		// nearest tile's nearest chip edge (the ghost appends), a whole-tile
+		// drag to the nearest tile boundary, so no pixel of the editor
+		// silently swallows a gesture. Handlers on chips, holders and the
+		// ghost run first (bubbling) and preventDefault, which is the
+		// signal this fallback must stand down.
+		const nearestListTarget = (x, y) => {
+			let best = null;
+			for (const holder of detailListEl.querySelectorAll(".hw-tile:not(.dragging)")) {
+				const rect = holder.getBoundingClientRect();
+				const dx = Math.max(rect.left - x, 0, x - rect.right);
+				const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+				const score = dy * 1000 + dx;
+				if (best === null || score < best.score) {
+					best = { holder, score, rect };
+				}
+			}
+			return best;
+		};
+		detailListEl.addEventListener("dragover", (ev) => {
+			if (ev.defaultPrevented) return;
+			ev.preventDefault();
+			ev.dataTransfer.dropEffect = "move";
+			const target = nearestListTarget(ev.clientX, ev.clientY);
+			if (target === null) return;
+			if (target.holder.classList.contains("ghost")) {
+				sweepCarets(target.holder);
+				target.holder.classList.add("drop-append");
+				return;
+			}
+			if (detailTileDrag !== null) {
+				const after = ev.clientY > target.rect.top + target.rect.height / 2;
+				sweepCarets(target.holder);
+				target.holder.classList.toggle("drop-after", after);
+				target.holder.classList.toggle("drop-before", !after);
+				return;
+			}
+			const edge = nearestChipEdge(target.holder, ev.clientX, ev.clientY);
+			if (edge === null) {
+				sweepCarets(null);
+				return;
+			}
+			sweepCarets(edge.chip);
+			edge.chip.classList.toggle("drop-after", edge.after);
+			edge.chip.classList.toggle("drop-before", !edge.after);
+		});
+		detailListEl.addEventListener("drop", (ev) => {
+			if (ev.defaultPrevented) return;
+			ev.preventDefault();
+			sweepCarets(null);
+			const target = nearestListTarget(ev.clientX, ev.clientY);
+			if (target === null) return;
+			const ghost = target.holder.classList.contains("ghost");
+			if (detailTileDrag !== null) {
+				const tiles = [...detailListEl.querySelectorAll(".hw-tile:not(.ghost)")];
+				const idx = tiles.indexOf(target.holder);
+				const after = ev.clientY > target.rect.top + target.rect.height / 2;
+				moveDetailTile(detailTileDrag, ghost || idx < 0 ? detailTileWalk().length : after ? idx + 1 : idx);
+				detailTileDrag = null;
+				return;
+			}
+			const dragged = ev.dataTransfer.getData("text/plain");
+			if (dragged === "") return;
+			if (ghost) {
+				moveDetailChip(dragged, null, false);
+				return;
+			}
+			const edge = nearestChipEdge(target.holder, ev.clientX, ev.clientY);
+			if (edge !== null) moveDetailChip(dragged, edge.chip.dataset.key, edge.after);
+		});
+		detailListEl.addEventListener("dragleave", (ev) => {
+			// Leaving the list entirely: no caret may outlive the pointer.
+			if (!(ev.relatedTarget instanceof Node) || !detailListEl.contains(ev.relatedTarget)) sweepCarets(null);
+		});
 		detailListEl.addEventListener("click", (ev) => {
 			const move = ev.target.closest(".hw-detail-move");
 			if (move !== null && !move.disabled) {
 				const key = move.closest(".hw-set-chip")?.dataset.key;
-				// Neighbors in LISTED order: swapping their raw slots swaps
-				// the chips while a parked primary between them stays put.
+				// Neighbors in LISTED order (a parked primary between the raw
+				// slots stays put); the shared mover carries the chip's label
+				// and color with it, in-tile and across a tile boundary alike.
 				const from = listedDetailKeys().indexOf(key);
 				const to = from + Number(move.dataset.move);
 				if (from >= 0 && to >= 0 && to < listedDetailKeys().length) {
-					const rawFrom = rawDetailIndex(from);
-					const rawTo = rawDetailIndex(to);
-					[detailKeys[rawFrom], detailKeys[rawTo]] = [detailKeys[rawTo], detailKeys[rawFrom]];
-					detailLanded = key; // the moved chip flashes at its new cell
-					writeDetailState();
+					moveDetailKey(key, to > from ? to + 1 : to);
 					// The render destroyed the pressed arrow and focus fell to
 					// body; the arrows are the keyboard affordance, so chained
 					// moves (Enter, Enter) must keep working. Follow onto the

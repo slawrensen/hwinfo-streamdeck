@@ -24,7 +24,12 @@
 //   7. a primary adopted into the list parks outside the walk (dressing
 //      and renames stay positional over the listed readings, removing
 //      the parked chip leaves the plan untouched), and a live re-pick
-//      moves the Back-tile mark and the collector's gates at once.
+//      moves the Back-tile mark and the collector's gates at once,
+//   8. a cell's label and color belong to the CHIP and travel with it
+//      through every mover (in-tile drags and arrows, boundary walks,
+//      cross-tile grows, full-target parks, dressed ghost leaves), and
+//      every pixel of a tile and of the list routes a chip drop to the
+//      nearest chip edge instead of a hidden end-of-tile jump.
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -905,16 +910,26 @@ try {
 	frame = atomic("leg G2 drop-after", writes.slice(mark));
 	check("leg G2: the to - 1 correction landed it after the target", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:3", "bench:0:0", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
 	check("leg G2: a move inside one tile left every tile alone", deepEqual(frame.detailTiles?.map((t) => t.size), [4, 3, 3]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
+	// The label and color belong to the CHIP: b0 carried the pink well
+	// from cell 0 to cell 2, and MINE rode b3 from cell 2 to cell 1.
+	check(
+		"leg G2: the pink and MINE traveled with their chips through the reorder",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "MINE", "", ""], colors: [null, null, "#FF00AA", null], cellLabels: true }),
+		JSON.stringify(frame.detailTiles?.[0])
+	);
 	mark = writes.length;
 	check(
-		"leg G3: dropped the quad's head cell on the last tile's chrome",
+		"leg G3: dropped the quad's head cell on the last tile's tail chrome",
 		(await evaluate(`(() => {
 			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"]');
 			const holder = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[2];
 			if (!chip || !holder) return "missing";
 			const dt = new DataTransfer();
 			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
-			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			// Bottom-right of the tile: the nearest chip edge is AFTER the
+			// last chip, the honest coordinates for "the tile's end".
+			const r = holder.getBoundingClientRect();
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.right - 2, clientY: r.bottom - 2 }));
 			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
 			return "ok";
 		})()`)).result?.value === "ok"
@@ -923,8 +938,8 @@ try {
 	frame = atomic("leg G3 chrome join", writes.slice(mark));
 	check("leg G3: the chip joined the tail tile's end", frame.detailKeys?.at(-1) === "bench:0:2", JSON.stringify(frame.detailKeys?.slice(-2)));
 	check(
-		"leg G3: the quad shrank, the pink left with its cell, and the grown tail pruned to the uniform fill",
-		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3]) && deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["", "MINE", ""], colors: [null, null, null], cellLabels: true }),
+		"leg G3: the quad shrank keeping MINE and the pink on their chips, and the grown tail pruned to the uniform fill",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3]) && deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["MINE", "", ""], colors: [null, "#FF00AA", null], cellLabels: true }),
 		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), first: frame.detailTiles?.[0] })
 	);
 	check(
@@ -980,6 +995,210 @@ try {
 	await sleep(700);
 	frame = atomic("leg I follow-up pick", writes.slice(mark));
 	check("leg I: the next pick appends at the end, not into a ghost aim", frame.detailKeys?.length === 11 && frame.detailKeys?.at(-1) === "gpu:0:0", JSON.stringify(frame.detailKeys?.slice(-2)));
+
+	// ---- run 3c: the dressing belongs to the chip (leg L) ----------------
+	// A cell's label and color are the CHIP's, not the position's: every
+	// mover (in-tile drag, the arrows, a boundary walk, a cross-tile grow,
+	// a full-target park, a dressed ghost leave) must carry them with the
+	// chip, and every pixel of a tile must route a drop to the nearest
+	// chip edge instead of a hidden "end of the tile" jump. Fresh grouped
+	// seed: listed [b0..b7], plan [{4, MINE on cell 3, pink on cell 0}],
+	// density 4, so the walk is a dressed quad plus a full fill quad.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg L: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+
+	// L1: an in-tile chip drop reorders the cells AND their dressing: the
+	// pink well rides b0 from cell 0 to cell 3, MINE rides b3 to cell 2.
+	mark = writes.length;
+	check("leg L1: dropped the pink chip after MINE's chip", (await dragDrop("bench:0:0", '#detail-list .hw-set-chip[data-key="bench:0:3"]', "right")) === "ok");
+	await sleep(700);
+	frame = atomic("leg L1 in-tile drop", writes.slice(mark));
+	check("leg L1: the cells reordered", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3", "bench:0:0", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L1: the pink and MINE traveled with their chips",
+		frame.detailTiles?.length === 1 && deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: [null, null, null, "#FF00AA"], cellLabels: true }),
+		JSON.stringify(frame.detailTiles)
+	);
+
+	// L2: the arrows are the same move: dressing travels on a keyboard
+	// reorder exactly as on a drag.
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="-1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg L2 arrow move", writes.slice(mark));
+	check("leg L2: the arrow swapped the neighbors", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:0", "bench:0:3", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L2: the pink followed its chip up, MINE stayed on its own chip",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", "MINE"], colors: [null, null, "#FF00AA", null], cellLabels: true }),
+		JSON.stringify(frame.detailTiles?.[0])
+	);
+
+	// L3: an arrow walking a chip ACROSS the tile boundary swaps the two
+	// chips' dressing across the specs: MINE crosses into the fill tile,
+	// which materializes to hold it.
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:3"] .hw-detail-move[data-move="1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg L3 boundary arrow", writes.slice(mark));
+	check("leg L3: the chips swapped across the boundary", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:0", "bench:0:4", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L3: MINE crossed into the materialized fill, the pink held its chip",
+		deepEqual(frame.detailTiles, [
+			{ size: 4, labels: ["", "", "", ""], colors: [null, null, "#FF00AA", null], cellLabels: true },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: [null, null, null, null], cellLabels: true }
+		]),
+		JSON.stringify(frame.detailTiles)
+	);
+
+	// L4: tile chrome is a reorder surface, not a teleport. Dropping a
+	// chip beside its own cell writes nothing (the honest no-op), and a
+	// drop on the chrome left of the first chip lands BEFORE it, exactly
+	// where the caret points, dressing riding along.
+	const chromeDrop = async (srcKey, tileIdx) =>
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="${srcKey}"]');
+			const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
+			const holder = tiles[${tileIdx}];
+			const first = holder?.querySelector(".hw-set-chip");
+			if (!chip || !holder || !first) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			// Chrome just left of the first chip: the nearest edge is BEFORE it.
+			const r = first.getBoundingClientRect();
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left - 4, clientY: r.top + 4 }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value;
+	mark = writes.length;
+	check("leg L4: dropped the head chip beside its own cell", (await chromeDrop("bench:0:1", 0)) === "ok");
+	await sleep(500);
+	check("leg L4: a drop where the chip already sits writes nothing", writes.length === mark, `${writes.length - mark} frames`);
+	mark = writes.length;
+	check("leg L4: dropped the tail chip on the head chrome", (await chromeDrop("bench:0:4", 0)) === "ok");
+	await sleep(700);
+	frame = atomic("leg L4 chrome caret", writes.slice(mark));
+	check("leg L4: the chip landed at the caret, not the tile's end", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:0", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L4: the pink stayed on its chip through the chrome reorder",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, "#FF00AA"], cellLabels: true }),
+		JSON.stringify(frame.detailTiles?.[0])
+	);
+
+	// L5: a full target parks the chip beside it as its own one-cell tile,
+	// and the park CARRIES the chip's color instead of shedding it.
+	mark = writes.length;
+	check(
+		"leg L5: dropped the pink chip on the full quad's tail chrome",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"]');
+			const holder = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[1];
+			if (!chip || !holder) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			const r = holder.getBoundingClientRect();
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.right - 2, clientY: r.bottom - 2 }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value === "ok"
+	);
+	await sleep(700);
+	frame = atomic("leg L5 dressed park", writes.slice(mark));
+	check("leg L5: the chip parked just past the quad", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L5: the park kept the pink on the parked chip",
+		deepEqual(frame.detailTiles, [
+			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: [null, null, null, null], cellLabels: true },
+			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
+		]),
+		JSON.stringify(frame.detailTiles)
+	);
+
+	// L6: a cross-tile drop on a chip grows the target at that exact cell
+	// with the traveling dressing: MINE moves tile and keeps its name.
+	mark = writes.length;
+	check("leg L6: dropped MINE's chip before the parked pink chip", (await dragDrop("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:0"]', "left")) === "ok");
+	await sleep(700);
+	frame = atomic("leg L6 dressed grow", writes.slice(mark));
+	check("leg L6: the chip landed at the dropped cell", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L6: the grown cell wears MINE beside the pink",
+		deepEqual(frame.detailTiles, [
+			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
+			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
+			{ size: 2, labels: ["MINE", ""], colors: [null, "#FF00AA"], cellLabels: true }
+		]),
+		JSON.stringify(frame.detailTiles)
+	);
+
+	// L7: the list's own padding and the gaps between tiles are drop
+	// zones too: a drop in the gap routes to the nearest tile's nearest
+	// chip edge instead of silently snapping the chip back.
+	mark = writes.length;
+	check(
+		"leg L7: dropped a chip into the gap between the tiles",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"]');
+			const list = document.getElementById("detail-list");
+			const holder = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[1];
+			if (!chip || !list || !holder) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			// One pixel above the second tile: inside the list, outside every
+			// holder, decisively nearest that tile's first chip edge.
+			const r = holder.getBoundingClientRect();
+			list.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 8, clientY: r.top - 1 }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value === "ok"
+	);
+	await sleep(700);
+	frame = atomic("leg L7 gap drop", writes.slice(mark));
+	check("leg L7: the gap drop joined the tile below at its head", deepEqual(frame.detailTiles?.map((t) => t.size), [2, 4, 2]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
+	check("leg L7: membership shifted without a flat-list shear", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L7: the dressed pair beside it is byte-stable",
+		deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["MINE", ""], colors: [null, "#FF00AA"], cellLabels: true }),
+		JSON.stringify(frame.detailTiles?.[2])
+	);
+
+	// L8: a DRESSED chip leaving for the ghost keeps its dressing: the
+	// walk freezes into the plan and the chip appends as its own one-cell
+	// tile instead of shedding the color into the uniform fill.
+	mark = writes.length;
+	check(
+		"leg L8: dragged the pink chip onto the ghost",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"]');
+			const ghost = document.querySelector("#detail-list .hw-tile.ghost");
+			if (!chip || !ghost) return "missing";
+			const dt = new DataTransfer();
+			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			ghost.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return "ok";
+		})()`)).result?.value === "ok"
+	);
+	await sleep(700);
+	frame = atomic("leg L8 dressed ghost leave", writes.slice(mark));
+	check("leg L8: the leaver stayed at the end of the list", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg L8: the walk froze and the pink survived as its own tile",
+		deepEqual(frame.detailTiles, [
+			{ size: 2, labels: ["", ""], colors: [null, null], cellLabels: true },
+			{ size: 4, labels: ["", "", "", ""], colors: [null, null, null, null], cellLabels: true },
+			{ size: 1, labels: ["MINE"], colors: [null], cellLabels: true },
+			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
+		]),
+		JSON.stringify(frame.detailTiles)
+	);
+	check(
+		"leg L8: the walk renders the parked pink as its own tile",
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value === JSON.stringify(["×2", "×4", "×1", "×1"]),
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value
+	);
 
 	// ---- run 3b: the Tile shows change regroups the walk live (leg J) ----
 	// The density select used to change only the STORED setting: the walk
@@ -1191,7 +1410,10 @@ try {
 			if (!chip || !holder) return "missing";
 			const dt = new DataTransfer();
 			chip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
-			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+			// Bottom-right of the tile: the nearest chip edge is AFTER the
+			// last chip, so the chrome drop means "join at the tile's end".
+			const r = holder.getBoundingClientRect();
+			holder.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.right - 2, clientY: r.bottom - 2 }));
 			chip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
 			return "ok";
 		})()`)).result?.value;

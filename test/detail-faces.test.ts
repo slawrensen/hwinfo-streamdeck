@@ -277,6 +277,17 @@ describe("hand-grouped tile specs (composeChunkFace + spec)", () => {
 		assert.doesNotMatch(bare, />MEMO</);
 		assert.ok(bare.includes(`fill="${QUAD_DEFAULT_COLORS[0] as string}">38`), "values wear the identity colors");
 	});
+
+	// On a bare-values tile the color IS the cell's identity, and the panel
+	// writes a moved reading's worn color into the cell it lands in, so this
+	// combination (no labels, explicit colors) is what a reordered tile
+	// actually stores. The value must wear the stored color, not the
+	// default its position would otherwise hand it.
+	it("cellLabels false honors an explicit per-cell color", () => {
+		const bare = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { cellLabels: false, colors: [QUAD_DEFAULT_COLORS[1] as string, null, null, null] }));
+		assert.ok(bare.includes(`fill="${QUAD_DEFAULT_COLORS[1] as string}">38`), "the first value wears the color that traveled with its reading");
+		assert.ok(!bare.includes(`fill="${QUAD_DEFAULT_COLORS[0] as string}">38`), "and not the default its position would hand it");
+	});
 });
 
 describe("chunk micro-label stripping", () => {

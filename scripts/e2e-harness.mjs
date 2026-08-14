@@ -8,13 +8,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, decodeSvg, latestSvg, makeCheck, pluginArgv, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, latestSvg, makeCheck, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 
 const PORT = 28999;
 const READING_KEY = process.env.HW_E2E_KEY ?? "f0000501:0:1000000"; // CPU (Tctl/Tdie) on this machine
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 const harnessStart = new Date();
+// A sparkline rebuild costs TWO fresh HWiNFO snapshots, and HWiNFO's cadence
+// is its own (measured at 1.97 to 2.04 s on this box, steady even under a full
+// suite:full). The legs below wait for the line itself instead of sleeping a
+// fixed window, so a healthy rebuild still returns in ~4 s and only a genuine
+// regression pays this deadline.
+const SPARKLINE_REBUILD_MS = 20_000;
 
 const results = {
 	registered: false,
@@ -278,9 +284,10 @@ async function scenario(send) {
 			await sleep(200);
 			// Two-row view: big values, and the dial's own series subscriptions
 			// feed a live sparkline once two fresh HWiNFO snapshots arrive
-			// (HWiNFO's own cadence, ~2 s each).
+			// (HWiNFO's own cadence, ~2 s each). Wait for the line, not a fixed
+			// window: see SPARKLINE_REBUILD_MS.
 			dialSet({ readingKey: k1, rotationKeys: [k1, k2], dialView: "tworow" });
-			await sleep(6500);
+			await waitUntil(() => (dialSvgLatest() ?? "").includes("<polyline"), SPARKLINE_REBUILD_MS, 100);
 			results.twoRowFrame = dialSvgLatest();
 			dialSet({ readingKey: k1 });
 			await sleep(200);
@@ -597,16 +604,27 @@ async function scenario(send) {
 	// dropped them ended collection for every visible key until its action
 	// reloaded (the 1.5.1 defect). Drive the real chain the panel drives:
 	// globals in, then prove a sparkline REBUILDS on the live key.
-	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt
-	// line needs two FRESH snapshots (~2 s each), the same budget the
-	// two-row dial leg above allows.
+	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt line
+	// needs two FRESH snapshots (~2 s each). It waits for the line rather than
+	// a fixed window because the poller feeds AT MOST ONE sample per tick no
+	// matter how many snapshots elapsed since it last read, so a single stalled
+	// tick costs a whole sample and pushes the rebuild past any budget sized
+	// for a quiet box. The old fixed 6.5 s held barely 2 s of slack over the
+	// 4.1 s worst case and lost it under load right after a suite run.
 	const intervalFramesBefore = results.images.filter((i) => i.context === "ctx-key").length;
+	const keyFramesSince = () => results.images.filter((i) => i.context === "ctx-key").slice(intervalFramesBefore);
+	const rebuildStart = Date.now();
 	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: 250 } } });
-	await sleep(6500);
-	results.sparklineAfterIntervalChange = results.images
-		.filter((i) => i.context === "ctx-key")
-		.slice(intervalFramesBefore)
-		.some((i) => decodeSvg(i.image).includes("<polyline"));
+	results.sparklineAfterIntervalChange = await waitUntil(() => keyFramesSince().some((i) => decodeSvg(i.image).includes("<polyline")), SPARKLINE_REBUILD_MS, 100);
+	// On failure, say which half broke. The frame count alone cannot: the key
+	// repaints only when its composed bytes change, so a steady sensor legitimately
+	// yields a single frame even while the poller is healthy (reintroducing the
+	// 1.5.1 defect on a quiet box produced exactly one). What does separate them is
+	// whether the poller ever saw the new cadence, plus the deadline itself: a live
+	// rebuild lands in ~3.5 s here, so 20 s of silence is a dead ring, not a slow box.
+	results.sparklineRebuildDetail = results.sparklineAfterIntervalChange
+		? `polyline returned after ${((Date.now() - rebuildStart) / 1000).toFixed(1)}s`
+		: `no sparkline over ${(SPARKLINE_REBUILD_MS / 1000).toFixed(0)}s in ${keyFramesSince().length} frame(s); poller logged the new interval: ${loggedThisRun("Poll interval set to 250 ms") ? "yes, so the ring never refilled" : "NO, the globals never reached it"}`;
 	send({ event: "didReceiveGlobalSettings", payload: { settings: {} } }); // back to the default cadence
 	await sleep(400);
 
@@ -737,7 +755,7 @@ async function finish() {
 	check(
 		"sparkline rebuilds after a poll-interval change (subscriptions survive the cadence reset)",
 		results.sparklineAfterIntervalChange === true,
-		results.sparklineAfterIntervalChange === true ? "polyline returned" : "no sparkline after the interval changed"
+		results.sparklineRebuildDetail ?? "leg did not run"
 	);
 	check(
 		"sparkline survives nav away + back (history persisted in poller)",

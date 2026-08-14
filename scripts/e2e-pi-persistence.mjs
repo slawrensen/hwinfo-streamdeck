@@ -70,6 +70,18 @@ const SEEDS = {
 		detailTiles: [{ size: 4, labels: ["", "", "", "MINE"], colors: ["#FF00AA", null, null, null], cellLabels: true }],
 		futureBlob: FUTURE_BLOB
 	},
+	// The bench case (leg M), reduced to its essentials: a bare-values quad
+	// whose only stored dressing is one cell label, so all four chips wear
+	// the default identity palette, plus a second quad to walk into.
+	bench: {
+		readingKey: "cpu:0:0",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailDensity: "4",
+		detailKeys: ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3", "bench:0:4", "bench:0:5"],
+		detailTiles: [{ size: 4, labels: ["Solo", "", "", ""], colors: [null, null, null, null], cellLabels: false }],
+		futureBlob: FUTURE_BLOB
+	},
 	// A list parked exactly at the 128-reading cap (the plugin parser's
 	// limit): the tick-refusal feedback and the cap note are the surface.
 	cap: {
@@ -261,7 +273,7 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|cap|salvage|density|adopted|repick)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -911,10 +923,15 @@ try {
 	check("leg G2: the to - 1 correction landed it after the target", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:3", "bench:0:0", "bench:0:1", "twin:1:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0"]), JSON.stringify(frame.detailKeys));
 	check("leg G2: a move inside one tile left every tile alone", deepEqual(frame.detailTiles?.map((t) => t.size), [4, 3, 3]), JSON.stringify(frame.detailTiles?.map((t) => t.size)));
 	// The label and color belong to the CHIP: b0 carried the pink well
-	// from cell 0 to cell 2, and MINE rode b3 from cell 2 to cell 1.
+	// from cell 0 to cell 2, MINE rode b3 from cell 2 to cell 1, and the
+	// two chips that shuffled under them froze the identity colors they
+	// were already wearing (cell 1's pink-red onto cell 0, cell 2's green
+	// onto cell 1) instead of being recolored by their new cells. Cell 3
+	// never changed hands, so it keeps its stored null and renders its own
+	// default: an untouched cell is never frozen.
 	check(
-		"leg G2: the pink and MINE traveled with their chips through the reorder",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "MINE", "", ""], colors: [null, null, "#FF00AA", null], cellLabels: true }),
+		"leg G2: the pink, MINE and the worn identity colors traveled with their chips",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "MINE", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", null], cellLabels: true }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 	mark = writes.length;
@@ -938,9 +955,11 @@ try {
 	frame = atomic("leg G3 chrome join", writes.slice(mark));
 	check("leg G3: the chip joined the tail tile's end", frame.detailKeys?.at(-1) === "bench:0:2", JSON.stringify(frame.detailKeys?.slice(-2)));
 	check(
-		"leg G3: the quad shrank keeping MINE and the pink on their chips, and the grown tail pruned to the uniform fill",
-		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3]) && deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["MINE", "", ""], colors: [null, "#FF00AA", null], cellLabels: true }),
-		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), first: frame.detailTiles?.[0] })
+		"leg G3: the quad shrank keeping MINE and the pink on their chips, and the leaver carried its worn color into the grown tail",
+		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3, 4]) &&
+			deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["MINE", "", ""], colors: ["#38CD89", "#FF00AA", null], cellLabels: true }) &&
+			deepEqual(frame.detailTiles?.[2], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, "#FF7E8E"], cellLabels: true }),
+		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), first: frame.detailTiles?.[0], tail: frame.detailTiles?.[2] })
 	);
 	check(
 		"leg G3: the walk still shows three tiles with a full quad tail",
@@ -1010,15 +1029,19 @@ try {
 	check("leg L: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 
 	// L1: an in-tile chip drop reorders the cells AND their dressing: the
-	// pink well rides b0 from cell 0 to cell 3, MINE rides b3 to cell 2.
+	// pink well rides b0 from cell 0 to cell 3, MINE rides b3 to cell 2,
+	// and every chip that shuffles keeps the identity color it was already
+	// wearing, so nothing on the tile changes color by being moved past.
+	// This is the whole complaint from the bench: the colors used to stay
+	// nailed to the cells and cycle through the readings.
 	mark = writes.length;
 	check("leg L1: dropped the pink chip after MINE's chip", (await dragDrop("bench:0:0", '#detail-list .hw-set-chip[data-key="bench:0:3"]', "right")) === "ok");
 	await sleep(700);
 	frame = atomic("leg L1 in-tile drop", writes.slice(mark));
 	check("leg L1: the cells reordered", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3", "bench:0:0", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
 	check(
-		"leg L1: the pink and MINE traveled with their chips",
-		frame.detailTiles?.length === 1 && deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: [null, null, null, "#FF00AA"], cellLabels: true }),
+		"leg L1: no chip changed color, and the pink and MINE traveled with theirs",
+		frame.detailTiles?.length === 1 && deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF7E8E", "#38CD89", "#D4AB33", "#FF00AA"], cellLabels: true }),
 		JSON.stringify(frame.detailTiles)
 	);
 
@@ -1029,9 +1052,11 @@ try {
 	await sleep(700);
 	frame = atomic("leg L2 arrow move", writes.slice(mark));
 	check("leg L2: the arrow swapped the neighbors", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:0", "bench:0:3", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	// Only the two swapped cells take traveling dressing; cells 0 and 1
+	// never changed hands, so they keep exactly what was stored.
 	check(
-		"leg L2: the pink followed its chip up, MINE stayed on its own chip",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", "MINE"], colors: [null, null, "#FF00AA", null], cellLabels: true }),
+		"leg L2: the pink followed its chip up, MINE rode the other chip down",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", "MINE"], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#D4AB33"], cellLabels: true }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 
@@ -1043,11 +1068,14 @@ try {
 	await sleep(700);
 	frame = atomic("leg L3 boundary arrow", writes.slice(mark));
 	check("leg L3: the chips swapped across the boundary", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:0", "bench:0:4", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
+	// The two chips trade cells across the boundary and each keeps what it
+	// wore: MINE and its yellow cross into the materialized fill, the fill
+	// chip carries its blue back into the plan's last cell.
 	check(
-		"leg L3: MINE crossed into the materialized fill, the pink held its chip",
+		"leg L3: MINE and its color crossed into the materialized fill, the incomer carried its own back",
 		deepEqual(frame.detailTiles, [
-			{ size: 4, labels: ["", "", "", ""], colors: [null, null, "#FF00AA", null], cellLabels: true },
-			{ size: 4, labels: ["MINE", "", "", ""], colors: [null, null, null, null], cellLabels: true }
+			{ size: 4, labels: ["", "", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#4CC2FF"], cellLabels: true },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
 	);
@@ -1081,8 +1109,8 @@ try {
 	frame = atomic("leg L4 chrome caret", writes.slice(mark));
 	check("leg L4: the chip landed at the caret, not the tile's end", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:0", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
 	check(
-		"leg L4: the pink stayed on its chip through the chrome reorder",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, "#FF00AA"], cellLabels: true }),
+		"leg L4: every chip kept its own color through the chrome reorder",
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89", "#FF00AA"], cellLabels: true }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 
@@ -1106,11 +1134,13 @@ try {
 	await sleep(700);
 	frame = atomic("leg L5 dressed park", writes.slice(mark));
 	check("leg L5: the chip parked just past the quad", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	// The source quad drops to three cells and stops rendering identity
+	// colors; the frozen values stay stored against the day it grows back.
 	check(
 		"leg L5: the park kept the pink on the parked chip",
 		deepEqual(frame.detailTiles, [
-			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
-			{ size: 4, labels: ["MINE", "", "", ""], colors: [null, null, null, null], cellLabels: true },
+			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true },
 			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
@@ -1124,11 +1154,11 @@ try {
 	frame = atomic("leg L6 dressed grow", writes.slice(mark));
 	check("leg L6: the chip landed at the dropped cell", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
 	check(
-		"leg L6: the grown cell wears MINE beside the pink",
+		"leg L6: the grown cell wears MINE and its own color beside the pink",
 		deepEqual(frame.detailTiles, [
+			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true },
 			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
-			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
-			{ size: 2, labels: ["MINE", ""], colors: [null, "#FF00AA"], cellLabels: true }
+			{ size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
 	);
@@ -1160,7 +1190,7 @@ try {
 	check("leg L7: membership shifted without a flat-list shear", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg L7: the dressed pair beside it is byte-stable",
-		deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["MINE", ""], colors: [null, "#FF00AA"], cellLabels: true }),
+		deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true }),
 		JSON.stringify(frame.detailTiles?.[2])
 	);
 
@@ -1187,9 +1217,9 @@ try {
 	check(
 		"leg L8: the walk froze and the pink survived as its own tile",
 		deepEqual(frame.detailTiles, [
-			{ size: 2, labels: ["", ""], colors: [null, null], cellLabels: true },
-			{ size: 4, labels: ["", "", "", ""], colors: [null, null, null, null], cellLabels: true },
-			{ size: 1, labels: ["MINE"], colors: [null], cellLabels: true },
+			{ size: 2, labels: ["", ""], colors: ["#4CC2FF", "#FF7E8E"], cellLabels: true },
+			{ size: 4, labels: ["", "", "", ""], colors: ["#38CD89", null, null, null], cellLabels: true },
+			{ size: 1, labels: ["MINE"], colors: ["#D4AB33"], cellLabels: true },
 			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
@@ -1198,6 +1228,74 @@ try {
 		"leg L8: the walk renders the parked pink as its own tile",
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value === JSON.stringify(["×2", "×4", "×1", "×1"]),
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value
+	);
+
+	// ---- run 3d: the bench case, exactly as reported (leg M) -------------
+	// Stephen's tile on the real deck: a bare-values quad whose ONLY
+	// stored dressing is one cell label ("Solo" on cell 0) and no colors
+	// at all, so all four chips wear the default identity palette. The
+	// down arrow on that chip used to leave the label nailed to cell 0
+	// while the readings shuffled under it: the label appeared to stick,
+	// the chip appeared not to move, and every reading on the tile
+	// changed color. The label must ride the chip and no chip may change
+	// color. Seeded fresh so the leg reads as its own story.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg M: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const wornColors = async () =>
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[0].querySelectorAll(".hw-set-chip")).map((c) => [c.dataset.key, c.querySelector(".hw-tile-color")?.value ?? null, c.querySelector(".hw-set-name")?.textContent]))`)).result?.value;
+	const beforeWorn = await wornColors();
+	check(
+		"leg M: the four chips start on the default identity palette, Solo on the head",
+		beforeWorn === JSON.stringify([
+			["bench:0:0", "#4cc2ff", "Solo"],
+			["bench:0:1", "#ff7e8e", "Bench 1"],
+			["bench:0:2", "#38cd89", "Bench 2"],
+			["bench:0:3", "#d4ab33", "Bench 3"]
+		]),
+		String(beforeWorn)
+	);
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg M down arrow on the labelled chip", writes.slice(mark));
+	check("leg M: the labelled chip itself moved down one cell", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:0", "bench:0:2", "bench:0:3", "bench:0:4", "bench:0:5"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg M: Solo rode the chip to cell 1 instead of sticking to cell 0",
+		deepEqual(frame.detailTiles?.[0]?.labels, ["", "Solo", "", ""]),
+		JSON.stringify(frame.detailTiles?.[0]?.labels)
+	);
+	check(
+		"leg M: the two swapped chips kept their colors, the untouched pair kept their stored nulls",
+		deepEqual(frame.detailTiles?.[0]?.colors, ["#FF7E8E", "#4CC2FF", null, null]),
+		JSON.stringify(frame.detailTiles?.[0]?.colors)
+	);
+	// The wells are the panel's own rendering of what the deck paints, so
+	// this is the color-consistency claim end to end: same four colors on
+	// the same four readings, in their new order.
+	const afterWorn = await wornColors();
+	check(
+		"leg M: every reading still wears the exact color it wore before the move",
+		afterWorn === JSON.stringify([
+			["bench:0:1", "#ff7e8e", "Bench 1"],
+			["bench:0:0", "#4cc2ff", "Solo"],
+			["bench:0:2", "#38cd89", "Bench 2"],
+			["bench:0:3", "#d4ab33", "Bench 3"]
+		]),
+		String(afterWorn)
+	);
+	// And the tail: a chip walking out of the quad into the next tile
+	// keeps its color there too (that tile is a quad as well).
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:3"] .hw-detail-move[data-move="1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg M boundary walk", writes.slice(mark));
+	check("leg M: the chip crossed the tile boundary", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:0", "bench:0:2", "bench:0:4", "bench:0:3", "bench:0:5"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg M: both chips carried their colors across the boundary",
+		deepEqual(frame.detailTiles?.[0]?.colors, ["#FF7E8E", "#4CC2FF", null, "#4CC2FF"]) && deepEqual(frame.detailTiles?.[1]?.colors, ["#D4AB33", null, null, null]),
+		JSON.stringify([frame.detailTiles?.[0]?.colors, frame.detailTiles?.[1]?.colors])
 	);
 
 	// ---- run 3b: the Tile shows change regroups the walk live (leg J) ----

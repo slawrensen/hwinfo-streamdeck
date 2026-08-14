@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-5";
+	const PI_BUILD = "1.5.1.0-6";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -466,7 +466,10 @@
 	function writeDetailTiles(next) {
 		// Trailing entries that only restate the uniform fill are noise:
 		// prune them so the stored plan stays exactly the hand-made part.
-		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c) => c === null);
+		// A quad wearing exactly the default identity colors renders the same
+		// as one storing none, so a shuffle that lands every cell back on its
+		// own default prunes away instead of freezing a tile into the plan.
+		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
 		while (next.length > 0 && isDefault(next[next.length - 1])) {
 			next.pop();
 		}
@@ -738,47 +741,69 @@
 		}
 	}
 
-	/** The dressing sequence over the LISTED positions (spec cells where
-	 * the plan reaches, empty over the uniform fill), respliced exactly
-	 * like the keys and poured back over the same walk shape. Returns
-	 * the plan to persist, or null when no plan exists and none is
-	 * needed (a flat list stays flat: reordering plain chips must not
-	 * invent one). A fill tile materializes only when a traveling label
-	 * or color actually lands in it. */
+	/** What a chip WEARS in the cell it currently sits in: its stored
+	 * label, and its stored color or, on a quad, the identity color that
+	 * cell renders by default. `explicit` marks a color the user actually
+	 * chose, which travels anywhere; an inherited default is only worth
+	 * carrying between quads, where dropping it would recolor the chip. */
+	function wornDressing(tile, cell) {
+		const stored = tile.spec !== null ? (tile.spec.colors[cell] ?? null) : null;
+		return {
+			label: tile.spec !== null ? (tile.spec.labels[cell] ?? "") : "",
+			color: stored ?? (tile.size === 4 ? (QUAD_DEFAULT_COLORS[cell] ?? null) : null),
+			explicit: stored !== null
+		};
+	}
+
+	/** The dressing sequence over the LISTED positions, respliced exactly
+	 * like the keys and poured back over the same walk shape. Returns the
+	 * plan to persist, or null when no plan exists and none is needed (a
+	 * flat list stays flat: reordering plain chips must not invent one).
+	 *
+	 * Only cells that CHANGED occupant take the traveling dressing; every
+	 * other cell keeps exactly what was stored, so a move never
+	 * materializes a fill tile it did not touch. On a quad the traveling
+	 * value is what the chip wore, so the identity colors follow their
+	 * readings instead of staying with the positions and recoloring
+	 * everything that shuffles under them. */
 	function movedDressingPlan(from, to) {
 		const walk = detailTileWalk();
 		const listed = listedDetailKeys();
 		const occupiedOf = (tile) => Math.min(tile.size, listed.length - tile.head);
-		const dressing = [];
-		for (const tile of walk) {
-			for (let c = 0; c < occupiedOf(tile); c++) {
-				dressing.push(tile.spec !== null ? { label: tile.spec.labels[c] ?? "", color: tile.spec.colors[c] ?? null } : { label: "", color: null });
-			}
-		}
-		const [moved] = dressing.splice(from, 1);
-		dressing.splice(to > from ? to - 1 : to, 0, moved);
-		let through = detailTiles.length - 1;
-		let cursor = 0;
+		const stored = [];
+		const worn = [];
+		const tileAt = [];
+		const cellAt = [];
 		walk.forEach((tile, idx) => {
-			const occupied = occupiedOf(tile);
-			for (let c = 0; c < occupied; c++) {
-				const d = dressing[cursor + c];
-				if ((d.label !== "" || d.color !== null) && idx > through) through = idx;
+			for (let c = 0; c < occupiedOf(tile); c++) {
+				stored.push({ label: tile.spec !== null ? (tile.spec.labels[c] ?? "") : "", color: tile.spec !== null ? (tile.spec.colors[c] ?? null) : null });
+				worn.push(wornDressing(tile, c));
+				tileAt.push(idx);
+				cellAt.push(c);
 			}
-			cursor += occupied;
+		});
+		const after = listed.slice();
+		const travel = worn.slice();
+		const at = to > from ? to - 1 : to;
+		after.splice(at, 0, ...after.splice(from, 1));
+		travel.splice(at, 0, ...travel.splice(from, 1));
+		// A cell keeps its stored dressing while its occupant is unchanged.
+		const dressing = listed.map((key, i) => {
+			if (after[i] === key) return stored[i];
+			const t = walk[tileAt[i]];
+			const d = travel[i];
+			return { label: d.label, color: t.size === 4 || d.explicit ? d.color : null };
+		});
+		let through = detailTiles.length - 1;
+		dressing.forEach((d, i) => {
+			if ((d.label !== "" || d.color !== null) && tileAt[i] > through) through = tileAt[i];
 		});
 		if (through < 0) return null;
 		const next = materializedTiles(through);
-		cursor = 0;
-		walk.forEach((tile, idx) => {
-			const occupied = occupiedOf(tile);
-			if (idx <= through) {
-				for (let c = 0; c < occupied; c++) {
-					next[idx].labels[c] = dressing[cursor + c].label;
-					next[idx].colors[c] = dressing[cursor + c].color;
-				}
-			}
-			cursor += occupied;
+		dressing.forEach((d, i) => {
+			if (tileAt[i] > through) return;
+			next[tileAt[i]].labels[cellAt[i]] = d.label;
+			next[tileAt[i]].colors[cellAt[i]] = d.color;
 		});
 		return next;
 	}
@@ -841,9 +866,15 @@
 			return;
 		}
 		const cell = from - walk[fromTileIdx].head;
-		const fromSpec = walk[fromTileIdx].spec;
-		const dressing = { label: fromSpec !== null ? (fromSpec.labels[cell] ?? "") : "", color: fromSpec !== null ? (fromSpec.colors[cell] ?? null) : null };
-		const dressed = dressing.label !== "" || dressing.color !== null;
+		const dressing = wornDressing(walk[fromTileIdx], cell);
+		// An inherited quad default is worth carrying between quads, never
+		// worth freezing a whole tile out of the fill for: only a label or
+		// a color the user chose makes a chip dressed in its own right.
+		const dressed = dressing.label !== "" || dressing.explicit;
+		// Only a quad renders per-cell identity colors, so an inherited
+		// default is stored only where it will actually be worn; a chosen
+		// color rides along whatever size the chip lands in.
+		const carried = (size) => (size === 4 || dressing.explicit ? dressing.color : null);
 		const next =
 			targetKey === null && dressed
 				? walk.map((tile) => occupancySpec(tile, Math.min(tile.size, listed.length - tile.head)))
@@ -861,7 +892,7 @@
 		if (targetKey === null) {
 			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
 			if (dressed) {
-				next.push({ size: 1, labels: [dressing.label], colors: [dressing.color], cellLabels: true });
+				next.push({ size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
 			}
 		} else {
 			const target = walk[targetTileIdx];
@@ -870,14 +901,14 @@
 			if (target.size < 4) {
 				next[targetAt].size += 1;
 				next[targetAt].labels.splice(cellInTarget, 0, dressing.label);
-				next[targetAt].colors.splice(cellInTarget, 0, dressing.color);
+				next[targetAt].colors.splice(cellInTarget, 0, carried(target.size + 1));
 				landAt = tIdx + (after ? 1 : 0) - (from < tIdx + (after ? 1 : 0) ? 1 : 0);
 			} else {
 				// Full target: the chip becomes its own tile on the dropped
 				// side, and the spec splice keeps every later tile's members.
 				const sideBefore = !after && tIdx === target.head;
 				const spliceAt = sideBefore ? targetAt : targetAt + 1;
-				next.splice(spliceAt, 0, { size: 1, labels: [dressing.label], colors: [dressing.color], cellLabels: true });
+				next.splice(spliceAt, 0, { size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
 				const boundary = sideBefore ? target.head : target.head + Math.min(target.size, listed.length - target.head);
 				landAt = boundary - (from < boundary ? 1 : 0);
 				if (detailArm !== null && detailArm.tileIdx >= spliceAt) {

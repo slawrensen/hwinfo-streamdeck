@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28995;
 const MISMATCH_PORT = 28994;
@@ -25,13 +26,11 @@ const MAPPING_NAME = `Local\\HwinfoE2E_Edge_${process.pid}`;
 const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;
 const READING_KEY = "f0001234:0:1000001"; // "Test Temp" in the fake provider
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) failures++;
-}
+const check = makeCheck(() => {
+	failures += 1;
+});
 
 function makeServer(port, context, frames) {
 	const wss = new WebSocketServer({ host: "127.0.0.1", port });
@@ -51,9 +50,9 @@ function makeServer(port, context, frames) {
 			} else if (msg.event === "getGlobalSettings") {
 				socket.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: {} } }));
 			} else if (msg.event === "setImage" && msg.context === context) {
-				const image = msg.payload?.image ?? "";
-				if (image.startsWith("data:image/svg+xml,")) {
-					frames.push(decodeURIComponent(image.slice("data:image/svg+xml,".length)));
+				const svg = decodeSvg(msg.payload?.image);
+				if (svg !== null) {
+					frames.push(svg);
 				}
 			}
 		});
@@ -61,35 +60,15 @@ function makeServer(port, context, frames) {
 	return { wss, send: (obj) => ws?.send(JSON.stringify(obj)) };
 }
 
-async function expectFrame(frames, name, predicate, timeoutMs, { fromStart = false } = {}) {
-	const start = Date.now();
-	// A one-shot status screen renders exactly once at plugin startup; a leg
-	// asserting on it must scan the whole history, not just new frames.
-	let from = fromStart ? 0 : frames.length;
-	while (Date.now() - start < timeoutMs) {
-		while (from < frames.length) {
-			if (predicate(frames[from])) {
-				check(name, true, `after ${((Date.now() - start) / 1000).toFixed(1)}s`);
-				return;
-			}
-			from++;
-		}
-		await sleep(150);
-	}
-	check(name, false, `no matching frame within ${timeoutMs / 1000}s (last: ${frames.at(-1)?.slice(0, 160) ?? "none"})`);
-}
+// A one-shot status screen renders exactly once at plugin startup; a leg
+// asserting on it passes fromStart to scan the whole history, not just new
+// frames (see makeExpectFrame).
+const expectFrame = (frames, name, predicate, timeoutMs, opts) => makeExpectFrame(frames, check)(name, predicate, timeoutMs, opts);
 
 function spawnPlugin(entry, cwd, port, uuid) {
 	return spawn(
 		process.execPath,
-		[entry, "-port", String(port), "-pluginUUID", uuid, "-registerEvent", "registerPlugin", "-info",
-			JSON.stringify({
-				application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-				colors: {},
-				devicePixelRatio: 1,
-				devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-				plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-			})],
+		[entry, "-port", String(port), "-pluginUUID", uuid, "-registerEvent", "registerPlugin", "-info", JSON.stringify(buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] }))],
 		{
 			cwd,
 			env: {

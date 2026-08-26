@@ -8,7 +8,7 @@
  * Storing native therefore lets the series survive a °C/°F toggle unchanged.
  */
 
-/** Samples retained per reading. Matches key-renderer's SPARK_SAMPLES. */
+/** Samples retained per reading; the key and dial sparklines slice to this cap. */
 export const HISTORY_LENGTH = 36;
 
 /** Appends one sample, dropping non-finite values and capping at HISTORY_LENGTH. */

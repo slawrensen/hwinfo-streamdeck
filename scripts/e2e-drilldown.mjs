@@ -11,6 +11,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, latestSvg as latestSvgIn, makeCheck, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 import { profileCells as sharedProfileCells } from "./lib/profile-cells.mjs";
 
 const PORT = 28994;
@@ -19,15 +20,9 @@ const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 const MAPPING_NAME = `Local\\HwinfoE2E_SM2_${process.pid}`;
 const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = { errors: [] };
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) {
-		results.errors.push(name);
-	}
-}
+const check = makeCheck((name) => results.errors.push(name));
 
 const profileCells = (name) => sharedProfileCells(pluginDir, name);
 
@@ -37,8 +32,7 @@ const switches = []; // { device, profile, page }
 const setSettings = []; // { context, payload }
 const showAlerts = []; // context
 
-const svgOf = (image) => (typeof image === "string" && image.startsWith("data:image/svg+xml,") ? decodeURIComponent(image.slice("data:image/svg+xml,".length)) : null);
-const latestSvg = (context) => images.filter((i) => i.context === context).map((i) => svgOf(i.svg)).filter((s) => s !== null).at(-1);
+const latestSvg = (context) => latestSvgIn(images, context);
 
 let fake = null;
 let finished = false;
@@ -155,11 +149,15 @@ async function scenario(send) {
 	await sleep(1800);
 	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1" });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: OPENER, payload: { event: "getSensorTree" } });
-	await sleep(600);
+	await waitUntil(() => results.tree !== undefined, 600);
 	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1" });
 	await sleep(200);
 	const keys = (results.tree?.groups ?? []).flatMap((g) => g.readings.map((r) => ({ key: r.key, label: r.label })));
 	check("fake tree offers two readings", keys.length === 2, `got ${keys.length}`);
+	// The filter counter matches on the RAW source name (empty for orphans),
+	// not the "Unknown sensor" display fallback; the payload must carry it.
+	const treeGroups = results.tree?.groups ?? [];
+	check("sensorTree groups carry matchName for the filter counter", treeGroups.length > 0 && treeGroups.every((g) => typeof g.matchName === "string"), JSON.stringify(treeGroups.map((g) => g.matchName)));
 	if (keys.length < 2) {
 		return finish();
 	}
@@ -179,8 +177,9 @@ async function scenario(send) {
 	const openerSettings = { readingKey: primary.key, statMode: "current", pressBehavior: "open-details" };
 	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: OPENER, device: "dev1", payload: { settings: openerSettings, coordinates: { column: 2, row: 1 }, isInMultiAction: false } });
 	await sleep(300);
+	const switchesBeforeEnter = switches.length;
 	await keyPress(send, OPENER, "dev1", openerSettings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeEnter, 500);
 	results.enterSwitch = switches.at(-1);
 	// The app now shows the (installed) profile: the opener leaves, the
 	// baked cells of the real shipped archive appear.
@@ -195,7 +194,7 @@ async function scenario(send) {
 
 	// C. A reading slot press cycles that slot's session stat.
 	slotPress(send, "dev1", cellOfIndex(standardCells, 0).coord, cellOfIndex(standardCells, 0).settings);
-	await sleep(900);
+	await waitUntil(() => (latestSvg(slot0Ctx) ?? "").includes("MIN"), 900);
 	results.slot0Min = latestSvg(slot0Ctx);
 
 	// D. Layout growth: a third reading joins the source mid-view.
@@ -222,7 +221,7 @@ async function scenario(send) {
 		device: "dev1",
 		payload: { settings: slot0Cell.settings, coordinates: { column: rc, row: rr }, controller: "Keypad", isInMultiAction: false }
 	});
-	await sleep(900);
+	await waitUntil(() => images.filter((i) => i.context === slot0Ctx).length > framesBeforeReplay, 900);
 	results.replayRepaint = images.filter((i) => i.context === slot0Ctx).length > framesBeforeReplay;
 	fake.stdin.write("alive\n");
 	await sleep(3200);
@@ -235,6 +234,8 @@ async function scenario(send) {
 	// keeps its face, so the way out never blinks away.
 	const switchesBeforeBack = switches.length;
 	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
+	// Fixed on purpose: leg G's idle-face read leans on this full window
+	// (the post-leave idle repaint lands a beat after the leave debounce).
 	await sleep(500);
 	results.backSwitch = switches.length > switchesBeforeBack ? switches.at(-1) : undefined;
 	results.leftSlotFace = latestSvg(slot0Ctx);
@@ -252,7 +253,7 @@ async function scenario(send) {
 	results.idleBackFace = latestSvg(backCtx);
 	const switchesBeforeIdleBack = switches.length;
 	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeIdleBack, 500);
 	results.idleBackSwitch = switches.length > switchesBeforeIdleBack ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "dev1", standardCells);
 	await sleep(300);
@@ -263,13 +264,17 @@ async function scenario(send) {
 	appearOpener(send, "ctx-ped", "devped", { readingKey: primary.key, pressBehavior: "open-details" }, { column: 0, row: 0 });
 	await sleep(300);
 	await keyPress(send, "ctx-ped", "devped", { readingKey: primary.key, pressBehavior: "open-details" });
-	await sleep(400);
+	await waitUntil(() => showAlerts.includes("ctx-ped"), 400);
 	results.pedAlerted = showAlerts.includes("ctx-ped");
 	appearOpener(send, "ctx-gone", "dev1", { readingKey: "no-such:0:0", pressBehavior: "open-details" }, { column: 3, row: 1 });
 	await sleep(300);
 	await keyPress(send, "ctx-gone", "dev1", { readingKey: "no-such:0:0", pressBehavior: "open-details" });
-	await sleep(400);
+	await waitUntil(() => showAlerts.includes("ctx-gone"), 400);
 	results.goneAlerted = showAlerts.includes("ctx-gone");
+	// refusalSwitches is a nothing-happened assertion: it needs the full
+	// window after the alert, not a wait that ends the moment the alert
+	// arrives (a switch emitted just after would escape it).
+	await sleep(400);
 	results.refusalSwitches = switches.length - switchesBeforeRefusals;
 
 	// I. Tap/hold: a short tap cycles once; a hold enters once and its
@@ -294,8 +299,9 @@ async function scenario(send) {
 	const xlOpener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-xl", "devxl", xlOpener, { column: 1, row: 1 });
 	await sleep(300);
+	const switchesBeforeXl = switches.length;
 	await keyPress(send, "ctx-xl", "devxl", xlOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeXl, 500);
 	results.xlSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-xl", device: "devxl", payload: { settings: xlOpener, coordinates: { column: 1, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devxl", xlCells);
@@ -315,8 +321,9 @@ async function scenario(send) {
 	const vsdOpener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-vsd", "devvsd", vsdOpener, { column: 0, row: 0 });
 	await sleep(300);
+	const switchesBeforeVsd = switches.length;
 	await keyPress(send, "ctx-vsd", "devvsd", vsdOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeVsd, 500);
 	results.vsdSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-vsd", device: "devvsd", payload: { settings: vsdOpener, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 	await sleep(200);
@@ -333,8 +340,9 @@ async function scenario(send) {
 	const r2Opener = { readingKey: primary.key, pressBehavior: "open-details" };
 	appearOpener(send, "ctx-r2", "devr2", r2Opener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeR2 = switches.length;
 	await keyPress(send, "ctx-r2", "devr2", r2Opener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeR2, 500);
 	results.r2Switch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-r2", device: "devr2", payload: { settings: r2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devr2", r2Cells);
@@ -407,7 +415,7 @@ async function scenario(send) {
 	const switchesBeforeIdle = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeIdle, 500);
 	results.r2IdleBackSwitch = switches.length > switchesBeforeIdle ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devr2", r2Cells);
 	await sleep(300);
@@ -436,7 +444,7 @@ async function scenario(send) {
 	const switchesBeforeDev1 = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: dev1BackCtx, device: "dev1", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeDev1, 500);
 	results.r2Dev1Switch = switches.length > switchesBeforeDev1 ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "dev1", r2Cells, "-r2");
 	await sleep(300);
@@ -456,8 +464,9 @@ async function scenario(send) {
 	const fltOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailMirrorBack: true };
 	appearOpener(send, "ctx-flt", "devflt", fltOpener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeFlt = switches.length;
 	await keyPress(send, "ctx-flt", "devflt", fltOpener);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeFlt, 500);
 	results.fltSwitch = switches.at(-1);
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-flt", device: "devflt", payload: { settings: fltOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devflt", fltCells);
@@ -468,7 +477,7 @@ async function scenario(send) {
 	results.fltSlot0Face = latestSvg(slotCtx("devflt", cellOfIndex(fltCells, 0).coord));
 	const switchesBeforeMirror = switches.length;
 	slotPress(send, "devflt", fltMirrorCell.coord, fltMirrorCell.settings);
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeMirror, 500);
 	results.fltMirrorSwitch = switches.length > switchesBeforeMirror ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devflt", fltCells);
 	await sleep(300);
@@ -497,11 +506,144 @@ async function scenario(send) {
 	const defBackCell = fltCells.find((c) => c.settings.detailRole === "back");
 	const defBackCtx = slotCtx("devdef", defBackCell.coord);
 	const [defBackCol, defBackRow] = defBackCell.coord.split(",").map(Number);
+	const switchesBeforeDefBack = switches.length;
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
-	await sleep(500);
+	await waitUntil(() => switches.length > switchesBeforeDefBack, 500);
 	results.defBackSwitch = switches.at(-1);
 	removeDetailSurface(send, "devdef", fltCells);
+	await sleep(300);
+
+	// V. Dense tiles, two readings per tile (issue #5 follow-up). The fake
+	// first gains four CONSTANT per-core voltages (min = max = avg), so
+	// every face asserted below is parked: it cannot move on its own, and
+	// a content assertion cannot pass by accident against broken code the
+	// way a "did it redraw" check would. Filter "*" over the grown layout
+	// is fan + volt + four cores = 6 readings; density 2 packs them onto
+	// three dual tiles and the title counts READINGS.
+	fake.stdin.write("cores\n");
+	await sleep(2600);
+	// The opener is itself a QUAD-layout key: a multi-reading key opening a
+	// drill-down was always allowed by the code but never covered or
+	// pressed anywhere until now.
+	const den2Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "2", keyLayout: "quad", secondaryReadingKey: keys[1].key, quadReadingKey3: keys[1].key };
+	appearOpener(send, "ctx-den2", "devden2", den2Opener, { column: 2, row: 1 });
+	await sleep(600);
+	results.den2OpenerFace = latestSvg("ctx-den2");
+	await keyPress(send, "ctx-den2", "devden2", den2Opener);
+	await sleep(500);
+	results.den2Switch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den2", device: "devden2", payload: { settings: den2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden2", fltCells);
+	await sleep(1600);
+	results.den2TitleFace = latestSvg(slotCtx("devden2", cellOfRole(fltCells, "title").coord));
+	results.den2Slot0Face = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 0).coord));
+	results.den2Slot1Face = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 1).coord));
+	// One press on the tile cycles BOTH of its readings to MIN together.
+	slotPress(send, "devden2", cellOfIndex(fltCells, 0).coord, cellOfIndex(fltCells, 0).settings);
+	await sleep(900);
+	results.den2Slot0Min = latestSvg(slotCtx("devden2", cellOfIndex(fltCells, 0).coord));
+	const den2BackCell = fltCells.find((c) => c.settings.detailRole === "back");
+	const den2BackCtx = slotCtx("devden2", den2BackCell.coord);
+	const [den2BackCol, den2BackRow] = den2BackCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: den2BackCtx, device: "devden2", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: den2BackCtx, device: "devden2", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devden2", fltCells);
+	await sleep(300);
+
+	// W. Four per tile: the "*core*" glob gathers exactly the four VIDs on
+	// ONE quad tile, whose micro-labels drop the shared "Core" token (the
+	// live-machine failure was four cells all reading "GPU" with a constant
+	// limit posing as a live temperature).
+	const den4Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*core*", detailDensity: "4" };
+	appearOpener(send, "ctx-den4", "devden4", den4Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-den4", "devden4", den4Opener);
+	await sleep(500);
+	results.den4Switch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den4", device: "devden4", payload: { settings: den4Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden4", fltCells);
+	await sleep(1600);
+	results.den4TitleFace = latestSvg(slotCtx("devden4", cellOfRole(fltCells, "title").coord));
+	results.den4Slot0Face = latestSvg(slotCtx("devden4", cellOfIndex(fltCells, 0).coord));
+	const den4BackCtx = slotCtx("devden4", den2BackCell.coord);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: den4BackCtx, device: "devden4", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: den4BackCtx, device: "devden4", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devden4", fltCells);
+	await sleep(300);
+
+	// X. Three per tile PLUS the opt-in mirror: the mirror still costs one
+	// TILE (the readings flow around it), the first tile rows three
+	// readings, and pressing the mirror cell leaves exactly like Back.
+	const den3Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "3", detailMirrorBack: true };
+	appearOpener(send, "ctx-den3", "devden3", den3Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-den3", "devden3", den3Opener);
+	await sleep(500);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den3", device: "devden3", payload: { settings: den3Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devden3", fltCells);
+	await sleep(1600);
+	results.den3TitleFace = latestSvg(slotCtx("devden3", cellOfRole(fltCells, "title").coord));
+	results.den3Slot0Face = latestSvg(slotCtx("devden3", cellOfIndex(fltCells, 0).coord));
+	results.den3MirrorFace = latestSvg(slotCtx("devden3", "2,1"));
+	const den3MirrorCell = fltCells.find((c) => c.coord === "2,1");
+	const switchesBeforeDen3 = switches.length;
+	slotPress(send, "devden3", den3MirrorCell.coord, den3MirrorCell.settings);
+	await waitUntil(() => switches.length > switchesBeforeDen3, 500);
+	results.den3MirrorSwitch = switches.length > switchesBeforeDen3 ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devden3", fltCells);
+	await sleep(300);
+
+	// Z. Hand-grouped custom tiles (issue #5 follow-up): a single with a
+	// custom label, a dressed quad (identity color + custom micro-label),
+	// and a trailing reading flowing at the default density, all on one
+	// page. The readings are the CONSTANT ones, so every assertion is
+	// against a face that cannot move on its own.
+	appearOpener(send, "ctx-tree", "devgrp", {}, { column: 4, row: 2 });
+	await sleep(600);
+	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp" });
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", payload: { event: "getSensorTree" } });
+	await sleep(600);
+	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp" });
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-tree", device: "devgrp", payload: { settings: {}, coordinates: { column: 4, row: 2 }, controller: "Keypad", isInMultiAction: false } });
+	const allReadings = (results.tree?.groups ?? []).flatMap((g) => g.readings.map((r) => ({ key: r.key, label: r.label })));
+	const keyOf = (label) => allReadings.find((r) => r.label === label)?.key;
+	const grpOpener = {
+		readingKey: primary.key,
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailTitle: "Grouped bench",
+		detailKeys: [keyOf("Test Fan"), keyOf("Test Volt"), keyOf("Core 0 VID"), keyOf("Core 1 VID"), keyOf("Core 2 VID"), keyOf("Core 3 VID")],
+		detailTiles: [
+			{ size: 1, labels: ["Fan spin"] },
+			{ size: 4, labels: ["", "", "", "Dcell"], colors: ["#ABCDEF", null, null, null], cellLabels: true }
+		]
+	};
+	results.grpKeysResolved = grpOpener.detailKeys.every((k) => typeof k === "string" && k !== "");
+	appearOpener(send, "ctx-grp", "devgrp", grpOpener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-grp", "devgrp", grpOpener);
+	await sleep(500);
+	results.grpSwitch = switches.at(-1);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-grp", device: "devgrp", payload: { settings: grpOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devgrp", fltCells);
+	await sleep(1600);
+	results.grpTitleFace = latestSvg(slotCtx("devgrp", cellOfRole(fltCells, "title").coord));
+	results.grpSingleFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 0).coord));
+	results.grpQuadFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 1).coord));
+	results.grpTailFace = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 2).coord));
+	// One press on the dressed quad cycles ALL FOUR readings together.
+	slotPress(send, "devgrp", cellOfIndex(fltCells, 1).coord, cellOfIndex(fltCells, 1).settings);
+	await sleep(900);
+	results.grpQuadMin = latestSvg(slotCtx("devgrp", cellOfIndex(fltCells, 1).coord));
+	const grpBackCell = fltCells.find((c) => c.settings.detailRole === "back");
+	const [grpBackCol, grpBackRow] = grpBackCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: slotCtx("devgrp", grpBackCell.coord), device: "devgrp", payload: { settings: grpBackCell.settings, coordinates: { column: grpBackCol, row: grpBackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: slotCtx("devgrp", grpBackCell.coord), device: "devgrp", payload: { settings: grpBackCell.settings, coordinates: { column: grpBackCol, row: grpBackRow } } });
+	await sleep(400);
+	removeDetailSurface(send, "devgrp", fltCells);
 	await sleep(300);
 
 	// Teardown: every action gone, the poller must idle, the process exit.
@@ -578,6 +720,82 @@ async function finish() {
 	check("the canonical Back on that live surface still wears the mark", typeof results.defBackFace === "string" && results.defBackFace.includes("M33 119"), (results.defBackFace ?? "no frame").slice(0, 140));
 	check("without the opt-in, pressing that cell stays in the view", results.defCellPressSwitched === false, JSON.stringify(results.defCellPressSwitched));
 	check("the canonical Back still leaves (restore, name omitted)", results.defBackSwitch !== undefined && results.defBackSwitch.device === "devdef" && results.defBackSwitch.profile === undefined, JSON.stringify(results.defBackSwitch));
+
+	// Dense tiles (readings per tile). Every asserted face is CONSTANT by
+	// construction (the fake's fan, volt and core readings never move).
+	const microLabelsOf = (svg) => (typeof svg === "string" ? [...svg.matchAll(/letter-spacing="0\.5" fill="#[0-9A-Fa-f]{6}">([^<]*)</g)].map((m) => m[1]) : []);
+	check(
+		"the opener itself renders as a quad key (multi-reading opener)",
+		typeof results.den2OpenerFace === "string" && results.den2OpenerFace.includes('<rect x="71" y="12" width="2" height="120"'),
+		(results.den2OpenerFace ?? "no frame").slice(0, 160)
+	);
+	check("a multi-reading opener's press still entered the class profile", results.den2Switch?.device === "devden2" && results.den2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den2Switch));
+	check("density 2 title counts READINGS (1-6 / 6 on 11 tiles)", typeof results.den2TitleFace === "string" && results.den2TitleFace.includes(">1-6 / 6<"), (results.den2TitleFace ?? "no frame").slice(0, 160));
+	check(
+		"density 2 tile 0 rows fan and volt together (constant values)",
+		typeof results.den2Slot0Face === "string" && results.den2Slot0Face.includes(">Test Fan<") && results.den2Slot0Face.includes(">Test Volt<") && results.den2Slot0Face.includes(">1200<") && results.den2Slot0Face.includes(">12.1<"),
+		(results.den2Slot0Face ?? "no frame").slice(0, 200)
+	);
+	check(
+		"density 2 tile 1 carries the next chunk (Core 0 + Core 1)",
+		typeof results.den2Slot1Face === "string" && results.den2Slot1Face.includes(">Core 0 VID<") && results.den2Slot1Face.includes(">Core 1 VID<") && results.den2Slot1Face.includes(">1.05<") && results.den2Slot1Face.includes(">1.15<"),
+		(results.den2Slot1Face ?? "no frame").slice(0, 200)
+	);
+	check(
+		"one press cycles the WHOLE tile to MIN (both min values, one badge)",
+		typeof results.den2Slot0Min === "string" && results.den2Slot0Min.includes(">800<") && results.den2Slot0Min.includes(">11.9<") && (results.den2Slot0Min.match(/>MIN</g) ?? []).length === 1,
+		(results.den2Slot0Min ?? "no frame").slice(0, 200)
+	);
+	check("density 4 title counts the four matches (1-4 / 4)", typeof results.den4TitleFace === "string" && results.den4TitleFace.includes(">1-4 / 4<"), (results.den4TitleFace ?? "no frame").slice(0, 160));
+	check(
+		"density 4 quad drops the shared Core token: micro-labels 0/1/2/3",
+		JSON.stringify(microLabelsOf(results.den4Slot0Face)) === JSON.stringify(["0", "1", "2", "3"]),
+		JSON.stringify(microLabelsOf(results.den4Slot0Face))
+	);
+	check(
+		"density 4 quad shows the four constant voltages",
+		typeof results.den4Slot0Face === "string" && [">1.05<", ">1.15<", ">1.25<", ">1.35<"].every((v) => results.den4Slot0Face.includes(v)),
+		(results.den4Slot0Face ?? "no frame").slice(0, 200)
+	);
+	check("density 3 + mirror keeps the READING count honest (1-6 / 6)", typeof results.den3TitleFace === "string" && results.den3TitleFace.includes(">1-6 / 6<"), (results.den3TitleFace ?? "no frame").slice(0, 160));
+	check(
+		// The three CONSTANT row values plus both separators prove three
+		// readings on one tile; labels are free to ellipsize (the triple
+		// ladder's own tests lock that behavior).
+		"density 3 tile 0 rows three readings around the mirror",
+		typeof results.den3Slot0Face === "string" &&
+			[">1200<", ">12.1<", ">1.05<"].every((v) => results.den3Slot0Face.includes(v)) &&
+			(results.den3Slot0Face.match(/<rect x="12" y="(?:47|95)" width="120" height="2"/g) ?? []).length === 2,
+		(results.den3Slot0Face ?? "no frame").slice(0, 300)
+	);
+	check("the mirror rides the opener's cell at density 3 (return mark)", typeof results.den3MirrorFace === "string" && results.den3MirrorFace.includes("M33 119"), (results.den3MirrorFace ?? "no frame").slice(0, 140));
+	check("pressing the dense mirror leaves (restore, name omitted)", results.den3MirrorSwitch !== undefined && results.den3MirrorSwitch.device === "devden3" && results.den3MirrorSwitch.profile === undefined, JSON.stringify(results.den3MirrorSwitch));
+
+	// Hand-grouped custom tiles.
+	check("grouping leg resolved every constant reading key", results.grpKeysResolved === true);
+	check("grouped entry switched devgrp to the class profile", results.grpSwitch?.device === "devgrp" && results.grpSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.grpSwitch));
+	check("grouped title counts readings across mixed tiles (1-6 / 6)", typeof results.grpTitleFace === "string" && results.grpTitleFace.includes(">1-6 / 6<"), (results.grpTitleFace ?? "no frame").slice(0, 160));
+	check(
+		"tile one is a SINGLE wearing its custom label",
+		typeof results.grpSingleFace === "string" && results.grpSingleFace.includes(">Fan spin<") && results.grpSingleFace.includes(">1200<") && !results.grpSingleFace.includes(">Test Fan<"),
+		(results.grpSingleFace ?? "no frame").slice(0, 200)
+	);
+	check(
+		"tile two is a QUAD dressed per cell (identity color + custom micro)",
+		typeof results.grpQuadFace === "string" && results.grpQuadFace.includes('fill="#ABCDEF">TEST<') && results.grpQuadFace.includes(">DCEL<") && results.grpQuadFace.includes(">12.1<"),
+		(results.grpQuadFace ?? "no frame").slice(0, 240)
+	);
+	check(
+		"the trailing reading flows on as a default single",
+		typeof results.grpTailFace === "string" && /Core 3 VID/.test(results.grpTailFace) && results.grpTailFace.includes(">1.35<"),
+		(results.grpTailFace ?? "no frame").slice(0, 200)
+	);
+	check(
+		"one press cycles the dressed quad's four readings together",
+		typeof results.grpQuadMin === "string" && results.grpQuadMin.includes(">11.9<") && (results.grpQuadMin.match(/>MIN</g) ?? []).length === 1,
+		(results.grpQuadMin ?? "no frame").slice(0, 240)
+	);
+
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
 	const shutdown = await new Promise((resolve) => {
@@ -612,21 +830,21 @@ async function finish() {
 }
 
 // --- boot ----------------------------------------------------------------
-const info = {
-	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-	colors: {},
-	devicePixelRatio: 1,
+const info = buildInfo({
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devr2", name: "Harness Deck B", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devflt", name: "Harness Deck C", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devdef", name: "Harness Deck D", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden2", name: "Harness Deck E", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden3", name: "Harness Deck F", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devden4", name: "Harness Deck G", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devgrp", name: "Harness Deck H", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }
-	],
-	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-};
+	]
+});
 
 fake = spawn(process.execPath, [path.join(repoRoot, "scripts", "fake-hwinfo.mjs")], {
 	stdio: ["pipe", "pipe", "inherit"],
@@ -644,7 +862,7 @@ const fakeReady = new Promise((resolve, reject) => {
 });
 await fakeReady;
 
-const plugin = spawn(process.execPath, ["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-drilldown", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
+const plugin = spawn(process.execPath, pluginArgv(PORT, "e2e-drilldown", info), {
 	cwd: pluginDir,
 	stdio: ["ignore", "inherit", "inherit"],
 	env: {

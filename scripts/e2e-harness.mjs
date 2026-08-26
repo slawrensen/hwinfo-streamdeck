@@ -8,14 +8,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, decodeSvg, latestSvg, makeCheck, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 
 const PORT = 28999;
 const READING_KEY = process.env.HW_E2E_KEY ?? "f0000501:0:1000000"; // CPU (Tctl/Tdie) on this machine
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 const harnessStart = new Date();
+// A sparkline rebuild costs TWO fresh HWiNFO snapshots, and HWiNFO's cadence
+// is its own (measured at 1.97 to 2.04 s on this box, steady even under a full
+// suite:full). The legs below wait for the line itself instead of sleeping a
+// fixed window, so a healthy rebuild still returns in ~4 s and only a genuine
+// regression pays this deadline.
+const SPARKLINE_REBUILD_MS = 20_000;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = {
 	registered: false,
 	images: [], // { context, image }
@@ -231,7 +237,7 @@ async function scenario(send) {
 		// marked row follows rotation, and a junk dialView falls back to the
 		// single face (rollback safety).
 		const k3 = (treeMsg?.groups ?? []).flatMap((g) => g.readings.map((r) => r.key))[2];
-		const dialSvgLatest = () => results.feedbacks.filter((f) => f.context === "ctx-dial").map((f) => decodeSvg(f.payload?.canvas)).filter((s) => s !== null).at(-1);
+		const dialSvgLatest = () => latestSvg(results.feedbacks, "ctx-dial", (f) => f.payload?.canvas);
 		if (typeof k3 === "string") {
 			dialSet({ readingKey: k1, rotationKeys: [k1, k2, k3], dialView: "overview" });
 			await sleep(600);
@@ -278,9 +284,10 @@ async function scenario(send) {
 			await sleep(200);
 			// Two-row view: big values, and the dial's own series subscriptions
 			// feed a live sparkline once two fresh HWiNFO snapshots arrive
-			// (HWiNFO's own cadence, ~2 s each).
+			// (HWiNFO's own cadence, ~2 s each). Wait for the line, not a fixed
+			// window: see SPARKLINE_REBUILD_MS.
 			dialSet({ readingKey: k1, rotationKeys: [k1, k2], dialView: "tworow" });
-			await sleep(6500);
+			await waitUntil(() => (dialSvgLatest() ?? "").includes("<polyline"), SPARKLINE_REBUILD_MS, 100);
 			results.twoRowFrame = dialSvgLatest();
 			dialSet({ readingKey: k1 });
 			await sleep(200);
@@ -308,7 +315,7 @@ async function scenario(send) {
 			payload: { settings: { readingKey: k1, keyLayout: "dual", secondaryReadingKey: k2, statMode: "max" }, coordinates: { column: 2, row: 0 }, isInMultiAction: false }
 		});
 		await sleep(500);
-		results.dualSharedFrame = results.images.filter((i) => i.context === "ctx-key2").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+		results.dualSharedFrame = latestSvg(results.images, "ctx-key2", (i) => i.image);
 		send({
 			event: "didReceiveSettings",
 			action: "com.lawrensen.hwinfo.reading",
@@ -317,7 +324,7 @@ async function scenario(send) {
 			payload: { settings: { readingKey: k1, keyLayout: { junk: true }, secondaryReadingKey: 42 }, coordinates: { column: 2, row: 0 }, isInMultiAction: false }
 		});
 		await sleep(500);
-		results.dualDegradedFrame = results.images.filter((i) => i.context === "ctx-key2").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+		results.dualDegradedFrame = latestSvg(results.images, "ctx-key2", (i) => i.image);
 		send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key2", device: "dev1", payload: { settings: {}, coordinates: { column: 2, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 
 		// Quad-grid key: four live readings behind the hairline cross, the
@@ -330,7 +337,7 @@ async function scenario(send) {
 		if (typeof q3 === "string" && typeof q4 === "string") {
 			const quadSet = (settings) =>
 				send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "ctx-key4", device: "dev1", payload: { settings, coordinates: { column: 3, row: 0 }, isInMultiAction: false } });
-			const quadLatest = () => results.images.filter((i) => i.context === "ctx-key4").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+			const quadLatest = () => latestSvg(results.images, "ctx-key4", (i) => i.image);
 			send({
 				event: "willAppear",
 				action: "com.lawrensen.hwinfo.reading",
@@ -367,7 +374,7 @@ async function scenario(send) {
 			// resolvable slots degrading to the single face.
 			const tripleSet = (settings) =>
 				send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "ctx-key3t", device: "dev1", payload: { settings, coordinates: { column: 4, row: 0 }, isInMultiAction: false } });
-			const tripleLatest = () => results.images.filter((i) => i.context === "ctx-key3t").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+			const tripleLatest = () => latestSvg(results.images, "ctx-key3t", (i) => i.image);
 			send({
 				event: "willAppear",
 				action: "com.lawrensen.hwinfo.reading",
@@ -410,7 +417,7 @@ async function scenario(send) {
 		{
 			const dispSet = (settings) =>
 				send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "ctx-key-disp", device: "dev1", payload: { settings, coordinates: { column: 4, row: 0 }, isInMultiAction: false } });
-			const dispLatest = () => results.images.filter((i) => i.context === "ctx-key-disp").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+			const dispLatest = () => latestSvg(results.images, "ctx-key-disp", (i) => i.image);
 			send({
 				event: "willAppear",
 				action: "com.lawrensen.hwinfo.reading",
@@ -473,7 +480,7 @@ async function scenario(send) {
 				});
 				send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key-data", device: "dev1" });
 				await sleep(700);
-				const dataLatest = () => results.images.filter((i) => i.context === "ctx-key-data").map((i) => decodeSvg(i.image)).filter((s) => s !== null).at(-1);
+				const dataLatest = () => latestSvg(results.images, "ctx-key-data", (i) => i.image);
 				results.dataDecimalFrame = dataLatest();
 				const previewsBefore = results.piPayloads.filter((p) => p?.event === "preview").length;
 				send({ event: "didReceiveGlobalSettings", payload: { settings: { dataUnits: "binary" } } });
@@ -597,16 +604,27 @@ async function scenario(send) {
 	// dropped them ended collection for every visible key until its action
 	// reloaded (the 1.5.1 defect). Drive the real chain the panel drives:
 	// globals in, then prove a sparkline REBUILDS on the live key.
-	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt
-	// line needs two FRESH snapshots (~2 s each), the same budget the
-	// two-row dial leg above allows.
+	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt line
+	// needs two FRESH snapshots (~2 s each). It waits for the line rather than
+	// a fixed window because the poller feeds AT MOST ONE sample per tick no
+	// matter how many snapshots elapsed since it last read, so a single stalled
+	// tick costs a whole sample and pushes the rebuild past any budget sized
+	// for a quiet box. The old fixed 6.5 s held barely 2 s of slack over the
+	// 4.1 s worst case and lost it under load right after a suite run.
 	const intervalFramesBefore = results.images.filter((i) => i.context === "ctx-key").length;
+	const keyFramesSince = () => results.images.filter((i) => i.context === "ctx-key").slice(intervalFramesBefore);
+	const rebuildStart = Date.now();
 	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: 250 } } });
-	await sleep(6500);
-	results.sparklineAfterIntervalChange = results.images
-		.filter((i) => i.context === "ctx-key")
-		.slice(intervalFramesBefore)
-		.some((i) => decodeSvg(i.image).includes("<polyline"));
+	results.sparklineAfterIntervalChange = await waitUntil(() => keyFramesSince().some((i) => decodeSvg(i.image).includes("<polyline")), SPARKLINE_REBUILD_MS, 100);
+	// On failure, say which half broke. The frame count alone cannot: the key
+	// repaints only when its composed bytes change, so a steady sensor legitimately
+	// yields a single frame even while the poller is healthy (reintroducing the
+	// 1.5.1 defect on a quiet box produced exactly one). What does separate them is
+	// whether the poller ever saw the new cadence, plus the deadline itself: a live
+	// rebuild lands in ~3.5 s here, so 20 s of silence is a dead ring, not a slow box.
+	results.sparklineRebuildDetail = results.sparklineAfterIntervalChange
+		? `polyline returned after ${((Date.now() - rebuildStart) / 1000).toFixed(1)}s`
+		: `no sparkline over ${(SPARKLINE_REBUILD_MS / 1000).toFixed(0)}s in ${keyFramesSince().length} frame(s); poller logged the new interval: ${loggedThisRun("Poll interval set to 250 ms") ? "yes, so the ring never refilled" : "NO, the globals never reached it"}`;
 	send({ event: "didReceiveGlobalSettings", payload: { settings: {} } }); // back to the default cadence
 	await sleep(400);
 
@@ -661,20 +679,15 @@ async function scenario(send) {
 	await finish();
 }
 
-function decodeSvg(image) {
-	if (typeof image !== "string" || !image.startsWith("data:image/svg+xml,")) {
-		return null;
-	}
-	return decodeURIComponent(image.slice("data:image/svg+xml,".length));
-}
-
-function check(name, ok, detail = "") {
-	const line = `${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`;
-	console.log(line);
-	if (!ok) {
-		results.errors.push(name);
-	}
-}
+const baseCheck = makeCheck((name) => results.errors.push(name));
+// Every check name that actually ran: the finish block audits this so a
+// release-blocking leg cannot vanish in a refactor and leave a shorter,
+// still-green run behind.
+const checksRun = [];
+const check = (name, ok, detail = "") => {
+	checksRun.push(name);
+	baseCheck(name, ok, detail);
+};
 
 /** Closes the app-side sockets and waits for the plugin to exit BY ITSELF —
  * the headless equivalent of "Stream Deck stopped". With the poller idle
@@ -742,7 +755,7 @@ async function finish() {
 	check(
 		"sparkline rebuilds after a poll-interval change (subscriptions survive the cadence reset)",
 		results.sparklineAfterIntervalChange === true,
-		results.sparklineAfterIntervalChange === true ? "polyline returned" : "no sparkline after the interval changed"
+		results.sparklineRebuildDetail ?? "leg did not run"
 	);
 	check(
 		"sparkline survives nav away + back (history persisted in poller)",
@@ -1048,8 +1061,8 @@ async function finish() {
 	const tree = results.piPayloads.find((p) => p?.event === "sensorTree");
 	check("PI got sensorTree", tree !== undefined);
 	check("sensorTree has many grouped readings", (tree?.groups?.length ?? 0) > 5 && tree.groups.reduce((n, g) => n + g.readings.length, 0) > 100, `groups=${tree?.groups?.length}, readings=${tree?.groups?.reduce((n, g) => n + g.readings.length, 0)}`);
-	const preview = results.piPayloads.find((p) => p?.event === "preview" && p.reading);
-	check("PI got live preview for selected reading", preview !== undefined, preview ? `${preview.reading.label}=${preview.reading.value}` : "");
+	const preview = results.piPayloads.find((p) => p?.event === "preview" && p.display);
+	check("PI got live preview for selected reading", preview !== undefined, preview ? `${preview.display.value}${preview.display.unit}` : "");
 
 	// The Deck-default chip must never guess: the plugin sends its RESOLVED
 	// deck theme, and it must be a real theme id from the same payload.
@@ -1082,15 +1095,18 @@ async function finish() {
 	const shutdown = await shutdownPlugin();
 	check("plugin exits when the app socket closes", shutdown.clean, shutdown.detail);
 
+	// A deleted gate runs zero checks and everything left still passes:
+	// name the legs a merge must never lose and fail when one never ran.
+	for (const req of ["sparkline rebuilds after a poll-interval change", "PI got live preview for selected reading"]) {
+		check(`required gate ran: ${req}`, checksRun.some((n) => n.includes(req)));
+	}
+
 	console.log(results.errors.length === 0 ? "\nE2E: ALL CHECKS PASSED" : `\nE2E: ${results.errors.length} FAILURES`);
 	process.exit(results.errors.length === 0 ? 0 : 1);
 }
 
 // Registration info mirroring a real Stream Deck 7.4 registration.
-const info = {
-	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-	colors: {},
-	devicePixelRatio: 1,
+const info = buildInfo({
 	devices: [
 		{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 		// A Stream Deck + (type 7) so the registry ingests the 4-encoder model.
@@ -1098,14 +1114,13 @@ const info = {
 		// Mirrors the real Stream Deck + XL registration observed on hardware
 		// (2026-07-09): DeviceType 13, 9x4 keys, encoders 0-5.
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 }
-	],
-	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-};
+	]
+});
 
 // Default the plugin to HWINFO_LOG_LEVEL=trace: a normal (non-debug) launch
 // must fall back to debug and say so. An explicit level from the caller wins.
 const forcedLogLevel = process.env.HWINFO_LOG_LEVEL === undefined;
-const plugin = spawn(process.execPath, ["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-harness", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
+const plugin = spawn(process.execPath, pluginArgv(PORT, "e2e-harness", info), {
 	cwd: pluginDir,
 	stdio: ["ignore", "inherit", "inherit"],
 	env: forcedLogLevel ? { ...process.env, HWINFO_LOG_LEVEL: "trace" } : process.env

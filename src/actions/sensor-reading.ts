@@ -6,21 +6,23 @@
 import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { readingRow } from "../detail/detail-faces";
 import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
+import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
 import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
-import { alertLevel, convertUnit, isStatMode, parseThreshold, STAT_BADGE, STAT_MODES, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, STAT_BADGE, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
-import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
+import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
-import { appliedTextMode, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, mixToward, resolveTextColors, type TextColors, type TextSettings } from "../ui/text-colors";
-import { decideLegacyDefault, effectiveTextFor, getDeckTheme, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
+import { quadIdentityColor, resolveTextColors } from "../ui/text-colors";
+import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
 /** Persisted per-key settings (written by the PI; all optional). */
@@ -92,12 +94,18 @@ export type ReadingSettings = {
 	 */
 	pressBehavior?: string;
 	/** What the detail view lists: "source" (every reading of this
-	 * sensor's HWiNFO source, the default) or "custom" (detailKeys). */
+	 * sensor's HWiNFO source, the default), "custom" (detailKeys), or
+	 * "filter" (readings matching the detailFilter glob). */
 	detailMode?: string;
 	/** Custom detail list: stable reading keys in display order. */
 	detailKeys?: string[];
 	/** Optional title for the detail view's title tile. */
 	detailTitle?: string;
+	/** Readings per detail tile: "2", "3" or "4" stack that many readings
+	 * on each tile of the view (dual, triple and quad faces); anything
+	 * else keeps the original one-reading tiles. The panel's select
+	 * writes strings; the parser also takes the bare numbers. */
+	detailDensity?: string;
 	/** Exactly true: inside the view, the reading slot on this key's own
 	 * cell doubles as a second Back (the mirror). Off by default: one
 	 * movable Back beat two fixed ones for the issue #5 testers. */
@@ -191,14 +199,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && v !== undefined));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
-		if (firstSighting) {
-			if (key !== undefined) {
-				poller.subscribeSeries(key);
-			}
-			subscribedKey = key;
-		} else if (subscribedKey !== key) {
-			// A replayed willAppear can carry settings that changed while the
-			// action was out of sight — track the new key's ring exactly like
+		if (subscribedKey !== key) {
+			// Covers the first sighting (subscribedKey starts undefined) and a
+			// replayed willAppear whose settings changed while the action was
+			// out of sight — track the new key's ring exactly like
 			// onDidReceiveSettings, or it never fills and the sparkline goes
 			// permanently blank. The old ring stays warm by design.
 			if (key !== undefined) {
@@ -218,7 +222,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// own replay (controller.ts registerSlot).
 			lastSvg: ""
 		});
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<ReadingSettings>): void {
@@ -255,7 +259,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// resolve its armed tap/hold session under the new role.
 			this.presses.cancel(ev.action.id);
 		}
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), ev.action.id);
 	}
 
 	/**
@@ -316,10 +320,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			return;
 		}
 		const current = isStatMode(state.settings.statMode) ? state.settings.statMode : "current";
-		const next = STAT_MODES[(STAT_MODES.indexOf(current) + 1) % STAT_MODES.length] as StatMode;
+		const next = nextStatMode(current);
 		state.settings = { ...state.settings, statMode: next };
 		await act.setSettings(state.settings);
-		this.renderAll(poller.getStatus());
+		this.renderAll(poller.getStatus(), contextId);
 	}
 
 	/**
@@ -370,11 +374,22 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		handlePiRequest(ev.payload);
 	}
 
+	private lastTickSignature = "";
+
 	private onPollerTick(status: PollerStatus): void {
 		// The sparkline rings are filled by the poller now (once per fresh
 		// snapshot, keyed by reading) so it survives this action's appear churn —
 		// here we only render and feed the open PI's live preview.
-		this.renderAll(status);
+		// Same gate as DetailController: an unchanged tick signature means every
+		// key face would compose to the bytes the dedupe already holds, so skip
+		// the compose itself, not just the setImage. Theme flips, settings
+		// receipts, appears and detail-session changes repaint through their own
+		// renderAll calls, never through this gate.
+		const signature = tickSignature(status);
+		if (signature !== this.lastTickSignature) {
+			this.lastTickSignature = signature;
+			this.renderAll(status);
+		}
 		pushPreviewToPi(status, this.manifestId, this.instances, true);
 	}
 
@@ -386,9 +401,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		this.renderAll(poller.getStatus());
 	}
 
-	private renderAll(status: PollerStatus): void {
+	private renderAll(status: PollerStatus, only?: string): void {
 		for (const act of this.actions) {
-			if (!act.isKey()) {
+			if (!act.isKey() || (only !== undefined && act.id !== only)) {
 				continue;
 			}
 			const state = this.instances.get(act.id);
@@ -571,7 +586,7 @@ function primaryContext(settings: ReadingSettings, primary: Reading | undefined,
 		primary !== undefined
 			? alertLevel(convertUnit(primary.value, primary.unit, fahrenheit).value, parseThreshold(settings.warnValue), parseThreshold(settings.critValue), settings.alertBelow === true)
 			: "normal";
-	const themeId = settings.theme !== undefined && settings.theme !== "" ? settings.theme : getDeckTheme();
+	const themeId = effectiveThemeFor(settings);
 	const accent = primary !== undefined && typeAccentsEnabled() ? classifyTypeAccent(primary.type, primary.unit, primary.label) : null;
 	return { level, themeId, accent };
 }
@@ -607,8 +622,8 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	const bottomMode = isStatMode(settings.secondaryStatMode) ? settings.secondaryStatMode : topMode;
 	const shared = topMode === bottomMode;
 	return renderDualKey({
-		top: dualRow(primary, settings.label, topMode, shared, measureOpts),
-		bottom: dualRow(secondary, settings.secondaryLabel, bottomMode, shared, measureOpts),
+		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : STAT_BADGE[topMode]),
+		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : STAT_BADGE[bottomMode]),
 		sharedBadge: shared ? STAT_BADGE[topMode] : "",
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
@@ -641,21 +656,12 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 	const palette = resolvePalette(loadThemes(), themeId, accent, level);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3];
 	return renderTripleKey({
-		rows: slotKeys.map((key, i) => (key === undefined ? null : tripleRow(readings[i], customLabels[i], mode, measureOpts))),
+		rows: slotKeys.map((key, i) => (key === undefined ? null : readingRow(readings[i], mode, measureOpts, customLabels[i]))),
 		sharedBadge: STAT_BADGE[mode],
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
 	});
-}
-
-function tripleRow(reading: Reading | undefined, customLabel: string | undefined, mode: StatMode, measureOpts: MeasureOptions): TripleKeyRow {
-	if (reading === undefined) {
-		// The one permitted em dash: the key face's "no value" placeholder.
-		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "" };
-	}
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measureOpts);
-	return { label: keyLabel(customLabel, reading.label), valueText: measured.valueText, unitText: measured.unitText };
 }
 
 /**
@@ -691,30 +697,13 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	const colors = quadColorsOf(settings);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3, settings.quadLabel4];
 	return renderQuadKey({
-		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadSlotColor(colors[i] as string, labeled, textSettings, text, palette)))),
+		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as string, labeled, textSettings, text, palette)))),
 		labels: labeled,
 		sharedBadge: STAT_BADGE[mode],
 		palette,
 		text,
 		returnMark
 	});
-}
-
-/**
- * A quad slot's identity color under the effective Text setting. The slot
- * colors are textual (the value glyphs, or the micro-label), so Custom
- * governs them too: the exact color for values, the secondary shade for
- * micro-labels. Dim lowers the identity hues themselves; Theme keeps them.
- */
-function quadSlotColor(identity: string, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
-	const mode = appliedTextMode(settings);
-	if (mode === "custom") {
-		return labeled ? text.label : text.value;
-	}
-	if (mode === "dim") {
-		return mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND);
-	}
-	return identity;
 }
 
 function quadCell(reading: Reading | undefined, customLabel: string | undefined, labeled: boolean, mode: StatMode, measureOpts: MeasureOptions, color: string): QuadKeyCell {
@@ -728,18 +717,4 @@ function quadCell(reading: Reading | undefined, customLabel: string | undefined,
 	}
 	const measured = formatQuadMeasurement(statValue(reading, mode), reading.unit, measureOpts);
 	return { label, valueText: measured.valueText, unitText: measured.unitText, color };
-}
-
-function dualRow(reading: Reading | undefined, customLabel: string | undefined, mode: StatMode, shared: boolean, measureOpts: MeasureOptions): DualKeyRow {
-	if (reading === undefined) {
-		// The one permitted em dash: the key face's "no value" placeholder.
-		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "", statBadge: "" };
-	}
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measureOpts);
-	return {
-		label: keyLabel(customLabel, reading.label),
-		valueText: measured.valueText,
-		unitText: measured.unitText,
-		statBadge: shared ? "" : STAT_BADGE[mode]
-	};
 }

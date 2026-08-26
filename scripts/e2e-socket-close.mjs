@@ -25,6 +25,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, makeCheck, pluginArgv, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28995;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,14 +39,12 @@ const EXIT_BUDGET_MS = 15_000;
 /** How long a live socket must keep the plugin alive before we trust it. */
 const ALIVE_PROOF_MS = 6_000;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 let frames = 0;
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) failures++;
-}
+const check = makeCheck(() => {
+	failures += 1;
+});
 
 const wss = new WebSocketServer({ host: "127.0.0.1", port: PORT });
 let pluginWs = null;
@@ -78,14 +77,7 @@ wss.on("connection", (ws) => {
 
 const plugin = spawn(
 	process.execPath,
-	["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-socket-close", "-registerEvent", "registerPlugin", "-info",
-		JSON.stringify({
-			application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-			colors: {},
-			devicePixelRatio: 1,
-			devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-			plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-		})],
+	pluginArgv(PORT, "e2e-socket-close", buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] })),
 	{
 		cwd: pluginDir,
 		env: {

@@ -14,6 +14,7 @@ import { execSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
+import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, pluginArgv, regDeleteKey as regDeleteKeyAt, regSet as regSetAt, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28997;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,38 +24,16 @@ const VSB_SUBKEY = `Software\\HwinfoE2E_VSB_${process.pid}`;
 const REG_PATH = `HKCU\\${VSB_SUBKEY}`;
 const READING_KEY = "g:Test Source:Test Temp";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frames = [];
 const piPayloads = [];
 let failures = 0;
 
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) failures++;
-}
-
-async function expectFrame(name, predicate, timeoutMs) {
-	const start = Date.now();
-	let from = frames.length;
-	while (Date.now() - start < timeoutMs) {
-		while (from < frames.length) {
-			if (predicate(frames[from])) {
-				check(name, true, `after ${((Date.now() - start) / 1000).toFixed(1)}s`);
-				return;
-			}
-			from++;
-		}
-		await sleep(150);
-	}
-	check(name, false, `no matching frame within ${timeoutMs / 1000}s (last: ${frames.at(-1)?.slice(0, 160) ?? "none"})`);
-}
-
-function regSet(name, value) {
-	execSync(`reg add "${REG_PATH}" /v ${name} /t REG_SZ /d "${value}" /f`, { stdio: "ignore" });
-}
-function regDeleteKey() {
-	execSync(`reg delete "${REG_PATH}" /f`, { stdio: "ignore" });
-}
+const check = makeCheck(() => {
+	failures += 1;
+});
+const expectFrame = makeExpectFrame(frames, check);
+const regSet = (name, value) => regSetAt(REG_PATH, name, value);
+const regDeleteKey = () => regDeleteKeyAt(REG_PATH);
 
 function publish(temp) {
 	regSet("Sensor0", "Test Source");
@@ -87,9 +66,9 @@ wss.on("connection", (ws) => {
 		} else if (msg.event === "getGlobalSettings") {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
 		} else if (msg.event === "setImage" && msg.context === "ctx-gadget") {
-			const image = msg.payload?.image ?? "";
-			if (image.startsWith("data:image/svg+xml,")) {
-				frames.push(decodeURIComponent(image.slice("data:image/svg+xml,".length)));
+			const svg = decodeSvg(msg.payload?.image);
+			if (svg !== null) {
+				frames.push(svg);
 			}
 		} else if (msg.event === "sendToPropertyInspector") {
 			piPayloads.push(msg.payload);
@@ -103,14 +82,7 @@ publish(47.5);
 
 const plugin = spawn(
 	process.execPath,
-	["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-gadget", "-registerEvent", "registerPlugin", "-info",
-		JSON.stringify({
-			application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-			colors: {},
-			devicePixelRatio: 1,
-			devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-			plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
-		})],
+	pluginArgv(PORT, "e2e-gadget", buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] })),
 	{
 		cwd: pluginDir,
 		env: {

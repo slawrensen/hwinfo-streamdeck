@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { clampOffset, pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { DETAIL_KEYS_MAX, detailKeysOf, detailModeOf, detailTitleOf, pressBehaviorOf } from "../src/detail/detail-settings";
+import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
+import { compileDetailFilter, DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -53,6 +53,25 @@ describe("detail settings parsing", () => {
 		assert.deepEqual(detailKeysOf({ detailKeys: "nope" as unknown as string[] }), []);
 	});
 
+	it("detailKeys: a friendly name pasted after a key is dropped, and dedupe sees through it", () => {
+		// The config document writes "<key>  <reading name>" so a person can
+		// read a nineteen-entry list and reorder it. The panel strips the name
+		// on apply; a document pasted straight into a settings file by hand
+		// does not go through the panel and lands here still wearing them.
+		assert.deepEqual(
+			detailKeysOf({
+				detailKeys: ["f0000301:0:8000005  Physical Memory Load", "f0000300:0:7000000  Core 0 T0 Usage", "e0002000:0:5000000"] as unknown as string[]
+			}),
+			["f0000301:0:8000005", "f0000300:0:7000000", "e0002000:0:5000000"]
+		);
+		// The same reading twice, once named and once bare, is one reading.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["a  GPU Power", "a"] as unknown as string[] }), ["a"]);
+		// A name is not a key: an entry that is only whitespace still drops.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["   ", "\t", "b  Name"] as unknown as string[] }), ["b"]);
+		// Tabs and runs of spaces separate just as well as the two the panel writes.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["c\tCPU Die (average)", " d   Page File Total "] as unknown as string[] }), ["c", "d"]);
+	});
+
 	it("detailKeys: capped without erroring", () => {
 		const many = Array.from({ length: DETAIL_KEYS_MAX + 40 }, (_, i) => `k${i}`);
 		const parsed = detailKeysOf({ detailKeys: many });
@@ -60,10 +79,93 @@ describe("detail settings parsing", () => {
 		assert.equal(parsed[0], "k0");
 	});
 
+	it("detailFilter: trimmed and truncated at the cap, not errored", () => {
+		const long = `ab${"c".repeat(DETAIL_FILTER_MAX * 2)}`;
+		assert.equal(detailFilterOf({ detailFilter: long })?.length, DETAIL_FILTER_MAX);
+		assert.equal(detailFilterOf({ detailFilter: "  gpu fan  " }), "gpu fan");
+		assert.equal(detailFilterOf({ detailFilter: "   " }), undefined);
+		assert.equal(detailFilterOf({ detailFilter: 42 }), undefined);
+	});
+
+	it("detailTiles: capped without erroring", () => {
+		const many = Array.from({ length: DETAIL_TILES_MAX + 40 }, () => ({ size: 2 }));
+		assert.equal(detailTilesOf({ detailTiles: many }).length, DETAIL_TILES_MAX);
+	});
+
 	it("detailTitle: trimmed, whitespace-only and non-strings unset", () => {
 		assert.equal(detailTitleOf({ detailTitle: "  My CPU  " }), "My CPU");
 		assert.equal(detailTitleOf({ detailTitle: "   " }), undefined);
 		assert.equal(detailTitleOf({ detailTitle: 42 }), undefined);
+	});
+
+	it("detailDensity: only the exact 2/3/4 markers (string or number) leave 1", () => {
+		assert.equal(detailDensityOf({}), 1);
+		assert.equal(detailDensityOf({ detailDensity: "1" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "2" }), 2);
+		assert.equal(detailDensityOf({ detailDensity: "3" }), 3);
+		assert.equal(detailDensityOf({ detailDensity: "4" }), 4);
+		assert.equal(detailDensityOf({ detailDensity: 2 }), 2);
+		assert.equal(detailDensityOf({ detailDensity: 3 }), 3);
+		assert.equal(detailDensityOf({ detailDensity: 4 }), 4);
+		assert.equal(detailDensityOf({ detailDensity: "5" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: 0 }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "2.0" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: " 2" }), 1);
+		assert.equal(detailDensityOf({ detailDensity: null }), 1);
+		assert.equal(detailDensityOf({ detailDensity: [2] }), 1);
+		assert.equal(detailDensityOf({ detailDensity: "quad" }), 1);
+	});
+});
+
+describe("compileDetailFilter (glob matching)", () => {
+	it("an adversarial wildcard run matches in linear time, not by regex backtracking", () => {
+		// "*?a" repeated 16 times drove the old `*` -> `.*` regex
+		// translation into exponential backtracking: this one call took
+		// >6 s, and >88 s near the 128-char cap, re-run every poll. A
+		// node:test timeout option CANNOT catch that regression: timeouts
+		// only interrupt at await points, so a synchronous 100 s match
+		// completes and records a pass, just slower (proven in a shadow
+		// revert). The wall clock is the only honest guard; the budget is
+		// ~200x the linear walk's worst observed cost, so it cannot
+		// meaningfully flake, while the regex regression overshoots it
+		// by another ~50x.
+		const evil = compileDetailFilter("*?a".repeat(16));
+		const started = performance.now();
+		assert.equal(evil("xa".repeat(34) + "b"), false); // trailing "b" defeats the anchored "...a"
+		assert.equal(evil("xa".repeat(34)), true); // the same shape, satisfiable
+		const elapsed = performance.now() - started;
+		assert.ok(elapsed < 2000, `adversarial match took ${elapsed.toFixed(0)} ms; the linear walk stays in single-digit milliseconds`);
+	});
+
+	it("a candidate containing literal wildcard characters still matches: the star stays a wildcard", () => {
+		// HWiNFO sensor names and labels are user-renamable free text, so a
+		// literal "*" can appear in the candidate. The pattern's star must
+		// not be consumed as that plain character (the shipped 1.5.0 regex
+		// matcher got these right; the walk's literal branch must skip the
+		// star unit or the backtrack anchor is never recorded).
+		assert.equal(compileDetailFilter("*")("*k"), true);
+		assert.equal(compileDetailFilter("*")("*"), true);
+		assert.equal(compileDetailFilter("4090")("RTX 4090* GPU Temperature"), true);
+		assert.equal(compileDetailFilter("oc")("GPU *OC* Temp"), true);
+		assert.equal(compileDetailFilter("g?u*")("g*u stars *everywhere*"), true);
+	});
+
+	it("wildcards anchor to the whole candidate, plain text substring-wraps, ? spans any character", () => {
+		assert.equal(compileDetailFilter("?PU")("GPU"), true);
+		assert.equal(compileDetailFilter("?PU")("GPU Temp"), false); // a wildcard pattern must cover the whole name
+		assert.equal(compileDetailFilter("pu")("GPU Temp"), true); // no wildcard: behaves as *pu*
+		assert.equal(compileDetailFilter("*?a")("GPU Vista"), true); // ends with the one-char-then-a shape
+		assert.equal(compileDetailFilter("a?c")("a\nc"), true); // ? crosses newlines like the old dotAll regex
+	});
+
+	it("case folds per code unit like the old non-unicode i regex, hand-mirrored in the panel", () => {
+		// The fold is duplicated in ui/pi-common.js detailFilterMatcher;
+		// these pin the mirror-sensitive non-ASCII rules on this side.
+		assert.equal(compileDetailFilter("µ")("rail μV noise"), true); // micro sign folds onto Greek mu
+		assert.equal(compileDetailFilter("μ")("rail µV noise"), true); // and the reverse
+		assert.equal(compileDetailFilter("ß")("GROSS RAIL"), false); // eszett never folds onto ASCII SS
+		assert.equal(compileDetailFilter("k")("Kelvin probe"), false); // nor Kelvin sign onto ASCII k
+		assert.equal(compileDetailFilter("K")("kelvin probe"), false);
 	});
 });
 
@@ -169,11 +271,11 @@ describe("pagination", () => {
 	});
 
 	it("clamps arbitrary offsets onto page boundaries", () => {
-		assert.equal(clampOffset(25, 999, 11), 22);
-		assert.equal(clampOffset(25, -5, 11), 0);
-		assert.equal(clampOffset(25, 13, 11), 11);
-		assert.equal(clampOffset(0, 7, 11), 0);
-		assert.equal(clampOffset(25, Number.NaN, 11), 0);
+		assert.equal(pageOf(keys, 999, 11).offset, 22);
+		assert.equal(pageOf(keys, -5, 11).offset, 0);
+		assert.equal(pageOf(keys, 13, 11).offset, 11);
+		assert.equal(pageOf([], 7, 11).offset, 0);
+		assert.equal(pageOf(keys, Number.NaN, 11).offset, 0);
 	});
 
 	it("the last page shows the remainder and disables next", () => {
@@ -220,5 +322,172 @@ describe("pagination", () => {
 		assert.equal(pageOf(["a", "b"], 0, 2, -1).step, 2);
 		assert.equal(pageOf(["a"], 0, 1, 0).step, 1);
 		assert.equal(pageOf(["a", "b"], 0, 2, 1.5).step, 2);
+	});
+});
+
+describe("dense pagination (readings per tile)", () => {
+	const keys = Array.from({ length: 25 }, (_, i) => `k${i}`);
+
+	it("density 1 produces exactly the one-reading page: every chunk is its slot", () => {
+		for (const [offset, reserved] of [
+			[0, undefined],
+			[11, undefined],
+			[0, 1]
+		] as const) {
+			const explicit = pageOf(keys, offset, 11, reserved, 1);
+			const defaulted = pageOf(keys, offset, 11, reserved);
+			assert.deepEqual(explicit, defaulted);
+			assert.deepEqual(
+				explicit.chunks,
+				explicit.slots.map((s) => (s === undefined ? [] : [s]))
+			);
+		}
+	});
+
+	it("each tile carries `density` readings and the range counts READINGS", () => {
+		const page = pageOf(keys, 0, 5, undefined, 3);
+		assert.equal(page.step, 15);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2"]);
+		assert.deepEqual(page.chunks[4], ["k12", "k13", "k14"]);
+		assert.equal(page.rangeText, "1-15 / 25");
+		assert.equal(page.hasNext, true);
+		assert.equal(page.slots[0], "k0"); // legacy view: first reading per tile
+		assert.equal(page.slots[4], "k12");
+	});
+
+	it("the last page holds the remainder: a partial chunk, then empty tiles", () => {
+		const page = pageOf(keys, 15, 5, undefined, 3);
+		assert.equal(page.rangeText, "16-25 / 25");
+		assert.deepEqual(page.chunks[2], ["k21", "k22", "k23"]);
+		assert.deepEqual(page.chunks[3], ["k24"]);
+		assert.deepEqual(page.chunks[4], []);
+		assert.equal(page.slots[3], "k24");
+		assert.equal(page.slots[4], undefined);
+		assert.equal(page.hasNext, false);
+	});
+
+	it("the mirror reserve costs one TILE, so its page loses `density` readings", () => {
+		const page = pageOf(keys, 0, 5, 1, 4);
+		assert.equal(page.step, 16); // (5 tiles - 1 mirrored) * 4
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], []); // the mirror tile
+		assert.equal(page.slots[1], undefined);
+		assert.deepEqual(page.chunks[2], ["k4", "k5", "k6", "k7"]);
+		assert.equal(page.rangeText, "1-16 / 25");
+		const second = pageOf(keys, page.offset + page.step, 5, 1, 4);
+		assert.equal(second.rangeText, "17-25 / 25");
+		assert.deepEqual(second.chunks[4], []); // 9 remaining fill 2 full + 1 single tile
+		assert.deepEqual(second.chunks[3], ["k24"]);
+	});
+
+	it("offsets clamp onto dense step boundaries", () => {
+		const page = pageOf(keys, 999, 5, undefined, 4);
+		assert.equal(page.offset, 20);
+		assert.equal(page.step, 5); // the LAST page consumes what remains
+		assert.equal(page.previousOffset, 0);
+		assert.equal(page.rangeText, "21-25 / 25");
+		assert.equal(pageOf(keys, 7, 5, undefined, 4).offset, 0);
+	});
+
+	it("a dense group smaller than one page disables paging", () => {
+		const page = pageOf(["a", "b", "c"], 0, 5, undefined, 2);
+		assert.deepEqual(page.chunks[0], ["a", "b"]);
+		assert.deepEqual(page.chunks[1], ["c"]);
+		assert.equal(page.rangeText, "1-3 / 3");
+		assert.equal(page.hasPrevious, false);
+		assert.equal(page.hasNext, false);
+	});
+});
+
+describe("detailTiles parsing (hand-grouped custom pages)", () => {
+	it("salvages per entry per field, sizing the label and color arrays", () => {
+		const tiles = detailTilesOf({
+			detailTiles: [
+				{ size: 4, labels: ["A", 7, "  C  "], colors: ["#FFAA00", "orange", null, "#0011ff"], cellLabels: false },
+				{ size: "2", labels: ["only"] },
+				{ size: 99 },
+				"junk",
+				null
+			]
+		});
+		assert.equal(tiles.length, 5);
+		assert.deepEqual(tiles[0], { size: 4, labels: ["A", "", "C", ""], colors: ["#FFAA00", null, null, "#0011ff"], cellLabels: false });
+		assert.deepEqual(tiles[1], { size: 2, labels: ["only", ""], colors: [null, null], cellLabels: true });
+		assert.equal(tiles[2]?.size, 1);
+		assert.equal(tiles[3]?.size, 1); // junk entries degrade to plain singles
+		assert.equal(tiles[4]?.cellLabels, true);
+	});
+
+	it("a non-array is no plan at all", () => {
+		assert.deepEqual(detailTilesOf({}), []);
+		assert.deepEqual(detailTilesOf({ detailTiles: "4,2,1" }), []);
+	});
+});
+
+describe("hand-grouped pagination (mixed tile sizes)", () => {
+	const keys = Array.from({ length: 10 }, (_, i) => `k${i}`);
+	const tile = (size: DetailDensity, extra: Partial<DetailTileSpec> = {}): DetailTileSpec => ({ size, labels: Array.from({ length: size }, () => ""), colors: Array.from({ length: size }, () => null), cellLabels: true, ...extra });
+
+	it("plan tiles take their own sizes, the rest flow at the uniform density", () => {
+		const page = pageOf(keys, 0, 6, undefined, 2, [tile(4), tile(1)]);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], ["k4"]);
+		assert.deepEqual(page.chunks[2], ["k5", "k6"]); // uniform fill past the plan
+		assert.deepEqual(page.chunks[3], ["k7", "k8"]);
+		assert.deepEqual(page.chunks[4], ["k9"]);
+		assert.deepEqual(page.chunks[5], []);
+		assert.equal(page.rangeText, "1-10 / 10");
+	});
+
+	it("specs ride onto the page parallel to their chunks", () => {
+		const labeled = tile(2, { labels: ["Top", "Bottom"] });
+		const page = pageOf(keys, 0, 6, undefined, 1, [labeled]);
+		assert.deepEqual(page.specs[0], labeled);
+		assert.equal(page.specs[1], undefined);
+	});
+
+	it("pages with VARIABLE strides: forward adds this page's step, backward lands on previousOffset", () => {
+		// Two tiles per page: page one holds 4+1=5 readings, page two 1+1=2,
+		// page three the rest.
+		const plan = [tile(4), tile(1), tile(1), tile(1)];
+		const first = pageOf(keys, 0, 2, undefined, 1, plan);
+		assert.equal(first.step, 5);
+		assert.equal(first.rangeText, "1-5 / 10");
+		assert.equal(first.hasNext, true);
+		const second = pageOf(keys, first.offset + first.step, 2, undefined, 1, plan);
+		assert.equal(second.offset, 5);
+		assert.equal(second.rangeText, "6-7 / 10");
+		assert.equal(second.previousOffset, 0);
+		const third = pageOf(keys, second.offset + second.step, 2, undefined, 1, plan);
+		assert.equal(third.rangeText, "8-9 / 10");
+		assert.equal(third.previousOffset, 5); // NOT third.offset - third.step
+		const fourth = pageOf(keys, third.offset + third.step, 2, undefined, 1, plan);
+		assert.equal(fourth.rangeText, "10-10 / 10");
+		assert.equal(fourth.hasNext, false);
+	});
+
+	it("an arbitrary offset snaps DOWN onto a variable page boundary", () => {
+		const plan = [tile(4), tile(1), tile(1), tile(1)];
+		assert.equal(pageOf(keys, 6, 2, undefined, 1, plan).offset, 5);
+		assert.equal(pageOf(keys, 4, 2, undefined, 1, plan).offset, 0);
+		assert.equal(pageOf(keys, 999, 2, undefined, 1, plan).offset, 9);
+	});
+
+	it("the mirror still reserves a TILE among grouped tiles", () => {
+		const page = pageOf(keys, 0, 3, 1, 1, [tile(4), tile(2), tile(4)]);
+		assert.deepEqual(page.chunks[0], ["k0", "k1", "k2", "k3"]);
+		assert.deepEqual(page.chunks[1], []); // the mirror
+		assert.equal(page.specs[1], undefined);
+		assert.deepEqual(page.chunks[2], ["k4", "k5"]);
+		assert.equal(page.step, 6);
+		assert.equal(page.hasNext, true);
+	});
+
+	it("a plan longer than the list mints no styled empties", () => {
+		const page = pageOf(["a"], 0, 4, undefined, 1, [tile(2), tile(4), tile(4)]);
+		assert.deepEqual(page.chunks[0], ["a"]);
+		assert.deepEqual(page.chunks[1], []);
+		assert.equal(page.specs[1], undefined);
+		assert.equal(page.rangeText, "1-1 / 1");
 	});
 });

@@ -37,6 +37,7 @@ details > summary:hover {
 .hw-picker {
 	position: relative;
 	display: flex;
+	flex-wrap: wrap;
 	gap: 4px;
 }
 
@@ -193,9 +194,10 @@ details > summary:hover {
 	font-style: italic;
 }
 
-/* Rotation set (dial PI): membership ticks in the picker rows + removable
-   chips under the picker. The label flexes so the tick/label/value row keeps
-   the label left-aligned (harmless on the key PI's tick-less rows). */
+/* Membership ticks in picker rows (the dial's rotation set and the reading
+   PI's drill-down collector share the one pattern) + removable chips under
+   the picker. The label flexes so the tick/label/value row keeps the label
+   left-aligned. */
 
 .hw-row .hw-tick {
 	/* Explicit box: the webview's native checkbox otherwise shrinks with the
@@ -259,6 +261,24 @@ details > summary:hover {
 
 .hw-set-name:hover {
 	text-decoration: underline dotted;
+}
+
+/* The parked primary's name. It has no cell, so there is no cell label to
+   rename and the click handler refuses it: drop the affordance too. */
+.hw-set-name.parked {
+	cursor: default;
+}
+
+.hw-set-name.parked:hover {
+	text-decoration: none;
+}
+
+/* A cell wearing the user's own label rather than HWiNFO's. The panel has
+   marked these since the cell rename shipped and nothing painted them, so
+   an override read exactly like the sensor's own name. Brighter, the same
+   way a planned tile reads brighter than the uniform fill. */
+.hw-set-name.renamed {
+	color: #e8eaed;
 }
 
 /* Chip rename input: group-name look, chip-sized. */
@@ -355,6 +375,50 @@ details > summary:hover {
 	color: #d8d8d8;
 	cursor: pointer;
 	font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Config export/apply: the document is hand-edited JSON, so it reads in
+   a monospaced well and never wraps a line out of shape. */
+.hw-config {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+}
+
+.hw-config textarea {
+	width: 100%;
+	min-height: 120px;
+	resize: vertical;
+	box-sizing: border-box;
+	padding: 4px;
+	font-family: ui-monospace, Consolas, monospace;
+	font-size: 10px;
+	tab-size: 2;
+	white-space: pre;
+	background: #1c1f24;
+	color: #d7dae0;
+	border: 1px solid #3a3f46;
+	border-radius: 4px;
+}
+
+.hw-config-row {
+	display: flex;
+	gap: 6px;
+}
+
+.hw-config-row button {
+	background: #3d3d3d;
+	border: 1px solid #555555;
+	border-radius: 3px;
+	color: #d8d8d8;
+	cursor: pointer;
+	font-family: "Segoe UI", Arial, sans-serif;
+	padding: 2px 10px;
+}
+
+.hw-config-row button:hover {
+	background: #4a4a4a;
 }
 
 .hw-set-actions button {
@@ -474,8 +538,11 @@ details .hw-section {
 	padding-top: 6px;
 }
 
-/* The first header after the setup fold: the fold's edge is rule enough. */
-.hw-setup + .hw-section {
+/* The first header after the setup fold: the fold's edge is rule enough.
+   The reading PI parks the usually hidden role note between them, so the
+   hint-interposed form is the same first header. */
+.hw-setup + .hw-section,
+.hw-setup + .hw-hint + .hw-section {
 	border-top: none;
 	margin-top: 6px;
 	padding-top: 0;
@@ -596,14 +663,9 @@ details .hw-section {
 	color: #d8d8d8;
 }
 
-/* Detail list (reading PI): the collector picker marks rows already in the
-   list, group headers grow an add-all button, and the ordered chips carry
-   move arrows (no rename here: labels come from HWiNFO). */
-
-.hw-row.added .hw-label::after {
-	content: " ✓";
-	color: #38cd89;
-}
+/* Detail list (reading PI): the collector rows carry the same membership
+   checkbox as the rotation set (one pattern everywhere), group headers grow
+   an add-all button, and the ordered chips carry move arrows. */
 
 .hw-group-add {
 	float: right;
@@ -623,14 +685,6 @@ details .hw-section {
 	color: #ffffff;
 }
 
-.hw-detail-name {
-	cursor: default;
-}
-
-.hw-detail-name:hover {
-	text-decoration: none;
-}
-
 .hw-detail-move {
 	background: none;
 	border: none;
@@ -648,4 +702,207 @@ details .hw-section {
 .hw-detail-move:disabled {
 	color: #4a4a4a;
 	cursor: default;
+}
+
+/* Hand-grouped detail tiles: one bordered run per tile, its size cycler
+   in front, chips (with their per-cell label fields and quad color
+   wells) inside. A planned tile reads slightly brighter than the
+   uniform fill so the hand-made part is visible at a glance. */
+.hw-tile {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin: 2px 4px 2px 0;
+	padding: 2px 3px;
+	border: 1px solid #3a3f46;
+	border-radius: 6px;
+	max-width: 100%;
+	flex-wrap: wrap;
+}
+
+.hw-tile.planned {
+	border-color: #4a5563;
+	background: #22262c;
+}
+
+.hw-tile-size,
+.hw-tile-abc {
+	background: #2c313a;
+	border: none;
+	border-radius: 4px;
+	color: #c9d1d9;
+	cursor: pointer;
+	font-size: 8pt;
+	padding: 2px 5px;
+}
+
+.hw-tile-size:hover,
+.hw-tile-abc:hover {
+	background: #3a4250;
+}
+
+.hw-tile-color {
+	flex: 0 0 20px;
+	width: 20px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: pointer;
+}
+
+/* The detail collector's results render INLINE (the shared picker list
+   is an overlay elsewhere): adding sensors must not bury the tile list
+   you are adding into. Full-basis so the static list wraps UNDER the
+   search row instead of joining its flex row and crushing the input.
+   margin-right gives the inner scrollbar daylight from the panel's own
+   bar; overscroll containment stops wheel input chaining into the body. */
+.hw-picker-list.hw-inline {
+	position: static;
+	flex-basis: 100%;
+	max-height: 220px;
+	margin-top: 4px;
+	margin-right: 10px;
+	overscroll-behavior: contain;
+}
+
+/* The list's scrollbar reads as interior menu chrome, not a second
+   window bar: thin inset thumb, transparent track. */
+.hw-picker-list::-webkit-scrollbar {
+	width: 8px;
+}
+
+.hw-picker-list::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.hw-picker-list::-webkit-scrollbar-thumb {
+	background: #565d68;
+	border-radius: 4px;
+	border: 2px solid #383838;
+}
+
+/* One + per tile that can still take a pick, sitting exactly where that
+   pick would land. lit = the current landing point; armed = picks are
+   aimed at this tile. Transparent dashed border keeps geometry identical
+   across states, so lighting never reflows the tile. */
+.hw-add {
+	background: #2c313a;
+	border: 1px dashed transparent;
+	border-radius: 4px;
+	color: #c9d1d9;
+	cursor: pointer;
+	font-size: 9pt;
+	line-height: 1;
+	padding: 2px 6px;
+}
+
+.hw-add:hover {
+	background: #3a4250;
+}
+
+.hw-add.lit {
+	background: none;
+	border-color: #4cc2ff;
+	color: #8ecbff;
+}
+
+.hw-add.armed {
+	background: #2660aa;
+	border-color: #4cc2ff;
+	color: #ffffff;
+}
+
+.hw-tile.ghost {
+	border-style: dashed;
+}
+
+/* Landing receipt: 0.5s so the capture harness's 700 ms post-pick frame
+   is past it (deterministic screenshots). No idle animations anywhere. */
+.hw-set-chip.landed {
+	animation: hw-landed 0.5s ease-out;
+}
+
+@keyframes hw-landed {
+	from {
+		background: #2660aa;
+	}
+	to {
+		background: #3d3d3d;
+	}
+}
+
+/* While the results list is open the Add sensor row pins, so results and
+   the landing marker stay co-visible from first pick to last. The
+   scroll-margins keep nearest-scrolled chips out from under the pinned
+   dock (about 30px search row + 4px margin + 220px list + slack), and
+   exist only while the dock does. */
+#detail-custom.picking #detail-add-dock {
+	position: sticky;
+	top: 0;
+	z-index: 40;
+	background: #2d2d2d;
+	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+	padding-bottom: 4px;
+}
+
+#detail-custom.picking #detail-list .hw-set-chip,
+#detail-custom.picking #detail-list .hw-add {
+	scroll-margin-top: 270px;
+	scroll-margin-bottom: 8px;
+}
+
+/* Drag: an honest insertion caret on the matching edge (box-shadow, so
+   it is layout-neutral and cannot oscillate the element under the
+   pointer), and a lit tile frame for append. */
+.hw-set-chip.dragging {
+	opacity: 0.5;
+}
+
+.hw-set-chip.drop-before {
+	box-shadow: -3px 0 0 0 #4cc2ff;
+}
+
+.hw-set-chip.drop-after {
+	box-shadow: 3px 0 0 0 #4cc2ff;
+}
+
+.hw-tile.drop-append {
+	border-color: #4cc2ff;
+}
+
+/* Whole-tile drag: the grip is the handle, and the landing edge is the
+   tile's left or right, the same rule the chips' bars follow. The list is
+   a wrapping flex row (.hw-set) of inline-flex tiles, so two short tiles
+   share a row and the side is a question about x, not y. */
+.hw-tile-grip {
+	background: none;
+	border: none;
+	color: #7c8694;
+	cursor: grab;
+	padding: 0 2px;
+	font-size: 11px;
+	line-height: 1;
+}
+
+.hw-tile-grip:hover,
+.hw-tile-grip:focus-visible {
+	color: #e8eaed;
+}
+
+.hw-tile.dragging {
+	opacity: 0.5;
+}
+
+.hw-tile.drop-before {
+	box-shadow: -3px 0 0 0 #4cc2ff;
+}
+
+.hw-tile.drop-after {
+	box-shadow: 3px 0 0 0 #4cc2ff;
+}
+
+.hw-tile.drop-append .hw-add {
+	border-color: #4cc2ff;
+	color: #4cc2ff;
 }

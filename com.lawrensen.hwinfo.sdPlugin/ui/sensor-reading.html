@@ -5,10 +5,10 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0" />
+		<link rel="stylesheet" href="pi.css?v=1.5.1.0-8" />
 	</head>
 	<body>
-		<details class="hw-setup" data-fold="setup">
+		<details class="hw-setup">
 			<summary>First time? HWiNFO setup</summary>
 			<p>
 				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
@@ -89,22 +89,36 @@
 				</sdpi-select>
 			</sdpi-item>
 			<div id="detail-custom" class="hw-cond" hidden>
-				<sdpi-item label="Add sensor">
-					<div class="hw-picker">
-						<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
-						<button id="pickerd-refresh" type="button" title="Reload sensor list">⟳</button>
-						<div class="hw-picker-list" id="pickerd-list" hidden></div>
-					</div>
-				</sdpi-item>
+				<div id="detail-add-dock">
+					<sdpi-item label="Add sensor">
+						<div class="hw-picker">
+							<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
+							<!-- Inline, not an overlay: results push the tile list down
+							     instead of covering it, and the whole row pins to the
+							     top while the list is open, so what you are adding TO
+							     stays visible while you pick. -->
+							<div class="hw-picker-list hw-inline" id="pickerd-list" hidden></div>
+						</div>
+					</sdpi-item>
+				</div>
 				<div id="detail-list" class="hw-set"></div>
 			</div>
 			<div id="detail-filter" class="hw-cond" hidden>
 				<sdpi-item label="Filter">
 					<sdpi-textfield setting="detailFilter" placeholder="*4090*   (* spans anything, ? one character)"></sdpi-textfield>
 				</sdpi-item>
-				<div class="hw-hint" id="detail-filter-count" hidden></div>
+				<div class="hw-hint" id="detail-filter-count" aria-live="polite" hidden></div>
 				<div class="hw-help">Lists every reading whose source name and label, taken together, match the pattern, deck-wide and live against HWiNFO's current layout. Plain text matches anywhere; * spans anything and ? matches one character (*gpu*fan* style).</div>
 			</div>
+			<sdpi-item label="Tile shows">
+				<sdpi-select setting="detailDensity" default="1">
+					<option value="1">One reading (default)</option>
+					<option value="2">Two readings, stacked</option>
+					<option value="3">Three readings, rows</option>
+					<option value="4">Four readings, quad grid</option>
+				</sdpi-select>
+			</sdpi-item>
+			<div class="hw-help">Packs that many readings onto each tile of the detail view, using the same stacked, row and quad faces regular keys have. Pressing a dense tile cycles the stat for all of its readings together; a Custom sensor list can also group and dress its tiles one by one in the list above.</div>
 			<sdpi-item label="Detail title">
 				<sdpi-textfield setting="detailTitle" placeholder="Title tile text (optional)"></sdpi-textfield>
 			</sdpi-item>
@@ -152,6 +166,7 @@
 				<option value="quad">Four readings, quad grid</option>
 			</sdpi-select>
 		</sdpi-item>
+		<div class="hw-hint" id="layout-hint" hidden>This layout shows once a second sensor is picked below.</div>
 		<div id="second-slot" class="hw-cond" hidden>
 			<sdpi-item label="Second sensor">
 				<div class="hw-picker">
@@ -174,7 +189,7 @@
 					<option value="avg">Always average (since HWiNFO start)</option>
 				</sdpi-select>
 			</sdpi-item>
-			<div class="hw-help">Two rows on one key: the sensor above on top, this one below. By default both rows show the same stat and the key press cycles them together, with one badge centered on the divider. Pin this row to a fixed stat for pairs like minimum and maximum; when the stats differ, each non-current row badges inline after its unit. Thresholds and the theme accent follow the first reading; the sparkline is a single-layout feature.</div>
+			<div class="hw-help">Two rows on one key, cycling together on a press unless this row pins a fixed stat (pairs like minimum and maximum). Thresholds and the theme accent follow the first reading; the sparkline is a single-layout feature.</div>
 		</div>
 		<div id="third-slot" class="hw-cond" hidden>
 			<sdpi-item label="Third sensor">
@@ -279,7 +294,7 @@
 					<sdpi-checkbox setting="textDimSecondary" global label="Dim labels, units and stats"></sdpi-checkbox>
 				</sdpi-item>
 			</div>
-			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color. Keys and dials with their own Text setting keep it. Warn and critical colors always win.</div>
+			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color, and keys or dials with their own Text setting keep it. Warn and critical colors always win.</div>
 			<sdpi-item label="Type accents">
 				<sdpi-select setting="typeAccents" global default="on">
 					<option value="on">On (accent color by sensor type)</option>
@@ -314,9 +329,30 @@
 				<button class="hw-support" id="support-report" type="button">Copy support report</button>
 			</sdpi-item>
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
+			<div class="hw-section">Config</div>
+			<sdpi-item label="This key">
+				<div class="hw-config">
+					<textarea id="config-key" spellcheck="false" autocomplete="off" aria-label="This key's configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-key-copy" type="button">Copy</button>
+						<button id="config-key-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<sdpi-item label="Deck">
+				<div class="hw-config">
+					<textarea id="config-deck" spellcheck="false" autocomplete="off" aria-label="Deck-wide configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-deck-copy" type="button">Copy</button>
+						<button id="config-deck-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<div class="hw-hint" id="config-note" aria-live="polite" hidden></div>
+			<div class="hw-help">The exact settings this key runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up; paste and Apply to restore it or to clone it onto another key, here or on another machine. Apply replaces the whole document and reloads this panel; fields this build does not know survive untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0"></script>
-		<script src="pi-control.js?v=1.5.0.0-2"></script>
+		<script src="pi-common.js?v=1.5.1.0-8"></script>
+		<script src="pi-control.js?v=1.5.1.0-8"></script>
 	</body>
 </html>

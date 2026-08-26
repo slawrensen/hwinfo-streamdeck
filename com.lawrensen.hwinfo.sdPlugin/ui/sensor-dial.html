@@ -5,10 +5,10 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.5.0.0" />
+		<link rel="stylesheet" href="pi.css?v=1.5.1.0-8" />
 	</head>
 	<body>
-		<details class="hw-setup" data-fold="setup">
+		<details class="hw-setup">
 			<summary>First time? HWiNFO setup</summary>
 			<p>
 				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
@@ -53,7 +53,7 @@
 		<sdpi-item label="Rotation set">
 			<div class="hw-set" id="rotation-set"></div>
 		</sdpi-item>
-		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those. Click a chip's name to rename that reading on this dial.</div>
+		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them.</div>
 
 		<sdpi-item label="Bump guard">
 			<sdpi-checkbox setting="rotationDisabled" label="Ignore turns (protects against accidental bumps)"></sdpi-checkbox>
@@ -255,6 +255,7 @@
 						<option value="three">Three: left/right switch, center taps</option>
 					</sdpi-select>
 				</sdpi-item>
+				<div class="hw-help">Two zones split the whole strip into previous and next, so the tap command (Touch tap in Custom, stat cycling in Elite) no longer fires. Three keeps a center tap.</div>
 			</div>
 			<sdpi-item label="Reset reach">
 				<sdpi-select setting="resetScope" default="current">
@@ -298,7 +299,7 @@
 					<sdpi-checkbox setting="textDimSecondary" global label="Dim labels, units and stats"></sdpi-checkbox>
 				</sdpi-item>
 			</div>
-			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color. Keys and dials with their own Text setting keep it. Warn and critical colors always win.</div>
+			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color, and keys or dials with their own Text setting keep it. Warn and critical colors always win.</div>
 			<sdpi-item label="Type accents">
 				<sdpi-select setting="typeAccents" global default="on">
 					<option value="on">On (accent color by sensor type)</option>
@@ -333,9 +334,30 @@
 				<button class="hw-support" id="support-report" type="button">Copy support report</button>
 			</sdpi-item>
 			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
+			<div class="hw-section">Config</div>
+			<sdpi-item label="This dial">
+				<div class="hw-config">
+					<textarea id="config-key" spellcheck="false" autocomplete="off" aria-label="This dial's configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-key-copy" type="button">Copy</button>
+						<button id="config-key-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<sdpi-item label="Deck">
+				<div class="hw-config">
+					<textarea id="config-deck" spellcheck="false" autocomplete="off" aria-label="Deck-wide configuration as JSON"></textarea>
+					<div class="hw-config-row">
+						<button id="config-deck-copy" type="button">Copy</button>
+						<button id="config-deck-apply" type="button">Apply</button>
+					</div>
+				</div>
+			</sdpi-item>
+			<div class="hw-hint" id="config-note" aria-live="polite" hidden></div>
+			<div class="hw-help">The exact settings this dial runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up; paste and Apply to restore it or to clone it onto another dial, here or on another machine. Apply replaces the whole document and reloads this panel; fields this build does not know survive untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.5.0.0"></script>
-		<script src="pi-control.js?v=1.5.0.0-2"></script>
+		<script src="pi-common.js?v=1.5.1.0-8"></script>
+		<script src="pi-control.js?v=1.5.1.0-8"></script>
 	</body>
 </html>

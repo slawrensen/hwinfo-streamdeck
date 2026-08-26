@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { appliedTextMode, CUSTOM_SECONDARY_BLEND, effectiveTextSettings, mixToward, parseTextSettings, resolveTextColors, themeTextColors, type TextSettings } from "../src/ui/text-colors";
+import { appliedTextMode, CUSTOM_SECONDARY_BLEND, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, quadIdentityColor, resolveTextColors, themeTextColors, type TextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { contrast } from "./wcag";
 
@@ -122,4 +122,27 @@ describe("dim constants hold legibility on the shipped themes", () => {
 			assert.ok(contrast(resolved.unit, palette.bg) >= 1.6, `${id} unit stays visible (${contrast(resolved.unit, palette.bg).toFixed(2)})`);
 		});
 	}
+});
+
+describe("quadIdentityColor", () => {
+	const identity = "#4CC2FF";
+	const dim: TextSettings = { mode: "dim", color: undefined, dimSecondary: false };
+
+	it("theme mode returns the identity unchanged for values and labels", () => {
+		const theme: TextSettings = { mode: "theme", color: undefined, dimSecondary: false };
+		assert.equal(quadIdentityColor(identity, false, theme, themeTextColors(VOID), VOID), identity);
+		assert.equal(quadIdentityColor(identity, true, theme, themeTextColors(VOID), VOID), identity);
+	});
+
+	it("custom mode routes to the resolved text colors by role", () => {
+		const text = resolveTextColors(VOID, custom("#660000"), "normal");
+		assert.equal(quadIdentityColor(identity, false, custom("#660000"), text, VOID), text.value);
+		assert.equal(quadIdentityColor(identity, true, custom("#660000"), text, VOID), text.label);
+	});
+
+	it("dim mode blends the identity toward the background per role", () => {
+		const text = resolveTextColors(VOID, dim, "normal");
+		assert.equal(quadIdentityColor(identity, false, dim, text, VOID), mixToward(identity, VOID.bg, DIM_VALUE_BLEND));
+		assert.equal(quadIdentityColor(identity, true, dim, text, VOID), mixToward(identity, VOID.bg, DIM_SECONDARY_BLEND));
+	});
 });

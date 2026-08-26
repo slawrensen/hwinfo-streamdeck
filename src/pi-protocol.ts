@@ -13,7 +13,7 @@ import { alertLevel, convertUnit, parseThreshold, type DecimalsSetting } from ".
 import { formatMeasurement, formatStat, type MeasureOptions } from "./ui/measure";
 import { statusSentence } from "./ui/state-screens";
 import { resolveTextColors } from "./ui/text-colors";
-import { effectiveTextFor, getDataUnits, getDeckTheme, measureOptionsFrom } from "./ui/theme-store";
+import { effectiveTextFor, effectiveThemeFor, getDataUnits, getDeckTheme, measureOptionsFrom } from "./ui/theme-store";
 import { loadThemes, resolvePalette } from "./ui/themes";
 
 type TreeReading = {
@@ -45,6 +45,10 @@ export type PreviewSettings = {
 
 type TreeGroup = {
 	name: string;
+	/** The raw source name ("" for an orphan reading): what the runtime's
+	 * detail filter matches against, so the PI's live match counter can
+	 * use the same candidate while `name` keeps the display fallback. */
+	matchName: string;
 	readings: TreeReading[];
 };
 
@@ -65,20 +69,10 @@ type PreviewPayload = {
 	/** Active data source ("shared-memory" | "gadget"); absent when unavailable. */
 	source?: string;
 	hint: string;
-	/** Selected reading's live numbers; absent when nothing valid is selected. */
-	reading?: {
-		key: string;
-		label: string;
-		group: string;
-		unit: string;
-		value: number;
-		valueMin: number;
-		valueMax: number;
-		valueAvg: number;
-	};
 	/** The preview line exactly as the face would show it: value and stats
 	 * formatted with the action's effective settings, colored by its resolved
-	 * theme and Text setting. Present whenever `reading` is. */
+	 * theme and Text setting. Absent when nothing valid is selected or the
+	 * reading is missing. */
 	display?: {
 		value: string;
 		unit: string;
@@ -142,8 +136,8 @@ export function buildSensorTree(status: PollerStatus): SensorTreePayload {
 		for (const reading of snapshot.readings) {
 			let group = byIndex.get(reading.sensorIndex);
 			if (group === undefined) {
-				const name = snapshot.sensors[reading.sensorIndex]?.name ?? "Unknown sensor";
-				group = { name, readings: [] };
+				const source = snapshot.sensors[reading.sensorIndex]?.name;
+				group = { name: source ?? "Unknown sensor", matchName: source ?? "", readings: [] };
 				byIndex.set(reading.sensorIndex, group);
 				groups.push(group);
 			}
@@ -188,20 +182,10 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 		payload.missing = true;
 		return payload;
 	}
-	payload.reading = {
-		key: reading.key,
-		label: reading.label,
-		group: status.snapshot.sensors[reading.sensorIndex]?.name ?? "Unknown sensor",
-		unit: reading.unit,
-		value: reading.value,
-		valueMin: reading.valueMin,
-		valueMax: reading.valueMax,
-		valueAvg: reading.valueAvg
-	};
 	const opts = measureOptionsFrom(settings);
 	const m = formatMeasurement(reading.value, reading.unit, opts);
 	const config = loadThemes();
-	const themeId = settings.theme !== undefined && settings.theme !== "" ? settings.theme : getDeckTheme();
+	const themeId = effectiveThemeFor(settings);
 	// The key face's alert precedence, mirrored (see primaryContext): the
 	// alert palettes outrank the theme and every text mode on the face, so
 	// they must outrank them in the panel too.

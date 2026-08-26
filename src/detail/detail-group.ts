@@ -5,7 +5,7 @@
  * projections; never touches the SDK or the poller.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
-import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailMode } from "./detail-settings";
+import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailDensity, type DetailMode, type DetailTileSpec } from "./detail-settings";
 
 /**
  * A resolved detail group. `keys` never contains the primary (the opener's
@@ -118,56 +118,106 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 
 /** One logical page of a group under a device's reading-slot capacity. */
 export type DetailPage = {
-	/** Keys for slot indices 0..pageSize-1; undefined = empty slot. */
+	/** The readings each physical tile carries, tile indices 0..pageSize-1
+	 *  in page order: `density` keys per tile (or the tile plan's own
+	 *  sizes), fewer on the page's last filled tile, empty for a tile
+	 *  past the group end or reserved for the mirror Back. */
+	readonly chunks: readonly (readonly string[])[];
+	/** Each tile's hand-grouped spec (labels, colors, variant), parallel
+	 *  to `chunks`; undefined = default styling (uniform-density tiles,
+	 *  the reserved mirror, tiles past the plan). */
+	readonly specs: readonly (DetailTileSpec | undefined)[];
+	/** Each tile's FIRST reading; undefined = empty or reserved tile. At
+	 *  density 1 this is exactly the pre-density shape (one key per tile),
+	 *  which the docs/marketing shot scripts still read. */
 	readonly slots: readonly (string | undefined)[];
-	/** Clamped page offset actually shown (multiple of the step). */
+	/** Clamped page offset actually shown (a real page boundary). */
 	readonly offset: number;
-	/** Keys consumed per page: the capacity, minus a reserved slot. */
+	/** READINGS this page consumes, so the mirror Back costs one TILE per
+	 *  page, not one reading. Hand-grouped pages make this vary per page;
+	 *  forward paging adds it, backward paging uses previousOffset. */
 	readonly step: number;
+	/** The previous page's first reading (equal to `offset` on page one):
+	 *  variable tile sizes mean the page BEFORE this one may consume a
+	 *  different count than this one, so backward paging cannot subtract. */
+	readonly previousOffset: number;
 	readonly hasPrevious: boolean;
 	readonly hasNext: boolean;
-	/** "3-7 / 12" style range text; "0 / 0" for an empty group. */
+	/** "3-7 / 12" style range text counting READINGS, never tiles;
+	 *  "0 / 0" for an empty group. */
 	readonly rangeText: string;
 };
-
-/** Clamps an arbitrary stored offset onto a real page boundary. */
-export function clampOffset(totalKeys: number, offset: number, pageSize: number): number {
-	if (pageSize <= 0 || !Number.isFinite(offset)) {
-		return 0;
-	}
-	const lastPageStart = totalKeys <= 0 ? 0 : Math.floor((totalKeys - 1) / pageSize) * pageSize;
-	const wanted = Math.max(0, Math.min(lastPageStart, Math.trunc(offset)));
-	return wanted - (wanted % pageSize);
-}
 
 /**
  * Projects one logical page; pure math, safe for any offset. An optional
  * RESERVED slot index (the mirror Back tile riding on the opener's own
  * cell) is skipped by the key mapping: readings flow around it, every
- * page pays exactly one slot for it, and no reading is ever hidden. A
+ * page pays exactly one TILE for it, and no reading is ever hidden. A
  * reserved index outside 0..pageSize-1 (or a one-slot page) is ignored.
+ * `density` readings ride on each tile (issue #5 follow-up), and an
+ * optional hand-grouped tile `plan` overrides the uniform density tile
+ * by tile: plan tiles take their own sizes (and carry their specs onto
+ * the page), readings past the plan flow on at the density. The default
+ * inputs reproduce the original one-reading pages exactly, chunk for
+ * chunk.
  */
-export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlot?: number): DetailPage {
+export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlot?: number, density: DetailDensity = 1, plan: readonly DetailTileSpec[] = []): DetailPage {
 	const safeSize = Math.max(1, Math.trunc(pageSize));
 	const reserved = reservedSlot !== undefined && Number.isInteger(reservedSlot) && reservedSlot >= 0 && reservedSlot < safeSize && safeSize > 1 ? reservedSlot : null;
-	const step = reserved === null ? safeSize : safeSize - 1;
-	const start = clampOffset(keys.length, offset, step);
-	const slots: (string | undefined)[] = [];
-	for (let i = 0; i < safeSize; i++) {
-		if (reserved !== null && i === reserved) {
-			slots.push(undefined);
+	const capacity = reserved === null ? safeSize : safeSize - 1;
+	// The whole group as a tile run: plan entries first, then the uniform
+	// fill. Tiles exist only while readings remain, so a plan longer than
+	// the list never mints styled empties.
+	const tiles: { start: number; size: number; spec: DetailTileSpec | undefined }[] = [];
+	for (let cursor = 0; cursor < keys.length; ) {
+		const spec = tiles.length < plan.length ? plan[tiles.length] : undefined;
+		const size = spec === undefined ? density : spec.size;
+		tiles.push({ start: cursor, size, spec });
+		cursor += size;
+	}
+	// Page boundaries in tile units, then the page holding the offset
+	// (snapping DOWN onto a boundary, like the offset always clamped).
+	const pageStarts: number[] = [];
+	for (let t = 0; t === 0 || t < tiles.length; t += capacity) {
+		pageStarts.push(t);
+	}
+	const wanted = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0;
+	let pageIndex = 0;
+	for (let i = 1; i < pageStarts.length; i++) {
+		if ((tiles[pageStarts[i] as number] as { start: number }).start <= wanted) {
+			pageIndex = i;
 		} else {
-			slots.push(keys[start + (reserved !== null && i > reserved ? i - 1 : i)]);
+			break;
 		}
 	}
-	const shown = Math.min(step, Math.max(0, keys.length - start));
+	const firstTile = pageStarts[pageIndex] as number;
+	const start = tiles[firstTile]?.start ?? 0;
+	const nextStart = tiles[firstTile + capacity]?.start;
+	const chunks: (readonly string[])[] = [];
+	const specs: (DetailTileSpec | undefined)[] = [];
+	for (let i = 0; i < safeSize; i++) {
+		if (reserved !== null && i === reserved) {
+			chunks.push([]);
+			specs.push(undefined);
+		} else {
+			const ordinal = reserved !== null && i > reserved ? i - 1 : i;
+			const tile = tiles[firstTile + ordinal];
+			chunks.push(tile === undefined ? [] : keys.slice(tile.start, tile.start + tile.size));
+			specs.push(tile?.spec);
+		}
+	}
+	const shown = Math.max(0, (nextStart ?? keys.length) - start);
+	const step = nextStart !== undefined ? nextStart - start : Math.max(0, keys.length - start);
 	const rangeText = keys.length === 0 ? "0 / 0" : `${start + 1}-${start + shown} / ${keys.length}`;
 	return {
-		slots,
+		chunks,
+		specs,
+		slots: chunks.map((chunk) => chunk[0]),
 		offset: start,
 		step,
-		hasPrevious: start > 0,
-		hasNext: start + step < keys.length,
+		previousOffset: pageIndex > 0 ? ((tiles[pageStarts[pageIndex - 1] as number] as { start: number }).start ?? 0) : start,
+		hasPrevious: pageIndex > 0,
+		hasNext: nextStart !== undefined,
 		rangeText
 	};
 }

@@ -493,7 +493,6 @@ async function drilldown() {
 	const status = { state: "ok", snapshot, source: "shared-memory" };
 	const state = {
 		deviceId: "marketing",
-		profileName: profile.name,
 		pageSize: profile.layout.readings.length,
 		primaryKey: primary.key,
 		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" },
@@ -627,30 +626,46 @@ async function dialViews() {
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "shot-7-dial-views.png"));
 }
 
-// ---------- shot 3: settings panel (from capture-pi.mjs screenshots) ----------
+// ---------- shot 4: settings panel (from capture-pi.mjs screenshots) ----------
+// Three panels, one per thing the gallery claims: find the reading, put four
+// on a key, choose what a drill-down key opens. The old two-panel version
+// predated both multi-reading keys and the drill-down, so it showed the
+// config for a feature set the listing no longer leads with.
 async function settings(piDir) {
 	const panels = [
-		{ file: "pi-picker.png", title: "Searchable picker: every reading, live values" },
-		{ file: "pi-settings.png", title: "Themes, thresholds and gauges per key" }
+		{ file: "pi-picker-block.png", title: "Find any reading, live values" },
+		{ file: "pi-key-quad-rows.png", title: "Four readings on one key" },
+		{ file: "pi-key-detail-filter.png", title: "Pick what a press opens, counted live" }
 	];
-	const CROP_H = 1150; // content ends at the Advanced fold (2× captures are 800px wide)
-	const SCALE_H = 700;
-	const w = Math.round(800 * (SCALE_H / CROP_H));
-	const gap = 96;
-	const startX = Math.round((W - (2 * w + gap)) / 2);
-	const top = 178;
+	const MAX_H = 660; // headline block above, one caption baseline below
+	const gap = 64;
+	const w = Math.floor((W - 200 - 2 * gap) / 3);
+	const startX = Math.round((W - (3 * w + 2 * gap)) / 2);
+	// The three panels are genuinely different heights. Center each in the
+	// band and put every caption on one baseline, so the row reads as a row.
+	const bandTop = 178;
+	const bandH = MAX_H;
+	const captionY = 908;
 
 	const chrome = [
 		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">Set up in seconds.</text>`,
-		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">The real settings panel: search 500+ readings with live values, pick a theme, set thresholds.</text>`
+		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">The real settings panel, not a mockup: search with live values, stack up to four, aim a drill-down key.</text>`
 	];
 	const composites = [];
 	for (let i = 0; i < panels.length; i++) {
 		const x = startX + i * (w + gap);
-		const img = await sharp(path.join(piDir, panels[i].file)).extract({ left: 0, top: 0, width: 800, height: CROP_H }).resize({ height: SCALE_H }).png().toBuffer();
+		const src = sharp(path.join(piDir, panels[i].file));
+		const meta = await src.metadata();
+		// Every panel is a clipped capture that already ends on a section
+		// boundary; the height budget only has to catch an overlong one.
+		const scale = w / meta.width;
+		const cropH = Math.min(meta.height, Math.round(MAX_H / scale));
+		const img = await src.extract({ left: 0, top: 0, width: meta.width, height: cropH }).resize({ width: w }).png().toBuffer();
+		const h = Math.min(MAX_H, Math.round(cropH * scale));
+		const top = bandTop + Math.round((bandH - h) / 2);
 		chrome.push(
-			`<rect x="${x - 14}" y="${top - 14}" width="${w + 28}" height="${SCALE_H + 28}" rx="14" fill="${CARD_BG}" stroke="${CARD_BORDER}" stroke-width="1.5"/>`,
-			`<text x="${x + w / 2}" y="${top + SCALE_H + 52}" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">${esc(panels[i].title)}</text>`
+			`<rect x="${x - 12}" y="${top - 12}" width="${w + 24}" height="${h + 24}" rx="14" fill="${CARD_BG}" stroke="${CARD_BORDER}" stroke-width="1.5"/>`,
+			`<text x="${x + w / 2}" y="${captionY}" text-anchor="middle" font-family="${MONO}" font-size="18" fill="${MUTED}">${esc(panels[i].title)}</text>`
 		);
 		composites.push({ input: img, left: x, top });
 	}
@@ -725,5 +740,5 @@ if (piDir !== undefined) {
 	await settings(piDir);
 	console.log(`Rendered thumbnail + shots 1, 3, 4, 5 (${W}x${H}) to ${outDir}/`);
 } else {
-	console.log(`Rendered thumbnail + shots 1, 3, 5 (${W}x${H}) to ${outDir}/ (pass a capture dir with pi-settings.png + pi-picker.png for shot 4)`);
+	console.log(`Rendered thumbnail + shots 1, 3, 5 (${W}x${H}) to ${outDir}/ (pass a dir from scripts/capture-pi.mjs for shot 4)`);
 }

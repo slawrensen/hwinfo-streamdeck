@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { WebSocketServer } from "ws";
+import { buildInfo, decodeSvg, makeCheck, pluginArgv, sleep } from "./lib/e2e-common.mjs";
 
 const PORT = 28995;
 const SOAK_SEC = Number(process.env.LOAD_SOAK_SEC ?? "90");
@@ -21,12 +22,10 @@ const POLL_MS = 250;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
-function check(name, ok, detail = "") {
-	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-	if (!ok) failures++;
-}
+const check = makeCheck(() => {
+	failures += 1;
+});
 
 // --- live reading inventory ----------------------------------------------------
 console.log("enumerating live readings via probe...");
@@ -56,7 +55,7 @@ wss.on("connection", (ws) => {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: String(POLL_MS) } } });
 		} else if (msg.event === "setImage") {
 			const image = msg.payload?.image ?? "";
-			if (image.startsWith("data:image/svg+xml,") && decodeURIComponent(image.slice(19)).includes('viewBox="0 0 144 144"')) {
+			if (decodeSvg(image)?.includes('viewBox="0 0 144 144"') === true) {
 				framesByCtx.set(msg.context, (framesByCtx.get(msg.context) ?? 0) + 1);
 				totalFrames++;
 			} else {
@@ -77,14 +76,7 @@ const registered = new Promise((resolve) => {
 // --- plugin under test ----------------------------------------------------------
 const plugin = spawn(
 	process.execPath,
-	["bin/plugin.js", "-port", String(PORT), "-pluginUUID", "e2e-load", "-registerEvent", "registerPlugin", "-info",
-		JSON.stringify({
-			application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
-			colors: {},
-			devicePixelRatio: 1,
-			devices: [{ id: "dev1", name: "Load Deck", size: { columns: 5, rows: 3 }, type: 0 }],
-			plugin: { uuid: "com.lawrensen.hwinfo", version: "1.1.0.0" }
-		})],
+	pluginArgv(PORT, "e2e-load", buildInfo({ devices: [{ id: "dev1", name: "Load Deck", size: { columns: 5, rows: 3 }, type: 0 }], plugin: { uuid: "com.lawrensen.hwinfo", version: "1.1.0.0" } })),
 	{ cwd: pluginDir, stdio: ["ignore", "inherit", "inherit"] }
 );
 let pluginExited = null;

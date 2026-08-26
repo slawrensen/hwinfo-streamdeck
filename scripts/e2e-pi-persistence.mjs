@@ -1015,7 +1015,7 @@ try {
 	frame = atomic("leg I follow-up pick", writes.slice(mark));
 	check("leg I: the next pick appends at the end, not into a ghost aim", frame.detailKeys?.length === 11 && frame.detailKeys?.at(-1) === "gpu:0:0", JSON.stringify(frame.detailKeys?.slice(-2)));
 
-	// ---- run 3c: the dressing belongs to the chip (leg L) ----------------
+	// ---- run 3b: the dressing belongs to the chip (legs L, L9) ------------
 	// A cell's label and color are the CHIP's, not the position's: every
 	// mover (in-tile drag, the arrows, a boundary walk, a cross-tile grow,
 	// a full-target park, a dressed ghost leave) must carry them with the
@@ -1230,7 +1230,55 @@ try {
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value
 	);
 
-	// ---- run 3d: the bench case, exactly as reported (leg M) -------------
+	// L9: the CARET itself, the thing every drop-routing commit is named
+	// for, and until now the one thing no leg ever dispatched: the suite
+	// fired dragstart and drop, never a dragover, so nothing checked that
+	// the bar a user aims by matches where the chip lands. A chip edge is
+	// honest while the tile can take the cell. A FULL quad cannot: the
+	// mover parks the chip beside the whole tile, so a bar between two of
+	// its cells promised a landing that has never been possible. On a full
+	// target the caret is the tile's own edge instead.
+	const caretAfter = async (payloadKey, targetSel, at) =>
+		(await evaluate(`(() => {
+			const src = document.querySelector('#detail-list .hw-set-chip[data-key="${payloadKey}"]');
+			const target = document.querySelector('${targetSel}');
+			if (!src || !target) return "missing";
+			const dt = new DataTransfer();
+			src.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+			const r = target.getBoundingClientRect();
+			const x = "${at}" === "left" ? r.left + 2 : r.right - 2;
+			target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: r.top + r.height / 2 }));
+			const painted = document.querySelectorAll("#detail-list .drop-before, #detail-list .drop-after");
+			const out = Array.from(painted).map((el) => [el.classList.contains("hw-tile") ? "tile" : (el.dataset.key ?? "chip"), el.classList.contains("drop-before") ? "before" : "after"]);
+			src.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+			return JSON.stringify(out);
+		})()`)).result?.value;
+	// The list here is [b4,b1] [b2,b5,b6,b7] [b3] [b0] (leg L8's end state),
+	// so tile 2 is a FULL quad and tile 1 is a two-cell tile with room.
+	mark = writes.length;
+	check(
+		"leg L9: a caret on a tile that has room marks the chip edge it will insert at",
+		(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:4"]', "right")) === JSON.stringify([["bench:0:4", "after"]]),
+		String(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:4"]', "right"))
+	);
+	check(
+		"leg L9: a caret between two cells of a FULL quad marks the tile, where the park lands",
+		(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:5"]', "right")) === JSON.stringify([["tile", "after"]]),
+		String(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:5"]', "right"))
+	);
+	check(
+		"leg L9: the full quad's own head cell still marks the near side, the one park that lands there",
+		(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:2"]', "left")) === JSON.stringify([["tile", "before"]]),
+		String(await caretAfter("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:2"]', "left"))
+	);
+	check(
+		"leg L9: a chip reordering INSIDE the full quad keeps its cell carets, that drop is a plain reorder",
+		(await caretAfter("bench:0:5", '#detail-list .hw-set-chip[data-key="bench:0:7"]', "right")) === JSON.stringify([["bench:0:7", "after"]]),
+		String(await caretAfter("bench:0:5", '#detail-list .hw-set-chip[data-key="bench:0:7"]', "right"))
+	);
+	check("leg L9: painting a caret wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
+
+	// ---- run 3c: the bench case, exactly as reported (leg M) -------------
 	// Stephen's tile on the real deck: a bare-values quad whose ONLY
 	// stored dressing is one cell label ("Solo" on cell 0) and no colors
 	// at all, so all four chips wear the default identity palette. The
@@ -1285,20 +1333,67 @@ try {
 		]),
 		String(afterWorn)
 	);
-	// And the tail: a chip walking out of the quad into the next tile
-	// keeps its color there too (that tile is a quad as well).
+	// And the tail: a chip walking out of the quad crosses into a tile
+	// holding only TWO readings, which the deck paints as a dual face, and a
+	// dual paints no identity colors at all. So the leaver wears none there
+	// and the incomer carries none back: the color follows its reading only
+	// as far as a tile that actually paints one. This used to write the
+	// leaver's #D4AB33 into that tail, which froze it into the plan (so it
+	// stopped following Tile shows) to store a color no face ever reads.
 	mark = writes.length;
 	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:3"] .hw-detail-move[data-move="1"]')?.click()`);
 	await sleep(700);
 	frame = atomic("leg M boundary walk", writes.slice(mark));
 	check("leg M: the chip crossed the tile boundary", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:0", "bench:0:2", "bench:0:4", "bench:0:3", "bench:0:5"]), JSON.stringify(frame.detailKeys));
 	check(
-		"leg M: both chips carried their colors across the boundary",
-		deepEqual(frame.detailTiles?.[0]?.colors, ["#FF7E8E", "#4CC2FF", null, "#4CC2FF"]) && deepEqual(frame.detailTiles?.[1]?.colors, ["#D4AB33", null, null, null]),
-		JSON.stringify([frame.detailTiles?.[0]?.colors, frame.detailTiles?.[1]?.colors])
+		"leg M: the color follows its reading only where a tile paints one",
+		deepEqual(frame.detailTiles, [{ size: 4, labels: ["", "Solo", "", ""], colors: ["#FF7E8E", "#4CC2FF", null, null], cellLabels: false }]),
+		JSON.stringify(frame.detailTiles)
 	);
 
-	// ---- run 3b: the Tile shows change regroups the walk live (leg J) ----
+	// ---- run 3d: a drop into the PARTLY FILLED tail (leg N) --------------
+	// Only the last tile of a walk can hold fewer readings than its size
+	// says, and the chip mover judged "has this tile room" by that size.
+	// A tail rendering two readings on a four-cell spec therefore read as
+	// FULL, so a chip dropped into it parked as its own one-cell entry
+	// spliced in behind a spec that already declares more cells than the
+	// list can fill. The walk stopped short of that entry, the chip's
+	// label and color went with it, and the buried entry surfaced later on
+	// whatever reading grew into its slot. The tail already owns the cell:
+	// the chip fills it, the tile keeps its size, and nothing is stored
+	// where the walk cannot reach it. Seeded fresh, same bench tile.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg N: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const legNTail = JSON.parse(
+		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")).map((t) => t.querySelectorAll(".hw-set-chip").length))`)).result?.value ?? "[]"
+	);
+	check("leg N: the walk is a full quad plus a tail holding two readings", deepEqual(legNTail, [4, 2]), JSON.stringify(legNTail));
+	mark = writes.length;
+	check("leg N: dropped the labelled chip after the tail's last chip", (await dragDrop("bench:0:0", '#detail-list .hw-set-chip[data-key="bench:0:5"]', "right")) === "ok");
+	await sleep(700);
+	frame = atomic("leg N tail drop", writes.slice(mark));
+	check("leg N: the chip landed at the cell it was dropped on", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3", "bench:0:4", "bench:0:5", "bench:0:0"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg N: the tail kept its size and Solo rode into the cell its chip fills",
+		deepEqual(frame.detailTiles, [
+			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: false },
+			{ size: 4, labels: ["", "", "Solo", ""], colors: [null, null, null, null], cellLabels: true }
+		]),
+		JSON.stringify(frame.detailTiles)
+	);
+	// The plan is the document the deck reads: an entry past the walk is
+	// invisible now and wrong later, so pin the two against each other.
+	const legNWalk = (await evaluate(`document.querySelectorAll("#detail-list .hw-tile:not(.ghost)").length`)).result?.value;
+	check("leg N: the plan stores no tile the walk cannot reach", frame.detailTiles?.length === legNWalk, `${frame.detailTiles?.length} stored, ${legNWalk} rendered`);
+	check(
+		"leg N: the moved chip still wears Solo in the panel",
+		(await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-set-name')?.textContent ?? "gone"`)).result?.value === "Solo",
+		String((await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-set-name')?.textContent ?? "gone"`)).result?.value)
+	);
+
+	// ---- run 3e: the Tile shows change regroups the walk live (leg J) ----
 	// The density select used to change only the STORED setting: the walk
 	// kept its old grouping until a reload, and the next removal persisted
 	// a plan built from the stale density (an empty plan here). The select
@@ -1332,7 +1427,7 @@ try {
 	check("leg J: the removal persisted the REGROUPED plan", deepEqual(frame.detailTiles, [{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
 	check("leg J: key left the list", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
 
-	// ---- run 3c: a walk reshape must never outlive the aim (legs J2-J5) --
+	// ---- run 3f: a walk reshape must never outlive the aim (legs J2-J5) --
 	// The disarm lived only in writeDetailState's past-end check, so the
 	// Tile shows select (followSetting -> adoptDetailUniform, no funnel)
 	// left a stale aim promising a tile the walk no longer had, and
@@ -1441,7 +1536,11 @@ try {
 	// and a standing aim (tile indices now mean different tiles) disarms.
 	// State here: keys [b0..b3, gpu:0:0, cpu:0:1], density 1, plan [x4],
 	// so the walk is [x4(b0-b3), x1(gpu), x1(cpu)].
-	const tileDrag = async (fromIdx, targetIdx, half) =>
+	// The list is a wrapping flex row of inline-flex tiles, so short tiles sit
+	// side by side and the landing side is a question about x. The helper aims
+	// horizontally and holds y at the target's own middle, which is exactly
+	// the pointer a real drag delivers along a shared row.
+	const tileDrag = async (fromIdx, targetIdx, side) =>
 		(await evaluate(`(() => {
 			const tiles = document.querySelectorAll("#detail-list .hw-tile:not(.ghost)");
 			const grip = tiles[${fromIdx}]?.querySelector(".hw-tile-grip");
@@ -1450,13 +1549,22 @@ try {
 			const dt = new DataTransfer();
 			grip.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
 			const r = target.getBoundingClientRect();
-			const y = ${JSON.stringify("top")} === "${half}" ? r.top + 1 : r.bottom - 1;
-			target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 4, clientY: y }));
+			const x = ${JSON.stringify("left")} === "${side}" ? r.left + 1 : r.right - 1;
+			target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: r.top + r.height / 2 }));
 			grip.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
 			return "ok";
 		})()`)).result?.value;
+	// The axis claim, measured rather than assumed: if two tiles share a row,
+	// a top/bottom midpoint cannot tell them apart and only x can.
+	const rowShare = JSON.parse(
+		(await evaluate(`(() => {
+			const r = Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")).map((t) => t.getBoundingClientRect());
+			return JSON.stringify(r.some((b, i) => i > 0 && Math.abs(b.top - r[i - 1].top) < 2 && r[i - 1].right <= b.left + 1));
+		})()`)).result?.value ?? "false"
+	);
+	check("leg J6: tiles share a row, so the landing side is a question about x", rowShare === true, String(rowShare));
 	mark = writes.length;
-	check("leg J6: dragged the quad tile below the last tile", (await tileDrag(0, 2, "bottom")) === "ok");
+	check("leg J6: dragged the quad tile past the last tile", (await tileDrag(0, 2, "right")) === "ok");
 	await sleep(700);
 	frame = atomic("leg J6 tile drop", writes.slice(mark));
 	check("leg J6: the run moved as one unit", deepEqual(frame.detailKeys, ["gpu:0:0", "cpu:0:1", "bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
@@ -1657,6 +1765,8 @@ try {
 			a: cell("bench:0:1"), b: cell("bench:0:2"), c: cell("bench:0:3"),
 			parkedInTile: parked === null ? "gone" : parked.closest(".hw-tile") !== null,
 			parkedMark: parked?.querySelector(".hw-set-name")?.textContent ?? "gone",
+			parkedRenameOffered: parked?.querySelector(".hw-set-name")?.classList.contains("parked") === false,
+			parkedRemoveNamed: (parked?.querySelector(".hw-set-remove")?.getAttribute("aria-label") ?? "").startsWith("Remove "),
 			parkedRemovable: Array.from(parked?.querySelectorAll("button") ?? []).some((b) => (b.title ?? "").startsWith("Remove")),
 			note: document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"
 		};
@@ -1666,6 +1776,10 @@ try {
 	check("adopted: tile 2 holds the third listed reading as L3", deepEqual(adopted.c, { tile: "1", cell: "0", text: "L3", renamed: true, inTile: true }), JSON.stringify(adopted.c));
 	check("adopted: the primary's chip is parked outside every tile", adopted.parkedInTile === false, JSON.stringify(adopted.parkedInTile));
 	check("adopted: the parked chip wears the Back-tile mark", String(adopted.parkedMark).includes("(Back tile)"), String(adopted.parkedMark));
+	// It holds no cell, so it has no cell label: the rename affordance every
+	// other name wears would be an invitation the click handler refuses.
+	check("adopted: the parked chip offers no rename it would refuse", adopted.parkedRenameOffered === false, JSON.stringify(adopted.parkedRenameOffered));
+	check("adopted: the parked chip's remove announces by name, not as a bare glyph", adopted.parkedRemoveNamed === true, JSON.stringify(adopted.parkedRemoveNamed));
 	check("adopted: the parked chip stays removable", adopted.parkedRemovable === true, JSON.stringify(adopted.parkedRemovable));
 	check("adopted: the note counts listed readings only", String(adopted.note).startsWith("3 readings across 2 tiles"), String(adopted.note));
 
@@ -1714,6 +1828,35 @@ try {
 	frame = atomic("adopted parked removal", writes.slice(mark));
 	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }, { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
 	check("adopted: only the parked key left the list", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+
+	// ---- run 6b: dressing travels PAST a parked primary (leg O) ----------
+	// The adopted run proved renames and removals around a parked primary
+	// but never moved a chip, so dressing travel in that shape was unproven
+	// by any leg. Seeded fresh: listed [b1, b2, b3] over two 2-cell tiles
+	// wearing L1 to L4, with the opener's own sensor parked outside them.
+	// The tail tile holds ONE reading in a two-cell spec, so dragging that
+	// reading out empties the tile: it must leave the plan with it, not
+	// linger as a one-cell entry the walk can no longer reach and carry L4
+	// off to whatever reading grows into that slot later.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg O: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	mark = writes.length;
+	check("leg O: dragged the tail reading onto the head tile", (await dragDrop("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:1"]', "left")) === "ok");
+	await sleep(700);
+	frame = atomic("leg O parked-primary move", writes.slice(mark));
+	check("leg O: the listed order changed and the parked primary kept its slot", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:3", "bench:0:1", "bench:0:2"]), JSON.stringify(frame.detailKeys));
+	check(
+		"leg O: every label rode its own reading and the emptied tile left the plan",
+		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null], cellLabels: true }]),
+		JSON.stringify(frame.detailTiles)
+	);
+	check(
+		"leg O: the panel renders one tile, so no stored entry outlives the walk",
+		(await evaluate(`document.querySelectorAll("#detail-list .hw-tile:not(.ghost)").length`)).result?.value === 1,
+		String((await evaluate(`document.querySelectorAll("#detail-list .hw-tile:not(.ghost)").length`)).result?.value)
+	);
 
 	// ---- run 7: a live primary re-pick moves the Back-tile gates (leg K.2)
 	// Re-picking the opener's sensor onto a listed reading used to leave
@@ -1778,6 +1921,25 @@ try {
 	await sleep(500);
 	check("repick: ticking the new primary is refused", writes.length === mark, `${writes.length - mark} frames`);
 
+	// The re-pick left the parked primary at raw slot 1, in the MIDDLE of
+	// the stored list, which is the shape rawDetailIndex exists for: every
+	// mover reads and writes LISTED positions, and only that mapping puts
+	// them back in the right detailKeys slot. No leg moved a chip in that
+	// state before, so the mapping rode on inspection alone (leg P).
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:3"] .hw-detail-move[data-move="-1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg P arrow past a mid-list parked primary", writes.slice(mark));
+	check("leg P: the move stepped over the parked primary's slot", deepEqual(frame.detailKeys, ["bench:0:3", "bench:0:1", "bench:0:2"]), JSON.stringify(frame.detailKeys));
+	check("leg P: a flat list stayed flat", deepEqual(frame.detailTiles, []), JSON.stringify(frame.detailTiles));
+	check(
+		"leg P: the parked chip is still parked outside the tiles",
+		(await evaluate(`(() => {
+			const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"]');
+			return chip !== null && chip.closest(".hw-tile") === null;
+		})()`)).result?.value === true
+	);
+
 	// ---- run 7b: config export and apply (the Advanced fold) -------------
 	// The document is the exact settings object, canonically ordered;
 	// filling is a read, refusal writes nothing, and Apply replaces the
@@ -1801,7 +1963,27 @@ try {
 	} catch {
 		keyDoc = null;
 	}
-	check("config: the key document is the seeded settings, canonical", keyDoc !== null && keyDoc.readingKey === "cpu:0:0" && Array.isArray(keyDoc.detailTiles) && deepEqual(Object.keys(keyDoc), Object.keys(keyDoc).slice().sort()), String(keyDocText).slice(0, 120));
+	// The document is the settings object with one readability pass: every
+	// reading key wears its friendly name, because a nineteen-key list of raw
+	// HWiNFO identities tells a person nothing and cannot be reordered by
+	// hand. Everything else is byte-for-byte the stored settings, canonically
+	// ordered. Apply takes the names back off (leg S below).
+	check(
+		"config: the key document is the seeded settings, canonical",
+		keyDoc !== null && Array.isArray(keyDoc.detailTiles) && deepEqual(Object.keys(keyDoc), Object.keys(keyDoc).slice().sort()),
+		String(keyDocText).slice(0, 120)
+	);
+	check("config: the opener's key wears its reading name", keyDoc?.readingKey === "cpu:0:0  CPU Tctl", JSON.stringify(keyDoc?.readingKey));
+	check(
+		"config: every listed reading wears its name, in list order",
+		deepEqual(keyDoc?.detailKeys?.slice(0, 3), ["bench:0:0  Bench 0", "bench:0:1  Bench 1", "bench:0:2  Bench 2"]),
+		JSON.stringify(keyDoc?.detailKeys?.slice(0, 3))
+	);
+	check(
+		"config: a key with no reading in the tree stays bare, which is the missing signal",
+		typeof keyDocText === "string" && !keyDocText.includes("undefined") && !keyDocText.includes("null  "),
+		String(keyDocText).slice(0, 80)
+	);
 	const deckDocText = (await evaluate(`document.getElementById("config-deck")?.value ?? "missing"`)).result?.value;
 	check("config: the deck document renders the globals", deckDocText === JSON.stringify({ theme: "void" }, null, "\t"), String(deckDocText));
 	check("config: filling both documents wrote nothing", writes.length === 0 && globalWrites.length === 0, `${writes.length}/${globalWrites.length}`);
@@ -1839,6 +2021,39 @@ try {
 	const reloadedText = (await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value;
 	check("config: the round trip preserved the unknown field", String(reloadedText).includes('"cfgBlob"') && String(reloadedText).includes('"Restored"'), String(reloadedText).slice(0, 120));
 	check("config: the editor rebuilt from the applied plan", (await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-set-name')?.textContent`)).result?.value === "A", String((await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key=\\"bench:0:0\\"] .hw-set-name')?.textContent`)).result?.value));
+
+	// ---- leg S: a NAMED document reorders by moving whole lines ----------
+	// The point of the names is that a person or an agent can rewrite the
+	// list by reading it. So drive the real gesture: take the document the
+	// panel just handed out, reorder its named lines, paste it back, and
+	// prove two things at once. The new order lands, and what reaches
+	// settings is keys alone, because a stored name would go stale the day
+	// HWiNFO renames the sensor.
+	mark = writes.length;
+	await evaluate(`(() => {
+		const doc = ${JSON.stringify(
+			JSON.stringify({
+				detailKeys: ["bench:0:2  Bench 2", "bench:0:0  Bench 0", "bench:0:5  not in the tree at all"],
+				detailMode: "custom",
+				detailTiles: [{ size: 2, labels: ["A", "B"], colors: [null, null], cellLabels: true }],
+				futureBlob: FUTURE_BLOB,
+				label: "Named",
+				pressBehavior: "open-details",
+				readingKey: "cpu:0:0  CPU Tctl"
+			})
+		)};
+		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key-apply").click();
+	})()`);
+	await sleep(700);
+	frame = atomic("leg S named apply", writes.slice(mark));
+	check("leg S: the reordered list landed in the pasted order", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:0", "bench:0:5"]), JSON.stringify(frame.detailKeys));
+	check("leg S: settings store keys alone, never a name that could go stale", JSON.stringify(frame.detailKeys ?? []).includes("Bench") === false, JSON.stringify(frame.detailKeys));
+	check("leg S: the opener's key shed its name too", frame.readingKey === "cpu:0:0", JSON.stringify(frame.readingKey));
+	check("leg S: an unresolvable name is still stripped to a usable key", frame.detailKeys?.[2] === "bench:0:5", JSON.stringify(frame.detailKeys?.[2]));
+	check("leg S: everything that is not a key rode through untouched", frame.label === "Named" && deepEqual(frame.futureBlob, FUTURE_BLOB) && frame.detailTiles?.[0]?.labels?.[0] === "A", JSON.stringify(frame).slice(0, 140));
+	await sleep(1400); // the panel reloads itself after an apply
+	check("leg S: the reloaded panel shows the chips in the pasted order", (await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value === JSON.stringify(["bench:0:2", "bench:0:0", "bench:0:5"]), String((await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value));
 	await evaluate(`(() => {
 		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper" });
 		document.getElementById("config-deck-apply").click();
@@ -1846,6 +2061,63 @@ try {
 	await sleep(700);
 	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
+
+	// ---- run 7c: a real press survives the rename it tears down (leg R) --
+	// Every other leg drives the panel with element.click(), which fires no
+	// mousedown and so cannot see this: opening a cell rename and then
+	// PRESSING any other control blurs the input, the blur commits or
+	// abandons the rename, and either path rebuilt the whole list from
+	// inside the press. replaceChildren took the pressed control with it,
+	// Blink dropped the click, and the user's press did nothing. The writes
+	// still go out at once; only the repaint waits for the press to finish.
+	// This is the one leg in the suite that dispatches real mouse input.
+	const realClick = async (sel) => {
+		const at = JSON.parse(
+			(await evaluate(`(() => {
+			const el = document.querySelector('${sel}');
+			if (!el) return "null";
+			el.scrollIntoView({ block: "center" });
+			const r = el.getBoundingClientRect();
+			return JSON.stringify([r.left + r.width / 2, r.top + r.height / 2]);
+		})()`)).result?.value ?? "null"
+		);
+		if (!Array.isArray(at)) return "missing";
+		await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: at[0], y: at[1], button: "left", buttons: 1, clickCount: 1 });
+		// A HELD press, the way a hand presses. Back-to-back press/release over
+		// CDP leaves no task boundary between them, so a zero-delay timer
+		// scheduled by the press cannot run inside the gesture and the abandon
+		// path's repaint never gets the chance to eat the click.
+		await sleep(120);
+		await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: at[0], y: at[1], button: "left", buttons: 0, clickCount: 1 });
+		return "ok";
+	};
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("leg R: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	// Phase 1, the abandon path: open a rename, change nothing, press another
+	// chip's remove. The focusout repaint must not eat that press.
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name')?.click()`);
+	await sleep(300);
+	check("leg R: the rename input is open", (await evaluate(`document.querySelector("#detail-list .hw-cell-rename") !== null`)).result?.value === true);
+	check("leg R: pressed another chip's remove with a real mouse", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-set-remove')) === "ok");
+	await sleep(900);
+	frame = atomic("leg R abandon then press", writes.slice(mark));
+	check("leg R: the press landed, it was not swallowed by the rename teardown", !frame.detailKeys?.includes("bench:0:2"), JSON.stringify(frame.detailKeys));
+	check("leg R: the abandoned rename input is gone", (await evaluate(`document.querySelector("#detail-list .hw-cell-rename") === null`)).result?.value === true);
+	// Phase 2, the commit path: type into the rename, then press a remove.
+	// BOTH must land, the rename write and the removal.
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-name')?.click()`);
+	await sleep(300);
+	await cdp("Input.insertText", { text: "Renamed" });
+	await sleep(200);
+	check("leg R: pressed a remove while the rename was dirty", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:3"] .hw-set-remove')) === "ok");
+	await sleep(900);
+	const legR = writes.slice(mark);
+	check("leg R: the rename committed", legR.some((w) => w.detailTiles?.[0]?.labels?.includes("Renamed")), JSON.stringify(legR.map((w) => w.detailTiles?.[0]?.labels)));
+	check("leg R: and the press that committed it also landed", legR.some((w) => !w.detailKeys?.includes("bench:0:3")), JSON.stringify(legR.map((w) => w.detailKeys?.length)));
 
 	// ---- run 8: the dial panel tells the runtime truth -------------------
 	// Custom preset + two touch zones is the dead-tap configuration

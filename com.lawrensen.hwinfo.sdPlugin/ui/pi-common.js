@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-6";
+	const PI_BUILD = "1.5.1.0-8";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -56,6 +56,59 @@
 			}
 		}
 		return null;
+	}
+
+	// --- reading keys in the config document ---------------------------------
+	// A stored reading key is HWiNFO's stable identity ("f0000301:0:8000005"),
+	// which is exactly what the runtime needs and exactly what nobody can read.
+	// The config document appends the reading's friendly name to every key it
+	// carries, so a person or an agent can see what a list holds and reorder it
+	// by moving whole lines. Apply strips the name straight back off: settings
+	// store the key alone, because a stored name is a parallel schema that goes
+	// stale the moment HWiNFO renames the sensor.
+
+	/** The settings fields whose values are reading keys. Scalars hold one,
+	 * arrays hold a list, and a rotation group holds its list under `keys`. */
+	const KEY_SCALAR_FIELDS = ["readingKey", "secondaryReadingKey", "quadReadingKey3", "quadReadingKey4"];
+	const KEY_LIST_FIELDS = ["detailKeys", "rotationKeys"];
+
+	/** The key alone: everything before the first run of whitespace. A HWiNFO
+	 * key is colon-separated hex and never contains a space, so this can only
+	 * ever cut an appended name off, never part of the key itself. */
+	function bareKey(value) {
+		if (typeof value !== "string") return value;
+		return value.trim().split(/\s+/)[0] ?? "";
+	}
+
+	/** The key with its friendly name appended, or the bare key when no name
+	 * resolves: the reading is not in the current HWiNFO layout, or the tree
+	 * has not arrived yet. An unnamed key in the document is itself the signal
+	 * that the reading is missing. */
+	function namedKey(value) {
+		const key = bareKey(value);
+		if (typeof key !== "string" || key === "") return key;
+		const label = readingLabelOf(key);
+		return label === null ? key : `${key}  ${label}`;
+	}
+
+	/** Runs `fn` over every reading key in a settings document, leaving every
+	 * other field untouched (the futureBlob discipline: a field this build
+	 * does not know rides along exactly as it arrived). */
+	function mapReadingKeys(doc, fn) {
+		if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return doc;
+		const out = { ...doc };
+		for (const field of KEY_SCALAR_FIELDS) {
+			if (typeof out[field] === "string") out[field] = fn(out[field]);
+		}
+		for (const field of KEY_LIST_FIELDS) {
+			if (Array.isArray(out[field])) out[field] = out[field].map((k) => (typeof k === "string" ? fn(k) : k));
+		}
+		if (Array.isArray(out.rotationGroups)) {
+			out.rotationGroups = out.rotationGroups.map((group) =>
+				typeof group === "object" && group !== null && Array.isArray(group.keys) ? { ...group, keys: group.keys.map((k) => (typeof k === "string" ? fn(k) : k)) } : group
+			);
+		}
+		return out;
 	}
 
 	// --- rotation set (dial PI only) -----------------------------------------
@@ -413,6 +466,17 @@
 		return tiles;
 	}
 
+	/** How many READINGS a walk tile actually holds. Only the last tile of a
+	 * walk can hold fewer than its size, and that tile is where every
+	 * size-versus-occupancy bug has lived: the deck builds a tile's face out
+	 * of the readings in it (composeChunkFace branches on the chunk length),
+	 * so this, never `size`, decides whether a tile is a quad, and a quad is
+	 * the only face that paints per-cell identity colors. Pass `listed` where
+	 * the caller already holds it, so a mover reads one consistent list. */
+	function tileReadings(tile, listed = listedDetailKeys()) {
+		return Math.min(tile.size, listed.length - tile.head);
+	}
+
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
@@ -478,12 +542,19 @@
 	}
 
 	function adoptDetailKeys(value) {
-		// Mirror the plugin parser: duplicates drop at their first occurrence
-		// (hand-edited settings could hold them, and indexOf-based move and
-		// remove need one chip per key), and the same cap applies, so the
-		// panel never shows chips past what the runtime lists.
+		// Mirror the plugin parser: a key sheds any friendly name pasted after
+		// it (the config document writes one), duplicates drop at their first
+		// occurrence (hand-edited settings could hold them, and indexOf-based
+		// move and remove need one chip per key), and the same cap applies, so
+		// the panel never shows chips past what the runtime lists.
 		const seen = new Set();
-		detailKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string" && k !== "" && !seen.has(k) && seen.add(k)).slice(0, DETAIL_KEYS_MAX) : [];
+		detailKeys = Array.isArray(value)
+			? value
+					.filter((k) => typeof k === "string")
+					.map((k) => bareKey(k))
+					.filter((k) => k !== "" && !seen.has(k) && seen.add(k))
+					.slice(0, DETAIL_KEYS_MAX)
+			: [];
 		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
@@ -630,7 +701,7 @@
 	function revalidateDetailAim() {
 		if (detailArm === null) return;
 		const tile = detailTileWalk()[detailArm.tileIdx];
-		if (tile === undefined || (tile.size >= 4 && listedDetailKeys().length - tile.head >= 4)) {
+		if (tile === undefined || tileReadings(tile) >= 4) {
 			disarmDetailAim();
 		}
 	}
@@ -642,6 +713,27 @@
 	// drag. dragover cannot read the payload (values hide until drop), so
 	// this is how tile drags and chip drags stay distinguishable mid-air.
 	let detailTileDrag = null;
+
+	// A mouse press inside the list must survive what the press itself tears
+	// down. Opening a cell rename swaps the name span for an input; the NEXT
+	// press anywhere in the list blurs that input, and the blur is the
+	// press's own default action, so the commit (change, straight into
+	// editTile) or the abandon (focusout) rebuilds the whole list between
+	// mousedown and mouseup. replaceChildren detaches the control under the
+	// pointer, Blink drops the click, and the press does nothing at all.
+	// Writes still go out at once, because a cell's tile and cell indices
+	// are only valid before another edit reshapes the walk. Only the
+	// REPAINT waits for the press to finish.
+	let detailPressing = false;
+	let detailRenderQueued = false;
+	let detailPressTimer = 0;
+	function releaseDetailPress() {
+		clearTimeout(detailPressTimer);
+		detailPressing = false;
+		if (!detailRenderQueued) return;
+		detailRenderQueued = false;
+		renderDetailList();
+	}
 
 	function detailSearchEl() {
 		return document.getElementById("pickerd-search");
@@ -669,7 +761,7 @@
 			const walk = detailTileWalk();
 			const tile = walk[detailArm.tileIdx];
 			if (tile !== undefined) {
-				const occupied = Math.min(tile.size, listedDetailKeys().length - tile.head);
+				const occupied = tileReadings(tile);
 				const next = materializedTiles(detailArm.tileIdx);
 				if (occupied >= next[detailArm.tileIdx].size && next[detailArm.tileIdx].size < 4) {
 					// The tile is full but can grow: the pick becomes its next cell.
@@ -682,7 +774,7 @@
 				// at the matching detailKeys slot, past a parked primary.
 				detailKeys.splice(rawDetailIndex(tile.head + cell), 0, key);
 				detailTiles = next; // staged and saved together in writeDetailState
-				if (Math.min(next[detailArm.tileIdx].size, listedDetailKeys().length - tile.head) >= 4) {
+				if (tileReadings({ size: next[detailArm.tileIdx].size, head: tile.head }) >= 4) {
 					armDetailAdd(detailArm.tileIdx); // full quad: disarm, and the end marker lights
 				}
 				// After the possible disarm re-render, so the receipt survives
@@ -745,12 +837,15 @@
 	 * label, and its stored color or, on a quad, the identity color that
 	 * cell renders by default. `explicit` marks a color the user actually
 	 * chose, which travels anywhere; an inherited default is only worth
-	 * carrying between quads, where dropping it would recolor the chip. */
+	 * carrying between quads, where dropping it would recolor the chip. A
+	 * tile is a quad when four READINGS sit in it: a ×4 tail holding two
+	 * paints a dual face with no identity colors at all, so a chip leaving
+	 * it wears none and must not carry one off. */
 	function wornDressing(tile, cell) {
 		const stored = tile.spec !== null ? (tile.spec.colors[cell] ?? null) : null;
 		return {
 			label: tile.spec !== null ? (tile.spec.labels[cell] ?? "") : "",
-			color: stored ?? (tile.size === 4 ? (QUAD_DEFAULT_COLORS[cell] ?? null) : null),
+			color: stored ?? (tileReadings(tile) === 4 ? (QUAD_DEFAULT_COLORS[cell] ?? null) : null),
 			explicit: stored !== null
 		};
 	}
@@ -769,7 +864,7 @@
 	function movedDressingPlan(from, to) {
 		const walk = detailTileWalk();
 		const listed = listedDetailKeys();
-		const occupiedOf = (tile) => Math.min(tile.size, listed.length - tile.head);
+		const occupiedOf = (tile) => tileReadings(tile, listed);
 		const stored = [];
 		const worn = [];
 		const tileAt = [];
@@ -787,12 +882,16 @@
 		const at = to > from ? to - 1 : to;
 		after.splice(at, 0, ...after.splice(from, 1));
 		travel.splice(at, 0, ...travel.splice(from, 1));
-		// A cell keeps its stored dressing while its occupant is unchanged.
+		// A cell keeps its stored dressing while its occupant is unchanged. An
+		// inherited default lands only where it will be worn, which means a
+		// tile holding four READINGS: writing one into a ×4 tail that renders
+		// a dual froze that tile into the plan (so it stopped following Tile
+		// shows) to store a color the deck never paints.
 		const dressing = listed.map((key, i) => {
 			if (after[i] === key) return stored[i];
 			const t = walk[tileAt[i]];
 			const d = travel[i];
-			return { label: d.label, color: t.size === 4 || d.explicit ? d.color : null };
+			return { label: d.label, color: occupiedOf(t) === 4 || d.explicit ? d.color : null };
 		});
 		let through = detailTiles.length - 1;
 		dressing.forEach((d, i) => {
@@ -865,22 +964,27 @@
 			moveDetailKey(key, after ? tIdx + 1 : tIdx); // cell order inside one tile: boundaries cannot shear, dressing rides the same splice
 			return;
 		}
+		const occupiedOf = (tile) => tileReadings(tile, listed);
 		const cell = from - walk[fromTileIdx].head;
 		const dressing = wornDressing(walk[fromTileIdx], cell);
 		// An inherited quad default is worth carrying between quads, never
 		// worth freezing a whole tile out of the fill for: only a label or
 		// a color the user chose makes a chip dressed in its own right.
 		const dressed = dressing.label !== "" || dressing.explicit;
-		// Only a quad renders per-cell identity colors, so an inherited
-		// default is stored only where it will actually be worn; a chosen
-		// color rides along whatever size the chip lands in.
-		const carried = (size) => (size === 4 || dressing.explicit ? dressing.color : null);
+		// Only a tile RENDERING four readings paints per-cell identity colors,
+		// so an inherited default is stored only where it will actually be
+		// worn; a chosen color rides along whatever the chip lands in. The
+		// argument is the destination's reading count, not its stored size.
+		const carried = (renders) => (renders === 4 || dressing.explicit ? dressing.color : null);
 		const next =
 			targetKey === null && dressed
-				? walk.map((tile) => occupancySpec(tile, Math.min(tile.size, listed.length - tile.head)))
+				? walk.map((tile) => occupancySpec(tile, occupiedOf(tile)))
 				: materializedTiles(Math.max(fromTileIdx, targetTileIdx));
 		let dissolved = false;
-		if (next[fromTileIdx].size <= 1) {
+		// The tile goes when its last READING leaves, not when its stored size
+		// happens to be 1: a partial tail holding one reading in a wider spec
+		// would otherwise survive as an entry no walk can reach.
+		if (occupiedOf(walk[fromTileIdx]) <= 1) {
 			next.splice(fromTileIdx, 1);
 			dissolved = true;
 		} else {
@@ -889,6 +993,7 @@
 			next[fromTileIdx].colors.splice(cell, 1);
 		}
 		let landAt;
+		let parkedAt = null; // where a full-target park spliced a tile in, else null
 		if (targetKey === null) {
 			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
 			if (dressed) {
@@ -898,32 +1003,50 @@
 			const target = walk[targetTileIdx];
 			const targetAt = dissolved && fromTileIdx < targetTileIdx ? targetTileIdx - 1 : targetTileIdx;
 			const cellInTarget = tIdx - target.head + (after ? 1 : 0);
-			if (target.size < 4) {
-				next[targetAt].size += 1;
+			// Room is a question about READINGS, not about the stored size: only
+			// the tail tile can be partial, and there the two disagree. A tile
+			// with a free cell already has the cell, so it takes the chip
+			// without growing (growing it would declare more cells than the
+			// list can fill, and the walk would stop short of every later
+			// entry, burying the chip's own dressing with them).
+			const spare = occupiedOf(target) < target.size;
+			if (tileTakesCell(target)) {
+				if (!spare) next[targetAt].size += 1;
 				next[targetAt].labels.splice(cellInTarget, 0, dressing.label);
-				next[targetAt].colors.splice(cellInTarget, 0, carried(target.size + 1));
+				next[targetAt].colors.splice(cellInTarget, 0, carried(occupiedOf(target) + 1));
+				// The splice pushed the trailing EMPTY cell past the tile's own
+				// size; a spec must stay exactly as long as it says it is.
+				next[targetAt].labels.length = next[targetAt].size;
+				next[targetAt].colors.length = next[targetAt].size;
 				landAt = tIdx + (after ? 1 : 0) - (from < tIdx + (after ? 1 : 0) ? 1 : 0);
 			} else {
 				// Full target: the chip becomes its own tile on the dropped
 				// side, and the spec splice keeps every later tile's members.
 				const sideBefore = !after && tIdx === target.head;
-				const spliceAt = sideBefore ? targetAt : targetAt + 1;
-				next.splice(spliceAt, 0, { size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
-				const boundary = sideBefore ? target.head : target.head + Math.min(target.size, listed.length - target.head);
+				parkedAt = sideBefore ? targetAt : targetAt + 1;
+				next.splice(parkedAt, 0, { size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
+				const boundary = sideBefore ? target.head : target.head + occupiedOf(target);
 				landAt = boundary - (from < boundary ? 1 : 0);
-				if (detailArm !== null && detailArm.tileIdx >= spliceAt) {
-					detailArm = { tileIdx: detailArm.tileIdx + 1 };
-				}
 			}
 		}
 		detailKeys.splice(detailKeys.indexOf(key), 1);
 		detailKeys.splice(rawDetailIndex(landAt), 0, key);
+		// A standing aim names its tile by index, and this move can change two
+		// of them. Re-anchor in the order the plan actually changed: the source
+		// dissolve first, because that shift is measured in the walk the aim was
+		// set against, THEN the park, because parkedAt is already an index into
+		// the shrunken plan. Both at once, in the other order, moved the aim one
+		// tile too far or read the shifted aim as the dissolved tile and threw
+		// it away, so the next pick landed in a tile nobody aimed at.
 		if (dissolved) {
 			if (detailArm !== null && detailArm.tileIdx === fromTileIdx) {
 				disarmDetailAim();
 			} else if (detailArm !== null && detailArm.tileIdx > fromTileIdx) {
 				detailArm = { tileIdx: detailArm.tileIdx - 1 };
 			}
+		}
+		if (parkedAt !== null && detailArm !== null && detailArm.tileIdx >= parkedAt) {
+			detailArm = { tileIdx: detailArm.tileIdx + 1 };
 		}
 		detailLanded = key;
 		writeDetailTiles(next);
@@ -947,7 +1070,7 @@
 		const listed = listedDetailKeys();
 		const members = listed.slice(from.head, Math.min(from.head + from.size, listed.length));
 		if (members.length === 0) return;
-		const specs = walk.map((tile) => occupancySpec(tile, Math.min(tile.size, listed.length - tile.head)));
+		const specs = walk.map((tile) => occupancySpec(tile, tileReadings(tile, listed)));
 		const movedSpec = specs[fromIdx];
 		const finalIdx = insertBefore > fromIdx ? insertBefore - 1 : insertBefore;
 		specs.splice(fromIdx, 1);
@@ -959,7 +1082,7 @@
 		let landAt = 0;
 		for (let i = 0; i < finalIdx; i++) {
 			const tile = reduced[i];
-			landAt += Math.min(tile.size, listed.length - tile.head);
+			landAt += tileReadings(tile, listed);
 		}
 		for (const k of members) {
 			detailKeys.splice(detailKeys.indexOf(k), 1);
@@ -987,7 +1110,7 @@
 		writeDetailState();
 	}
 
-	function detailChip(key, index, tile, tileIdx, cellIdx) {
+	function detailChip(key, index, tile, tileIdx, cellIdx, fullQuad) {
 		const label = readingLabelOf(key);
 		const chip = document.createElement("span");
 		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
@@ -1010,14 +1133,13 @@
 		});
 		chip.addEventListener("dragover", (ev) => {
 			if (detailTileDrag !== null) return; // a whole-tile drag targets tile boundaries, not cells
+			// Allow the drop and stand the container fallback down; the caret
+			// itself belongs to the holder (wireTileChromeDrop), which runs a
+			// moment later on the same event and is the only place that knows
+			// whether this tile can take the cell or will park the chip beside
+			// it. A bar painted here would be swept there anyway.
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
-			// An honest caret: the midpoint decides before or after, and the
-			// edge bar (box-shadow, layout-neutral) marks the true index.
-			const rect = chip.getBoundingClientRect();
-			const after = ev.clientX > rect.left + rect.width / 2;
-			chip.classList.toggle("drop-after", after);
-			chip.classList.toggle("drop-before", !after);
 		});
 		chip.addEventListener("dragleave", () => chip.classList.remove("drop-before", "drop-after"));
 		chip.addEventListener("drop", (ev) => {
@@ -1087,8 +1209,10 @@
 		remove.setAttribute("aria-label", `Remove ${spokenName} from the detail list`);
 		remove.textContent = "×";
 		chip.append(name);
-		if (tile.size === 4) {
-			// Quad cells carry identity colors, like a standalone quad key.
+		if (fullQuad) {
+			// Quad cells carry identity colors, like a standalone quad key. A
+			// tile is a quad when four READINGS sit in it: that is the only
+			// chunk the deck paints identity colors on (see renderDetailList).
 			const well = document.createElement("input");
 			well.type = "color";
 			well.className = "hw-tile-color";
@@ -1118,7 +1242,10 @@
 		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
 		chip.dataset.key = detailPrimaryKey;
 		const name = document.createElement("span");
-		name.className = "hw-set-name";
+		// `parked` opts out of the rename affordance: this chip holds no cell,
+		// so the delegated click refuses it, and the text cursor and hover
+		// underline every other name wears were an invitation to nothing.
+		name.className = "hw-set-name parked";
 		name.textContent = `${label ?? detailPrimaryKey} (Back tile)`;
 		name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
 		const remove = document.createElement("button");
@@ -1126,6 +1253,9 @@
 		remove.className = "hw-set-remove";
 		remove.dataset.key = detailPrimaryKey;
 		remove.title = "Remove from the detail list";
+		// Named for the same reason every other glyph button is: a bare "×"
+		// announces as nothing at all.
+		remove.setAttribute("aria-label", `Remove ${label ?? detailPrimaryKey} from the detail list`);
 		remove.textContent = "×";
 		chip.append(name, remove);
 		holder.appendChild(chip);
@@ -1160,28 +1290,65 @@
 		return best;
 	}
 
+	/** The room test every chip drop shares, in the mover's own terms (see
+	 * moveDetailChip): a tile takes another cell while it still has a free
+	 * one (only the tail can) or can still grow to four. A tile with
+	 * neither parks the chip beside it as its own one-cell tile. */
+	function tileTakesCell(tile) {
+		return tileReadings(tile) < tile.size || tile.size < 4;
+	}
+
+	/** Paints the caret the DROP will actually honor. A chip edge is honest
+	 * while the target tile can take the cell, and while the drag started
+	 * inside that same tile (a plain cell reorder, which every edge
+	 * honors). Otherwise the chip parks beside the tile, so the honest
+	 * caret is the TILE's own edge, the bar a whole-tile drag paints. A bar
+	 * between two cells of a full quad promised a landing the mover has
+	 * never been able to give. */
+	function paintDropEdge(holder, edge) {
+		if (edge === null) {
+			sweepCarets(null);
+			return;
+		}
+		const tile = detailTileWalk()[Number(edge.chip.dataset.tile)];
+		const source = detailListEl.querySelector(".hw-set-chip.dragging");
+		const inTile = source !== null && source.dataset.tile === edge.chip.dataset.tile;
+		if (tile !== undefined && !inTile && !tileTakesCell(tile)) {
+			// Where the park splices: before only on the head cell's near half.
+			const before = !edge.after && edge.chip.dataset.cell === "0";
+			sweepCarets(holder);
+			holder.classList.toggle("drop-before", before);
+			holder.classList.toggle("drop-after", !before);
+			return;
+		}
+		sweepCarets(edge.chip);
+		edge.chip.classList.toggle("drop-after", edge.after);
+		edge.chip.classList.toggle("drop-before", !edge.after);
+	}
+
 	/** Tile chrome routes a chip drag to the nearest chip edge: every
 	 * pixel of the tile is a drop zone whose landing is the painted
 	 * caret, never a hidden end-of-tile jump. Whole-tile drags bypass
-	 * this (the holder's boundary handlers run first and stop them). */
+	 * this (the holder's boundary handlers run first and stop them).
+	 * This handler owns the caret for the whole tile, chips included: a
+	 * chip painting its own would be swept a moment later by the holder's
+	 * own sweepCarets, and only one place can know whether the drop is a
+	 * cell insert or a park. */
 	function wireTileChromeDrop(holder) {
 		holder.addEventListener("dragover", (ev) => {
 			if (detailTileDrag !== null) return;
 			ev.preventDefault();
 			ev.dataTransfer.dropEffect = "move";
 			const overChip = ev.target instanceof Element ? ev.target.closest(".hw-set-chip") : null;
-			if (overChip !== null) {
-				sweepCarets(overChip); // its own dragover painted the caret
-				return;
-			}
-			const edge = nearestChipEdge(holder, ev.clientX, ev.clientY);
-			if (edge === null) {
-				sweepCarets(null);
-				return;
-			}
-			sweepCarets(edge.chip);
-			edge.chip.classList.toggle("drop-after", edge.after);
-			edge.chip.classList.toggle("drop-before", !edge.after);
+			const chipRect = overChip?.getBoundingClientRect();
+			// A pointer over a chip means that chip's own midpoint; anywhere
+			// else on the chrome means the nearest chip edge. One painter
+			// settles both, because either can turn out to be a park.
+			const edge =
+				overChip !== null && chipRect !== undefined
+					? { chip: overChip, after: ev.clientX > chipRect.left + chipRect.width / 2 }
+					: nearestChipEdge(holder, ev.clientX, ev.clientY);
+			paintDropEdge(holder, edge);
 		});
 		holder.addEventListener("drop", (ev) => {
 			if (detailTileDrag !== null) return; // the boundary handler above stopped real tile drops already
@@ -1243,6 +1410,10 @@
 		// cell rename (the rotation editor holds the same line).
 		const active = document.activeElement;
 		if (active !== null && active.classList.contains("hw-cell-rename")) return;
+		if (detailPressing) {
+			detailRenderQueued = true; // repaint once the press that caused this resolves
+			return;
+		}
 		const frag = document.createDocumentFragment();
 		const listed = listedDetailKeys();
 		const walk = detailTileWalk();
@@ -1257,17 +1428,20 @@
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
-			// A whole-tile drag targets TILE boundaries: the holder's upper
-			// half lands the dragged tile before this one, the lower half
-			// after it. Registered before wireAppendDrop so a tile payload
-			// can stop the key-append path on the same element.
+			// A whole-tile drag targets TILE boundaries: the holder's left
+			// half lands the dragged tile before this one, the right half
+			// after it. The list is a wrapping flex row and the tiles are
+			// inline-flex, so two short tiles share a row: a top/bottom
+			// midpoint cannot tell same-row neighbours apart, and the chips
+			// inside already split on x. Registered before wireAppendDrop so
+			// a tile payload can stop the key-append path on the same element.
 			holder.addEventListener("dragover", (ev) => {
 				if (detailTileDrag === null) return;
 				ev.preventDefault();
 				ev.stopImmediatePropagation();
 				ev.dataTransfer.dropEffect = "move";
 				const rect = holder.getBoundingClientRect();
-				const after = ev.clientY > rect.top + rect.height / 2;
+				const after = ev.clientX > rect.left + rect.width / 2;
 				sweepCarets(holder); // the gap fallback paints holders too; one caret at a time
 				holder.classList.toggle("drop-after", after);
 				holder.classList.toggle("drop-before", !after);
@@ -1280,7 +1454,7 @@
 				// The same honest midpoint the dragover painted, recomputed
 				// from the drop itself (a synthetic drop has no dragover).
 				const rect = holder.getBoundingClientRect();
-				const after = ev.clientY > rect.top + rect.height / 2;
+				const after = ev.clientX > rect.left + rect.width / 2;
 				holder.classList.remove("drop-before", "drop-after");
 				moveDetailTile(detailTileDrag, after ? tileIdx + 1 : tileIdx);
 				detailTileDrag = null;
@@ -1322,7 +1496,16 @@
 			size.title = "Cells on this tile; click to cycle 1, 2, 3, 4";
 			size.textContent = `×${tile.size}`;
 			holder.appendChild(size);
-			if (tile.size === 4) {
+			// The quad knobs follow the READINGS, not the stored size. Only the
+			// tail tile can hold fewer readings than its size says, and the deck
+			// builds its face from the readings it actually has: a chunk of one,
+			// two or three takes a single, dual or triple face, and those read
+			// neither the cell-labels switch nor the identity colors. Offering
+			// either on a half-filled ×4 tail put a control on the panel whose
+			// click the key could not honor, with nothing to say why.
+			const occupied = tileReadings(tile, listed);
+			const fullQuad = tile.size >= 4 && occupied >= 4;
+			if (fullQuad) {
 				const abc = document.createElement("button");
 				abc.type = "button";
 				abc.className = "hw-tile-abc";
@@ -1336,10 +1519,8 @@
 				const index = tile.head + c;
 				const key = listed[index];
 				if (key === undefined) break;
-				holder.appendChild(detailChip(key, index, tile, tileIdx, c));
+				holder.appendChild(detailChip(key, index, tile, tileIdx, c, fullQuad));
 			}
-			const occupied = Math.min(tile.size, listed.length - tile.head);
-			const fullQuad = tile.size >= 4 && occupied >= 4;
 			if (!fullQuad) {
 				const armed = detailArm !== null && detailArm.tileIdx === tileIdx;
 				const lit = detailArm === null && tileIdx === walk.length - 1 && lastHasRoom;
@@ -2317,20 +2498,13 @@
 				return;
 			}
 			if (detailTileDrag !== null) {
-				const after = ev.clientY > target.rect.top + target.rect.height / 2;
+				const after = ev.clientX > target.rect.left + target.rect.width / 2;
 				sweepCarets(target.holder);
 				target.holder.classList.toggle("drop-after", after);
 				target.holder.classList.toggle("drop-before", !after);
 				return;
 			}
-			const edge = nearestChipEdge(target.holder, ev.clientX, ev.clientY);
-			if (edge === null) {
-				sweepCarets(null);
-				return;
-			}
-			sweepCarets(edge.chip);
-			edge.chip.classList.toggle("drop-after", edge.after);
-			edge.chip.classList.toggle("drop-before", !edge.after);
+			paintDropEdge(target.holder, nearestChipEdge(target.holder, ev.clientX, ev.clientY));
 		});
 		detailListEl.addEventListener("drop", (ev) => {
 			if (ev.defaultPrevented) return;
@@ -2342,7 +2516,7 @@
 			if (detailTileDrag !== null) {
 				const tiles = [...detailListEl.querySelectorAll(".hw-tile:not(.ghost)")];
 				const idx = tiles.indexOf(target.holder);
-				const after = ev.clientY > target.rect.top + target.rect.height / 2;
+				const after = ev.clientX > target.rect.left + target.rect.width / 2;
 				moveDetailTile(detailTileDrag, ghost || idx < 0 ? detailTileWalk().length : after ? idx + 1 : idx);
 				detailTileDrag = null;
 				return;
@@ -2440,6 +2614,16 @@
 		// results stay open and the pick flow never restarts.
 		detailListEl.addEventListener("mousedown", (ev) => {
 			if (ev.target.closest(".hw-add") !== null) ev.preventDefault();
+			// Hold the repaint for the length of this press (see detailPressing):
+			// the blur it causes can commit or abandon a cell rename, and a
+			// rebuild before mouseup would take the pressed control with it.
+			detailPressing = true;
+			clearTimeout(detailPressTimer);
+			// A zero timer on mouseup lands after this press's own click has
+			// been dispatched; the ceiling covers a release the window never
+			// sees (a drag out of the webview), so nothing strands the repaint.
+			detailPressTimer = setTimeout(releaseDetailPress, 500);
+			window.addEventListener("mouseup", () => setTimeout(releaseDetailPress, 0), { once: true });
 		});
 		// Cell-rename commit and teardown, byte-parallel to the rotation
 		// chips: change writes once, blur without an edit restores the span,
@@ -2612,8 +2796,10 @@
 		const fill = async () => {
 			// Asymmetric client shapes: getSettings resolves the payload
 			// envelope, getGlobalSettings resolves the bare settings object.
+			// Every reading key goes out wearing its friendly name; apply
+			// takes the names back off, so nothing stale is ever stored.
 			const own = await streamDeckClient.getSettings();
-			configKeyEl.value = canonical(own?.settings);
+			configKeyEl.value = canonical(mapReadingKeys(own?.settings, namedKey));
 			configDeckEl.value = canonical(await streamDeckClient.getGlobalSettings());
 		};
 		// Filling is a read; it happens when the fold opens, never a write.
@@ -2643,7 +2829,10 @@
 				say("Refused: the document must be one JSON object.");
 				return;
 			}
-			write(doc);
+			// Names come off here, whether this build wrote them or a person
+			// typed them: what lands in settings is keys alone. A document
+			// that never carried a name passes through unchanged.
+			write(mapReadingKeys(doc, bareKey));
 			say(`Applied the ${what} document; reloading the panel.`);
 			setTimeout(() => window.location.reload(), 350);
 		};

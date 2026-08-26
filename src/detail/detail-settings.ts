@@ -264,11 +264,22 @@ export function detailKeysOf(settings: { detailKeys?: unknown }): readonly strin
 	const seen = new Set<string>();
 	const keys: string[] = [];
 	for (const entry of raw) {
-		if (typeof entry !== "string" || entry === "" || seen.has(entry)) {
+		if (typeof entry !== "string") {
 			continue;
 		}
-		seen.add(entry);
-		keys.push(entry);
+		// The property inspector's config document appends each reading's
+		// friendly name after its key so a person can read the list and
+		// reorder it. The panel strips those on apply, so settings written
+		// through it never carry one; a document pasted straight into a
+		// settings file by hand does, and lands here. A key is colon-separated
+		// hex and never contains a space, so taking everything before the
+		// first whitespace can only ever drop an appended name.
+		const key = entry.trim().split(/\s+/)[0] ?? "";
+		if (key === "" || seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		keys.push(key);
 		if (keys.length >= DETAIL_KEYS_MAX) {
 			break;
 		}

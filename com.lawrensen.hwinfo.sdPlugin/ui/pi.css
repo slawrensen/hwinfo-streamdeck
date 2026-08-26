@@ -263,6 +263,24 @@ details > summary:hover {
 	text-decoration: underline dotted;
 }
 
+/* The parked primary's name. It has no cell, so there is no cell label to
+   rename and the click handler refuses it: drop the affordance too. */
+.hw-set-name.parked {
+	cursor: default;
+}
+
+.hw-set-name.parked:hover {
+	text-decoration: none;
+}
+
+/* A cell wearing the user's own label rather than HWiNFO's. The panel has
+   marked these since the cell rename shipped and nothing painted them, so
+   an override read exactly like the sensor's own name. Brighter, the same
+   way a planned tile reads brighter than the uniform fill. */
+.hw-set-name.renamed {
+	color: #e8eaed;
+}
+
 /* Chip rename input: group-name look, chip-sized. */
 .hw-chip-rename {
 	flex: 0 1 auto;
@@ -854,7 +872,9 @@ details .hw-section {
 }
 
 /* Whole-tile drag: the grip is the handle, and the landing edge is the
-   tile's top or bottom, matching the chips' left/right bars. */
+   tile's left or right, the same rule the chips' bars follow. The list is
+   a wrapping flex row (.hw-set) of inline-flex tiles, so two short tiles
+   share a row and the side is a question about x, not y. */
 .hw-tile-grip {
 	background: none;
 	border: none;
@@ -875,11 +895,11 @@ details .hw-section {
 }
 
 .hw-tile.drop-before {
-	box-shadow: 0 -3px 0 0 #4cc2ff;
+	box-shadow: -3px 0 0 0 #4cc2ff;
 }
 
 .hw-tile.drop-after {
-	box-shadow: 0 3px 0 0 #4cc2ff;
+	box-shadow: 3px 0 0 0 #4cc2ff;
 }
 
 .hw-tile.drop-append .hw-add {

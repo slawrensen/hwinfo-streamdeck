@@ -53,6 +53,25 @@ describe("detail settings parsing", () => {
 		assert.deepEqual(detailKeysOf({ detailKeys: "nope" as unknown as string[] }), []);
 	});
 
+	it("detailKeys: a friendly name pasted after a key is dropped, and dedupe sees through it", () => {
+		// The config document writes "<key>  <reading name>" so a person can
+		// read a nineteen-entry list and reorder it. The panel strips the name
+		// on apply; a document pasted straight into a settings file by hand
+		// does not go through the panel and lands here still wearing them.
+		assert.deepEqual(
+			detailKeysOf({
+				detailKeys: ["f0000301:0:8000005  Physical Memory Load", "f0000300:0:7000000  Core 0 T0 Usage", "e0002000:0:5000000"] as unknown as string[]
+			}),
+			["f0000301:0:8000005", "f0000300:0:7000000", "e0002000:0:5000000"]
+		);
+		// The same reading twice, once named and once bare, is one reading.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["a  GPU Power", "a"] as unknown as string[] }), ["a"]);
+		// A name is not a key: an entry that is only whitespace still drops.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["   ", "\t", "b  Name"] as unknown as string[] }), ["b"]);
+		// Tabs and runs of spaces separate just as well as the two the panel writes.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["c\tCPU Die (average)", " d   Page File Total "] as unknown as string[] }), ["c", "d"]);
+	});
+
 	it("detailKeys: capped without erroring", () => {
 		const many = Array.from({ length: DETAIL_KEYS_MAX + 40 }, (_, i) => `k${i}`);
 		const parsed = detailKeysOf({ detailKeys: many });

@@ -81,9 +81,4 @@ export class PressEngine {
 			session.timer = null;
 		}
 	}
-
-	/** True while a session is armed or consumed-but-unreleased. */
-	hasSession(contextId: string): boolean {
-		return this.sessions.has(contextId);
-	}
 }

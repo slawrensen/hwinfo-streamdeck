@@ -2062,6 +2062,44 @@ try {
 	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
 
+	// ---- leg C: Copy hands out the settings of now, not of fold-open -----
+	// The help sells Copy as the exact settings this key runs on. An edit
+	// made while the fold stays open must reach the next Copy: an
+	// untouched well refills first (a read), and a hand-edited draft is
+	// the one thing Copy must never overwrite.
+	check("leg C: reopened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(600);
+	mark = writes.length;
+	const gmark = globalWrites.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="-1"]')?.click()`);
+	await sleep(700);
+	frame = atomic("leg C in-fold edit", writes.slice(mark));
+	check("leg C: the edit landed while the fold stayed open", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:5"]), JSON.stringify(frame.detailKeys));
+	await evaluate(`document.getElementById("config-key-copy")?.click()`);
+	await sleep(500);
+	let legCDoc = null;
+	try {
+		legCDoc = JSON.parse((await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value);
+	} catch {
+		legCDoc = null;
+	}
+	check("leg C: Copy refreshed the untouched well to the post-edit settings", legCDoc?.detailKeys?.[0] === "bench:0:0  Bench 0", JSON.stringify(legCDoc?.detailKeys));
+	check("leg C: the refresh was a read, not a write", writes.length === mark + 1 && globalWrites.length === gmark, `${writes.length - mark}/${globalWrites.length - gmark}`);
+	check("leg C: the note reported an honest outcome", /^(Copied\.|Copy failed;)/.test(String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value)), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	await evaluate(`(() => {
+		const el = document.getElementById("config-key");
+		el.value = "{ draft";
+		el.dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("config-key-copy").click();
+	})()`);
+	await sleep(500);
+	check("leg C: a hand-edited draft copies as typed, never overwritten", (await evaluate(`document.getElementById("config-key")?.value`)).result?.value === "{ draft", String((await evaluate(`document.getElementById("config-key")?.value`)).result?.value));
+
 	// ---- run 7c: a real press survives the rename it tears down (leg R) --
 	// Every other leg drives the panel with element.click(), which fires no
 	// mousedown and so cannot see this: opening a cell rename and then

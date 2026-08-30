@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.5.1.0-8";
+	const PI_BUILD = "1.5.1.0-10";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -2793,14 +2793,30 @@
 			configNote.hidden = false;
 			configNote.textContent = text;
 		};
-		const fill = async () => {
+		// A hand-edit marks its well dirty; a fill takes the mark back off.
+		// Copy refreshes an untouched well first, so the backup is the
+		// settings of the moment the button is pressed, not of fold-open.
+		// A dirty well copies the draft exactly as typed.
+		const dirty = new WeakSet();
+		for (const well of [configKeyEl, configDeckEl]) {
+			well.addEventListener("input", () => dirty.add(well));
+		}
+		const fillWell = async (el) => {
 			// Asymmetric client shapes: getSettings resolves the payload
 			// envelope, getGlobalSettings resolves the bare settings object.
 			// Every reading key goes out wearing its friendly name; apply
 			// takes the names back off, so nothing stale is ever stored.
-			const own = await streamDeckClient.getSettings();
-			configKeyEl.value = canonical(mapReadingKeys(own?.settings, namedKey));
-			configDeckEl.value = canonical(await streamDeckClient.getGlobalSettings());
+			if (el === configKeyEl) {
+				const own = await streamDeckClient.getSettings();
+				el.value = canonical(mapReadingKeys(own?.settings, namedKey));
+			} else {
+				el.value = canonical(await streamDeckClient.getGlobalSettings());
+			}
+			dirty.delete(el);
+		};
+		const fill = async () => {
+			await fillWell(configKeyEl);
+			await fillWell(configDeckEl);
 		};
 		// Filling is a read; it happens when the fold opens, never a write.
 		const fold = document.querySelector('details[data-fold="advanced"]');
@@ -2808,14 +2824,17 @@
 			if (fold.open) fill();
 		});
 		const copy = (el) => async () => {
-			const text = el.value;
+			if (!dirty.has(el)) {
+				await fillWell(el);
+			}
+			let ok = true;
 			try {
-				await navigator.clipboard.writeText(text);
+				await navigator.clipboard.writeText(el.value);
 			} catch {
 				el.select();
-				document.execCommand("copy");
+				ok = document.execCommand("copy");
 			}
-			say("Copied.");
+			say(ok ? "Copied." : "Copy failed; select the text and copy by hand.");
 		};
 		const apply = (el, write, what) => () => {
 			let doc;

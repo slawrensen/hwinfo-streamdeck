@@ -63,7 +63,12 @@ describe("press engine", () => {
 		fire();
 		engine.keyUp("ctx");
 		assert.deepEqual(outcomes, [{ id: "ctx", outcome: "hold" }]);
-		assert.equal(engine.hasSession("ctx"), false);
+		engine.keyDown("ctx"); // the session is gone: a fresh press starts clean
+		engine.keyUp("ctx");
+		assert.deepEqual(outcomes, [
+			{ id: "ctx", outcome: "hold" },
+			{ id: "ctx", outcome: "tap" }
+		]);
 	});
 
 	it("cancel kills the session with no outcome, and the stale timer stays dead", () => {

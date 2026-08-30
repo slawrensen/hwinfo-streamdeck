@@ -367,6 +367,7 @@ details > summary:hover {
 	margin-top: 6px;
 }
 
+.hw-config-row button,
 .hw-set-actions button,
 .hw-support {
 	background: #3d3d3d;
@@ -407,18 +408,11 @@ details > summary:hover {
 	gap: 6px;
 }
 
+/* Shares the panel button recipe (the .hw-set-actions group); only
+   the size and padding are this row's own. */
 .hw-config-row button {
-	background: #3d3d3d;
-	border: 1px solid #555555;
-	border-radius: 3px;
-	color: #d8d8d8;
-	cursor: pointer;
-	font-family: "Segoe UI", Arial, sans-serif;
+	font-size: 8.5pt;
 	padding: 2px 10px;
-}
-
-.hw-config-row button:hover {
-	background: #4a4a4a;
 }
 
 .hw-set-actions button {
@@ -426,6 +420,7 @@ details > summary:hover {
 	padding: 2px 8px;
 }
 
+.hw-config-row button:hover,
 .hw-set-actions button:hover,
 .hw-support:hover {
 	background: #4a4a4a;
@@ -704,10 +699,10 @@ details .hw-section {
 	cursor: default;
 }
 
-/* Hand-grouped detail tiles: one bordered run per tile, its size cycler
-   in front, chips (with their per-cell label fields and quad color
-   wells) inside. A planned tile reads slightly brighter than the
-   uniform fill so the hand-made part is visible at a glance. */
+/* Hand-grouped detail tiles: one bordered run per tile, its drag grip
+   and size cycler in front, chips (names rename on click; quad cells
+   add color wells) inside. A planned tile reads slightly brighter than
+   the uniform fill so the hand-made part is visible at a glance. */
 .hw-tile {
 	display: inline-flex;
 	align-items: center;
@@ -876,8 +871,6 @@ details .hw-section {
    a wrapping flex row (.hw-set) of inline-flex tiles, so two short tiles
    share a row and the side is a question about x, not y. */
 .hw-tile-grip {
-	background: none;
-	border: none;
 	color: #7c8694;
 	cursor: grab;
 	padding: 0 2px;

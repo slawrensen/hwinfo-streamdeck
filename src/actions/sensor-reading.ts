@@ -106,9 +106,10 @@ export type ReadingSettings = {
 	 * else keeps the original one-reading tiles. The panel's select
 	 * writes strings; the parser also takes the bare numbers. */
 	detailDensity?: string;
-	/** Exactly true: inside the view, the reading slot on this key's own
-	 * cell doubles as a second Back (the mirror). Off by default: one
-	 * movable Back beat two fixed ones for the issue #5 testers. */
+	/** Exactly false disables the mirror: inside the view, the reading
+	 * slot on this key's own cell doubles as a second Back by default
+	 * (tap in, tap out, one finger); untick to keep the movable top-left
+	 * Back as the one way out. */
 	detailMirrorBack?: boolean;
 	/**
 	 * Baked navigation role. The revision-2 detail profiles ship their
@@ -348,8 +349,8 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			snapshot: status.state === "unavailable" ? null : status.snapshot,
 			// The opener's own cell: a detail reading slot on the same cell
 			// becomes the mirror Back tile (tap in, tap out, one finger).
-			// Opt-in per key; without it the cell is simply not captured and
-			// the whole mirror path stays inert.
+			// On by default; an explicit false skips the capture and the
+			// whole mirror path stays inert.
 			openerCell: detailMirrorBackOf(state.settings) && act.coordinates !== undefined ? { column: act.coordinates.column, row: act.coordinates.row } : undefined
 		});
 		if (result !== "entered") {

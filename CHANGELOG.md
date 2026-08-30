@@ -13,6 +13,12 @@ Elgato Marketplace listing is a separate track.
   tiles, so a Stream Deck + XL page can list up to 128 readings at
   once. One reading per tile stays the default and keeps the page
   exactly as it was.
+- The second Back under your finger is now on by default: press a key
+  to open its details and the same cell becomes a Back tile, so the
+  finger that pressed in presses right back out. The movable top-left
+  Back stays as well. Untick "Repeat Back under this key's own cell"
+  to keep only the top-left Back; a choice you already made either
+  way is preserved. (1.5.0 shipped this off by default.)
 - A custom sensor list can group and dress its tiles one by one. Each
   tile in the list grows a size cycler and per-cell labels (click a
   name to rename it), and a four-reading tile adds per-cell colors

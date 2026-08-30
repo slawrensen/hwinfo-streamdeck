@@ -127,9 +127,9 @@ function removeDetailSurface(send, device, cells, suffix = "") {
 	}
 }
 
-function slotPress(send, device, coord, settings) {
+function slotPress(send, device, coord, settings, suffix = "") {
 	const [column, row] = coord.split(",").map(Number);
-	const context = slotCtx(device, coord);
+	const context = slotCtx(device, coord, suffix);
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.detail-slot", context, device, payload: { settings, coordinates: { column, row } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.detail-slot", context, device, payload: { settings, coordinates: { column, row } } });
 }
@@ -454,7 +454,7 @@ async function scenario(send) {
 	await sleep(300);
 	results.r2AllBackWrites = setSettings.filter((s) => s.context === r2BackCtx || s.context === dev1BackCtx).length;
 
-	// T. Filter mode + the OPT-IN mirror Back, self-contained on its own
+	// T. Filter mode + the mirror Back, explicitly on, self-contained on its own
 	// device: a glob-driven group opens, and with detailMirrorBack set the
 	// reading slot on the OPENER'S OWN CELL renders the opener face with
 	// the return mark, the readings flow around it (step shrinks, nothing
@@ -482,10 +482,9 @@ async function scenario(send) {
 	removeDetailSurface(send, "devflt", fltCells);
 	await sleep(300);
 
-	// U. The mirror is opt-in (issue #5 feedback): the same shape WITHOUT
-	// detailMirrorBack keeps the opener's cell as an ordinary reading slot,
-	// pressing it stays in the view, and the canonical top-left Back is
-	// the one way out.
+	// U. The mirror is the DEFAULT (1.6.0 flip): the same shape WITHOUT
+	// detailMirrorBack puts the second Back on the opener's cell, pressing
+	// it leaves like Back, and the canonical top-left Back still works.
 	const defOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
 	appearOpener(send, "ctx-def", "devdef", defOpener, { column: 2, row: 1 });
 	await sleep(300);
@@ -499,8 +498,15 @@ async function scenario(send) {
 	const defOpenerCell = fltCells.find((c) => c.coord === "2,1");
 	const switchesBeforeDef = switches.length;
 	slotPress(send, "devdef", defOpenerCell.coord, defOpenerCell.settings);
-	await sleep(400);
+	await waitUntil(() => switches.length > switchesBeforeDef, 500);
 	results.defCellPressSwitched = switches.length > switchesBeforeDef;
+	results.defMirrorSwitch = switches.length > switchesBeforeDef ? switches.at(-1) : undefined;
+	// The mirror press above LEFT the view, so this device is inside the
+	// 1500 ms leave debounce (navigation.ts LEAVE_DEBOUNCE_MS): a second
+	// leave inside it collapses into the first by design. Dwell past the
+	// window, as leg G does, so the canonical Back below is a real press
+	// and not a swallowed one.
+	await sleep(1700);
 	// The active-revision Back cell is a real Sensor Reading (detailRole),
 	// not a hidden slot binding: press it as the reading action.
 	const defBackCell = fltCells.find((c) => c.settings.detailRole === "back");
@@ -510,8 +516,32 @@ async function scenario(send) {
 	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
 	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: defBackCtx, device: "devdef", payload: { settings: defBackCell.settings, coordinates: { column: defBackCol, row: defBackRow } } });
 	await waitUntil(() => switches.length > switchesBeforeDefBack, 500);
-	results.defBackSwitch = switches.at(-1);
+	// Guarded: the mirror press just above now leaves too, and its switch
+	// wears the same shape, so an unguarded at(-1) could pass on it.
+	results.defBackSwitch = switches.length > switchesBeforeDefBack ? switches.at(-1) : undefined;
 	removeDetailSurface(send, "devdef", fltCells);
+	await sleep(300);
+
+	// U2. Exactly false is the opt-out: the opener's cell stays an
+	// ordinary reading slot and pressing it stays in the view; the
+	// top-left Back is then the one way out. Same device as leg U, so the
+	// surface takes a suffix: without it latestSvg could read leg U's
+	// mirror frame off the identically named slot.
+	const def2Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailMirrorBack: false };
+	appearOpener(send, "ctx-def2", "devdef", def2Opener, { column: 2, row: 1 });
+	await sleep(300);
+	await keyPress(send, "ctx-def2", "devdef", def2Opener);
+	await sleep(500);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-def2", device: "devdef", payload: { settings: def2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devdef", fltCells, "-d2");
+	await sleep(1600);
+	results.def2OpenerCellFace = latestSvg(slotCtx("devdef", "2,1", "-d2"));
+	const def2OpenerCell = fltCells.find((c) => c.coord === "2,1");
+	const switchesBeforeDef2 = switches.length;
+	slotPress(send, "devdef", def2OpenerCell.coord, def2OpenerCell.settings, "-d2");
+	await sleep(400);
+	results.def2CellPressSwitched = switches.length > switchesBeforeDef2;
+	removeDetailSurface(send, "devdef", fltCells, "-d2");
 	await sleep(300);
 
 	// V. Dense tiles, two readings per tile (issue #5 follow-up). The fake
@@ -576,7 +606,7 @@ async function scenario(send) {
 	removeDetailSurface(send, "devden4", fltCells);
 	await sleep(300);
 
-	// X. Three per tile PLUS the opt-in mirror: the mirror still costs one
+	// X. Three per tile PLUS the mirror (explicitly on): the mirror still costs one
 	// TILE (the readings flow around it), the first tile rows three
 	// readings, and pressing the mirror cell leaves exactly like Back.
 	const den3Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailDensity: "3", detailMirrorBack: true };
@@ -719,10 +749,13 @@ async function finish() {
 	check("filter title shows the glob range 1-2 / 2", typeof results.fltTitleFace === "string" && results.fltTitleFace.includes(">1-2 / 2<"), (results.fltTitleFace ?? "no frame").slice(0, 160));
 	check("readings flow around the mirror (slot 0 stays live)", typeof results.fltSlot0Face === "string" && results.fltSlot0Face.includes("<text"), (results.fltSlot0Face ?? "no frame").slice(0, 100));
 	check("pressing the mirror cell left the view (restore, name omitted)", results.fltMirrorSwitch !== undefined && results.fltMirrorSwitch.device === "devflt" && results.fltMirrorSwitch.profile === undefined, JSON.stringify(results.fltMirrorSwitch));
-	check("without the opt-in, the opener's cell carries no return mark", typeof results.defOpenerCellFace === "string" && !results.defOpenerCellFace.includes("M33 119"), (results.defOpenerCellFace ?? "no frame").slice(0, 140));
+	check("the default puts the mirror Back on the opener's cell", typeof results.defOpenerCellFace === "string" && results.defOpenerCellFace.includes("M33 119"), (results.defOpenerCellFace ?? "no frame").slice(0, 140));
 	check("the canonical Back on that live surface still wears the mark", typeof results.defBackFace === "string" && results.defBackFace.includes("M33 119"), (results.defBackFace ?? "no frame").slice(0, 140));
-	check("without the opt-in, pressing that cell stays in the view", results.defCellPressSwitched === false, JSON.stringify(results.defCellPressSwitched));
-	check("the canonical Back still leaves (restore, name omitted)", results.defBackSwitch !== undefined && results.defBackSwitch.device === "devdef" && results.defBackSwitch.profile === undefined, JSON.stringify(results.defBackSwitch));
+	check("the default mirror leaves the view on press", results.defCellPressSwitched === true, JSON.stringify(results.defCellPressSwitched));
+	check("the default mirror press restored (name omitted)", results.defMirrorSwitch !== undefined && results.defMirrorSwitch.device === "devdef" && results.defMirrorSwitch.profile === undefined, JSON.stringify(results.defMirrorSwitch));
+	check("the canonical Back still leaves with the mirror present (restore, name omitted)", results.defBackSwitch !== undefined && results.defBackSwitch.device === "devdef" && results.defBackSwitch.profile === undefined, JSON.stringify(results.defBackSwitch));
+	check("exactly false keeps the opener's cell an ordinary reading slot", typeof results.def2OpenerCellFace === "string" && !results.def2OpenerCellFace.includes("M33 119"), (results.def2OpenerCellFace ?? "no frame").slice(0, 140));
+	check("exactly false: pressing that cell stays in the view", results.def2CellPressSwitched === false, JSON.stringify(results.def2CellPressSwitched));
 
 	// Dense tiles (readings per tile). Every asserted face is CONSTANT by
 	// construction (the fake's fan, volt and core readings never move).
@@ -733,7 +766,7 @@ async function finish() {
 		(results.den2OpenerFace ?? "no frame").slice(0, 160)
 	);
 	check("a multi-reading opener's press still entered the class profile", results.den2Switch?.device === "devden2" && results.den2Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den2Switch));
-	check("density 2 title counts READINGS (1-6 / 6 on 11 tiles)", typeof results.den2TitleFace === "string" && results.den2TitleFace.includes(">1-6 / 6<"), (results.den2TitleFace ?? "no frame").slice(0, 160));
+	check("density 2 title counts READINGS (1-6 / 6)", typeof results.den2TitleFace === "string" && results.den2TitleFace.includes(">1-6 / 6<"), (results.den2TitleFace ?? "no frame").slice(0, 160));
 	check(
 		"density 2 tile 0 rows fan and volt together (constant values)",
 		typeof results.den2Slot0Face === "string" && results.den2Slot0Face.includes(">Test Fan<") && results.den2Slot0Face.includes(">Test Volt<") && results.den2Slot0Face.includes(">1200<") && results.den2Slot0Face.includes(">12.1<"),

@@ -230,12 +230,15 @@ export function detailTilesOf(settings: { detailTiles?: unknown }): readonly Det
 
 /**
  * Whether the opener also becomes a Back tile at its own cell inside the
- * view (the mirror). Off unless exactly true: testers found two Back
- * tiles per page more confusing than one they can move, so the fixed
- * top-left Back is the only default way out (issue #5 feedback).
+ * view (the mirror). ON unless exactly false: the finger that pressed in
+ * presses right back out, and the movable top-left Back works regardless.
+ * 1.5.0 shipped this opt-in after issue #5 testing preferred one movable
+ * Back; 1.6.0 makes the same-finger exit the default again (the owner's
+ * call), with the untick as the way back to a single Back. Absent, junk
+ * and hand-edited values all land on the default, never rewritten.
  */
 export function detailMirrorBackOf(settings: { detailMirrorBack?: unknown }): boolean {
-	return settings.detailMirrorBack === true;
+	return settings.detailMirrorBack !== false;
 }
 
 /**

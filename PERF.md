@@ -30,7 +30,7 @@ zero orphan processes after the full suite.
 ### 2026-08-30: 1.6.0.0 release snapshot, and the soak this tag waits on
 
 `node scripts/perf-report.mjs` against the packed release artifact
-(`d375e08f…`, 284,743 B; gzip 274,557 B). The pack grew about 27.5 KB
+(`54913122…`, 284,760 B; gzip 274,616 B). The pack grew about 27.5 KB
 over 1.5.1.0, almost all of it ui/ (the tile editor and the Config
 section in pi-common.js and pi.css, now 243,786 B); bin/plugin.js is
 185,514 B, and `hwsm.node` is byte-identical to the 1.5.0.0 and

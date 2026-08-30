@@ -255,16 +255,18 @@ try {
 		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
 	})()`));
 
-	// ---- key PI: the Second Back checkbox ticked (the opt-in second Back) ----
-	expectOk("second-back ticked", await evaluate(`(() => {
+	// ---- key PI: the Second Back checkbox, ticked by default (1.6.0) ----
+	expectOk("second-back ticked by default", await evaluate(`(() => {
 		const el = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]');
 		if (!el) return "missing";
 		const input = (el.shadowRoot ?? el).querySelector("input[type=checkbox]");
 		if (!input) return "no input";
-		input.click();
-		return input.checked === true ? "ok" : "did not tick";
+		// No click: the mirror is on by default, and this pins the
+		// default="true" attribute actually rendering ticked in a real
+		// webview with no stored setting and no write.
+		return input.checked === true ? "ok" : "not ticked by default";
 	})()`));
-	await sleep(600); // the setting echo settles so the tick is stored state, not a mid-write frame
+	await sleep(600); // layout settles before the clip is measured
 	await captureClipped("pi-key-detail-back.png", await evaluate(`(() => {
 		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
 		const block = document.getElementById("detail-config");
@@ -274,7 +276,8 @@ try {
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
 	})()`));
-	// Untick: every later state shows the default-off panel.
+	// Untick: an explicit false (the opt-out), so later states show the
+	// single-Back panel and the stored-false path gets exercised too.
 	expectOk("second-back cleared", await evaluate(`(() => {
 		const input = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]').shadowRoot.querySelector("input[type=checkbox]");
 		input.click();

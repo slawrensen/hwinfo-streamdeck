@@ -35,21 +35,23 @@ describe("detailRoleOf", () => {
 		assert.equal(detailRoleOf({ detailRole: "back-v2" }), undefined);
 	});
 
-	it("the mirror Back is opt-in: exactly true and nothing else", () => {
-		// Issue #5 feedback: two Back tiles per page beat one movable one for
-		// nobody, so the mirror is off unless the key asks for it.
-		assert.equal(detailMirrorBackOf({ detailMirrorBack: true }), true);
-		for (const value of [undefined, false, "true", 1, null, {}, []] as unknown[]) {
-			assert.equal(detailMirrorBackOf({ detailMirrorBack: value } as { detailMirrorBack?: unknown }), false, JSON.stringify(value));
-		}
-		assert.equal(detailMirrorBackOf({}), false);
-	});
-
 	it("the role never affects pressBehavior parsing (separate axes)", () => {
 		// A marked tile still carries whatever pressBehavior the profile or
 		// a copy brought along; the ACTION checks the role first, but the
 		// parsers stay independent so ordinary keys are untouched.
 		assert.equal(pressBehaviorOf({ pressBehavior: "open-details", detailRole: "back" } as { pressBehavior?: unknown }), "open-details");
 		assert.equal(pressBehaviorOf({ detailRole: "back" } as { pressBehavior?: unknown }), "cycle-stat");
+	});
+});
+
+describe("detailMirrorBackOf", () => {
+	it("the mirror is on unless exactly false; junk lands on the default", () => {
+		assert.equal(detailMirrorBackOf({}), true); // absent: the default
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: true }), true);
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: false }), false); // the one opt-out
+		// Hand-edited junk never disables by accident: salvage to the default.
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: "false" }), true);
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: 0 }), true);
+		assert.equal(detailMirrorBackOf({ detailMirrorBack: null }), true);
 	});
 });

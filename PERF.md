@@ -27,6 +27,30 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-08-30: 1.6.0.0 release snapshot, and the soak this tag waits on
+
+`node scripts/perf-report.mjs` against the packed release artifact
+(`d375e08f…`, 284,743 B; gzip 274,557 B). The pack grew about 27.5 KB
+over 1.5.1.0, almost all of it ui/ (the tile editor and the Config
+section in pi-common.js and pi.css, now 243,786 B); bin/plugin.js is
+185,514 B, and `hwsm.node` is byte-identical to the 1.5.0.0 and
+1.5.1.0 releases (`git diff v1.5.1..HEAD -- native/` is empty), so the
+native bytes are the exact ones the 2026-07-31 48 h soak proved. The
+parse path is unchanged: shared-memory tick 8.6 µs mean / 11.3 µs p95
+over 521 live readings (1,000 iterations, 242.1 KB region). At
+snapshot time the machine's two live plugin processes (retail
+1.5.1.0 plus the dev clone) showed 0.16% / 0.01% avg CPU and
+46.1 / 40.2 MB RSS after 24.5 h of desk use, the baseline the soak
+below compares against. Dense-tile render cost was measured before the
+feature shipped; see the 2026-08-03 entry.
+
+The runbook's soak rule does not bind this release (`native/hwsm` and
+`src/poller.ts` are untouched since the soaked bytes), but the tag is
+held on a 48 h desk-use soak of the installed 1.6.0.0 pack anyway:
+`node scripts/soak-monitor.mjs` external sampling into `release/`,
+with one HWiNFO restart, one Stream Deck restart and one sleep/wake
+inside the window. The summary lands here when the window closes.
+
 ### 2026-08-11: 1.5.1 soak scope, and why this poller change did not get one
 
 The runbook requires a hardware soak for any release touching the poller,

@@ -3,6 +3,49 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.6.0.0 - 2026-08-30
+
+- A detail tile can carry one to four readings. The new Tile shows
+  setting packs two, three or four readings onto each tile of the
+  drill-down view, using the same stacked, row and quad faces regular
+  keys have: a dense tile shows one shared stat badge, a press cycles
+  everything on it together, and paging counts readings rather than
+  tiles, so a Stream Deck + XL page can list up to 128 readings at
+  once. One reading per tile stays the default and keeps the page
+  exactly as it was.
+- A custom sensor list can group and dress its tiles one by one. Each
+  tile in the list grows a size cycler and per-cell labels (click a
+  name to rename it), and a four-reading tile adds per-cell colors
+  with a switch to bare color-coded values, the same knobs a regular
+  key of that size has. Chips drag between tiles with the landing
+  point painted at the cell edge nearest the pointer, whole tiles
+  drag (and arrow-key) as one unit, and a reading's label and color
+  travel with it wherever it moves. Removing a reading shrinks the
+  tile that held it instead of pulling the next reading up into a
+  layout you were looking at.
+- The settings panel's Advanced fold gains a Config section: this
+  key's (or dial's) settings and the deck-wide settings as one JSON
+  document you can copy, keep and apply, for backing up a hand-built
+  layout or cloning it onto another key or machine. Reading keys in
+  the document carry their friendly sensor names so the list reads
+  and reorders by hand; Apply strips the names, replaces the whole
+  document in one write, and reloads the panel. Copy always hands out
+  the settings of the moment you press it, and says so honestly if
+  the clipboard refuses.
+- The detail filter got faster and more talkative: the pattern
+  matcher now runs in linear time (an adversarial pattern could
+  previously stall a match for minutes, re-run every poll), and the
+  panel shows a live match count under the filter field before you
+  ever press the key.
+- Hardening across the faces: hostile text degrades instead of
+  breaking a render (a lone UTF-16 surrogate no longer aborts the
+  face, an absurdly long pasted label no longer stalls a tick, a
+  hand-edited decimals value falls back to auto), an invalid per-key
+  theme now follows the deck default instead of the built-in one,
+  faces repaint when their data changes rather than on every clock
+  tick, and the HWiNFO Control success badge can no longer hold a
+  closing plugin process open for its last 700 ms.
+
 ## 1.5.1.0 - 2026-08-11
 
 - Sparklines no longer disappear for good after a Poll interval change.

@@ -28,8 +28,8 @@
 
 	const MAX_ROWS = 150;
 	const SENSOR_TYPE_NAMES = ["", "Temp", "Voltage", "Fan", "Current", "Power", "Clock", "Usage"];
-	// One hex gate for every color field, mirroring the plugin parsers it
-	// stands in for (detail-settings.ts, sensor-reading.ts, text-colors.ts).
+	// One hex gate for every color field, mirroring the plugin's shared
+	// HEX6 in src/ui/text-colors.ts (unsharable across the webview boundary).
 	const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 	// Mirrors QUAD_DEFAULT_COLORS in src/ui/key-renderer.ts.
 	const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
@@ -680,14 +680,24 @@
 	let detailArm = null;
 
 	const DETAIL_RESTING_PLACEHOLDER = "Search sensors to add…";
+	const DETAIL_CAP_PLACEHOLDER = "At the cap; remove a reading to add another.";
+
+	/** The search box's aim line always states the CURRENT aim. Movers
+	 * renumber detailArm.tileIdx when an earlier tile dissolves or a park
+	 * lands (removeDetailKey, moveDetailChip); every such edit funnels
+	 * through revalidateDetailAim, so syncing here keeps the promised
+	 * tile number equal to the painted marker's. */
+	function syncDetailAimPlaceholder() {
+		const search = detailSearchEl();
+		if (search !== null) search.placeholder = detailArm === null ? DETAIL_RESTING_PLACEHOLDER : `Adding into tile ${detailArm.tileIdx + 1}; click its + again to finish.`;
+	}
 
 	/** Quietly drops a standing aim and restores the resting search text
 	 * (no focus, no render): writeDetailState's past-end check, the splice
 	 * re-anchor and a stale-aim append all disarm through here. */
 	function disarmDetailAim() {
 		detailArm = null;
-		const search = detailSearchEl();
-		if (search !== null) search.placeholder = DETAIL_RESTING_PLACEHOLDER;
+		syncDetailAimPlaceholder();
 	}
 
 	/** An aim is only honest while its landing is painted. The walk can
@@ -701,9 +711,11 @@
 	function revalidateDetailAim() {
 		if (detailArm === null) return;
 		const tile = detailTileWalk()[detailArm.tileIdx];
-		if (tile === undefined || tileReadings(tile) >= 4) {
+		if (tile === undefined || tileReadings(tile) >= 4 || detailKeys.length >= DETAIL_KEYS_MAX) {
 			disarmDetailAim();
+			return;
 		}
+		syncDetailAimPlaceholder();
 	}
 	// The reading key that just landed (pick, drop, arrow move): its chip
 	// re-renders with a short flash and is scrolled into view, then the
@@ -740,13 +752,21 @@
 	}
 
 	function armDetailAdd(tileIdx) {
+		// The cap refuses to arm: an aim at the cap is a promise no pick
+		// can keep (addDetailKey refuses every add there).
+		if (detailKeys.length >= DETAIL_KEYS_MAX) {
+			disarmDetailAim();
+			const search = detailSearchEl();
+			if (search !== null) search.placeholder = DETAIL_CAP_PLACEHOLDER;
+			return;
+		}
 		detailArm = tileIdx === null || (detailArm !== null && detailArm.tileIdx === tileIdx) ? null : { tileIdx };
 		// Render first, focus second: focusing opens the list, whose
 		// onOpenChange scrolls the FRESH armed marker into view.
 		renderDetailList();
 		const search = detailSearchEl();
 		if (search !== null) {
-			search.placeholder = detailArm === null ? DETAIL_RESTING_PLACEHOLDER : `Adding into tile ${detailArm.tileIdx + 1}; click its + again to finish.`;
+			syncDetailAimPlaceholder();
 			search.focus({ preventScroll: true });
 		}
 	}
@@ -1391,14 +1411,16 @@
 
 	/** The + marker sitting at the exact cell the next pick would fill in
 	 * its tile. `lit` marks THE current landing point (one at a time);
-	 * `armed` marks the aimed tile. Full quads render no marker at all. */
-	function detailAddMarker(arm, armed, lit) {
+	 * `armed` marks the aimed tile. Full quads render no marker at all.
+	 * At the cap no marker is lit and every marker says so: no pick can
+	 * land anywhere until a reading goes. */
+	function detailAddMarker(arm, armed, lit, atCap = false) {
 		const add = document.createElement("button");
 		add.type = "button";
 		add.className = "hw-add" + (armed ? " armed" : "") + (lit ? " lit" : "");
 		add.dataset.arm = arm;
-		add.title = armed ? "Picks land here. Click again to finish." : lit ? "New picks land here." : "Send the next picks into this tile. It can grow to four cells.";
-		add.setAttribute("aria-label", arm === "end" ? "Send the next picks into a new tile" : `Send the next picks into tile ${Number(arm) + 1}`);
+		add.title = atCap ? DETAIL_CAP_PLACEHOLDER : armed ? "Picks land here. Click again to finish." : lit ? "New picks land here." : "Send the next picks into this tile. It can grow to four cells.";
+		add.setAttribute("aria-label", atCap ? DETAIL_CAP_PLACEHOLDER : arm === "end" ? "Send the next picks into a new tile" : `Send the next picks into tile ${Number(arm) + 1}`);
 		add.setAttribute("aria-pressed", armed ? "true" : "false"); // the armed state is otherwise class-and-title only
 		add.textContent = "+";
 		return add;
@@ -1425,6 +1447,7 @@
 		// the trailing ghost tile that stands for "a new tile at the end".
 		const lastTile = walk.length > 0 ? walk[walk.length - 1] : null;
 		const lastHasRoom = lastTile !== null && listed.length - lastTile.head < lastTile.size;
+		const atCap = detailKeys.length >= DETAIL_KEYS_MAX;
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
@@ -1494,6 +1517,7 @@
 			size.className = "hw-tile-size";
 			size.dataset.tile = String(tileIdx);
 			size.title = "Cells on this tile; click to cycle 1, 2, 3, 4";
+			size.setAttribute("aria-label", `Tile ${tileIdx + 1}: ${tile.size} cell${tile.size === 1 ? "" : "s"}; click to cycle 1, 2, 3, 4`);
 			size.textContent = `×${tile.size}`;
 			holder.appendChild(size);
 			// The quad knobs follow the READINGS, not the stored size. Only the
@@ -1512,6 +1536,7 @@
 				abc.dataset.tile = String(tileIdx);
 				const on = tile.spec === null ? true : tile.spec.cellLabels;
 				abc.title = on ? "Cell labels shown; click for color-coded bare values" : "Bare values; click to show cell labels";
+				abc.setAttribute("aria-label", on ? `Tile ${tileIdx + 1}: cell labels shown; click for color-coded bare values` : `Tile ${tileIdx + 1}: bare values; click to show cell labels`);
 				abc.textContent = on ? "Abc" : "123";
 				holder.appendChild(abc);
 			}
@@ -1523,8 +1548,8 @@
 			}
 			if (!fullQuad) {
 				const armed = detailArm !== null && detailArm.tileIdx === tileIdx;
-				const lit = detailArm === null && tileIdx === walk.length - 1 && lastHasRoom;
-				holder.appendChild(detailAddMarker(String(tileIdx), armed, lit));
+				const lit = !atCap && detailArm === null && tileIdx === walk.length - 1 && lastHasRoom;
+				holder.appendChild(detailAddMarker(String(tileIdx), armed, lit, atCap));
 			}
 			frag.appendChild(holder);
 		});
@@ -1534,7 +1559,7 @@
 			const ghost = document.createElement("span");
 			ghost.className = "hw-tile ghost";
 			wireGhostDrop(ghost);
-			ghost.appendChild(detailAddMarker("end", false, detailArm === null));
+			ghost.appendChild(detailAddMarker("end", false, !atCap && detailArm === null, atCap));
 			frag.appendChild(ghost);
 		}
 		// The note counts what the deck lists (the parked primary is on the
@@ -2596,6 +2621,9 @@
 					t.labels = Array.from({ length: grown }, (_, i) => t.labels[i] ?? "");
 					t.colors = Array.from({ length: grown }, (_, i) => t.colors[i] ?? null);
 				});
+				// Same follow the move arrows use: the rebuild destroyed
+				// the pressed control, and chained Enter must keep working.
+				detailListEl.querySelector(`.hw-tile-size[data-tile="${size.dataset.tile}"]`)?.focus();
 				return;
 			}
 			const abc = ev.target.closest(".hw-tile-abc");
@@ -2603,11 +2631,19 @@
 				editTile(Number(abc.dataset.tile), (t) => {
 					t.cellLabels = !t.cellLabels;
 				});
+				detailListEl.querySelector(`.hw-tile-abc[data-tile="${abc.dataset.tile}"]`)?.focus();
 				return;
 			}
 			const remove = ev.target.closest(".hw-set-remove");
 			if (remove !== null) {
+				const removes = [...detailListEl.querySelectorAll(".hw-set-remove")];
+				const at = removes.indexOf(remove);
 				removeDetailKey(remove.dataset.key);
+				// Follow onto the neighbouring remove (same index, else the
+				// new last), else back to the search box.
+				const again = [...detailListEl.querySelectorAll(".hw-set-remove")];
+				const follow = again[Math.min(at, again.length - 1)] ?? detailSearchEl();
+				follow?.focus();
 			}
 		});
 		// Arming must not steal focus from the search: with focus intact the
@@ -2857,7 +2893,7 @@
 		};
 		document.getElementById("config-key-copy")?.addEventListener("click", copy(configKeyEl));
 		document.getElementById("config-deck-copy")?.addEventListener("click", copy(configDeckEl));
-		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), "key"));
+		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), document.title.includes("Dial") ? "dial" : "key"));
 		document.getElementById("config-deck-apply")?.addEventListener("click", apply(configDeckEl, (doc) => streamDeckClient.setGlobalSettings(doc), "deck"));
 	}
 	requestTree();

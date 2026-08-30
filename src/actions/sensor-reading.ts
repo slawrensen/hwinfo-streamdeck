@@ -21,7 +21,7 @@ import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from ".
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
-import { quadIdentityColor, resolveTextColors } from "../ui/text-colors";
+import { HEX6, quadIdentityColor, resolveTextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
@@ -137,8 +137,6 @@ function nonEmptyStringOf(value: unknown): string | undefined {
 	return typeof value === "string" && value !== "" ? value : undefined;
 }
 
-const QUAD_HEX = /^#[0-9A-Fa-f]{6}$/;
-
 /** Per-entry salvage of the quad identity colors: each slot independently
  *  keeps a valid #RRGGBB override or falls back to that slot's default, so
  *  one hand-edited bad hex costs exactly one cell. */
@@ -147,7 +145,7 @@ function quadColorsOf(settings: ReadingSettings): readonly [string, string, stri
 	const entries: readonly unknown[] = Array.isArray(raw) ? raw : [];
 	return QUAD_DEFAULT_COLORS.map((fallback, i) => {
 		const entry = entries[i];
-		return typeof entry === "string" && QUAD_HEX.test(entry) ? entry : fallback;
+		return typeof entry === "string" && HEX6.test(entry) ? entry : fallback;
 	}) as unknown as readonly [string, string, string, string];
 }
 

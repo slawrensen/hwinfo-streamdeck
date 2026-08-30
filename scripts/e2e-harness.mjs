@@ -1097,7 +1097,22 @@ async function finish() {
 
 	// A deleted gate runs zero checks and everything left still passes:
 	// name the legs a merge must never lose and fail when one never ran.
-	for (const req of ["sparkline rebuilds after a poll-interval change", "PI got live preview for selected reading"]) {
+	for (const req of [
+		"sparkline rebuilds after a poll-interval change",
+		"PI got live preview for selected reading",
+		"a replayed willAppear repaints the key despite unchanged bytes",
+		"a replayed willAppear repaints the dial despite unchanged bytes",
+		"poller idles when no actions visible",
+		"poller logged idle stop",
+		"plugin exits when the app socket closes",
+		"malformed rotation fields pass through writes verbatim (no salvage rewrite)",
+		"control key advances the dial across devices",
+		"control key shows the corner tick badge, never the stock checkmark",
+		"control key treats a malformed Target as no target (no crash)",
+		"reset-all reaches the dials past a non-matching Target (as its panel says)",
+		"a never-configured control key acts as Next reading (panel default), not an alert",
+		"control key nextGroup honors rotation groups on any preset"
+	]) {
 		check(`required gate ran: ${req}`, checksRun.some((n) => n.includes(req)));
 	}
 

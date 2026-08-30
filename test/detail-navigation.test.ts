@@ -367,6 +367,28 @@ describe("paging and stats", () => {
 		assert.equal(nav.statModeFor(state, "cpu:0:2"), "max");
 	});
 
+	it("pagePrevious lands on the previous page's own start when strides vary", async () => {
+		const { nav } = bed();
+		// 22 hand-grouped singles then a uniform density-4 remainder: pages
+		// stride 11, 11, 16 (the current page is WIDER than the one before).
+		const keys = Array.from({ length: 38 }, (_, i) => `syn:0:${i}`);
+		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { readingKey: "cpu:0:0", detailMode: "custom", detailKeys: keys, detailDensity: "4", detailTiles: Array.from({ length: 22 }, () => ({ size: 1 })) }, snapshot });
+		const state = nav.stateFor("dev1");
+		if (state === undefined) {
+			assert.fail("no state");
+		}
+		assert.equal(nav.pageFor(state).step, 11); // shape guard: page one is 11 singles
+		nav.pageNext("dev1");
+		assert.equal(state.offset, 11);
+		nav.pageNext("dev1");
+		assert.equal(state.offset, 22);
+		assert.equal(nav.pageFor(state).step, 16); // shape guard: the last page consumes the remainder
+		nav.pagePrevious("dev1");
+		// The projection's previousOffset, not 0 (a hardcoded backward branch)
+		// and not 22 - 16 = 6 (the old offset-minus-step arithmetic).
+		assert.equal(state.offset, 11);
+	});
+
 	it("the mirror costs one tile per page at any density", async () => {
 		const { nav } = bed();
 		await nav.enter({ deviceId: "dev1", deviceType: 0, settings: { ...opener, detailDensity: "2" }, snapshot });

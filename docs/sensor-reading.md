@@ -222,9 +222,11 @@ The settings panel shows the matching plain-language explanation and fix while t
 
 ## Advanced (deck-wide)
 
-The **Advanced** section in this panel holds plugin-wide settings shared by every key and dial, in three headed groups: **Deck defaults (every key and dial)** with **Deck theme**, **Deck text**, **Type accents** and **Data units**; **Connection** with **Data source** and **Poll every**; and **Support**. Themes and Deck text are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
+The **Advanced** section in this panel holds plugin-wide settings shared by every key and dial, in four headed groups: **Deck defaults (every key and dial)** with **Deck theme**, **Deck text**, **Type accents** and **Data units**; **Connection** with **Data source** and **Poll every**; **Support**; and **Config**. Themes and Deck text are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
 
-![The expanded Advanced section in the Stream Deck app: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, and Support with the Copy support report button.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
+![The expanded Advanced section in the Stream Deck app: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, and Support with the Copy support report button, then Config with the This key and Deck JSON wells and their Copy and Apply buttons.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
+
+**Config** holds two JSON wells: **This key**, the exact settings this key runs on, and **Deck**, the plugin-wide settings. **Copy** fills an untouched well with the settings of the moment you press it and puts the document on the clipboard; save it to a file to back a hand-built layout up. Paste a saved document and press **Apply** to restore it, or to clone it onto another key here or on another machine. Apply replaces the whole document in one write and reloads the panel; fields this build does not know survive untouched. Reading keys in the document carry the sensor's friendly name after the key so the file stays readable; Apply strips the names, and settings always store bare keys. The wells live on the Sensor Reading and Sensor Dial panels only; the HWiNFO Control key holds just a command, a target and a reset scope, so I left it without wells and re-enter those by hand.
 
 **Data units** decides how byte quantities and transfer rates read, everywhere at once:
 

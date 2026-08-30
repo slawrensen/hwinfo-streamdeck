@@ -5,6 +5,7 @@
  * future-version values to the exact legacy behavior, never throws, and
  * never rewrites what it cannot parse.
  */
+import { HEX6 } from "../ui/text-colors";
 
 /** What a key press does; absent or unrecognized values mean "cycle-stat". */
 export type PressBehavior = "cycle-stat" | "open-details" | "tap-cycle-hold-details";
@@ -196,8 +197,6 @@ export type DetailTileSpec = {
 /** The most grouped tiles an opener may describe (the list caps there too). */
 export const DETAIL_TILES_MAX = 128;
 
-const TILE_COLOR = /^#[0-9A-Fa-f]{6}$/;
-
 /**
  * The hand-grouped tile plan for custom mode, walked over detailKeys in
  * order: tile one takes the first `size` readings, tile two the next,
@@ -222,7 +221,7 @@ export function detailTilesOf(settings: { detailTiles?: unknown }): readonly Det
 		const colors: (string | null)[] = [];
 		for (let i = 0; i < size; i++) {
 			labels.push(typeof rawLabels[i] === "string" ? (rawLabels[i] as string).trim() : "");
-			colors.push(typeof rawColors[i] === "string" && TILE_COLOR.test(rawColors[i] as string) ? (rawColors[i] as string) : null);
+			colors.push(typeof rawColors[i] === "string" && HEX6.test(rawColors[i] as string) ? (rawColors[i] as string) : null);
 		}
 		tiles.push({ size, labels, colors, cellLabels: record.cellLabels !== false });
 	}

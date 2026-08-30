@@ -273,10 +273,9 @@ details > summary:hover {
 	text-decoration: none;
 }
 
-/* A cell wearing the user's own label rather than HWiNFO's. The panel has
-   marked these since the cell rename shipped and nothing painted them, so
-   an override read exactly like the sensor's own name. Brighter, the same
-   way a planned tile reads brighter than the uniform fill. */
+/* A cell wearing the user's own label rather than HWiNFO's; without the
+   paint an override reads exactly like the sensor's own name. Brighter,
+   the same way a planned tile reads brighter than the uniform fill. */
 .hw-set-name.renamed {
 	color: #e8eaed;
 }
@@ -849,16 +848,20 @@ details .hw-section {
 
 /* Drag: an honest insertion caret on the matching edge (box-shadow, so
    it is layout-neutral and cannot oscillate the element under the
-   pointer), and a lit tile frame for append. */
-.hw-set-chip.dragging {
+   pointer) for chips and whole tiles alike, and a lit tile frame for
+   append. */
+.hw-set-chip.dragging,
+.hw-tile.dragging {
 	opacity: 0.5;
 }
 
-.hw-set-chip.drop-before {
+.hw-set-chip.drop-before,
+.hw-tile.drop-before {
 	box-shadow: -3px 0 0 0 #4cc2ff;
 }
 
-.hw-set-chip.drop-after {
+.hw-set-chip.drop-after,
+.hw-tile.drop-after {
 	box-shadow: 3px 0 0 0 #4cc2ff;
 }
 
@@ -867,9 +870,9 @@ details .hw-section {
 }
 
 /* Whole-tile drag: the grip is the handle, and the landing edge is the
-   tile's left or right, the same rule the chips' bars follow. The list is
-   a wrapping flex row (.hw-set) of inline-flex tiles, so two short tiles
-   share a row and the side is a question about x, not y. */
+   tile's left or right. The list is a wrapping flex row (.hw-set) of
+   inline-flex tiles, so two short tiles share a row and the side is a
+   question about x, not y. */
 .hw-tile-grip {
 	color: #7c8694;
 	cursor: grab;
@@ -881,18 +884,6 @@ details .hw-section {
 .hw-tile-grip:hover,
 .hw-tile-grip:focus-visible {
 	color: #e8eaed;
-}
-
-.hw-tile.dragging {
-	opacity: 0.5;
-}
-
-.hw-tile.drop-before {
-	box-shadow: -3px 0 0 0 #4cc2ff;
-}
-
-.hw-tile.drop-after {
-	box-shadow: 3px 0 0 0 #4cc2ff;
 }
 
 .hw-tile.drop-append .hw-add {

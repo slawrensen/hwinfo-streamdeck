@@ -530,9 +530,10 @@ async function scenario(send) {
 	appearOpener(send, "ctx-den2", "devden2", den2Opener, { column: 2, row: 1 });
 	await sleep(600);
 	results.den2OpenerFace = latestSvg("ctx-den2");
+	const switchesBeforeDen2 = switches.length;
 	await keyPress(send, "ctx-den2", "devden2", den2Opener);
-	await sleep(500);
-	results.den2Switch = switches.at(-1);
+	await waitUntil(() => switches.length > switchesBeforeDen2, 500);
+	results.den2Switch = switches.length > switchesBeforeDen2 ? switches.at(-1) : undefined;
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den2", device: "devden2", payload: { settings: den2Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devden2", fltCells);
 	await sleep(1600);
@@ -559,9 +560,10 @@ async function scenario(send) {
 	const den4Opener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*core*", detailDensity: "4" };
 	appearOpener(send, "ctx-den4", "devden4", den4Opener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeDen4 = switches.length;
 	await keyPress(send, "ctx-den4", "devden4", den4Opener);
-	await sleep(500);
-	results.den4Switch = switches.at(-1);
+	await waitUntil(() => switches.length > switchesBeforeDen4, 500);
+	results.den4Switch = switches.length > switchesBeforeDen4 ? switches.at(-1) : undefined;
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-den4", device: "devden4", payload: { settings: den4Opener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devden4", fltCells);
 	await sleep(1600);
@@ -624,9 +626,10 @@ async function scenario(send) {
 	results.grpKeysResolved = grpOpener.detailKeys.every((k) => typeof k === "string" && k !== "");
 	appearOpener(send, "ctx-grp", "devgrp", grpOpener, { column: 2, row: 1 });
 	await sleep(300);
+	const switchesBeforeGrp = switches.length;
 	await keyPress(send, "ctx-grp", "devgrp", grpOpener);
-	await sleep(500);
-	results.grpSwitch = switches.at(-1);
+	await waitUntil(() => switches.length > switchesBeforeGrp, 500);
+	results.grpSwitch = switches.length > switchesBeforeGrp ? switches.at(-1) : undefined;
 	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-grp", device: "devgrp", payload: { settings: grpOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
 	installDetailSurface(send, "devgrp", fltCells);
 	await sleep(1600);
@@ -746,6 +749,7 @@ async function finish() {
 		typeof results.den2Slot0Min === "string" && results.den2Slot0Min.includes(">800<") && results.den2Slot0Min.includes(">11.9<") && (results.den2Slot0Min.match(/>MIN</g) ?? []).length === 1,
 		(results.den2Slot0Min ?? "no frame").slice(0, 200)
 	);
+	check("density 4 entry switched devden4 to the class profile", results.den4Switch?.device === "devden4" && results.den4Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den4Switch));
 	check("density 4 title counts the four matches (1-4 / 4)", typeof results.den4TitleFace === "string" && results.den4TitleFace.includes(">1-4 / 4<"), (results.den4TitleFace ?? "no frame").slice(0, 160));
 	check(
 		"density 4 quad drops the shared Core token: micro-labels 0/1/2/3",

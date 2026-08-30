@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { SensorType } from "../hwinfo/types";
 import type { AlertLevel } from "./format";
+import { HEX6 } from "./text-colors";
 
 /** The six render tokens every theme and alert palette must define. */
 export const TOKEN_KEYS = ["bg", "label", "value", "unit", "accent", "track"] as const;
@@ -32,8 +33,6 @@ export type ThemesConfig = {
 	readonly typeAccents: Readonly<Record<TypeAccentKey, string>>;
 };
 
-const HEX = /^#[0-9A-Fa-f]{6}$/;
-
 function fail(path: string, problem: string): never {
 	throw new Error(`themes.json invalid at ${path}: ${problem}`);
 }
@@ -45,7 +44,7 @@ function validatePalette(value: unknown, path: string): Palette {
 	const record = value as Record<string, unknown>;
 	for (const key of TOKEN_KEYS) {
 		const hex = record[key];
-		if (typeof hex !== "string" || !HEX.test(hex)) {
+		if (typeof hex !== "string" || !HEX6.test(hex)) {
 			fail(`${path}.${key}`, `expected a #RRGGBB hex, got ${JSON.stringify(hex)}`);
 		}
 	}
@@ -98,7 +97,7 @@ export function validateThemesConfig(raw: unknown): ThemesConfig {
 	const accents = accentsRaw as Record<string, unknown>;
 	for (const key of TYPE_ACCENT_KEYS) {
 		const hex = accents[key];
-		if (typeof hex !== "string" || !HEX.test(hex)) {
+		if (typeof hex !== "string" || !HEX6.test(hex)) {
 			fail(`typeAccents.${key}`, `expected a #RRGGBB hex, got ${JSON.stringify(hex)}`);
 		}
 	}

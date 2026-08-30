@@ -53,8 +53,12 @@ changelog makes is behavioral and no automated gate covers it end to end
 on real hardware, so it was checked live instead: install the pack, show
 a sparkline key, change Poll every, confirm the line rebuilds rather than
 dying, then restart the plugin with the non-default interval saved and
-confirm the first sparkline of the session still appears. The result is
-recorded with the 1.5.1.0 row in the submission log.
+confirm the first sparkline of the session still appears. Checked live
+2026-08-11 on this machine (app 7.4.2, real HWiNFO, Virtual Stream Deck
+3): the line cleared and rebuilt within about 10 s of changing Poll
+every from 1 s to 250 ms. After an app restart with the 250 ms interval
+saved, the log showed the launch order the defect exploited and the
+first sparkline of the session still appeared.
 
 Automated coverage added with the fix, both proven red against the
 reverted line: a unit leg that drives the real poller singleton and

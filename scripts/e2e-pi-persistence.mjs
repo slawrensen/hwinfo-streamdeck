@@ -966,6 +966,10 @@ try {
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value === JSON.stringify(["×3", "×3", "×4"]),
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`)).result?.value
 	);
+	// The tail is the only full quad here, so its Abc is the only one
+	// rendered: the label must say which tile it belongs to.
+	const abcLabel = (await evaluate(`document.querySelector('#detail-list .hw-tile-abc')?.getAttribute("aria-label") ?? "none"`)).result?.value;
+	check("leg G3: the quad's label toggle names its tile and state", /^Tile 3: /.test(String(abcLabel)), String(abcLabel));
 	mark = writes.length;
 	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:2"] .hw-detail-move[data-move="-1"]')?.click()`);
 	await sleep(700);
@@ -1522,6 +1526,8 @@ try {
 	check("leg J5: the up arrow names its reading", typeof arrowLabel === "string" && arrowLabel !== "none" && arrowLabel.length > 3 && arrowLabel !== "↑", String(arrowLabel));
 	const removeLabel = (await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:1"] .hw-set-remove')?.getAttribute("aria-label") ?? "none"`)).result?.value;
 	check("leg J5: the remove names its reading", typeof removeLabel === "string" && removeLabel !== "none" && removeLabel.length > 3 && removeLabel !== "×", String(removeLabel));
+	const sizeLabel = (await evaluate(`document.querySelector('#detail-list .hw-tile-size')?.getAttribute("aria-label") ?? "none"`)).result?.value;
+	check("leg J5: the size cycler names its tile", /^Tile 1: /.test(String(sizeLabel)), String(sizeLabel));
 	check("leg J5: armed tile 2's +", (await clickAdd("1")) === "ok");
 	await sleep(400);
 	const pressedArmed = (await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.getAttribute("aria-pressed") ?? "none"`)).result?.value;
@@ -1695,6 +1701,16 @@ try {
 	check("cap: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const capNote = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
 	check("cap: the list note names the cap", String(capNote).includes("That is the cap"), String(capNote));
+	// A lit or armable + at the cap promises a landing no pick can reach:
+	// every marker must say the cap instead, and the click must refuse.
+	check("cap: no marker is lit at the cap", (await evaluate(`document.querySelector('#detail-list .hw-add.lit') === null`)).result?.value === true);
+	const capMarkerTitle = (await evaluate(`document.querySelector('#detail-list .hw-tile.ghost .hw-add')?.title ?? "gone"`)).result?.value;
+	check("cap: the end marker says the cap, not a promise", capMarkerTitle === "At the cap; remove a reading to add another.", String(capMarkerTitle));
+	await evaluate(`document.querySelector('#detail-list .hw-tile.ghost .hw-add')?.click()`);
+	await sleep(400);
+	check("cap: clicking + refuses to arm", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
+	check("cap: the refusal names the cap in the search box", (await placeholderNow()) === "At the cap; remove a reading to add another.", await placeholderNow());
+	check("cap: the refused arm wrote nothing", writes.length === 0, `${writes.length} writes`);
 	await openCollector();
 	mark = writes.length;
 	const capTick = await evaluate(`(() => {
@@ -1714,6 +1730,7 @@ try {
 	await sleep(700);
 	frame = atomic("cap removal", writes.slice(mark));
 	check("cap: 127 left", frame.detailKeys?.length === 127, `${frame.detailKeys?.length} keys`);
+	check("cap: below the cap the landing lights again", (await evaluate(`document.querySelector('#detail-list .hw-add.lit') !== null`)).result?.value === true);
 	mark = writes.length;
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="bench:0:0"] .hw-tick')?.click()`);
 	await sleep(700);
@@ -1721,6 +1738,28 @@ try {
 	check("cap: the freed slot took the tick", frame.detailKeys?.length === 128 && frame.detailKeys?.includes("bench:0:0"), `${frame.detailKeys?.length} keys`);
 	const capNote2 = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
 	check("cap: back at the cap the note says so again", String(capNote2).includes("That is the cap"), String(capNote2));
+
+	// ---- run 4b: a standing aim renumbers when an earlier tile dissolves,
+	// and click()-driven edits keep keyboard focus in the list.
+	// State here: 128 keys at density 1, so the walk is 128 single tiles.
+	const run4bFirst = (await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-set-chip')?.dataset.key ?? "gone"`)).result?.value;
+	check("run 4b: freed one slot", (await clickChipRemove(run4bFirst)) === "ok");
+	await sleep(700);
+	check("run 4b: armed tile 6's +", (await clickAdd("5")) === "ok");
+	await sleep(400);
+	check("run 4b: aim names tile 6", (await placeholderNow()) === "Adding into tile 6; click its + again to finish.", await placeholderNow());
+	const run4bSecond = (await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-set-chip')?.dataset.key ?? "gone"`)).result?.value;
+	check("run 4b: dissolved the first single tile", (await clickChipRemove(run4bSecond)) === "ok");
+	await sleep(700);
+	check("run 4b: the placeholder renumbered with the walk", (await placeholderNow()) === "Adding into tile 5; click its + again to finish.", await placeholderNow());
+	check("run 4b: the armed marker moved with it", (await evaluate(`document.querySelector('#detail-list .hw-add.armed[data-arm="4"]') !== null`)).result?.value === true);
+	check("run 4b: focus followed the remove through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-set-remove")`)).result?.value === true);
+	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
+	await sleep(300);
+	check("run 4b: disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	await evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="0"]')?.click()`);
+	await sleep(500);
+	check("run 4b: focus followed the size cycler through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-tile-size") && document.activeElement.dataset.tile === "0"`)).result?.value === true);
 
 	// ---- run 5: the tile-plan mirror rejects what the plugin parser rejects
 	// detailTilesOf takes labels/colors only as ARRAYS; a hand-edited string
@@ -2099,6 +2138,25 @@ try {
 	})()`);
 	await sleep(500);
 	check("leg C: a hand-edited draft copies as typed, never overwritten", (await evaluate(`document.getElementById("config-key")?.value`)).result?.value === "{ draft", String((await evaluate(`document.getElementById("config-key")?.value`)).result?.value));
+	// The deck button must copy the DECK well: wiring the key well to it
+	// would pass every key-side check above. This harness records
+	// setGlobalSettings but never stores it, so every getGlobalSettings
+	// answers { theme: "void" }; that is the deck document Copy hands back,
+	// and the key fields it does NOT carry are what tell the wells apart
+	// (the key well holds the unparseable "{ draft" right now).
+	mark = writes.length;
+	const gmarkDeck = globalWrites.length;
+	await evaluate(`document.getElementById("config-deck-copy")?.click()`);
+	await sleep(500);
+	let legCDeck = null;
+	try {
+		legCDeck = JSON.parse((await evaluate(`document.getElementById("config-deck")?.value ?? "missing"`)).result?.value);
+	} catch {
+		legCDeck = null;
+	}
+	check("leg C: deck Copy filled the deck well with the deck document", legCDeck !== null && legCDeck.theme === "void" && legCDeck.detailKeys === undefined && legCDeck.readingKey === undefined, JSON.stringify(legCDeck)?.slice(0, 120));
+	check("leg C: deck Copy was a read, not a write", writes.length === mark && globalWrites.length === gmarkDeck, `${writes.length - mark}/${globalWrites.length - gmarkDeck}`);
+	check("leg C: deck Copy note reported an honest outcome", /^(Copied\.|Copy failed;)/.test(String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value)), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 
 	// ---- run 7c: a real press survives the rename it tears down (leg R) --
 	// Every other leg drives the panel with element.click(), which fires no

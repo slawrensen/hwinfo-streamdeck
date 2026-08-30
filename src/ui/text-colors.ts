@@ -33,7 +33,11 @@ export type TextColors = {
 	badge: string;
 };
 
-const HEX6 = /^#[0-9A-Fa-f]{6}$/;
+/** The one #RRGGBB gate every color-bearing setting parses through
+ * (quad colors, tile colors, custom text, themes.json palettes). The
+ * ui/pi-common.js HEX_COLOR mirror cannot share it across the webview
+ * boundary and keeps its own keep-in-sync comment. */
+export const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 
 /**
  * Dim blends toward the theme background: polarity-correct on dark and light

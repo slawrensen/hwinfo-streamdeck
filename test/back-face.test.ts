@@ -14,7 +14,7 @@ import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
 import { renderDetailIdleBackKey } from "../src/ui/detail-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
-import { effectiveTextFor, measureOptionsFrom } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings, effectiveTextFor, effectiveThemeFor, measureOptionsFrom } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
@@ -175,5 +175,25 @@ describe("the idle Back face", () => {
 	it("stays the honest way out when no session exists", () => {
 		const svg = renderDetailIdleBackKey();
 		assert.match(svg, />Back</);
+	});
+});
+
+describe("effectiveThemeFor", () => {
+	it("junk follows the DECK default, not the spec default; strings pass through", () => {
+		// The deck must sit on a non-default theme or the two fallbacks
+		// are indistinguishable.
+		applyGlobalThemeSettings({ theme: "paper" });
+		try {
+			assert.equal(effectiveThemeFor({ theme: 42 }), "paper");
+			assert.equal(effectiveThemeFor({ theme: ["paper"] }), "paper");
+			assert.equal(effectiveThemeFor({ theme: null }), "paper");
+			assert.equal(effectiveThemeFor({ theme: "" }), "paper");
+			assert.equal(effectiveThemeFor({}), "paper");
+			assert.equal(effectiveThemeFor({ theme: "void" }), "void");
+			// Unknown ids pass through; resolvePalette owns that fallback.
+			assert.equal(effectiveThemeFor({ theme: "not-a-theme" }), "not-a-theme");
+		} finally {
+			applyGlobalThemeSettings({ theme: loadThemes().defaultTheme });
+		}
 	});
 });

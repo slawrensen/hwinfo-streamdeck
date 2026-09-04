@@ -13,7 +13,9 @@
  *    ▲                                 │ (probe re-open every 5 s)
  *    └────────(pollTime advances)──────┘
  * `unavailable` re-attempts a full open every tick (cheap: one failing
- * OpenFileMappingW / RegOpenKeyExW), so recovery is automatic.
+ * OpenFileMappingW / RegOpenKeyExW), so recovery is automatic. The one
+ * exception is a present-but-empty Gadget key: it opens, and the bounded VSB
+ * scan runs before the source is refused as "gadget-empty".
  *
  * A poisoned session (the hwsm bridge invalidates on any layout change; a
  * game start adding GPU readings does it routinely) is reopened at the new

@@ -82,7 +82,10 @@ const steps = [
 	["e2e:socket-close", () => run("e2e:socket-close", ["scripts/e2e-socket-close.mjs"])],
 	// After the timing-sensitive UI suites: its 10k-read soak saturates a
 	// core, which can flake the frame-timing assertions above.
-	["test:native", () => run("test:native", ["--import", "tsx", "--test", "test/native-hwsm.test.ts"])],
+	// One file at a time: native-hwsm times a mutex-contended open against a
+	// 400 ms ceiling and ends on a 10k-read soak, both of which a sibling
+	// file running in parallel would skew.
+	["test:native", () => run("test:native", ["--import", "tsx", "--test", "--test-concurrency=1", "test/native-hwsm.test.ts", "test/gadget-provider.test.ts"])],
 	["contact-sheet", () => run("contact-sheet", ["--import", "tsx", "scripts/contact-sheet.mjs", path.join(outRoot, "contact")])],
 	["marketplace-shots", () => run("marketplace-shots", ["--import", "tsx", "scripts/marketplace-shots.mjs", path.join(outRoot, "shots")])],
 	["pi-capture", runPiCapture]

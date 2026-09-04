@@ -20,7 +20,7 @@
 		"docs-shots": "tsx scripts/gen-docs-shots.mjs",
 		"changelog:page": "node scripts/gen-changelog-page.mjs",
 		"probe": "tsx src/probe.ts",
-		"test:native": "tsx --test test/native-hwsm.test.ts",
+		"test:native": "tsx --test --test-concurrency=1 test/native-hwsm.test.ts test/gadget-provider.test.ts",
 		"e2e": "node scripts/e2e-harness.mjs",
 		"e2e:resilience": "node scripts/e2e-resilience.mjs",
 		"e2e:gadget": "node scripts/e2e-gadget.mjs",

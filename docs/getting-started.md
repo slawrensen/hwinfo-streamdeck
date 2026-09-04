@@ -17,7 +17,7 @@ In the actions list, open **HWiNFO Sensors** and drag **Sensor Reading** onto an
 
 The key immediately shows a blue **"Pick a sensor / in settings"** screen. That's the plugin working, waiting for you to choose what to display. The settings panel (the property inspector) opens below the canvas at the same time.
 
-> **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, right-click sensors and tick **"Report value in Gadget"**; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
+> **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget** and tick **"Report value in Gadget"**; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
 
 ## 3. Pick a sensor
 

@@ -113,6 +113,14 @@ The settings-panel sensor list is populated live from whatever source is active:
 
 ![The settings-panel sensor picker open, showing the search box, the ⟳ refresh button, and the list of readings grouped by source.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
+## Only some of the readings I ticked in Gadget show up
+
+HWiNFO gives every reading you tick **Report value in Gadget** a numbered registry slot and keeps that number reserved while the reading is unticked in the sensor window, writing nothing into it, so the numbering can carry permanent gaps. Plugin versions before 1.6.0 stopped reading at the first gap: with a hole early in the list only the readings before it reached the picker, the keys and the detail view, and a hole at the very first slot showed **Tick sensors / in Gadget** over a full registry. Since 1.6.0 the plugin reads every published slot. If you still see fewer readings than you ticked:
+
+1. **Update the plugin** to 1.6.0 or later, then click **⟳ refresh** in the picker.
+2. **Check the tick itself.** Only readings with **Report value in Gadget** ticked are written, and only while they are enabled in the sensor window.
+3. **The scan is bounded.** The plugin reads slots 0 to 1023, far above any set a person ticks by hand; a reading parked above that is not read.
+
 ## Plugin shows nothing at all / the action is missing
 
 1. **Actions not visible in Stream Deck.** Look for the **HWiNFO Sensors** category in the actions list; drag **Sensor Reading** onto a key (or **Sensor Dial** onto a Stream Deck + or Stream Deck + XL encoder).

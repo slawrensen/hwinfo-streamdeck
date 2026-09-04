@@ -68,6 +68,10 @@ Set it under **Advanced → Data source** in any key's settings, or under **Dial
 
 See [Data sources](data-sources.md) for the full breakdown.
 
+### I ticked many readings in Gadget but only a few show up. Why?
+
+HWiNFO reserves a numbered slot for every ticked reading and keeps the number while the reading is unticked, so the list carries gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press **⟳** in the picker. Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
+
 ### Why are min / max / avg showing the current value?
 
 Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. The plugin fills those in with the current value, so a MIN/MAX/AVG stat mode on a key just repeats the live number.

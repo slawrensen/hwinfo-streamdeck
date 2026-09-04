@@ -13,6 +13,7 @@ description: >-
 
 - **Live keys.** One HWiNFO reading per key, one bright element per face: the value carries the light, the label identifies, the unit stays deliberately quiet so the number's silhouette reads at a glance. Custom label, and a live preview while you pick.
 - **Multi-readout layouts.** Stack a [second reading](sensor-reading.md#layout-two-readings-on-one-key) under the first, list [three as compact rows](sensor-reading.md#layout-three-readings-rows), or split a key into a [quad grid](sensor-reading.md#layout-four-readings-the-quad-grid) of four color-coded cells; a dial can list its rotation as a [two- or three-row overview](sensor-dial.md#overview-view), the two-row face with live trend sparklines.
+- **Sensor details (drill-down).** Set a key's Press to open details and the deck switches to a [plugin-managed page](sensor-details.md) listing every reading of that sensor's source, a custom list you build, or everything matching a filter, with the pressed key staying live as the Back tile. Each tile can carry up to four readings, and a custom list can size and dress its tiles one by one.
 - **Stream Deck + and + XL dials.** Touchscreen value with a range bar and session ▼min/▲max kept per reading; rotate to step through readings, push to reset the session, touch to cycle stats.
 - **Rotation on your terms.** Build a [rotation set](sensor-dial.md#rotation-set-ignore-turns-and-auto-cycle) (any readings, in your order, across sensors), tick **Ignore turns** so a bump can't move the dial, or let the **auto cycle** tour the set on a timer that holds while a reading is critical. Three [control presets](controls.md) (Legacy, Elite, Custom) map the gestures, up to three-zone touch.
 - **HWiNFO Control key.** Drive Sensor Dials from any key, pedal, G-key or Multi Action step: switch readings, pause or pin, reset session stats, targeted at one [Link ID](controls.md#the-hwinfo-control-key-action) or every dial.
@@ -38,6 +39,7 @@ New to the plugin? Follow these two pages in order:
 From there:
 
 - **[Sensor Reading (keys)](sensor-reading.md)**: every key setting and the press-to-cycle behavior.
+- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, Tile shows, grouped custom tiles, filter patterns and the Back tile.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**: the dial's rotate / push / touch controls, rotation sets, auto cycle and range bar.
 - **[Dial controls & presets](controls.md)**: the Legacy, Elite and Custom presets, touch zones, pause/pin, reset reach, and the HWiNFO Control key action.
 - **[Themes and alerts](themes.md)**: the seven presets, type accents, and how alerts override everything.

@@ -5,7 +5,8 @@
 // Custom with the color well and dim checkbox, the Press section on Open
 // sensor details, the same block with the Second Back checkbox ticked, the
 // custom detail list mid-build (collector rows added,
-// ordered chips with move arrows), dual, triple and quad layouts
+// ordered chips with move arrows), the same list as a mixed pair, quad
+// and single tile plan (the 1.6.0 tile editor), dual, triple and quad layouts
 // (quad with the cell-colors row, plus the quad rows clipped on their own);
 // the dial PI's rotation-set picker with ticked
 // rows, a chip open mid-rename beside two already-renamed chips,
@@ -302,6 +303,61 @@ try {
 	await sleep(700);
 	await captureClipped("pi-key-detail-custom.png", await evaluate(`(() => {
 		const block = document.getElementById("detail-config");
+		if (!block) return "missing";
+		const r = block.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
+	})()`));
+	// ---- key PI: the tile editor with mixed sizes (1.6.0), at the panel's real width ----
+	// "+ all" pulls the open source in, the list is trimmed to seven
+	// readings through the chips' own remove buttons, the popup closes, and
+	// two tiles are sized through their own control (one click = one step
+	// of the 1, 2, 3, 4 cycle): the first to a stacked pair, the second to
+	// a quad, leaving one single. The shot shows pair, quad and single
+	// tiles with their grips, size and label controls, built the way a
+	// person builds them.
+	expectOk("+ all added the open source", await evaluate(`(() => {
+		const all = document.querySelector("#pickerd-list .hw-group-add");
+		if (!all) return "missing";
+		all.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+		return "ok";
+	})()`));
+	await sleep(700);
+	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await sleep(400);
+	for (let guard = 0; guard < 64; guard++) {
+		const res = await evaluate(`(() => {
+			const removes = [...document.querySelectorAll("#detail-list .hw-set-remove")];
+			if (removes.length <= 7) return "done";
+			removes.at(-1).click();
+			return "more";
+		})()`);
+		if (res.result?.value !== "more") break;
+		await sleep(350);
+	}
+	expectOk("list trimmed to seven readings", await evaluate(`(() => {
+		const n = document.querySelectorAll("#detail-list .hw-set-remove").length;
+		return n === 7 ? "ok" : n + " readings";
+	})()`));
+	const cycleTile = async (tile, clicks) => {
+		for (let i = 0; i < clicks; i++) {
+			expectOk(`tile ${tile} size control`, await evaluate(`(() => {
+				const size = document.querySelector('.hw-tile-size[data-tile="${tile}"]');
+				if (!size) return "missing";
+				size.click();
+				return "ok";
+			})()`));
+			await sleep(450); // the setting echo and the list rebuild
+		}
+	};
+	await cycleTile(0, 1); // x2
+	await cycleTile(1, 3); // x4
+	expectOk("mixed tile sizes rendered", await evaluate(`(() => {
+		const sizes = [...document.querySelectorAll(".hw-tile-size")].map((el) => el.textContent);
+		return sizes.join(" ") === "\u00d72 \u00d74 \u00d71" ? "ok" : "sizes: " + sizes.join(" ");
+	})()`));
+	await sleep(400);
+	await captureClipped("pi-key-detail-tiles.png", await evaluate(`(() => {
+		const block = document.getElementById("detail-custom");
 		if (!block) return "missing";
 		const r = block.getBoundingClientRect();
 		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };

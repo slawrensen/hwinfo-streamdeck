@@ -78,6 +78,7 @@ const steps = [
 	["e2e:native-edge", () => run("e2e:native-edge", ["scripts/e2e-native-edge.mjs"])],
 	["e2e:load", () => run("e2e:load", ["scripts/e2e-load.mjs"], { env: { ...process.env, LOAD_SOAK_SEC: "45" } })],
 	["e2e:drilldown", () => run("e2e:drilldown", ["scripts/e2e-drilldown.mjs"])],
+	["e2e:workspace", () => run("e2e:workspace", ["scripts/e2e-workspace.mjs"])],
 	["e2e:pi", () => run("e2e:pi", ["scripts/e2e-pi-persistence.mjs"])],
 	["e2e:socket-close", () => run("e2e:socket-close", ["scripts/e2e-socket-close.mjs"])],
 	// After the timing-sensitive UI suites: its 10k-read soak saturates a

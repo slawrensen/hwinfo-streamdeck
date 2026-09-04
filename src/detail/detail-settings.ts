@@ -8,7 +8,7 @@
 import { HEX6 } from "../ui/text-colors";
 
 /** What a key press does; absent or unrecognized values mean "cycle-stat". */
-export type PressBehavior = "cycle-stat" | "open-details" | "tap-cycle-hold-details";
+export type PressBehavior = "cycle-stat" | "open-details" | "tap-cycle-hold-details" | "open-workspace";
 
 /** The one fixed navigation role a Sensor Reading key can carry. The
  *  revision-2 detail profiles bake it into their top-left cell so the
@@ -35,7 +35,39 @@ export const HOLD_THRESHOLD_MS = 500;
 
 export function pressBehaviorOf(settings: { pressBehavior?: unknown }): PressBehavior {
 	const raw = settings.pressBehavior;
-	return raw === "open-details" || raw === "tap-cycle-hold-details" ? raw : "cycle-stat";
+	return raw === "open-details" || raw === "tap-cycle-hold-details" || raw === "open-workspace" ? raw : "cycle-stat";
+}
+
+/**
+ * Pages per bundled workspace profile. FROZEN with the shipped bundle
+ * identity (see workspace-profiles.ts): installed profiles never
+ * auto-update and workspace pages hold user layouts, so this count can
+ * never change for a shipped bundle.
+ */
+export const WORKSPACE_PAGE_COUNT = 4;
+
+/**
+ * Which workspace page an "open-workspace" press targets, zero-indexed.
+ * The panel's select writes the option value as a string ("0".."3"); a
+ * hand-edited bare number counts the same. Salvage: any malformed value
+ * (junk strings, floats, padded text, non-scalars) degrades to page 0,
+ * and a well-formed integer outside the shipped range CLAMPS into it, so
+ * a future build's higher page lands on the nearest page that exists
+ * instead of silently jumping to the first.
+ */
+export function workspacePageOf(settings: { workspacePage?: unknown }): number {
+	const raw = settings.workspacePage;
+	let page: number | null = null;
+	if (typeof raw === "number" && Number.isSafeInteger(raw)) {
+		page = raw;
+	} else if (typeof raw === "string" && /^-?\d+$/.test(raw)) {
+		const parsed = Number(raw);
+		page = Number.isSafeInteger(parsed) ? parsed : null;
+	}
+	if (page === null) {
+		return 0;
+	}
+	return Math.min(Math.max(page, 0), WORKSPACE_PAGE_COUNT - 1);
 }
 
 export function detailModeOf(settings: { detailMode?: unknown }): DetailMode {
@@ -250,6 +282,23 @@ export function detailMirrorBackOf(settings: { detailMirrorBack?: unknown }): bo
  */
 export function detailRoleOf(settings: { detailRole?: unknown }): DetailRole | undefined {
 	return settings.detailRole === "back" ? "back" : undefined;
+}
+
+/**
+ * Whether a baked Back cell came from a WORKSPACE bundle rather than a
+ * detail one. Both families bake the identical `detailRole: "back"`
+ * marker, so without this the runtime cannot tell which family's page is
+ * on screen, and a workspace page's only key borrows the face of
+ * whatever detail session the device happens to be carrying.
+ *
+ * FROZEN WITH THE BUNDLE: installed profiles never auto-update, so this
+ * marker has to be in the workspace bytes from the first shipped copy.
+ * It can never be added afterwards without a new identity, which would
+ * strand every arranged page. Exact `true` only: a hand-edited or future
+ * value is not a workspace Back.
+ */
+export function isWorkspaceBack(settings: { workspaceBack?: unknown }): boolean {
+	return settings.workspaceBack === true;
 }
 
 /**

@@ -69,9 +69,10 @@ export function detailNamespaceFor(profile: Pick<ManagedDetailProfile, "key">, r
 	return revision === 1 ? `${PLUGIN_UUID}.detail:${profile.key}` : `${PLUGIN_UUID}.detail:r${revision}:${profile.key}`;
 }
 
-/** Fixed environment metadata: the app/OS the canonical import test ran on. */
-const APP_VERSION = "7.4.2.22730";
-const OS_VERSION = "10.0.19044";
+/** Fixed environment metadata: the app/OS the canonical import test ran on.
+ * Exported so the workspace archive builder ships the same fixed stamp. */
+export const APP_VERSION = "7.4.2.22730";
+export const OS_VERSION = "10.0.19044";
 
 /** RFC 4122 version-5 style GUID from a stable namespace + name. */
 export function guidFor(namespace: string, name: string): string {
@@ -83,8 +84,10 @@ export function guidFor(namespace: string, name: string): string {
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** One page cell, shaped exactly like Elgato's own profile exports. */
-function cellEntry(namespace: string, cellName: string, actionName: string, uuid: string, settings: Record<string, unknown>): Record<string, unknown> {
+/** One page cell, shaped exactly like Elgato's own profile exports.
+ * Exported so the workspace pages bake their Back cell through the SAME
+ * shape (and the same GUID derivation) the detail pages use. */
+export function cellEntry(namespace: string, cellName: string, actionName: string, uuid: string, settings: Record<string, unknown>): Record<string, unknown> {
 	return {
 		ActionID: guidFor(namespace, cellName),
 		LinkedTitle: true,
@@ -205,9 +208,10 @@ function crc32(data: Buffer): number {
 	return (crc ^ 0xffffffff) >>> 0;
 }
 
-type ZipEntry = { path: string; data: Buffer };
+export type ZipEntry = { path: string; data: Buffer };
 
-function zipStore(entries: readonly ZipEntry[]): Buffer {
+/** Exported for the workspace archive builder: one writer, one byte law. */
+export function zipStore(entries: readonly ZipEntry[]): Buffer {
 	const chunks: Buffer[] = [];
 	const central: Buffer[] = [];
 	let offset = 0;

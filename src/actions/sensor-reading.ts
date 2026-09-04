@@ -7,7 +7,7 @@ import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type
 import type { JsonValue } from "@elgato/utils";
 
 import { readingRow } from "../detail/detail-faces";
-import { detailMirrorBackOf, detailRoleOf, pressBehaviorOf } from "../detail/detail-settings";
+import { detailMirrorBackOf, detailRoleOf, isWorkspaceBack, pressBehaviorOf, workspacePageOf } from "../detail/detail-settings";
 import { PressEngine } from "../detail/press-engine";
 import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
@@ -88,11 +88,18 @@ export type ReadingSettings = {
 	/**
 	 * What a key press does (issue #5): "cycle-stat" (the unchanged
 	 * default), "open-details" (switch this device to its bundled detail
-	 * profile), or "tap-cycle-hold-details" (short tap cycles, a held
-	 * press opens details). Absent or unrecognized values behave exactly
-	 * as cycle-stat, so rolled-back and hand-edited profiles never break.
+	 * profile), "tap-cycle-hold-details" (short tap cycles, a held press
+	 * opens details), or "open-workspace" (switch to one page of the
+	 * bundled freeform workspace profile). Absent or unrecognized values
+	 * behave exactly as cycle-stat, so rolled-back and hand-edited
+	 * profiles never break.
 	 */
 	pressBehavior?: string;
+	/** Which workspace page an "open-workspace" press shows, zero-indexed.
+	 * The panel's select writes strings ("0".."3"); bare numbers count
+	 * the same, junk degrades to page 0, and integers outside the shipped
+	 * range clamp to the nearest page (see workspacePageOf). */
+	workspacePage?: string;
 	/** What the detail view lists: "source" (every reading of this
 	 * sensor's HWiNFO source, the default), "custom" (detailKeys), or
 	 * "filter" (readings matching the detailFilter glob). */
@@ -120,6 +127,13 @@ export type ReadingSettings = {
 	 * ordinary key; the value is never normalized or rewritten.
 	 */
 	detailRole?: string;
+	/**
+	 * Baked into every workspace page's Back cell, and nowhere else. It
+	 * exists only so the runtime can tell a workspace page's Back from a
+	 * detail page's otherwise identical one; nothing writes it, and a
+	 * value other than exactly true is not a workspace Back.
+	 */
+	workspaceBack?: boolean;
 };
 
 type InstanceState = {
@@ -191,11 +205,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (firstSighting) {
 			poller.retain();
 		}
-		// The baked Back marker ships inside the revision-2 profiles (1.4.91+),
-		// so its presence can never signal a pre-theme install: without this
-		// exclusion, a first launch that starts inside a detail profile would
-		// wrongly migrate a fresh install onto the legacy graphite theme.
-		decideLegacyDefault(Object.entries(ev.payload.settings).some(([key, v]) => key !== "detailRole" && v !== undefined));
+		decideLegacyDefault(looksConfiguredForLegacyProbe(ev.payload.settings));
 		const key = nonEmptyStringOf(ev.payload.settings.readingKey);
 		let subscribedKey = existing?.subscribedKey;
 		if (subscribedKey !== key) {
@@ -267,7 +277,8 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	 * (no stat cycle, no detail entry, no tap/hold arming). Otherwise the
 	 * default "cycle-stat" keeps the original semantics exactly: cycle
 	 * current → min → max → avg on key DOWN. "open-details" enters the
-	 * detail view on key down instead, and "tap-cycle-hold-details" arms
+	 * detail view on key down instead, "open-workspace" switches to the
+	 * key's configured workspace page, and "tap-cycle-hold-details" arms
 	 * the press engine (tap cycles on release, a 500 ms hold opens details
 	 * once). Malformed or future pressBehavior values take the cycle-stat
 	 * path.
@@ -288,6 +299,10 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		const behavior = pressBehaviorOf(state.settings);
 		if (behavior === "open-details") {
 			await this.openDetails(ev.action.id);
+			return;
+		}
+		if (behavior === "open-workspace") {
+			await this.openWorkspace(ev.action.id);
 			return;
 		}
 		if (behavior === "tap-cycle-hold-details") {
@@ -355,6 +370,34 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		});
 		if (result !== "entered") {
 			streamDeck.logger.info(`Detail entry ${result} (device type ${caps.type ?? "unknown"})`);
+			await act.showAlert();
+		}
+	}
+
+	/**
+	 * Opens the key's configured workspace page on this key's device. The
+	 * same refusal contract as openDetails: every refusal keeps the key
+	 * exactly as it was and shows the alert cue, and the log names the
+	 * device type, never a sensor. The page index is parsed here (salvage
+	 * plus clamp) and passed EXPLICITLY so the app can never substitute a
+	 * remembered page.
+	 */
+	private async openWorkspace(contextId: string): Promise<void> {
+		const state = this.instances.get(contextId);
+		const act = this.actionById(contextId);
+		if (state === undefined || act === undefined) {
+			return;
+		}
+		const deviceId = act.device.id;
+		const caps = deviceCapabilities.get(deviceId);
+		const result = await this.detailNavigator.enterWorkspace({
+			deviceId,
+			deviceType: caps.type,
+			grid: { columns: caps.columns, rows: caps.rows },
+			page: workspacePageOf(state.settings)
+		});
+		if (result !== "entered") {
+			streamDeck.logger.info(`Workspace entry ${result} (device type ${caps.type ?? "unknown"})`);
 			await act.showAlert();
 		}
 	}
@@ -430,15 +473,44 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (detailRoleOf(state.settings) !== "back") {
 			return compose(state.settings, status);
 		}
-		if (nonEmptyStringOf(state.settings.readingKey) !== undefined) {
-			return compose(state.settings, status, true);
-		}
-		const detail = this.detailNavigator.stateFor(deviceId);
-		if (detail === undefined) {
-			return renderDetailIdleBackKey();
-		}
-		return compose(backFallbackSettings(detail), status, true);
+		return backTileFace(state.settings, this.detailNavigator.stateFor(deviceId), status);
 	}
+}
+
+/**
+ * Whether a settings blob looks like a CONFIGURED key, for the legacy-theme
+ * migration probe only. Both managed families bake a navigation marker into
+ * their profiles (detailRole on every detail and workspace Back,
+ * workspaceBack on the workspace one), so a first launch that happens to
+ * start on one of those pages must not read as a pre-theme install and
+ * migrate a fresh install onto the legacy graphite theme.
+ *
+ * Exported so the exclusion list is pinned by test rather than by comment:
+ * every future baked marker has to be added here, and forgetting one is
+ * silent and user-visible.
+ */
+export function looksConfiguredForLegacyProbe(settings: Record<string, unknown>): boolean {
+	return Object.entries(settings).some(([key, v]) => key !== "detailRole" && key !== "workspaceBack" && v !== undefined);
+}
+
+/**
+ * The face a Back-role tile shows. Its own configured reading wins; a
+ * WORKSPACE Back always falls back to the honest idle face, because it
+ * belongs to no detail session and the fallback below is keyed on the
+ * DEVICE, so an unconfirmed session left on this deck (an install prompt
+ * still open, or one that expired) would otherwise lend the workspace
+ * page's only way out an abandoned opener's live sensor face. A detail
+ * Back with no session shows the same idle face. Exported so the face
+ * rules are testable without the action instance.
+ */
+export function backTileFace(settings: ReadingSettings, detail: DeviceDetailState | undefined, status: PollerStatus): string {
+	if (nonEmptyStringOf(settings.readingKey) !== undefined) {
+		return compose(settings, status, true);
+	}
+	if (isWorkspaceBack(settings) || detail === undefined) {
+		return renderDetailIdleBackKey();
+	}
+	return compose(backFallbackSettings(detail), status, true);
 }
 
 /** The minimal synthetic settings for an unconfigured Back tile: the

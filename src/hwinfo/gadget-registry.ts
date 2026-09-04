@@ -1,9 +1,11 @@
 /**
  * HWiNFO "Gadget" registry backend — `HKCU\Software\HWiNFO64\VSB` holds
- * `Sensor<i>` / `Label<i>` / `Value<i>` / `ValueRaw<i>` REG_SZ quadruplets for
- * every reading the user ticked "Report value in Gadget" for. Unlike shared
- * memory it never expires on the free version, but it carries no min/max/avg,
- * no ids and no poll timestamp.
+ * `Sensor<i>` / `Label<i>` / `Value<i>` / `ValueRaw<i>` REG_SZ values for every
+ * reading the user ticked "Report value in Gadget" for (HWiNFO writes a fifth,
+ * `Color<i>`, which this reader has no use for). Unlike shared memory it never
+ * expires on the free version, but it carries no min/max/avg, no ids and no
+ * poll timestamp. `Value` is display-formatted and may carry a thousands
+ * separator ("2,295.0 MHz"); `ValueRaw` is the one to parse.
  *
  * The provider owns ONE opaque native GadgetKey for its lifetime (opened
  * under HKCU with query-only rights by the hwsm bridge); every value read

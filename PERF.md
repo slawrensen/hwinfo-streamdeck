@@ -27,15 +27,102 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
+
+`node scripts/perf-report.mjs` against the release candidate pack
+(`fa305293…`, 284,822 B; gzip 274,714 B): the 2026-08-30 density cut
+plus the issue #21 Gadget scan fix (#22), the Configure Sensors
+guidance (#23), the corrected README and first-run tip, and the
+1.6.0.0-2 panel cache tokens. bin/plugin.js is 185,561 B (the scan fix
+is 47 B of bundle), ui/ is 243,963 B, and `hwsm.node` builds from the
+same native source as 1.5.0.0 and 1.5.1.0 (`git diff v1.5.1..HEAD --
+native/` is empty; the CI-built addon is the one that ships). The
+shared-memory parse path is unchanged: 8.4 µs mean / 10.5 µs p95 over
+548 live readings (1,000 iterations, 255.8 KB region).
+
+The Gadget path is the one that changed, and it is dearer by design.
+The old scan stopped at the first missing `SensorN`; the fix walks the
+whole 1,024-slot bound on every read, because a missing slot is a
+reserved one, not the end of the list (issue #21). On this machine's
+real Gadget key (13 contiguous readings, HWiNFO 8.48) the same bench
+run against both scans measures:
+
+| Gadget tick (13 readings, 1,000 iterations) | mean µs | p50 µs | p95 µs | alloc/tick |
+| --- | ---: | ---: | ---: | ---: |
+| 1.5.1.0 scan (stops at the first hole) | 121.8 | 116.6 | 143.3 | 11,137 B |
+| 1.6.0.0 scan (whole 1,024-slot bound) | 2,736.5 | 2,694.1 | 2,998.3 | 42,370 B |
+
+About 2.6 ms of that is the 1,011 registry queries that answer
+ERROR_FILE_NOT_FOUND, so the cost is set by the bound, not by how many
+readings are ticked: at the default 1 s poll it is about 0.3% of one
+core, at the fastest 250 ms poll about 1.1%, and the shared-memory
+path, the default source and the one Auto mode prefers, pays nothing.
+Earlier entries carry "n/a" for the Gadget tick because the key was
+absent on this machine; this is the file's first before-and-after row
+for it.
+
+The soak this release rests on is the 2026-09-02 entry below: 48 h on
+the 2026-08-30 pack (`54913122…`), whose runtime differs from this
+candidate by the Gadget provider's scan loop (src/hwinfo/gadget-
+registry.ts), a poller comment, and two user-facing strings. The
+shared-memory poller, the renderers and the native bytes the soak
+exercised are the same source; the changed Gadget path is covered by
+the 24-case provider suite, the Gadget e2e (21 checks, 8 of them new,
+all failing against the old scan) and a bench install of this pack.
+`perf-report` could not attribute the live plugin process from this
+shell (the Stream Deck app's child processes answer the WMI command-line
+query with an empty string here), so the process row is not refreshed;
+the soak's own samples stand for it.
+
+### 2026-09-02: the 1.6.0.0 soak closed clean
+
+`node scripts/soak-monitor.mjs --summary release/soak-1.6.0.0-20260830-1636.csv`,
+the same code path that printed the live summary when the window
+closed. The subject was the installed 1.6.0.0 pack (`54913122…`) under
+two days of desk use, sampled from outside the process once a minute.
+
+| Soak | Value |
+| --- | ---: |
+| Window | 2026-08-30T23:34:53Z to 2026-09-01T23:35:00Z (48.0 h, 2884 samples) |
+| RSS slope, longest same-PID run (2615 samples, PID 31640) | -0.03 MB/30 min |
+| Private bytes slope, same run | +0.03 MB/30 min |
+| Private bytes, start to close | 50.1 MB to 61.4 MB (max 67.6) |
+| Handles | 207 to 178 (max 207) |
+| Threads | 16 to 12 |
+| Avg CPU, same run | 0.15% |
+| Plugin restarts / HWiNFO-absent samples | 2 / 0 |
+| New log WARN / ERROR lines | 0 / 0 |
+| Sampling gaps over 90 s | 0 |
+
+Both slopes sit far inside the 1 MB/30 min gate. The two plugin
+restarts were two Stream Deck app restarts, the planned one at
+2026-08-30T23:37Z (plugin PID 66972 to 31640) and an orderly quit and
+relaunch at 2026-09-01T19:10Z that left the plugin absent for two
+samples (PID 31640 to 101052; the app log ends that session with
+"Application event loop ended (0)", no crash). The RSS column ends at
+1.2 MB because Windows trimmed the idle process working set late in
+the window; private bytes cannot be trimmed, so they carry the
+steady-state judgment. The HWiNFO restart and the sleep/wake the
+runbook asks for did not happen inside this window. The machine
+rebooted after it (2026-09-02T05:51Z), which restarted HWiNFO and the
+app together: the plugin came back with the app at 05:59Z and opened
+HWiNFO's shared memory on HWiNFO's own start eight minutes later, zero
+WARN and zero ERROR. Sleep/wake stays unexercised on this cut; the
+native bytes and the poller are the ones the 2026-07-31 soak covered.
+The 2026-09-01 afternoon bench of the SPIKE clone (its own plugin id,
+its own process) ran beside the subject and never touched it.
+
 ### 2026-08-30: 1.6.0.0 release snapshot, and the soak this tag waits on
 
 `node scripts/perf-report.mjs` against the packed release artifact
 (`54913122…`, 284,760 B; gzip 274,616 B). The pack grew about 27.5 KB
 over 1.5.1.0, almost all of it ui/ (the tile editor and the Config
-section in pi-common.js and pi.css, now 243,786 B); bin/plugin.js is
-185,514 B, and `hwsm.node` is byte-identical to the 1.5.0.0 and
-1.5.1.0 releases (`git diff v1.5.1..HEAD -- native/` is empty), so the
-native bytes are the exact ones the 2026-07-31 48 h soak proved. The
+section in pi-common.js and pi.css, now 243,821 B); bin/plugin.js is
+185,514 B, and `hwsm.node` builds from the same native source as the
+1.5.0.0 and 1.5.1.0 releases (`git diff v1.5.1..HEAD -- native/` is
+empty; the CI build is the one that ships, and the release workflow
+proves it reproducible), so the native behavior is the one the
+2026-07-31 48 h soak proved. The
 parse path is unchanged: shared-memory tick 8.6 µs mean / 11.3 µs p95
 over 521 live readings (1,000 iterations, 242.1 KB region). At
 snapshot time the machine's two live plugin processes (retail
@@ -49,7 +136,7 @@ The runbook's soak rule does not bind this release (`native/hwsm` and
 held on a 48 h desk-use soak of the installed 1.6.0.0 pack anyway:
 `node scripts/soak-monitor.mjs` external sampling into `release/`,
 with one HWiNFO restart, one Stream Deck restart and one sleep/wake
-inside the window. The summary lands here when the window closes.
+inside the window. The summary is the 2026-09-02 entry above.
 
 ### 2026-08-11: 1.5.1 soak scope, and why this poller change did not get one
 

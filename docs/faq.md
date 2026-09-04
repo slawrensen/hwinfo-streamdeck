@@ -62,7 +62,7 @@ Leave it on **Auto** (the default) unless you have a specific reason not to. Aut
 | Sensor coverage | everything HWiNFO measures (~500+) | only sensors you tick in HWiNFO |
 | Min / max / average | yes (from HWiNFO) | no (current value only) |
 | Free-version limit | disables after 12 h | none |
-| Enable in HWiNFO | Settings → Shared Memory Support | right-click a sensor → *Report value in Gadget* |
+| Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → *Report value in Gadget* |
 
 Set it under **Advanced → Data source** in any key's settings, or under **Dial gestures & advanced → Data source** on a dial (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
 

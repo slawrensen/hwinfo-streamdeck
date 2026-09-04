@@ -149,7 +149,7 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | **HWiNFO busy** / retrying | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll. |
 | **Shared Memory off** / enable in HWiNFO | HWiNFO reports sharing disabled. Re-enable it, or rely on the Gadget fallback in Auto mode. |
 | **HWiNFO stalled** / check sharing | Values frozen (Sensors window closed or HWiNFO stopped polling). When the dial is on the Gadget source this reads **check Gadget** instead. |
-| **Gadget empty** / tick sensors | Gadget reporting is on but no values are ticked. Right-click sensors in HWiNFO → "Report value in Gadget". |
+| **Gadget empty** / tick sensors | Gadget reporting is on but no values are ticked. In HWiNFO: **Configure Sensors** → **HWiNFO Gadget** tab → "Report value in Gadget". |
 | **Access denied** / un-elevate HWiNFO | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **HWiNFO error** / restart HWiNFO | Shared memory didn't validate (mid-restart or an incompatible version). |
 | **Plugin damaged** / reinstall it | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing, was blocked from loading (usually an antivirus quarantine), or doesn't match this plugin version. Reinstall the plugin; restarting HWiNFO won't clear this one. The file is unsigned, so check it against the release's published SHA-256 before allowing it ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). |

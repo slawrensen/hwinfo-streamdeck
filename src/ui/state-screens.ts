@@ -98,7 +98,7 @@ export function statusSentence(status: PollerStatus): string {
 		case "busy":
 			return "HWiNFO is running, but its shared memory was busy at the moment the plugin connected. This is momentary contention; the plugin retries on the next poll with nothing to do on your side.";
 		case "gadget-empty":
-			return "HWiNFO's Gadget registry is enabled but empty. In the HWiNFO sensor window, right-click each value you want on the deck and tick \"Report value in Gadget\".";
+			return "HWiNFO's Gadget registry is enabled but empty. In the HWiNFO sensor window, click Configure Sensors, open the HWiNFO Gadget tab and tick \"Report value in Gadget\" for the values you want on the deck.";
 		case "disabled":
 			return "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.";
 		case "access-denied":

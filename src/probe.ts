@@ -22,7 +22,7 @@ const GUIDANCE: Record<string, string> = {
 	"unsupported-platform": "This probe needs 64-bit Windows (x64); HWiNFO's interfaces aren't readable here.",
 	"not-running": "Start HWiNFO and enable Settings → 'Shared Memory Support' (Sensors window open, or Sensors-only mode), or enable Gadget reporting and tick sensors (free, no 12-hour limit).",
 	busy: "HWiNFO is running, but its shared memory was busy at this instant. Run the probe again; the plugin itself just retries on its next poll.",
-	"gadget-empty": "The Gadget registry exists but is empty. In HWiNFO's sensor window, tick 'Report value in Gadget' for the sensors you need.",
+	"gadget-empty": "The Gadget registry exists but is empty. In HWiNFO, open Configure Sensors -> HWiNFO Gadget and tick 'Report value in Gadget' for the sensors you need.",
 	"access-denied": "HWiNFO and this process run at different privilege levels. Run both elevated or both non-elevated.",
 	disabled: "Shared Memory Support is switched off in HWiNFO. Re-enable it in Settings; the free version auto-disables it after 12 hours and HWiNFO Pro removes that limit.",
 	invalid: "The shared-memory contents did not validate; HWiNFO may be mid-restart or an incompatible version. Try again in a few seconds.",

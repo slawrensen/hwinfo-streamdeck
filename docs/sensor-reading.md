@@ -210,7 +210,7 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | **HWiNFO busy / retrying** | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll; held values stay up meanwhile. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
 | **Not updating / check sharing** *(or* **check Gadget***)* | Values are frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. The sub-line names the source in use. (The free version's 12-hour expiry shows **Shared Memory / is off** instead, or falls back to Gadget in Auto mode.) |
-| **Tick sensors / in Gadget** | Gadget reporting is on but no sensors are ticked. Right-click values in HWiNFO and choose "Report value in Gadget". |
+| **Tick sensors / in Gadget** | Gadget reporting is on but no sensors are ticked. In HWiNFO open **Configure Sensors** → **HWiNFO Gadget** and tick "Report value in Gadget". |
 | **Access denied / un-elevate** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |

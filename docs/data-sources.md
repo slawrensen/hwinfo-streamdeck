@@ -14,7 +14,7 @@ The plugin reads HWiNFO through one of two local interfaces. It picks the best o
 | Min / max / average | ✅ full stats since HWiNFO started | current value only (min/max/avg **show the current value**) |
 | Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | ✅ no time limit |
 | Works across privilege levels | usually: fails only when HWiNFO is elevated and Stream Deck is not (see [Troubleshooting](troubleshooting.md)) | ✅ yes |
-| Enable in HWiNFO | Settings → **Shared Memory Support** | sensor right-click → **Report value in Gadget** |
+| Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Report value in Gadget** |
 
 Shared Memory is richer in every way except licensing: on the free version it switches itself off after 12 hours of runtime. The Gadget registry has none of that time pressure but only carries the current value of the specific readings you ticked, with no historical min/max/avg.
 
@@ -26,7 +26,9 @@ In HWiNFO → **Settings** → tick **Shared Memory Support**. This is the recom
 
 ### Enabling Gadget reporting
 
-In HWiNFO's Sensors window, right-click each reading you want and tick **Report value in Gadget**. Only ticked readings appear to the plugin; an enabled-but-empty Gadget key surfaces a **Tick sensors / in Gadget** screen on the key.
+In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab, tick **Enable reporting to Gadget**, then tick **Report value in Gadget** for each reading you want. Shift-click selects a whole range at once. Only ticked readings appear to the plugin; an enabled-but-empty Gadget key surfaces a **Tick sensors / in Gadget** screen on the key.
+
+HWiNFO gives every ticked reading a numbered slot and leaves that number reserved even while the reading itself is switched off, so the numbering can carry permanent gaps. The plugin reads across them.
 
 ## Auto mode
 

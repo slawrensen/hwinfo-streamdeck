@@ -63,8 +63,8 @@ Shared Memory exposes **every** reading HWiNFO measures, with min / max / averag
 Gadget reporting never expires on the free version, but it only exposes the sensors **you tick**, and only their current value (no min / max / average).
 
 1. Start **HWiNFO** in Sensors mode.
-2. In the HWiNFO **sensor window**, right-click a value you want on the deck and tick **"Report value in Gadget"**.
-3. Repeat for each sensor you want to show.
+2. In the HWiNFO **sensor window**, click **Configure Sensors** and open the **HWiNFO Gadget** tab.
+3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Shift-click selects a range, so you can tick many at once.
 
 The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. If you enable Gadget reporting but don't tick any sensors, keys show **Tick sensors / in Gadget** until you do.
 

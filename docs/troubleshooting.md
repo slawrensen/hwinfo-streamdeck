@@ -36,7 +36,7 @@ When a key can't show live data it renders a two-line, true-black status screen 
 The plugin found HWiNFO on **neither** interface. In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
-2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead right-click sensors and tick **"Report value in Gadget"** (no 12-hour limit); see [Data sources](data-sources.md).
+2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget** and tick **"Report value in Gadget"** (no 12-hour limit); see [Data sources](data-sources.md).
 3. **Portable HWiNFO window was closed.** The portable build only publishes while its window is open, and nothing auto-starts it. Reopen it (and add it to autostart yourself if you want it always on).
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It can take a few seconds after start to create the shared-memory mapping. Wait, then the key recovers on its own; the plugin re-probes every tick.
@@ -107,7 +107,7 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 The settings-panel sensor list is populated live from whatever source is active:
 
 1. **HWiNFO isn't up yet.** Start HWiNFO, then click the **⟳ refresh** button next to the search box.
-2. **On the Gadget source with nothing ticked**: the key shows **"Tick sensors / in Gadget."** In HWiNFO's sensor window, right-click each value you want and tick **"Report value in Gadget."** The registry key exists but is empty until you do.
+2. **On the Gadget source with nothing ticked**: the key shows **"Tick sensors / in Gadget."** In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for each value you want. The registry key exists but is empty until you do.
 3. **Shared memory is disabled/expired** and you're forced to **Gadget only**; same fix as above.
 4. **Search filter too narrow.** Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 

@@ -106,6 +106,34 @@ for (const f of ["src/ui/state-screens.ts", "src/probe.ts", `${SD}/ui/pi-common.
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Stale guidance: instructions that point at a UI that does not exist.
+// ---------------------------------------------------------------------------
+
+// HWiNFO's "Report value in Gadget" tick lives in the sensor window's
+// Configure Sensors dialog (HWiNFO Gadget tab); there is no right-click
+// route to it (issue #21, PR #23). Current guidance must not send anyone to
+// a menu that does not carry the setting. Release history (CHANGELOG.md and
+// the generated docs page) stays as written.
+const STALE_GUIDANCE = [
+	{ re: /(right-?click[^\n]*gadget)|(gadget[^\n]*right-?click)/i, why: "Gadget reporting is ticked under Configure Sensors -> HWiNFO Gadget, not by right-click" },
+];
+const HISTORY_FILES = new Set(["CHANGELOG.md", "docs/changelog.md"]);
+const GUIDANCE_FILES = [
+	...PROSE_FILES.filter((f) => !HISTORY_FILES.has(f.replaceAll("\\", "/"))),
+	"src/ui/state-screens.ts",
+	"src/probe.ts",
+	`${SD}/ui/pi-common.js`,
+];
+for (const rel of GUIDANCE_FILES) {
+	if (!exists(rel)) continue;
+	read(rel).split(/\r?\n/).forEach((line, i) => {
+		for (const { re, why } of STALE_GUIDANCE) {
+			if (re.test(line)) fail(rel, i + 1, why);
+		}
+	});
+}
+
+// ---------------------------------------------------------------------------
 // 2. Manifest sanity + referenced assets.
 // ---------------------------------------------------------------------------
 
@@ -155,6 +183,23 @@ if (manifest && !new RegExp(`^## ${manifest.Version.replaceAll(".", "\\.")}\\b`,
 }
 if (manifest && exists("MARKETPLACE.md") && !read("MARKETPLACE.md").includes(manifest.Version)) {
 	warn("MARKETPLACE.md", `submission log has no row for ${manifest.Version} yet (added at pack time)`);
+}
+// package-lock.json carries the version twice (the root record and the ""
+// package entry); `npm ci` hard-fails when either drifts from package.json,
+// which is how 1.1.11.0 broke CI. Refuse the drift here, before the tag.
+if (exists("package-lock.json")) {
+	let lock;
+	try {
+		lock = JSON.parse(read("package-lock.json"));
+	} catch (err) {
+		fail("package-lock.json", 0, `does not parse: ${err.message}`);
+	}
+	if (lock) {
+		const rootEntry = lock.packages?.[""]?.version;
+		if (lock.version !== pkg.version || rootEntry !== pkg.version) {
+			fail("package-lock.json", 0, `lock version ${lock.version} / root entry ${rootEntry} do not match package.json ${pkg.version} (run npm install --package-lock-only)`);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

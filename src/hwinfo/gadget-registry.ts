@@ -7,8 +7,8 @@
  *
  * The provider owns ONE opaque native GadgetKey for its lifetime (opened
  * under HKCU with query-only rights by the hwsm bridge); every value read
- * reuses the key and the bridge's native buffer, so steady-state polling
- * allocates only the JavaScript strings it returns.
+ * reuses the key and the bridge's native buffer, so a read allocates only
+ * the value names it queries and the JavaScript strings it returns.
  *
  * Freshness: the registry is NOT cleared when HWiNFO exits, so absence can't
  * be detected structurally. A content digest is tracked instead — while the
@@ -21,6 +21,18 @@ import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type Sensor
 /** Overridable so the gadget e2e can point at a synthetic key. */
 const VSB_SUBKEY = process.env.HWINFO_VSB_KEY || "Software\\HWiNFO64\\VSB";
 
+/**
+ * The scan bound. The numbering is sparse (see readEntries), so there is no
+ * end-of-list marker to stop on and every read walks a fixed range instead.
+ * The range a live set occupies is bounded by how many readings are ticked
+ * at once, not by how many have ever been ticked: HWiNFO hands the flagged
+ * readings a dense run of VSBidx values (issue #21 reports 39 flagged
+ * readings running 0..38 with no gap in the configuration), and the holes
+ * appear only in what gets written. 1024 slots is far above any set a person
+ * would tick, and the bound is also what keeps a corrupt or hostile key from
+ * turning one poll tick into an unbounded walk. A reading parked at an index
+ * at or above it is not read.
+ */
 const MAX_ENTRIES = 1024;
 /** Win32 ERROR_KEY_DELETED: the key vanished under our open handle. */
 const ERROR_KEY_DELETED = 1018;
@@ -132,10 +144,18 @@ export class GadgetRegistryProvider {
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
 
+		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
+		// reading is ticked "Report value in Gadget" and keeps that
+		// reservation while the reading is disabled in the sensor window,
+		// writing nothing into the slot: a permanent hole. So a missing
+		// Sensor<i> is an unused slot, never an end-of-list marker, and the
+		// scan runs the whole bounded range. queryString returns null for
+		// exactly one condition, ERROR_FILE_NOT_FOUND; every other registry
+		// failure throws, so skipping a null cannot swallow a real fault.
 		for (let i = 0; i < MAX_ENTRIES; i++) {
 			const sensorName = this.key.queryString(`Sensor${i}`);
 			if (sensorName === null) {
-				break;
+				continue;
 			}
 			const label = this.key.queryString(`Label${i}`) ?? `Reading ${i}`;
 			const formatted = this.key.queryString(`Value${i}`) ?? "";

@@ -12,6 +12,8 @@
 //   reading past a hole → key and dial both render "After Gap"
 //   value updated       → frame shows the new value, either side of the hole
 //   PI sensor tree      → both groups, all three readings
+//   dynamic details     → a filter view lists both readings across the holes,
+//                         counts them, updates past the hole, and Back leaves
 //   values frozen       → "Not updating" (digest-based staleness)
 //   updates resume      → live again
 //   key deleted         → "Start HWiNFO"
@@ -23,7 +25,8 @@ import { execSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, pluginArgv, regDeleteKey as regDeleteKeyAt, regSet as regSetAt, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, latestSvg as latestSvgIn, makeCheck, makeExpectFrame, pluginArgv, regDeleteKey as regDeleteKeyAt, regSet as regSetAt, sleep, waitUntil } from "./lib/e2e-common.mjs";
+import { profileCells } from "./lib/profile-cells.mjs";
 
 const PORT = 28997;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,6 +42,10 @@ const frames = [];
 const gapFrames = [];
 const dialFrames = [];
 const piPayloads = [];
+/** setImage frames of the detail surface: { context, svg }. */
+const slotImages = [];
+/** switchToProfile calls: { device, profile, page }. */
+const switches = [];
 let failures = 0;
 
 const check = makeCheck(() => {
@@ -120,6 +127,12 @@ wss.on("connection", (ws) => {
 			if (svg !== null) {
 				(msg.context === "ctx-gadget" ? frames : gapFrames).push(svg);
 			}
+		} else if (msg.event === "setImage" && typeof msg.context === "string" && msg.context.startsWith("slot-")) {
+			if (typeof msg.payload?.image === "string") {
+				slotImages.push({ context: msg.context, svg: msg.payload.image });
+			}
+		} else if (msg.event === "switchToProfile") {
+			switches.push({ device: msg.device, profile: msg.payload?.profile, page: msg.payload?.page });
 		} else if (msg.event === "setFeedback" && msg.context === "ctx-gap-dial") {
 			const svg = decodeSvg(msg.payload?.canvas);
 			if (svg !== null) {
@@ -145,7 +158,10 @@ const plugin = spawn(
 			devices: [
 				{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 },
 				// A Stream Deck + (type 7) so the dial leg has an encoder to land on.
-				{ id: "devplus", name: "Harness Plus", size: { columns: 4, rows: 2 }, type: 7 }
+				{ id: "devplus", name: "Harness Plus", size: { columns: 4, rows: 2 }, type: 7 },
+				// A second 15-key deck for the detail-view leg, so its profile
+				// switch and surface never touch dev1's keys.
+				{ id: "devdet", name: "Harness Detail Deck", size: { columns: 5, rows: 3 }, type: 0 }
 			]
 		})
 	),
@@ -194,25 +210,112 @@ try {
 	check("PI sensorTree offers every reading across the holes", tree?.groups?.length === 2 && treeReadings.length === 3 && treeReadings.some((r) => r.key === GAP_READING_KEY), `${tree?.groups?.length ?? 0} groups, ${treeReadings.length} readings`);
 	check("PI payloads report source=gadget with hint", anyGadget !== undefined && piPayloads.some((p) => typeof p?.hint === "string" && p.hint.includes("Gadget")), anyGadget?.hint?.slice(0, 80) ?? "");
 
-	// 6. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
+	// 6. Inside the dynamic details (issue #21 meets issue #5): an opener on
+	// its own deck opens a filter view over everything this Gadget key
+	// publishes. The readings either side of the holes (Test Fan at index
+	// 2, After Gap at index 6) must both land on the page in order, the
+	// title must count them, an update behind the hole must move its tile,
+	// and Back must still leave. The opener sits on the profile's own Back
+	// cell, so no mirror slot is reserved and the tile indexes stay literal.
+	const detCells = profileCells(pluginDir, "profiles/detail-r3-standard");
+	const detOpener = { readingKey: READING_KEY, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
+	const openerAt = { column: 0, row: 0 };
+	const slotCtx = (coord) => `slot-devdet-${coord.replace(",", "x")}`;
+	const detCell = (predicate) => detCells.find(predicate);
+	const titleCtx = slotCtx(detCell((c) => c.settings.slot === "title").coord);
+	const backCell = detCell((c) => c.settings.detailRole === "back");
+	const backCtx = slotCtx(backCell.coord);
+	const tileCtx = (index) => slotCtx(detCell((c) => c.settings.slot === "reading" && c.settings.index === index).coord);
+	const face = (context) => latestSvgIn(slotImages, context);
+	const short = (context) => (face(context) ?? "no frame").slice(0, 160);
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener", device: "devdet", payload: { settings: detOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	await sleep(400);
+	const switchesBeforeEnter = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener", device: "devdet", payload: { settings: detOpener, coordinates: openerAt } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener", device: "devdet", payload: { settings: detOpener, coordinates: openerAt } });
+	await waitUntil(() => switches.length > switchesBeforeEnter, 1500);
+	const entered = switches.at(-1);
+	check("open-details on a Gadget reading switches to the detail profile", switches.length > switchesBeforeEnter && entered?.device === "devdet" && entered?.profile === "profiles/detail-r3-standard", JSON.stringify(entered ?? null));
+	// The app now shows the installed profile: the opener leaves, the baked
+	// cells of the real shipped archive appear under their own action UUIDs.
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener", device: "devdet", payload: { settings: detOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	const surface = (event) => {
+		for (const cell of detCells) {
+			const [column, row] = cell.coord.split(",").map(Number);
+			send({ event, action: cell.uuid, context: slotCtx(cell.coord), device: "devdet", payload: { settings: cell.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false } });
+		}
+	};
+	surface("willAppear");
+	await waitUntil(() => (face(tileCtx(1)) ?? "").includes("After Gap"), 8000);
+	check("detail tile 1 lists the reading before the hole", (face(tileCtx(0)) ?? "").includes("Test Fan"), short(tileCtx(0)));
+	check("detail tile 2 lists the reading behind the holes", (face(tileCtx(1)) ?? "").includes("After Gap"), short(tileCtx(1)));
+	check("detail tile 3 stays empty: the list ends at two readings", face(tileCtx(2)) !== undefined && !face(tileCtx(2)).includes("<text"), short(tileCtx(2)));
+	check("the detail title counts both readings across the holes", (face(titleCtx) ?? "").includes(">1-2 / 2<"), short(titleCtx));
+	check("the Back tile carries the opener's own Gadget reading", (face(backCtx) ?? "").includes("Test Temp"), short(backCtx));
+	publishGap(90.5);
+	await waitUntil(() => (face(tileCtx(1)) ?? "").includes("90.5"), 8000);
+	check("a value update behind the hole reaches its detail tile", (face(tileCtx(1)) ?? "").includes("90.5"), short(tileCtx(1)));
+	const switchesBeforeBack = switches.length;
+	const [backColumn, backRow] = backCell.coord.split(",").map(Number);
+	send({ event: "keyDown", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	send({ event: "keyUp", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	await waitUntil(() => switches.length > switchesBeforeBack, 1500);
+	check("Back restores the previous profile from a Gadget-fed view", switches.length > switchesBeforeBack && switches.at(-1)?.device === "devdet" && switches.at(-1)?.profile === undefined, JSON.stringify(switches.at(-1) ?? null));
+	surface("willDisappear");
+	await sleep(300);
+
+	// 6b. The same Gadget readings through a hand-built custom list (issue
+	// #21 meets the 1.5 custom mode). A Gadget key is "g:<source>:<label>",
+	// the names as HWiNFO writes them, so it carries spaces of its own, and
+	// the custom list runs through the same salvage parser that sheds a
+	// friendly name pasted after a key. A parser that cut at the first
+	// space left "g:Test" and "g:Gap" behind and rendered Sensor missing
+	// on every tile of a Gadget custom list.
+	const customStart = slotImages.length;
+	const faceC = (context) => latestSvgIn(slotImages.slice(customStart), context);
+	const shortC = (context) => (faceC(context) ?? "no frame").slice(0, 160);
+	const customOpener = { readingKey: READING_KEY, pressBehavior: "open-details", detailMode: "custom", detailKeys: ["g:Test Source:Test Fan", GAP_READING_KEY], detailTitle: "Gadget list" };
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	await sleep(400);
+	const switchesBeforeCustom = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt } });
+	await waitUntil(() => switches.length > switchesBeforeCustom, 1500);
+	check("open-details on a custom Gadget list switches to the detail profile", switches.length > switchesBeforeCustom && switches.at(-1)?.device === "devdet" && switches.at(-1)?.profile === "profiles/detail-r3-standard", JSON.stringify(switches.at(-1) ?? null));
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	surface("willAppear");
+	await waitUntil(() => (faceC(tileCtx(1)) ?? "").includes("After Gap"), 8000);
+	check("custom tile 1 renders the Gadget reading before the hole", (faceC(tileCtx(0)) ?? "").includes("Test Fan") && (faceC(tileCtx(0)) ?? "").includes("1200"), shortC(tileCtx(0)));
+	check("custom tile 2 renders the Gadget reading behind the holes", (faceC(tileCtx(1)) ?? "").includes("After Gap"), shortC(tileCtx(1)));
+	check("no custom tile fell to Sensor missing", ![tileCtx(0), tileCtx(1)].some((ctx) => (faceC(ctx) ?? "").includes("Sensor missing")), `${shortC(tileCtx(0))} | ${shortC(tileCtx(1))}`);
+	check("the custom title carries the list name and counts both readings", (faceC(titleCtx) ?? "").includes("Gadget list") && (faceC(titleCtx) ?? "").includes(">1-2 / 2<"), shortC(titleCtx));
+	const switchesBeforeCustomBack = switches.length;
+	send({ event: "keyDown", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	send({ event: "keyUp", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	await waitUntil(() => switches.length > switchesBeforeCustomBack, 1500);
+	check("Back leaves the custom Gadget view", switches.length > switchesBeforeCustomBack && switches.at(-1)?.profile === undefined, JSON.stringify(switches.at(-1) ?? null));
+	surface("willDisappear");
+	await sleep(300);
+
+	// 7. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
 	clearInterval(updater);
 	await expectFrame("frozen registry → 'Not updating'", (svg) => svg.includes("Not updating"), 12000);
 
-	// 7. Resume → live again.
+	// 8. Resume → live again.
 	const updater2 = setInterval(() => publish((51.1 + Math.random() * 0.05).toFixed(2)), 700);
 	await expectFrame("resumed updates → live again", (svg) => svg.includes("51.1"), 10000);
 	clearInterval(updater2);
 
-	// 8. Key deleted → unavailable.
+	// 9. Key deleted → unavailable.
 	regDeleteKey();
 	await expectFrame("key deleted → 'Start HWiNFO'", (svg) => svg.includes("Start HWiNFO"), 10000);
 
-	// 9. Key present but EMPTY (gadget enabled, nothing ticked) — must NOT be
+	// 10. Key present but EMPTY (gadget enabled, nothing ticked) — must NOT be
 	// diagnosed as "start HWiNFO"; the user needs to tick sensors instead.
 	execSync(`reg add "${REG_PATH}" /f`, { stdio: "ignore" });
 	await expectFrame("empty key → 'Tick sensors' (gadget-empty)", (svg) => svg.includes("Tick sensors"), 10000);
 
-	// 10. The hole at index 0 itself: the user disabled the reading holding
+	// 11. The hole at index 0 itself: the user disabled the reading holding
 	// VSBidx 0. The key still holds every other reading, so this is NOT an
 	// empty gadget key and must not be diagnosed as one.
 	regSet("Sensor2", "Test Source");

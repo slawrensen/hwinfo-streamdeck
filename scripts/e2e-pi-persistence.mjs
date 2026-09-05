@@ -134,6 +134,17 @@ const SEEDS = {
 		detailMode: "custom",
 		detailKeys: ["bench:0:1", "bench:0:2", "bench:0:3"],
 		futureBlob: FUTURE_BLOB
+	},
+	// A custom list on the Gadget source (issue #21 meets custom mode):
+	// every key is "g:<source>:<label>" and carries HWiNFO's own spaces.
+	// The panel's key parser must keep them whole, or the first edit
+	// writes "g:Test" back and the config document shows cut keys.
+	gadget: {
+		readingKey: "g:Test Source:Test Temp",
+		pressBehavior: "open-details",
+		detailMode: "custom",
+		detailKeys: ["g:Test Source:Test Fan", "g:Gap Source:After Gap"],
+		futureBlob: FUTURE_BLOB
 	}
 };
 
@@ -195,6 +206,30 @@ const TREE = {
 	source: "shared-memory",
 	hint: ""
 };
+/** The tree the Gadget seed sees: the runtime keys these readings by source
+ * name and label, spaces and all (src/hwinfo/gadget-registry.ts). Served
+ * only in that mode so every other run keeps its exact group count. */
+const GADGET_TREE = {
+	event: "sensorTree",
+	groups: [
+		{
+			name: "Test Source",
+			matchName: "Test Source",
+			readings: [
+				{ key: "g:Test Source:Test Temp", label: "Test Temp", unit: "°C", value: 47.5, type: 1, display: "47.5 °C" },
+				{ key: "g:Test Source:Test Fan", label: "Test Fan", unit: "RPM", value: 1200, type: 3, display: "1200 RPM" }
+			]
+		},
+		{
+			name: "Gap Source",
+			matchName: "Gap Source",
+			readings: [{ key: "g:Gap Source:After Gap", label: "After Gap", unit: "°C", value: 61.5, type: 1, display: "61.5 °C" }]
+		}
+	],
+	state: "ok",
+	source: "gadget",
+	hint: "Reading from the HWiNFO Gadget registry: current values only."
+};
 const THEMES = {
 	event: "themes",
 	effectiveDeckTheme: "void",
@@ -232,7 +267,7 @@ wss.on("connection", (ws) => {
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
 				if (event === "getSensorTree") {
-					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: TREE });
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: mode === "gadget" ? GADGET_TREE : TREE });
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
@@ -273,7 +308,7 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -608,6 +643,22 @@ try {
 	// readings (found by the Codex review on PR #6).
 	await setSelect("pressBehavior", "open-details");
 	await sleep(700);
+
+	// The mirror Back is on by default since 1.6.0 and opts out only on an
+	// exactly-false setting (the runtime parser reads anything else as on).
+	// The real checkbox must therefore write the boolean false when unticked
+	// and true when ticked again, with the unknown field riding along.
+	mark = writes.length;
+	await clickCheckbox("detailMirrorBack");
+	await sleep(700);
+	const mirrorOff = writes.at(-1) ?? {};
+	check("ordinary key: unticking the second Back writes the boolean false", writes.length > mark && mirrorOff.detailMirrorBack === false, JSON.stringify(mirrorOff.detailMirrorBack));
+	check("ordinary key: the untick kept the unknown field", deepEqual(mirrorOff.futureBlob, FUTURE_BLOB), JSON.stringify(mirrorOff.futureBlob));
+	mark = writes.length;
+	await clickCheckbox("detailMirrorBack");
+	await sleep(700);
+	const mirrorOn = writes.at(-1) ?? {};
+	check("ordinary key: ticking the second Back again writes the boolean true", writes.length > mark && mirrorOn.detailMirrorBack === true, JSON.stringify(mirrorOn.detailMirrorBack));
 	await setSelect("detailMode", "custom");
 	await sleep(700);
 	const customVisible = await evaluate(`document.getElementById("detail-custom")?.hidden`);
@@ -2119,6 +2170,19 @@ try {
 	await sleep(700);
 	frame = atomic("leg C in-fold edit", writes.slice(mark));
 	check("leg C: the edit landed while the fold stayed open", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:5"]), JSON.stringify(frame.detailKeys));
+	// The clipboard is stubbed so the outcome is decided, not left to what
+	// headless Chrome grants: the async API refuses, the legacy command
+	// refuses, and the note must say so honestly. The legacy command is
+	// restored to succeed before the later Copy presses.
+	check("leg C: clipboard stubbed to refuse", (await evaluate(`(() => {
+		if (navigator.clipboard) navigator.clipboard.writeText = () => Promise.reject(new Error("denied"));
+		document.execCommand = () => false;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await evaluate(`document.getElementById("config-key-copy")?.click()`);
+	await sleep(500);
+	check("leg C: a refused clipboard reports the failure by name", (await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value === "Copy failed; select the text and copy by hand.", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	await evaluate(`(() => { document.execCommand = () => true; return "ok"; })()`);
 	await evaluate(`document.getElementById("config-key-copy")?.click()`);
 	await sleep(500);
 	let legCDoc = null;
@@ -2129,7 +2193,7 @@ try {
 	}
 	check("leg C: Copy refreshed the untouched well to the post-edit settings", legCDoc?.detailKeys?.[0] === "bench:0:0  Bench 0", JSON.stringify(legCDoc?.detailKeys));
 	check("leg C: the refresh was a read, not a write", writes.length === mark + 1 && globalWrites.length === gmark, `${writes.length - mark}/${globalWrites.length - gmark}`);
-	check("leg C: the note reported an honest outcome", /^(Copied\.|Copy failed;)/.test(String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value)), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	check("leg C: the legacy copy path reports Copied.", (await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value === "Copied.", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 	await evaluate(`(() => {
 		const el = document.getElementById("config-key");
 		el.value = "{ draft";
@@ -2156,7 +2220,7 @@ try {
 	}
 	check("leg C: deck Copy filled the deck well with the deck document", legCDeck !== null && legCDeck.theme === "void" && legCDeck.detailKeys === undefined && legCDeck.readingKey === undefined, JSON.stringify(legCDeck)?.slice(0, 120));
 	check("leg C: deck Copy was a read, not a write", writes.length === mark && globalWrites.length === gmarkDeck, `${writes.length - mark}/${globalWrites.length - gmarkDeck}`);
-	check("leg C: deck Copy note reported an honest outcome", /^(Copied\.|Copy failed;)/.test(String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value)), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+	check("leg C: deck Copy reports Copied. through the legacy path", (await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value === "Copied.", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 
 	// ---- run 7c: a real press survives the rename it tears down (leg R) --
 	// Every other leg drives the panel with element.click(), which fires no
@@ -2236,6 +2300,66 @@ try {
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
+
+	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
+	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.
+	// The panel strips a friendly name off every key it adopts or applies
+	// (the config document writes "<key>  <name>"), and a parser that cut
+	// at the first space wrote "g:Test" back on the first edit and showed
+	// cut keys in the config document.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/gadget`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("gadget: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const gadgetChips = JSON.parse(
+		(await evaluate(`JSON.stringify([...document.querySelectorAll("#detail-list .hw-set-chip")].map((c) => ({ key: c.dataset.key ?? null, missing: c.classList.contains("missing"), text: c.textContent.trim().slice(0, 40) })))`)).result?.value ?? "[]"
+	);
+	check("gadget: both chips keep their whole keys", gadgetChips.length === 2 && gadgetChips[0]?.key === "g:Test Source:Test Fan" && gadgetChips[1]?.key === "g:Gap Source:After Gap", JSON.stringify(gadgetChips));
+	check("gadget: neither chip reads as missing", gadgetChips.length === 2 && gadgetChips.every((c) => c.missing === false), JSON.stringify(gadgetChips));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#detail-list .hw-set-chip[data-key="g:Test Source:Test Fan"] .hw-set-remove')?.click()`);
+	await sleep(700);
+	const gadgetAfterRemove = writes.at(-1) ?? {};
+	check("gadget: removing one chip wrote the other key back whole", writes.length > mark && deepEqual(gadgetAfterRemove.detailKeys, ["g:Gap Source:After Gap"]), JSON.stringify(gadgetAfterRemove.detailKeys));
+	check("gadget: the opener's own Gadget key stayed whole", gadgetAfterRemove.readingKey === "g:Test Source:Test Temp" && deepEqual(gadgetAfterRemove.futureBlob, FUTURE_BLOB), JSON.stringify(gadgetAfterRemove.readingKey));
+	// The config document names a hex key after two spaces; a Gadget key
+	// already reads as a name and is written whole and bare, and Apply
+	// must hand it back whole.
+	check("gadget: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(600);
+	let gadgetDoc = null;
+	try {
+		gadgetDoc = JSON.parse((await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value);
+	} catch {
+		gadgetDoc = null;
+	}
+	check(
+		"gadget: the config document carries the whole Gadget keys, bare",
+		gadgetDoc?.readingKey === "g:Test Source:Test Temp" && deepEqual(gadgetDoc?.detailKeys, ["g:Gap Source:After Gap"]),
+		JSON.stringify({ readingKey: gadgetDoc?.readingKey, detailKeys: gadgetDoc?.detailKeys })
+	);
+	mark = writes.length;
+	await evaluate(`(() => {
+		const el = document.getElementById("config-key");
+		const doc = JSON.parse(el.value);
+		doc.detailKeys = ["g:Gap Source:After Gap", "g:Test Source:Test Fan"];
+		el.value = JSON.stringify(doc);
+		el.dispatchEvent(new Event("input", { bubbles: true }));
+		document.getElementById("config-key-apply").click();
+	})()`);
+	await sleep(900);
+	const gadgetApplied = writes.slice(mark).at(-1) ?? {};
+	check(
+		"gadget: Apply wrote the bare Gadget keys back whole",
+		deepEqual(gadgetApplied.detailKeys, ["g:Gap Source:After Gap", "g:Test Source:Test Fan"]) && gadgetApplied.readingKey === "g:Test Source:Test Temp",
+		JSON.stringify({ readingKey: gadgetApplied.readingKey, detailKeys: gadgetApplied.detailKeys })
+	);
+	await sleep(1400); // the panel's self-reload after Apply settles before the browser goes down
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

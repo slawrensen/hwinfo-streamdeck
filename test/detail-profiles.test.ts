@@ -72,6 +72,18 @@ const REVISION2_SHA256: Record<string, string> = {
 	"plus-xl": "c89fa95cd2c32ab443ba56d769f3cbfa9c66e9bc63f9562d55e8fce552325ca4"
 };
 
+/** Revision 3 is the revision installed in the wild since v1.5.0, and the
+ * one every 1.6.0 entry still switches to: the density work must not
+ * replace it (a changed archive would re-prompt every deck for install). */
+const REVISION3_SHA256: Record<string, string> = {
+	mini: "93b461b252f6d4be7b1896f2489dcbc20741c6098941db24a1fcd62919498d12",
+	standard: "3c5dbb8e757c977c90237f9c688b3b0eaebdd9f659883e3f8c5b17300270f169",
+	neo: "41c9647105e40ed3af61ba8b262b201a0c39eaecd39a6bf830f2ec77b8f2b3e8",
+	plus: "046c24e19af7bb75f90ada636cc77a33f3c785e701d2c4614ca778c65f7cc9aa",
+	xl: "6621a0d14aec12c620ed3949ca7c3fa2548d62bc7279479513a75d874ed1fdea",
+	"plus-xl": "24c536b547b8c9822475ba687b6f5331503eea1344e525ec5ae8ae8c2b4edd9c"
+};
+
 const EXPECTED_CAPACITY: Record<string, number> = { mini: 3, standard: 11, neo: 4, plus: 4, xl: 28, "plus-xl": 32 };
 
 describe("managed profile registry", () => {
@@ -245,6 +257,13 @@ describe("archives", () => {
 		for (const profile of DETAIL_PROFILES) {
 			const committed = fs.readFileSync(path.join(pluginDir, `${detailProfileNameFor(profile.key, 2)}.streamDeckProfile`));
 			assert.equal(createHash("sha256").update(committed).digest("hex"), REVISION2_SHA256[profile.key], `${profile.key}: installed revision-2 copies exist; these bytes may never change`);
+		}
+	});
+
+	it("revision-3 bytes are frozen at their shipped v1.5.0 hashes", () => {
+		for (const profile of DETAIL_PROFILES) {
+			const committed = fs.readFileSync(path.join(pluginDir, `${detailProfileNameFor(profile.key, 3)}.streamDeckProfile`));
+			assert.equal(createHash("sha256").update(committed).digest("hex"), REVISION3_SHA256[profile.key], `${profile.key}: installed revision-3 copies exist since v1.5.0; these bytes may never change`);
 		}
 	});
 

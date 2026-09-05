@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.6.0.0-1";
+	const PI_BUILD = "1.6.0.0-3";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -65,28 +65,34 @@
 	// carries, so a person or an agent can see what a list holds and reorder it
 	// by moving whole lines. Apply strips the name straight back off: settings
 	// store the key alone, because a stored name is a parallel schema that goes
-	// stale the moment HWiNFO renames the sensor.
+	// stale the moment HWiNFO renames the sensor. A Gadget key ("g:<source>:
+	// <label>", the names as HWiNFO writes them) already reads as a name and
+	// carries spaces of its own, so it is written whole and never named.
 
 	/** The settings fields whose values are reading keys. Scalars hold one,
 	 * arrays hold a list, and a rotation group holds its list under `keys`. */
 	const KEY_SCALAR_FIELDS = ["readingKey", "secondaryReadingKey", "quadReadingKey3", "quadReadingKey4"];
 	const KEY_LIST_FIELDS = ["detailKeys", "rotationKeys"];
 
-	/** The key alone: everything before the first run of whitespace. A HWiNFO
-	 * key is colon-separated hex and never contains a space, so this can only
-	 * ever cut an appended name off, never part of the key itself. */
+	/** The key alone. A shared-memory key is colon-separated hex and never
+	 * contains a space, so everything before the first run of whitespace is
+	 * the key and anything after it an appended name. A Gadget key is kept
+	 * whole: its spaces are HWiNFO's own (issue #21 meets custom mode), and
+	 * cutting at the first one left "g:Test" behind and every chip missing. */
 	function bareKey(value) {
 		if (typeof value !== "string") return value;
-		return value.trim().split(/\s+/)[0] ?? "";
+		const trimmed = value.trim();
+		return trimmed.startsWith("g:") ? trimmed : (trimmed.split(/\s+/)[0] ?? "");
 	}
 
 	/** The key with its friendly name appended, or the bare key when no name
 	 * resolves: the reading is not in the current HWiNFO layout, or the tree
-	 * has not arrived yet. An unnamed key in the document is itself the signal
-	 * that the reading is missing. */
+	 * has not arrived yet. An unnamed hex key in the document is itself the
+	 * signal that the reading is missing; a Gadget key names its reading
+	 * already and stays bare. */
 	function namedKey(value) {
 		const key = bareKey(value);
-		if (typeof key !== "string" || key === "") return key;
+		if (typeof key !== "string" || key === "" || key.startsWith("g:")) return key;
 		const label = readingLabelOf(key);
 		return label === null ? key : `${key}  ${label}`;
 	}

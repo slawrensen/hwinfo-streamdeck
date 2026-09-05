@@ -606,6 +606,53 @@ async function scenario(send) {
 	removeDetailSurface(send, "devden4", fltCells);
 	await sleep(300);
 
+	// W2. Paging, forward and back, on a page smaller than the list. The
+	// Stream Deck + bundle holds four reading slots and the six "*"
+	// readings after "cores" take two pages. The opener sits on the
+	// bundle's own Back cell (0,0), so no mirror slot is reserved and the
+	// ranges stay literal: 1-4 / 6, then Next to 5-6 / 6 with slot 0
+	// repainted to the fifth reading and slot 2 emptied, then Previous back
+	// to 1-4 / 6 and the first reading. Every other leg's Next press lands
+	// on a list that fits its page, which moves nothing.
+	const pageCells = profileCells("profiles/detail-r3-plus");
+	const pageOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*" };
+	const pageAt = { column: 0, row: 0 };
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-page", device: "devpage", payload: { settings: pageOpener, coordinates: pageAt, controller: "Keypad", isInMultiAction: false } });
+	await sleep(300);
+	const switchesBeforePage = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-page", device: "devpage", payload: { settings: pageOpener, coordinates: pageAt } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-page", device: "devpage", payload: { settings: pageOpener, coordinates: pageAt } });
+	await waitUntil(() => switches.length > switchesBeforePage, 500);
+	results.pageSwitch = switches.length > switchesBeforePage ? switches.at(-1) : undefined;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-page", device: "devpage", payload: { settings: pageOpener, coordinates: pageAt, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devpage", pageCells);
+	await sleep(1600);
+	const pageTitleCtx = slotCtx("devpage", cellOfRole(pageCells, "title").coord);
+	const pageSlot0Ctx = slotCtx("devpage", cellOfIndex(pageCells, 0).coord);
+	const pageSlot2Ctx = slotCtx("devpage", cellOfIndex(pageCells, 2).coord);
+	results.pageTitle1 = latestSvg(pageTitleCtx);
+	results.pageSlot0First = latestSvg(pageSlot0Ctx);
+	const pageNext = cellOfRole(pageCells, "next");
+	const pagePrevious = cellOfRole(pageCells, "previous");
+	slotPress(send, "devpage", pageNext.coord, pageNext.settings);
+	await sleep(900);
+	results.pageTitle2 = latestSvg(pageTitleCtx);
+	results.pageSlot0Second = latestSvg(pageSlot0Ctx);
+	results.pageSlot2Second = latestSvg(pageSlot2Ctx);
+	slotPress(send, "devpage", pagePrevious.coord, pagePrevious.settings);
+	await sleep(900);
+	results.pageTitle3 = latestSvg(pageTitleCtx);
+	results.pageSlot0Third = latestSvg(pageSlot0Ctx);
+	const pageBackCell = pageCells.find((c) => c.settings.detailRole === "back");
+	const [pageBackCol, pageBackRow] = pageBackCell.coord.split(",").map(Number);
+	const switchesBeforePageBack = switches.length;
+	send({ event: "keyDown", action: pageBackCell.uuid, context: slotCtx("devpage", pageBackCell.coord), device: "devpage", payload: { settings: pageBackCell.settings, coordinates: { column: pageBackCol, row: pageBackRow } } });
+	send({ event: "keyUp", action: pageBackCell.uuid, context: slotCtx("devpage", pageBackCell.coord), device: "devpage", payload: { settings: pageBackCell.settings, coordinates: { column: pageBackCol, row: pageBackRow } } });
+	await waitUntil(() => switches.length > switchesBeforePageBack, 500);
+	results.pageBackSwitch = switches.length > switchesBeforePageBack ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devpage", pageCells);
+	await sleep(300);
+
 	// X. Three per tile PLUS the mirror (explicitly on): the mirror still costs one
 	// TILE (the readings flow around it), the first tile rows three
 	// readings, and pressing the mirror cell leaves exactly like Back.
@@ -782,6 +829,21 @@ async function finish() {
 		typeof results.den2Slot0Min === "string" && results.den2Slot0Min.includes(">800<") && results.den2Slot0Min.includes(">11.9<") && (results.den2Slot0Min.match(/>MIN</g) ?? []).length === 1,
 		(results.den2Slot0Min ?? "no frame").slice(0, 200)
 	);
+	check("paging: the Stream Deck + entered its own bundle", results.pageSwitch?.device === "devpage" && results.pageSwitch?.profile === "profiles/detail-r3-plus", JSON.stringify(results.pageSwitch));
+	check("paging: page one reads 1-4 / 6", typeof results.pageTitle1 === "string" && results.pageTitle1.includes(">1-4 / 6<"), (results.pageTitle1 ?? "no frame").slice(0, 160));
+	check("paging: Next moves the title to 5-6 / 6", typeof results.pageTitle2 === "string" && results.pageTitle2.includes(">5-6 / 6<"), (results.pageTitle2 ?? "no frame").slice(0, 160));
+	check(
+		"paging: Next repainted slot 0 with the fifth reading",
+		typeof results.pageSlot0Second === "string" && results.pageSlot0Second !== results.pageSlot0First && results.pageSlot0Second.includes("VID"),
+		(results.pageSlot0Second ?? "no frame").slice(0, 160)
+	);
+	check("paging: the slot past the list is empty on page two", typeof results.pageSlot2Second === "string" && !results.pageSlot2Second.includes("<text"), (results.pageSlot2Second ?? "no frame").slice(0, 160));
+	check(
+		"paging: Previous returns to 1-4 / 6 and the first reading",
+		typeof results.pageTitle3 === "string" && results.pageTitle3.includes(">1-4 / 6<") && typeof results.pageSlot0Third === "string" && results.pageSlot0Third.includes(">Test Fan<"),
+		(results.pageTitle3 ?? "no frame").slice(0, 160)
+	);
+	check("paging: Back left the paged view", results.pageBackSwitch?.device === "devpage" && results.pageBackSwitch?.profile === undefined, JSON.stringify(results.pageBackSwitch));
 	check("density 4 entry switched devden4 to the class profile", results.den4Switch?.device === "devden4" && results.den4Switch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.den4Switch));
 	check("density 4 title counts the four matches (1-4 / 4)", typeof results.den4TitleFace === "string" && results.den4TitleFace.includes(">1-4 / 4<"), (results.den4TitleFace ?? "no frame").slice(0, 160));
 	check(
@@ -877,6 +939,9 @@ const info = buildInfo({
 		{ id: "devden3", name: "Harness Deck F", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devden4", name: "Harness Deck G", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devgrp", name: "Harness Deck H", size: { columns: 5, rows: 3 }, type: 0 },
+		// A Stream Deck + (type 7, 4x2): its bundle holds four reading slots,
+		// the smallest page the paging leg can overflow with six readings.
+		{ id: "devpage", name: "Harness Plus", size: { columns: 4, rows: 2 }, type: 7 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
 		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }

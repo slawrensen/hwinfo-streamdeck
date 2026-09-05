@@ -253,6 +253,26 @@ export function detailRoleOf(settings: { detailRole?: unknown }): DetailRole | u
 }
 
 /**
+ * A reading key with any friendly name the config document appended after
+ * it stripped off. The property inspector writes "<key>  <name>" so a
+ * person can read a list and reorder it; the panel strips the names on
+ * apply, so settings written through it never carry one, but a document
+ * pasted straight into a settings file by hand does. A shared-memory key
+ * is colon-separated hex and never contains whitespace, so it ends at the
+ * first run of it. A Gadget key is "g:<source>:<label>", the names as
+ * HWiNFO writes them, so it carries spaces of its own (issue #21 meets
+ * custom mode) and already reads as a name: it is kept whole, and the
+ * panel never appends a name to one.
+ */
+export function bareReadingKey(entry: string): string {
+	const trimmed = entry.trim();
+	if (trimmed.startsWith("g:")) {
+		return trimmed;
+	}
+	return trimmed.split(/\s+/)[0] ?? "";
+}
+
+/**
  * The configured custom reading keys: configured order preserved, exact
  * duplicates dropped after their first occurrence, non-string and empty
  * entries ignored, capped at {@link DETAIL_KEYS_MAX}. A non-array (or a
@@ -269,14 +289,10 @@ export function detailKeysOf(settings: { detailKeys?: unknown }): readonly strin
 		if (typeof entry !== "string") {
 			continue;
 		}
-		// The property inspector's config document appends each reading's
-		// friendly name after its key so a person can read the list and
-		// reorder it. The panel strips those on apply, so settings written
-		// through it never carry one; a document pasted straight into a
-		// settings file by hand does, and lands here. A key is colon-separated
-		// hex and never contains a space, so taking everything before the
-		// first whitespace can only ever drop an appended name.
-		const key = entry.trim().split(/\s+/)[0] ?? "";
+		// A hand-pasted config document lands here still wearing its
+		// friendly names; see bareReadingKey for why a Gadget key is kept
+		// whole while a shared-memory key ends at the first whitespace.
+		const key = bareReadingKey(entry);
 		if (key === "" || seen.has(key)) {
 			continue;
 		}

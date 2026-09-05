@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 const PREVIEW_REPO = "slawrensen/hwinfo-streamdeck-preview";
 const PREVIEW_BASEURL = "/hwinfo-streamdeck-preview";
 const PREVIEW_URL = `https://docs.slawrensen.com${PREVIEW_BASEURL}/`;
-const PREVIEW_LABEL = "1.5.0 preview";
+const PREVIEW_LABEL = "1.6.0 preview";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", cwd: repoRoot, ...opts });

@@ -1,9 +1,15 @@
 # Automated release: push a `vX.Y.Z` tag and this builds, packs, hashes and
-# publishes the .streamDeckPlugin to a GitHub Release with auto-generated notes.
+# stages the .streamDeckPlugin on a DRAFT GitHub Release with auto-generated
+# notes. The draft is invisible to everyone but the maintainer, so the
+# workflow's own pack can be downloaded, hashed against the validated
+# candidate and smoke-installed before anyone can reach it; publishing is
+# one deliberate step afterwards (RELEASE_RUNBOOK.md, section 4).
 #
 #   # after bumping manifest/package + CHANGELOG on main:
 #   git tag -a v1.1.7 -m "HWiNFO Sensors 1.1.7.0"
 #   git push origin main --follow-tags
+#   # inspect the draft, then:
+#   gh release edit v1.1.7 --draft=false
 #
 # The UI e2e suites need a live plugin against a mock Stream Deck socket, so
 # they stay local (`npm run suite:full`); this gate runs the static + unit +
@@ -116,9 +122,14 @@ jobs:
       # points at tomorrow. Pins freeze the version their major pointed at
       # when written; Dependabot proposes newer versions (including new
       # majors) by PR, where the bump is a reviewed diff.
-      - name: Publish GitHub Release
+      - name: Stage the GitHub Release as a draft
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
+          # Draft first: the assets land where only the maintainer can see
+          # them, get verified against the local candidate, and go public
+          # with `gh release edit <tag> --draft=false`. /releases/latest
+          # keeps pointing at the previous release until then.
+          draft: true
           name: HWiNFO Sensors ${{ steps.verify.outputs.ver }}
           files: |
             release/com.lawrensen.hwinfo.streamDeckPlugin

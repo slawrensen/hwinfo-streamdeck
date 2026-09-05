@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
-import { composeBackFace, composePagerFace, composeReadingFace, composeTitleFace } from "../src/detail/detail-faces.ts";
+import { composeBackFace, composeChunkFace, composePagerFace, composeReadingFace, composeTitleFace } from "../src/detail/detail-faces.ts";
 import { pageOf, resolveDetailGroup } from "../src/detail/detail-group.ts";
 import { DETAIL_PROFILES } from "../src/detail/managed-profiles.ts";
 import { SharedMemoryProvider } from "../src/hwinfo/provider.ts";
@@ -504,6 +504,117 @@ async function detailBoard() {
 	await render("detail-second-back.png", 4); // reading slot 4 = cell 2,1
 }
 
+/**
+ * Two more 15-key pages for the 1.6.0 density work, composed the way the
+ * controller composes them (pageOf with a density and a tile plan, then
+ * composeChunkFace per tile). detail-dense-view.png is the same CPU
+ * source with Tile shows at four readings per tile, the mirror Back on
+ * by default at the opener's cell (2,1): eleven tiles minus the mirror
+ * carry up to 40 readings, and the title counts readings, not tiles.
+ * detail-mixed-view.png is a hand-grouped custom list: a single, a
+ * stacked pair with its own cell labels, three rows, a quad with chosen
+ * cell colors, a bare-values quad, then the rest of the list flowing on
+ * at the page's two-per-tile setting.
+ */
+async function detailDensityBoards() {
+	const primary = byKey(K.cpuTemp);
+	const profile = DETAIL_PROFILES.find((p) => p.key === "standard");
+	const ctx = {
+		config,
+		deckThemeId: "void",
+		typeAccents: true,
+		measure: { decimals: "auto", fahrenheit: false, dataUnits: "decimal" },
+		text: effectiveTextSettings(parseTextSettings({}), null)
+	};
+	const status = { state: "ok", snapshot, source: "shared-memory" };
+	const MIRROR = 4; // reading slot 4 = cell 2,1, the opener's own cell
+
+	const render = async (outName, { group, density, plan, mirrorIndex }) => {
+		const state = {
+			deviceId: "docs",
+			pageSize: profile.layout.readings.length,
+			density,
+			tilePlan: plan,
+			primaryKey: primary.key,
+			groupSettings: { readingKey: primary.key },
+			presentation: {},
+			group,
+			openerCell: mirrorIndex === undefined ? null : { column: 2, row: 1 },
+			mirrorSlotIndex: mirrorIndex ?? null,
+			offset: 0,
+			statModes: new Map(),
+			surfaceCount: 1,
+			pending: false,
+			dispatchedAt: 0
+		};
+		const page = pageOf(group.keys, 0, state.pageSize, mirrorIndex, density, plan);
+		const faceAt = (column, row) => {
+			const nav = profile.layout.nav;
+			if (nav.back.column === column && nav.back.row === row) return composeBackFace(state, status, ctx);
+			if (nav.title !== null && nav.title.column === column && nav.title.row === row) return composeTitleFace(state, page, ctx);
+			if (nav.previous !== null && nav.previous.column === column && nav.previous.row === row) return composePagerFace("previous", page, state, ctx);
+			if (nav.next !== null && nav.next.column === column && nav.next.row === row) return composePagerFace("next", page, state, ctx);
+			const index = profile.layout.readings.findIndex((c) => c.column === column && c.row === row);
+			if (mirrorIndex !== undefined && index === mirrorIndex) return composeBackFace(state, status, ctx);
+			const chunk = page.chunks[index] ?? [];
+			// One tile shows a cycled stat, the way a press leaves it.
+			const mode = index === 1 && chunk.length > 0 ? "max" : "current";
+			return composeChunkFace(state, chunk, mode, status, ctx, page.specs[index]);
+		};
+		await writeBoard(outName, profile, faceAt);
+	};
+
+	// Dense: the live CPU source at four readings per tile.
+	const sourceGroup = resolveDetailGroup(snapshot, { readingKey: primary.key });
+	if (sourceGroup === null) {
+		throw new Error("dense board: the live CPU reading did not resolve");
+	}
+	await render("detail-dense-view.png", { group: sourceGroup, density: 4, plan: [], mirrorIndex: MIRROR });
+
+	// Mixed: a hand-built custom list. The showcase readings lead, then
+	// the CPU source fills the flow, so every tile carries a live value.
+	const showcase = [K.cpuPower, K.cpuLoad, K.gpuTemp, K.gpuHot, K.cpuFan, K.pump];
+	const fill = sourceGroup.keys.filter((key) => !showcase.includes(key)).slice(0, 18);
+	const mixedGroup = resolveDetailGroup(snapshot, {
+		readingKey: primary.key,
+		detailMode: "custom",
+		detailTitle: "Mixed bench",
+		detailKeys: [...showcase, ...fill]
+	});
+	if (mixedGroup === null) {
+		throw new Error("mixed board: the custom list did not resolve");
+	}
+	const plan = [
+		{ size: 1, labels: [""], colors: [null], cellLabels: true },
+		{ size: 2, labels: ["Load", "GPU"], colors: [null, null], cellLabels: true },
+		{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
+		{ size: 4, labels: ["", "", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#7CFFB2", "#FFD166"], cellLabels: true },
+		{ size: 4, labels: ["", "", "", ""], colors: [null, null, null, null], cellLabels: false }
+	];
+	await render("detail-mixed-view.png", { group: mixedGroup, density: 2, plan, mirrorIndex: MIRROR });
+}
+
+/** Composites one profile's worth of faces onto the dark board. */
+async function writeBoard(outName, profile, faceAt) {
+	const KEY = 216;
+	const GAP = 14;
+	const COLS = profile.layout.columns;
+	const ROWS = profile.layout.rows;
+	const W = COLS * KEY + (COLS + 1) * GAP;
+	const H = ROWS * KEY + (ROWS + 1) * GAP;
+	const mask = Buffer.from(`<svg width="${KEY}" height="${KEY}"><rect width="${KEY}" height="${KEY}" rx="20" ry="20" fill="#fff"/></svg>`);
+	const layers = [];
+	for (let row = 0; row < ROWS; row++) {
+		for (let column = 0; column < COLS; column++) {
+			const face = await sharp(Buffer.from(faceAt(column, row))).resize(KEY, KEY).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+			layers.push({ input: face, left: GAP + column * (KEY + GAP), top: GAP + row * (KEY + GAP) });
+		}
+	}
+	const outFile = path.join(outDir, outName);
+	writeFileSync(outFile, await sharp({ create: { width: W, height: H, channels: 3, background: BOARD_BG } }).composite(layers).png().toBuffer());
+	console.log(`wrote ${outFile} (${W}x${H})`);
+}
+
 // ---------- the HWiNFO Control key face (the shipped action image) ----------
 
 async function controlKey() {
@@ -527,6 +638,7 @@ try {
 	await displayAndText();
 	await dialsBoard();
 	await detailBoard();
+await detailDensityBoards();
 	await controlKey();
 } finally {
 	provider.close();

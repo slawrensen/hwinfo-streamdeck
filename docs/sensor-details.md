@@ -30,13 +30,15 @@ In the key's settings panel, under **Press**:
 - **Detail title** names the view's title tile in any mode, replacing the default (the source name, the filter pattern, or Custom set).
 - **Repeat Back under this key's own cell** keeps the second Back tile described [below](#the-detail-page), on by default; untick it and the movable top-left Back is the one way out.
 
-![The Press section of the settings panel: Press does set to Open sensor details, Detail contains on All readings from this sensor source, an empty Detail title field, and the Second Back checkbox ticked, reading Repeat Back under this key's own cell.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
+![The Press section of the settings panel: Press does set to Open sensor details, Detail contains on All readings from this sensor source, Tile shows on One reading (default), an empty Detail title field, and the Second Back checkbox ticked, reading Repeat Back under this key's own cell.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
+
+![The Custom sensor list editor in the settings panel at its real width: the Add sensor search field, then three tiles built by hand, a two-cell tile holding GPU/CPU 1 Current and Temperature1, a four-cell tile with its Abc label toggle and a color well beside each of its four chips, and a one-cell tile holding PSU +3.3V, each tile with a grip and a size control, each chip with move arrows and a remove cross, a plus inside a tile with room and a dashed plus for a new tile, and the note reading 7 readings across 3 tiles.]({{ '/assets/img/detail-custom-tiles-panel.png' | relative_url }})
 
 Existing keys are untouched: a key without a Press setting behaves exactly as it always has.
 
 ## The detail page
 
-![A 15-key detail page rendered by the plugin from live HWiNFO data: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
+![A 15-key detail page rendered by the plugin from live HWiNFO data, with Repeat Back under this key's own cell unticked by hand so the page holds one Back only: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
 
 Every detail page has the same furniture:
 
@@ -47,7 +49,15 @@ Every detail page has the same furniture:
 - **Reading tiles**: live readings, themed like the opener. At the default one reading per tile, each tile carries the type accent of its own reading; a denser tile (**Tile shows**) carries its first reading's accent, the same rule the regular stacked, row and quad layouts follow for their first sensor. Pressing a tile cycles current / min / max / avg for everything on it, for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
 - **No sparklines on reading tiles, by design.** A sparkline needs a history buffer that fills over a minute or more, and a detail page shows dozens of arbitrary readings (up to 128 on a + XL at four per tile) that change with every page turn and every filter, so the lines would draw mostly empty while costing buffer churn on every visit. The tiles stay instant and scannable; your opener key keeps its own sparkline back on your page.
 
-![The same 15-key detail page with the second Back enabled: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
+![The same 15-key detail page at the default, with the second Back on: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
+
+With **Tile shows** at four readings per tile the same page carries 40 readings: ten quad tiles around the two Back tiles, each cell with a short label, the title counting readings rather than tiles, and one tile showing the MAX badge after a press.
+
+![The same 15-key detail page with Tile shows set to four readings per tile: the CPU temperature opener on the top-left Back tile and again on the center cell as the second Back, the title reading CPU number 0 AMD Ryzen 9 9950X over the range 1-40 of 71, and ten quad tiles each carrying four live CPU readings with short per-cell labels such as CPU, CORE, L3 and VDDC, one of them badged MAX.]({{ '/assets/img/detail-dense-view.png' | relative_url }})
+
+A hand-grouped custom list mixes sizes on one page: here a single, a stacked pair with its own cell labels, a three-row tile, a quad with chosen cell colors, a bare-values quad, and the rest of the list flowing on at two per tile.
+
+![A 15-key detail page for a hand-grouped custom list titled Mixed bench over the range 1-24 of 24: a single CPU package power tile, a stacked pair labelled Load and GPU with a MAX badge, a three-row tile of GPU hot spot, CPU fan and pump readings, a quad with blue, red, green and yellow cell labels, a bare-values quad showing four color-coded temperatures without labels, five two-reading tiles of CCD core temperatures, and the CPU temperature opener on the top-left Back tile and again on the center cell.]({{ '/assets/img/detail-mixed-view.png' | relative_url }})
 
 If HWiNFO stops publishing while the view is open, the tiles show the same status screens as ordinary keys and recover on their own; Back keeps working throughout. If a listed reading disappears (custom mode), its tile shows **Sensor missing** in place, and the others do not shift.
 
@@ -68,7 +78,7 @@ The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one c
 2. **One wildcard anchors the whole pattern.** The moment a pattern contains `*` or `?`, the automatic wrapping is off and the pattern must cover the entire combined text. `core*clock` matches nothing, because the text starts with the source name, not with "core"; `*core*clock*` is the form you want.
 3. **Spaces are literal.** Multi-word plain text works only when the words sit adjacent in the name: `gpu fan` finds the GPU fans, but `core clock` finds nothing because the cores are named `Core 0 Clock`. Span the gap with a star: `*core*clock*`.
 
-![The Press section of the settings panel with Detail contains set to Readings matching a filter: the Filter field holds the pattern star 4090 star, and a live hint under it reads Matches 79 readings right now, above the help text, the Detail title field and the unticked Second Back checkbox.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
+![The Press section of the settings panel with Detail contains set to Readings matching a filter: the Filter field holds the pattern star 4090 star, and a live hint under it reads Matches 79 readings right now, above the help text, the Tile shows select, the Detail title field and a Second Back checkbox unticked by hand.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
 
 Patterns I run on my own bench (512 readings across 21 sources), with their live match counts:
 

@@ -126,7 +126,7 @@ export class GadgetRegistryProvider {
 			provider.close();
 			// The key existing but holding no readings means HWiNFO IS (or was)
 			// running with Gadget support — "start HWiNFO" would mislead here.
-			throw new HwinfoError("gadget-empty", `HKCU\\${VSB_SUBKEY} exists but holds no readings: in HWiNFO's sensor window, tick "Report value in Gadget" for the sensors you need.`);
+			throw new HwinfoError("gadget-empty", `HKCU\\${VSB_SUBKEY} exists but holds no readings: in HWiNFO's sensor window open Configure Sensors, HWiNFO Gadget tab, and tick "Report value in Gadget" for the sensors you need.`);
 		}
 		return provider;
 	}

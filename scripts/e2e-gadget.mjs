@@ -264,6 +264,39 @@ try {
 	surface("willDisappear");
 	await sleep(300);
 
+	// 6b. The same Gadget readings through a hand-built custom list (issue
+	// #21 meets the 1.5 custom mode). A Gadget key is "g:<source>:<label>",
+	// the names as HWiNFO writes them, so it carries spaces of its own, and
+	// the custom list runs through the same salvage parser that sheds a
+	// friendly name pasted after a key. A parser that cut at the first
+	// space left "g:Test" and "g:Gap" behind and rendered Sensor missing
+	// on every tile of a Gadget custom list.
+	const customStart = slotImages.length;
+	const faceC = (context) => latestSvgIn(slotImages.slice(customStart), context);
+	const shortC = (context) => (faceC(context) ?? "no frame").slice(0, 160);
+	const customOpener = { readingKey: READING_KEY, pressBehavior: "open-details", detailMode: "custom", detailKeys: ["g:Test Source:Test Fan", GAP_READING_KEY], detailTitle: "Gadget list" };
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	await sleep(400);
+	const switchesBeforeCustom = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt } });
+	await waitUntil(() => switches.length > switchesBeforeCustom, 1500);
+	check("open-details on a custom Gadget list switches to the detail profile", switches.length > switchesBeforeCustom && switches.at(-1)?.device === "devdet" && switches.at(-1)?.profile === "profiles/detail-r3-standard", JSON.stringify(switches.at(-1) ?? null));
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-opener-custom", device: "devdet", payload: { settings: customOpener, coordinates: openerAt, controller: "Keypad", isInMultiAction: false } });
+	surface("willAppear");
+	await waitUntil(() => (faceC(tileCtx(1)) ?? "").includes("After Gap"), 8000);
+	check("custom tile 1 renders the Gadget reading before the hole", (faceC(tileCtx(0)) ?? "").includes("Test Fan") && (faceC(tileCtx(0)) ?? "").includes("1200"), shortC(tileCtx(0)));
+	check("custom tile 2 renders the Gadget reading behind the holes", (faceC(tileCtx(1)) ?? "").includes("After Gap"), shortC(tileCtx(1)));
+	check("no custom tile fell to Sensor missing", ![tileCtx(0), tileCtx(1)].some((ctx) => (faceC(ctx) ?? "").includes("Sensor missing")), `${shortC(tileCtx(0))} | ${shortC(tileCtx(1))}`);
+	check("the custom title carries the list name and counts both readings", (faceC(titleCtx) ?? "").includes("Gadget list") && (faceC(titleCtx) ?? "").includes(">1-2 / 2<"), shortC(titleCtx));
+	const switchesBeforeCustomBack = switches.length;
+	send({ event: "keyDown", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	send({ event: "keyUp", action: backCell.uuid, context: backCtx, device: "devdet", payload: { settings: backCell.settings, coordinates: { column: backColumn, row: backRow } } });
+	await waitUntil(() => switches.length > switchesBeforeCustomBack, 1500);
+	check("Back leaves the custom Gadget view", switches.length > switchesBeforeCustomBack && switches.at(-1)?.profile === undefined, JSON.stringify(switches.at(-1) ?? null));
+	surface("willDisappear");
+	await sleep(300);
+
 	// 7. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
 	clearInterval(updater);
 	await expectFrame("frozen registry → 'Not updating'", (svg) => svg.includes("Not updating"), 12000);

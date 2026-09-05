@@ -72,6 +72,22 @@ describe("detail settings parsing", () => {
 		assert.deepEqual(detailKeysOf({ detailKeys: ["c\tCPU Die (average)", " d   Page File Total "] as unknown as string[] }), ["c", "d"]);
 	});
 
+	it("detailKeys: a Gadget key is kept whole, spaces and all", () => {
+		// The Gadget source keys a reading by "g:<source>:<label>", the names
+		// as HWiNFO writes them, so the key itself carries spaces (issue #21
+		// meets custom mode). Cutting at the first space left "g:CPU" behind
+		// and turned every tile of a Gadget custom list into Sensor missing.
+		const vid = "g:CPU [#0]: AMD Ryzen 9 9950X3D2:Core 0 VID";
+		const gap = "g:Gap Source:After Gap";
+		assert.deepEqual(detailKeysOf({ detailKeys: [vid, gap, `${vid}~1`, ` ${gap} `] }), [vid, gap, `${vid}~1`]);
+		// A Gadget key already reads as a name, so the document never appends
+		// one and nothing after the key is cut: a label with a double space
+		// inside it must survive, so no separator heuristic applies.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["g:Test Source:Two  Spaces"] }), ["g:Test Source:Two  Spaces"]);
+		// A shared-memory key still ends at the first run of whitespace.
+		assert.deepEqual(detailKeysOf({ detailKeys: ["f0000300:0:7000000 Core 0 T0 Usage"] }), ["f0000300:0:7000000"]);
+	});
+
 	it("detailKeys: capped without erroring", () => {
 		const many = Array.from({ length: DETAIL_KEYS_MAX + 40 }, (_, i) => `k${i}`);
 		const parsed = detailKeysOf({ detailKeys: many });

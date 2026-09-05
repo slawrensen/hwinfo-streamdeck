@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-2" />
+		<link rel="stylesheet" href="pi.css?v=1.6.0.0-3" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -14,8 +14,9 @@
 				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
 				2. In HWiNFO Settings, enable <b>Shared Memory Support</b>. On the free
 				version you can instead click <b>Configure Sensors</b> in the sensor
-				window, open the <b>HWiNFO Gadget</b> tab and tick <b>“Report value in
-				Gadget”</b> (no 12-hour limit).<br />
+				window, open the <b>HWiNFO Gadget</b> tab, tick <b>Enable reporting to
+				Gadget</b>, then tick <b>“Report value in Gadget”</b> on the readings
+				you want (no 12-hour limit).<br />
 				3. Pick a sensor below. That's it.
 			</p>
 		</details>
@@ -353,7 +354,7 @@
 			<div class="hw-help">The exact settings this key runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another key or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.6.0.0-2"></script>
-		<script src="pi-control.js?v=1.6.0.0-2"></script>
+		<script src="pi-common.js?v=1.6.0.0-3"></script>
+		<script src="pi-control.js?v=1.6.0.0-3"></script>
 	</body>
 </html>

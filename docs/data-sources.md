@@ -30,6 +30,8 @@ In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget*
 
 HWiNFO gives every ticked reading a numbered slot and leaves that number reserved even while the reading itself is switched off, so the numbering can carry permanent gaps. The plugin reads across them (since 1.6.0; earlier versions stopped at the first gap, see [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up)).
 
+The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Renaming either in HWiNFO changes that identity and the key shows **Sensor missing / pick again** until you pick it again; reordering, restarts and the slot numbering do not affect it.
+
 ## Auto mode
 
 The **Data source** setting defaults to **Auto**, and it's what most setups should stay on. In Auto mode the plugin:

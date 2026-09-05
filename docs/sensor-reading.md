@@ -9,7 +9,7 @@ One face, one hierarchy: the value carries the light, the label identifies, and 
 
 This page documents every setting in the key's settings panel. For the Stream Deck + dial, see [Sensor Dial](sensor-dial.md).
 
-![The full Sensor Reading settings panel in the Stream Deck property inspector, its rows grouped under flat Sensor, Format, Press, Appearance, Layout and Alerts headers: the sensor picker with a live value and the label field, the stat, decimals and unit rows, the Press does select, the theme gallery with the Text select under it, the layout and Display selects, the threshold controls, and the expanded Advanced section headed Deck defaults (deck theme, Deck text, type accents, data units), Connection (data source, poll rate) and Support (the Copy support report button).]({{ '/assets/img/settings-panel.png' | relative_url }})
+![The full Sensor Reading settings panel in the Stream Deck property inspector, its rows grouped under flat Sensor, Format, Press, Appearance, Layout and Alerts headers: the sensor picker with a live value and the label field, the stat, decimals and unit rows, the Press does select, the theme gallery with the Text select under it, the layout and Display selects, the threshold controls, and the expanded Advanced section headed Deck defaults (deck theme, Deck text, type accents, data units), Connection (data source, poll rate), Support (the Copy support report button) and Config (the This key and Deck JSON wells with their Copy and Apply buttons).]({{ '/assets/img/settings-panel.png' | relative_url }})
 
 ## Settings
 
@@ -17,7 +17,7 @@ This page documents every setting in the key's settings panel. For the Stream De
 
 A searchable picker over every reading HWiNFO publishes (typically 500+), grouped by source (CPU, GPU, drives, network, and so on). Type in the **Search sensors…** box to filter; each row shows a live value so you can confirm you have the right one. The **⟳** button reloads the list if HWiNFO's sensor set changed.
 
-The selected sensor is stored as HWiNFO's stable `sensor-id : instance : reading-id` identity, not a list position, so keys survive HWiNFO restarts and sensor reordering. If that identity later disappears from HWiNFO's output (a hardware, driver, or sensor-profile change), the key shows **Sensor missing / pick again**: reopen settings and pick it again.
+The selected sensor is stored as HWiNFO's stable `sensor-id : instance : reading-id` identity (on the Gadget registry, which carries no ids, as the source name and reading label HWiNFO writes), not a list position, so keys survive HWiNFO restarts and sensor reordering. If that identity later disappears from HWiNFO's output (a hardware, driver, or sensor-profile change, or a rename in HWiNFO while on the Gadget source), the key shows **Sensor missing / pick again**: reopen settings and pick it again.
 
 > **Note:** With the picker open, pressing Enter with no search text typed does **not** change your selection (fixed in 1.1.5.0). Your saved sensor is left untouched.
 
@@ -224,7 +224,7 @@ The settings panel shows the matching plain-language explanation and fix while t
 
 The **Advanced** section in this panel holds plugin-wide settings shared by every key and dial, in four headed groups: **Deck defaults (every key and dial)** with **Deck theme**, **Deck text**, **Type accents** and **Data units**; **Connection** with **Data source** and **Poll every**; **Support**; and **Config**. Themes and Deck text are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
 
-![The expanded Advanced section in the Stream Deck app: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, and Support with the Copy support report button, then Config with the This key and Deck JSON wells and their Copy and Apply buttons.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
+![The expanded Advanced section of the settings panel at its real width: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, Support with the Copy support report button, and Config with the This key and Deck JSON wells, each with its Copy and Apply buttons, over the help line that explains them.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
 
 **Config** holds two JSON wells: **This key**, the exact settings this key runs on, and **Deck**, the plugin-wide settings. **Copy** fills an untouched well with the settings of the moment you press it and puts the document on the clipboard; save it to a file to back a hand-built layout up. Paste a saved document and press **Apply** to restore it, or to clone it onto another key here or on another machine. Apply replaces the whole document in one write and reloads the panel; fields this build does not know survive untouched. Reading keys in the document carry the sensor's friendly name after the key so the file stays readable; Apply strips the names, and settings always store bare keys. The wells live on the Sensor Reading and Sensor Dial panels only; the HWiNFO Control key holds just a command, a target and a reset scope, so I left it without wells and re-enter those by hand.
 

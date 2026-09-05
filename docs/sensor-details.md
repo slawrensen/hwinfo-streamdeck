@@ -32,13 +32,13 @@ In the key's settings panel, under **Press**:
 
 ![The Press section of the settings panel: Press does set to Open sensor details, Detail contains on All readings from this sensor source, Tile shows on One reading (default), an empty Detail title field, and the Second Back checkbox ticked, reading Repeat Back under this key's own cell.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
 
-![The Custom sensor list editor in the settings panel at its real width: three tiles built by hand, a two-cell tile holding GPU/CPU 1 Current and Temperature1, a four-cell tile with its Abc label toggle and a color well beside each of its four chips, and a one-cell tile holding PSU +3.3V, each tile with a grip, a size control and move arrows, a dashed plus for a new tile, and the note reading 7 readings across 3 tiles.]({{ '/assets/img/detail-custom-tiles-panel.png' | relative_url }})
+![The Custom sensor list editor in the settings panel at its real width: the Add sensor search field, then three tiles built by hand, a two-cell tile holding GPU/CPU 1 Current and Temperature1, a four-cell tile with its Abc label toggle and a color well beside each of its four chips, and a one-cell tile holding PSU +3.3V, each tile with a grip and a size control, each chip with move arrows and a remove cross, a plus inside a tile with room and a dashed plus for a new tile, and the note reading 7 readings across 3 tiles.]({{ '/assets/img/detail-custom-tiles-panel.png' | relative_url }})
 
 Existing keys are untouched: a key without a Press setting behaves exactly as it always has.
 
 ## The detail page
 
-![A 15-key detail page rendered by the plugin from live HWiNFO data: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
+![A 15-key detail page rendered by the plugin from live HWiNFO data, with Repeat Back under this key's own cell unticked by hand so the page holds one Back only: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
 
 Every detail page has the same furniture:
 
@@ -49,7 +49,7 @@ Every detail page has the same furniture:
 - **Reading tiles**: live readings, themed like the opener. At the default one reading per tile, each tile carries the type accent of its own reading; a denser tile (**Tile shows**) carries its first reading's accent, the same rule the regular stacked, row and quad layouts follow for their first sensor. Pressing a tile cycles current / min / max / avg for everything on it, for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
 - **No sparklines on reading tiles, by design.** A sparkline needs a history buffer that fills over a minute or more, and a detail page shows dozens of arbitrary readings (up to 128 on a + XL at four per tile) that change with every page turn and every filter, so the lines would draw mostly empty while costing buffer churn on every visit. The tiles stay instant and scannable; your opener key keeps its own sparkline back on your page.
 
-![The same 15-key detail page with the second Back enabled: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
+![The same 15-key detail page at the default, with the second Back on: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
 
 With **Tile shows** at four readings per tile the same page carries 40 readings: ten quad tiles around the two Back tiles, each cell with a short label, the title counting readings rather than tiles, and one tile showing the MAX badge after a press.
 

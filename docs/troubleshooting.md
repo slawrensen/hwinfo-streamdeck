@@ -36,7 +36,7 @@ When a key can't show live data it renders a two-line, true-black status screen 
 The plugin found HWiNFO on **neither** interface. In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
-2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget** and tick **"Report value in Gadget"** (no 12-hour limit); see [Data sources](data-sources.md).
+2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit); see [Data sources](data-sources.md).
 3. **Portable HWiNFO window was closed.** The portable build only publishes while its window is open, and nothing auto-starts it. Reopen it (and add it to autostart yourself if you want it always on).
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It can take a few seconds after start to create the shared-memory mapping. Wait, then the key recovers on its own; the plugin re-probes every tick.
@@ -48,7 +48,7 @@ HWiNFO's shared-memory mapping exists but its header is flagged **disabled** (in
 
 1. **Shared Memory Support was turned off** in HWiNFO Settings. Re-enable it.
 2. **Free version's 12-hour timer expired.** The free build auto-disables shared memory 12 hours after start and leaves the dead mapping behind. Toggle **Shared Memory Support** off and on to restart the timer, or restart HWiNFO. HWiNFO **Pro** removes the limit entirely.
-3. **You don't want to keep toggling it.** Enable **Gadget reporting** instead (tick "Report value in Gadget" on the sensors you need). In the default **Auto** data source the plugin falls back to the Gadget registry by itself when shared memory dies, and upgrades back automatically when it returns.
+3. **You don't want to keep toggling it.** Enable **Gadget reporting** instead (**Configure Sensors → HWiNFO Gadget**: tick "Enable reporting to Gadget", then "Report value in Gadget" on the sensors you need). In the default **Auto** data source the plugin falls back to the Gadget registry by itself when shared memory dies, and upgrades back automatically when it returns.
 
 > **Note:** If your **Data source** (Advanced) is set to **Shared Memory only**, the plugin will *not* fall back. Set it to **Auto** to get automatic Gadget fallback.
 

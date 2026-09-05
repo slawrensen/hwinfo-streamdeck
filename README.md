@@ -68,7 +68,7 @@ advanced*):
 | Sensor coverage | everything HWiNFO measures | only sensors you tick in HWiNFO |
 | Min / max / average | ✅ | current value only |
 | Free version | auto-disables after **12 h** (Pro: unlimited) | ✅ no time limit |
-| Enable in HWiNFO | Settings → *Shared Memory Support* | *Configure Sensors* → *HWiNFO Gadget* tab → *Report value in Gadget* |
+| Enable in HWiNFO | Settings → *Shared Memory Support* | *Configure Sensors* → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
 
 In **Auto** mode the plugin uses Shared Memory whenever it's available and
 silently falls back to the Gadget registry (e.g. after the free version's 12-hour
@@ -252,12 +252,13 @@ status screen that names the problem and its fix:
 
 <p align="center">
   <img src="docs/assets/img/status-screens.png" width="820"
-       alt="The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing">
+       alt="The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing">
 </p>
 
 | Key shows | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
+| **HWiNFO busy** | HWiNFO is running, but another reader held its shared memory at the instant the plugin connected. Momentary; the plugin retries on the next poll. |
 | **Shared Memory off** | HWiNFO reports sharing disabled. This is also where the free version's **12-hour timer** lands: it switches sharing off (HWiNFO Pro removes the limit). Re-enable it in HWiNFO Settings, or enable Gadget reporting; Auto mode falls back to it by itself. |
 | **Tick sensors in Gadget** | Gadget reporting is on but nothing is ticked, so the registry is empty. In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **Report value in Gadget** for each value you want on the deck. |
 | **Not updating** | Values frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. Reopen the Sensors window; if it keeps happening, restart HWiNFO. |

@@ -19,3 +19,6 @@ This plugin is free software (MIT licensed) with **no ads and no telemetry**.
   vendored as `ui/sdpi-components.js` from the official distribution). The
   HWiNFO bridge (`bin/hwsm.node`) is this project's own N-API addon, built
   from `native/hwsm` and covered by the same MIT license.
+- **ws** (MIT, Einar Otto Stangvik and contributors,
+  <https://github.com/websockets/ws>), the SDK's WebSocket client to the
+  local Stream Deck app, bundled into `bin/plugin.js`.

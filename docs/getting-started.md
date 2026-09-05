@@ -17,7 +17,7 @@ In the actions list, open **HWiNFO Sensors** and drag **Sensor Reading** onto an
 
 The key immediately shows a blue **"Pick a sensor / in settings"** screen. That's the plugin working, waiting for you to choose what to display. The settings panel (the property inspector) opens below the canvas at the same time.
 
-> **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget** and tick **"Report value in Gadget"**; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
+> **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
 
 ## 3. Pick a sensor
 
@@ -32,7 +32,7 @@ Click the **Sensor** search box to open the picker. It lists every reading HWiNF
 
 Click a row to select it. The **Live value** line just under the picker previews the chosen reading (current value plus min / max / avg), and the key on your deck switches from the blue prompt to the live number straight away.
 
-That's the whole loop: drag, pick, done. The key now updates roughly once a second (see [Poll every](data-sources.md#poll-every) under Advanced settings to change the rate). Your choice is stored by HWiNFO's stable sensor identity, not by list position, so the key survives restarts and hardware reordering.
+That's the whole loop: drag, pick, done. The key now updates roughly once a second (see [Poll every](data-sources.md#poll-every) under Advanced settings to change the rate). Your choice is stored by HWiNFO's stable sensor identity (on the Gadget source, by the source name and reading label as HWiNFO writes them), not by list position, so the key survives restarts and hardware reordering.
 
 ## Where to go next
 

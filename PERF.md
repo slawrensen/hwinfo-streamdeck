@@ -29,16 +29,19 @@ zero orphan processes after the full suite.
 
 ### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
 
-`node scripts/perf-report.mjs` against the release candidate pack
-(`fa305293…`, 284,822 B; gzip 274,714 B): the 2026-08-30 density cut
-plus the issue #21 Gadget scan fix (#22), the Configure Sensors
-guidance (#23), the corrected README and first-run tip, and the
-1.6.0.0-2 panel cache tokens. bin/plugin.js is 185,561 B (the scan fix
-is 47 B of bundle), ui/ is 243,963 B, and `hwsm.node` builds from the
-same native source as 1.5.0.0 and 1.5.1.0 (`git diff v1.5.1..HEAD --
-native/` is empty; the CI-built addon is the one that ships). The
-shared-memory parse path is unchanged: 8.4 µs mean / 10.5 µs p95 over
-548 live readings (1,000 iterations, 255.8 KB region).
+`node scripts/perf-report.mjs` against the final release candidate pack
+(`0f894cd2…`, 285,205 B; gzip 275,094 B, measured 2026-09-05 03:06Z):
+the 2026-08-30 density cut plus the issue #21 Gadget scan fix (#22),
+the Configure Sensors guidance (#23), the corrected README and
+first-run tip, the 1.6.0.0-3 panel cache tokens, and the custom-list
+key parser that keeps a Gadget key whole (found by the release gap
+audit; see the soak paragraph below). bin/plugin.js is 185,666 B, ui/ is
+244,582 B, and `hwsm.node` builds from the same native source as
+1.5.0.0 and 1.5.1.0 (`git diff v1.5.1..HEAD -- native/` is empty; the
+CI-built addon is the one that ships). The shared-memory parse path is
+unchanged: 8.5 µs mean / 8.7 µs p95 over 548 live readings (1,000
+iterations, 255.8 KB region). The afternoon cut of the same day
+(`fa305293…`, 284,822 B) measured 8.4 / 10.5 µs on the same path.
 
 The Gadget path is the one that changed, and it is dearer by design.
 The old scan stopped at the first missing `SensorN`; the fix walks the
@@ -52,7 +55,9 @@ run against both scans measures:
 | 1.5.1.0 scan (stops at the first hole) | 121.8 | 116.6 | 143.3 | 11,137 B |
 | 1.6.0.0 scan (whole 1,024-slot bound) | 2,736.5 | 2,694.1 | 2,998.3 | 42,370 B |
 
-About 2.6 ms of that is the 1,011 registry queries that answer
+Re-measured on the final pack: 2,565.3 µs mean / 2,555.1 p50 / 2,630.2
+p95, 42,377 B per tick, the same shape inside run-to-run noise. About
+2.6 ms of that is the 1,011 registry queries that answer
 ERROR_FILE_NOT_FOUND, so the cost is set by the bound, not by how many
 readings are ticked: at the default 1 s poll it is about 0.3% of one
 core, at the fastest 250 ms poll about 1.1%, and the shared-memory
@@ -64,11 +69,17 @@ for it.
 The soak this release rests on is the 2026-09-02 entry below: 48 h on
 the 2026-08-30 pack (`54913122…`), whose runtime differs from this
 candidate by the Gadget provider's scan loop (src/hwinfo/gadget-
-registry.ts), a poller comment, and two user-facing strings. The
+registry.ts), the custom-list key parser (src/detail/detail-settings.ts:
+a Gadget key is "g:<source>:<label>" and carries spaces, and the parser
+cut it at the first one, a defect introduced on the density branch and
+never released), a poller comment, and three user-facing strings. The
 shared-memory poller, the renderers and the native bytes the soak
-exercised are the same source; the changed Gadget path is covered by
-the 24-case provider suite, the Gadget e2e (21 checks, 8 of them new,
-all failing against the old scan) and a bench install of this pack.
+exercised are the same source; the changed paths are covered by the
+24-case provider suite, the Gadget e2e (27 checks; 10 of the original
+21 fail against the v1.5.1 scan, and 3 of the 6 custom-list checks fail
+against the first-space parser, both proven in isolated worktrees
+before the fixes), the PI e2e's Gadget run (8 checks, 6 of them failing
+against the old panel parser) and a bench install of this pack.
 `perf-report` could not attribute the live plugin process from this
 shell (the Stream Deck app's child processes answer the WMI command-line
 query with an empty string here), so the process row is not refreshed;

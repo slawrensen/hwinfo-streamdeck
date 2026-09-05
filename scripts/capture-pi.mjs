@@ -1,6 +1,6 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Twenty-one states: the key PI's settings view,
+// the theme gallery are present. Twenty-three states: the key PI's settings view,
 // open picker (marketplace shot 4), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, the Press section on Open
 // sensor details, the same block with the Second Back checkbox ticked, the
@@ -182,6 +182,16 @@ try {
 	await viewport(Math.min(2400, Math.max(880, Number(settingsHeight.result?.value ?? 880) + 16)));
 	await sleep(300);
 	await capture("pi-settings.png");
+	// The Advanced fold on its own, from its summary to the Config help line:
+	// the deck-wide groups (Deck defaults, Connection, Support) and the
+	// 1.6.0 Config wells with their Copy and Apply buttons, at the panel's
+	// real width. Feeds docs/assets/img/pi-live-key-advanced.png.
+	await captureClipped("pi-key-advanced.png", await evaluate(`(() => {
+		const adv = document.querySelector('details[data-fold="advanced"]');
+		if (!adv) return "missing";
+		const r = adv.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 6)), h: Math.ceil(r.height + 16) };
+	})()`));
 	await viewport(880);
 
 	// Open the picker with a query typed in, so the filtered list shows.
@@ -722,6 +732,24 @@ try {
 	await setSelect("textMode", "");
 	await sleep(400);
 
+	// ---- dial PI: the deck-wide tail of "Dial gestures & advanced" ----
+	// From the Remote control header (Link ID) through Deck defaults,
+	// Connection, Support and the Config wells, clipped so the per-gesture
+	// rows above stay out of it. Feeds docs/assets/img/pi-live-dial-advanced.png.
+	await setSelect("controlPreset", "elite");
+	await sleep(900);
+	await viewport(2400);
+	await evaluate(openGestures);
+	await sleep(300);
+	await captureClipped("pi-dial-advanced.png", await evaluate(`(() => {
+		const g = document.querySelector('details[data-fold="advanced"]');
+		const head = [...document.querySelectorAll('details[data-fold="advanced"] .hw-section')].find((el) => el.textContent.trim() === "Remote control");
+		if (!g || !head) return "missing";
+		const top = head.getBoundingClientRect().top + window.scrollY;
+		const bottom = g.getBoundingClientRect().bottom + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 6)), h: Math.ceil(bottom - top + 16) };
+	})()`));
+
 	// ---- HWiNFO Control PI: command + Link ID target ----
 	log("navigating: control");
 	await viewport(880);
@@ -738,7 +766,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 21 PI states to ${outDir}`);
+	console.log(`captured 23 PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

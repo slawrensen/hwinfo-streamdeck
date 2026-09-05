@@ -75,9 +75,10 @@ Elgato Marketplace listing is a separate track.
   reading reaches keys, dials and the Sensor details view, and a
   missing slot is never mistaken for a fault. (Reported in issue #21.)
 - The Gadget setup guidance names where the tick actually lives: the
-  sensor window's Configure Sensors dialog, HWiNFO Gadget tab, not a
-  right-click menu. The status screens, the settings panel's first-run
-  tip and the docs all say so now.
+  sensor window's Configure Sensors dialog, HWiNFO Gadget tab, then the
+  Enable reporting to Gadget switch and Report value in Gadget on each
+  reading, not a right-click menu. The status screens, the settings
+  panel's first-run tip and the docs all say so now.
 
 ## 1.5.1.0 - 2026-08-11
 

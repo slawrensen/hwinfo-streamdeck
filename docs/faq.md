@@ -62,7 +62,7 @@ Leave it on **Auto** (the default) unless you have a specific reason not to. Aut
 | Sensor coverage | everything HWiNFO measures (~500+) | only sensors you tick in HWiNFO |
 | Min / max / average | yes (from HWiNFO) | no (current value only) |
 | Free-version limit | disables after 12 h | none |
-| Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → *Report value in Gadget* |
+| Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
 
 Set it under **Advanced → Data source** in any key's settings, or under **Dial gestures & advanced → Data source** on a dial (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
 
@@ -192,7 +192,7 @@ Yes to both. The **free** version works (with the 12-hour Shared Memory caveat a
 
 ### Do keys survive reboots, HWiNFO restarts, or reordering sensors in HWiNFO?
 
-Yes. A key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list. So keys keep working across restarts and if you reorder sensors in HWiNFO. If a saved sensor genuinely disappears (hardware/driver change, or you renamed a sensor profile), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
+Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. So keys keep working across restarts and if you reorder sensors in HWiNFO. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
 
 ### Can I use Stream Deck + dials without HWiNFO Pro?
 

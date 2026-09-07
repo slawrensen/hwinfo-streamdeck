@@ -45,6 +45,34 @@ describe("setIntervalMs keeps series subscriptions", () => {
 	});
 });
 
+describe("integrity: subsecond sampling", () => {
+	for (const interval of [250, 500, 1000]) {
+		it(`${interval}ms captures revisions inside a second and steady producer stamps`, () => {
+			const seam = poller as unknown as Seam & { dropProvider(): void };
+			seam.dropProvider();
+			const key = `cadence:${interval}:0`;
+			let time = 1000;
+			let revision = 1;
+			let value = 40;
+			seam.openProvider = () => ({ source: "shared-memory", close: () => {}, read: () => {
+				const base = snapshotAt(Math.floor(time / 1000), value);
+				const reading = { ...base.readings[0]!, key };
+				return { ...base, valueRevision: revision, readings: [reading], byKey: new Map([[key, reading]]) };
+			} });
+			poller.setIntervalMs(interval);
+			poller.subscribeSeries(key);
+			seam.tick();
+			for (let i = 0; i < 4; i++) { time += interval; revision++; value++; seam.tick(); }
+			assert.deepEqual([...(poller.getSeries(key) ?? [])], [40, 41, 42, 43, 44]);
+			seam.tick();
+			assert.equal(poller.getSeries(key)?.length, 5, "a duplicate observation is not another sample");
+			time += 1000;
+			seam.tick();
+			assert.deepEqual(poller.getSeries(key), [40, 41, 42, 43, 44, 44], "a new producer stamp with a steady value is a sample");
+		});
+	}
+});
+
 describe("integrity: explicit source links", () => {
 	it("saved keys keep their measurement in both provider directions, layouts and lists", () => {
 		const seam = poller as unknown as Seam & { dropProvider(): void; setReadingLinks?(raw: unknown): void };
@@ -77,5 +105,37 @@ describe("integrity: explicit source links", () => {
 			}
 		}
 		seam.setReadingLinks?.([]);
+	});
+});
+
+// The source-link pairs are explicit assertions by the user. Conflicting
+// assertions must all be refused instead of making encounter order win.
+describe("refutation: links and history", () => {
+	it("topology-only revisions do not invent points, and gaps/units reset the ring", () => {
+		const seam = poller as unknown as Seam & { dropProvider(): void };
+		seam.dropProvider();
+		const key = "cpu:0:0";
+		let current: SensorSnapshot | null = { ...snapshotAt(500, 40), valueRevision: 1 };
+		seam.openProvider = () => ({ source: "shared-memory", close: () => {}, read: () => current });
+		poller.setIntervalMs(500);
+		poller.subscribeSeries(key);
+		seam.tick();
+		current = { ...current, valueRevision: 2 };
+		seam.tick();
+		assert.deepEqual([...(poller.getSeries(key) ?? [])], [40]);
+		current = null;
+		seam.tick();
+		assert.deepEqual(poller.getSeries(key), [], "a skipped read creates a visible gap");
+		current = { ...snapshotAt(501, 41), valueRevision: 3 };
+		seam.tick();
+		assert.deepEqual([...(poller.getSeries(key) ?? [])], [41]);
+		current = { ...snapshotAt(502, 80), valueRevision: 4 };
+		const reading = { ...current.readings[0]!, unit: "°F" };
+		current = { ...current, readings: [reading], byKey: new Map([[key, reading]]) };
+		seam.tick();
+		assert.deepEqual([...(poller.getSeries(key) ?? [])], [80], "never join native units across a unit rewrite");
+		current = { ...current, readings: [], byKey: new Map() };
+		seam.tick();
+		assert.deepEqual(poller.getSeries(key), [], "a missing reading ends its segment");
 	});
 });

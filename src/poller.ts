@@ -75,12 +75,16 @@ class HwinfoPoller extends EventEmitter {
 	private intervalMs = DEFAULT_INTERVAL_MS;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
+	private lastValueRevision: number | undefined;
+	private lastFreshnessRevision: number | undefined;
+	private seriesSource: SnapshotSource | undefined;
+	private readonly seriesUnits = new Map<string, string>();
 	private readingLinks: readonly ReadingLink[] = [];
 	private bindingRevision = 0;
 	private lastAdvanceAt = 0;
 	private lastReopenProbeAt = 0;
 	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
-	private heldFreshness: { pollTime: number; advanceAt: number } | null = null;
+	private heldFreshness: { pollTime: number; advanceAt: number; valueRevision?: number; freshnessRevision?: number } | null = null;
 	private lastUpgradeProbeAt = 0;
 	/** Nonzero while a transient failure is being ridden out on held values. */
 	private holdingSince = 0;
@@ -101,7 +105,6 @@ class HwinfoPoller extends EventEmitter {
 	getStatus(): PollerStatus {
 		return this.status;
 	}
-
 
 	setReadingLinks(raw: unknown): void {
 		const links = parseReadingLinks(raw);
@@ -277,6 +280,8 @@ class HwinfoPoller extends EventEmitter {
 					// instead of letting the reopen pose as an advance.
 					this.lastPollTime = this.heldFreshness.pollTime;
 					this.lastAdvanceAt = this.heldFreshness.advanceAt;
+					this.lastValueRevision = this.heldFreshness.valueRevision;
+					this.lastFreshnessRevision = this.heldFreshness.freshnessRevision;
 					this.heldFreshness = null;
 				} else {
 					this.lastAdvanceAt = monotonicNow();
@@ -302,9 +307,20 @@ class HwinfoPoller extends EventEmitter {
 			}
 			this.holdingSince = 0;
 			if (snapshot !== null) snapshot = applyReadingLinks(snapshot, this.readingLinks, this.bindingRevision);
-			if (snapshot !== null && snapshot.pollTime !== this.lastPollTime) {
-				this.lastPollTime = snapshot.pollTime;
-				this.lastAdvanceAt = monotonicNow();
+			if (snapshot !== null) {
+				const sourceChanged = this.seriesSource !== this.provider.source;
+				if (sourceChanged) {
+					for (const ring of this.series.values()) ring.length = 0;
+					this.seriesSource = this.provider.source;
+					this.lastValueRevision = undefined;
+					this.lastFreshnessRevision = undefined;
+				}
+				const stampChanged = snapshot.pollTime !== this.lastPollTime;
+				const revisionChanged = snapshot.valueRevision !== undefined && snapshot.valueRevision !== this.lastValueRevision;
+				const evidenceChanged = this.provider.source === "gadget"
+					? (snapshot.freshnessRevision ?? 0) > 0 && (stampChanged || snapshot.freshnessRevision !== this.lastFreshnessRevision)
+					: stampChanged || revisionChanged;
+				if (evidenceChanged) this.lastAdvanceAt = monotonicNow();
 				// Feed every tracked ring, on-screen or not, but only on a
 				// genuinely fresh snapshot: a frozen or stale source must never
 				// push duplicate points (that would flatten the line in place
@@ -312,15 +328,28 @@ class HwinfoPoller extends EventEmitter {
 				// key renderer self-normalizes.
 				for (const [key, ring] of this.series) {
 					const reading = snapshot.byKey.get(key);
-					if (reading !== undefined) {
+					if (reading === undefined || !Number.isFinite(reading.value)) {
+						ring.length = 0;
+						continue;
+					}
+					const unit = `${reading.type}:${reading.unit}`;
+					if (this.seriesUnits.get(key) !== unit) ring.length = 0;
+					this.seriesUnits.set(key, unit);
+					if (evidenceChanged && (stampChanged || ring.length === 0 || ring.at(-1) !== reading.value)) {
 						pushSample(ring, reading.value);
 					}
 				}
+				this.lastPollTime = snapshot.pollTime;
+				this.lastValueRevision = snapshot.valueRevision;
+				this.lastFreshnessRevision = snapshot.freshnessRevision;
+			} else {
+				for (const ring of this.series.values()) ring.length = 0;
 			}
 			// Freshness is judged even when the read was skipped (mutex busy) —
 			// a consumer wedged on the mutex must not freeze us at "ok" forever.
 			const staleForMs = monotonicNow() - this.lastAdvanceAt;
 			if (staleForMs > STALE_AFTER_MS) {
+				for (const ring of this.series.values()) ring.length = 0;
 				// The data is frozen. If HWiNFO exited we would never notice through
 				// our held handles — probe a fresh open.
 				this.probeReopen();
@@ -330,10 +359,13 @@ class HwinfoPoller extends EventEmitter {
 					this.status = { state: "stale", snapshot: last, source, staleForMs };
 				}
 			} else if (snapshot !== null) {
-				this.status = { state: "ok", snapshot, source: this.provider.source };
+				this.status = this.provider.source === "gadget" && snapshot.pollTime === 0
+					? { state: "stale", snapshot, source: "gadget", staleForMs }
+					: { state: "ok", snapshot, source: this.provider.source };
 			}
 			// Otherwise (skipped read, still fresh): keep the previous status.
 		} catch (err) {
+			for (const ring of this.series.values()) ring.length = 0;
 			this.dropProvider();
 			if (err instanceof HwinfoError) {
 				// Transient classes (a poisoned session whose reopen has not
@@ -377,12 +409,14 @@ class HwinfoPoller extends EventEmitter {
 		const prev = this.provider;
 		const prevPollTime = this.lastPollTime;
 		const prevAdvanceAt = this.lastAdvanceAt;
+		const prevValueRevision = this.lastValueRevision;
+		const prevFreshnessRevision = this.lastFreshnessRevision;
 		// Stashed on the instance too: when openProvider throws here (a busy
 		// mutex at the probe instant), these locals die with the probe, and
 		// the next tick's cold reopen would otherwise mint a fresh advance
 		// for a still-frozen source: a false ok window plus duplicate
 		// sparkline samples, repeating while HWiNFO stays paused.
-		this.heldFreshness = { pollTime: prevPollTime, advanceAt: prevAdvanceAt };
+		this.heldFreshness = { pollTime: prevPollTime, advanceAt: prevAdvanceAt, valueRevision: prevValueRevision, freshnessRevision: prevFreshnessRevision };
 		this.dropProvider();
 		this.provider = this.openProvider(); // HwinfoError propagates to tick()
 		this.heldFreshness = null;
@@ -394,6 +428,8 @@ class HwinfoPoller extends EventEmitter {
 		}
 		this.lastPollTime = prevPollTime;
 		this.lastAdvanceAt = prevAdvanceAt;
+		this.lastValueRevision = prevValueRevision;
+		this.lastFreshnessRevision = prevFreshnessRevision;
 	}
 
 	/** On the gadget fallback in auto mode, switch back once shared memory returns. */

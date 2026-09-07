@@ -62,7 +62,11 @@ export interface SensorSnapshot {
 	readonly bindingRevision?: number;
 	/** Gadget readings withheld because their names have been ambiguous. */
 	readonly blockedReadingCount?: number;
-	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */
+	/** Gadget value-change evidence, distinct from render/topology revision.
+	 * Zero means only an initial registry observation, never producer proof. */
+	readonly freshnessRevision?: number;
+	/** Unix seconds of HWiNFO's last sensor poll. Gadget uses the time of an
+	 * observed value change, or zero when no change has been observed. */
 	readonly pollTime: number;
 	/**
 	 * Bumped by the provider whenever any value actually changed or the

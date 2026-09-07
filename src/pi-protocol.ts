@@ -195,7 +195,7 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 	payload.display = {
 		value: m.valueText,
 		unit: m.unitText,
-		stats: `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
+		stats: status.source === "gadget" ? "Historical statistics unavailable in Gadget" : `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
 		bg: palette.bg,
 		valueColor: text.value,
 		statsColor: text.unit

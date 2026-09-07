@@ -408,3 +408,73 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		assert.equal(renamed.byKey.get("g:Stable Source:CPU Package")?.value, 40);
 	});
 });
+
+describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("current-only readings never manufacture historical numbers", () => {
+		shape([0]);
+		const reading = readShape().readings[0];
+		assert.ok(reading);
+		assert.ok(Number.isNaN(reading.valueMin));
+		assert.ok(Number.isNaN(reading.valueMax));
+		assert.ok(Number.isNaN(reading.valueAvg));
+	});
+
+	test("an unchanged initial registry is unverified; only a value change supplies evidence", () => {
+		shape([0]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const first = provider.read();
+			assert.equal(first.pollTime, 0, "first observation is not a producer timestamp");
+			assert.equal(provider.read().pollTime, 0, "successful reads of old data are not fresh");
+			putValue("Label0", "Renamed without a new sample");
+			const renamed = provider.read();
+			assert.equal(renamed.pollTime, 0, "topology is not value evidence");
+			assert.ok((renamed.valueRevision ?? 0) > (first.valueRevision ?? 0), "render revision includes topology");
+			putValue("ValueRaw0", "55");
+			const changed = provider.read();
+			assert.ok(changed.pollTime > 0);
+			assert.equal(provider.read().pollTime, changed.pollTime);
+		} finally {
+			provider.close();
+		}
+	});
+});
+
+describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("a separate process cannot adopt a disappeared duplicate", () => {
+		shape([0, 1], (i) => ({ sensor: "Restart GPU", label: "Temperature", raw: i ? "80" : "40", value: `${i ? 80 : 40} °C` }));
+		readShape();
+		dropValue("Sensor0");
+		const script = 'const { GadgetRegistryProvider } = await import("./src/hwinfo/gadget-registry.ts"); const p = GadgetRegistryProvider.open(); try { process.stdout.write(JSON.stringify(p.read().readings)); } finally { p.close(); }';
+		const stdout = execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], { encoding: "utf8" });
+		assert.deepEqual(JSON.parse(stdout), []);
+		assert.doesNotMatch(fs.readFileSync(identityFile, "utf8"), /Restart GPU|Temperature|^(?:40|80)$/m);
+	});
+
+	test("duplicate values cannot manufacture producer evidence on an unchanged scan", () => {
+		shape([0, 8], (i) => ({ sensor: "Frozen duplicate", label: "Temp", raw: i ? "80" : "40", value: "40 °C" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			for (let i = 0; i < 4; i++) assert.equal(provider.read().freshnessRevision, 0);
+		} finally { provider.close(); }
+	});
+
+	test("a corrupt journal fails closed and never discards history", () => {
+		const saved = fs.readFileSync(identityFile, "utf8");
+		try {
+			fs.writeFileSync(identityFile, "incomplete history");
+			shape([0]);
+			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "invalid");
+			assert.equal(fs.readFileSync(identityFile, "utf8"), "incomplete history");
+		} finally { fs.writeFileSync(identityFile, saved); }
+	});
+
+	test("an unwritable journal destination cannot return ambiguous readings", () => {
+		const savedPath = process.env.HWINFO_GADGET_IDENTITY_FILE;
+		try {
+			process.env.HWINFO_GADGET_IDENTITY_FILE = path.join(identityFile, "impossible-child");
+			shape([0, 1], () => ({ sensor: "Denied duplicate", label: "Temp", raw: "40", value: "40 °C" }));
+			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "invalid");
+		} finally { process.env.HWINFO_GADGET_IDENTITY_FILE = savedPath; }
+	});
+});

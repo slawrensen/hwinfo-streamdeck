@@ -26,7 +26,7 @@ function stale(source: "shared-memory" | "gadget"): PollerStatus {
 describe("state-screens: stale recovery hint follows the source", () => {
 	it("dial stale on gadget points at Gadget, not Shared Memory", () => {
 		const text = statusDialText(stale("gadget"));
-		assert.equal(text?.title, "HWiNFO stalled");
+		assert.equal(text?.title, "Age unknown");
 		assert.equal(text?.value, "check Gadget");
 		assert.doesNotMatch(text?.value ?? "", /sharing/i);
 	});
@@ -37,7 +37,7 @@ describe("state-screens: stale recovery hint follows the source", () => {
 	});
 
 	it("key stale screen branches on source", () => {
-		assert.deepEqual(statusScreen(stale("gadget"))?.lines, ["Not updating", "check Gadget"]);
+		assert.deepEqual(statusScreen(stale("gadget"))?.lines, ["Age unknown", "check Gadget"]);
 		assert.deepEqual(statusScreen(stale("shared-memory"))?.lines, ["Not updating", "check sharing"]);
 	});
 

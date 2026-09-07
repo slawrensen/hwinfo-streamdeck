@@ -14,7 +14,7 @@
 import type { PollerStatus } from "../poller";
 import type { Reading } from "../hwinfo/types";
 import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
-import { alertLevel, convertUnit, parseThreshold, STAT_BADGE, statValue } from "../ui/format";
+import { alertLevel, convertUnit, parseThreshold, readingStatBadge, statValue } from "../ui/format";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { keyLabel, missingReadingScreen, statusScreen } from "../ui/state-screens";
@@ -108,7 +108,7 @@ export function composeReadingFace(state: DeviceDetailState, key: string | undef
 		label: keyLabel(customLabel, reading.label),
 		valueText: measured.valueText,
 		unitText: measured.unitText,
-		statBadge: STAT_BADGE[mode],
+		statBadge: readingStatBadge(reading, mode),
 		palette,
 		text
 	});
@@ -204,7 +204,7 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 	const accent = ctx.typeAccents && first !== undefined ? classifyTypeAccent(first.type, first.unit, first.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, "normal");
 	const text = resolveTextColors(palette, ctx.text, "normal");
-	const sharedBadge = STAT_BADGE[mode];
+	const sharedBadge = readingStatBadge(readings.find((reading) => reading !== undefined), mode);
 	if (keys.length === 2) {
 		return renderDualKey({
 			top: readingRow(readings[0], mode, ctx.measure, specLabel(spec, 0)),

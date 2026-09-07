@@ -10,6 +10,8 @@
  * thrash the moment the sampled set outgrew it, silently resetting every
  * session each tick.
  */
+import type { Reading, SensorSnapshot } from "./hwinfo/types";
+
 export type SessionStats = {
 	min: number;
 	max: number;
@@ -19,6 +21,22 @@ export type SessionStats = {
 
 export class SessionStatsStore {
 	private readonly byKey = new Map<string, SessionStats>();
+	private readonly observations = new Map<string, { pollTime: number; value: number; domain: string }>();
+
+	/** Sample-weighted local observations, never repeated held frames. A
+	 * provider/unit/link change starts a new session for that reading. */
+	observe(reading: Reading, snapshot: SensorSnapshot, source: string): void {
+		const domain = `${source}:${reading.type}:${reading.unit}:${snapshot.bindingRevision ?? 0}`;
+		const previous = this.observations.get(reading.key);
+		if (previous !== undefined && previous.domain !== domain) this.reset([reading.key]);
+		if (!Number.isFinite(reading.value)) {
+			this.reset([reading.key]);
+			return;
+		}
+		if (previous?.domain === domain && previous.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
+		this.sample(reading.key, reading.value);
+		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, domain });
+	}
 
 	/** Folds one native-unit sample into the reading's session. */
 	sample(key: string, value: number): void {
@@ -52,6 +70,7 @@ export class SessionStatsStore {
 			}
 			if (!keep.has(key)) {
 				this.byKey.delete(key);
+				this.observations.delete(key);
 			}
 		}
 	}
@@ -68,10 +87,12 @@ export class SessionStatsStore {
 	reset(keys?: readonly string[]): void {
 		if (keys === undefined) {
 			this.byKey.clear();
+			this.observations.clear();
 			return;
 		}
 		for (const key of keys) {
 			this.byKey.delete(key);
+			this.observations.delete(key);
 		}
 	}
 

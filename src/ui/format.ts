@@ -36,6 +36,11 @@ export function statValue(reading: Reading, mode: StatMode): number {
 	}
 }
 
+/** An unavailable historical field must never wear a numeric MIN/MAX/AVG. */
+export function readingStatBadge(reading: Reading | undefined, mode: StatMode): string {
+	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? "N/A" : STAT_BADGE[mode];
+}
+
 /** Converts a value for display; only °C→°F is meaningful in HWiNFO data. */
 export function convertUnit(value: number, unit: string, fahrenheit: boolean): { value: number; unit: string } {
 	if (fahrenheit && unit === "°C") {

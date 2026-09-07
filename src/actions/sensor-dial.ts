@@ -524,7 +524,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			// its true session, and hidden members keep alert coverage. The
 			// two-row view's sparkline subscriptions ride the same sweep.
 			for (const state of this.instances.values()) {
-				this.sampleStats(state, status.snapshot);
+				this.sampleStats(state, status.snapshot, status.source);
 				this.syncRowSeries(state, status.snapshot);
 			}
 			// Completes a unit stamp whose threshold edit landed while the
@@ -542,15 +542,18 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 					this.hidden.delete(id);
 					continue;
 				}
-				this.sampleStats(entry.state, status.snapshot);
+				this.sampleStats(entry.state, status.snapshot, status.source);
 			}
 			this.autoCycle(status, now);
+		} else {
+			for (const state of this.instances.values()) state.stats.reset();
+			for (const entry of this.hidden.values()) entry.state.stats.reset();
 		}
 		this.renderAll(status);
 		pushPreviewToPi(status, this.manifestId, this.instances, false);
 	}
 
-	private sampleStats(state: InstanceState, snapshot: SensorSnapshot): void {
+	private sampleStats(state: InstanceState, snapshot: SensorSnapshot, source: string): void {
 		const keys = new Set<string>(rotationKeysOf(state.settings) ?? []);
 		const current = readingKeyOf(state.settings);
 		if (current !== undefined) {
@@ -568,7 +571,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		for (const key of keys) {
 			const reading = snapshot.byKey.get(key);
 			if (reading !== undefined) {
-				state.stats.sample(key, reading.value);
+				state.stats.observe(reading, snapshot, source);
+			} else {
+				state.stats.reset([key]);
 			}
 		}
 		// Bound by relevance: every actively sampled reading is kept whatever

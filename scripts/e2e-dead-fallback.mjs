@@ -155,6 +155,10 @@ try {
 		// 1. Present DEAD mapping must not block the gadget fallback in auto mode.
 		//    (Pre-fix: SharedMemoryProvider.open() "succeeds" on the dead mapping,
 		//    so auto never reaches gadget and the key shows "Shared Memory off".)
+		await expectFrame("initial Gadget freshness is unknown", (svg) => svg.includes("Age unknown"), 9000, { fromStart: true });
+		publish(47.6);
+		await sleep(1100);
+		publish(47.5);
 		await expectFrame("present DEAD mapping → falls back to live gadget value", (svg) => svg.includes("Test Temp") && svg.includes("47.5"), 9000);
 		const smFrames = frames.map((svg, i) => [i, svg]).filter(([, svg]) => svg.includes("Shared Memory"));
 		if (smFrames.length > 0) {

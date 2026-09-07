@@ -13,9 +13,9 @@
  * the value names it queries and the JavaScript strings it returns.
  *
  * Freshness: the registry is NOT cleared when HWiNFO exits, so absence can't
- * be detected structurally. A content digest is tracked instead — while the
- * values keep changing the synthesized pollTime advances; when HWiNFO stops,
- * the digest freezes and the poller's normal staleness handling kicks in.
+ * be detected structurally. Only changes to an already observed, unambiguous
+ * reading in the same unit advance value evidence. Initial reads and topology
+ * changes leave age unverified. Steady values cannot prove a producer exit.
  */
 import { GadgetIdentityGuard, gadgetReadingKey } from "./gadget-identity";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
@@ -95,7 +95,9 @@ export class GadgetRegistryProvider {
 	 * memory, so two registry rewrites within one second stay distinguishable
 	 * even though the synthesized pollTime cannot move twice in it. */
 	private valueRevision = 0;
-	private lastChangeSec = Math.floor(Date.now() / 1000);
+	private lastChangeSec = 0;
+	private freshnessRevision = 0;
+	private lastValues = new Map<string, string>();
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
 
@@ -147,6 +149,7 @@ export class GadgetRegistryProvider {
 		const readings: Reading[] = [];
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
+		const values = new Map<string, string>();
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
 		// reading is ticked "Report value in Gadget" and keeps that
@@ -186,26 +189,43 @@ export class GadgetRegistryProvider {
 				unit,
 				// The gadget interface exposes only the current value.
 				value,
-				valueMin: value,
-				valueMax: value,
-				valueAvg: value
+				valueMin: Number.NaN,
+				valueMax: Number.NaN,
+				valueAvg: Number.NaN
 			};
 			readings.push(reading);
 			byKey.set(key, reading);
-			digestParts.push(raw);
+			digestParts.push(JSON.stringify([i, key, unit, raw]));
+			// Compare only the same named reading in the same unit. A new
+			// slot or rename is topology, not evidence of a new measurement.
+			const evidenceKey = JSON.stringify([key, unit]);
+			values.set(evidenceKey, raw);
 		}
 
 		const digest = digestParts.join("|");
 		if (digest !== this.lastDigest) {
 			this.lastDigest = digest;
-			this.lastChangeSec = Math.floor(Date.now() / 1000);
 			this.valueRevision++;
 		}
-
 		const blocked = this.identity.blocked(readings.map((reading) => reading.key));
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
+		let valueChanged = false;
+		const safeValues = new Map<string, string>();
+		for (const reading of safeReadings) {
+			const evidenceKey = JSON.stringify([reading.key, reading.unit]);
+			const raw = values.get(evidenceKey) as string;
+			const previous = this.lastValues.get(evidenceKey);
+			if (previous !== undefined && previous !== raw && Number.isFinite(reading.value)) valueChanged = true;
+			safeValues.set(evidenceKey, raw);
+		}
+		this.lastValues = safeValues;
+		if (valueChanged) {
+			this.lastChangeSec = Math.floor(Date.now() / 1000);
+			this.freshnessRevision++;
+		}
+
 		for (const key of blocked) byKey.delete(key);
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: readings.length - safeReadings.length };
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: readings.length - safeReadings.length };
 	}
 
 	close(): void {
@@ -221,5 +241,7 @@ export class GadgetRegistryProvider {
 		this.lastDigest = from.lastDigest;
 		this.lastChangeSec = from.lastChangeSec;
 		this.valueRevision = from.valueRevision;
+		this.freshnessRevision = from.freshnessRevision;
+		this.lastValues = from.lastValues;
 	}
 }

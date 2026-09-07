@@ -27,7 +27,11 @@ const REG_PATH = `HKCU\\${VSB_SUBKEY}`;
 
 // Dynamic, because the module snapshots HWINFO_VSB_KEY at load time.
 process.env.HWINFO_VSB_KEY = VSB_SUBKEY;
+const identityFile = path.join(os.tmpdir(), `hwinfo-gadget-identity-${process.pid}.jsonl`);
+process.env.HWINFO_GADGET_IDENTITY_FILE = identityFile;
 const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry");
+
+after(() => fs.rmSync(identityFile, { force: true }));
 
 /** The bound the reader scans to; mirrors MAX_ENTRIES in the provider. */
 const MAX_ENTRIES = 1024;
@@ -271,11 +275,12 @@ describe("gadget provider: identity and grouping across holes", { skip: !onWindo
 		}
 	});
 
-	test("duplicate sensor and label across a hole get distinct keys", () => {
+	test("duplicate sensor and label across a hole are withheld", () => {
 		shape([0, 4], () => ({ sensor: "Same Source", label: "Same Label", value: "1 °C", raw: "1" }));
 		const snap = readShape();
-		assert.deepEqual(snap.readings.map((r) => r.key), ["g:Same Source:Same Label", "g:Same Source:Same Label~1"]);
-		assert.equal(snap.byKey.size, 2, "neither reading is lost to a key collision");
+		assert.deepEqual(snap.readings, [], "neither duplicate has a stable identity");
+		assert.equal(snap.byKey.size, 0);
+		assert.equal(snap.blockedReadingCount, 2);
 	});
 });
 
@@ -352,5 +357,54 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 		} finally {
 			first.close();
 		}
+	});
+});
+
+describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("removing slot zero never substitutes slot one for the saved base key", () => {
+		shape([0, 1], (i) => ({ sensor: "GPU", label: "Temperature", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			provider.read();
+			dropValue("Sensor0");
+			const afterGap = provider.read();
+			assert.equal(afterGap.byKey.get("g:GPU:Temperature"), undefined, "80 must never replace the removed 40");
+			assert.equal(afterGap.byKey.get("g:GPU:Temperature~1"), undefined, "encounter-order suffixes are not identities");
+		} finally {
+			provider.close();
+		}
+		const restarted = GadgetRegistryProvider.open();
+		try {
+			assert.equal(restarted.read().byKey.get("g:GPU:Temperature"), undefined, "a reopen must remember observed ambiguity");
+		} finally {
+			restarted.close();
+		}
+	});
+
+	test("duplicate names cannot acquire a selectable identity through reorder or restart", () => {
+		shape([0, 7], (i) => ({ sensor: "Duplicate GPU", label: "Temperature", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
+		assert.equal(readShape().readings.length, 0, "the registry contains no evidence identifying either duplicate");
+		shape([0, 7], (i) => ({ sensor: "Duplicate GPU", label: "Temperature", value: `${i ? 40 : 80} °C`, raw: i ? "40" : "80" }));
+		assert.equal(readShape().readings.length, 0);
+	});
+
+	test("colon partitions and literal tildes never alias legacy keys", () => {
+		shape([0, 1, 2], (i) => ({ sensor: ["GPU:0", "GPU", "GPU"][i], label: ["Temp", "0:Temp", "Temperature~1"][i], value: `${40 + i} °C`, raw: String(40 + i) }));
+		const snapshot = readShape();
+		assert.equal(snapshot.byKey.size, 3);
+		assert.equal(snapshot.byKey.get("g:GPU:0:Temp"), undefined, "legacy colon keys do not identify their partition");
+		assert.equal(snapshot.byKey.get("g:GPU:Temperature~1"), undefined, "literal suffix must not adopt an old duplicate selection");
+		assert.deepEqual(snapshot.readings.map((r) => r.value), [40, 41, 42]);
+	});
+
+	test("unique names with spaces survive sparse reorder and restart; rename leaves the old key missing", () => {
+		shape([0, 8], (i) => ({ sensor: "Stable Source", label: i === 0 ? "CPU Temp" : "GPU Temp", raw: i === 0 ? "40" : "80", value: "40 °C" }));
+		assert.equal(readShape().byKey.get("g:Stable Source:CPU Temp")?.value, 40);
+		shape([4, 9], (i) => ({ sensor: "Stable Source", label: i === 9 ? "CPU Temp" : "GPU Temp", raw: i === 9 ? "40" : "80", value: "40 °C" }));
+		assert.equal(readShape().byKey.get("g:Stable Source:CPU Temp")?.value, 40);
+		putValue("Label9", "CPU Package");
+		const renamed = readShape();
+		assert.equal(renamed.byKey.get("g:Stable Source:CPU Temp"), undefined);
+		assert.equal(renamed.byKey.get("g:Stable Source:CPU Package")?.value, 40);
 	});
 });

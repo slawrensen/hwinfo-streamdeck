@@ -17,6 +17,7 @@
  * values keep changing the synthesized pollTime advances; when HWiNFO stops,
  * the digest freezes and the poller's normal staleness handling kicks in.
  */
+import { GadgetIdentityGuard, gadgetReadingKey } from "./gadget-identity";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
@@ -87,6 +88,7 @@ function toHwinfoError(err: unknown): unknown {
 
 export class GadgetRegistryProvider {
 	readonly source = "gadget";
+	private readonly identity = new GadgetIdentityGuard(VSB_SUBKEY);
 
 	private lastDigest = "";
 	/** Counts digest changes: the same fact valueRevision carries for shared
@@ -122,7 +124,7 @@ export class GadgetRegistryProvider {
 			provider.close();
 			throw err;
 		}
-		if (snapshot.readings.length === 0) {
+		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount) {
 			provider.close();
 			// The key existing but holding no readings means HWiNFO IS (or was)
 			// running with Gadget support — "start HWiNFO" would mislead here.
@@ -174,11 +176,7 @@ export class GadgetRegistryProvider {
 			// HWiNFO writes ValueRaw with the system locale's decimal separator.
 			const value = Number.parseFloat(raw.replace(",", "."));
 
-			const baseKey = `g:${sensorName}:${label}`;
-			let key = baseKey;
-			for (let dup = 1; byKey.has(key); dup++) {
-				key = `${baseKey}~${dup}`;
-			}
+			const key = gadgetReadingKey(sensorName, label);
 			const reading: Reading = {
 				key,
 				type: inferType(unit),
@@ -204,7 +202,10 @@ export class GadgetRegistryProvider {
 			this.valueRevision++;
 		}
 
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, version: 0, revision: 0, sensors, readings, byKey };
+		const blocked = this.identity.blocked(readings.map((reading) => reading.key));
+		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
+		for (const key of blocked) byKey.delete(key);
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: readings.length - safeReadings.length };
 	}
 
 	close(): void {

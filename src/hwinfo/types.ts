@@ -56,6 +56,8 @@ export interface Reading {
  * cache `Reading` objects across ticks expecting historical values.
  */
 export interface SensorSnapshot {
+	/** Gadget readings withheld because their names have been ambiguous. */
+	readonly blockedReadingCount?: number;
 	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */
 	readonly pollTime: number;
 	/**

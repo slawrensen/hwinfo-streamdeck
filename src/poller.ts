@@ -76,6 +76,7 @@ class HwinfoPoller extends EventEmitter {
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
 	private lastValueRevision: number | undefined;
+	private revisionProvider: SnapshotProvider | null = null;
 	private lastFreshnessRevision: number | undefined;
 	private seriesSource: SnapshotSource | undefined;
 	private readonly seriesUnits = new Map<string, string>();
@@ -316,7 +317,9 @@ class HwinfoPoller extends EventEmitter {
 					this.lastFreshnessRevision = undefined;
 				}
 				const stampChanged = snapshot.pollTime !== this.lastPollTime;
-				const revisionChanged = snapshot.valueRevision !== undefined && snapshot.valueRevision !== this.lastValueRevision;
+				// Revisions belong to one parser, not the producer. Its initial
+				// decode after reopen must never refresh a frozen timestamp.
+				const revisionChanged = this.revisionProvider === this.provider && snapshot.valueRevision !== undefined && snapshot.valueRevision !== this.lastValueRevision;
 				const evidenceChanged = this.provider.source === "gadget"
 					? (snapshot.freshnessRevision ?? 0) > 0 && (stampChanged || snapshot.freshnessRevision !== this.lastFreshnessRevision)
 					: stampChanged || revisionChanged;
@@ -341,6 +344,7 @@ class HwinfoPoller extends EventEmitter {
 				}
 				this.lastPollTime = snapshot.pollTime;
 				this.lastValueRevision = snapshot.valueRevision;
+				this.revisionProvider = this.provider;
 				this.lastFreshnessRevision = snapshot.freshnessRevision;
 			} else {
 				for (const ring of this.series.values()) ring.length = 0;

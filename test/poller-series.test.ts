@@ -111,6 +111,27 @@ describe("integrity: explicit source links", () => {
 // The source-link pairs are explicit assertions by the user. Conflicting
 // assertions must all be refused instead of making encounter order win.
 describe("refutation: links and history", () => {
+	it("a parser revision reset after reopen never refreshes a frozen producer", () => {
+		const seam = poller as unknown as Seam & { dropProvider(): void; probeReopen(): void; lastAdvanceAt: number; lastReopenProbeAt: number };
+		seam.dropProvider();
+		let revision = 9;
+		let value = 40;
+		seam.openProvider = () => ({ source: "shared-memory", close: () => {}, read: () => ({ ...snapshotAt(700, value), valueRevision: revision }) });
+		seam.tick();
+		const advance = seam.lastAdvanceAt = -60_000;
+		for (let i = 0; i < 3; i++) {
+			seam.lastReopenProbeAt = -60_000;
+			seam.probeReopen();
+			revision = 1;
+			seam.tick();
+			assert.equal(seam.lastAdvanceAt, advance, "decoding the same bytes in a new parser is not producer evidence");
+			assert.equal(poller.getStatus().state, "stale");
+		}
+		value = 41;
+		revision++;
+		seam.tick();
+		assert.equal(poller.getStatus().state, "ok", "a subsequent same-second value change resumes normally");
+	});
 	it("topology-only revisions do not invent points, and gaps/units reset the ring", () => {
 		const seam = poller as unknown as Seam & { dropProvider(): void };
 		seam.dropProvider();

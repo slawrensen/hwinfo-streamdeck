@@ -57,7 +57,7 @@ What the key displays, drawn from HWiNFO's own statistics since it started:
 
 When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears in a gap between the label and the value, centered on the key, so the label keeps its full width.
 
-> **Note:** Min / max / average come from HWiNFO's Shared Memory interface. On the Gadget-registry fallback these statistics aren't available, so all four modes show the current value. See [Data sources](data-sources.md).
+> **Note:** Min / max / average come from HWiNFO's Shared Memory interface. On the Gadget-registry fallback these statistics aren't available, so historical modes show N/A with an empty value. See [Data sources](data-sources.md).
 
 ### Layout: two readings on one key
 
@@ -209,7 +209,7 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
 | **HWiNFO busy / retrying** | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll; held values stay up meanwhile. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
-| **Not updating / check sharing** *(or* **check Gadget***)* | Values are frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. The sub-line names the source in use. (The free version's 12-hour expiry shows **Shared Memory / is off** instead, or falls back to Gadget in Auto mode.) |
+| **Not updating / check sharing** | Values are frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. Gadget instead shows **Age unknown / check Gadget**, since steady readings and a stopped producer leave the same registry data. (The free version's 12-hour expiry shows **Shared Memory / is off** instead, or falls back to Gadget in Auto mode.) |
 | **Tick sensors / in Gadget** | Gadget reporting is on but no sensors are ticked. In HWiNFO open **Configure Sensors** → **HWiNFO Gadget** and tick "Report value in Gadget". |
 | **Access denied / un-elevate** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |

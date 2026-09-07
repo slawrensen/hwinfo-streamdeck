@@ -2145,11 +2145,11 @@ try {
 	await sleep(1400); // the panel reloads itself after an apply
 	check("leg S: the reloaded panel shows the chips in the pasted order", (await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value === JSON.stringify(["bench:0:2", "bench:0:0", "bench:0:5"]), String((await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value));
 	await evaluate(`(() => {
-		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper" });
+		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } });
 		document.getElementById("config-deck-apply").click();
 	})()`);
 	await sleep(700);
-	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
+	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
 
 	// ---- leg C: Copy hands out the settings of now, not of fold-open -----

@@ -32,7 +32,7 @@ Click the **Sensor** search box to open the picker. It lists every reading HWiNF
 
 Click a row to select it. The **Live value** line just under the picker previews the chosen reading (current value plus min / max / avg), and the key on your deck switches from the blue prompt to the live number straight away.
 
-That's the whole loop: drag, pick, done. The key now updates roughly once a second (see [Poll every](data-sources.md#poll-every) under Advanced settings to change the rate). Your choice is stored by HWiNFO's stable sensor identity (on the Gadget source, by the source name and reading label as HWiNFO writes them), not by list position, so the key survives restarts and hardware reordering.
+That's the whole loop: drag, pick, done. The key now updates roughly once a second (see [Poll every](data-sources.md#poll-every) under Advanced settings to change the rate). Your choice is stored by HWiNFO's stable sensor identity (on the Gadget source, by the source name and reading label as HWiNFO writes them), not by list position, so Shared Memory keys survive restarts and hardware reordering. Gadget requires unique names; see [identity and provider-link limits](data-sources.md).
 
 ## Where to go next
 

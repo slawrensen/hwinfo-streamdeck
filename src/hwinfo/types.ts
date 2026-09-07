@@ -25,6 +25,8 @@ export interface SensorSource {
 
 /** A single reading, e.g. "CPU (Tctl/Tdie) = 56.3 °C". */
 export interface Reading {
+	/** Explicit user-confirmed equivalent keys on another provider. */
+	readonly linkedKeys?: readonly string[];
 	/**
 	 * Stable identity of this reading across HWiNFO restarts:
 	 * `sensorId:sensorInstance:readingId` (hex), with `~n` appended for
@@ -56,6 +58,8 @@ export interface Reading {
  * cache `Reading` objects across ticks expecting historical values.
  */
 export interface SensorSnapshot {
+	/** Rendering invalidation for changed explicit provider links. */
+	readonly bindingRevision?: number;
 	/** Gadget readings withheld because their names have been ambiguous. */
 	readonly blockedReadingCount?: number;
 	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */

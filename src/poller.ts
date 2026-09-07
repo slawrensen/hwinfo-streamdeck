@@ -31,6 +31,7 @@ import { EventEmitter } from "node:events";
 
 import { monotonicNow } from "./clock";
 import { GadgetRegistryProvider } from "./hwinfo/gadget-registry";
+import { applyReadingLinks, parseReadingLinks, type ReadingLink } from "./hwinfo/reading-links";
 import { SharedMemoryProvider, type SnapshotProvider, type SnapshotSource } from "./hwinfo/provider";
 import { HwinfoError, type HwinfoUnavailableReason, type SensorSnapshot } from "./hwinfo/types";
 import { pushSample } from "./series";
@@ -74,6 +75,8 @@ class HwinfoPoller extends EventEmitter {
 	private intervalMs = DEFAULT_INTERVAL_MS;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
+	private readingLinks: readonly ReadingLink[] = [];
+	private bindingRevision = 0;
 	private lastAdvanceAt = 0;
 	private lastReopenProbeAt = 0;
 	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
@@ -97,6 +100,15 @@ class HwinfoPoller extends EventEmitter {
 	/** Latest status; safe to read at any time (e.g. right after willAppear). */
 	getStatus(): PollerStatus {
 		return this.status;
+	}
+
+
+	setReadingLinks(raw: unknown): void {
+		const links = parseReadingLinks(raw);
+		if (JSON.stringify(links) === JSON.stringify(this.readingLinks)) return;
+		this.readingLinks = links;
+		this.bindingRevision++;
+		for (const ring of this.series.values()) ring.length = 0;
 	}
 
 	/** Redacted data-source facts for the support report (no sensor values). */
@@ -289,6 +301,7 @@ class HwinfoPoller extends EventEmitter {
 				this.logger.info(`Data source layout changed; reopened in place (${this.provider.source})`);
 			}
 			this.holdingSince = 0;
+			if (snapshot !== null) snapshot = applyReadingLinks(snapshot, this.readingLinks, this.bindingRevision);
 			if (snapshot !== null && snapshot.pollTime !== this.lastPollTime) {
 				this.lastPollTime = snapshot.pollTime;
 				this.lastAdvanceAt = monotonicNow();

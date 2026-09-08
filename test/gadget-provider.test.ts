@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, mock, test } from "node:test";
 import type { HwsmGadgetKey } from "../src/hwinfo/hwsm-loader";
+import { applyReadingLinks } from "../src/hwinfo/reading-links";
 
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
 
@@ -509,6 +510,91 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 });
 
 describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	for (const failure of ["field interleave", "numeric contradiction", "query error"] as const) {
+		test(`verified duplicate history survives a later ${failure}`, () => {
+			const source = `Partial scan ${failure}`;
+			const savedKey = `g:${source}:Temperature`;
+			shape([0, 8], (i) => ({ sensor: source, label: i === 0 ? "Temperature" : "Other", raw: i === 0 ? "40" : "10", value: `${i === 0 ? 40 : 10} °C` }));
+			const provider = GadgetRegistryProvider.open();
+			const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+			try {
+				const before = readVerified(provider);
+				assert.equal(before.byKey.get(savedKey)?.value, 40);
+				// Both duplicate rows are coherent, and precede the unrelated
+				// failing slot. The changed prefix value must not become freshness.
+				putValue("Value0", "45 °C");
+				putValue("ValueRaw0", "45");
+				putValue("Sensor1", source);
+				putValue("Label1", "Temperature");
+				putValue("Value1", "80 °C");
+				putValue("ValueRaw1", "80");
+				if (failure === "numeric contradiction") putValue("Value8", "99 °C");
+				let visits = 0;
+				Reflect.set(provider, "key", {
+					queryString(name: string): string | null {
+						if (name === "Value8") {
+							visits++;
+							if (failure === "query error") throw new Error("fixture query failure");
+							if (failure === "field interleave" && visits === 2) return "99 °C";
+						}
+						return nativeKey.queryString(name);
+					},
+					close: () => nativeKey.close()
+				});
+				if (failure === "query error") assert.throws(() => provider.read(), /fixture query failure/);
+				else assert.equal(provider.read(), null, "an incoherent scan never publishes a prefix");
+				assert.ok(visits > 0, "the rejection follows both coherent duplicate rows");
+				assert.equal(Reflect.get(provider, "valueRevision"), before.valueRevision, "no rejected digest commits");
+				assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision, "no rejected measurement evidence commits");
+				Reflect.set(provider, "key", nativeKey);
+				dropValue("Sensor0");
+				putValue("Value8", "10 °C");
+				const after = readVerified(provider);
+				assert.equal(after.byKey.get(savedKey), undefined, "80 must never replace the removed 40 after a rejected scan");
+				assert.equal(after.blockedReadingCount, 1);
+				assert.equal(after.freshnessRevision, before.freshnessRevision);
+				const linked = applyReadingLinks(after, [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }], 1);
+				assert.equal(linked.byKey.get("f0001234:0:1000001"), undefined, "an explicit alias cannot revive a denied owner");
+			} finally { provider.close(); }
+			assert.equal(readShape().byKey.get(savedKey), undefined, "a reopened provider keeps the prefix ambiguity");
+		});
+	}
+
+	test("a rejected unique prefix remains compatible when the full scan recovers", () => {
+		shape([0, 8], (i) => ({ sensor: "Unique rejected prefix", label: `Reading ${i}`, raw: "40", value: "40 °C" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const before = readVerified(provider);
+			putValue("Value0", "45 °C");
+			putValue("ValueRaw0", "45");
+			putValue("Value8", "99 °C");
+			assert.equal(provider.read(), null);
+			assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision);
+			putValue("Value8", "40 °C");
+			const recovered = readVerified(provider);
+			assert.equal(recovered.byKey.get("g:Unique rejected prefix:Reading 0")?.value, 45);
+			assert.equal(recovered.blockedReadingCount, 0);
+			assert.equal(recovered.freshnessRevision, (before.freshnessRevision ?? 0) + 1);
+		} finally { provider.close(); }
+	});
+
+	test("a rejected scan fails closed if verified ambiguity cannot be journaled", () => {
+		shape([0, 8], (i) => ({ sensor: "Unwritable partial journal", label: i === 0 ? "Temperature" : "Other", raw: "40", value: "40 °C" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			putValue("Sensor1", "Unwritable partial journal");
+			putValue("Label1", "Temperature");
+			putValue("Value1", "80 °C");
+			putValue("ValueRaw1", "80");
+			putValue("Value8", "99 °C");
+			// A real file cannot be the parent of the journal destination.
+			// Point only this provider's guard there after its clean open.
+			if (!fs.existsSync(identityFile)) fs.writeFileSync(identityFile, "");
+			Reflect.set(Reflect.get(provider, "identity") as object, "file", path.join(identityFile, "impossible-child"));
+			assert.equal(reasonOf(() => provider.read()), "invalid", "a null/busy result must not hide failed identity persistence");
+		} finally { provider.close(); }
+	});
+
 	test("a separate process cannot adopt a disappeared duplicate", () => {
 		shape([0, 1], (i) => ({ sensor: "Restart GPU", label: "Temperature", raw: i ? "80" : "40", value: `${i ? 80 : 40} °C` }));
 		readShape();

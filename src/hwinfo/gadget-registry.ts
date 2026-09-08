@@ -158,62 +158,70 @@ export class GadgetRegistryProvider {
 		// scan runs the whole bounded range. queryString returns null for
 		// exactly one condition, ERROR_FILE_NOT_FOUND; every other registry
 		// failure throws, so skipping a null cannot swallow a real fault.
-		for (let i = 0; i < MAX_ENTRIES; i++) {
-			const sensorName = this.key.queryString(`Sensor${i}`);
-			if (sensorName === null) {
-				continue;
+		let blocked: ReadonlySet<string>;
+		try {
+			for (let i = 0; i < MAX_ENTRIES; i++) {
+				const sensorName = this.key.queryString(`Sensor${i}`);
+				if (sensorName === null) {
+					continue;
+				}
+				const labelField = this.key.queryString(`Label${i}`);
+				const formattedField = this.key.queryString(`Value${i}`);
+				const rawField = this.key.queryString(`ValueRaw${i}`);
+				// Gadget has no atomic row or producer sequence. One bounded
+				// validation pass catches observable field interleavings and
+				// withholds the entire scan before measurement evidence commits.
+				// A writer paused in an intermediate state can still look stable;
+				// agreement here is not an atomicity or producer-liveness claim.
+				const verifiedSensor = this.key.queryString(`Sensor${i}`);
+				const verifiedLabel = this.key.queryString(`Label${i}`);
+				const verifiedFormatted = this.key.queryString(`Value${i}`);
+				const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
+				if (sensorName !== verifiedSensor || labelField !== verifiedLabel || formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
+				const label = labelField ?? `Reading ${i}`;
+				const formatted = formattedField ?? "";
+				const raw = rawField ?? "";
+
+				let sensorIndex = sensorIndexByName.get(sensorName);
+				if (sensorIndex === undefined) {
+					sensorIndex = sensors.length;
+					sensorIndexByName.set(sensorName, sensorIndex);
+					sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
+				}
+
+				const unit = gadgetUnitOf(formatted);
+				// HWiNFO writes ValueRaw with the system locale's decimal separator.
+				const value = Number.parseFloat(raw.replace(",", "."));
+				if (!gadgetValueAgrees(formatted, value)) return null;
+
+				const key = gadgetReadingKey(sensorName, label);
+				const reading: Reading = {
+					key,
+					type: inferType(unit),
+					sensorIndex,
+					id: i,
+					label,
+					unit,
+					// The gadget interface exposes only the current value.
+					value,
+					statistics: "unavailable",
+					valueMin: Number.NaN,
+					valueMax: Number.NaN,
+					valueAvg: Number.NaN
+				};
+				readings.push(reading);
+				byKey.set(key, reading);
+				digestParts.push(JSON.stringify([i, key, unit, raw]));
+				// Compare only the same named reading in the same unit. A new
+				// slot or rename is topology, not evidence of a new measurement.
+				const evidenceKey = JSON.stringify([key, unit]);
+				values.set(evidenceKey, value);
 			}
-			const labelField = this.key.queryString(`Label${i}`);
-			const formattedField = this.key.queryString(`Value${i}`);
-			const rawField = this.key.queryString(`ValueRaw${i}`);
-			// Gadget has no atomic row or producer sequence. One bounded
-			// validation pass catches observable field interleavings and
-			// withholds the entire scan before any evidence/history commits.
-			// A writer paused in an intermediate state can still look stable;
-			// agreement here is not an atomicity or producer-liveness claim.
-			const verifiedSensor = this.key.queryString(`Sensor${i}`);
-			const verifiedLabel = this.key.queryString(`Label${i}`);
-			const verifiedFormatted = this.key.queryString(`Value${i}`);
-			const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
-			if (sensorName !== verifiedSensor || labelField !== verifiedLabel || formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
-			const label = labelField ?? `Reading ${i}`;
-			const formatted = formattedField ?? "";
-			const raw = rawField ?? "";
-
-			let sensorIndex = sensorIndexByName.get(sensorName);
-			if (sensorIndex === undefined) {
-				sensorIndex = sensors.length;
-				sensorIndexByName.set(sensorName, sensorIndex);
-				sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
-			}
-
-			const unit = gadgetUnitOf(formatted);
-			// HWiNFO writes ValueRaw with the system locale's decimal separator.
-			const value = Number.parseFloat(raw.replace(",", "."));
-			if (!gadgetValueAgrees(formatted, value)) return null;
-
-			const key = gadgetReadingKey(sensorName, label);
-			const reading: Reading = {
-				key,
-				type: inferType(unit),
-				sensorIndex,
-				id: i,
-				label,
-				unit,
-				// The gadget interface exposes only the current value.
-				value,
-				statistics: "unavailable",
-				valueMin: Number.NaN,
-				valueMax: Number.NaN,
-				valueAvg: Number.NaN
-			};
-			readings.push(reading);
-			byKey.set(key, reading);
-			digestParts.push(JSON.stringify([i, key, unit, raw]));
-			// Compare only the same named reading in the same unit. A new
-			// slot or rename is topology, not evidence of a new measurement.
-			const evidenceKey = JSON.stringify([key, unit]);
-			values.set(evidenceKey, value);
+		} finally {
+			// Verified identities remain evidence even when a later row rejects
+			// the scan. Persist ambiguity before any return or thrown query error;
+			// a partial scan still commits no values, digest or freshness.
+			blocked = this.identity.blocked(readings.map((reading) => reading.key));
 		}
 
 		const digest = digestParts.join("|");
@@ -221,7 +229,6 @@ export class GadgetRegistryProvider {
 			this.lastDigest = digest;
 			this.valueRevision++;
 		}
-		const blocked = this.identity.blocked(readings.map((reading) => reading.key));
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
 		let valueChanged = false;
 		const safeValues = new Map<string, number>();

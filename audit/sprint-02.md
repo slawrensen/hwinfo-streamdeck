@@ -109,3 +109,47 @@ Physical HWiNFO topology-change captures, physical key/dial results and
 guided repair/cancellation captures also remain outstanding. The D05 fix
 can be reviewed and delivered with the existing measurement-integrity
 containment without waiting for a future calendar sprint boundary.
+
+## Follow-up: ambiguity from a rejected Gadget scan
+
+Base: `c5f404448359e7024d801537ec62caeb6272e6c6`. The integration review found
+a D03 regression at the boundary between duplicate containment and the
+subsequent U1 scan validation. This follow-up does not establish an atomic
+Gadget producer contract.
+
+Start with a selected unique name at slot 0. Add its indistinguishable
+duplicate at slot 1, then make unrelated slot 8 fail validation. The reader
+verifies both duplicate rows, but rejects the scan before its old journal
+call. Removing slot 0 and repairing slot 8 can then publish slot 1 under
+the saved key. An explicit cross-source link can propagate that wrong key.
+
+The scan now journals the coherently decoded prefix in a `finally` block.
+Later field disagreement, formatted/raw disagreement or a query exception
+cannot discard already observed ambiguity. A rejected scan still publishes
+no snapshot and commits no digest or measurement freshness. Failed journal
+access throws `invalid`; it is not hidden behind a retryable `null` result.
+Successful scans read the journal once, as before. A rejected scan now also
+does that bounded journal operation; no measured overhead claim is made.
+
+The added Windows production-provider regressions cover all three abort
+paths, duplicate removal and reopen, explicit-link containment, unchanged
+freshness on rejection, unique-reading recovery and failed journal access.
+The centrally serialized run produced this evidence:
+
+| Command and source | Result | Ignored raw evidence under `release/audit-evidence/` |
+| --- | --- | --- |
+| `node --import tsx --test --test-name-pattern="verified duplicate history\|rejected unique prefix\|rejected scan fails" test/gadget-provider.test.ts`, original provider | Four failures, one pass, zero skips. All three abort paths returned the survivor's 80 under the saved 40's key; failed journal access returned `null` instead of `invalid`. | `partial-scan-red.log` |
+| `node --import tsx --test test/gadget-provider.test.ts`, patched provider | 44 pass, zero failures or skips | `partial-scan-green.log` |
+| `npm run lint` | Pass, zero warnings | `partial-scan-lint.log` |
+| `npm run typecheck` | Pass | `partial-scan-typecheck.log` |
+
+The unchanged production addon was copied from the qualification worktree;
+its SHA-256 was
+`BE3527D829D84EFC54473C235C35A0454272B3D32F3D36C825369E1CBD3F2453`.
+Native source was not rebuilt or modified for this follow-up. The matching
+Gadget e2e and full integrated candidate qualification remain the root
+coordinator's execution gates; these local results do not replace them.
+
+Native production source and the physical producer are unchanged. The tests
+use the existing per-process synthetic registry key and a query seam; they
+do not write the real HWiNFO Gadget key or touch its shared-memory mutex.

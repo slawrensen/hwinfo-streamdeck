@@ -11,9 +11,10 @@
  * number. {@link SnapshotParser} therefore decodes the full skeleton once
  * and on subsequent ticks only re-reads the volatile doubles into the same
  * structures, verifying per entry that the identity words (type, sensor
- * index, id) AND the raw unit bytes still match. Any header, identity, or
- * unit change ⇒ full rebuild. A mid-session label rename is also possible
- * and is knowingly NOT detected (stale label until the next rebuild): a
+ * index, id), the owning sensor ID/instance and the raw unit bytes still
+ * match. Any header, identity, or unit change causes a full rebuild. A
+ * mid-session label rename is also possible and is knowingly NOT detected
+ * (stale label until the next rebuild): a
  * stale name is cosmetic, a stale unit is a wrong number.
  */
 import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
@@ -146,6 +147,20 @@ export class SnapshotParser {
 	 * steady-state ticks alloc-free (the guards are raw word compares).
 	 */
 	private refresh(dv: DataView, snap: MutableSnapshot): boolean {
+		const sensorSectionOffset = dv.getUint32(HEADER.sensorSectionOffset, true);
+		const sensorElementSize = dv.getUint32(HEADER.sensorElementSize, true);
+		// Entry sensorIndex is only a position. An owner descriptor can be
+		// rewritten without changing that position or any entry identity word.
+		// Validate owners before accepting values under the cached stable keys.
+		for (let i = 0, o = sensorSectionOffset; i < snap.sensors.length; i++, o += sensorElementSize) {
+			const sensor = snap.sensors[i] as SensorSource;
+			if (
+				dv.getUint32(o + SENSOR.id, true) !== sensor.id ||
+				dv.getUint32(o + SENSOR.instance, true) !== sensor.instance
+			) {
+				return false;
+			}
+		}
 		const entrySectionOffset = dv.getUint32(HEADER.entrySectionOffset, true);
 		const entryElementSize = dv.getUint32(HEADER.entryElementSize, true);
 		const entryHasUtf8 = entryElementSize >= ENTRY_UTF8_SIZE;

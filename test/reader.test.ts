@@ -225,6 +225,54 @@ describe("SnapshotParser — incremental fast path", () => {
 		assert.equal(swapped.readings[0]?.label, "Different");
 	});
 
+	for (const utf8 of [false, true]) {
+		for (const changed of ["id", "instance"] as const) {
+			it(`rebuilds when only the owning sensor ${changed} changes (${utf8 ? "UTF-8" : "classic"})`, () => {
+				const parser = new SnapshotParser();
+				const buf = compose([CPU], [TEMP], { utf8 });
+				const first = parser.parse(buf);
+				const oldKey = first.readings[0]?.key;
+				assert.ok(oldKey);
+				const beforeRevision = first.valueRevision ?? 0;
+				const sensorOffset = buf.readUInt32LE(HEADER.sensorSectionOffset);
+				const entryOffset = buf.readUInt32LE(HEADER.entrySectionOffset);
+				const newOwner = { ...CPU, [changed]: CPU[changed] + 1 };
+				// Preserve the header, entry identity and unit bytes. Only the
+				// owner descriptor and its new measurement change in place.
+				buf.writeUInt32LE(newOwner[changed], sensorOffset + SENSOR[changed]);
+				buf.writeDoubleLE(81, entryOffset + ENTRY.value);
+				const rewritten = parser.parse(buf);
+				assert.notEqual(rewritten, first, "owner changes invalidate the cached identity");
+				assert.equal(rewritten.byKey.get(oldKey), undefined, "the previous owner must never receive the replacement value");
+				assert.equal(rewritten.byKey.get(`${newOwner.id.toString(16)}:${newOwner.instance}:${TEMP.id.toString(16)}`)?.value, 81);
+				assert.ok((rewritten.valueRevision ?? 0) > beforeRevision);
+				assert.equal(parser.parse(buf), rewritten, "the rebuilt owner supports the ordinary fast path");
+			});
+		}
+
+		it(`rebuilds after owner descriptors swap with unchanged entry identities (${utf8 ? "UTF-8" : "classic"})`, () => {
+			const parser = new SnapshotParser();
+			const other = { ...CPU, id: CPU.id + 1, orig: "Other CPU" };
+			const entries = [TEMP, { ...TEMP, sensorIndex: 1, value: 81 }];
+			const first = parser.parse(compose([CPU, other], entries, { utf8 }));
+			const swapped = parser.parse(compose([other, CPU], entries, { utf8 }));
+			assert.notEqual(swapped, first);
+			assert.equal(swapped.byKey.get("f0000501:0:1000000")?.value, 81);
+			assert.equal(swapped.byKey.get("f0000502:0:1000000")?.value, TEMP.value);
+			assert.equal(swapped.sensors[0]?.name, "Other CPU");
+		});
+
+		it(`preserves saved keys when ordinary entries reorder (${utf8 ? "UTF-8" : "classic"})`, () => {
+			const parser = new SnapshotParser();
+			const other = { ...TEMP, id: TEMP.id + 1, orig: "Other temperature", value: 81 };
+			const first = parser.parse(compose([CPU], [TEMP, other], { utf8 }));
+			const reordered = parser.parse(compose([CPU], [other, TEMP], { utf8 }));
+			assert.notEqual(reordered, first);
+			assert.equal(reordered.byKey.get("f0000501:0:1000000")?.value, TEMP.value);
+			assert.equal(reordered.byKey.get("f0000501:0:1000001")?.value, 81);
+		});
+	}
+
 	it("rebuilds when a unit changes under an unchanged skeleton (runtime C to F flip)", () => {
 		const parser = new SnapshotParser();
 		const first = parser.parse(compose([CPU], [TEMP]));

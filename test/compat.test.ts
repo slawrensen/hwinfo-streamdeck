@@ -1,7 +1,9 @@
 /**
  * Compatibility proof: faces rendered from legacy-shaped inputs (no gauge, no
- * text overrides, no data-unit re-tiering in play) must stay byte-identical
- * to the captured renderer output in test/golden/legacy-faces.json. The dial
+ * text overrides, no data-unit re-tiering in play) must preserve captured
+ * geometry and content from test/golden/legacy-faces.json. The two explicit
+ * numeric-unit color replacements below are the readability correction.
+ * The dial
  * faces and the quad key are the untouched 1.2.0 capture; the single and
  * dual key entries were re-baselined for the adaptive label typography
  * (issue #3), and the three single-key entries again for the measured
@@ -22,12 +24,15 @@ import { renderDualKey, renderQuadKey, renderReadingKey } from "../src/ui/key-re
 import { resolveTextColors, themeTextColors } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 
-const golden = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
+const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
+// Retain the historical artifacts. Authorize only these foreground changes;
+// all other bytes still compare exactly, including number and unit geometry.
+const golden = Object.fromEntries(Object.entries(legacy).map(([name, svg]) => [name, svg.replaceAll("#667082", "#6B7586").replaceAll("#8A6326", "#926E35")]));
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 const EMBER = resolvePalette(config, "ember", "temperature", "normal");
 
-describe("legacy faces stay byte-identical", () => {
+describe("legacy faces retain all bytes except the approved numeric colors", () => {
 	it("single key, plain (no sparkline field ever set)", () => {
 		assert.equal(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", palette: VOID }), golden.singlePlain);
 	});

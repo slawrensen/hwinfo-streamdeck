@@ -35,6 +35,35 @@ import { loadThemes, resolvePalette } from "../src/ui/themes";
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 
+describe("persistent non-color key severity", () => {
+	for (const severity of ["warn", "crit"] as const) {
+		it(`${severity}: the single face keeps its number and adds a distinct shape in the badge gap`, () => {
+			const svg = render({ severity, statBadge: "MAX", returnMark: true });
+			assert.match(svg, new RegExp(`data-severity="${severity}"`));
+			assert.match(svg, /data-severity="[^"]+" transform="translate\(114 38\)"/);
+			assert.match(svg, />56\.3<\/text>/);
+			assert.doesNotMatch(svg, /<animate/);
+			const shape = svg.match(/data-severity="[^"]+"[^>]*><rect[^>]*\/><polygon points="([^"]+)"/);
+			assert.ok(shape);
+			assert.equal(shape[1]?.split(" ").length, severity === "warn" ? 3 : 8);
+		});
+		it(`${severity}: dense faces reserve the separator's right gap and preserve all value runs`, () => {
+			for (const [svg, y] of [
+				[renderDual({ severity, sharedBadge: "MAX", returnMark: true }), 64],
+				[renderTriple({ severity, sharedBadge: "MAX", returnMark: true }), 40],
+				[renderQuad({ severity, sharedBadge: "MAX", labels: true, returnMark: true }), 65]
+			] as const) {
+				assert.match(svg, new RegExp(`data-severity="${severity}" transform="translate\\(114 ${y}\\)"`));
+				assert.match(svg, />MAX</);
+				assert.ok(svg.includes("<text"));
+			}
+		});
+	}
+	it("a normal face has no attention marker", () => {
+		assert.doesNotMatch(render({}), /data-severity/);
+	});
+});
+
 function render(overrides: Partial<ReadingKeyOptions>): string {
 	return renderReadingKey({
 		label: "CPU Package",
@@ -215,7 +244,7 @@ describe("alert pass recolors the whole key", () => {
 		assert.match(svg, /<rect width="144" height="144" fill="#E8940D"\/>/);
 		assert.match(svg, /y="94"[^>]*fill="#1C1200"/);
 		assert.match(svg, /y="32"[^>]*fill="#402C00"/); // label
-		assert.match(svg, /y="114"[^>]*fill="#553C00"/); // unit
+		assert.match(svg, /y="114"[^>]*fill="#503900"/); // unit
 		assert.match(svg, /<polyline [^>]*stroke="#402C00"/); // accent, not themed
 		assert.match(svg, /<path [^>]*fill="#C67A06"/); // track, not themed
 	});

@@ -523,6 +523,7 @@ export function compose(settings: ReadingSettings, status: PollerStatus, returnM
 	const display = displayModeOf(settings);
 	const badge = readingStatBadge(reading, mode);
 	return renderReadingKey({
+		severity: level,
 		label: keyLabel(settings.label, reading.label),
 		valueText: measured.valueText,
 		unitText: measured.unitText,
@@ -621,6 +622,7 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	const bottomMode = isStatMode(settings.secondaryStatMode) ? settings.secondaryStatMode : topMode;
 	const shared = topMode === bottomMode;
 	return renderDualKey({
+		severity: level,
 		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : readingStatBadge(primary ?? secondary, topMode)),
 		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : readingStatBadge(secondary, bottomMode)),
 		sharedBadge: shared ? readingStatBadge(primary ?? secondary, topMode) : "",
@@ -655,6 +657,7 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 	const palette = resolvePalette(loadThemes(), themeId, accent, level);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3];
 	return renderTripleKey({
+		severity: level,
 		rows: slotKeys.map((key, i) => (key === undefined ? null : readingRow(readings[i], mode, measureOpts, customLabels[i]))),
 		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
 		palette,
@@ -696,6 +699,7 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	const colors = quadColorsOf(settings);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3, settings.quadLabel4];
 	return renderQuadKey({
+		severity: level,
 		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as string, labeled, textSettings, text, palette)))),
 		labels: labeled,
 		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),

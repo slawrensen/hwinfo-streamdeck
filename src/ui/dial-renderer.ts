@@ -9,8 +9,8 @@
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
  */
 import { HISTORY_LENGTH } from "../series";
-import { estimateFooterWidth, fitFooter, truncateLabel, wrapLabelTwoLines } from "./format";
-import { barSegment, escapeXml, FONT, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
+import { estimateFooterWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, type AlertLevel } from "./format";
+import { barSegment, escapeXml, FONT, severityMarkSvg, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
 import { themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -97,6 +97,7 @@ export function wideValueFit(values: readonly string[]): { size: number; maxW: n
 }
 
 export interface OverviewRow {
+	severity?: AlertLevel;
 	label: string;
 	valueText: string;
 	unitText: string;
@@ -200,9 +201,11 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// the real guarantee: the mask and the value draw after the label,
 		// so a hot estimate ends up under the value, never over it.
 		const labelRight = WIDE.valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
-		const label = fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - WIDE.labelX) * 0.94));
+		const alerting = row.severity === "warn" || row.severity === "crit";
+		const labelX = alerting ? 28 : WIDE.labelX;
+		const label = fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - labelX) * 0.94));
 		parts.push(
-			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" letter-spacing="0.4" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
+			`<text x="${labelX}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" letter-spacing="0.4" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
 			// Bg-colored insurance between the label run and this row's value:
 			// invisible (rows sit on plain bg), and renderer-proof where the
 			// label estimate ran hot (clipPath is unproven on this engine).
@@ -212,6 +215,7 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		if (row.unitText !== "") {
 			parts.push(`<text x="${WIDE.unitLeft}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
+		parts.push(severityMarkSvg(row.severity, 12, baseline - 12, 12, palette.value, palette.bg));
 	});
 	parts.push(wideContextLine(g.lineBaseline, opts.contextText, opts.statsText, text));
 	parts.push("</svg>");
@@ -248,6 +252,9 @@ export function twoRowValueFontSize(text: string): 26 | 20 | 16 {
 }
 
 export interface TwoRowRow {
+	severity?: AlertLevel;
+	/** Units share the selected row's actual surface with its value. */
+	unitColor?: string;
 	label: string;
 	valueText: string;
 	unitText: string;
@@ -308,10 +315,12 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 				`<rect x="2" y="${top + 4}" width="4" height="32" rx="2" fill="${palette.accent}"/>`
 			);
 		}
-		const lines = wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
+		const alerting = row.severity === "warn" || row.severity === "crit";
+		const lines = wrapLabelTwoLines(row.label, alerting ? TWO_ROW_LINE1_MAX - 3 : TWO_ROW_LINE1_MAX, line2Max);
 		parts.push(
-			`<text x="12" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(lines[0] as string)}</text>`
+			`<text x="${alerting ? 30 : 12}" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(lines[0] as string)}</text>`
 		);
+		parts.push(severityMarkSvg(row.severity, 12, top + 1, 13, palette.value, rowBg));
 		if (lines.length > 1) {
 			parts.push(
 				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(lines[1] as string)}</text>`
@@ -334,7 +343,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 			`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${FONT}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
 		);
 		if (row.unitText !== "") {
-			parts.push(`<text x="${unitX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
+			parts.push(`<text x="${unitX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.unitColor ?? text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
 	});
 	if (opts.footerText !== "") {
@@ -345,6 +354,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 }
 
 export interface DialRenderOptions {
+	severity?: AlertLevel;
 	title: string;
 	valueText: string;
 	/** Rendered inline after the value; empty to omit. */
@@ -378,10 +388,12 @@ function dialZoneSvg(zone: DrawnZone): string {
 export function renderDial(opts: DialRenderOptions): string {
 	const { palette, barColor } = opts;
 	const text = opts.text ?? themeTextColors(palette);
+	const alerting = opts.severity === "warn" || opts.severity === "crit";
 	const parts: string[] = [
 		...svgOpen(200, 100, palette.bg),
-		`<text x="12" y="24" text-anchor="start" font-family="${FONT}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(truncateLabel(opts.title, TITLE_MAX))}</text>`
+		`<text x="12" y="24" text-anchor="start" font-family="${FONT}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(alerting ? fitTextLadder(opts.title, 158, [18]).text : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
+	parts.push(severityMarkSvg(opts.severity, 174, 10, 14, palette.value, palette.bg));
 	const unit = opts.unitText !== "" ? `<tspan dx="6" font-size="17" font-weight="600" fill="${text.unit}">${escapeXml(opts.unitText)}</tspan>` : "";
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
 	parts.push(`<text x="12" y="58" text-anchor="start" font-family="${FONT}" font-size="${valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);

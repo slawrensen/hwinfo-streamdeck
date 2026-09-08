@@ -9,7 +9,7 @@
  * value and label glyph sizes flex with content.
  */
 import { HISTORY_LENGTH } from "../series";
-import { estimateKeyTextWidth, fitTextLadder, truncateLabel, type FittedText } from "./format";
+import { estimateKeyTextWidth, fitTextLadder, truncateLabel, type AlertLevel, type FittedText } from "./format";
 import { themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -240,6 +240,8 @@ function keyRingSvg(gauge: KeyGauge, palette: Palette): string[] {
 }
 
 export interface ReadingKeyOptions {
+	/** Persistent shape for the primary reading's active condition. */
+	severity?: AlertLevel;
 	label: string;
 	valueText: string;
 	unitText: string;
@@ -266,6 +268,17 @@ export interface ReadingKeyOptions {
  * masked gap on their divider instead. */
 export function returnMarkSvg(color: string, x: number = 15, y: number = 119): string {
 	return `<path d="M${x + 18} ${y} v5 a3 3 0 0 1 -3 3 h-9" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/><polygon points="${x + 9},${y + 4} ${x + 9},${y + 12} ${x + 1},${y + 8}" fill="${color}"/>`;
+}
+
+/** Severity is a shape, never a font glyph or animation. The clear backing
+ * keeps separators/gauges out of the mark; callers reserve its text space. */
+export function severityMarkSvg(level: AlertLevel | undefined, x: number, y: number, size: number, color: string, background: string): string {
+	if (level !== "warn" && level !== "crit") return "";
+	const points = level === "warn"
+		? [[0.5, 0], [1, 1], [0, 1]]
+		: [[0.3, 0], [0.7, 0], [1, 0.3], [1, 0.7], [0.7, 1], [0.3, 1], [0, 0.7], [0, 0.3]];
+	const polygon = points.map(([px, py]) => `${((px as number) * size).toFixed(1)},${((py as number) * size).toFixed(1)}`).join(" ");
+	return `<g data-severity="${level}" transform="translate(${x} ${y})"><rect x="-1" y="-1" width="${size + 2}" height="${size + 2}" fill="${background}"/><polygon points="${polygon}" fill="${color}"/><path d="M${size / 2} ${size * 0.35} v${size * 0.3}" stroke="${background}" stroke-width="${size * 0.12}"/><circle cx="${size / 2}" cy="${size * 0.82}" r="${size * 0.065}" fill="${background}"/></g>`;
 }
 
 /** The return hook seated in a masked gap at the left end of a divider:
@@ -328,6 +341,7 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		}
 		parts.push(returnMarkSvg(text.unit));
 	}
+	parts.push(severityMarkSvg(opts.severity, 114, 38, 16, palette.value, palette.bg));
 	parts.push("</svg>");
 	return parts.join("");
 }
@@ -386,6 +400,7 @@ export interface DualKeyRow {
 }
 
 export interface DualKeyOptions {
+	severity?: AlertLevel;
 	top: DualKeyRow;
 	bottom: DualKeyRow;
 	/** Stat both rows display; drawn once, centered in the divider gap.
@@ -433,6 +448,7 @@ export function renderDualKey(opts: DualKeyOptions): string {
 	if (opts.returnMark === true) {
 		parts.push(...dividerReturnMarkSvg(DUAL.dividerY + 1, palette.bg, text.unit));
 	}
+	parts.push(severityMarkSvg(opts.severity, 114, 64, 16, palette.value, palette.bg));
 	parts.push("</svg>");
 	return parts.join("");
 }
@@ -497,6 +513,7 @@ export interface TripleKeyRow {
 }
 
 export interface TripleKeyOptions {
+	severity?: AlertLevel;
 	/** Up to three rows top to bottom. A null slot draws an empty band. */
 	rows: readonly (TripleKeyRow | null)[];
 	/** Stat every row displays (the key press cycles all rows together);
@@ -607,6 +624,7 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 	if (opts.returnMark === true) {
 		parts.push(...dividerReturnMarkSvg((TRIPLE.separatorYs[0] as number) + 1, palette.bg, text.unit));
 	}
+	parts.push(severityMarkSvg(opts.severity, 114, 40, 16, palette.value, palette.bg));
 	parts.push("</svg>");
 	return parts.join("");
 }
@@ -634,9 +652,9 @@ const QUAD_LABEL_BUDGET = 50;
 const QUAD_VALUE_MAX = 7;
 
 /** Default per-slot identity colors (top-left, top-right, bottom-left,
- * bottom-right): four hues apart in both hue and lightness, picked to hold
- * against every theme background. The action salvages user overrides per
- * entry against these; the PI's preset list starts from the same four. */
+ * bottom-right): four identity hues. The action resolves their contrast
+ * against the actual background and salvages user overrides per entry;
+ * the PI's preset list starts from the same four. */
 export const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"] as const;
 
 /**
@@ -668,6 +686,7 @@ export interface QuadKeyCell {
 }
 
 export interface QuadKeyOptions {
+	severity?: AlertLevel;
 	/** Up to four cells in reading order (top-left, top-right, bottom-left,
 	 * bottom-right). A null slot draws an empty quadrant. */
 	cells: readonly (QuadKeyCell | null)[];
@@ -738,6 +757,9 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 	if (opts.returnMark === true) {
 		parts.push(...dividerReturnMarkSvg(QUAD_CROSS_H.y + 1, palette.bg, text.unit));
 	}
+	// The labeled upper units can descend to y=64; lower micro-label ink
+	// begins after y=80. Keep the complete backing inside that corridor.
+	parts.push(severityMarkSvg(opts.severity, 114, 65, 14, palette.value, palette.bg));
 	parts.push("</svg>");
 	return parts.join("");
 }

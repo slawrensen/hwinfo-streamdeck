@@ -13,10 +13,48 @@ import { SessionStatsStore } from "../src/stats";
 import { convertUnit, readingStatBadge, statValue } from "../src/ui/format";
 import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-store";
 import { loadThemes } from "../src/ui/themes";
+import { contrast } from "./wcag";
 
 const link = { sharedMemory: "f0001234:0:1000001", gadget: "g:GPU:Temperature", unit: "°C", sensorType: 1 };
 const reading: Reading = { key: link.sharedMemory, sensorIndex: 0, id: 1, label: "Temperature", type: 1, unit: "°C", value: 40, valueMin: 30, valueMax: 60, valueAvg: 42 };
 const snapshot = (r: Reading = reading, pollTime = 1): SensorSnapshot => ({ pollTime, valueRevision: pollTime, version: 1, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "GPU" }], readings: [r], byKey: new Map([[r.key, r]]) });
+
+describe("readability through production action composition", () => {
+	for (const [theme, palette] of Object.entries(loadThemes().themes)) {
+		for (const dialView of ["single", "overview", "tworow"]) {
+			it(`${theme} ${dialView}: built-in dim and alert values meet 4.5 on their actual surfaces`, () => {
+				for (const level of ["normal", "warn", "crit"] as const) {
+					const state: Parameters<typeof composeDialSvg>[0] = {
+						settings: { readingKey: reading.key, dialView, theme, textMode: "dim", warnValue: level === "normal" ? "50" : "30", critValue: level === "crit" ? "35" : "60", alertUnit: "°C" },
+						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+					};
+					const svg = composeDialSvg(state, { state: "ok", source: "shared-memory", snapshot: snapshot() });
+					const value = svg.match(/<text[^>]*font-weight="700" fill="(#[A-Fa-f0-9]{6})">40(?:\.0)?(?:<tspan|<\/text>)/);
+					assert.ok(value, "the actual composed numeric text exists");
+					assert.ok(contrast(value[1]!, dialView === "tworow" ? palette.track : palette.bg) >= 4.5, `${theme} ${dialView} ${level}: ${value[1]}`);
+					for (const element of svg.matchAll(/<(?:text|tspan)\b[^>]*\bfill="(#[A-Fa-f0-9]{6})"[^>]*>([^<]*)/g)) {
+						if (!/[0-9°]/.test(element[2]!)) continue;
+						const background = dialView === "tworow" && /y="40"/.test(element[0]) ? palette.track : palette.bg;
+						assert.ok(contrast(element[1]!, background) >= 4.5, `${theme} ${dialView} ${level} numeric/unit run: ${element[2]}`);
+					}
+					if (level !== "normal") assert.match(svg, new RegExp(`data-severity="${level}"`));
+					else assert.doesNotMatch(svg, /data-severity/);
+				}
+			});
+		}
+	}
+	it("all key layouts pass primary severity to the renderer without losing values", () => {
+		const extra = { ...reading, key: "f0001234:0:1000002", id: 2, value: 55 };
+		const source = { ...snapshot(), readings: [reading, extra], byKey: new Map([[reading.key, reading], [extra.key, extra]]) };
+		for (const keyLayout of ["single", "dual", "triple", "quad"]) {
+			for (const level of ["warn", "crit"]) {
+				const svg = compose({ readingKey: reading.key, secondaryReadingKey: extra.key, keyLayout, warnValue: "30", critValue: level === "crit" ? "35" : "60" }, { state: "ok", source: "shared-memory", snapshot: source });
+				assert.match(svg, new RegExp(`data-severity="${level}"`));
+				assert.match(svg, />40(?:\.0)?(?:<tspan|<\/text>)/);
+			}
+		}
+	});
+});
 
 describe("refutation: identity and explicit links", () => {
 	it("reserved names, empty names and spaces produce injective keys", () => {

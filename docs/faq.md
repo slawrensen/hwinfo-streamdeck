@@ -173,7 +173,7 @@ Because a per-key pick always wins. The **Deck theme** (Advanced) only affects k
 
 ### Is the native binary signed? How do I verify what I installed?
 
-The plugin's native piece, `bin/hwsm.node`, is **unsigned**: it carries no Authenticode certificate, which is also why an antivirus sometimes eyes it. What you can verify is the bytes. Every [GitHub release](https://github.com/slawrensen/hwinfo-streamdeck/releases) from 1.4.0 on prints the addon's SHA-256 and the pack's SHA-256 in its notes. Compare your installed copy in PowerShell:
+The plugin's native piece, `bin/hwsm.node`, is **unsigned**: it carries no Authenticode certificate. That alone does not explain a load failure or establish a security block. What you can verify is the bytes. Every [GitHub release](https://github.com/slawrensen/hwinfo-streamdeck/releases) from 1.4.0 on prints the addon's SHA-256 and the pack's SHA-256 in its notes. Compare your installed copy in PowerShell:
 
 ```powershell
 Get-FileHash "$env:APPDATA\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\bin\hwsm.node" -Algorithm SHA256
@@ -200,7 +200,7 @@ Yes. Dials have the same requirements as keys: free HWiNFO with Shared Memory or
 
 ### A key says "Access denied": what's wrong?
 
-HWiNFO and Stream Deck are running at **different privilege levels**. Windows blocks reading the shared memory across that boundary. Fix it by running **both elevated or both normal**; most people just restart HWiNFO *without* "Run as administrator." (On the free version, Gadget reporting also works across privilege levels.) See [Troubleshooting](troubleshooting.md) for the full status-screen list.
+Windows denied access needed to read the sensor source. The error can come from Shared Memory or the Gadget registry and does not identify which access rule failed. Open the key or dial settings and choose **Copy support report** for support. See [Troubleshooting](troubleshooting.md#keys-show-access-denied) for account, session and privilege checks.
 
 ### What do the two-line screens on my keys mean?
 
@@ -209,14 +209,14 @@ They're status screens telling you exactly what to fix. As of 1.1.6 they're pure
 | Key shows | Meaning / fix |
 | --- | --- |
 | `Start HWiNFO / not detected` | HWiNFO isn't publishing on either interface. Start it with Shared Memory or Gadget reporting on. |
-| `HWiNFO busy / retrying` | HWiNFO is running but its shared memory was locked at that instant. The plugin retries on the next poll; nothing to do. |
+| `Source busy / retrying` | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
-| `Not updating / check sharing` | Values frozen for 15 seconds (e.g. the Sensors window is closed). Gadget instead shows `Age unknown / check Gadget`: unchanged data might be steady or left after exit. |
-| `Access denied / un-elevate` | Privilege mismatch: run HWiNFO and Stream Deck at the same level. |
-| `Tick sensors / in Gadget` | Gadget reporting is on but no sensors are ticked; tick some in HWiNFO. |
+| `Not updating / check sharing` | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| `Access denied / open settings` | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
 | `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |
 | `Needs x64 / Windows` | Not a 64-bit Windows machine (Windows-on-ARM / other); unsupported. |
-| `Plugin damaged / reinstall` | The plugin's native bridge (`bin/hwsm.node`) is missing, was blocked from loading, or does not match this plugin version; often an antivirus quarantine. Reinstall the plugin, and allow that file in your antivirus if it comes back; it is unsigned, so [verify its hash](#is-the-native-binary-signed-how-do-i-verify-what-i-installed) first. |
+| `Bridge failed / reinstall` | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
 ![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})

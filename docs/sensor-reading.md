@@ -207,16 +207,16 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | Key shows | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
-| **HWiNFO busy / retrying** | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll; held values stay up meanwhile. |
+| **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
-| **Not updating / check sharing** | Values are frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. Gadget instead shows **Age unknown / check Gadget**, since steady readings and a stopped producer leave the same registry data. (The free version's 12-hour expiry shows **Shared Memory / is off** instead, or falls back to Gadget in Auto mode.) |
-| **Tick sensors / in Gadget** | Gadget reporting is on but no sensors are ticked. In HWiNFO open **Configure Sensors** → **HWiNFO Gadget** and tick "Report value in Gadget". |
-| **Access denied / un-elevate** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
+| **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| **Tick sensors / in Gadget** | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
+| **Access denied / open settings** | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
-| **Plugin damaged / reinstall** | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; if it happens again, allow that file in your antivirus after checking its hash against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)); it is unsigned, so the hash is the check. |
+| **Bridge failed / reinstall** | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 | **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
-| **HWiNFO error / restart HWiNFO** | Rare. The shared memory did not validate. It usually clears on the next poll; if it persists, restart HWiNFO. |
+| **Source error / open settings** | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
 
 The settings panel shows the matching plain-language explanation and fix while the key is in one of these states. Full details are on [Status screens](status-screens.md).
 

@@ -32,7 +32,7 @@ There are two ways to install, depending on where you got the plugin.
 
 The plugin is on the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). Install it from there in one click and the Marketplace hands the package to the Stream Deck app. I publish each version to GitHub Releases first, so while an update is in review the Marketplace can be a version behind. Check the version shown on the listing if you want the newest build.
 
-> **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, that is a privilege *mismatch* between HWiNFO and Stream Deck, not a permission you granted at install. See [Troubleshooting](troubleshooting.md).
+> **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, Windows refused access needed to read the sensor source. That error alone does not identify an account, session or privilege mismatch. Open the key or dial settings and choose **Copy support report** for support; see [Troubleshooting](troubleshooting.md).
 
 ### Updating and removing
 
@@ -76,7 +76,7 @@ The portable build of HWiNFO works identically, but there is no installer to wir
 
 - **Only publishes while its window is open.** Close the portable HWiNFO and the data stops; the plugin will show **Not updating** and then **Start HWiNFO**.
 - **Add it to autostart yourself.** There's no installer to register Auto Start, so if you want it running at login you must add the executable to your own startup (e.g. a Startup-folder shortcut or Task Scheduler).
-- **Watch the folder and elevation.** Don't run portable HWiNFO from a folder that requires admin rights (e.g. `Program Files`) unless Stream Deck is also elevated. If HWiNFO runs elevated and Stream Deck doesn't (or vice-versa), Windows blocks the plugin from reading shared memory and keys show **Access denied / un-elevate**. Run both elevated, or both normal.
+- **Review access settings if needed.** **Access denied / open settings** means Windows refused access needed to read the sensor source. Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck; the error alone does not identify which access rule failed. See [Troubleshooting](troubleshooting.md#keys-show-access-denied).
 
 ## Verify it works
 

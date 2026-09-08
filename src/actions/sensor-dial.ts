@@ -245,7 +245,16 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (ev.action.isDial()) {
 			this.pushTriggerDescriptions(ev.action, ev.payload.settings);
 		}
-		this.renderAll(poller.getStatus(), ev.action.id);
+		// retain() may synchronously read a different source or native unit
+		// before this instance is restored. Validate its session against that
+		// observation before drawing the first frame, just as each tick does.
+		const status = poller.getStatus();
+		if (status.state === "ok") {
+			this.sampleStats(state, status.snapshot, status.source);
+		} else {
+			state.stats.reset();
+		}
+		this.renderAll(status, ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<DialSettings>): void {

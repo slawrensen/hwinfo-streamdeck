@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 import { compose, type ReadingSettings } from "../src/actions/sensor-reading";
 import { composeDialSvg, SensorDialAction } from "../src/actions/sensor-dial";
 import { composeChunkFace, type DetailFaceContext } from "../src/detail/detail-faces";
@@ -8,9 +8,10 @@ import { IDLE_GESTURE } from "../src/gestures";
 import { gadgetReadingKey } from "../src/hwinfo/gadget-identity";
 import { applyReadingLinks, parseReadingLinks } from "../src/hwinfo/reading-links";
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
+import { poller, type PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
 import { convertUnit, readingStatBadge, statValue } from "../src/ui/format";
-import { effectiveTextFor } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-store";
 import { loadThemes } from "../src/ui/themes";
 
 const link = { sharedMemory: "f0001234:0:1000001", gadget: "g:GPU:Temperature", unit: "°C", sensorType: 1 };
@@ -50,6 +51,100 @@ describe("refutation: identity and explicit links", () => {
 			assert.equal(applyReadingLinks({ ...snapshot(), readings: [], byKey: new Map() }, [link], 1).byKey.size, 0);
 		}
 	});
+});
+
+describe("dial appearance synchronizes history before its first frame", () => {
+	type DialState = Parameters<typeof composeDialSvg>[0];
+	type Appearance = Parameters<SensorDialAction["onWillAppear"]>[0];
+	type Lifecycle = {
+		instances: Map<string, DialState>;
+		hidden: Map<string, { at: number; state: DialState }>;
+		traceLifecycle(): void;
+		pushTriggerDescriptions(): void;
+		renderAll(status: PollerStatus): void;
+		onWillAppear(event: Appearance): void;
+	};
+	function firstFrame(status: PollerStatus, retained: "hidden" | "replayed" | "new", dialView: string): { svg: string; stats: ReturnType<SessionStatsStore["get"]>; overlay: string | undefined } {
+		// Exercise the production action handler while replacing only the SDK
+		// sink and shared poller's native acquisition boundary. A cold retain
+		// makes the new snapshot available before the state is restored.
+		applyGlobalThemeSettings({ theme: "void" });
+		const settings = Object.freeze({ readingKey: reading.key, dialView, label: "My CPU", decimals: "1" as const });
+		const previous: DialState = { settings, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "old frame", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		previous.stats.observe({ ...reading, value: 45 }, snapshot({ ...reading, value: 45 }), "shared-memory");
+		const action = Object.create(SensorDialAction.prototype) as Lifecycle;
+		action.instances = new Map(retained === "replayed" ? [["ctx", previous]] : []);
+		action.hidden = new Map(retained === "hidden" ? [["ctx", { at: Date.now(), state: previous }]] : []);
+		action.traceLifecycle = () => {};
+		action.pushTriggerDescriptions = () => {};
+		let svg = "";
+		let renderedStats: ReturnType<SessionStatsStore["get"]>;
+		let overlay: string | undefined;
+		action.renderAll = (current) => {
+			const state = action.instances.get("ctx");
+			assert.ok(state);
+			renderedStats = state.stats.get(reading.key);
+			overlay = state.overlay?.text;
+			svg = composeDialSvg(state, current);
+		};
+		let latest: PollerStatus = retained === "replayed" ? status : { state: "unavailable", reason: "not-running", message: "idle fixture" };
+		const retain = mock.method(poller, "retain", () => { latest = status; });
+		const getStatus = mock.method(poller, "getStatus", () => latest);
+		let settingsWrites = 0;
+		try {
+			action.onWillAppear({ action: { id: "ctx", device: { id: "fixture", name: "Fixture" }, isDial: () => true, coordinates: { column: 0, row: 0 }, setSettings: () => { settingsWrites++; } }, payload: { settings } } as unknown as Appearance);
+			assert.equal(retain.mock.callCount(), retained === "replayed" ? 0 : 1);
+			assert.equal(settingsWrites, 0, "history synchronization never rewrites action settings");
+			assert.equal(action.instances.get("ctx")?.settings, settings);
+			return { svg, stats: renderedStats, overlay };
+		} finally {
+			const timer = action.instances.get("ctx")?.overlayTimer;
+			if (timer) clearTimeout(timer);
+			retain.mock.restore();
+			getStatus.mock.restore();
+		}
+	}
+	for (const dialView of ["single", "overview", "tworow"]) {
+		for (const retained of ["hidden", "replayed"] as const) {
+			it(`${retained} ${dialView}: native-unit change resets MIN before the first frame`, () => {
+				const current = { ...reading, value: 113, unit: "°F" };
+				const result = firstFrame({ state: "ok", source: "shared-memory", snapshot: snapshot(current, 2) }, retained, dialView);
+				assert.deepEqual(result.stats, { min: 113, max: 113, sum: 113, count: 1 });
+				assert.match(result.svg, />113(?:\.0)?(?: °F)?</);
+				assert.doesNotMatch(result.svg, />45(?:\.0)?(?: °F)?</);
+				assert.equal(result.overlay, "stats reset: units changed");
+			});
+			it(`${retained} ${dialView}: the same observation preserves history without double counting`, () => {
+				const current = { ...reading, value: 45 };
+				const result = firstFrame({ state: "ok", source: "shared-memory", snapshot: snapshot(current) }, retained, dialView);
+				assert.deepEqual(result.stats, { min: 45, max: 45, sum: 45, count: 1 });
+				assert.equal(result.overlay, undefined);
+			});
+			it(`${retained} ${dialView}: a backend change resets local MIN before rendering`, () => {
+				const current = { ...reading, value: 80, statistics: "unavailable" as const };
+				const result = firstFrame({ state: "ok", source: "gadget", snapshot: { ...snapshot(current, 2), freshnessRevision: 1 } }, retained, dialView);
+				assert.deepEqual(result.stats, { min: 80, max: 80, sum: 80, count: 1 });
+				assert.equal(result.overlay, "stats reset: source changed");
+			});
+		}
+		it(`${dialView}: a new appearance seeds its first observed local sample`, () => {
+			const result = firstFrame({ state: "ok", source: "shared-memory", snapshot: snapshot() }, "new", dialView);
+			assert.equal(result.stats?.count, 1);
+			assert.equal(result.stats?.min, reading.value);
+		});
+	}
+	for (const status of [
+		{ state: "stale", source: "gadget", snapshot: snapshot(), staleForMs: 16_000 },
+		{ state: "unavailable", reason: "not-running", message: "fixture feed absent" },
+		{ state: "ok", source: "shared-memory", snapshot: snapshot({ ...reading, value: Number.NaN }) },
+		{ state: "ok", source: "shared-memory", snapshot: { ...snapshot(), readings: [], byKey: new Map<string, Reading>() } }
+	] satisfies PollerStatus[]) {
+		it(`${status.state}: restored unavailable or missing history is cleared before rendering`, () => {
+			const result = firstFrame(status, "hidden", "single");
+			assert.equal(result.stats, undefined);
+			assert.doesNotMatch(result.svg, />45(?:\.0)?(?: °C)?</);
+		});
+	}
 });
 
 describe("refutation: historical and local statistics", () => {

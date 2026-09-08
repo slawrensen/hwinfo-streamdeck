@@ -85,3 +85,48 @@ Rollback: revert this follow-up without changing saved settings. The existing
 candidate still supplies NaN Gadget history and unit-safe local resets; the
 new capability enforcement and visible reasons would be removed. Preserve
 the red/green logs and regression fixtures when preparing any rollback.
+
+## Follow-up: restored dial first-frame integrity
+
+Integration base: `2b352a312e61593378a01d6c02632ded6422cb93`.
+Branch: `fix/audit-dial-restore-20260907`.
+
+A lifecycle review found a remaining D04 path after the per-tick correction:
+when the last dial was hidden, its cached session could contain a 45 C minimum.
+On return, `retain()` could synchronously acquire a new 113 F reading before
+the cached state was restored to the visible instance map. The first
+`onWillAppear` render then used the old 45 minimum with the new F unit. The
+next ordinary tick corrected the session, leaving the first frame wrong.
+Replayed appearances could also draw retained history before checking its
+current source, unit, or availability.
+
+`onWillAppear` now passes the current snapshot through the existing session
+sampling and domain validation before its first render. Source/native-unit
+changes reset with the existing visible reason, missing/nonfinite readings
+drop their history, and stale/unavailable sources clear the session. New dials
+seed their first observed sample. A repeated observation keeps its history
+without being counted twice. This changes no saved setting and adds no timer
+or acquisition loop.
+
+The registered `test/measurement-integrity.test.ts` exercises the actual
+`SensorDialAction.onWillAppear` method and production `composeDialSvg`. It
+replaces only the SDK output sink and shared poller's acquisition boundary,
+including the synchronous cold-retain ordering. Hidden, replayed and new
+appearances cover all three dial views; stale, unavailable, missing and
+nonfinite first-frame histories are also covered. A frozen settings object
+and a `setSettings` spy assert that the lifecycle does not rewrite settings.
+
+Evidence in this worktree's ignored `release/audit-evidence/`:
+
+| Command | Result |
+| --- | --- |
+| `node --import tsx --test --test-name-pattern="dial appearance" test/measurement-integrity.test.ts` before the fix | 0 pass, 15 fail, 0 skipped; `sprint-01-restore-red.log`. |
+| The same command after the fix | 15 pass, 0 fail, 0 skipped; `sprint-01-restore-green.log`. |
+| `npm test` after adding preservation and nonfinite cases | 809 pass, 0 fail, 0 skipped, including all 25 lifecycle cases; `sprint-01-restore-unit.log`. |
+| `npm run lint` | Exit 0, zero warnings; `sprint-01-restore-lint.log`. |
+| `npm run typecheck` | Exit 0; `sprint-01-restore-typecheck.log`. |
+
+These are deterministic action/module tests on Windows, not physical Stream
+Deck captures. The integration owner must run the final combined full suite.
+Rollback is the small appearance synchronization block; keep the regressions
+and evidence, and do not rewrite user settings.

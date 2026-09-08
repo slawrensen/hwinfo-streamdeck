@@ -50,3 +50,29 @@ adversary tool. Record both processes and the hardware configuration.
 Rollback: revert the monitor changes. Retain raw CSVs; the old monitor will
 not parse the new appended host columns, so preserve this summarizer with
 the evidence. No user settings or installed plugin bytes were changed.
+
+## PR review correction: observation gaps and host events
+
+Review of `5d4c72d2241e77eb250c7adbe3251d69cbdc2906` found that a failed
+WMI snapshot was summarized as a stopped plugin and absent HWiNFO. The CSV
+had preserved the failure note, but the summary discarded it. Failed
+observations now remain unknown, with an explicit count and the original
+error note. The same correction applies to historical 14- and 19-column
+files whose failure rows contain zero counts. Confirmed empty snapshots
+still count as absence. WMI command errors are terminating, and resource
+segments end at failed observations and detected sampling gaps.
+
+Host lifetime events were calculated but omitted from the printed report.
+They now appear with a Stream Deck host scope and a separate restart count,
+including a reused PID with a changed creation timestamp. A missing or
+ambiguous host association says observation unavailable, not process absent.
+Notes cannot inflate restart counts just by containing the word restart.
+
+Four new production `--summary` regressions failed before the correction.
+Afterward the focused release-input, host-selector and monitor suites pass
+21 tests, with zero skips; lint and typecheck pass. Commands and raw logs
+are retained under `release/audit-evidence/review-soak-{red,green,lint,typecheck}.log`.
+The focused command is `node --import tsx --test --test-concurrency=1
+test/release-inputs.test.ts test/soak-host.test.mjs test/soak-monitor.test.ts`.
+Only synthetic CSV summaries ran. No native, WMI, live-host or physical
+test ran for this correction; the required hardware gates remain open.

@@ -68,11 +68,11 @@ const TARGET_RE = args.pattern ? new RegExp(args.pattern, "i") : /com\.lawrensen
 
 async function processSnapshot() {
 	const ps =
-		"$procs = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
+		"$procs = @(Get-CimInstance Win32_Process -ErrorAction Stop -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
 		"Select-Object ProcessId,ParentProcessId,SessionId,CreationDate,Name,CommandLine,WorkingSetSize,PrivatePageCount,HandleCount,ThreadCount,UserModeTime,KernelModeTime); " +
 		"ConvertTo-Json -InputObject $procs -Depth 2 -Compress";
 	const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", ps], { timeout: 30_000, maxBuffer: 8 * MB });
-	return JSON.parse(stdout.trim() || "[]");
+	return JSON.parse(stdout);
 }
 
 /** Sticky selection: keep the known PID while it lives; otherwise pick the
@@ -170,6 +170,10 @@ function parseCsv(file) {
 	}
 	return lines.slice(1).map((l) => {
 		const c = l.split(",");
+		const note = c[13] ?? "";
+		// Historical collectors wrote zero counts on a failed observation.
+		// Preserve that note as evidence; those zeros never prove absence.
+		const unknown = note.startsWith("snapshot-failed:");
 		return {
 			tsIso: c[0],
 			tsMs: Number(c[1]),
@@ -179,9 +183,11 @@ function parseCsv(file) {
 			handles: c[6] === "" ? null : Number(c[6]),
 			cpuS: c[8] === "" ? null : Number(c[8]),
 			sdAppPid: c[9] === "" ? null : Number(c[9]),
-			hwinfoCount: Number(c[10]),
+			hwinfoCount: unknown || c[10] === "" ? null : Number(c[10]),
 			warn: Number(c[11]),
 			error: Number(c[12]),
+			note,
+			unknown,
 			sdRssB: c[14] ? Number(c[14]) : null,
 			sdPrivateB: c[15] ? Number(c[15]) : null,
 			sdHandles: c[16] ? Number(c[16]) : null,
@@ -250,18 +256,35 @@ function computeSummary(rows, includeHost = true) {
 	const sorted = [...dts].sort((a, b) => a - b);
 	const medianDt = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
 	const events = [];
+	const gapBefore = new Set();
 	for (let i = 1; i < rows.length; i++) {
 		if (medianDt > 0 && rows[i].tsMs - rows[i - 1].tsMs > 3 * medianDt) {
-			events.push(`${rows[i].tsIso} sampling gap of ${Math.round((rows[i].tsMs - rows[i - 1].tsMs) / 1000)} s (sleep or stall)`);
+			gapBefore.add(rows[i]);
+			if (includeHost) events.push(`${rows[i].tsIso} sampling gap of ${Math.round((rows[i].tsMs - rows[i - 1].tsMs) / 1000)} s (sleep or stall)`);
 		}
 	}
 
 	// Contiguous same-PID present segments; restarts and absences are events.
+	const scope = includeHost ? "plugin" : "Stream Deck host";
+	// A missing host selection may be ambiguity, not a stopped host process.
+	const unavailable = includeHost ? "plugin process absent" : "Stream Deck host observation unavailable";
 	const segments = [];
 	let seg = null;
-	let lastPid = null;
+	let lastPresent = null;
 	let absentRun = null;
+	let restarts = 0;
 	for (const r of rows) {
+		if (gapBefore.has(r)) seg = null;
+		if (r.unknown) {
+			if (absentRun !== null) {
+				events.push(`${absentRun} ${unavailable} before observation became unknown at ${r.tsIso}`);
+				absentRun = null;
+			}
+			if (includeHost) events.push(`${r.tsIso} observation unknown (${r.note})`);
+			seg = null;
+			continue;
+		}
+		if (includeHost && r.note) events.push(`${r.tsIso} ${r.note}`);
 		if (r.pid === null) {
 			if (absentRun === null) {
 				absentRun = r.tsIso;
@@ -270,18 +293,20 @@ function computeSummary(rows, includeHost = true) {
 			continue;
 		}
 		if (absentRun !== null) {
-			events.push(`${absentRun} plugin process absent until ${r.tsIso}`);
+			events.push(`${absentRun} ${unavailable} until ${r.tsIso}`);
 			absentRun = null;
 		}
-		if (lastPid !== null && r.pid !== lastPid) {
-			events.push(`${r.tsIso} plugin PID changed ${lastPid} -> ${r.pid} (restart)`);
+		if (lastPresent !== null && r.pid !== lastPresent.pid) {
+			events.push(`${r.tsIso} ${scope} PID changed ${lastPresent.pid} -> ${r.pid} (restart)`);
+			restarts++;
 		}
-		const previous = seg?.rows.at(-1);
-		if (previous && seg.pid === r.pid) {
+		const previous = lastPresent;
+		if (previous && previous.pid === r.pid) {
 			const newLifetime = r.startedMs !== null && previous.startedMs !== null && r.startedMs !== previous.startedMs;
 			const counterReset = r.cpuS !== null && previous.cpuS !== null && r.cpuS < previous.cpuS;
 			if (newLifetime || counterReset) {
-				events.push(`${r.tsIso} PID ${r.pid}: ${newLifetime ? "creation time changed (restart)" : "CPU counter reset; new resource segment"}`);
+				events.push(`${r.tsIso} ${scope} PID ${r.pid}: ${newLifetime ? "creation time changed (restart)" : "CPU counter reset; new resource segment"}`);
+				if (newLifetime) restarts++;
 				seg = null;
 			}
 		}
@@ -290,18 +315,14 @@ function computeSummary(rows, includeHost = true) {
 			segments.push(seg);
 		}
 		seg.rows.push(r);
-		lastPid = r.pid;
+		lastPresent = r;
 	}
 	if (absentRun !== null) {
-		events.push(`${absentRun} plugin process absent through the end of the window`);
-	}
-	const sdPids = [...new Set(rows.map((r) => r.sdAppPid).filter((p) => p !== null))];
-	if (sdPids.length > 1) {
-		events.push(`Stream Deck app PID changed across the window: ${sdPids.join(" -> ")} (app restart)`);
+		events.push(`${absentRun} ${unavailable} through the end of the window`);
 	}
 
 	const longest = segments.reduce((a, b) => (b.rows.length > (a?.rows.length ?? 0) ? b : a), null);
-	const present = rows.filter((r) => r.pid !== null);
+	const present = rows.filter((r) => !r.unknown && r.pid !== null);
 	const rss = present.filter((r) => r.rssB !== null).map((r) => r.rssB);
 	const handles = present.filter((r) => r.handles !== null).map((r) => r.handles);
 	let cpuPct = null;
@@ -318,7 +339,8 @@ function computeSummary(rows, includeHost = true) {
 		firstIso: rows[0].tsIso,
 		lastIso: rows[rows.length - 1].tsIso,
 		spanHours: spanMs / 3_600_000,
-		restarts: events.filter((e) => e.includes("(restart)")).length,
+		restarts,
+		unknownSamples: rows.filter((r) => r.unknown).length,
 		hwinfoAbsentSamples: rows.filter((r) => r.hwinfoCount === 0).length,
 		warnTotal: rows.reduce((a, r) => a + r.warn, 0),
 		errorTotal: rows.reduce((a, r) => a + r.error, 0),
@@ -362,13 +384,15 @@ function printSummary(s, csvFile, adversary = null) {
 		console.log(`| Host RSS slope, host PID ${s.host.longestSegPid ?? "n/a"} (${s.host.longestSegSamples} samples) | ${slope(s.host.rssSlope)} |`);
 		console.log(`| Host handles | ${s.host.handlesFirst ?? "n/a"} to ${s.host.handlesLast ?? "n/a"} (max ${s.host.handlesMax ?? "n/a"}) |`);
 		console.log(`| Host avg CPU, same host PID | ${s.host.cpuPct === null ? "n/a" : s.host.cpuPct.toFixed(2) + "%"} |`);
+		console.log(`| Host restarts | ${s.host.restarts} |`);
 	}
 	console.log(`| Plugin restarts / HWiNFO-absent samples | ${s.restarts} / ${s.hwinfoAbsentSamples} |`);
+	console.log(`| Unknown process snapshots | ${s.unknownSamples} |`);
 	console.log(`| New log WARN / ERROR lines | ${s.warnTotal} / ${s.errorTotal} |`);
 	if (adversary !== null) {
 		console.log(`| Adversary events (injected faults survived) | ${adversary.pass}/${adversary.total} |`);
 	}
-	const events = [...s.events, ...(adversary?.events ?? [])].sort();
+	const events = [...s.events, ...(s.host?.events ?? []), ...(adversary?.events ?? [])].sort();
 	if (events.length > 0) {
 		console.log("\nEvents:");
 		for (const e of events.slice(0, 40)) {
@@ -483,7 +507,7 @@ async function sampleOnce() {
 			hostSelection.matches
 		];
 	} catch (err) {
-		row = [new Date(startedAt).toISOString(), startedAt, "", 0, "", "", "", "", "", "", 0, 0, 0, `snapshot-failed: ${String(err?.message ?? err).replaceAll(",", ";").replaceAll("\n", " ").slice(0, 120)}`, "", "", "", "", "", "", "", 0];
+		row = [new Date(startedAt).toISOString(), startedAt, "", "", "", "", "", "", "", "", "", "", "", `snapshot-failed: ${String(err?.message ?? err).replaceAll(",", ";").replaceAll("\n", " ").replaceAll("\r", " ").slice(0, 120)}`, "", "", "", "", "", "", "", ""];
 	}
 	fs.appendFileSync(outPath, row.join(",") + os.EOL);
 	return Date.now() - startedAt;

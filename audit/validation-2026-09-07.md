@@ -1,5 +1,10 @@
 # Combined Windows validation
 
+Historical candidate evidence. The later
+[Gadget and soak corrections](gadget-soak-resolution-2026-09-08.md) have a new
+validated runtime/package and clarify U1's synthetic-producer evidence.
+The results below remain valid for the exact older candidate only.
+
 Validated runtime and package source:
 `232d3681a6aa5944c64498050f07b1f940756d4d`.
 Subsequent qualification commits add evidence and documentation only.

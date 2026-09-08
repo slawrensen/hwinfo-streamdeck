@@ -20,10 +20,13 @@ pauses between writes. The producer contract and exact-candidate hardware
 qualification remain open.
 
 The user's escalation rule suspends feature expansion on a confirmed S0.
-Consequently later features remain queued/design-only. This is an explicit
-gate, not a claim that thirteen sprints have been completed. Correctness
-containment and its independent release/readability/diagnostic fixes proceed
-without waiting for the proposed calendar boundary.
+The confirmed missing-label identity defect found during PR review is now
+corrected. U1 separately proves an interface limitation under a controlled
+writer; a real HWiNFO trigger remains unverified. Do not classify that
+synthetic result as an established normal-producer S0. Its source-policy
+decision and physical release gates remain open. Later features remain
+queued/design-only; thirteen report files are not thirteen completed
+sprints. Correctness fixes proceed without waiting for calendar boundaries.
 
 ## PR groups and owners
 
@@ -39,11 +42,13 @@ The same domain owner may cover related sprints sequentially. The session
 supports three agents beside the integration owner; native/e2e tests use one
 shared execution slot to prevent fixture and timing interference.
 
-The final combined [Windows validation](validation-2026-09-07.md) passed
-910 unit tests, 99 native tests and the full suite with zero orphaned
-processes. The package and native hashes are pinned there. These software
-passes supersede the pending central-check notes in earlier area reports;
-their physical, producer-contract and guided-feature gates remain open.
+Native GitHub Stack #30 contains #25 -> #26 -> #27 -> #28 -> #29, all drafts.
+The current [Gadget and soak correction evidence](gadget-soak-resolution-2026-09-08.md)
+records 917 unit tests, 113 native tests and the full suite with zero orphaned
+processes at runtime `6bc3fde`. It supersedes the earlier
+[910-unit/99-native candidate validation](validation-2026-09-07.md) for these
+new changes. Package and native hashes are pinned in the new report. The
+physical, source-policy and guided-feature gates remain open.
 
 ## Sprint ledger
 

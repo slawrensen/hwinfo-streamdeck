@@ -147,6 +147,145 @@ describe("dial appearance synchronizes history before its first frame", () => {
 	}
 });
 
+describe("dial selection validates retained history before rendering", () => {
+	type DialState = Parameters<typeof composeDialSvg>[0];
+	type SettingsEvent = Parameters<SensorDialAction["onDidReceiveSettings"]>[0];
+	type DialHandle = SettingsEvent["action"];
+	type Selection = {
+		instances: Map<string, DialState>;
+		hidden: Map<string, { at: number; state: DialState }>;
+		pushTriggerDescriptions(): void;
+		sampleStats(state: DialState, snapshot: SensorSnapshot, source: string): void;
+		renderAll(status: PollerStatus): void;
+		adoptReading(action: DialHandle, state: DialState, key: string): Promise<void>;
+		onDidReceiveSettings(event: SettingsEvent): void;
+	};
+	function fixture() {
+		const second = { ...reading, key: "f0001234:0:1000002", id: 2, value: 70 };
+		const complete = (current: Reading, pollTime = 3): SensorSnapshot => ({ ...snapshot(current, pollTime), readings: [current, second], byKey: new Map([[current.key, current], [second.key, second]]) });
+		const state: DialState = { settings: { readingKey: reading.key, decimals: "1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const action = Object.create(SensorDialAction.prototype) as Selection;
+		action.instances = new Map([["ctx", state]]);
+		action.hidden = new Map();
+		action.pushTriggerDescriptions = () => {};
+		// A accumulates 45/65 C, then becomes an untracked stray while B is
+		// selected. The production sampler deliberately preserves its history.
+		action.sampleStats(state, complete({ ...reading, value: 45 }, 1), "shared-memory");
+		action.sampleStats(state, complete({ ...reading, value: 65 }, 2), "shared-memory");
+		state.settings = { ...state.settings, readingKey: second.key };
+		action.sampleStats(state, complete({ ...reading, value: 65 }, 2), "shared-memory");
+		let latest: PollerStatus = { state: "ok", source: "shared-memory", snapshot: complete({ ...reading, value: 65 }, 2) };
+		let visible = true;
+		let write: () => Promise<void> = () => Promise.resolve();
+		let writes = 0;
+		const frames: { svg: string; stats: ReturnType<SessionStatsStore["get"]>; overlay: string | undefined }[] = [];
+		const handle = {
+			id: "ctx", isDial: () => true,
+			setSettings: () => { writes++; return write(); },
+			setFeedback: (payload: { canvas: string }) => {
+				const stats = state.stats.get(reading.key);
+				frames.push({ svg: decodeURIComponent(payload.canvas.slice("data:image/svg+xml,".length)), stats: stats === undefined ? undefined : { ...stats }, overlay: state.overlay?.text });
+				return Promise.resolve();
+			}
+		} as unknown as DialHandle;
+		Object.defineProperty(action, "actions", { get: () => visible ? [handle] : [] });
+		const getStatus = mock.method(poller, "getStatus", () => latest);
+		return {
+			action, state, handle, frames, complete,
+			status: () => latest,
+			setStatus: (status: PollerStatus) => { latest = status; },
+			setWrite: (next: () => Promise<void>) => { write = next; },
+			writes: () => writes,
+			disappear: () => { visible = false; action.instances.delete("ctx"); },
+			settings: (dialView = "single", fahrenheit = false) => action.onDidReceiveSettings({ action: handle, payload: { settings: { readingKey: reading.key, dialView, fahrenheit, decimals: "1" } } } as SettingsEvent),
+			close: () => { if (state.overlayTimer) clearTimeout(state.overlayTimer); getStatus.mock.restore(); }
+		};
+	}
+
+	for (const route of ["settings", "adopt"] as const) {
+		for (const dialView of ["single", "overview", "tworow"]) {
+			for (const domain of ["same", "unit", "source"] as const) {
+				it(`${route} ${dialView} validates ${domain} domain before its first SDK frame`, async () => {
+					const f = fixture();
+					try {
+						const current = { ...reading, value: domain === "unit" ? 113 : domain === "source" ? 80 : 65, unit: domain === "unit" ? "°F" : "°C" };
+						f.setStatus({ state: "ok", source: domain === "source" ? "gadget" : "shared-memory", snapshot: f.complete(current, domain === "same" ? 2 : 3) });
+						if (route === "settings") f.settings(dialView);
+						else {
+							f.state.settings = { ...f.state.settings, dialView };
+							await f.action.adoptReading(f.handle, f.state, reading.key);
+						}
+						const first = f.frames[0];
+						assert.ok(first, "production renderAll must emit the first SDK frame");
+						assert.deepEqual(first.stats, domain === "same" ? { min: 45, max: 65, sum: 110, count: 2 } : { min: current.value, max: current.value, sum: current.value, count: 1 });
+						assert.equal(first.overlay, domain === "same" ? undefined : `stats reset: ${domain === "unit" ? "units" : "source"} changed`);
+						assert.match(first.svg, new RegExp(`>${current.value}(?:\\.0)?(?: °[CF])?<`));
+						if (domain !== "same") assert.doesNotMatch(first.svg, /[▼▲]\s*45(?:\.0)?/);
+						f.action.renderAll(f.status());
+						assert.deepEqual(f.state.stats.get(reading.key), first.stats, "a repaint cannot count the same observation again");
+						assert.equal(f.writes(), route === "settings" ? 0 : 1);
+					} finally { f.close(); }
+				});
+			}
+		}
+	}
+
+	it("display-only conversion preserves the physical session during reselection", () => {
+		const f = fixture();
+		try {
+			f.settings("single", true);
+			assert.deepEqual(f.frames[0]?.stats, { min: 45, max: 65, sum: 110, count: 2 });
+			assert.match(f.frames[0]?.svg ?? "", /▼ 113\.0/);
+			assert.equal(f.frames[0]?.overlay, undefined);
+		} finally { f.close(); }
+	});
+
+	it("direct repaint clears stale history and validates newly displayed native units", () => {
+		const f = fixture();
+		try {
+			f.state.settings = { ...f.state.settings, readingKey: reading.key };
+			f.state.statMode = "min";
+			f.setStatus({ state: "ok", source: "shared-memory", snapshot: f.complete({ ...reading, value: 113, unit: "°F" }) });
+			f.action.renderAll(f.status());
+			assert.equal(f.frames[0]?.stats?.min, 113);
+			assert.match(f.frames[0]?.svg ?? "", />113\.0</);
+			f.setStatus({ state: "stale", source: "shared-memory", snapshot: f.complete(reading), staleForMs: 20_000 });
+			f.action.renderAll(f.status());
+			assert.equal(f.state.stats.size, 0);
+		} finally { f.close(); }
+	});
+
+	it("selection completion uses the latest source instead of an older snapshot captured before the host write", async () => {
+		const f = fixture();
+		try {
+			let finish: (() => void) | undefined;
+			f.setWrite(() => new Promise<void>((resolve) => { finish = resolve; }));
+			const pending = f.action.adoptReading(f.handle, f.state, reading.key);
+			assert.ok(finish);
+			const current = { ...reading, value: 113, unit: "°F" };
+			f.setStatus({ state: "ok", source: "shared-memory", snapshot: f.complete(current) });
+			finish();
+			await pending;
+			assert.equal(f.frames[0]?.stats?.min, 113);
+			assert.match(f.frames[0]?.svg ?? "", />113\.0</);
+		} finally { f.close(); }
+	});
+
+	it("a pending selection does not render an action that disappeared", async () => {
+		const f = fixture();
+		try {
+			let finish: (() => void) | undefined;
+			f.setWrite(() => new Promise<void>((resolve) => { finish = resolve; }));
+			const pending = f.action.adoptReading(f.handle, f.state, reading.key);
+			assert.ok(finish);
+			f.disappear();
+			finish();
+			await pending;
+			assert.equal(f.frames.length, 0);
+		} finally { f.close(); }
+	});
+});
+
 describe("refutation: historical and local statistics", () => {
 	it("explicitly unavailable history cannot be restored by placeholder numeric fields", () => {
 		const gadget = { ...reading, statistics: "unavailable" as const };

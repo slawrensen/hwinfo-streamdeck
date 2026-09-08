@@ -506,11 +506,11 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				this.showOverlay(state, groupDisplayName(groups, landed));
 			}
 		}
-		await this.adoptReading(action, state, next.key, status);
+		await this.adoptReading(action, state, next.key);
 	}
 
 	/** Moves the selection and persists it; per-reading stats stay intact. */
-	private async adoptReading(action: DialAction<DialSettings>, state: InstanceState, nextKey: string, status: PollerStatus): Promise<void> {
+	private async adoptReading(action: DialAction<DialSettings>, state: InstanceState, nextKey: string): Promise<void> {
 		const before = readingKeyOf(state.settings);
 		// The custom label described the reading it was written for; in the
 		// default "auto" label mode, moving to a different reading drops it
@@ -522,7 +522,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		state.nextCycleAt = null; // any move defers the next automatic step by a full interval
 		trace({ event: "selection", context: action.id, selectionBefore: before === undefined ? undefined : hashId(before), selectionAfter: hashId(nextKey) });
 		await action.setSettings(state.settings);
-		this.renderAll(status);
+		// A source/unit transition can land while the host write is pending.
+		// Never redraw the older observation captured when selection began.
+		this.renderAll(poller.getStatus());
 	}
 
 	private onPollerTick(status: PollerStatus): void {
@@ -662,7 +664,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				}
 				// adoptReading leaves nextCycleAt null; the next tick re-arms
 				// a full interval out.
-				void this.adoptReading(act, state, target.key, status);
+				void this.adoptReading(act, state, target.key);
 			}
 		}
 	}
@@ -855,6 +857,12 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			if (state === undefined) {
 				continue;
 			}
+			// Settings, gestures, theme changes and overlay expiry can render
+			// before the next tick. Revalidate every displayed session here so
+			// a retained untracked reading never borrows its old unit/source.
+			// observe() deduplicates unchanged evidence, including tick renders.
+			if (status.state === "ok") this.sampleStats(state, status.snapshot, status.source);
+			else state.stats.reset();
 			const svg = composeDialSvg(state, status);
 			if (svg !== state.lastFeedback) {
 				state.lastFeedback = svg;

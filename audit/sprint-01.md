@@ -130,3 +130,60 @@ These are deterministic action/module tests on Windows, not physical Stream
 Deck captures. The integration owner must run the final combined full suite.
 Rollback is the small appearance synchronization block; keep the regressions
 and evidence, and do not rewrite user settings.
+
+## Follow-up: selecting a retained dial session
+
+Integration base: `c5f404448359e7024d801537ec62caeb6272e6c6`.
+Branch: `fix/audit-dial-selection-20260907`.
+
+The first-frame appearance fix does not cover every immediate render. In
+single view without a rotation set, A can accumulate 45/65 C and then become
+untracked when B is selected. The relevance-bounded store deliberately keeps
+A's session. If the producer changes A to 113 F while B remains selected,
+reselecting A through settings or dial controls used to draw its old minimum
+and maximum using the new unit until the next ordinary poller callback.
+
+All immediate render entry points were inspected:
+
+| Entry point | Required invariant |
+| --- | --- |
+| `onWillAppear` | Preserve the existing cold-retain and replay validation before the first frame. |
+| `onDidReceiveSettings` | Validate newly selected readings and newly visible rows before drawing. |
+| `adoptReading`, shared by rotation, taps, carousel and control selection | After the awaited settings write, use the latest poller observation and validate the current visible state. |
+| State-only gestures and controls | Repainting MIN/MAX/AVG or a reset cannot bypass domain validation. |
+| Theme callback and overlay expiry | A redraw must not revive an old session under the current reading unit. |
+| Ordinary poller tick | Preserve sampling for the configured set, hidden dials and unchanged-observation deduplication. |
+
+Production-module regressions exercise settings, selection and the
+real `renderAll` method, replacing only the SDK frame sink and poller status.
+The matrix covers all three dial views, same/native-unit/source domains,
+repeated renders, display-only conversion, stale status, source changes while
+a host settings write is pending, and disappearance before that write returns.
+Frames capture statistics as scalar copies at submission, so a later update
+cannot retroactively make the first frame look correct.
+
+`renderAll` now runs the existing domain-aware sampler before each composition
+and clears history for a non-ok source. Unchanged observation deduplication
+prevents replays from adding samples; configured and hidden-set sampling on
+ordinary ticks remains intact. The appearance correction is preserved.
+`adoptReading` obtains the latest poller status after its awaited settings write,
+so an older captured observation cannot be drawn after an intervening source
+transition. No saved setting, native contract or acquisition loop changes.
+
+After the central test slot was granted:
+
+| Command | Result |
+| --- | --- |
+| `npm ci --ignore-scripts` | 156 packages installed, zero advisories; no install scripts executed. |
+| `node --import tsx --test --test-name-pattern="dial selection validates" test/measurement-integrity.test.ts` before the runtime fix | 8 pass, 14 fail, zero skips; `sprint-01-selection-red.log`. |
+| `node --import tsx --test test/measurement-integrity.test.ts test/stats.test.ts` after the fix | 70 pass, zero failures/skips; `sprint-01-selection-green.log`. Includes all 22 selection cases and existing appearance regressions. |
+| `npm run lint` | Exit 0, zero warnings; `sprint-01-selection-lint.log`. |
+| `npm run typecheck` | Exit 0; `sprint-01-selection-typecheck.log`. |
+
+Logs remain under this worktree's ignored `release/audit-evidence/`. These are
+production action/module tests with mocked SDK output, not device captures.
+No native, e2e, registry fixture or installed-plugin operation ran here. The
+integration owner must rerun required combined-head checks and resource gates;
+this change does not claim new performance measurements. Rollback reverts the
+render validation and latest-status selection changes while retaining the
+appearance fix, saved settings, regression fixtures and evidence.

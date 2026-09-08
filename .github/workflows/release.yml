@@ -27,18 +27,31 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write # required for the GITHUB_TOKEN to create the release
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: windows-2025
+    outputs:
+      ver: ${{ steps.verify.outputs.ver }}
+      sha: ${{ steps.hash.outputs.sha }}
+      size: ${{ steps.hash.outputs.size }}
+      nativesha: ${{ steps.hash.outputs.nativesha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
+
+      - name: Verify exact release versions before running dependency code
+        id: verify
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/verify-release-tag.mjs
 
       - run: npm ci
       - name: Print toolchain versions
@@ -89,20 +102,6 @@ jobs:
       - name: Pack plugin
         run: npm run pack
 
-      - name: Verify packed version matches the tag
-        id: verify
-        shell: pwsh
-        run: |
-          $manifest = Get-Content com.lawrensen.hwinfo.sdPlugin/manifest.json -Raw | ConvertFrom-Json
-          $tag = "${{ github.ref_name }}".TrimStart('v')            # v1.1.8 -> 1.1.8
-          $ver = $manifest.Version                                  # 1.1.8.0
-          if (-not $ver.StartsWith("$tag.") -and $ver -ne $tag) {
-            Write-Error "manifest Version $ver does not match tag $tag; bump manifest.json before tagging"
-            exit 1
-          }
-          "ver=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Output "manifest $ver matches tag $tag"
-
       - name: Compute SHA-256
         id: hash
         shell: pwsh
@@ -116,12 +115,31 @@ jobs:
           "nativesha=$($native.sha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Output "pack SHA-256 $sha ($size bytes); hwsm.node SHA-256 $($native.sha256)"
 
-      # Pinned to a commit SHA: this is the only third-party action in the
-      # repo and it runs inside the contents:write job that publishes the
-      # binary, so a moving tag here would hand that job to whatever the tag
-      # points at tomorrow. Pins freeze the version their major pointed at
-      # when written; Dependabot proposes newer versions (including new
-      # majors) by PR, where the bump is a reviewed diff.
+      - name: Transfer only the validated release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-candidate
+          path: |
+            release/com.lawrensen.hwinfo.streamDeckPlugin
+            release-native-manifest.json
+            native/hwsm/build/Release/hwsm.pdb
+          if-no-files-found: error
+          retention-days: 7
+
+  # Dependency installs, repository scripts and native builds never receive
+  # the release token. This job downloads data and invokes pinned actions.
+  stage:
+    needs: build
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    steps:
+      - name: Download the validated release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-candidate
+          path: candidate
+
       - name: Stage the GitHub Release as a draft
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
@@ -130,19 +148,19 @@ jobs:
           # with `gh release edit <tag> --draft=false`. /releases/latest
           # keeps pointing at the previous release until then.
           draft: true
-          name: HWiNFO Sensors ${{ steps.verify.outputs.ver }}
+          name: HWiNFO Sensors ${{ needs.build.outputs.ver }}
           files: |
-            release/com.lawrensen.hwinfo.streamDeckPlugin
-            release-native-manifest.json
-            native/hwsm/build/Release/hwsm.pdb
+            candidate/release/com.lawrensen.hwinfo.streamDeckPlugin
+            candidate/release-native-manifest.json
+            candidate/native/hwsm/build/Release/hwsm.pdb
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            Built and published automatically from `${{ github.ref_name }}`.
+            Built automatically for version `${{ needs.build.outputs.ver }}` and staged for maintainer verification.
 
-            **Pack SHA-256:** `${{ steps.hash.outputs.sha }}` (${{ steps.hash.outputs.size }} bytes)
-            **Native hwsm.node SHA-256:** `${{ steps.hash.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
+            **Pack SHA-256:** `${{ needs.build.outputs.sha }}` (${{ needs.build.outputs.size }} bytes)
+            **Native hwsm.node SHA-256:** `${{ needs.build.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
 
-            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.ref_name }}/SECURITY.md).
+            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.sha }}/SECURITY.md).
 
             Install: download the `.streamDeckPlugin` below and double-click it, or install from the Elgato Marketplace once approved. See the [documentation](https://docs.slawrensen.com/hwinfo-streamdeck/) for setup and troubleshooting.

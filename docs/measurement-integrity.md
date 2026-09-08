@@ -5,9 +5,11 @@ nav_exclude: true
 
 # Measurement integrity, September 7, 2026
 
-This documents an unreleased 1.6.1 development candidate. It is not a
-release approval. The [six-month roadmap](../ROADMAP.md) advances from these
-outcomes and the remaining bench evidence.
+This is the historical handoff for the unreleased candidate at
+`7320a83436fa153ca37405378ea25367b9cd811e`. Its test and package evidence
+does not qualify later changes. The current audit remediation reports live
+under `audit/`; the [six-month roadmap](../ROADMAP.md) tracks the remaining
+work. Neither document is release approval.
 
 ## Starting point and scope
 

@@ -25,6 +25,14 @@ Elgato Marketplace listing is a separate track.
   session statistics count observed changes and producer stamps once;
   missing readings, stale/unavailable data, unit/provider/link changes and
   explicit resets start a new session. Averages are sample-weighted.
+- Shared Memory's cached reader checks the owning sensor ID and instance
+  before updating a value, including descriptor-only topology changes.
+- Gadget rereads each row before accepting a scan and withholds changing
+  fields or contradictory formatted/raw values. This catches detectable
+  partial writes; the registry still cannot prove an atomic producer update.
+  Reopening the registry and metadata changes do not establish freshness.
+- Source statistic capabilities are explicit. Dial sessions show a brief
+  reset reason when their binding, native unit, type or source changes.
 
 ## 1.6.0.0 - 2026-09-04
 

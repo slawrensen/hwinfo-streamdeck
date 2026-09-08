@@ -130,7 +130,7 @@ try {
 	fake.stdin.write("grow\n");
 	await sleep(300);
 	await expectFrame(frames, "layout grows → live values continue (reopened in place)", (svg) => svg.includes("Test Temp"), 10000);
-	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("HWiNFO error") || svg.includes("No new data") || svg.includes("Start HWiNFO"));
+	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("Source error") || svg.includes("No new data") || svg.includes("Start HWiNFO"));
 	check("no status frame during the growth transition", flashed.length === 0, flashed.length > 0 ? `${flashed.length} status frame(s) reached the deck` : "");
 
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.

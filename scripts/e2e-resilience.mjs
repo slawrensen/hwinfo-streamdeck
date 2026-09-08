@@ -114,7 +114,7 @@ try {
 	const beforeFlip = frames.length;
 	fake.stdin.write("fahrenheit\n");
 	await expectFrame("units flipped in place → face shows °F", (svg) => svg.includes("°F"), 8000);
-	const flipFlash = frames.slice(beforeFlip).filter((svg) => svg.includes("HWiNFO error") || svg.includes("Start HWiNFO") || svg.includes("Not updating") || svg.includes("HWiNFO busy"));
+	const flipFlash = frames.slice(beforeFlip).filter((svg) => svg.includes("Source error") || svg.includes("Start HWiNFO") || svg.includes("Not updating") || svg.includes("Source busy"));
 	check("no status frame during the unit flip", flipFlash.length === 0, `${flipFlash.length} status frames`);
 	fake.stdin.write("celsius\n");
 	await expectFrame("units restored → face shows °C again", (svg) => svg.includes("°C"), 8000);

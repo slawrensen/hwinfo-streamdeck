@@ -10,7 +10,7 @@
 //
 // Phase B (busy-at-open): with the SAME populated gadget key, a LIVE mapping
 // whose consistency mutex is held at the instant the plugin opens must show
-// "HWiNFO busy" and retry shared memory, never silently fall back to gadget
+// "Source busy" and retry shared memory, never silently fall back to gadget
 // (whose key namespace differs, so a shared-memory key would read "Sensor
 // missing" until the upgrade probe swung back).
 //
@@ -180,14 +180,14 @@ try {
 	// fresh plugin opens. The gadget key is still populated, so a fallback
 	// would "succeed" and this key's shared-memory identity would read
 	// "Sensor missing" until the upgrade probe swung back. The poller must
-	// surface "HWiNFO busy" and retry shared memory instead.
+	// surface "Source busy" and retry shared memory instead.
 	phase = "busy";
 	await fakeCmd("alive", "MODE alive");
 	await fakeCmd("hold", "HELD");
 	const busyStart = frames.length;
 	const plugin2 = spawnPlugin("e2e-busy-open");
 	try {
-		await expectFrame("mutex held at open → 'HWiNFO busy' screen", (svg) => svg.includes("HWiNFO busy"), 9000);
+		await expectFrame("mutex held at open → 'Source busy' screen", (svg) => svg.includes("Source busy"), 9000);
 		fake.stdin.write("release\n");
 		await expectFrame("mutex released → live shared-memory value", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 9000);
 		const missing = frames.slice(busyStart).filter((svg) => svg.includes("Sensor missing"));

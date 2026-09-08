@@ -207,16 +207,16 @@ If HWiNFO isn't providing data, the key shows a calm true-black status screen wi
 | Key shows | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
-| **HWiNFO busy / retrying** | The shared-memory consistency mutex was busy when the plugin connected. This alone does not establish the producer process state. The plugin retries automatically on the next poll. |
+| **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
 | **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
 | **Tick sensors / in Gadget** | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
-| **Access denied / check access** | Windows denied access to the shared-memory object; the error does not identify which access rule failed. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| **Access denied / open settings** | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
 | **Bridge failed / reinstall** | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 | **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
-| **HWiNFO error / restart HWiNFO** | Rare. The shared memory did not validate. It usually clears on the next poll; if it persists, restart HWiNFO. |
+| **Source error / open settings** | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
 
 The settings panel shows the matching plain-language explanation and fix while the key is in one of these states. Full details are on [Status screens](status-screens.md).
 

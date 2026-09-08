@@ -23,22 +23,22 @@ export function statusScreen(status: PollerStatus): StatusKeyOptions | null {
 		case "not-running":
 			return { icon: "power", accent: BLUE, lines: ["Start HWiNFO", "not detected"] };
 		case "busy":
-			// The source mutex was held when the plugin connected. Retrying
-			// needs no inference about whether the producer process is running.
-			return { icon: "clock", accent: AMBER, lines: ["HWiNFO busy", "retrying"] };
+			// Both shared-memory contention and a changing Gadget scan can
+			// reach this reason; neither proves the producer's process state.
+			return { icon: "clock", accent: AMBER, lines: ["Source busy", "retrying"] };
 		case "gadget-empty":
 			return { icon: "target", accent: AMBER, lines: ["Tick sensors", "in Gadget"] };
 		case "disabled":
 			return { icon: "warning", accent: AMBER, lines: ["Shared Memory", "is off"] };
 		case "access-denied":
-			return { icon: "lock", accent: RED, lines: ["Access denied", "check access"] };
+			return { icon: "lock", accent: RED, lines: ["Access denied", "open settings"] };
 		case "unsupported-platform":
 			return { icon: "warning", accent: RED, lines: ["Needs x64", "Windows"] };
 		case "bridge-failed":
 			// A bridge load failure does not identify damage or a security block.
 			return { icon: "warning", accent: RED, lines: ["Bridge failed", "reinstall"] };
 		default:
-			return { icon: "warning", accent: RED, lines: ["HWiNFO error", "restart HWiNFO"] };
+			return { icon: "warning", accent: RED, lines: ["Source error", "open settings"] };
 	}
 }
 
@@ -65,19 +65,19 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 		case "not-running":
 			return { title: "Start HWiNFO", value: "not detected" };
 		case "busy":
-			return { title: "HWiNFO busy", value: "retrying" };
+			return { title: "Source busy", value: "retrying" };
 		case "gadget-empty":
 			return { title: "Gadget empty", value: "tick sensors" };
 		case "disabled":
 			return { title: "Shared Memory off", value: "enable in HWiNFO" };
 		case "access-denied":
-			return { title: "Access denied", value: "check access" };
+			return { title: "Access denied", value: "open settings" };
 		case "unsupported-platform":
 			return { title: "Needs x64 Windows", value: "—" };
 		case "bridge-failed":
 			return { title: "Bridge failed", value: "reinstall it" };
 		default:
-			return { title: "HWiNFO error", value: "restart HWiNFO" };
+			return { title: "Source error", value: "open settings" };
 	}
 }
 
@@ -95,19 +95,19 @@ export function statusSentence(status: PollerStatus): string {
 		case "not-running":
 			return "The plugin could not open a sensor feed. Check that HWiNFO is running in Sensors-only mode with Shared Memory Support enabled, or enable Gadget reporting and tick the sensors you need.";
 		case "busy":
-			return "The shared-memory consistency mutex was busy when the plugin connected. The plugin retries on the next poll. This observation alone does not establish the producer's process state.";
+			return "The sensor source was busy or changed during a read. The plugin retries automatically. If this persists, open settings and choose \"Copy support report\" for support.";
 		case "gadget-empty":
 			return "The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab. Check Enable reporting to Gadget and tick \"Report value in Gadget\" for the readings you need.";
 		case "disabled":
 			return "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.";
 		case "access-denied":
-			return "Windows denied access to the shared-memory object. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. This error alone does not identify which access rule failed.";
+			return "Windows denied access needed to read the sensor source. Open settings and choose \"Copy support report\" for support. This error alone does not identify which access rule failed.";
 		case "unsupported-platform":
 			return "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).";
 		case "bridge-failed":
 			return "The native HWiNFO bridge (bin/hwsm.node) could not load. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A load failure alone does not identify the cause.";
 		default:
-			return "HWiNFO's shared memory did not validate; it may be mid-restart or an incompatible version. Usually clears on the next poll; if it persists, restart HWiNFO.";
+			return "The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose \"Copy support report\" for support.";
 	}
 }
 

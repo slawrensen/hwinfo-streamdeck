@@ -146,12 +146,12 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | Touchscreen | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO** / not detected | HWiNFO isn't publishing on either interface. Start it (Shared Memory Support or Gadget reporting). |
-| **HWiNFO busy** / retrying | The shared-memory consistency mutex was busy when the plugin connected. This alone does not establish the producer process state. The plugin retries automatically on the next poll. |
+| **Source busy** / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory off** / enable in HWiNFO | HWiNFO reports sharing disabled. Re-enable it, or rely on the Gadget fallback in Auto mode. |
 | **No new data** / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
 | **Gadget empty** / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
-| **Access denied** / check access | Windows denied access to the shared-memory object; the error does not identify which access rule failed. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| **HWiNFO error** / restart HWiNFO | Shared memory didn't validate (mid-restart or an incompatible version). |
+| **Access denied** / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| **Source error** / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.

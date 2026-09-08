@@ -200,7 +200,7 @@ Yes. Dials have the same requirements as keys: free HWiNFO with Shared Memory or
 
 ### A key says "Access denied": what's wrong?
 
-HWiNFO and Stream Deck are running at **different privilege levels**. Windows blocks reading the shared memory across that boundary. Fix it by running **both elevated or both normal**; most people just restart HWiNFO *without* "Run as administrator." (On the free version, Gadget reporting also works across privilege levels.) See [Troubleshooting](troubleshooting.md) for the full status-screen list.
+Windows denied access needed to read the sensor source. The error can come from Shared Memory or the Gadget registry and does not identify which access rule failed. Open the key or dial settings and choose **Copy support report** for support. See [Troubleshooting](troubleshooting.md#keys-show-access-denied) for account, session and privilege checks.
 
 ### What do the two-line screens on my keys mean?
 
@@ -209,10 +209,10 @@ They're status screens telling you exactly what to fix. As of 1.1.6 they're pure
 | Key shows | Meaning / fix |
 | --- | --- |
 | `Start HWiNFO / not detected` | HWiNFO isn't publishing on either interface. Start it with Shared Memory or Gadget reporting on. |
-| `HWiNFO busy / retrying` | The shared-memory consistency mutex was busy when the plugin connected. This alone does not establish the producer process state. The plugin retries automatically on the next poll. |
+| `Source busy / retrying` | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
 | `Not updating / check sharing` | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| `Access denied / check access` | Windows denied access to the shared-memory object; the error does not identify which access rule failed. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| `Access denied / open settings` | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
 | `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |

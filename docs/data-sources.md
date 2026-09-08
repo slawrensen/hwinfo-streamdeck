@@ -118,7 +118,10 @@ the plugin cannot tell. Shared Memory supplies a producer poll timestamp.
 
 Each occupied Gadget row is read twice. If a field changes between those
 observations, the whole scan is withheld and retried on the next poll.
-This catches observable interleaving; it cannot prove an atomic snapshot
+Recognized numeric display precision must also agree with the raw number;
+rounding and locale grouping are allowed without selecting a guessed locale.
+Boolean/nonnumeric displays retain their existing behavior. These checks
+catch observable contradictions; they cannot prove an atomic snapshot
 when a writer pauses in an intermediate state. Shared Memory provides the
 consistency mutex that Gadget lacks.
 

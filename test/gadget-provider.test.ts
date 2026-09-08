@@ -317,6 +317,7 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 
 			putValue("ValueRaw6", "77.25");
 			putValue("Value6", "77.25 °C");
+			putValue("Value6", "77.25 °C");
 			const after = readVerified(provider);
 			assert.equal(after.byKey.get("g:Alpha Source:Label 6")?.value, 77.25);
 			assert.ok((after.valueRevision ?? 0) > (before.valueRevision ?? 0), "the digest now covers entries past a hole");
@@ -405,9 +406,9 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 	});
 
 	test("unique names with spaces survive sparse reorder and restart; rename leaves the old key missing", () => {
-		shape([0, 8], (i) => ({ sensor: "Stable Source", label: i === 0 ? "CPU Temp" : "GPU Temp", raw: i === 0 ? "40" : "80", value: "40 °C" }));
+		shape([0, 8], (i) => ({ sensor: "Stable Source", label: i === 0 ? "CPU Temp" : "GPU Temp", raw: i === 0 ? "40" : "80", value: `${i === 0 ? 40 : 80} °C` }));
 		assert.equal(readShape().byKey.get("g:Stable Source:CPU Temp")?.value, 40);
-		shape([4, 9], (i) => ({ sensor: "Stable Source", label: i === 9 ? "CPU Temp" : "GPU Temp", raw: i === 9 ? "40" : "80", value: "40 °C" }));
+		shape([4, 9], (i) => ({ sensor: "Stable Source", label: i === 9 ? "CPU Temp" : "GPU Temp", raw: i === 9 ? "40" : "80", value: `${i === 9 ? 40 : 80} °C` }));
 		assert.equal(readShape().byKey.get("g:Stable Source:CPU Temp")?.value, 40);
 		putValue("Label9", "CPU Package");
 		const renamed = readShape();
@@ -417,6 +418,26 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 });
 
 describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("formatted locales retain native raw precision and the correct unit", () => {
+		const cases = [["2,295.0 MHz", "2295.04", "MHz", 2295.04], ["2.295,0 MHz", "2295,04", "MHz", 2295.04], ["2'295.0 MHz", "2295.04", "MHz", 2295.04], ["2\u202f295,0 MHz", "2295,04", "MHz", 2295.04], ["−1,2 A", "-1,249", "A", -1.249], ["1.23e4 Hz", "12345", "Hz", 12345], ["Yes", "1", "Yes", 1]] as const;
+		shape(cases.map((_, i) => i), (i) => ({ sensor: "Locale fixture", label: `Case ${i}`, value: cases[i]![0], raw: cases[i]![1] }));
+		const snapshot = readShape();
+		for (const [i, entry] of cases.entries()) {
+			assert.equal(snapshot.readings[i]?.value, entry[3]);
+			assert.equal(snapshot.readings[i]?.unit, entry[2]);
+		}
+	});
+	test("a paused formatted-unit rewrite cannot publish the previous raw number", () => {
+		shape([0], () => ({ sensor: "Unit fixture", label: "Temperature", value: "80 °C", raw: "80" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			putValue("Value0", "176 °F");
+			assert.equal(provider.read(), null, "stable repeated fields still contradict each other");
+			putValue("ValueRaw0", "176");
+			assert.equal(readVerified(provider).readings[0]?.value, 176);
+			assert.equal(readVerified(provider).readings[0]?.unit, "°F");
+		} finally { provider.close(); }
+	});
 	test("a detected field interleave discards the whole scan before publishing evidence", () => {
 		for (const field of ["Sensor0", "Label0", "Value0", "ValueRaw0"]) {
 			shape([0]);
@@ -477,6 +498,7 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 			assert.equal(renamed.pollTime, 0, "topology is not value evidence");
 			assert.ok((renamed.valueRevision ?? 0) > (first.valueRevision ?? 0), "render revision includes topology");
 			putValue("ValueRaw0", "55");
+			putValue("Value0", "55 °C");
 			const changed = readVerified(provider);
 			assert.ok(changed.pollTime > 0);
 			assert.equal(readVerified(provider).pollTime, changed.pollTime);
@@ -498,7 +520,7 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 	});
 
 	test("duplicate values cannot manufacture producer evidence on an unchanged scan", () => {
-		shape([0, 8], (i) => ({ sensor: "Frozen duplicate", label: "Temp", raw: i ? "80" : "40", value: "40 °C" }));
+		shape([0, 8], (i) => ({ sensor: "Frozen duplicate", label: "Temp", raw: i ? "80" : "40", value: `${i ? 80 : 40} °C` }));
 		const provider = GadgetRegistryProvider.open();
 		try {
 			for (let i = 0; i < 4; i++) assert.equal(readVerified(provider).freshnessRevision, 0);

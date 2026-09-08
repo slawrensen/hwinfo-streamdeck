@@ -88,7 +88,11 @@ try {
 	for (let i = 0; i < 4; i++) for (const [field, value] of Object.entries({ Sensor: "Test Source", Label: `Core ${i} VID`, Value: `${gadgetValues[i]} V`, ValueRaw: gadgetValues[i] })) regSet(regPath, `${field}${i}`, value);
 	regSet(regPath, "Sensor9", "Witness"); regSet(regPath, "Label9", "Changing value"); regSet(regPath, "Value9", "10 W"); regSet(regPath, "ValueRaw9", "10");
 	let witness = 10;
-	updater = setInterval(() => regSet(regPath, "ValueRaw9", String(++witness)), 450);
+	updater = setInterval(() => {
+		witness++;
+		regSet(regPath, "Value9", `${witness} W`);
+		regSet(regPath, "ValueRaw9", String(witness));
+	}, 450);
 	producer = spawn(process.execPath, [path.join(root, "scripts/fake-hwinfo.mjs")], { cwd: root, env, stdio: ["pipe", "pipe", "inherit"] });
 	producer.stdout.on("data", (chunk) => { producerText += chunk.toString(); });
 	await waitUntil(() => producerText.includes("READY"), 6000);

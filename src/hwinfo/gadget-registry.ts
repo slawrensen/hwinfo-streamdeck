@@ -18,6 +18,7 @@
  * changes leave age unverified. Steady values cannot prove a producer exit.
  */
 import { GadgetIdentityGuard, gadgetReadingKey } from "./gadget-identity";
+import { gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
@@ -63,12 +64,6 @@ function inferType(unit: string): SensorType {
 		default:
 			return SensorType.Other;
 	}
-}
-
-/** "45.5 °C" → "°C"; "1 200 RPM" → "RPM"; "Yes" → "". */
-function unitOf(formatted: string): string {
-	const match = /^\s*-?[\d.,\s]*(.*)$/.exec(formatted);
-	return (match?.[1] ?? "").trim();
 }
 
 /** Native registry failure → status-screen reason. */
@@ -192,9 +187,10 @@ export class GadgetRegistryProvider {
 				sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
 			}
 
-			const unit = unitOf(formatted);
+			const unit = gadgetUnitOf(formatted);
 			// HWiNFO writes ValueRaw with the system locale's decimal separator.
 			const value = Number.parseFloat(raw.replace(",", "."));
+			if (!gadgetValueAgrees(formatted, value)) return null;
 
 			const key = gadgetReadingKey(sensorName, label);
 			const reading: Reading = {

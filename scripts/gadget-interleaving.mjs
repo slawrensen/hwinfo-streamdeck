@@ -55,14 +55,22 @@ try {
 	// A writer can pause between updating the formatted unit and raw value.
 	// Two identical observations cannot detect that stable intermediate row.
 	write({ Value0: "176 °F" });
-	const pausedIntermediate = provider.read()?.readings[0];
+	const pausedObservation = provider.read();
+	const pausedIntermediate = pausedObservation?.readings[0] ?? null;
+	if (process.argv.includes("--expect-consistent")) assert.equal(pausedObservation, null, "contradictory formatted and raw numbers must withhold the scan");
 	write({ ValueRaw0: "176" });
 	const completedUnitChange = provider.read()?.readings[0];
+	// Numerically consistent fields still cannot reveal a paused owner
+	// replacement. The new owner's numbers can appear under the old name.
+	write({ Value0: "50 °F", ValueRaw0: "50" });
+	const pausedOwnerReplacement = provider.read()?.readings[0];
+	write({ Sensor0: "Fixture GPU C" });
+	const completedOwnerReplacement = provider.read()?.readings[0];
 	process.stdout.write(`${JSON.stringify({
 		fixture: "U1-controlled-registry-interleaving-v1",
 		method: "real native queries; child reg.exe writer at a deterministic field boundary",
 		before, interleaved: interleaved ?? null, after, mixedObserved, scanWithheld: observation === null,
-		pausedIntermediate, completedUnitChange,
+		pausedIntermediate, completedUnitChange, pausedOwnerReplacement, completedOwnerReplacement,
 		limitation: "Proves an allowed registry interleaving, not that HWiNFO uses this write order or timing. The interface supplies no transaction or producer sequence."
 	}, null, "\t")}\n`);
 } finally {

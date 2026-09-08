@@ -31,6 +31,9 @@ changed during the incident investigation.
 | 18:30:45 | Local Windows crash dump for that HWiNFO PID written. It was not uploaded or committed. |
 | 18:39-18:42 | Process inventories found Stream Deck and its installed plugin alive, but no HWiNFO process. |
 | 18:42:09-18:42:19 | Six reads using the installed Node 20 runtime and installed native bridge succeeded. All 262,848-byte snapshots had the same timestamp and SHA-256; no read timed out on the mutex. |
+| 18:45:01 | HWiNFO restarted as PID 61084, observed later from process creation time. The agent did not launch it. |
+| 18:45:09-18:45:17 | The original installed plugin logged source layout changes and reopened Shared Memory in place. Its PID remained 26256. |
+| 18:51:37-18:51:47 | Six new reads had advancing producer timestamps every two seconds and distinct content hashes, confirming source recovery. |
 
 The driver currently reported by Windows is 32.0.16.1686 on the RTX 4090.
 The faulting library version in the event is the earlier 8.17.16.1664.
@@ -69,10 +72,12 @@ future NVIDIA crash has the same cause.
 
 ## Recovery and limits
 
-Finish the driver installation and any restart it requests, then start
-HWiNFO again. Verify advancing producer timestamps and the deck's recovery;
-the investigation did not restart either application or claim recovery
-without observing it. Close HWiNFO before subsequent GPU-driver updates.
+HWiNFO's restart restored advancing producer timestamps, and the original
+plugin reopened the source without an update or restart. These are process,
+log and source observations; the physical display was not inspected. The
+investigation did not restart either application. For this recovery path,
+finish the driver installation and any restart it requests before starting
+HWiNFO again. Close HWiNFO before subsequent GPU-driver updates.
 The [HWiNFO author's support response](https://www.hwinfo.com/forum/threads/hwinfo64-crashing-during-nvidia-driver-update-on-windows-11.9278/)
 recommends avoiding concurrent monitoring during driver updates. That thread
 also records a later workaround for its historical reproduction; it is not

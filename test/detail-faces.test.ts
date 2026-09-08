@@ -322,24 +322,25 @@ describe("dense tile goldens", () => {
 	// detail-profiles.test.ts: same fixed snapshot, default theme, default
 	// measure. A hash move means the composed bytes changed for everyone;
 	// change it ONLY alongside a deliberate face change.
+	// September 2026: unit/stat foregrounds raised to the numeric 4.5 floor.
 	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
 
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(svg), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(svg), "f7c36c1b683d02622bc841926d9cecd1db34f4ab3bbdd78d6399f7c8d8ba8429");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(svg), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		assert.equal(golden(svg), "8a63d325d99f7f8c001b9f344c543064e796202f1ef245635a42278042c80a85");
 	});
 
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(svg), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		assert.equal(golden(svg), "09acc55a718ab2abdac7917d72cbf2a05cd19c74892cac53afe7437c7e5a0b73");
 	});
 });
 

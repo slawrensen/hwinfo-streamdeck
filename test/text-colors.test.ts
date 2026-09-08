@@ -6,14 +6,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { appliedTextMode, CUSTOM_SECONDARY_BLEND, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, quadIdentityColor, resolveTextColors, themeTextColors, type TextSettings } from "../src/ui/text-colors";
+import { appliedTextMode, CUSTOM_SECONDARY_BLEND, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, quadIdentityColor, readableValueColor, resolveTextColors, themeTextColors, type TextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
+import { QUAD_DEFAULT_COLORS } from "../src/ui/key-renderer";
 import { contrast } from "./wcag";
 
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 
 const custom = (color: string | undefined, dimSecondary = false): TextSettings => ({ mode: "custom", color, dimSecondary });
+
+describe("built-in numeric text contrast", () => {
+	for (const [name, palette] of Object.entries(config.themes)) {
+		for (const mode of ["theme", "dim"] as const) {
+			it(`${name} ${mode}: primary and every quad identity value meet 4.5:1`, () => {
+				const settings: TextSettings = { mode, color: undefined, dimSecondary: false };
+				const text = resolveTextColors(palette, settings, "normal");
+				assert.ok(contrast(text.value, palette.bg) >= 4.5, `primary ${contrast(text.value, palette.bg)}`);
+				assert.ok(contrast(text.unit, palette.bg) >= 4.5, `numeric statistics/unit ${contrast(text.unit, palette.bg)}`);
+				for (const identity of QUAD_DEFAULT_COLORS) {
+					const color = quadIdentityColor(identity, false, settings, text, palette);
+					assert.ok(contrast(color, palette.bg) >= 4.5, `${identity} value ${contrast(color, palette.bg)}`);
+				}
+			});
+		}
+	}
+});
 
 describe("parseTextSettings salvage", () => {
 	it("only the exact mode markers parse; everything else follows", () => {
@@ -140,9 +158,21 @@ describe("quadIdentityColor", () => {
 		assert.equal(quadIdentityColor(identity, true, custom("#660000"), text, VOID), text.label);
 	});
 
-	it("dim mode blends the identity toward the background per role", () => {
+	it("dim mode blends identity per role, retaining the numeric contrast floor", () => {
 		const text = resolveTextColors(VOID, dim, "normal");
-		assert.equal(quadIdentityColor(identity, false, dim, text, VOID), mixToward(identity, VOID.bg, DIM_VALUE_BLEND));
-		assert.equal(quadIdentityColor(identity, true, dim, text, VOID), mixToward(identity, VOID.bg, DIM_SECONDARY_BLEND));
+		assert.equal(quadIdentityColor(identity, false, dim, text, VOID), readableValueColor(mixToward(identity, VOID.bg, DIM_VALUE_BLEND), VOID.bg));
+		assert.equal(quadIdentityColor(identity, true, dim, text, VOID), readableValueColor(mixToward(identity, VOID.bg, DIM_SECONDARY_BLEND), VOID.bg));
+	});
+});
+
+describe("readableValueColor", () => {
+	it("retains passing colors and adjusts failing colors against light, dark and middle surfaces", () => {
+		for (const background of ["#000000", "#FFFFFF", "#808080", "#14181F", "#CDC9BD"]) {
+			for (const color of ["#000000", "#FFFFFF", "#808080", "#4CC2FF", "#660000", "#00FF00"]) {
+				const resolved = readableValueColor(color, background);
+				assert.ok(contrast(resolved, background) >= 4.5, `${color} on ${background}: ${resolved}`);
+				if (contrast(color, background) >= 4.5) assert.equal(resolved, color);
+			}
+		}
 	});
 });

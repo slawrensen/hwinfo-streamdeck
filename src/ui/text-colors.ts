@@ -63,6 +63,45 @@ export function mixToward(color: string, toward: string, amount: number): string
 	return `#${channel(1)}${channel(3)}${channel(5)}`;
 }
 
+/** WCAG relative luminance for the validated sRGB theme/settings colors. */
+function luminance(color: string): number {
+	const linear = (offset: number): number => {
+		const channel = parseInt(color.slice(offset, offset + 2), 16) / 255;
+		return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * linear(1) + 0.7152 * linear(3) + 0.0722 * linear(5);
+}
+
+/** Built-in numeric foregrounds use a 4.5:1 floor on their actual surface.
+ * Already-readable colors remain byte-identical. Otherwise retain the hue
+ * while moving toward the higher-contrast endpoint. Custom Text deliberately
+ * bypasses this function: its contract is the exact user-selected color. */
+export function readableValueColor(color: string, background: string): string {
+	const bg = luminance(background);
+	const ratio = (candidate: string): number => {
+		const value = luminance(candidate);
+		return (Math.max(value, bg) + 0.05) / (Math.min(value, bg) + 0.05);
+	};
+	if (ratio(color) >= 4.5) return color;
+	const target = (bg + 0.05) / 0.05 >= 1.05 / (bg + 0.05) ? "#000000" : "#FFFFFF";
+	let low = 0;
+	let high = 1;
+	let result = target;
+	// Keep the passing, quantized candidate, not a rounded estimate of the
+	// threshold. A value just below 4.5 must never be rounded into a pass.
+	for (let i = 0; i < 12; i++) {
+		const middle = (low + high) / 2;
+		const candidate = mixToward(color, target, middle);
+		if (ratio(candidate) >= 4.5) {
+			high = middle;
+			result = candidate;
+		} else {
+			low = middle;
+		}
+	}
+	return result;
+}
+
 /**
  * Parses one scope of raw Text settings. Settings are untyped JSON at
  * runtime: only the exact mode markers count, and anything else (absent, "",
@@ -93,14 +132,15 @@ export function appliedTextMode(settings: TextSettings): TextMode {
 
 /** The theme's own text tokens, as a TextColors (the identity resolution). */
 export function themeTextColors(palette: Palette): TextColors {
-	return { value: palette.value, label: palette.label, unit: palette.unit, badge: palette.accent };
+	return { value: palette.value, label: palette.label, unit: readableValueColor(palette.unit, palette.bg), badge: palette.accent };
 }
 
 /**
  * A quad cell's identity color under the effective Text setting. The slot
  * colors are textual (the value glyphs, or the micro-label), so Custom
  * governs them too: the exact color for values, the secondary shade for
- * micro-labels. Dim lowers the identity hues themselves; Theme keeps them.
+ * micro-labels. Dim lowers identity hues; Theme retains them where they meet
+ * the contrast floor. Both modes adjust unreadable hues for the surface.
  * Shared by the standalone quad layout and the detail view's dense tiles.
  */
 export function quadIdentityColor(identity: string, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
@@ -109,14 +149,14 @@ export function quadIdentityColor(identity: string, labeled: boolean, settings: 
 		return labeled ? text.label : text.value;
 	}
 	if (mode === "dim") {
-		return mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND);
+		return readableValueColor(mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND), palette.bg);
 	}
-	return identity;
+	return readableValueColor(identity, palette.bg);
 }
 
 /**
  * Resolves the final textual fills. Alert faces always return the (alert)
- * palette's own tokens: warn/critical presentation outranks every text mode.
+ * palette's numeric tokens: warn/critical presentation outranks text modes.
  * The main value in Custom is the exact selected color, never adjusted.
  */
 export function resolveTextColors(palette: Palette, settings: TextSettings, level: AlertLevel): TextColors {
@@ -126,9 +166,9 @@ export function resolveTextColors(palette: Palette, settings: TextSettings, leve
 	}
 	if (mode === "dim") {
 		return {
-			value: mixToward(palette.value, palette.bg, DIM_VALUE_BLEND),
+			value: readableValueColor(mixToward(palette.value, palette.bg, DIM_VALUE_BLEND), palette.bg),
 			label: mixToward(palette.label, palette.bg, DIM_SECONDARY_BLEND),
-			unit: mixToward(palette.unit, palette.bg, DIM_SECONDARY_BLEND),
+			unit: readableValueColor(mixToward(palette.unit, palette.bg, DIM_SECONDARY_BLEND), palette.bg),
 			badge: mixToward(palette.accent, palette.bg, DIM_SECONDARY_BLEND)
 		};
 	}

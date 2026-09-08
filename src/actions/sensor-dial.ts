@@ -41,7 +41,7 @@ import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
 import { statusDialText } from "../ui/state-screens";
 import { resolveTextColors, type TextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
-import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
+import { alertValueColor, classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
 
 /** Persisted per-dial settings (written by the PI; all optional). */
 export type DialSettings = {
@@ -1067,6 +1067,7 @@ export function composeDialSvg(state: InstanceState, status: PollerStatus): stri
 	const maxText = formatStat(stats.max, reading.unit, measureOpts);
 	const statsLine = overlay !== null && overlay.until > Date.now() ? overlay.text : isDataUnit(reading.unit) ? `▼${minText} ▲${maxText} ${stateTag}` : `▼ ${minText}   ▲ ${maxText}   ${stateTag}`;
 	return renderDial({
+		severity: level,
 		title: label,
 		valueText: shown.valueText,
 		unitText: `${shown.unitText}${badge !== "" ? " · " + badge : ""}`.trim(),
@@ -1153,14 +1154,20 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 		const scoped = thresholdsApplyTo(settings.alertUnit, member.unit);
 		const live = convertUnit(member.value, member.unit, fahrenheit).value;
 		const level = scoped ? alertLevel(live, warn, crit, settings.alertBelow === true) : "normal";
+		const rowBg = rowCount === 2 && selected ? palette.track : palette.bg;
+		const rowText = resolveTextColors({ ...palette, bg: rowBg }, effectiveTextFor(settings), "normal");
 		return {
+			severity: level,
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,
 			unitText: shown.unitText,
 			selected,
-			// An alerting row's value is the alert indicator and stays fixed;
-			// custom text never recolors it.
-			valueColor: level !== "normal" ? config.alerts[level].bg : text.value,
+			// Selected two-row values sit on the track, not the theme bg.
+			// Resolve both built-in dim and alert hues against that surface.
+			valueColor: level !== "normal"
+				? alertValueColor(config, level, rowBg)
+				: rowText.value,
+			unitColor: rowText.unit,
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.
 			...(rowCount === 2 ? { history: poller.getSeries(member.key) } : {})

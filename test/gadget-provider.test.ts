@@ -17,7 +17,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { after, describe, test } from "node:test";
+import { after, describe, mock, test } from "node:test";
+import type { HwsmGadgetKey } from "../src/hwinfo/hwsm-loader";
 
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
 
@@ -115,10 +116,16 @@ function dropKey(): void {
 function readShape(): SensorSnapshot {
 	const provider = GadgetRegistryProvider.open();
 	try {
-		return provider.read();
+		return readVerified(provider);
 	} finally {
 		provider.close();
 	}
+}
+
+function readVerified(provider: ReturnType<typeof GadgetRegistryProvider.open>): SensorSnapshot {
+	const snapshot = provider.read();
+	assert.ok(snapshot, "a stable fixture must return a snapshot");
+	return snapshot;
 }
 
 const ids = (snap: SensorSnapshot): number[] => snap.readings.map((r) => r.id);
@@ -289,13 +296,13 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 		shape([0, 1, 2, 5]);
 		const provider = GadgetRegistryProvider.open();
 		try {
-			assert.deepEqual(ids(provider.read()), [0, 1, 2, 5]);
+			assert.deepEqual(ids(readVerified(provider)), [0, 1, 2, 5]);
 
 			dropValue("Sensor1"); // the reading at index 1 is disabled in HWiNFO
-			assert.deepEqual(ids(provider.read()), [0, 2, 5], "later readings survive an earlier slot vanishing");
+			assert.deepEqual(ids(readVerified(provider)), [0, 2, 5], "later readings survive an earlier slot vanishing");
 
 			putValue("Sensor1", "Beta Source"); // re-enabled
-			assert.deepEqual(ids(provider.read()), [0, 1, 2, 5], "the restored reading comes back");
+			assert.deepEqual(ids(readVerified(provider)), [0, 1, 2, 5], "the restored reading comes back");
 		} finally {
 			provider.close();
 		}
@@ -305,16 +312,16 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 		shape([0, 6]);
 		const provider = GadgetRegistryProvider.open();
 		try {
-			const before = provider.read();
+			const before = readVerified(provider);
 			assert.equal(before.byKey.get("g:Alpha Source:Label 6")?.value, 6.5);
 
 			putValue("ValueRaw6", "77.25");
 			putValue("Value6", "77.25 °C");
-			const after = provider.read();
+			const after = readVerified(provider);
 			assert.equal(after.byKey.get("g:Alpha Source:Label 6")?.value, 77.25);
 			assert.ok((after.valueRevision ?? 0) > (before.valueRevision ?? 0), "the digest now covers entries past a hole");
 
-			const idle = provider.read();
+			const idle = readVerified(provider);
 			assert.equal(idle.valueRevision, after.valueRevision, "an unchanged key does not bump the revision");
 		} finally {
 			provider.close();
@@ -326,7 +333,7 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 		const provider = GadgetRegistryProvider.open();
 		try {
 			dropKey();
-			assert.equal(reasonOf(() => provider.read()), "not-running");
+			assert.equal(reasonOf(() => readVerified(provider)), "not-running");
 		} finally {
 			provider.close();
 		}
@@ -344,11 +351,11 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 		shape([0, 6]);
 		const first = GadgetRegistryProvider.open();
 		try {
-			const before = first.read();
+			const before = readVerified(first);
 			const second = GadgetRegistryProvider.open();
 			try {
 				second.adoptFreshness(first);
-				const carried = second.read();
+				const carried = readVerified(second);
 				assert.equal(carried.valueRevision, before.valueRevision, "an unchanged key must not look newly changed");
 				assert.equal(carried.pollTime, before.pollTime);
 			} finally {
@@ -365,9 +372,9 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		shape([0, 1], (i) => ({ sensor: "GPU", label: "Temperature", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
 		const provider = GadgetRegistryProvider.open();
 		try {
-			provider.read();
+			readVerified(provider);
 			dropValue("Sensor0");
-			const afterGap = provider.read();
+			const afterGap = readVerified(provider);
 			assert.equal(afterGap.byKey.get("g:GPU:Temperature"), undefined, "80 must never replace the removed 40");
 			assert.equal(afterGap.byKey.get("g:GPU:Temperature~1"), undefined, "encounter-order suffixes are not identities");
 		} finally {
@@ -375,7 +382,7 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		}
 		const restarted = GadgetRegistryProvider.open();
 		try {
-			assert.equal(restarted.read().byKey.get("g:GPU:Temperature"), undefined, "a reopen must remember observed ambiguity");
+			assert.equal(readVerified(restarted).byKey.get("g:GPU:Temperature"), undefined, "a reopen must remember observed ambiguity");
 		} finally {
 			restarted.close();
 		}
@@ -410,6 +417,45 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 });
 
 describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("a detected field interleave discards the whole scan before publishing evidence", () => {
+		for (const field of ["Sensor0", "Label0", "Value0", "ValueRaw0"]) {
+			shape([0]);
+			const provider = GadgetRegistryProvider.open();
+			const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+			let swapped = false;
+			Reflect.set(provider, "key", {
+				queryString(name: string): string | null {
+					const value = nativeKey.queryString(name);
+					if (!swapped && name === field) {
+						swapped = true;
+						putValue(field, field === "ValueRaw0" ? "60" : "Rewritten fixture field");
+					}
+					return value;
+				},
+				close: () => nativeKey.close()
+			});
+			try {
+				assert.equal(provider.read(), null, `${field} changed between the two observations`);
+				assert.ok(swapped);
+			} finally { provider.close(); }
+		}
+	});
+	test("an interleaved cold open reports busy rather than empty", () => {
+		shape([0]);
+		const seam = mock.method(GadgetRegistryProvider.prototype, "read", () => null);
+		try { assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "busy"); }
+		finally { seam.mock.restore(); }
+	});
+	test("numeric formatting and invalid baselines do not manufacture freshness", () => {
+		for (const [before, after] of [["40", "40.000"], ["unavailable", "40"]]) {
+			shape([0], () => ({ sensor: "Evidence Source", label: "Constant", raw: before, value: "40 °C" }));
+			const provider = GadgetRegistryProvider.open();
+			try {
+				putValue("ValueRaw0", after as string);
+				assert.equal(readVerified(provider).freshnessRevision, 0);
+			} finally { provider.close(); }
+		}
+	});
 	test("current-only readings never manufacture historical numbers", () => {
 		shape([0]);
 		const reading = readShape().readings[0];
@@ -423,17 +469,17 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 		shape([0]);
 		const provider = GadgetRegistryProvider.open();
 		try {
-			const first = provider.read();
+			const first = readVerified(provider);
 			assert.equal(first.pollTime, 0, "first observation is not a producer timestamp");
-			assert.equal(provider.read().pollTime, 0, "successful reads of old data are not fresh");
+			assert.equal(readVerified(provider).pollTime, 0, "successful reads of old data are not fresh");
 			putValue("Label0", "Renamed without a new sample");
-			const renamed = provider.read();
+			const renamed = readVerified(provider);
 			assert.equal(renamed.pollTime, 0, "topology is not value evidence");
 			assert.ok((renamed.valueRevision ?? 0) > (first.valueRevision ?? 0), "render revision includes topology");
 			putValue("ValueRaw0", "55");
-			const changed = provider.read();
+			const changed = readVerified(provider);
 			assert.ok(changed.pollTime > 0);
-			assert.equal(provider.read().pollTime, changed.pollTime);
+			assert.equal(readVerified(provider).pollTime, changed.pollTime);
 		} finally {
 			provider.close();
 		}
@@ -455,7 +501,7 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 		shape([0, 8], (i) => ({ sensor: "Frozen duplicate", label: "Temp", raw: i ? "80" : "40", value: "40 °C" }));
 		const provider = GadgetRegistryProvider.open();
 		try {
-			for (let i = 0; i < 4; i++) assert.equal(provider.read().freshnessRevision, 0);
+			for (let i = 0; i < 4; i++) assert.equal(readVerified(provider).freshnessRevision, 0);
 		} finally { provider.close(); }
 	});
 

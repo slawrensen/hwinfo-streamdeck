@@ -116,6 +116,12 @@ not freshness. After 15 seconds without value evidence, or before the first
 change, Gadget displays **Age unknown**. It may be steady or stopped;
 the plugin cannot tell. Shared Memory supplies a producer poll timestamp.
 
+Each occupied Gadget row is read twice. If a field changes between those
+observations, the whole scan is withheld and retried on the next poll.
+This catches observable interleaving; it cannot prove an atomic snapshot
+when a writer pauses in an intermediate state. Shared Memory provides the
+consistency mutex that Gadget lacks.
+
 Sparklines ingest subsecond changes plus advancing producer timestamps.
 Steady observations within the same producer second are not separate known
 samples. A skipped read, missing/non-finite reading, stale data, native-unit

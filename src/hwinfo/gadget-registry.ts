@@ -97,7 +97,7 @@ export class GadgetRegistryProvider {
 	private valueRevision = 0;
 	private lastChangeSec = 0;
 	private freshnessRevision = 0;
-	private lastValues = new Map<string, string>();
+	private lastValues = new Map<string, number>();
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
 
@@ -119,12 +119,16 @@ export class GadgetRegistryProvider {
 			throw toHwinfoError(err);
 		}
 		const provider = new GadgetRegistryProvider(key);
-		let snapshot: SensorSnapshot;
+		let snapshot: SensorSnapshot | null;
 		try {
 			snapshot = provider.read();
 		} catch (err) {
 			provider.close();
 			throw err;
+		}
+		if (snapshot === null) {
+			provider.close();
+			throw new HwinfoError("busy", "Gadget readings changed during the scan. Retrying automatically.");
 		}
 		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount) {
 			provider.close();
@@ -135,7 +139,7 @@ export class GadgetRegistryProvider {
 		return provider;
 	}
 
-	read(): SensorSnapshot {
+	read(): SensorSnapshot | null {
 		try {
 			return this.readEntries();
 		} catch (err) {
@@ -143,13 +147,13 @@ export class GadgetRegistryProvider {
 		}
 	}
 
-	private readEntries(): SensorSnapshot {
+	private readEntries(): SensorSnapshot | null {
 		const sensors: SensorSource[] = [];
 		const sensorIndexByName = new Map<string, number>();
 		const readings: Reading[] = [];
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
-		const values = new Map<string, string>();
+		const values = new Map<string, number>();
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
 		// reading is ticked "Report value in Gadget" and keeps that
@@ -164,9 +168,22 @@ export class GadgetRegistryProvider {
 			if (sensorName === null) {
 				continue;
 			}
-			const label = this.key.queryString(`Label${i}`) ?? `Reading ${i}`;
-			const formatted = this.key.queryString(`Value${i}`) ?? "";
-			const raw = this.key.queryString(`ValueRaw${i}`) ?? "";
+			const labelField = this.key.queryString(`Label${i}`);
+			const formattedField = this.key.queryString(`Value${i}`);
+			const rawField = this.key.queryString(`ValueRaw${i}`);
+			// Gadget has no atomic row or producer sequence. One bounded
+			// validation pass catches observable field interleavings and
+			// withholds the entire scan before any evidence/history commits.
+			// A writer paused in an intermediate state can still look stable;
+			// agreement here is not an atomicity or producer-liveness claim.
+			const verifiedSensor = this.key.queryString(`Sensor${i}`);
+			const verifiedLabel = this.key.queryString(`Label${i}`);
+			const verifiedFormatted = this.key.queryString(`Value${i}`);
+			const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
+			if (sensorName !== verifiedSensor || labelField !== verifiedLabel || formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
+			const label = labelField ?? `Reading ${i}`;
+			const formatted = formattedField ?? "";
+			const raw = rawField ?? "";
 
 			let sensorIndex = sensorIndexByName.get(sensorName);
 			if (sensorIndex === undefined) {
@@ -200,7 +217,7 @@ export class GadgetRegistryProvider {
 			// Compare only the same named reading in the same unit. A new
 			// slot or rename is topology, not evidence of a new measurement.
 			const evidenceKey = JSON.stringify([key, unit]);
-			values.set(evidenceKey, raw);
+			values.set(evidenceKey, value);
 		}
 
 		const digest = digestParts.join("|");
@@ -211,13 +228,13 @@ export class GadgetRegistryProvider {
 		const blocked = this.identity.blocked(readings.map((reading) => reading.key));
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
 		let valueChanged = false;
-		const safeValues = new Map<string, string>();
+		const safeValues = new Map<string, number>();
 		for (const reading of safeReadings) {
 			const evidenceKey = JSON.stringify([reading.key, reading.unit]);
-			const raw = values.get(evidenceKey) as string;
+			const value = values.get(evidenceKey) as number;
 			const previous = this.lastValues.get(evidenceKey);
-			if (previous !== undefined && previous !== raw && Number.isFinite(reading.value)) valueChanged = true;
-			safeValues.set(evidenceKey, raw);
+			if (previous !== undefined && Number.isFinite(previous) && Number.isFinite(value) && previous !== value) valueChanged = true;
+			safeValues.set(evidenceKey, value);
 		}
 		this.lastValues = safeValues;
 		if (valueChanged) {

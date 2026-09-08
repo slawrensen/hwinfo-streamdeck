@@ -71,6 +71,7 @@ interface MutableReading {
 interface MutableSnapshot {
 	pollTime: number;
 	valueRevision: number;
+	freshnessRevision: number;
 	version: number;
 	revision: number;
 	sensors: readonly SensorSource[];
@@ -168,6 +169,7 @@ export class SnapshotParser {
 		const identity = this.identity;
 		const unitWords = this.unitWords;
 		let changed = false;
+		let evidenceChanged = false;
 		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			if (
 				dv.getUint32(o + ENTRY.type, true) !== identity[i * 3] ||
@@ -188,12 +190,18 @@ export class SnapshotParser {
 					}
 				}
 			}
+		}
+		// Validate the entire identity skeleton before mutating cached values.
+		// Otherwise a late rebuild could lose an earlier value change when
+		// comparing its newly decoded readings with the previous snapshot.
+		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			// Object.is, not !==: a NaN entry would otherwise read as changed
 			// on every tick, re-boxing the double and bumping the revision on
 			// identical bytes (which would defeat the detail render gate).
 			const r = readings[i] as MutableReading;
 			const value = dv.getFloat64(o + ENTRY.value, true);
 			if (!Object.is(r.value, value)) {
+				if (Number.isFinite(r.value) && Number.isFinite(value)) evidenceChanged = true;
 				r.value = value;
 				changed = true;
 			}
@@ -217,12 +225,14 @@ export class SnapshotParser {
 		if (snap.pollTime !== pollTime) {
 			snap.pollTime = pollTime;
 			changed = true;
+			evidenceChanged = true;
 		}
 		if (changed) {
 			// See SensorSnapshot.valueRevision: the change counter pollTime's
 			// one-second grain cannot carry.
 			snap.valueRevision++;
 		}
+		if (evidenceChanged) snap.freshnessRevision++;
 		return true;
 	}
 
@@ -324,7 +334,12 @@ export class SnapshotParser {
 		// A rebuild is a data change by definition (layout growth, unit flip),
 		// even when pollTime and the reading count happen to match: carry the
 		// revision line forward and bump it.
-		this.snapshot = { pollTime, valueRevision: (this.snapshot?.valueRevision ?? 0) + 1, version, revision, sensors, readings, byKey };
+		const previous = this.snapshot;
+		const evidenceChanged = previous !== null && (previous.pollTime !== pollTime || readings.some((reading) => {
+			const old = previous.byKey.get(reading.key);
+			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
+		}));
+		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}
 }

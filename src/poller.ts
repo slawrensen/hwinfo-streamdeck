@@ -85,7 +85,7 @@ class HwinfoPoller extends EventEmitter {
 	private lastAdvanceAt = 0;
 	private lastReopenProbeAt = 0;
 	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
-	private heldFreshness: { pollTime: number; advanceAt: number; valueRevision?: number; freshnessRevision?: number } | null = null;
+	private heldFreshness: { source: SnapshotSource; pollTime: number; advanceAt: number; valueRevision?: number; freshnessRevision?: number; gadget?: GadgetRegistryProvider } | null = null;
 	private lastUpgradeProbeAt = 0;
 	/** Nonzero while a transient failure is being ridden out on held values. */
 	private holdingSince = 0;
@@ -124,7 +124,7 @@ class HwinfoPoller extends EventEmitter {
 			intervalMs: this.intervalMs,
 			polling: this.timer !== null,
 			retained: this.refs,
-			sampleAgeMs: this.lastAdvanceAt === 0 ? null : monotonicNow() - this.lastAdvanceAt
+			sampleAgeMs: status.state === "unavailable" || (status.source === "gadget" && status.snapshot.pollTime === 0) || this.lastAdvanceAt === 0 ? null : monotonicNow() - this.lastAdvanceAt
 		};
 	}
 
@@ -192,6 +192,7 @@ class HwinfoPoller extends EventEmitter {
 		}
 		this.mode = mode;
 		this.logger.info(`Source mode set to ${mode}`);
+		this.heldFreshness = null;
 		this.dropProvider();
 		if (this.timer !== null) {
 			this.tick();
@@ -232,6 +233,33 @@ class HwinfoPoller extends EventEmitter {
 		this.lastPollTime = -1;
 	}
 
+	/** A replacement session is not evidence that its producer advanced. */
+	private preserveFreshness(): void {
+		if (this.provider === null || this.heldFreshness !== null) return;
+		this.heldFreshness = {
+			source: this.provider.source,
+			pollTime: this.lastPollTime,
+			advanceAt: this.lastAdvanceAt,
+			valueRevision: this.lastValueRevision,
+			freshnessRevision: this.lastFreshnessRevision,
+			...(this.provider instanceof GadgetRegistryProvider ? { gadget: this.provider } : {})
+		};
+	}
+
+	private restoreFreshness(): void {
+		const held = this.heldFreshness;
+		if (held !== null && held.source === this.provider?.source) {
+			this.lastPollTime = held.pollTime;
+			this.lastAdvanceAt = held.advanceAt;
+			this.lastValueRevision = held.valueRevision;
+			this.lastFreshnessRevision = held.freshnessRevision;
+			if (held.gadget && this.provider instanceof GadgetRegistryProvider) this.provider.adoptFreshness(held.gadget);
+		} else if (held === null) {
+			this.lastAdvanceAt = monotonicNow();
+		}
+		this.heldFreshness = null;
+	}
+
 	/** Opens the preferred source; in auto mode shared memory wins, gadget is the fallback. */
 	private openProvider(): SnapshotProvider {
 		if (this.mode === "shared-memory") {
@@ -260,7 +288,7 @@ class HwinfoPoller extends EventEmitter {
 				// more specific primary diagnosis (access-denied, disabled).
 				if (
 					fallback instanceof HwinfoError &&
-					fallback.reason === "gadget-empty" &&
+					(fallback.reason === "gadget-empty" || fallback.reason === "busy") &&
 					primary instanceof HwinfoError &&
 					primary.reason === "not-running"
 				) {
@@ -275,18 +303,7 @@ class HwinfoPoller extends EventEmitter {
 		try {
 			if (this.provider === null) {
 				this.provider = this.openProvider();
-				if (this.heldFreshness !== null) {
-					// A failed stale probe dropped the provider last tick; the
-					// source is the same frozen one, so restore its freshness
-					// instead of letting the reopen pose as an advance.
-					this.lastPollTime = this.heldFreshness.pollTime;
-					this.lastAdvanceAt = this.heldFreshness.advanceAt;
-					this.lastValueRevision = this.heldFreshness.valueRevision;
-					this.lastFreshnessRevision = this.heldFreshness.freshnessRevision;
-					this.heldFreshness = null;
-				} else {
-					this.lastAdvanceAt = monotonicNow();
-				}
+				this.restoreFreshness();
 				this.logger.info(`Opened HWiNFO data source: ${this.provider.source}`);
 			}
 			this.maybeUpgradeToSharedMemory();
@@ -301,8 +318,10 @@ class HwinfoPoller extends EventEmitter {
 				// Poisoned session (layout changed): reopen at the new exact size
 				// and read again within the same tick, so live values never leave
 				// the keys. A failure here falls to the hold in the outer catch.
+				this.preserveFreshness();
 				this.dropProvider();
 				this.provider = this.openProvider();
+				this.restoreFreshness();
 				snapshot = this.provider.read();
 				this.logger.info(`Data source layout changed; reopened in place (${this.provider.source})`);
 			}
@@ -319,7 +338,9 @@ class HwinfoPoller extends EventEmitter {
 				const stampChanged = snapshot.pollTime !== this.lastPollTime;
 				// Revisions belong to one parser, not the producer. Its initial
 				// decode after reopen must never refresh a frozen timestamp.
-				const revisionChanged = this.revisionProvider === this.provider && snapshot.valueRevision !== undefined && snapshot.valueRevision !== this.lastValueRevision;
+				const evidenceRevision = snapshot.freshnessRevision ?? snapshot.valueRevision;
+				const previousEvidenceRevision = this.lastFreshnessRevision ?? this.lastValueRevision;
+				const revisionChanged = this.revisionProvider === this.provider && evidenceRevision !== undefined && evidenceRevision !== previousEvidenceRevision;
 				const evidenceChanged = this.provider.source === "gadget"
 					? (snapshot.freshnessRevision ?? 0) > 0 && (stampChanged || snapshot.freshnessRevision !== this.lastFreshnessRevision)
 					: stampChanged || revisionChanged;
@@ -356,8 +377,8 @@ class HwinfoPoller extends EventEmitter {
 				for (const ring of this.series.values()) ring.length = 0;
 				// The data is frozen. If HWiNFO exited we would never notice through
 				// our held handles — probe a fresh open.
-				this.probeReopen();
 				const source = this.provider.source;
+				this.probeReopen();
 				const last = snapshot ?? (this.status.state !== "unavailable" ? this.status.snapshot : null);
 				if (last !== null) {
 					this.status = { state: "stale", snapshot: last, source, staleForMs };
@@ -370,6 +391,7 @@ class HwinfoPoller extends EventEmitter {
 			// Otherwise (skipped read, still fresh): keep the previous status.
 		} catch (err) {
 			for (const ring of this.series.values()) ring.length = 0;
+			this.preserveFreshness();
 			this.dropProvider();
 			if (err instanceof HwinfoError) {
 				// Transient classes (a poisoned session whose reopen has not
@@ -410,30 +432,15 @@ class HwinfoPoller extends EventEmitter {
 		// Release our handles FIRST: a named section stays alive while any handle
 		// references it — including ours — so probing before closing would succeed
 		// even after HWiNFO died, making the stale→unavailable edge unreachable.
-		const prev = this.provider;
-		const prevPollTime = this.lastPollTime;
-		const prevAdvanceAt = this.lastAdvanceAt;
-		const prevValueRevision = this.lastValueRevision;
-		const prevFreshnessRevision = this.lastFreshnessRevision;
-		// Stashed on the instance too: when openProvider throws here (a busy
-		// mutex at the probe instant), these locals die with the probe, and
-		// the next tick's cold reopen would otherwise mint a fresh advance
-		// for a still-frozen source: a false ok window plus duplicate
-		// sparkline samples, repeating while HWiNFO stays paused.
-		this.heldFreshness = { pollTime: prevPollTime, advanceAt: prevAdvanceAt, valueRevision: prevValueRevision, freshnessRevision: prevFreshnessRevision };
+		// Persist across a failing open too, so the next tick cannot mint a
+		// fresh window merely because a still-frozen source reopened.
+		this.preserveFreshness();
 		this.dropProvider();
 		this.provider = this.openProvider(); // HwinfoError propagates to tick()
-		this.heldFreshness = null;
 		// Preserve freshness across the swap: dropProvider resets lastPollTime
 		// and a fresh gadget provider resets its digest — either would let a
 		// frozen source pose as advancing for one stale window (ok↔stale flap).
-		if (prev instanceof GadgetRegistryProvider && this.provider instanceof GadgetRegistryProvider) {
-			this.provider.adoptFreshness(prev);
-		}
-		this.lastPollTime = prevPollTime;
-		this.lastAdvanceAt = prevAdvanceAt;
-		this.lastValueRevision = prevValueRevision;
-		this.lastFreshnessRevision = prevFreshnessRevision;
+		this.restoreFreshness();
 	}
 
 	/** On the gadget fallback in auto mode, switch back once shared memory returns. */

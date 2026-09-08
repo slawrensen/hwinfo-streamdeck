@@ -13,6 +13,7 @@ import { poller } from "../src/poller";
 import { compose } from "../src/actions/sensor-reading";
 import { rotationReadings, overviewWindow } from "../src/rotation";
 import { resolveDetailGroup } from "../src/detail/detail-group";
+import { HwinfoError } from "../src/hwinfo/types";
 
 type Seam = {
 	openProvider(): { source: "shared-memory" | "gadget"; read(): SensorSnapshot | null; close(): void };
@@ -42,6 +43,90 @@ describe("setIntervalMs keeps series subscriptions", () => {
 		seam.tick();
 		seam.tick();
 		assert.deepEqual([...(poller.getSeries("cpu:0:0") ?? [])], [13, 14], "collection must resume without a resubscribe");
+	});
+});
+
+describe("freshness evidence survives lifecycle changes", () => {
+	type FreshnessSeam = Seam & { provider: ReturnType<Seam["openProvider"]> | null; lastAdvanceAt: number; lastReopenProbeAt: number; probeReopen(): void };
+	type Subject = Pick<typeof poller, "setSourceMode" | "getStatus" | "diagnostics"> & FreshnessSeam;
+	const isolated = (): Subject => new (poller.constructor as unknown as { new(): Subject })();
+
+	it("cold Gadget diagnostics do not invent a sample age", () => {
+		const subject = isolated();
+		subject.setSourceMode("gadget");
+		subject.openProvider = () => ({ source: "gadget", close() {}, read: () => ({ ...snapshotAt(0, 0), freshnessRevision: 0 }) });
+		subject.tick();
+		assert.equal(subject.getStatus().state, "stale");
+		assert.equal(subject.diagnostics().sampleAgeMs, null, "provider-open time is not sample time");
+	});
+
+	it("topology revisions cannot keep a frozen producer fresh", () => {
+		const subject = isolated();
+		let revision = 1;
+		subject.openProvider = () => ({ source: "shared-memory", close() {}, read: () => ({ ...snapshotAt(700, 40), valueRevision: revision++, freshnessRevision: 0 }) });
+		subject.tick();
+		subject.lastAdvanceAt = -60_000;
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		subject.tick();
+		assert.equal(subject.lastAdvanceAt, -60_000);
+		assert.equal(subject.getStatus().state, "stale");
+	});
+
+	it("an invalid-session reopen does not refresh identical producer bytes", () => {
+		const subject = isolated();
+		let invalid = false;
+		let opened = 0;
+		subject.openProvider = () => {
+			const generation = ++opened;
+			return { source: "shared-memory", close() {}, read: () => {
+				if (generation === 1 && invalid) throw new HwinfoError("invalid", "synthetic layout reopen");
+				return { ...snapshotAt(700, 40), valueRevision: 1, freshnessRevision: 0 };
+			} };
+		};
+		subject.tick();
+		subject.lastAdvanceAt = -60_000;
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		invalid = true;
+		subject.tick();
+		assert.equal(opened, 2);
+		assert.equal(subject.lastAdvanceAt, -60_000);
+		assert.equal(subject.getStatus().state, "stale");
+	});
+
+	it("repeated successful opens followed by busy reads cannot extend held freshness", () => {
+		const subject = isolated();
+		let busy = false;
+		subject.openProvider = () => ({ source: "shared-memory", close() {}, read: () => {
+			if (busy) throw new HwinfoError("busy", "synthetic read failure");
+			return snapshotAt(700, 40);
+		} });
+		subject.tick();
+		subject.lastAdvanceAt = -60_000;
+		busy = true;
+		for (let i = 0; i < 3; i++) {
+			subject.tick();
+			assert.equal(subject.lastAdvanceAt, -60_000);
+			assert.equal(subject.getStatus().state, "unavailable");
+		}
+	});
+
+	it("a stale reopen cannot label old shared-memory values as Gadget", () => {
+		const subject = isolated();
+		let source: "shared-memory" | "gadget" = "shared-memory";
+		subject.openProvider = () => {
+			const openedSource = source;
+			return { source: openedSource, close() {}, read: () => snapshotAt(openedSource === "gadget" ? 0 : 700, openedSource === "gadget" ? 80 : 40) };
+		};
+		subject.tick();
+		subject.lastAdvanceAt = -60_000;
+		subject.lastReopenProbeAt = -60_000;
+		source = "gadget";
+		subject.tick();
+		const status = subject.getStatus();
+		assert.notEqual(status.state, "unavailable");
+		if (status.state === "unavailable") return;
+		assert.equal(status.source, "shared-memory", "held snapshot keeps its actual provenance until the new provider is read");
+		assert.equal(status.snapshot.readings[0]?.value, 40);
 	});
 });
 

@@ -86,7 +86,7 @@ try {
 	// The shared-memory parser reuses its snapshot. Retain scalar evidence
 	// before the next read mutates it.
 	const firstPollTime = first.pollTime;
-	const firstValueRevision = first.valueRevision;
+	const firstEvidenceRevision = first.freshnessRevision ?? first.valueRevision;
 	const firstFreshnessRevision = first.freshnessRevision ?? 0;
 
 	// A second read ~2.6 s later proves values are actually flowing (HWiNFO
@@ -95,7 +95,7 @@ try {
 	const snapshot = read(session);
 	const advancing = session.source === "gadget"
 		? (snapshot.freshnessRevision ?? 0) > firstFreshnessRevision
-		: snapshot.pollTime !== firstPollTime || snapshot.valueRevision !== firstValueRevision;
+		: snapshot.pollTime !== firstPollTime || (snapshot.freshnessRevision ?? snapshot.valueRevision) !== firstEvidenceRevision;
 	const ageSec = Math.round(Date.now() / 1000 - snapshot.pollTime);
 
 	if (asJson) {

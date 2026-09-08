@@ -65,8 +65,9 @@ export interface SensorSnapshot {
 	readonly bindingRevision?: number;
 	/** Gadget readings withheld because their names have been ambiguous. */
 	readonly blockedReadingCount?: number;
-	/** Gadget value-change evidence, distinct from render/topology revision.
-	 * Zero means only an initial registry observation, never producer proof. */
+	/** Measurement evidence, distinct from render/topology revision. Shared
+	 * memory counts producer stamps or finite same-unit value changes; Gadget
+	 * counts only finite same-unit value changes. Initial decoding is zero. */
 	readonly freshnessRevision?: number;
 	/** Unix seconds of HWiNFO's last sensor poll. Gadget uses the time of an
 	 * observed value change, or zero when no change has been observed. */

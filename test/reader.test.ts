@@ -98,6 +98,35 @@ function compose(sensors: FakeSensor[], entries: FakeEntry[], opts: ComposeOptio
 }
 
 const CPU: FakeSensor = { id: 0xf0000501, instance: 0, orig: "CPU [#0]: Ryzen" };
+
+describe("producer evidence is distinct from topology revisions", () => {
+	const entry: FakeEntry = { type: SensorType.Temperature, sensorIndex: 0, id: 1, orig: "Temperature", unit: "°C", value: 40 };
+	it("initial decode, owner changes, unit changes and topology rebuilds supply no measurement evidence", () => {
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [entry], { pollTime: 700 }));
+		assert.equal(first.freshnessRevision, 0);
+		const initialRevision = first.valueRevision ?? 0;
+		for (const [owner, reading, revision] of [[CPU, entry, 3], [{ ...CPU, id: 8 }, entry, 3], [{ ...CPU, id: 8 }, { ...entry, unit: "°F", value: 104 }, 3]] as const) {
+			const next = parser.parse(compose([owner], [reading], { pollTime: 700, revision }));
+			assert.equal(next.freshnessRevision, 0);
+			assert.ok((next.valueRevision ?? 0) > initialRevision, "render invalidation still notices rebuilds");
+		}
+	});
+	it("same-unit value changes and producer stamps count, including changes during a rebuild", () => {
+		const parser = new SnapshotParser();
+		parser.parse(compose([CPU], [entry], { pollTime: 700 }));
+		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 41 }], { pollTime: 700 })).freshnessRevision, 1);
+		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 42 }], { pollTime: 700, revision: 3 })).freshnessRevision, 2);
+		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 42 }], { pollTime: 701, revision: 3 })).freshnessRevision, 3);
+	});
+	it("a later entry rewrite cannot consume an earlier value change before rebuild", () => {
+		const parser = new SnapshotParser();
+		const second = { ...entry, id: 2 };
+		parser.parse(compose([CPU], [entry, second], { pollTime: 700 }));
+		const next = parser.parse(compose([CPU], [{ ...entry, value: 41 }, { ...second, id: 3 }], { pollTime: 700 }));
+		assert.equal(next.freshnessRevision, 1);
+	});
+});
 const TEMP: FakeEntry = { type: SensorType.Temperature, sensorIndex: 0, id: 0x1000000, orig: "Tctl/Tdie", unit: "°C", value: 55.5, min: 40, max: 90, avg: 60 };
 
 describe("parseSnapshot — classic 264/316 layout", () => {

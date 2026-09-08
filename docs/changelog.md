@@ -44,6 +44,10 @@ Elgato Marketplace listing is a separate track.
   Reopening the registry and metadata changes do not establish freshness.
 - Source statistic capabilities are explicit. Dial sessions show a brief
   reset reason when their binding, native unit, type or source changes.
+- Built-in numeric colors maintain at least 4.5:1 authored contrast in
+  normal, dim, dense and dial alert views. Explicit custom text colors stay
+  unchanged. Warning triangles and critical octagons add severity cues
+  alongside color without replacing the reading.
 
 ## 1.6.0.0 - 2026-09-04
 

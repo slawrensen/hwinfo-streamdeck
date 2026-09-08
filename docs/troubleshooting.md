@@ -16,17 +16,17 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | Key shows | Dial shows | Meaning |
 | --- | --- | --- |
 | **Start HWiNFO** / not detected | Start HWiNFO / not detected | Nothing found on either interface. |
-| **HWiNFO busy** / retrying | HWiNFO busy / retrying | HWiNFO is running but its shared memory was locked at that instant; the plugin retries on the next poll. |
+| **HWiNFO busy** / retrying | HWiNFO busy / retrying | The shared-memory consistency mutex was busy when the plugin connected. This alone does not establish the producer process state. The plugin retries automatically on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
-| **Not updating** / check sharing | HWiNFO stalled / check sharing | No Shared Memory producer evidence for 15 seconds. |
+| **Not updating** / check sharing | No new data / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
 | **Age unknown** / check Gadget | Age unknown / check Gadget | Gadget has no heartbeat. Steady readings and an old registry left after exit are indistinguishable. |
-| **Access denied** / un-elevate | Access denied / un-elevate HWiNFO | Privilege mismatch between HWiNFO and Stream Deck. |
-| **Tick sensors** / in Gadget | Gadget empty / tick sensors | Gadget reporting is on but no sensors are ticked. |
+| **Access denied** / check access | Access denied / check access | Windows denied access to the shared-memory object; the error does not identify which access rule failed. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| **Tick sensors** / in Gadget | Gadget empty / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Pick a sensor** / in settings | HWiNFO / rotate to pick | No sensor selected on this key/dial yet. |
 | **Sensor missing** / pick again | Sensor missing / waiting | The saved sensor isn't in HWiNFO's current output. |
 | **Needs x64** / Windows | Needs x64 Windows | 32-bit or Windows-on-ARM: unsupported. |
 | **HWiNFO error** / restart HWiNFO | HWiNFO error / restart HWiNFO | Header didn't validate (mid-restart or incompatible build). |
-| **Plugin damaged** / reinstall | Plugin damaged / reinstall it | The plugin's native bridge (`bin/hwsm.node`) would not load: missing, blocked by antivirus, or a version mismatch. Reinstall the plugin. The file is unsigned; before allowing it in your antivirus, check it against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). |
+| **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
 ![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})
 
@@ -75,22 +75,11 @@ On an older build you can switch that check off: add a user environment variable
 
 ## Keys show "Access denied"
 
-Windows refused to open HWiNFO's shared memory. Almost always that is a privilege mismatch: **HWiNFO is running elevated ("Run as administrator") while Stream Deck is not**.
+Windows refused access to the shared-memory object. The error alone does not identify which access rule failed.
 
-The fix is to make the two match:
+Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck, including any scheduled task that launches HWiNFO. Record those settings with the support report if access remains denied. Matching elevation is not a guarantee that object permissions permit access.
 
-| HWiNFO | Stream Deck | Result |
-| --- | --- | --- |
-| Normal | Normal | ✅ Works |
-| Elevated | Elevated | ✅ Works |
-| **Elevated** | **Normal** | ❌ Access denied |
-| Normal | Elevated | ✅ Works (lower can't be blocked here) |
-
-Easiest fix: **restart HWiNFO without "Run as administrator."** If you genuinely need HWiNFO elevated (some low-level sensors require it), run Stream Deck elevated too.
-
-> **Free-version escape hatch:** the **Gadget registry** lives in `HKCU` and is readable across privilege levels, so enabling Gadget reporting sidesteps this mismatch entirely.
-
-There is one other way to land here: **HWiNFO running as a different Windows user**, for example started by Task Scheduler under another account, or left running in another session with Fast User Switching. The shared-memory object belongs to whoever created it, so no elevation change will help; the Gadget registry does not help either, because it lives in that other user's `HKCU`. Start HWiNFO as the same user that runs Stream Deck.
+Gadget reads the current user's `HKCU` registry. It cannot read another user's Gadget store, and an available Gadget source does not automatically identify the equivalents of saved Shared Memory readings. See [Data sources](data-sources.md) for explicit pairing and freshness limitations.
 
 ## Keys show "Sensor missing"
 
@@ -236,7 +225,7 @@ Run through this first; most problems resolve here:
 
 If it still fails, open an issue at the [project repository](https://github.com/slawrensen/hwinfo-streamdeck) and include:
 
-1. **What you see**: the exact status-screen text (e.g. "Access denied / un-elevate") or a photo of the key/dial.
+1. **What you see**: the exact status-screen text (e.g. "Access denied / check access") or a photo of the key/dial.
 2. **HWiNFO version and edition** (free or Pro), and which interface(s) you enabled.
 3. **Plugin version** (see the Marketplace listing or `manifest.json`).
 4. **Stream Deck software version** and device model (regular, Stream Deck +, Stream Deck + XL).

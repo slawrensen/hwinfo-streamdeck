@@ -4,7 +4,7 @@
 //   mapping present, mutex ABSENT  → "Start HWiNFO" (never an unguarded read)
 //   mutex appears                  → live value (recovery)
 //   published layout GROWS mid-run → session invalidates → reopen → live again
-//   protocol-mismatched hwsm.node  → "Plugin damaged" (loader fails closed)
+//   protocol-mismatched hwsm.node  → "Bridge failed" (loader fails closed)
 //
 // The mismatch leg runs a second plugin instance from a scratch bundle whose
 // hwsm.node is the hwsm_protomm build (HWSM_PROTOCOL_VERSION=999).
@@ -130,11 +130,11 @@ try {
 	fake.stdin.write("grow\n");
 	await sleep(300);
 	await expectFrame(frames, "layout grows → live values continue (reopened in place)", (svg) => svg.includes("Test Temp"), 10000);
-	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("HWiNFO error") || svg.includes("HWiNFO stalled") || svg.includes("Start HWiNFO"));
+	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("HWiNFO error") || svg.includes("No new data") || svg.includes("Start HWiNFO"));
 	check("no status frame during the growth transition", flashed.length === 0, flashed.length > 0 ? `${flashed.length} status frame(s) reached the deck` : "");
 
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
-	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Plugin damaged'", (svg) => svg.includes("Plugin damaged"), 10000, { fromStart: true });
+	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });
 } finally {
 	const gone = Promise.all([plugin, mismatchPlugin].map((p) => new Promise((r) => { p.once("exit", r); p.kill(); })));
 	fake.kill();

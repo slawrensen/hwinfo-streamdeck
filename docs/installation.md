@@ -76,7 +76,7 @@ The portable build of HWiNFO works identically, but there is no installer to wir
 
 - **Only publishes while its window is open.** Close the portable HWiNFO and the data stops; the plugin will show **Not updating** and then **Start HWiNFO**.
 - **Add it to autostart yourself.** There's no installer to register Auto Start, so if you want it running at login you must add the executable to your own startup (e.g. a Startup-folder shortcut or Task Scheduler).
-- **Watch the folder and elevation.** Don't run portable HWiNFO from a folder that requires admin rights (e.g. `Program Files`) unless Stream Deck is also elevated. If HWiNFO runs elevated and Stream Deck doesn't (or vice-versa), Windows blocks the plugin from reading shared memory and keys show **Access denied / un-elevate**. Run both elevated, or both normal.
+- **Review access settings if needed.** **Access denied / check access** means Windows refused access to the shared-memory object. Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck; the error alone does not identify which access rule failed. See [Troubleshooting](troubleshooting.md#keys-show-access-denied).
 
 ## Verify it works
 

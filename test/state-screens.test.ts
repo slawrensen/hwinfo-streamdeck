@@ -73,13 +73,14 @@ describe("state-screens: every unavailable reason has its own guidance", () => {
 	});
 
 	it("open-time contention never claims HWiNFO is not running", () => {
-		// A held consistency mutex means HWiNFO IS running; telling the user
-		// to start software that is running in front of them is a lie.
+		// The source mutex was busy; that alone does not prove the producer's
+		// process state or justify asking the user to restart it.
 		const status = unavailable("busy");
 		assert.deepEqual(statusScreen(status)?.lines, ["HWiNFO busy", "retrying"]);
 		assert.equal(statusDialText(status)?.title, "HWiNFO busy");
 		assert.doesNotMatch(statusScreen(status)?.lines.join(" ") ?? "", /Start HWiNFO/);
 		assert.doesNotMatch(statusSentence(status), /not running|Start HWiNFO|restart HWiNFO/);
+		assert.doesNotMatch(statusSentence(status), /HWiNFO is running/);
 		assert.match(statusSentence(status), /busy|retr/i);
 	});
 
@@ -87,11 +88,26 @@ describe("state-screens: every unavailable reason has its own guidance", () => {
 		// An AV-quarantined or missing bin/hwsm.node cannot be fixed by
 		// restarting HWiNFO; the screens must not borrow "invalid"'s advice.
 		const status = unavailable("bridge-failed");
-		assert.deepEqual(statusScreen(status)?.lines, ["Plugin damaged", "reinstall"]);
+		assert.deepEqual(statusScreen(status)?.lines, ["Bridge failed", "reinstall"]);
 		assert.equal(statusDialText(status)?.value, "reinstall it");
 		assert.match(statusSentence(status), /[Rr]einstall/);
-		assert.match(statusSentence(status), /antivirus/);
+		assert.match(statusSentence(status), /security.*report|report.*security/);
+		assert.doesNotMatch(statusSentence(status), /restore or allow|allow.*antivirus|often.*quarantine/);
 		assert.doesNotMatch(statusSentence(status), /restart HWiNFO/);
+	});
+
+	it("access denial and persistent empty storage do not claim a particular cause", () => {
+		const denied = unavailable("access-denied");
+		assert.deepEqual(statusScreen(denied)?.lines, ["Access denied", "check access"]);
+		assert.doesNotMatch(statusSentence(denied), /Usually|run both elevated|works across privilege/);
+		assert.match(statusSentence(denied), /does not identify/);
+		assert.doesNotMatch(statusSentence(unavailable("gadget-empty")), /registry is enabled/);
+	});
+
+	it("missing update evidence is not diagnosed as a stalled process", () => {
+		assert.equal(statusDialText(stale("shared-memory"))?.title, "No new data");
+		assert.match(statusSentence(stale("shared-memory")), /No new Shared Memory.*20s/);
+		assert.doesNotMatch(statusSentence(stale("shared-memory")), /HWiNFO stopped updating/);
 	});
 });
 

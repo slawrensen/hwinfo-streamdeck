@@ -29,15 +29,21 @@ without waiting for the proposed calendar boundary.
 
 | Group | Owner | Scope | Dependency |
 | --- | --- | --- | --- |
-| Release integrity | root | D09 input validation, build/staging token separation, two dev dependency advisory fixes; PR #25 | main |
-| Measurement foundation | statistics, identity and freshness agents; root integration | Sprints 1-3, D01-D05/D07, U1 experiment/containment and existing explicit-pair runtime | Release integrity |
-| Readability | identity/readability agent | D08 default value/stat contrast and persistent severity shapes | Measurement foundation |
-| Recovery copy and PI designs | statistics/PI agent | Factual recovery instructions; setup, pairing and transactional-import specifications | Measurement foundation |
+| Release integrity | root | D09 input validation, build/staging token separation, two dev dependency advisory fixes; [PR #25](https://github.com/slawrensen/hwinfo-streamdeck/pull/25) | main |
+| Measurement foundation | statistics, identity and freshness agents; root integration | Sprints 1-3, D01-D05/D07, U1 experiment/containment and existing explicit-pair runtime; [PR #26](https://github.com/slawrensen/hwinfo-streamdeck/pull/26) | Release integrity |
+| Recovery copy and PI designs | statistics/PI agent | Factual recovery instructions; setup, pairing and transactional-import specifications; [PR #27](https://github.com/slawrensen/hwinfo-streamdeck/pull/27) | Measurement foundation |
+| Readability | identity/readability agent | D08 default value/stat contrast and persistent severity shapes; [PR #28](https://github.com/slawrensen/hwinfo-streamdeck/pull/28) | Recovery copy |
 | Qualification and program | root; additional area review | Host/plugin measurements, hardware gates, later-sprint designs and release decision | Final reviewed software stack |
 
 The same domain owner may cover related sprints sequentially. The session
 supports three agents beside the integration owner; native/e2e tests use one
 shared execution slot to prevent fixture and timing interference.
+
+The final combined [Windows validation](validation-2026-09-07.md) passed
+910 unit tests, 99 native tests and the full suite with zero orphaned
+processes. The package and native hashes are pinned there. These software
+passes supersede the pending central-check notes in earlier area reports;
+their physical, producer-contract and guided-feature gates remain open.
 
 ## Sprint ledger
 

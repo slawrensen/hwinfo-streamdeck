@@ -24,6 +24,7 @@ export function nextStatMode(mode: StatMode): StatMode {
 }
 
 export function statValue(reading: Reading, mode: StatMode): number {
+	if (mode !== "current" && reading.statistics === "unavailable") return Number.NaN;
 	switch (mode) {
 		case "min":
 			return reading.valueMin;

@@ -189,6 +189,7 @@ export class GadgetRegistryProvider {
 				unit,
 				// The gadget interface exposes only the current value.
 				value,
+				statistics: "unavailable",
 				valueMin: Number.NaN,
 				valueMax: Number.NaN,
 				valueAvg: Number.NaN

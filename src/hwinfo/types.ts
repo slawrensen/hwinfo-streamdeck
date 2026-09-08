@@ -41,6 +41,9 @@ export interface Reading {
 	readonly label: string;
 	readonly unit: string;
 	readonly value: number;
+	/** Producer history capability. Omitted on legacy snapshots means producer
+	 * history; unavailable sources must not substitute their current value. */
+	readonly statistics?: "producer" | "unavailable";
 	readonly valueMin: number;
 	readonly valueMax: number;
 	readonly valueAvg: number;

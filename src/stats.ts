@@ -19,23 +19,53 @@ export type SessionStats = {
 	count: number;
 };
 
+export type SessionResetReason = "source" | "unit" | "type" | "binding";
+
+const RESET_MESSAGES: Record<SessionResetReason, string> = {
+	source: "stats reset: source changed",
+	unit: "stats reset: units changed",
+	type: "stats reset: reading changed",
+	binding: "stats reset: pairing changed"
+};
+
+export function sessionResetMessage(reason: SessionResetReason): string {
+	return RESET_MESSAGES[reason];
+}
+
+type Observation = {
+	pollTime: number;
+	value: number;
+	source: string;
+	type: Reading["type"];
+	unit: string;
+	bindingRevision: number;
+};
+
 export class SessionStatsStore {
 	private readonly byKey = new Map<string, SessionStats>();
-	private readonly observations = new Map<string, { pollTime: number; value: number; domain: string }>();
+	private readonly observations = new Map<string, Observation>();
 
 	/** Sample-weighted local observations, never repeated held frames. A
 	 * provider/unit/link change starts a new session for that reading. */
-	observe(reading: Reading, snapshot: SensorSnapshot, source: string): void {
-		const domain = `${source}:${reading.type}:${reading.unit}:${snapshot.bindingRevision ?? 0}`;
+	observe(reading: Reading, snapshot: SensorSnapshot, source: string): SessionResetReason | undefined {
+		const bindingRevision = snapshot.bindingRevision ?? 0;
 		const previous = this.observations.get(reading.key);
-		if (previous !== undefined && previous.domain !== domain) this.reset([reading.key]);
+		let reason: SessionResetReason | undefined;
+		if (previous !== undefined) {
+			if (previous.source !== source) reason = "source";
+			else if (previous.unit !== reading.unit) reason = "unit";
+			else if (previous.type !== reading.type) reason = "type";
+			else if (previous.bindingRevision !== bindingRevision) reason = "binding";
+		}
+		if (reason !== undefined) this.reset([reading.key]);
 		if (!Number.isFinite(reading.value)) {
 			this.reset([reading.key]);
 			return;
 		}
-		if (previous?.domain === domain && previous.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
+		if (reason === undefined && previous?.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
 		this.sample(reading.key, reading.value);
-		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, domain });
+		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, bindingRevision });
+		return reason;
 	}
 
 	/** Folds one native-unit sample into the reading's session. */

@@ -33,7 +33,7 @@ import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-prot
 import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, groupReadings, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource, type RotationGroup } from "../rotation";
-import { SessionStatsStore, type SessionStats } from "../stats";
+import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
 import { FOOTER_PX, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
 import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
@@ -571,7 +571,8 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		for (const key of keys) {
 			const reading = snapshot.byKey.get(key);
 			if (reading !== undefined) {
-				state.stats.observe(reading, snapshot, source);
+				const resetReason = state.stats.observe(reading, snapshot, source);
+				if (key === current && resetReason !== undefined) this.showOverlay(state, sessionResetMessage(resetReason));
 			} else {
 				state.stats.reset([key]);
 			}
@@ -962,7 +963,7 @@ function parseAutoCycleMs(raw: string | undefined): number | null {
 	return Number.isInteger(ms) && ms > 0 ? ms : null;
 }
 
-function composeDialSvg(state: InstanceState, status: PollerStatus): string {
+export function composeDialSvg(state: InstanceState, status: PollerStatus): string {
 	const settings = state.settings;
 	const config = loadThemes();
 	const themeId = effectiveThemeFor(settings);

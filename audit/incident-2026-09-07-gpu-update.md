@@ -8,9 +8,10 @@ The installed deck reported `HWiNFO stalled / check sharing` because its
 Shared Memory producer had crashed. Windows recorded HWiNFO64.exe crashing
 inside NVIDIA's `nvml.dll`; the user confirmed updating the GPU driver.
 SetupAPI independently places the driver replacement seconds before the
-crash. This strongly supports driver replacement as the trigger. The exact
-internal NVIDIA/HWiNFO failure requires crash-stack analysis; an access
-violation event alone does not establish the faulty instruction's cause.
+crash. Local crash-dump metadata confirms that the fault occurred in the
+old nvml.dll while old and new NVIDIA libraries coexisted in HWiNFO. This
+strongly supports driver replacement as the trigger. The exact internal
+NVIDIA/HWiNFO failure still requires a full stack and instruction analysis.
 
 The development changes were not installed. The live plugin remained
 1.6.0.0, PID 26256, started September 6 at 17:30:48. Its directory was an
@@ -33,6 +34,14 @@ changed during the incident investigation.
 
 The driver currently reported by Windows is 32.0.16.1686 on the RTX 4090.
 The faulting library version in the event is the earlier 8.17.16.1664.
+
+The local dump's exception and module records independently identify a read
+access violation in nvml.dll 8.17.16.1664 at offset 0xf3ea0. The same dump
+contains nvml.dll 8.17.16.1686, nvapi64.dll 32.0.16.1686 and
+nvapi64_impl.dll 32.0.16.1664. This is evidence of mixed driver generations,
+not an assertion of the exact bad call or pointer. No debugger was installed;
+only documented minidump metadata was parsed locally. No memory contents or
+dump were uploaded, and no symbolic stack unwind was claimed.
 
 Snapshot SHA-256:
 `e1701ab3cfda35a393b4644c53a5551790f02a9542e81a83adee5e52b600f3aa`.

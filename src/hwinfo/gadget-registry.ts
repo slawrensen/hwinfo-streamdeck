@@ -147,6 +147,7 @@ export class GadgetRegistryProvider {
 		const sensorIndexByName = new Map<string, number>();
 		const readings: Reading[] = [];
 		const identityKeys: string[] = [];
+		let incompleteIdentityCount = 0;
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
 		const values = new Map<string, number>();
@@ -177,7 +178,14 @@ export class GadgetRegistryProvider {
 				const verifiedSensor = this.key.queryString(`Sensor${i}`);
 				const verifiedLabel = this.key.queryString(`Label${i}`);
 				if (sensorName !== verifiedSensor || labelField !== verifiedLabel) return null;
-				const label = labelField ?? `Reading ${i}`;
+				// Registry positions identify scan locations, never readings.
+				// Preserve meaningful producer names exactly, but withhold an
+				// incomplete row instead of inventing a persistent slot label.
+				if (!sensorName.trim() || !labelField?.trim()) {
+					incompleteIdentityCount++;
+					continue;
+				}
+				const label = labelField;
 				const key = gadgetReadingKey(sensorName, label);
 				// Name identity is evidence independently of numeric eligibility.
 				// Capture it before a numeric reread can throw or validation can
@@ -253,7 +261,7 @@ export class GadgetRegistryProvider {
 		}
 
 		for (const key of blocked) byKey.delete(key);
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: readings.length - safeReadings.length };
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: incompleteIdentityCount + readings.length - safeReadings.length };
 	}
 
 	close(): void {

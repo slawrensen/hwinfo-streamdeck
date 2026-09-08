@@ -85,11 +85,11 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 /** Human sentence for PI hints. */
 export function statusSentence(status: PollerStatus): string {
 	if (status.state === "ok") {
-		return status.source === "gadget" ? "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs." + (status.snapshot.blockedReadingCount ? " Ambiguous Gadget names are withheld. Give these readings unique names in HWiNFO, then select them again." : "") : "";
+		return status.source === "gadget" ? "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs." + (status.snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names and give each reading a unique label in HWiNFO, then select it again." : "") : "";
 	}
 	if (status.state === "stale") {
 		return status.source === "gadget"
-			? "Gadget freshness is unknown. Unchanged values may be steady readings or an old registry left after HWiNFO exits. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + (status.snapshot.blockedReadingCount ? " Ambiguous Gadget names are withheld; give these readings unique names before selecting them again." : "")
+			? "Gadget freshness is unknown. Unchanged values may be steady readings or an old registry left after HWiNFO exits. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + (status.snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names and give each reading a unique label in HWiNFO, then select it again." : "")
 			: `HWiNFO stopped updating ${Math.round(status.staleForMs / 1000)}s ago. Check that the Sensors window is open and Shared Memory Support is still enabled.`;
 	}
 	switch (status.reason) {

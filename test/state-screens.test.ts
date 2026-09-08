@@ -45,6 +45,18 @@ describe("state-screens: stale recovery hint follows the source", () => {
 		assert.match(statusSentence(stale("gadget")), /Gadget/);
 		assert.match(statusSentence(stale("shared-memory")), /Shared Memory/);
 	});
+
+	it("withheld Gadget names explain incomplete identity as well as ambiguity", () => {
+		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, blockedReadingCount: 1 };
+		const statuses: PollerStatus[] = [
+			{ state: "ok", source: "gadget", snapshot },
+			{ state: "stale", source: "gadget", snapshot, staleForMs: 20_000 }
+		];
+		for (const status of statuses) {
+			assert.match(statusSentence(status), /Incomplete or ambiguous Gadget names are withheld/);
+			assert.match(statusSentence(status), /source names.*unique label.*select it again/);
+		}
+	});
 });
 
 describe("state-screens: every unavailable reason has its own guidance", () => {

@@ -10,8 +10,15 @@ const hash = (text: string): string => createHash("sha256").update(text).digest(
 
 /** Keep ordinary saved keys, including spaces. Reserved characters use a
  * separate namespace that cannot impersonate a legacy suffix or colon
- * partition. No aliases from those ambiguous legacy strings. */
+ * partition. Literal names matching the old missing-label fallback use a
+ * tagged tuple: an old slot selection cannot become a genuine named reading
+ * on upgrade, even when its incomplete identity was never observed here.
+ * No aliases from either ambiguous legacy format. */
 export function gadgetReadingKey(sensor: string, label: string): string {
+	const fallback = /^Reading (0|[1-9]\d*)$/.exec(label);
+	if (fallback && fallback[0] === label && Number(fallback[1]) < 1024) {
+		return `g2:${Buffer.from(JSON.stringify(["named", sensor, label])).toString("base64url")}`;
+	}
 	return /[:~\r\n]/.test(sensor + label)
 		? `g2:${Buffer.from(JSON.stringify([sensor, label])).toString("base64url")}`
 		: `g:${sensor}:${label}`;

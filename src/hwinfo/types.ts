@@ -63,7 +63,7 @@ export interface Reading {
 export interface SensorSnapshot {
 	/** Rendering invalidation for changed explicit provider links. */
 	readonly bindingRevision?: number;
-	/** Gadget readings withheld because their names have been ambiguous. */
+	/** Gadget readings withheld because their names are incomplete or ambiguous. */
 	readonly blockedReadingCount?: number;
 	/** Measurement evidence, distinct from render/topology revision. Shared
 	 * memory counts producer stamps or finite same-unit value changes; Gadget

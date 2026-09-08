@@ -30,7 +30,11 @@ In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget*
 
 HWiNFO gives every ticked reading a numbered slot and leaves that number reserved even while the reading itself is switched off, so the numbering can carry permanent gaps. The plugin reads across them (since 1.6.0; earlier versions stopped at the first gap, see [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up)).
 
-The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Ordinary unique names survive reordering and restarts. Renaming either changes that identity. Duplicate names are withheld, and observed ambiguous names remain blocked across restarts. Give those readings distinct names and select them again. Names containing colons or tildes use a new unambiguous key format; old selections stay saved but need reselection. The registry cannot reveal ambiguity that vanished before the first observation, or distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
+The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Ordinary unique names survive reordering and restarts. Renaming either changes that identity. Missing or blank source names and labels are withheld; the plugin never substitutes a registry position for a name. Duplicate names are also withheld, and observed ambiguous names remain blocked across restarts. Check the source names, give readings distinct labels and select them again.
+
+Names containing colons or tildes use a new unambiguous key format; old selections stay saved but need reselection. Genuine producer labels spelled exactly `Reading 0` through `Reading 1023` also need reselection once. Earlier versions invented those same labels when a registry label was missing, so an old selection cannot safely identify a real producer label. The real named reading remains selectable under a new identity, and its explicit cross-source link must be updated if one was configured. Other names, including `Reading 00` and `Reading 1024`, keep their existing identities. No saved settings are rewritten automatically.
+
+The registry cannot reveal ambiguity that vanished before the first observation, or distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
 
 ## Auto mode
 

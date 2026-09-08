@@ -55,9 +55,8 @@ interface Quartet {
 
 /**
  * Three rotating groups; the value tracks the index so a reading is
- * identifiable. The label deliberately does NOT read `Reading <i>`: that is
- * the provider's own fallback for an absent LabelN, and a fixture using it
- * would let a reader that never queried LabelN pass every assertion here.
+ * identifiable. Labels differ from the old synthetic `Reading <i>` fallback
+ * so a reader that never queried LabelN cannot pass the label assertions.
  */
 function defaultQuartet(i: number): Quartet {
 	return { sensor: ["Alpha Source", "Beta Source", "Gamma Source"][i % 3], label: `Label ${i}`, value: `${i}.5 °C`, raw: `${i}.5` };
@@ -226,26 +225,31 @@ describe("gadget provider: key states and entry shapes", { skip: !onWindows ? "w
 		assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "not-running");
 	});
 
-	test("missing companion values keep their documented fallbacks past a hole", () => {
+	test("an incomplete identity is withheld past a hole", () => {
 		shape([0]);
 		putValue("Sensor5", "Lonely Source");
 		const snap = readShape();
+		assert.deepEqual(ids(snap), [0]);
+		assert.equal(snap.byKey.has("g:Lonely Source:Reading 5"), false, "a slot cannot supply a persistent identity");
+		assert.equal(snap.blockedReadingCount, 1);
+	});
+
+	test("missing numeric fields preserve an unavailable value under a complete identity", () => {
+		shape([0, 5], (i) => i === 0 ? defaultQuartet(i) : { sensor: "Named Source", label: "Named reading" });
+		const snap = readShape();
 		assert.deepEqual(ids(snap), [0, 5]);
 		const lonely = snap.readings[1] as Reading;
-		assert.equal(lonely.label, "Reading 5", "absent LabelN falls back to the index");
+		assert.equal(lonely.label, "Named reading");
 		assert.equal(lonely.unit, "", "absent ValueN yields no unit");
 		assert.ok(Number.isNaN(lonely.value), "absent ValueRawN parses to NaN");
 	});
 
-	test("an empty SensorN is a present entry, not an absent one", () => {
+	test("an empty SensorN is withheld without hiding later entries", () => {
 		shape([0, 2]);
 		putValue("Sensor1", "");
 		const snap = readShape();
-		assert.deepEqual(ids(snap), [0, 1, 2], "an empty REG_SZ is a value that exists");
-		// It groups under an empty sensor name rather than being skipped; the
-		// native contract already separates "" from null, and this pins that
-		// the reader keeps that distinction.
-		assert.equal(snap.readings[1]?.key, "g::Reading 1");
+		assert.deepEqual(ids(snap), [0, 2]);
+		assert.equal(snap.blockedReadingCount, 1, "an empty REG_SZ exists but supplies no source identity");
 	});
 
 	test("stray Label/Value without a SensorN stays skipped", () => {
@@ -370,6 +374,122 @@ describe("gadget provider: shape changes between polls", { skip: !onWindows ? "w
 });
 
 describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	for (const [name, invalid] of [
+		["missing label", { sensor: "Incomplete missing label" }],
+		["empty label", { sensor: "Incomplete empty label", label: "" }],
+		["whitespace label", { sensor: "Incomplete whitespace label", label: " \t\u00a0 " }],
+		["empty source", { sensor: "", label: "Incomplete empty source" }],
+		["whitespace source", { sensor: " \t\u00a0 ", label: "Incomplete whitespace source" }]
+	] as const) {
+		test(`a finite value with ${name} has no selectable Gadget identity`, () => {
+			shape([0, 8], (i) => i === 0 ? { ...invalid, value: "40 °C", raw: "40" } : defaultQuartet(i));
+			const snapshot = readShape();
+			assert.deepEqual(ids(snapshot), [8]);
+			assert.equal(snapshot.byKey.size, 1);
+			assert.equal(snapshot.sensors.length, 1, "incomplete identities do not create picker groups");
+			assert.equal(snapshot.blockedReadingCount, 1);
+			assert.equal(snapshot.freshnessRevision, 0);
+		});
+	}
+
+	test("unlabelled slots cannot change a saved fallback owner through removal, compaction or restart", () => {
+		const sensor = "Unlabelled compaction";
+		shape([0, 7], (i) => ({ sensor, value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const initial = readVerified(provider);
+			assert.deepEqual(initial.readings, []);
+			assert.equal(initial.blockedReadingCount, 2);
+			dropValue("Sensor0");
+			assert.equal(readVerified(provider).byKey.has(`g:${sensor}:Reading 0`), false);
+			putValue("Sensor0", sensor);
+			putValue("Value0", "80 °C");
+			putValue("ValueRaw0", "80");
+			dropValue("Sensor7");
+			const compacted = readVerified(provider);
+			assert.deepEqual(compacted.readings, []);
+			assert.equal(compacted.blockedReadingCount, 1);
+			assert.equal(compacted.freshnessRevision, 0, "invalid identities cannot establish numeric-change evidence");
+		} finally { provider.close(); }
+		assert.deepEqual(readShape().readings, []);
+	});
+
+	test("a genuine producer Reading 0 label gets a non-positional identity through reorder and restart", () => {
+		const sensor = "Literal reading label";
+		shape([0], () => ({ sensor, label: "Reading 0", value: "40 °C", raw: "40" }));
+		const snapshot = readShape();
+		assert.equal(snapshot.byKey.has(`g:${sensor}:Reading 0`), false, "a saved legacy positional selection requires reselection");
+		const key = snapshot.readings[0]?.key;
+		assert.ok(key);
+		assert.ok(key.startsWith("g2:"));
+		assert.deepEqual(JSON.parse(Buffer.from(key.slice(3), "base64url").toString()), ["named", sensor, "Reading 0"]);
+		shape([9], () => ({ sensor, label: "Reading 0", value: "45 °C", raw: "45" }));
+		assert.equal(readShape().byKey.get(key)?.value, 45);
+	});
+
+	test("old synthetic identities cannot bind a later real label in another process", () => {
+		const sensor = "Legacy fallback collision";
+		shape([0], () => ({ sensor, value: "40 °C", raw: "40" }));
+		readShape();
+		shape([7], () => ({ sensor, label: "Reading 0", value: "80 °C", raw: "80" }));
+		const script = 'const { GadgetRegistryProvider } = await import("./src/hwinfo/gadget-registry.ts"); const p = GadgetRegistryProvider.open(); try { process.stdout.write(JSON.stringify(p.read().readings)); } finally { p.close(); }';
+		const stdout = execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], { encoding: "utf8" });
+		const readings = JSON.parse(stdout) as Reading[];
+		assert.equal(readings.length, 1, "a genuine producer label remains selectable");
+		assert.notEqual(readings[0]?.key, `g:${sensor}:Reading 0`, "a real label must not inherit an old slot fallback");
+		putValue("Label7", "Uniquely repaired reading");
+		assert.equal(readShape().byKey.get(`g:${sensor}:Uniquely repaired reading`)?.value, 80);
+	});
+
+	test("real labels never alias synthetic legacy identities in either scan order", () => {
+		for (const incompleteSlot of [0, 8]) {
+			const sensor = `Current fallback collision ${incompleteSlot}`;
+			shape([0, 8], (i) => ({ sensor, ...(i === incompleteSlot ? {} : { label: `Reading ${incompleteSlot}` }), value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
+			const snapshot = readShape();
+			assert.equal(snapshot.byKey.has(`g:${sensor}:Reading ${incompleteSlot}`), false);
+			assert.deepEqual(ids(snapshot), [incompleteSlot === 0 ? 8 : 0]);
+			assert.equal(snapshot.blockedReadingCount, 1);
+		}
+	});
+
+	test("first observation cannot reuse a legacy encoded fallback identity or its explicit link", () => {
+		const sensor = "First upgrade: source";
+		const label = "Reading 1023";
+		const legacyKey = `g2:${Buffer.from(JSON.stringify([sensor, label])).toString("base64url")}`;
+		shape([7], () => ({ sensor, label, value: "80 °C", raw: "80" }));
+		const snapshot = readShape();
+		assert.equal(snapshot.byKey.has(legacyKey), false, "no prior invalid-row observation is needed for migration safety");
+		const newKey = snapshot.readings[0]?.key;
+		assert.ok(newKey);
+		assert.notEqual(newKey, legacyKey);
+		const oldLink = applyReadingLinks(snapshot, [{ sharedMemory: "f0001234:0:1000001", gadget: legacyKey, unit: "°C", sensorType: 1 }], 1);
+		assert.equal(oldLink.byKey.has("f0001234:0:1000001"), false);
+		const newLink = applyReadingLinks(snapshot, [{ sharedMemory: "f0001234:0:1000001", gadget: newKey, unit: "°C", sensorType: 1 }], 2);
+		assert.equal(newLink.byKey.get("f0001234:0:1000001")?.value, 80);
+	});
+
+	test("only canonical historical fallback labels require reselection", () => {
+		const unchanged = ["Reading 00", "Reading 01", "Reading -1", "Reading 1024", "Reading 1.0", "Reading 1 ", " Reading 1", "reading 1"];
+		shape(unchanged.map((_, i) => i), (i) => ({ sensor: "Literal label boundary", label: unchanged[i], value: "40 °C", raw: "40" }));
+		const snapshot = readShape();
+		for (const label of unchanged) assert.equal(snapshot.byKey.get(`g:Literal label boundary:${label}`)?.value, 40);
+	});
+
+	test("literal fallback label duplicates stay withheld after removal and restart", () => {
+		const sensor = "Duplicate literal fallback";
+		shape([0, 7], (i) => ({ sensor, label: "Reading 17", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
+		assert.deepEqual(readShape().readings, []);
+		dropValue("Sensor0");
+		const survivor = readShape();
+		assert.deepEqual(survivor.readings, []);
+		assert.equal(survivor.blockedReadingCount, 1);
+	});
+
+	test("complete producer names retain significant surrounding spaces", () => {
+		shape([0], () => ({ sensor: " Source with spaces ", label: " Reading with spaces ", value: "40 °C", raw: "40" }));
+		assert.equal(readShape().byKey.get("g: Source with spaces : Reading with spaces ")?.value, 40);
+	});
+
 	test("removing slot zero never substitutes slot one for the saved base key", () => {
 		shape([0, 1], (i) => ({ sensor: "GPU", label: "Temperature", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
 		const provider = GadgetRegistryProvider.open();
@@ -640,7 +760,7 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 	}
 
 	test("a rejected unique prefix remains compatible when the full scan recovers", () => {
-		shape([0, 8], (i) => ({ sensor: "Unique rejected prefix", label: `Reading ${i}`, raw: "40", value: "40 °C" }));
+		shape([0, 8], (i) => ({ sensor: "Unique rejected prefix", label: `Measurement ${i}`, raw: "40", value: "40 °C" }));
 		const provider = GadgetRegistryProvider.open();
 		try {
 			const before = readVerified(provider);
@@ -651,7 +771,7 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 			assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision);
 			putValue("Value8", "40 °C");
 			const recovered = readVerified(provider);
-			assert.equal(recovered.byKey.get("g:Unique rejected prefix:Reading 0")?.value, 45);
+			assert.equal(recovered.byKey.get("g:Unique rejected prefix:Measurement 0")?.value, 45);
 			assert.equal(recovered.blockedReadingCount, 0);
 			assert.equal(recovered.freshnessRevision, (before.freshnessRevision ?? 0) + 1);
 		} finally { provider.close(); }

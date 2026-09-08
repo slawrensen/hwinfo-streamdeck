@@ -43,6 +43,16 @@ selections remain saved and require reselection. Duplicate names cannot
 become eligible merely by removing one duplicate or restarting the plugin.
 Rename the readings distinctly and select them again.
 
+Incomplete source names or labels are withheld even when their numbers are
+valid. A registry slot supplies no persistent identity. Literal producer
+labels spelled exactly `Reading 0` through `Reading 1023` receive a tagged
+identity distinct from both old key formats, because previous versions
+generated those labels for missing registry fields. These readings remain
+selectable but require explicit reselection and replacement of any old
+cross-source link. This closes first-upgrade collisions without needing
+historical observations. Other valid names remain unchanged. The plugin
+does not rewrite saved selections or infer replacement identities.
+
 Gadget cannot identify hardware that reuses a name, recover duplicate
 history lost before observation, provide atomic multi-field snapshots, or
 distinguish an unchanged live reading from abandoned registry data. A value

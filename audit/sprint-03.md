@@ -34,7 +34,7 @@ release gates; passing these synthetic fixtures does not close them.
 | Stale Shared Memory probe selects Gadget | Prior snapshot is briefly labelled as Gadget | Held snapshot retains its actual source until a new observation |
 | Successful reopen repeatedly followed by a busy read | Open time can extend held freshness | Prior evidence age survives every retry |
 | Gadget raw number changes spelling, or becomes finite from invalid | Raw-string difference supplies liveness evidence | Two finite, numerically different values are required |
-| Any Gadget row field changes between validation observations | Mixed identity/unit/value can be returned | Whole scan returns null before identity journal, digest or evidence updates |
+| Any Gadget row field changes between validation observations | Mixed identity/unit/value can be returned | Whole scan returns null before digest or measurement evidence updates; verified identity ambiguity is still journaled |
 | Formatted 176 F is paired with raw 80 while the writer pauses | Two repeated rows agree but still contain contradictory numbers | Whole scan is withheld until raw and displayed numeric precision agree |
 | First Gadget scan is withheld by validation | Could be confused with an empty source | Open closes the handle and reports busy; Auto preserves that observation when Shared Memory is absent |
 
@@ -76,8 +76,11 @@ Before containment, the fixture returned:
 
 After containment, that intermediate scan is null. Tests exercise a change
 in each of Sensor, Label, formatted Value and raw Value fields, plus busy
-cold-open behavior. No evidence or ambiguity history is committed from the
-withheld scan.
+cold-open behavior. No measurement evidence is committed from a withheld
+scan. Later D03 follow-ups in [Sprint 2](sprint-02.md) preserve verified
+identity ambiguity even if that row's numeric fields or a later row reject
+the scan. Rejected measurements must not erase independently observed
+identity history.
 
 A second fixture deliberately pauses after changing formatted `80 C` to
 `176 F`, before changing raw `80` to `176`. Both validation observations
@@ -129,6 +132,12 @@ The final integrated candidate still requires the root agent's full suite
 and package checks. A final small preservation of the old evidence clock
 during a source-changing reopen was unit-tested after the e2e runs; it is
 included in the pending integrated full-suite gate.
+
+This ledger describes the original area pass. PR #29 subsequently recorded
+a passing combined Windows suite. The later incomplete-name and legacy
+fallback identity fix is documented in [Sprint 2](sprint-02.md) and requires
+a new integrated run. It withholds incomplete Gadget identities without
+minting freshness; it does not add a producer heartbeat or atomicity claim.
 
 The bounded reread adds four queries per occupied row. At 39 sparse rows,
 500 measured scans after 50 warmups changed from 1,141 to 1,297 queries.

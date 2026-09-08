@@ -20,10 +20,27 @@ const snapshot = (r: Reading = reading, pollTime = 1): SensorSnapshot => ({ poll
 
 describe("refutation: identity and explicit links", () => {
 	it("reserved names, empty names and spaces produce injective keys", () => {
-		const parts = ["", "GPU", "GPU:0", "GPU~1", "GPU %", "a:b", "a", "b:c", "a\nb", "é", "\"[]", " Two words "];
+		const parts = ["", "GPU", "GPU:0", "GPU~1", "GPU %", "a:b", "a", "b:c", "a\nb", "é", "\"[]", " Two words ", "Reading 0", "Reading 1023"];
 		const keys = parts.flatMap((source) => parts.map((label) => gadgetReadingKey(source, label)));
 		assert.equal(new Set(keys).size, parts.length ** 2);
 		assert.equal(gadgetReadingKey("Two words", "CPU Temp"), "g:Two words:CPU Temp");
+	});
+	it("literal fallback names cannot reuse either historical key format", () => {
+		for (const sensor of ["Source", "Source:with delimiter"]) {
+			for (let i = 0; i < 1024; i++) {
+				const label = `Reading ${i}`;
+				const key = gadgetReadingKey(sensor, label);
+				assert.notEqual(key, `g:${sensor}:${label}`);
+				assert.notEqual(key, `g2:${Buffer.from(JSON.stringify([sensor, label])).toString("base64url")}`);
+				assert.deepEqual(JSON.parse(Buffer.from(key.slice(3), "base64url").toString()), ["named", sensor, label]);
+			}
+		}
+	});
+	it("fallback-like names outside the exact historical spellings retain their keys", () => {
+		for (const label of ["Reading 00", "Reading 1024", "Reading 1\n", "Reading 1\r", "Reading 1\r\n", "Reading 1\u2028", "Reading 1\u2029"]) {
+			const original = /[:~\r\n]/.test(label) ? `g2:${Buffer.from(JSON.stringify(["Source", label])).toString("base64url")}` : `g:Source:${label}`;
+			assert.equal(gadgetReadingKey("Source", label), original);
+		}
 	});
 	it("links are opt in and never inferred from identical names or numbers", () => {
 		assert.equal(applyReadingLinks(snapshot(), [], 0).byKey.get(link.gadget), undefined);

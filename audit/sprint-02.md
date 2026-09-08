@@ -53,8 +53,8 @@ run here includes the existing production key-encoding/link regressions.
 The journal cannot recover duplicate history that the candidate never
 observed, detect a different physical device reusing a unique name, or make
 separate registry queries atomic. These are explicit Gadget interface
-limits, not solved cases. No new Gadget implementation or speculative
-identity heuristic was added in this change.
+limits, not solved cases. The initial parser patch added no new Gadget
+implementation. The later Gadget follow-ups are recorded below.
 
 ## Compatibility and recovery
 
@@ -99,7 +99,7 @@ Commands ran on Windows x64 with repository dependencies installed by
 review is owned by the release-integrity work; no automatic dependency
 changes were applied here.
 
-## Outstanding acceptance gates
+## Initial area-pass outstanding acceptance gates
 
 This area pass does not mark the whole sprint or release qualified.
 `build:native`, `build`, `test:native`, `e2e:gadget`, `e2e:pi` and
@@ -109,6 +109,10 @@ Physical HWiNFO topology-change captures, physical key/dial results and
 guided repair/cancellation captures also remain outstanding. The D05 fix
 can be reviewed and delivered with the existing measurement-integrity
 containment without waiting for a future calendar sprint boundary.
+
+These are the original area-pass results. The combined candidate later
+passed Windows qualification recorded in PR #29. Subsequent runtime changes
+require a new integrated run; those older logs do not qualify this patch.
 
 ## Follow-up: ambiguity from a rejected Gadget scan
 
@@ -186,3 +190,52 @@ The red command used
 `node --import tsx --test --test-name-pattern="stable duplicate identity|an unstable .* does not manufacture" test/gadget-provider.test.ts`;
 green used `node --import tsx --test test/gadget-provider.test.ts`.
 The same unchanged addon and isolated per-process fixture were used.
+
+## PR review follow-up: incomplete names and legacy slot identities
+
+Reviewed September 7, 2026 against foundation
+`67b40a4dbd3b77b6cdf460213faa52307ca86098`. The provider still accepted empty
+source names and missing or blank labels. A missing label became
+`Reading <slot>`, allowing removal and compaction to change a saved key's
+owner. A genuine producer label with that spelling could also inherit a
+saved synthetic selection on the first upgrade read, before any identity
+journal observation.
+
+The provider now requires a non-whitespace source name and label before
+publishing a reading. Meaningful names remain byte-for-byte unchanged.
+Incomplete rows contribute to the withheld count without creating picker
+groups, readings, numeric-change evidence or invented slot identities.
+Absent Sensor fields remain sparse holes. The PI describes incomplete and
+ambiguous identities and directs the user to check names and reselect.
+
+Literal producer labels spelled exactly `Reading 0` through `Reading 1023`
+use a tagged `g2:` tuple, distinct from the legacy plain key and the earlier
+two-element encoded tuple. They remain selectable and stable across reorder
+and restart, but require explicit reselection once. Existing links to the
+old key remain unresolved; a newly verified link can use the new key.
+This narrow migration requires neither new journal state nor a settings
+rewrite. `Reading 00`, `Reading 1024`, surrounding spaces and line-ending
+variants keep their prior identities. Existing duplicate journaling applies
+to the new identities without changes.
+
+The complete production-provider suite failed before the fix with 56 pass,
+12 fail and zero skips. After the fix, all 68 cases pass with zero skips.
+The added cases cover finite values with incomplete names, missing numeric
+fields with complete names, removal/compaction/reopen, a separate process,
+literal labels, first-observation legacy collisions, old/new explicit links,
+duplicate literal labels and significant whitespace. Pure regressions cover
+all 1,024 historical fallback spellings in both old key formats, plus exact
+boundaries including final CR/LF and Unicode line separators.
+The foundation unit suite passes all 834 tests with zero skips; lint passes
+with zero warnings and type checking passes.
+
+Raw evidence is retained in ignored `release/audit-evidence/`:
+`incomplete-gadget-red.log`, `incomplete-gadget-green.log`,
+`incomplete-gadget-unit.log`, `incomplete-gadget-lint.log` and
+`incomplete-gadget-typecheck.log`. The provider command is
+`node --import tsx --test test/gadget-provider.test.ts`; unit, lint and type
+checking use the package scripts. Native source and protocol remain
+unchanged. These tests use the isolated per-process registry fixture only.
+The root coordinator owns the matching Gadget e2e and integrated full-suite
+rerun. Physical producer write atomicity and hardware qualification remain
+separate, unresolved gates; this patch does not establish either.

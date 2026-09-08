@@ -1,4 +1,18 @@
-# Six-month roadmap, grounded in the September 7 verification
+# Six-month roadmap
+
+The current authorized sequence and per-sprint evidence are in the
+[audit remediation program](audit/PROGRAM.md). Confirmed wrong-data cases
+take precedence over feature expansion. Sprints 5 and 7-10 remain queued;
+the remote experiment has a documented no-go, and hardware qualification
+and release approval remain open. Draft PRs are review artifacts, not a
+release or completion of the thirteen-sprint program.
+
+## Historical September 7 plan
+
+The earlier plan below is retained as context. The audit program supersedes
+its ordering and proposals where they differ, including workspace and
+computed-metric expansion. Historical verification applies only to the
+candidate it names.
 
 Objective: make HWiNFO Sensors the easiest trustworthy local hardware
 readout. Obtain the correct reading quickly, preserve identity through

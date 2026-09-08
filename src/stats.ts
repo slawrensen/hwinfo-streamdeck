@@ -10,6 +10,8 @@
  * thrash the moment the sampled set outgrew it, silently resetting every
  * session each tick.
  */
+import type { Reading, SensorSnapshot } from "./hwinfo/types";
+
 export type SessionStats = {
 	min: number;
 	max: number;
@@ -17,8 +19,54 @@ export type SessionStats = {
 	count: number;
 };
 
+export type SessionResetReason = "source" | "unit" | "type" | "binding";
+
+const RESET_MESSAGES: Record<SessionResetReason, string> = {
+	source: "stats reset: source changed",
+	unit: "stats reset: units changed",
+	type: "stats reset: reading changed",
+	binding: "stats reset: pairing changed"
+};
+
+export function sessionResetMessage(reason: SessionResetReason): string {
+	return RESET_MESSAGES[reason];
+}
+
+type Observation = {
+	pollTime: number;
+	value: number;
+	source: string;
+	type: Reading["type"];
+	unit: string;
+	bindingRevision: number;
+};
+
 export class SessionStatsStore {
 	private readonly byKey = new Map<string, SessionStats>();
+	private readonly observations = new Map<string, Observation>();
+
+	/** Sample-weighted local observations, never repeated held frames. A
+	 * provider/unit/link change starts a new session for that reading. */
+	observe(reading: Reading, snapshot: SensorSnapshot, source: string): SessionResetReason | undefined {
+		const bindingRevision = snapshot.bindingRevision ?? 0;
+		const previous = this.observations.get(reading.key);
+		let reason: SessionResetReason | undefined;
+		if (previous !== undefined) {
+			if (previous.source !== source) reason = "source";
+			else if (previous.unit !== reading.unit) reason = "unit";
+			else if (previous.type !== reading.type) reason = "type";
+			else if (previous.bindingRevision !== bindingRevision) reason = "binding";
+		}
+		if (reason !== undefined) this.reset([reading.key]);
+		if (!Number.isFinite(reading.value)) {
+			this.reset([reading.key]);
+			return;
+		}
+		if (reason === undefined && previous?.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
+		this.sample(reading.key, reading.value);
+		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, bindingRevision });
+		return reason;
+	}
 
 	/** Folds one native-unit sample into the reading's session. */
 	sample(key: string, value: number): void {
@@ -52,6 +100,7 @@ export class SessionStatsStore {
 			}
 			if (!keep.has(key)) {
 				this.byKey.delete(key);
+				this.observations.delete(key);
 			}
 		}
 	}
@@ -68,10 +117,12 @@ export class SessionStatsStore {
 	reset(keys?: readonly string[]): void {
 		if (keys === undefined) {
 			this.byKey.clear();
+			this.observations.clear();
 			return;
 		}
 		for (const key of keys) {
 			this.byKey.delete(key);
+			this.observations.delete(key);
 		}
 	}
 

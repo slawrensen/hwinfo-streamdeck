@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.6.1.0-1" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -317,6 +317,7 @@
 					<option value="gadget">Gadget registry only</option>
 				</sdpi-select>
 			</sdpi-item>
+			<div class="hw-help">Auto switches providers. To keep a selection working on both, explicitly link its Shared Memory and Gadget keys in the deck Config document. See <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers">reading links</a>.</div>
 			<sdpi-item label="Poll every">
 				<sdpi-select setting="pollIntervalMs" global default="1000">
 					<option value="250">250 ms</option>
@@ -354,7 +355,7 @@
 			<div class="hw-help">The exact settings this key runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another key or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.6.0.0-3"></script>
-		<script src="pi-control.js?v=1.6.0.0-3"></script>
+		<script src="pi-common.js?v=1.6.1.0-1"></script>
+		<script src="pi-control.js?v=1.6.1.0-1"></script>
 	</body>
 </html>

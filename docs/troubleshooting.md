@@ -18,7 +18,8 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | **Start HWiNFO** / not detected | Start HWiNFO / not detected | Nothing found on either interface. |
 | **HWiNFO busy** / retrying | HWiNFO busy / retrying | HWiNFO is running but its shared memory was locked at that instant; the plugin retries on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
-| **Not updating** / check sharing *(or)* check Gadget | HWiNFO stalled / check sharing *(or)* check Gadget | Values frozen; the sub-line names the source in use. |
+| **Not updating** / check sharing | HWiNFO stalled / check sharing | No Shared Memory producer evidence for 15 seconds. |
+| **Age unknown** / check Gadget | Age unknown / check Gadget | Gadget has no heartbeat. Steady readings and an old registry left after exit are indistinguishable. |
 | **Access denied** / un-elevate | Access denied / un-elevate HWiNFO | Privilege mismatch between HWiNFO and Stream Deck. |
 | **Tick sensors** / in Gadget | Gadget empty / tick sensors | Gadget reporting is on but no sensors are ticked. |
 | **Pick a sensor** / in settings | HWiNFO / rotate to pick | No sensor selected on this key/dial yet. |
@@ -54,7 +55,7 @@ HWiNFO's shared-memory mapping exists but its header is flagged **disabled** (in
 
 ## Values are frozen / "Not updating"
 
-The reading stopped changing for more than ~15 seconds, so the plugin flags it stale. The sub-line names the source: **check sharing** (shared memory) or **check Gadget** (Gadget registry).
+No Shared Memory producer timestamp or value revision advanced for more than ~15 seconds. Gadget instead shows **Age unknown / check Gadget** until a value change is observed, and again after 15 seconds without value evidence. A steady reading is not proof that HWiNFO stopped; the registry cannot establish its age.
 
 1. **HWiNFO's Sensors window was closed or HWiNFO was minimised to tray without sensor polling.** Reopen the Sensors window; HWiNFO must keep polling to update either interface.
 2. **Not the free version's 12-hour timer.** Expiry doesn't freeze values: it marks the shared-memory mapping `DEAD`, which shows **"Shared Memory off"** or silently falls back to the Gadget registry in Auto mode. (Pro removes the limit.)

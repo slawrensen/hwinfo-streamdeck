@@ -27,6 +27,35 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-09-07: bounded Gadget row validation, synthetic registry
+
+Harness: `node --import tsx scripts/gadget-scan-benchmark.mjs`, Windows x64,
+Node v24.16.0, 39 populated sparse slots, 50 warmup scans and 500 measured
+scans. Native registry queries and production provider/identity handling
+are included. The before run uses the measurement-integrity candidate
+before row rereads; subsequent runs include one reread of every row field
+and then the numeric precision consistency check. The final run occurred
+after the native and Gadget e2e processes finished.
+
+| Measurement | Before | Row reread | Final row and number checks |
+| --- | ---: | ---: | ---: |
+| Registry queries per scan | 1,141 | 1,297 | 1,297 |
+| Mean scan | 4.56 ms | 6.03 ms | 5.15 ms |
+| Median scan | 4.51 ms | 5.42 ms | 5.04 ms |
+| P95 scan | 4.95 ms | 7.95 ms | 5.78 ms |
+
+These are separate short runs with ordinary system variance. The lower
+final timing does not establish that adding numeric checks improves speed.
+
+Query count changes from `1024 + 3N` to `1024 + 7N`. At 1,024 occupied
+slots this is 8,192 queries per scan, twice the previous 4,096. The 39-row
+result is a short synthetic measurement on this machine, not a 1,024-row
+timing result, host-resource budget, physical-device result or soak.
+The validation detects observed interleavings and withholds the scan;
+it cannot establish atomicity for a writer paused in an intermediate row.
+Raw before/after JSON is retained in the worktree's ignored
+`release/audit-evidence/sprint-03-scan-{before,after,final-isolated}.json`.
+
 ### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
 
 `node scripts/perf-report.mjs` against the final release candidate pack

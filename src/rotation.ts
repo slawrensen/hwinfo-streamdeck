@@ -4,6 +4,7 @@
  * behavior is unit-testable without the Stream Deck runtime.
  */
 import type { Reading, SensorSnapshot } from "./hwinfo/types";
+import { readingMatchesKey } from "./hwinfo/reading-links";
 
 /**
  * The list a dial moves through. A rotation set (readings ticked in the
@@ -20,7 +21,7 @@ export function rotationReadings(setKeys: readonly string[] | undefined, current
 	}
 	const current = currentKey !== undefined && currentKey !== "" ? snapshot.byKey.get(currentKey) : undefined;
 	if (current !== undefined) {
-		return snapshot.readings.filter((r) => r.sensorIndex === current.sensorIndex);
+		return snapshot.readings.filter((r) => r.sensorIndex === current.sensorIndex).map((r) => readingMatchesKey(r, currentKey) ? current : r);
 	}
 	return snapshot.readings;
 }
@@ -33,7 +34,7 @@ export function stepReading(list: readonly Reading[], currentKey: string | undef
 	if (list.length === 0) {
 		return undefined;
 	}
-	const index = currentKey === undefined ? -1 : list.findIndex((r) => r.key === currentKey);
+	const index = currentKey === undefined ? -1 : list.findIndex((r) => readingMatchesKey(r, currentKey));
 	if (index === -1) {
 		return list[0];
 	}
@@ -172,7 +173,7 @@ export function stepSensorSource(list: readonly Reading[], currentKey: string | 
 			sources.push(reading.sensorIndex);
 		}
 	}
-	const current = currentKey === undefined ? undefined : list.find((r) => r.key === currentKey);
+	const current = currentKey === undefined ? undefined : list.find((r) => readingMatchesKey(r, currentKey));
 	if (current === undefined) {
 		return list[0];
 	}
@@ -197,7 +198,7 @@ export function overviewWindow(list: readonly Reading[], currentKey: string | un
 	if (list.length === 0 || size <= 0) {
 		return { rows: [], selectedIndex: -1 };
 	}
-	const index = currentKey === undefined ? -1 : list.findIndex((r) => r.key === currentKey);
+	const index = currentKey === undefined ? -1 : list.findIndex((r) => readingMatchesKey(r, currentKey));
 	const start = index === -1 ? 0 : Math.max(0, Math.min(index - Math.floor((size - 1) / 2), list.length - size));
 	const rows = list.slice(start, start + size);
 	return { rows, selectedIndex: index === -1 ? -1 : index - start };

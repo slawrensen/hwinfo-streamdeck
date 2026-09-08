@@ -5,6 +5,7 @@
  * projections; never touches the SDK or the poller.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
+import { readingMatchesKey } from "../hwinfo/reading-links";
 import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailDensity, type DetailMode, type DetailTileSpec } from "./detail-settings";
 
 /**
@@ -74,7 +75,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 		const matches = compileDetailFilter(pattern);
 		const keys: string[] = [];
 		for (const reading of snapshot.readings) {
-			if (reading.key === primaryKey) {
+			if (readingMatchesKey(reading, primaryKey)) {
 				continue;
 			}
 			const sourceName = snapshot.sensors[reading.sensorIndex]?.name ?? "";
@@ -103,7 +104,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 	}
 	const keys: string[] = [];
 	for (const reading of snapshot.readings) {
-		if (reading.sensorIndex === primary.sensorIndex && reading.key !== primaryKey) {
+		if (reading.sensorIndex === primary.sensorIndex && !readingMatchesKey(reading, primaryKey)) {
 			keys.push(reading.key);
 		}
 	}

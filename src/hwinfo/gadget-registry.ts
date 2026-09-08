@@ -13,10 +13,12 @@
  * the value names it queries and the JavaScript strings it returns.
  *
  * Freshness: the registry is NOT cleared when HWiNFO exits, so absence can't
- * be detected structurally. A content digest is tracked instead — while the
- * values keep changing the synthesized pollTime advances; when HWiNFO stops,
- * the digest freezes and the poller's normal staleness handling kicks in.
+ * be detected structurally. Only changes to an already observed, unambiguous
+ * reading in the same unit advance value evidence. Initial reads and topology
+ * changes leave age unverified. Steady values cannot prove a producer exit.
  */
+import { GadgetIdentityGuard, gadgetReadingKey } from "./gadget-identity";
+import { gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
@@ -64,12 +66,6 @@ function inferType(unit: string): SensorType {
 	}
 }
 
-/** "45.5 °C" → "°C"; "1 200 RPM" → "RPM"; "Yes" → "". */
-function unitOf(formatted: string): string {
-	const match = /^\s*-?[\d.,\s]*(.*)$/.exec(formatted);
-	return (match?.[1] ?? "").trim();
-}
-
 /** Native registry failure → status-screen reason. */
 function toHwinfoError(err: unknown): unknown {
 	const code = hwsmCode(err);
@@ -87,13 +83,16 @@ function toHwinfoError(err: unknown): unknown {
 
 export class GadgetRegistryProvider {
 	readonly source = "gadget";
+	private readonly identity = new GadgetIdentityGuard(VSB_SUBKEY);
 
 	private lastDigest = "";
 	/** Counts digest changes: the same fact valueRevision carries for shared
 	 * memory, so two registry rewrites within one second stay distinguishable
 	 * even though the synthesized pollTime cannot move twice in it. */
 	private valueRevision = 0;
-	private lastChangeSec = Math.floor(Date.now() / 1000);
+	private lastChangeSec = 0;
+	private freshnessRevision = 0;
+	private lastValues = new Map<string, number>();
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
 
@@ -115,14 +114,18 @@ export class GadgetRegistryProvider {
 			throw toHwinfoError(err);
 		}
 		const provider = new GadgetRegistryProvider(key);
-		let snapshot: SensorSnapshot;
+		let snapshot: SensorSnapshot | null;
 		try {
 			snapshot = provider.read();
 		} catch (err) {
 			provider.close();
 			throw err;
 		}
-		if (snapshot.readings.length === 0) {
+		if (snapshot === null) {
+			provider.close();
+			throw new HwinfoError("busy", "Gadget readings changed during the scan. Retrying automatically.");
+		}
+		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount) {
 			provider.close();
 			// The key existing but holding no readings means HWiNFO IS (or was)
 			// running with Gadget support — "start HWiNFO" would mislead here.
@@ -131,7 +134,7 @@ export class GadgetRegistryProvider {
 		return provider;
 	}
 
-	read(): SensorSnapshot {
+	read(): SensorSnapshot | null {
 		try {
 			return this.readEntries();
 		} catch (err) {
@@ -139,12 +142,15 @@ export class GadgetRegistryProvider {
 		}
 	}
 
-	private readEntries(): SensorSnapshot {
+	private readEntries(): SensorSnapshot | null {
 		const sensors: SensorSource[] = [];
 		const sensorIndexByName = new Map<string, number>();
 		const readings: Reading[] = [];
+		const identityKeys: string[] = [];
+		let incompleteIdentityCount = 0;
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
+		const values = new Map<string, number>();
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
 		// reading is ticked "Report value in Gadget" and keeps that
@@ -154,57 +160,108 @@ export class GadgetRegistryProvider {
 		// scan runs the whole bounded range. queryString returns null for
 		// exactly one condition, ERROR_FILE_NOT_FOUND; every other registry
 		// failure throws, so skipping a null cannot swallow a real fault.
-		for (let i = 0; i < MAX_ENTRIES; i++) {
-			const sensorName = this.key.queryString(`Sensor${i}`);
-			if (sensorName === null) {
-				continue;
-			}
-			const label = this.key.queryString(`Label${i}`) ?? `Reading ${i}`;
-			const formatted = this.key.queryString(`Value${i}`) ?? "";
-			const raw = this.key.queryString(`ValueRaw${i}`) ?? "";
+		let blocked: ReadonlySet<string>;
+		try {
+			for (let i = 0; i < MAX_ENTRIES; i++) {
+				const sensorName = this.key.queryString(`Sensor${i}`);
+				if (sensorName === null) {
+					continue;
+				}
+				const labelField = this.key.queryString(`Label${i}`);
+				const formattedField = this.key.queryString(`Value${i}`);
+				const rawField = this.key.queryString(`ValueRaw${i}`);
+				// Gadget has no atomic row or producer sequence. One bounded
+				// validation pass catches observable field interleavings and
+				// withholds the entire scan before measurement evidence commits.
+				// A writer paused in an intermediate state can still look stable;
+				// agreement here is not an atomicity or producer-liveness claim.
+				const verifiedSensor = this.key.queryString(`Sensor${i}`);
+				const verifiedLabel = this.key.queryString(`Label${i}`);
+				if (sensorName !== verifiedSensor || labelField !== verifiedLabel) return null;
+				// Registry positions identify scan locations, never readings.
+				// Preserve meaningful producer names exactly, but withhold an
+				// incomplete row instead of inventing a persistent slot label.
+				if (!sensorName.trim() || !labelField?.trim()) {
+					incompleteIdentityCount++;
+					continue;
+				}
+				const label = labelField;
+				const key = gadgetReadingKey(sensorName, label);
+				// Name identity is evidence independently of numeric eligibility.
+				// Capture it before a numeric reread can throw or validation can
+				// reject this same row. Keep the original bounded query order so
+				// the repeated identity check still spans the first value reads.
+				identityKeys.push(key);
+				const verifiedFormatted = this.key.queryString(`Value${i}`);
+				const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
+				if (formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
+				const formatted = formattedField ?? "";
+				const raw = rawField ?? "";
 
-			let sensorIndex = sensorIndexByName.get(sensorName);
-			if (sensorIndex === undefined) {
-				sensorIndex = sensors.length;
-				sensorIndexByName.set(sensorName, sensorIndex);
-				sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
-			}
+				let sensorIndex = sensorIndexByName.get(sensorName);
+				if (sensorIndex === undefined) {
+					sensorIndex = sensors.length;
+					sensorIndexByName.set(sensorName, sensorIndex);
+					sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
+				}
 
-			const unit = unitOf(formatted);
-			// HWiNFO writes ValueRaw with the system locale's decimal separator.
-			const value = Number.parseFloat(raw.replace(",", "."));
+				const unit = gadgetUnitOf(formatted);
+				// HWiNFO writes ValueRaw with the system locale's decimal separator.
+				const value = Number.parseFloat(raw.replace(",", "."));
+				if (!gadgetValueAgrees(formatted, value)) return null;
 
-			const baseKey = `g:${sensorName}:${label}`;
-			let key = baseKey;
-			for (let dup = 1; byKey.has(key); dup++) {
-				key = `${baseKey}~${dup}`;
+				const reading: Reading = {
+					key,
+					type: inferType(unit),
+					sensorIndex,
+					id: i,
+					label,
+					unit,
+					// The gadget interface exposes only the current value.
+					value,
+					statistics: "unavailable",
+					valueMin: Number.NaN,
+					valueMax: Number.NaN,
+					valueAvg: Number.NaN
+				};
+				readings.push(reading);
+				byKey.set(key, reading);
+				digestParts.push(JSON.stringify([i, key, unit, raw]));
+				// Compare only the same named reading in the same unit. A new
+				// slot or rename is topology, not evidence of a new measurement.
+				const evidenceKey = JSON.stringify([key, unit]);
+				values.set(evidenceKey, value);
 			}
-			const reading: Reading = {
-				key,
-				type: inferType(unit),
-				sensorIndex,
-				id: i,
-				label,
-				unit,
-				// The gadget interface exposes only the current value.
-				value,
-				valueMin: value,
-				valueMax: value,
-				valueAvg: value
-			};
-			readings.push(reading);
-			byKey.set(key, reading);
-			digestParts.push(raw);
+		} finally {
+			// Verified identities remain evidence even when this or a later row
+			// rejects the scan. Persist them before any return or thrown error;
+			// a partial scan still commits no values, digest or freshness.
+			blocked = this.identity.blocked(identityKeys);
 		}
 
 		const digest = digestParts.join("|");
 		if (digest !== this.lastDigest) {
 			this.lastDigest = digest;
-			this.lastChangeSec = Math.floor(Date.now() / 1000);
 			this.valueRevision++;
 		}
+		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
+		let valueChanged = false;
+		const safeValues = new Map<string, number>();
+		for (const reading of safeReadings) {
+			const evidenceKey = JSON.stringify([reading.key, reading.unit]);
+			const value = values.get(evidenceKey) as number;
+			const previous = this.lastValues.get(evidenceKey);
+			if (previous !== undefined && Number.isFinite(previous) && Number.isFinite(value) && previous !== value) valueChanged = true;
+			safeValues.set(evidenceKey, value);
+		}
+		this.lastValues = safeValues;
+		if (valueChanged) {
+			this.lastChangeSec = Math.floor(Date.now() / 1000);
+			this.freshnessRevision++;
+		}
 
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, version: 0, revision: 0, sensors, readings, byKey };
+		for (const key of blocked) byKey.delete(key);
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: incompleteIdentityCount + readings.length - safeReadings.length };
 	}
 
 	close(): void {
@@ -220,5 +277,7 @@ export class GadgetRegistryProvider {
 		this.lastDigest = from.lastDigest;
 		this.lastChangeSec = from.lastChangeSec;
 		this.valueRevision = from.valueRevision;
+		this.freshnessRevision = from.freshnessRevision;
+		this.lastValues = from.lastValues;
 	}
 }

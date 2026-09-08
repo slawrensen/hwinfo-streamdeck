@@ -1,3 +1,4 @@
+import type { JsonValue } from "@elgato/utils";
 import streamDeck, { DeviceType, type Device } from "@elgato/streamdeck";
 
 import { DetailSlotAction } from "./actions/detail-slot";
@@ -18,6 +19,8 @@ import { applyGlobalThemeSettings, decideLegacyDefault, onThemeChange } from "./
 type GlobalSettings = {
 	pollIntervalMs?: string;
 	source?: string;
+	/** Explicit cross-provider reading pairs, editable through Config. */
+	readingLinks?: JsonValue;
 	/** Deck-wide default theme id from themes.json. */
 	theme?: string;
 	/** "on" (default) | "off" — color accents by sensor type. */
@@ -218,6 +221,7 @@ if (traceEnabled()) {
 }
 
 streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
+	poller.setReadingLinks(ev.settings.readingLinks);
 	poller.setIntervalMs(parsePollInterval(ev.settings.pollIntervalMs));
 	poller.setSourceMode(parseSourceMode(ev.settings.source));
 	applyGlobalThemeSettings(ev.settings);
@@ -231,6 +235,7 @@ for (const device of streamDeck.devices) {
 }
 
 const globals = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
+poller.setReadingLinks(globals.readingLinks);
 poller.setIntervalMs(parsePollInterval(globals.pollIntervalMs));
 poller.setSourceMode(parseSourceMode(globals.source));
 applyGlobalThemeSettings(globals);

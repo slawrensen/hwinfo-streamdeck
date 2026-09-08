@@ -34,7 +34,7 @@ No. It's an independent, MIT-licensed project, not affiliated with or endorsed b
 - **HWiNFO free**: Shared Memory Support auto-disables after **12 hours** of runtime. After that, in the default **Auto** mode the plugin falls back to the Gadget registry by itself (Gadget reporting has no time limit) and upgrades back to Shared Memory automatically if you re-enable it.
 - **HWiNFO Pro**: no 12-hour limit; Shared Memory stays on permanently, so you keep min/max/avg and full sensor coverage indefinitely without touching anything.
 
-If you never leave HWiNFO running longer than ~12 hours between restarts, free + Shared Memory is fully equivalent. If you run HWiNFO 24/7 and want min/max/avg to stay available, either buy Pro or enable **Gadget reporting** for the sensors you care about (see below).
+If you never leave HWiNFO running longer than ~12 hours between restarts, free + Shared Memory is fully equivalent. If you run HWiNFO 24/7 and want min/max/avg to stay available, use Pro for HWiNFO history. Gadget provides current values and the dial can collect a local session.
 
 ### Why did my values freeze / stop updating after about 12 hours?
 
@@ -46,7 +46,7 @@ That's the free version's Shared Memory timer expiring. HWiNFO stops publishing 
 Fixes, cheapest first:
 
 1. In HWiNFO **Settings → Shared Memory Support**, toggle it back on (resets the 12-hour clock).
-2. Enable **Gadget reporting** on the sensors you use, so Auto mode has something to fall back to permanently.
+2. Enable **Gadget reporting** on the sensors you use, then explicitly [link each reading](data-sources.md#link-readings-across-providers) so its selection survives a provider change.
 3. Buy HWiNFO Pro to remove the limit entirely.
 
 > **Note:** The plugin considers data "stale" when HWiNFO's poll timestamp hasn't advanced for **15 seconds**, then shows the `Not updating` screen. So a frozen value shows up as a status screen within seconds, not as silently wrong numbers.
@@ -55,7 +55,7 @@ Fixes, cheapest first:
 
 ### Which data source should I use?
 
-Leave it on **Auto** (the default) unless you have a specific reason not to. Auto uses Shared Memory whenever it's available (full data), and silently falls back to the Gadget registry when it isn't (e.g. after the free 12-hour timeout), then upgrades back when Shared Memory returns.
+Leave it on **Auto** (the default) unless you have a specific reason not to. Auto uses Shared Memory whenever it's available (full data), and falls back to the Gadget registry when it isn't (e.g. after the free 12-hour timeout), then upgrades back when Shared Memory returns.
 
 | | Shared Memory (preferred) | Gadget registry (fallback) |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ Leave it on **Auto** (the default) unless you have a specific reason not to. Aut
 
 Set it under **Advanced → Data source** in any key's settings, or under **Dial gestures & advanced → Data source** on a dial (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
 
-See [Data sources](data-sources.md) for the full breakdown.
+A provider switch does not translate saved identities by itself. Configure explicit [reading links](data-sources.md#link-readings-across-providers) for continuity in either direction. See [Data sources](data-sources.md) for the full breakdown.
 
 ### I ticked many readings in Gadget but only a few show up. Why?
 
@@ -74,7 +74,7 @@ HWiNFO reserves a numbered slot for every ticked reading and keeps the number wh
 
 ### Why are min / max / avg showing the current value?
 
-Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. The plugin fills those in with the current value, so a MIN/MAX/AVG stat mode on a key just repeats the live number.
+Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. Versions through 1.6.0 filled those fields with the current value. The measurement-integrity update leaves them unavailable: historical modes on keys and detail tiles show N/A with an empty value.
 
 This happens when Shared Memory isn't available, most commonly after the free version's 12-hour timeout in Auto mode, or if you've forced `Gadget registry only`. When it's active, the settings panel shows a note. To get real min/max/avg back, re-enable Shared Memory Support in HWiNFO (or use Pro).
 
@@ -84,7 +84,7 @@ This happens when Shared Memory isn't available, most commonly after the free ve
 
 They're two different things:
 
-- **Key** (Sensor Reading): the `Show` setting and the key-press cycle display **HWiNFO's own** min/max/avg, measured since HWiNFO started (or since you last reset them *inside HWiNFO*). These come from the shared-memory data, so they're empty (equal to current) on the Gadget source.
+- **Key** (Sensor Reading): the `Show` setting and the key-press cycle display **HWiNFO's own** min/max/avg, measured since HWiNFO started (or since you last reset them *inside HWiNFO*). These come from the shared-memory data, so they're unavailable on the Gadget source.
 - **Dial** (Sensor Dial): min/max/avg are a **session** the plugin accumulates itself, kept **per reading** and keyed by HWiNFO's stable sensor identity. Rotate away and back and that reading's own session numbers are still there; they survive page switches and profile changes for up to 30 minutes off screen. **Push** the dial to reset them. This works on any data source.
 
 ## Sparklines
@@ -192,7 +192,7 @@ Yes to both. The **free** version works (with the 12-hour Shared Memory caveat a
 
 ### Do keys survive reboots, HWiNFO restarts, or reordering sensors in HWiNFO?
 
-Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. So keys keep working across restarts and if you reorder sensors in HWiNFO. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
+Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Observed duplicate names are withheld across restarts; see the [identity limits](data-sources.md#enabling-gadget-reporting). If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
 
 ### Can I use Stream Deck + dials without HWiNFO Pro?
 
@@ -211,7 +211,7 @@ They're status screens telling you exactly what to fix. As of 1.1.6 they're pure
 | `Start HWiNFO / not detected` | HWiNFO isn't publishing on either interface. Start it with Shared Memory or Gadget reporting on. |
 | `HWiNFO busy / retrying` | HWiNFO is running but its shared memory was locked at that instant. The plugin retries on the next poll; nothing to do. |
 | `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
-| `Not updating / check sharing` | Values frozen for 15 seconds (e.g. the Sensors window is closed). `check Gadget` instead when reading from Gadget. |
+| `Not updating / check sharing` | Values frozen for 15 seconds (e.g. the Sensors window is closed). Gadget instead shows `Age unknown / check Gadget`: unchanged data might be steady or left after exit. |
 | `Access denied / un-elevate` | Privilege mismatch: run HWiNFO and Stream Deck at the same level. |
 | `Tick sensors / in Gadget` | Gadget reporting is on but no sensors are ticked; tick some in HWiNFO. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |

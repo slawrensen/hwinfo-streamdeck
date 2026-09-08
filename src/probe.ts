@@ -36,7 +36,9 @@ function bail(err: HwinfoError): never {
 }
 
 function fmt(r: Reading): string {
-	const stats = `min ${r.valueMin.toFixed(1)}  max ${r.valueMax.toFixed(1)}  avg ${r.valueAvg.toFixed(1)}`;
+	const stats = [r.valueMin, r.valueMax, r.valueAvg].every(Number.isFinite)
+		? `min ${r.valueMin.toFixed(1)}  max ${r.valueMax.toFixed(1)}  avg ${r.valueAvg.toFixed(1)}`
+		: "history unavailable";
 	return `${r.label.padEnd(38)} ${r.value.toFixed(2).padStart(12)} ${r.unit.padEnd(8)} (${stats})  [${SensorType[r.type]}]`;
 }
 
@@ -81,12 +83,19 @@ try {
 	// version's 12 h timer wrote the DEAD magic, "invalid" mid-restart); route
 	// those through the same guidance table instead of a raw stack trace.
 	const first = read(session);
+	// The shared-memory parser reuses its snapshot. Retain scalar evidence
+	// before the next read mutates it.
+	const firstPollTime = first.pollTime;
+	const firstEvidenceRevision = first.freshnessRevision ?? first.valueRevision;
+	const firstFreshnessRevision = first.freshnessRevision ?? 0;
 
 	// A second read ~2.6 s later proves values are actually flowing (HWiNFO
 	// polls every ~2 s by default, so poll time should advance within a cycle).
 	await new Promise((resolve) => setTimeout(resolve, 2600));
 	const snapshot = read(session);
-	const advancing = snapshot.pollTime > first.pollTime;
+	const advancing = session.source === "gadget"
+		? (snapshot.freshnessRevision ?? 0) > firstFreshnessRevision
+		: snapshot.pollTime !== firstPollTime || (snapshot.freshnessRevision ?? snapshot.valueRevision) !== firstEvidenceRevision;
 	const ageSec = Math.round(Date.now() / 1000 - snapshot.pollTime);
 
 	if (asJson) {
@@ -94,7 +103,11 @@ try {
 	} else {
 		const label = session.source === "gadget" ? "Gadget registry" : `shared memory v${snapshot.version}.${snapshot.revision}`;
 		console.log(`HWiNFO ${label}: ${snapshot.sensors.length} sensors, ${snapshot.readings.length} readings [source: ${session.source}]`);
-		console.log(`last poll: ${new Date(snapshot.pollTime * 1000).toISOString()} (${ageSec}s ago), advancing: ${advancing ? "yes" : "NO (previous poll " + first.pollTime + ")"}`);
+		if (session.source === "gadget") {
+			console.log(`Gadget value-change evidence: ${advancing ? "observed" : "none; freshness unknown"}. Registry reads do not prove liveness.`);
+		} else {
+			console.log(`last poll: ${new Date(snapshot.pollTime * 1000).toISOString()} (${ageSec}s ago), advancing: ${advancing ? "yes" : "NO (previous poll " + firstPollTime + ")"}`);
+		}
 		console.log("");
 
 		const bySensor = new Map<number, Reading[]>();

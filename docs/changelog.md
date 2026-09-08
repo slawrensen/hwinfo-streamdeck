@@ -14,6 +14,37 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.6.1.0 - Unreleased
+
+- Gadget readings with duplicate names are withheld instead of assigning
+  encounter-order identities. Observed ambiguous names stay blocked across
+  restarts in a local journal of name hashes. Give the readings distinct
+  names in HWiNFO before selecting them again. Sparse slots and ordinary
+  keys containing spaces keep working. Reserved colon and tilde names use
+  new keys and require reselection; old settings are preserved.
+- Advanced users can explicitly link a Shared Memory key and its Gadget
+  counterpart in the deck Config document. Links apply to keys, dense
+  layouts, dials and custom detail lists in either provider direction.
+  Nothing is inferred from similar names or values. Conflicting links and
+  changed native units or types are refused.
+- Gadget starts with unknown freshness until a value change is observed.
+  Unchanged registry values show Age unknown instead of claiming
+  HWiNFO stalled. Gadget historical fields are unavailable, with an N/A
+  badge and an empty value for MIN/MAX/AVG on keys and detail tiles.
+- Sparklines capture subsecond value changes and end their segment on a
+  skipped read, missing reading, unit change or provider transition. Dial
+  session statistics count observed changes and producer stamps once;
+  missing readings, stale/unavailable data, unit/provider/link changes and
+  explicit resets start a new session. Averages are sample-weighted.
+- Shared Memory's cached reader checks the owning sensor ID and instance
+  before updating a value, including descriptor-only topology changes.
+- Gadget rereads each row before accepting a scan and withholds changing
+  fields or contradictory formatted/raw values. This catches detectable
+  partial writes; the registry still cannot prove an atomic producer update.
+  Reopening the registry and metadata changes do not establish freshness.
+- Source statistic capabilities are explicit. Dial sessions show a brief
+  reset reason when their binding, native unit, type or source changes.
+
 ## 1.6.0.0 - 2026-09-04
 
 - A detail tile can carry one to four readings. The new Tile shows

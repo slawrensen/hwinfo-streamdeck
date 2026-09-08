@@ -24,6 +24,7 @@ export function nextStatMode(mode: StatMode): StatMode {
 }
 
 export function statValue(reading: Reading, mode: StatMode): number {
+	if (mode !== "current" && reading.statistics === "unavailable") return Number.NaN;
 	switch (mode) {
 		case "min":
 			return reading.valueMin;
@@ -34,6 +35,11 @@ export function statValue(reading: Reading, mode: StatMode): number {
 		default:
 			return reading.value;
 	}
+}
+
+/** An unavailable historical field must never wear a numeric MIN/MAX/AVG. */
+export function readingStatBadge(reading: Reading | undefined, mode: StatMode): string {
+	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? "N/A" : STAT_BADGE[mode];
 }
 
 /** Converts a value for display; only °C→°F is meaningful in HWiNFO data. */

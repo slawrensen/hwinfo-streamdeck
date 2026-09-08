@@ -26,7 +26,7 @@ function stale(source: "shared-memory" | "gadget"): PollerStatus {
 describe("state-screens: stale recovery hint follows the source", () => {
 	it("dial stale on gadget points at Gadget, not Shared Memory", () => {
 		const text = statusDialText(stale("gadget"));
-		assert.equal(text?.title, "HWiNFO stalled");
+		assert.equal(text?.title, "Age unknown");
 		assert.equal(text?.value, "check Gadget");
 		assert.doesNotMatch(text?.value ?? "", /sharing/i);
 	});
@@ -37,13 +37,25 @@ describe("state-screens: stale recovery hint follows the source", () => {
 	});
 
 	it("key stale screen branches on source", () => {
-		assert.deepEqual(statusScreen(stale("gadget"))?.lines, ["Not updating", "check Gadget"]);
+		assert.deepEqual(statusScreen(stale("gadget"))?.lines, ["Age unknown", "check Gadget"]);
 		assert.deepEqual(statusScreen(stale("shared-memory"))?.lines, ["Not updating", "check sharing"]);
 	});
 
 	it("PI sentence already branches on source", () => {
 		assert.match(statusSentence(stale("gadget")), /Gadget/);
 		assert.match(statusSentence(stale("shared-memory")), /Shared Memory/);
+	});
+
+	it("withheld Gadget names explain incomplete identity as well as ambiguity", () => {
+		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, blockedReadingCount: 1 };
+		const statuses: PollerStatus[] = [
+			{ state: "ok", source: "gadget", snapshot },
+			{ state: "stale", source: "gadget", snapshot, staleForMs: 20_000 }
+		];
+		for (const status of statuses) {
+			assert.match(statusSentence(status), /Incomplete or ambiguous Gadget names are withheld/);
+			assert.match(statusSentence(status), /source names.*unique label.*select it again/);
+		}
 	});
 });
 

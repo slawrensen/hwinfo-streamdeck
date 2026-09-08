@@ -74,6 +74,7 @@ const steps = [
 	["e2e", () => run("e2e", ["scripts/e2e-harness.mjs"])],
 	["e2e:resilience", () => run("e2e:resilience", ["scripts/e2e-resilience.mjs"])],
 	["e2e:gadget", () => run("e2e:gadget", ["scripts/e2e-gadget.mjs"])],
+	["e2e:reading-links", () => run("e2e:reading-links", ["scripts/e2e-reading-links.mjs", path.join(outRoot, "reading-links")])],
 	["e2e:dead-fallback", () => run("e2e:dead-fallback", ["scripts/e2e-dead-fallback.mjs"])],
 	["e2e:native-edge", () => run("e2e:native-edge", ["scripts/e2e-native-edge.mjs"])],
 	["e2e:load", () => run("e2e:load", ["scripts/e2e-load.mjs"], { env: { ...process.env, LOAD_SOAK_SEC: "45" } })],

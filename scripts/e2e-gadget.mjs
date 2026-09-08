@@ -180,7 +180,11 @@ const plugin = spawn(
 );
 
 try {
-	// 1. Auto-fallback: SM absent, gadget populated → live value.
+	// 1. A populated registry alone is not producer evidence.
+	await expectFrame("initial registry has unknown freshness", (svg) => svg.includes("Age unknown"), 8000, { fromStart: true });
+	publish(47.6);
+	await sleep(1100);
+	publish(47.5);
 	await expectFrame("auto-fallback → live gadget 'Test Temp'", (svg) => svg.includes("Test Temp") && svg.includes("°C") && svg.includes("47.5"), 8000);
 
 	// 2. The reading at index 6, behind the hole at index 1, reaches both
@@ -299,7 +303,7 @@ try {
 
 	// 7. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
 	clearInterval(updater);
-	await expectFrame("frozen registry → 'Not updating'", (svg) => svg.includes("Not updating"), 12000);
+	await expectFrame("frozen registry → unknown freshness", (svg) => svg.includes("Age unknown"), 12000);
 
 	// 8. Resume → live again.
 	const updater2 = setInterval(() => publish((51.1 + Math.random() * 0.05).toFixed(2)), 700);

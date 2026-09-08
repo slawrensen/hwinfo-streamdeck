@@ -132,3 +132,11 @@ combined candidate. Physical recognition trials, real device captures and
 the Windows locale matrix are also pending, not passed or silently skipped.
 The automated D08 correction is ready for its own review, while the full
 sprint's physical acceptance criteria remain open.
+
+The first combined full suite at runtime commit `9e50600` exposed one stale
+e2e expectation: the malformed quad-slot fixture required dark `#123456` to
+remain exact, even though quad value colors now receive contrast correction.
+Its salvage fixture now uses readable `#ABCDEF`; malformed cells, invalid
+per-entry color fallback and the grid geometry remain asserted. The contrast
+regressions still exercise low-contrast inputs. Final combined rerun results
+belong to the qualification report; the failed first run is retained.

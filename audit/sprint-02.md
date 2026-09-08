@@ -123,7 +123,7 @@ verifies both duplicate rows, but rejects the scan before its old journal
 call. Removing slot 0 and repairing slot 8 can then publish slot 1 under
 the saved key. An explicit cross-source link can propagate that wrong key.
 
-The scan now journals the coherently decoded prefix in a `finally` block.
+The scan journals verified identity keys in a `finally` block.
 Later field disagreement, formatted/raw disagreement or a query exception
 cannot discard already observed ambiguity. A rejected scan still publishes
 no snapshot and commits no digest or measurement freshness. Failed journal
@@ -153,3 +153,36 @@ coordinator's execution gates; these local results do not replace them.
 Native production source and the physical producer are unchanged. The tests
 use the existing per-process synthetic registry key and a query seam; they
 do not write the real HWiNFO Gadget key or touch its shared-memory mutex.
+
+### Follow-up: identity evidence from numerically rejected rows
+
+Peer review of `a720df8f592c9207ff6da4904a779b13103ec88d` found the same
+boundary within a row: the duplicate's Sensor/Label fields could agree
+while its own numeric fields failed. The first patch journaled only fully
+decoded readings, so this duplicate was still forgotten.
+
+Identity keys are now captured immediately after the Sensor/Label rereads
+agree, before either numeric reread or value validation can reject or
+throw. The original eight-query order for a populated row is retained:
+Sensor, Label, Value, ValueRaw, then their rereads. This keeps the identity
+check spanning the first numeric reads and adds no retries. A numeric read
+that throws before the identity rereads supplies no verified identity;
+history that was not observed remains outside this guarantee. Disagreeing
+Sensor/Label observations are never promoted to verified duplicate evidence.
+
+Ten additional production-provider regressions cover contradictory numbers,
+changes to either numeric field, exceptions from either numeric reread,
+missing formatted/raw fields, nonfinite raw values, and disagreement in
+either identity field. The five numeric rejection/exception cases failed
+against `a720df8`, each publishing the repaired survivor's 80 under the
+removed 40's key. The five compatibility controls passed on that source.
+After the correction, the full Gadget provider suite passes all 54 tests
+with zero failures or skips. Lint and type checking pass.
+
+Raw evidence remains in ignored `release/audit-evidence/` files:
+`own-row-identity-red.log`, `own-row-identity-green.log`,
+`own-row-identity-lint.log` and `own-row-identity-typecheck.log`.
+The red command used
+`node --import tsx --test --test-name-pattern="stable duplicate identity|an unstable .* does not manufacture" test/gadget-provider.test.ts`;
+green used `node --import tsx --test test/gadget-provider.test.ts`.
+The same unchanged addon and isolated per-process fixture were used.

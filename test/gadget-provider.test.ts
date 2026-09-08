@@ -510,6 +510,85 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 });
 
 describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	for (const numericState of ["contradictory", "changing formatted", "changing raw", "missing formatted", "missing raw", "nonfinite raw", "throwing formatted reread", "throwing raw reread"] as const) {
+		test(`stable duplicate identity survives its own ${numericState} numeric fields`, () => {
+			const source = `Own row ${numericState}`;
+			const savedKey = `g:${source}:Temperature`;
+			shape([0, 8], (i) => ({ sensor: source, label: i === 0 ? "Temperature" : "Other", raw: "40", value: "40 °C" }));
+			const provider = GadgetRegistryProvider.open();
+			const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+			try {
+				const before = readVerified(provider);
+				putValue("Sensor1", source);
+				putValue("Label1", "Temperature");
+				if (numericState !== "missing formatted") putValue("Value1", numericState === "contradictory" ? "99 °C" : "80 °C");
+				if (numericState !== "missing raw") putValue("ValueRaw1", numericState === "nonfinite raw" ? "unavailable" : "80");
+				const visits = new Map<string, number>();
+				Reflect.set(provider, "key", {
+					queryString(name: string): string | null {
+						const count = (visits.get(name) ?? 0) + 1;
+						visits.set(name, count);
+						if (count === 2) {
+							if ((numericState === "throwing formatted reread" && name === "Value1") || (numericState === "throwing raw reread" && name === "ValueRaw1")) throw new Error("fixture numeric reread failure");
+							if (numericState === "changing formatted" && name === "Value1") return "99 °C";
+							if (numericState === "changing raw" && name === "ValueRaw1") return "99";
+						}
+						return nativeKey.queryString(name);
+					},
+					close: () => nativeKey.close()
+				});
+				const rejected = !numericState.startsWith("missing") && numericState !== "nonfinite raw";
+				if (numericState.startsWith("throwing")) assert.throws(() => provider.read(), /fixture numeric reread failure/);
+				else if (rejected) assert.equal(provider.read(), null, "invalid values never publish a partial snapshot");
+				else assert.equal(readVerified(provider).byKey.get(savedKey), undefined, "unavailable values do not disguise duplicate identity");
+				assert.equal(visits.get("Sensor1"), 2);
+				assert.equal(visits.get("Label1"), 2);
+				assert.ok([...visits.values()].every((count) => count <= 2), "identity protection does not add row retries");
+				if (rejected) assert.equal(Reflect.get(provider, "valueRevision"), before.valueRevision);
+				assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision);
+				Reflect.set(provider, "key", nativeKey);
+				dropValue("Sensor0");
+				putValue("Value1", "80 °C");
+				putValue("ValueRaw1", "80");
+				const recovered = readVerified(provider);
+				assert.equal(recovered.byKey.get(savedKey), undefined, "the numerically repaired survivor cannot adopt the removed owner");
+				assert.equal(recovered.blockedReadingCount, 1);
+				assert.equal(recovered.freshnessRevision, before.freshnessRevision);
+				const linked = applyReadingLinks(recovered, [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }], 1);
+				assert.equal(linked.byKey.get("f0001234:0:1000001"), undefined);
+			} finally { provider.close(); }
+			assert.equal(readShape().byKey.get(savedKey), undefined, "reopening cannot forget coherent identity evidence");
+		});
+	}
+
+	for (const identityField of ["Sensor1", "Label1"]) {
+		test(`an unstable ${identityField} does not manufacture verified duplicate evidence`, () => {
+			const source = `Unstable identity ${identityField}`;
+			const savedKey = `g:${source}:Temperature`;
+			shape([0], () => ({ sensor: source, label: "Temperature", raw: "40", value: "40 °C" }));
+			const provider = GadgetRegistryProvider.open();
+			const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+			try {
+				putValue("Sensor1", source);
+				putValue("Label1", "Temperature");
+				putValue("Value1", "80 °C");
+				putValue("ValueRaw1", "80");
+				let visits = 0;
+				Reflect.set(provider, "key", {
+					queryString(name: string): string | null {
+						if (name === identityField && ++visits === 2) return "Different identity";
+						return nativeKey.queryString(name);
+					},
+					close: () => nativeKey.close()
+				});
+				assert.equal(provider.read(), null);
+				Reflect.set(provider, "key", nativeKey);
+				putValue("Label1", "Different temperature");
+				assert.equal(readVerified(provider).byKey.get(savedKey)?.value, 40);
+			} finally { provider.close(); }
+		});
+	}
+
 	for (const failure of ["field interleave", "numeric contradiction", "query error"] as const) {
 		test(`verified duplicate history survives a later ${failure}`, () => {
 			const source = `Partial scan ${failure}`;

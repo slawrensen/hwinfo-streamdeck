@@ -146,6 +146,7 @@ export class GadgetRegistryProvider {
 		const sensors: SensorSource[] = [];
 		const sensorIndexByName = new Map<string, number>();
 		const readings: Reading[] = [];
+		const identityKeys: string[] = [];
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
 		const values = new Map<string, number>();
@@ -175,10 +176,17 @@ export class GadgetRegistryProvider {
 				// agreement here is not an atomicity or producer-liveness claim.
 				const verifiedSensor = this.key.queryString(`Sensor${i}`);
 				const verifiedLabel = this.key.queryString(`Label${i}`);
+				if (sensorName !== verifiedSensor || labelField !== verifiedLabel) return null;
+				const label = labelField ?? `Reading ${i}`;
+				const key = gadgetReadingKey(sensorName, label);
+				// Name identity is evidence independently of numeric eligibility.
+				// Capture it before a numeric reread can throw or validation can
+				// reject this same row. Keep the original bounded query order so
+				// the repeated identity check still spans the first value reads.
+				identityKeys.push(key);
 				const verifiedFormatted = this.key.queryString(`Value${i}`);
 				const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
-				if (sensorName !== verifiedSensor || labelField !== verifiedLabel || formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
-				const label = labelField ?? `Reading ${i}`;
+				if (formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
 				const formatted = formattedField ?? "";
 				const raw = rawField ?? "";
 
@@ -194,7 +202,6 @@ export class GadgetRegistryProvider {
 				const value = Number.parseFloat(raw.replace(",", "."));
 				if (!gadgetValueAgrees(formatted, value)) return null;
 
-				const key = gadgetReadingKey(sensorName, label);
 				const reading: Reading = {
 					key,
 					type: inferType(unit),
@@ -218,10 +225,10 @@ export class GadgetRegistryProvider {
 				values.set(evidenceKey, value);
 			}
 		} finally {
-			// Verified identities remain evidence even when a later row rejects
-			// the scan. Persist ambiguity before any return or thrown query error;
+			// Verified identities remain evidence even when this or a later row
+			// rejects the scan. Persist them before any return or thrown error;
 			// a partial scan still commits no values, digest or freshness.
-			blocked = this.identity.blocked(readings.map((reading) => reading.key));
+			blocked = this.identity.blocked(identityKeys);
 		}
 
 		const digest = digestParts.join("|");

@@ -260,7 +260,14 @@ async function scenario(send) {
 				const rotated = valueColors().join() === [accents.temperature, accents.fan].join() && saved?.sensorValueColors === true && saved?.future31?.keep?.[1] === "two";
 				dialSet({ ...settings, sensorValueColors: false });
 				const cleared = await waitUntil(() => valueColors().join() === ["#FFFFFF", "#FFFFFF"].join(), 750, 25);
-				results.sensorColorChecks.push({ dialView, repainted, rotated, cleared });
+				const readingColors = { [temperature.key]: "#4CC2FF", [fan.key]: "#38CD89" };
+				dialSet({ ...settings, readingColors });
+				const custom = await waitUntil(() => valueColors().join() === ["#4CC2FF", "#38CD89"].join(), 750, 25);
+				dialRotate();
+				await sleep(200);
+				const customSaved = dialWrites().at(-1)?.payload;
+				const customRotated = valueColors().join() === ["#4CC2FF", "#38CD89"].join() && customSaved?.readingColors?.[temperature.key] === "#4CC2FF" && customSaved?.future31?.keep?.[1] === "two";
+				results.sensorColorChecks.push({ dialView, repainted, rotated, cleared, custom, customRotated });
 			}
 		}
 		if (typeof k3 === "string") {
@@ -837,7 +844,7 @@ async function finish() {
 		typeof results.overviewRenamed === "string" && results.overviewRenamed.includes(">RENAMED"),
 		(results.overviewRenamed ?? "no frame").slice(0, 120)
 	);
-	check("sensor colors: both multi-row views repaint on/off immediately and rotation preserves settings", results.sensorColorChecks?.length === 2 && results.sensorColorChecks.every((r) => r.repainted && r.rotated && r.cleared), JSON.stringify(results.sensorColorChecks));
+	check("sensor colors: both multi-row views repaint automatic and individual colors immediately; rotation preserves settings", results.sensorColorChecks?.length === 2 && results.sensorColorChecks.every((r) => r.repainted && r.rotated && r.cleared && r.custom && r.customRotated), JSON.stringify(results.sensorColorChecks));
 	check(
 		"junk dialView degrades to the single face (bar back at y=84)",
 		typeof results.overviewDegraded === "string" && results.overviewDegraded.includes('y="84"'),

@@ -69,6 +69,8 @@ export type DialSettings = {
 	textDimSecondary?: boolean;
 	/** Multi-row normal numbers use sensor-type colors only on exact true. */
 	sensorValueColors?: boolean;
+	/** Optional numeric color overrides by stable reading key; multi-row only. */
+	readingColors?: Record<string, string>;
 	/** Rotation set: rotate/autocycle move only through these picked readings. */
 	rotationKeys?: string[];
 	/**
@@ -1146,7 +1148,7 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 			// An alerting row's value is the alert indicator and stays fixed;
 			// custom text never recolors it.
 			valueColor: level !== "normal" ? config.alerts[level].bg : sensorValueColor({
-				enabled: settings.sensorValueColors, reading: member, value: nativeShown,
+				enabled: settings.sensorValueColors, readingColors: settings.readingColors, reading: member, value: nativeShown,
 				config, themeId, typeAccents: typeAccentsEnabled(), textSettings,
 				normalColor: text.value, background: rowCount === 2 && selected ? palette.track : palette.bg
 			}),

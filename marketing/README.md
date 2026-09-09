@@ -126,3 +126,12 @@ npm run icons                               # renders imgs/plugin/marketplace(@2
 All copy baked into these images follows `docs/release/COPY_RULES.md` (no em
 dashes, no "telemetry", claims that map to real behavior). The validator cannot
 read text inside a PNG, so check rendered strings by eye after regenerating.
+
+The additional `issue-31/custom-before-after.png` comparison is sample data
+through the same production dial composer. Generate it with
+`npx tsx scripts/dial-color-comparison.mjs marketing/issue-31 --custom`.
+Both sides use Text: Theme, Type accents: OFF, identical readings, histories,
+selection and layout. Only `readingColors` changes, using the achievable
+Appearance → Reading colors → Signal preset. CPU and GPU temperatures can
+therefore differ while graph lines keep their previous colors. This is preview
+evidence, not a physical screenshot or a claim about the stable Marketplace build.

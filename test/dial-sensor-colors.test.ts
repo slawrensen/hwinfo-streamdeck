@@ -174,5 +174,93 @@ it("alerts keep priority over Custom and sensor colors, with native-unit scoping
 it("gallery fixtures equal production composition with explicit achievable settings", () => {
 	for (const view of ["tworow", "overview"] as const) {
 		for (const enabled of [false, true]) assert.equal(renderGalleryDial(view, enabled), compose(dialGalleryFixture(view, enabled)));
+		const colors = { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:4": "#38CD89" };
+		assert.equal(renderGalleryDial(view, false, colors), compose(dialGalleryFixture(view, false, colors)));
 	}
+});
+
+it("individual reading colors distinguish two temperatures and leave every non-value byte unchanged", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture("overview");
+		fixture.state.settings.dialView = view;
+		const before = compose(fixture);
+		Object.assign(fixture.state.settings, { readingColors: { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" } });
+		assert.deepEqual(values(compose(fixture)), ["#4CC2FF", "#FF7E8E", "#38CD89"].slice(0, view === "tworow" ? 2 : 3));
+		assert.equal(withoutValues(compose(fixture)), withoutValues(before));
+	}
+});
+
+it("individual colors salvage per entry, keep exact chosen hues and never rewrite settings", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture(view, true);
+		const [first, second] = fixture.snapshot.readings;
+		const automatic = compose(fixture);
+		for (const readingColors of [undefined, null, true, "#123456", [], { [first!.key]: "bad", [second!.key]: 123 }, Object.create({ [first!.key]: "#123456" })]) {
+			Object.assign(fixture.state.settings, { readingColors });
+			assert.equal(compose(fixture), automatic);
+		}
+		Object.assign(fixture.state.settings, { readingColors: { [first!.key]: "#012aBc", [second!.key]: "bad", future: { keep: true } } });
+		const saved = structuredClone(fixture.state.settings);
+		assert.equal(values(compose(fixture))[0], "#012aBc", "explicit choices bypass automatic contrast adjustment");
+		assert.equal(values(compose(fixture))[1], values(automatic)[1]);
+		assert.deepEqual(fixture.state.settings, saved);
+		fixture.state.settings.dialView = "single";
+		const single = compose(fixture);
+		delete fixture.state.settings.readingColors;
+		assert.equal(compose(fixture), single);
+	}
+});
+
+it("individual colors survive rotation, selection, reordered groups, removal and re-adding", () => {
+	const fixture = dialGalleryFixture("overview");
+	const colors = { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" };
+	fixture.state.settings.readingColors = colors;
+	const readings = fixture.snapshot.readings;
+	for (const view of ["tworow", "overview"] as const) {
+		fixture.state.settings.dialView = view;
+		for (const order of [readings, [...readings].reverse(), [readings[1]!, readings[2]!], readings]) {
+			fixture.state.settings.rotationKeys = order.map((r) => r.key);
+			for (const groups of [undefined, [{ keys: [order[0]!.key] }, { keys: order.slice(1).map((r) => r.key) }]]) {
+				fixture.state.settings.rotationGroups = groups;
+				for (const reading of order) {
+					fixture.state.settings.readingKey = reading.key;
+					const svg = compose(fixture);
+					for (const r of order) {
+						if (svg.includes(`>${r.value}</text>`)) assert.ok(svg.includes(`fill="${colors[r.key as keyof typeof colors]}">${r.value}</text>`));
+					}
+				}
+			}
+		}
+	}
+	assert.deepEqual(fixture.state.settings.readingColors, colors);
+});
+
+it("individual colors work with accents off and Paper, follow Dim and inherited Custom, and preserve alert scoping", () => {
+	const fixture = dialGalleryFixture("overview");
+	fixture.state.settings.readingColors = { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" };
+	for (const theme of Object.keys(config.themes)) {
+		for (const view of ["tworow", "overview"] as const) {
+			applyGlobalThemeSettings({ theme, typeAccents: "off", textMode: "theme" });
+			Object.assign(fixture.state.settings, { theme, dialView: view, textMode: "theme" });
+			const chosen = ["#4CC2FF", "#FF7E8E", "#38CD89"].slice(0, view === "tworow" ? 2 : 3);
+			assert.deepEqual(values(compose(fixture)), chosen);
+			fixture.state.settings.textMode = "dim";
+			assert.deepEqual(values(compose(fixture)), chosen.map((color, i) => mixToward(color, view === "tworow" && i === 0 ? config.themes[theme]!.track : config.themes[theme]!.bg, DIM_VALUE_BLEND)));
+			delete fixture.state.settings.textMode;
+			applyGlobalThemeSettings({ textMode: "custom", textColor: "#123abc" });
+			assert.deepEqual(values(compose(fixture)), chosen.map(() => "#123abc"));
+			fixture.state.settings.textMode = "custom";
+			fixture.state.settings.textColor = "invalid";
+			assert.deepEqual(values(compose(fixture)), chosen);
+		}
+	}
+	Object.assign(fixture.state.settings, { theme: "void", dialView: "overview", textMode: "theme", warnValue: "70", critValue: "75", alertUnit: "°C" });
+	assert.deepEqual(values(compose(fixture)), [config.alerts.warn.bg, config.alerts.crit.bg, "#38CD89"]);
+	Object.assign(fixture.state.settings, { warnValue: "80", critValue: "90" });
+	assert.deepEqual(values(compose(fixture)), ["#4CC2FF", "#FF7E8E", "#38CD89"]);
+	const readings = fixture.snapshot.readings.map((r) => ({ ...r, type: SensorType.Other, value: NaN }));
+	fixture.snapshot = { ...fixture.snapshot, readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	const missing = compose(fixture);
+	delete fixture.state.settings.readingColors;
+	assert.equal(compose(fixture), missing);
 });

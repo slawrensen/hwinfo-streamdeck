@@ -3,6 +3,20 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.6.90.0 - 2026-09-09
+
+- GitHub preview for issue #31, based only on released 1.6.0. Not a
+  Marketplace release. Adds the opt-in **Color numbers by sensor type**
+  setting under Appearance for two-row and three-row dials. Type accents
+  and Text Theme/Dim apply; valid Custom Text and alerts retain precedence.
+  Existing settings, single dials and key layouts keep their behavior.
+- Multi-row gallery renders now use the runtime action composer with
+  achievable settings. The corrected stable assets use normal text; colored
+  examples remain preview-only until a corrected Marketplace build ships.
+- Native bytes are reused from v1.6.0. The planned 1.7.0 stable version
+  supersedes this preview; 1.6.1 does not. See the preview's install and
+  return-to-stable notes before installing over 1.6.0.
+
 ## 1.6.0.0 - 2026-09-04
 
 - A detail tile can carry one to four readings. The new Tile shows

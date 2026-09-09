@@ -1,21 +1,45 @@
 # Marketing assets
 
-The Elgato Marketplace listing images for HWiNFO Sensors. Nothing here is a
-mockup: the boards are drawn by the plugin's own renderers (`src/ui/`) from
-live HWiNFO readings on the dev machine, and the one photograph is the plugin
-running on real hardware, nothing staged. The
-marketing is the product output. That is the point, and it is why these files
-live in the open repo instead of a private drive.
+The Elgato Marketplace listing images for HWiNFO Sensors. The boards use
+production renderers with sample scenarios, live HWiNFO inputs and generated
+histories. They are sample-data renders, not physical screenshots.
+`shot-2-hardware.png` is the photograph of the plugin on real hardware.
+Multi-row dials now go through the runtime action composer, including its
+formatting, settings and color precedence.
+
+Issue #31 exposed a gallery mismatch: the released script supplied per-row
+`palette.accent` directly, while the 1.6.0 action used normal Text colors.
+The historical [1.6.0 script and assets](https://github.com/slawrensen/hwinfo-streamdeck/tree/v1.6.0/marketing)
+remain in that release; the [original script](https://github.com/slawrensen/hwinfo-streamdeck/blob/v1.6.0/scripts/marketplace-shots.mjs)
+records their source. The colored multi-row examples were not achievable
+with released settings.
+
+Replace `shot-7-dial-views.png` (the customer's image), `shot-1-hero.png` and
+`thumbnail.png` with the corrected default renders here for the stable
+listing. Their normal numeric Text styling is achievable in 1.6.0. The
+colored versions require **Color numbers by sensor type** under Appearance,
+Text → Theme, and Type accents enabled. They are preview-only until a
+corrected stable Marketplace build is available. No Marketplace submission
+is made by regenerating these files.
+
+`issue-31/before-after.png` compares identical fixtures through the production
+composer, changing only the new setting. Both temperatures share pink, fan
+uses cyan, power gold and load purple. Labels, units, graphs, selection and
+footer keep their ordinary styling. Explicit valid Custom Text overrides
+sensor coloring; Dim applies the existing blend with a numeric contrast
+floor on the actual row background. Alerts retain priority; accents off,
+Paper and unknown categories keep normal text.
 
 | File | Use | Spec |
 | --- | --- | --- |
 | `app-icon-288.png` | Marketplace app icon | 288x288 |
 | `thumbnail.png` | Listing thumbnail | 1920x960 |
-| `shot-1-hero.png` | Gallery 1: full deck of live readings | 1920x960 |
+| `shot-1-hero.png` | Gallery 1: sample-data deck render | 1920x960 |
 | `shot-2-hardware.png` | Gallery 2: real Stream Deck + XL photograph board | 1920x960 |
 | `shot-3-themes.png` | Gallery 3: all seven themes + alert states | 1920x960 |
 | `shot-4-settings.png` | Gallery 4: the real settings panel | 1920x960 |
 | `shot-5-dials.png` | Gallery 5: Stream Deck + dials | 1920x960 |
+| `shot-7-dial-views.png` | Gallery 7: production-composed sample dial views | 1920x960 |
 | `hwinfo-streamdeckxlplus.png` | Photo master: Camera Raw develop of the Sony A7 III capture | source |
 | `hwinfo-streamdeckxlplus-squared.png` | Photo master as the board consumes it; the board's default source | source |
 
@@ -32,6 +56,11 @@ HWiNFO running:
 ```bash
 npx tsx scripts/marketplace-shots.mjs marketing
 ```
+
+The default keeps multi-row sensor coloring off. To generate explicitly
+marked preview boards in a separate output directory, append
+`--sensor-value-colors`. Generate the reproducible comparison without live
+HWiNFO using `npx tsx scripts/dial-color-comparison.mjs`.
 
 Shot 4 composites three real property-inspector screenshots, so it needs a
 capture directory. Full pipeline:

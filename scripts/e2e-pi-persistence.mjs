@@ -57,7 +57,7 @@ const SEEDS = {
 	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
 	// The dial panel-truth leg: Custom preset with two touch zones (the
 	// dead-tap configuration) on the overview view (no bar to promise).
-	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview" },
+	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview", futureBlob: FUTURE_BLOB },
 	// A grouped custom list: one hand-dressed quad in the plan, then the
 	// uniform fill at density 4. Exercises the shrink-on-remove rules and
 	// the one-frame-per-edit invariant.
@@ -2300,6 +2300,24 @@ try {
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
+	const colorToggle = `document.querySelector('sdpi-checkbox[setting="sensorValueColors"]').shadowRoot.querySelector('input[type=checkbox]')`;
+	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
+	await clickCheckbox("sensorValueColors");
+	await sleep(500);
+	check("dial: toggle persists exact true with unknown and unrelated settings", store.settings.sensorValueColors === true && store.settings.touchZones === "two" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	await setSelect("dialView", "single");
+	await waitDom("dial: single view hides the option", `document.getElementById('sensor-value-colors').hidden`, 2000);
+	check("dial: hiding preserves the stored choice", store.settings.sensorValueColors === true);
+	await setSelect("dialView", "tworow");
+	await waitDom("dial: two-row restores the checked option", `!document.getElementById('sensor-value-colors').hidden && ${colorToggle}.checked`, 2000);
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	check("dial: reopening writes nothing", writes.length === mark);
+	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
+	await clickCheckbox("sensorValueColors");
+	await sleep(500);
+	check("dial: toggle persists exact false without dropping unknown settings", store.settings.sensorValueColors === false && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
 
 	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
 	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.

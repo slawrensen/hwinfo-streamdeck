@@ -238,6 +238,31 @@ async function scenario(send) {
 		// single face (rollback safety).
 		const k3 = (treeMsg?.groups ?? []).flatMap((g) => g.readings.map((r) => r.key))[2];
 		const dialSvgLatest = () => latestSvg(results.feedbacks, "ctx-dial", (f) => f.payload?.canvas);
+		// Issue #31: real settings events repaint numeric colors immediately,
+		// and rotation carries the option plus unknown settings forward.
+		const available = (treeMsg?.groups ?? []).flatMap((g) => g.readings);
+		const temperature = available.find((r) => r.type === 1 && r.unit === "°C" && !/memory|ram/i.test(r.label));
+		const fan = available.find((r) => r.type === 3);
+		results.sensorColorChecks = [];
+		if (temperature && fan) {
+			const accents = JSON.parse(fs.readFileSync(path.join(pluginDir, "themes.json"), "utf8")).typeAccents;
+			const valueColors = () => [...(dialSvgLatest() ?? "").matchAll(/font-weight="700" fill="([^"]+)">/g)].map((m) => m[1]);
+			for (const dialView of ["tworow", "overview"]) {
+				const settings = { readingKey: temperature.key, rotationKeys: [temperature.key, fan.key], dialView, theme: "void", textMode: "theme", future31: { keep: [1, "two"] } };
+				dialSet(settings);
+				await sleep(200);
+				const before = results.feedbacks.length;
+				dialSet({ ...settings, sensorValueColors: true });
+				const repainted = await waitUntil(() => results.feedbacks.length > before && valueColors().join() === [accents.temperature, accents.fan].join(), 750, 25);
+				dialRotate();
+				await sleep(200);
+				const saved = dialWrites().at(-1)?.payload;
+				const rotated = valueColors().join() === [accents.temperature, accents.fan].join() && saved?.sensorValueColors === true && saved?.future31?.keep?.[1] === "two";
+				dialSet({ ...settings, sensorValueColors: false });
+				const cleared = await waitUntil(() => valueColors().join() === ["#FFFFFF", "#FFFFFF"].join(), 750, 25);
+				results.sensorColorChecks.push({ dialView, repainted, rotated, cleared });
+			}
+		}
 		if (typeof k3 === "string") {
 			dialSet({ readingKey: k1, rotationKeys: [k1, k2, k3], dialView: "overview" });
 			await sleep(600);
@@ -813,6 +838,7 @@ async function finish() {
 		typeof results.overviewRenamed === "string" && results.overviewRenamed.includes(">RENAMED"),
 		(results.overviewRenamed ?? "no frame").slice(0, 120)
 	);
+	check("sensor colors: both multi-row views repaint on/off immediately and rotation preserves settings", results.sensorColorChecks?.length === 2 && results.sensorColorChecks.every((r) => r.repainted && r.rotated && r.cleared), JSON.stringify(results.sensorColorChecks));
 	check(
 		"junk dialView degrades to the single face (bar back at y=84)",
 		typeof results.overviewDegraded === "string" && results.overviewDegraded.includes('y="84"'),

@@ -2233,11 +2233,13 @@
 	const overviewRowsEl = document.getElementById("overview-rows");
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
+		const sensorValueColorsEl = document.getElementById("sensor-value-colors");
 		const barRangeEl = document.getElementById("bar-range");
 		const warnEl = document.querySelector('sdpi-textfield[setting="warnValue"]');
 		const critEl = document.querySelector('sdpi-textfield[setting="critValue"]');
 		const applyView = (value) => {
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
+			if (sensorValueColorsEl !== null) sensorValueColorsEl.hidden = overviewRowsEl.hidden;
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
 			if (barRangeEl !== null) barRangeEl.hidden = value === "tworow" || value === "overview";
 			// The multi-row views draw no bar: alerts tint the row VALUE

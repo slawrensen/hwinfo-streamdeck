@@ -121,6 +121,24 @@ details > summary:hover {
 	cursor: pointer;
 }
 
+/* Dial reading colors reuse the quad wells; names keep large rotation sets clear. */
+.hw-reading-colors {
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.hw-reading-colors .hw-quad-colors {
+	margin-bottom: 4px;
+}
+
+.hw-reading-colors label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .hw-picker-list {
 	position: absolute;
 	top: 100%;
@@ -367,6 +385,7 @@ details > summary:hover {
 }
 
 .hw-config-row button,
+.hw-reading-colors button,
 .hw-set-actions button,
 .hw-support {
 	background: #3d3d3d;

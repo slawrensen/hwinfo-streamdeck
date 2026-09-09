@@ -1,9 +1,9 @@
 /** Fixed sample data, not a hardware capture. No renderer/color overrides. */
-import { composeDialSvg, type DialRenderState } from "../../src/actions/sensor-dial";
+import { composeDialSvg, type DialRenderState, type DialSettings } from "../../src/actions/sensor-dial";
 import { SensorType, type Reading, type SensorSnapshot } from "../../src/hwinfo/types";
 import { SessionStatsStore } from "../../src/stats";
 
-export function dialGalleryFixture(view: "tworow" | "overview", sensorValueColors = false): { state: DialRenderState; snapshot: SensorSnapshot; historyOf: (key: string) => readonly number[] } {
+export function dialGalleryFixture(view: "tworow" | "overview", sensorValueColors = false, readingColors?: DialSettings["readingColors"]): { state: DialRenderState; snapshot: SensorSnapshot; historyOf: (key: string) => readonly number[] } {
 	const sample = (id: number, label: string, type: SensorType, unit: string, value: number, valueMin: number, valueMax: number): Reading => ({
 		key: `31:0:${id.toString(16)}`, sensorIndex: 0, id, label, type, unit, value, valueMin, valueMax, valueAvg: value
 	});
@@ -28,13 +28,13 @@ export function dialGalleryFixture(view: "tworow" | "overview", sensorValueColor
 		for (const value of history) stats.sample(r.key, value);
 	}
 	const state: DialRenderState = {
-		settings: { readingKey: readings[0]!.key, rotationKeys: readings.map((r) => r.key), dialView: view, theme: "void", textMode: "theme", overviewLabels: "full", sensorValueColors },
+		settings: { readingKey: readings[0]!.key, rotationKeys: readings.map((r) => r.key), dialView: view, theme: "void", textMode: "theme", overviewLabels: "full", sensorValueColors, ...(readingColors === undefined ? {} : { readingColors }) },
 		stats, statMode: "current", overlay: null, pinned: false, cyclePaused: false
 	};
 	return { state, snapshot, historyOf: (key: string) => histories.get(key) ?? [] };
 }
 
-export function renderGalleryDial(view: "tworow" | "overview", sensorValueColors = false): string {
-	const { state, snapshot, historyOf } = dialGalleryFixture(view, sensorValueColors);
+export function renderGalleryDial(view: "tworow" | "overview", sensorValueColors = false, readingColors?: DialSettings["readingColors"]): string {
+	const { state, snapshot, historyOf } = dialGalleryFixture(view, sensorValueColors, readingColors);
 	return composeDialSvg(state, { state: "ok", snapshot, source: "shared-memory" }, historyOf);
 }

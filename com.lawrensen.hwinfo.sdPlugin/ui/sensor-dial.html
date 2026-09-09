@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.1.0-31" />
+		<link rel="stylesheet" href="pi.css?v=1.6.1.0-31b" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -157,6 +157,21 @@
 				<sdpi-checkbox id="sensor-value-colors-toggle" label="Color numbers by sensor type"></sdpi-checkbox>
 			</sdpi-item>
 			<div class="hw-help">Off by default. Use Text → Theme or Dim with Type accents enabled. Valid Custom Text overrides these colors, including a deck-wide Custom default. Alerts keep priority. Paper and unknown sensor types keep normal text.</div>
+			<sdpi-item label="Reading colors">
+				<div class="hw-quad-colors">
+					<select id="reading-color-preset" aria-label="Reading color preset">
+						<option value="automatic">Automatic</option>
+						<option value="signal">Signal (four hues)</option>
+						<option value="pairs">Pairs (two hues)</option>
+						<option value="uniform">Uniform</option>
+						<option value="custom" disabled>Custom</option>
+					</select>
+				</div>
+			</sdpi-item>
+			<sdpi-item label="">
+				<div id="reading-color-list" class="hw-reading-colors"></div>
+			</sdpi-item>
+			<div class="hw-help">Pick a color for each reading, independent of Type accents. Colors follow readings through rotation. Automatic uses the option above. Text → Custom overrides these colors; Dim dims them. Alerts keep priority. Graphs stay unchanged.</div>
 		</div>
 
 		<div id="bar-range">
@@ -367,7 +382,7 @@
 			<div class="hw-help">The exact settings this dial runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another dial or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.6.1.0-31"></script>
-		<script src="pi-control.js?v=1.6.1.0-31"></script>
+		<script src="pi-common.js?v=1.6.1.0-31b"></script>
+		<script src="pi-control.js?v=1.6.1.0-31b"></script>
 	</body>
 </html>

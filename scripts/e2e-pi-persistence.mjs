@@ -2300,9 +2300,9 @@ try {
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
-	const colorToggle = `document.querySelector('sdpi-checkbox[setting="sensorValueColors"]').shadowRoot.querySelector('input[type=checkbox]')`;
+	const colorToggle = `document.getElementById('sensor-value-colors-toggle').shadowRoot.querySelector('input[type=checkbox]')`;
 	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
-	await clickCheckbox("sensorValueColors");
+	await evaluate(`${colorToggle}.click()`);
 	await sleep(500);
 	check("dial: toggle persists exact true with unknown and unrelated settings", store.settings.sensorValueColors === true && store.settings.touchZones === "two" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
 	await setSelect("dialView", "single");
@@ -2315,9 +2315,18 @@ try {
 	await sleep(3500);
 	check("dial: reopening writes nothing", writes.length === mark);
 	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
-	await clickCheckbox("sensorValueColors");
+	await evaluate(`${colorToggle}.click()`);
 	await sleep(500);
 	check("dial: toggle persists exact false without dropping unknown settings", store.settings.sensorValueColors === false && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	store.settings.sensorValueColors = "true";
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	await waitDom("dial: malformed boolean displays off", `!${colorToggle}.checked`, 2000);
+	check("dial: malformed setting is not rewritten on opening", writes.length === mark && store.settings.sensorValueColors === "true");
+	await setSelect("dialView", "overview");
+	await sleep(500);
+	check("dial: unrelated edit preserves malformed and unknown settings", store.settings.sensorValueColors === "true" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
 
 	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
 	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.

@@ -2251,6 +2251,21 @@
 		};
 		followSetting("dialView", applyView);
 	}
+	// An unbound component avoids its truthy coercion of malformed settings.
+	// Loading paints exact true without saving; only a user's edit persists.
+	const sensorColorsToggle = document.getElementById("sensor-value-colors-toggle");
+	if (sensorColorsToggle !== null) {
+		let painting = false;
+		const [, write] = useSettings("sensorValueColors", () => {}, null);
+		followSetting("sensorValueColors", (value) => {
+			painting = true;
+			sensorColorsToggle.value = value === true;
+			painting = false;
+		});
+		sensorColorsToggle.addEventListener("valuechange", () => {
+			if (!painting) write(sensorColorsToggle.value === true);
+		});
+	}
 
 	// Quad cell colors (reading PI only): one preset select plus four
 	// per-cell wells, all writing the single quadColors setting. The plugin

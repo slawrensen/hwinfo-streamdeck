@@ -9,7 +9,7 @@ import { SensorType, type Reading } from "../src/hwinfo/types";
 import { stepReading } from "../src/rotation";
 import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
-import { classifyTypeAccent, loadThemes } from "../src/ui/themes";
+import { alertValueColor, classifyTypeAccent, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
 
 const config = loadThemes();
@@ -160,14 +160,15 @@ it("classification uses native units and source labels, regardless of display al
 it("alerts keep priority over Custom and sensor colors, with native-unit scoping and recovery", () => {
 	for (const view of ["tworow", "overview"] as const) {
 		const fixture = dialGalleryFixture("overview", true);
+		const warnColor = alertValueColor(config, "warn", view === "tworow" ? config.themes.void!.track : config.themes.void!.bg);
 		Object.assign(fixture.state.settings, { dialView: view, warnValue: "70", critValue: "75", alertUnit: "°C", textMode: "custom", textColor: "#123abc" });
-		assert.deepEqual(values(compose(fixture)), view === "overview" ? [config.alerts.warn.bg, config.alerts.crit.bg, "#123abc"] : [config.alerts.warn.bg, config.alerts.crit.bg]);
+		assert.deepEqual(values(compose(fixture)), view === "overview" ? [warnColor, alertValueColor(config, "crit", config.themes.void!.bg), "#123abc"] : [warnColor, alertValueColor(config, "crit", config.themes.void!.bg)]);
 		Object.assign(fixture.state.settings, { warnValue: "80", critValue: "90", textMode: "theme" });
 		assert.deepEqual(values(compose(fixture)), view === "overview" ? [config.typeAccents.temperature, config.typeAccents.temperature, config.typeAccents.fan] : [config.typeAccents.temperature, config.typeAccents.temperature]);
 		fixture.state.settings.fahrenheit = true;
 		fixture.state.settings.warnValue = "160";
 		fixture.state.settings.critValue = "168";
-		assert.deepEqual(values(compose(fixture)), view === "overview" ? [config.alerts.warn.bg, config.alerts.crit.bg, config.typeAccents.fan] : [config.alerts.warn.bg, config.alerts.crit.bg]);
+		assert.deepEqual(values(compose(fixture)), view === "overview" ? [warnColor, alertValueColor(config, "crit", config.themes.void!.bg), config.typeAccents.fan] : [warnColor, alertValueColor(config, "crit", config.themes.void!.bg)]);
 	}
 });
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { compose, type ReadingSettings } from "../src/actions/sensor-reading";
-import { composeDialSvg, SensorDialAction } from "../src/actions/sensor-dial";
+import { composeDialSvg, SensorDialAction, type InstanceState } from "../src/actions/sensor-dial";
 import { composeChunkFace, type DetailFaceContext } from "../src/detail/detail-faces";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import { IDLE_GESTURE } from "../src/gestures";
@@ -24,7 +24,7 @@ describe("readability through production action composition", () => {
 		for (const dialView of ["single", "overview", "tworow"]) {
 			it(`${theme} ${dialView}: built-in dim and alert values meet 4.5 on their actual surfaces`, () => {
 				for (const level of ["normal", "warn", "crit"] as const) {
-					const state: Parameters<typeof composeDialSvg>[0] = {
+					const state: InstanceState = {
 						settings: { readingKey: reading.key, dialView, theme, textMode: "dim", warnValue: level === "normal" ? "50" : "30", critValue: level === "crit" ? "35" : "60", alertUnit: "°C" },
 						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
 					};
@@ -109,7 +109,7 @@ describe("refutation: identity and explicit links", () => {
 });
 
 describe("dial appearance synchronizes history before its first frame", () => {
-	type DialState = Parameters<typeof composeDialSvg>[0];
+	type DialState = InstanceState;
 	type Appearance = Parameters<SensorDialAction["onWillAppear"]>[0];
 	type Lifecycle = {
 		instances: Map<string, DialState>;
@@ -203,7 +203,7 @@ describe("dial appearance synchronizes history before its first frame", () => {
 });
 
 describe("dial selection validates retained history before rendering", () => {
-	type DialState = Parameters<typeof composeDialSvg>[0];
+	type DialState = InstanceState;
 	type SettingsEvent = Parameters<SensorDialAction["onDidReceiveSettings"]>[0];
 	type DialHandle = SettingsEvent["action"];
 	type Selection = {
@@ -431,7 +431,7 @@ describe("measurement truth through production renderers", () => {
 		}
 	});
 	it("dial native-unit and backend resets are explained on all three views", () => {
-		type DialState = Parameters<typeof composeDialSvg>[0];
+		type DialState = InstanceState;
 		type DialSeam = { sampleStats(state: DialState, snapshot: SensorSnapshot, source: string): void };
 		// Exercise the production sampling and overlay methods without opening
 		// a poller or registering live SDK listeners.

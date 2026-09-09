@@ -142,7 +142,7 @@ export type DialSettings = {
 	overviewSeparators?: string;
 };
 
-type InstanceState = {
+export type InstanceState = {
 	settings: DialSettings;
 	/** Session stats per reading identity; survives rotation and hiding. */
 	stats: SessionStatsStore;

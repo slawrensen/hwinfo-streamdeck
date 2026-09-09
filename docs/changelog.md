@@ -14,6 +14,22 @@ hand.
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## 1.6.91.0 - 2026-09-09
+
+- GitHub preview for issue #31, based only on released 1.6.0. Not a
+  Marketplace release. Adds **Color numbers by sensor type** and independent
+  **Reading colors** under Appearance for two-row and three-row dials.
+  Signal, Pairs and Uniform presets share the four-reading key's palette;
+  individual color wells follow reading identity through rotation and groups.
+- Chosen colors work with Type accents off, keeping existing graph colors.
+  Valid Custom Text and alerts retain priority; Dim uses the existing blend.
+  Existing settings, single dials and every key layout keep their behavior.
+- Multi-row gallery examples use the runtime composer with achievable
+  settings. Colored examples remain preview-only until a corrected
+  Marketplace build ships. Native bytes are reused from v1.6.0.
+- This preview upgrades 1.6.0 and 1.6.90. Planned stable 1.7.0 supersedes it;
+  1.6.1 does not. See the preview's install and return-to-stable notes.
+
 ## 1.6.0.0 - 2026-09-04
 
 - A detail tile can carry one to four readings. The new Tile shows

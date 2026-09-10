@@ -135,3 +135,9 @@ selection and layout. Only `readingColors` changes, using the achievable
 Appearance → Reading colors → Signal preset. CPU and GPU temperatures can
 therefore differ while graph lines keep their previous colors. This is preview
 evidence, not a physical screenshot or a claim about the stable Marketplace build.
+
+The docs image `docs/assets/img/pi-dial-reading-colors-preview.png` is the
+maintainer's unedited `multicolor.png` Stream Deck app capture, supplied on
+2026-09-09 with preview 1.6.92.0 installed. It shows the individual color
+controls for five readings. It is a settings-panel screenshot, not a photo
+of the physical display or a replacement for the stable Marketplace assets.

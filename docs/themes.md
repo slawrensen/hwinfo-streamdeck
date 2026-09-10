@@ -78,9 +78,11 @@ Automatic quad identity colors also adjust for their background when needed. Sav
 
 The setting recolors **text only**. Backgrounds, theme and type accents, sparklines, bars, rings, range bars, tracks and separators keep their theme colors, status screens keep their fixed safety colors, and the [alert palettes](#alerts-override-everything) always override it: a warning key is amber with black text whatever Text says, and a dial's alert-colored bar or overview row value is never recolored.
 
+The issue #31 preview adds [individual reading colors](sensor-dial.md#reading-colors-preview) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls are not in stable 1.6.0.
+
 ## Type accents
 
-**Type accents** (*Advanced → Type accents*, **on by default**) color the accent on each key and dial by the sensor's type: the sparkline's line and end dot, the Bar and Ring gauge fills, the MIN/MAX/AVG badge in its gap under the title, and on a dial the range bar fill or the overview's selection bar. Only the accent changes; label, value and unit keep the theme's own luminance rhythm.
+**Type accents** (*Advanced → Type accents*, **on by default**) color the accent on each key and dial by the sensor's type: the sparkline's line and end dot, the Bar and Ring gauge fills, the MIN/MAX/AVG badge in its gap under the title, and on a dial the range bar fill or the overview's selection bar. With default number-color settings, labels, values and units keep their Text styling.
 
 | Sensor type | Accent |
 | --- | --- |

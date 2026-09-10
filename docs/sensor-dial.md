@@ -61,6 +61,26 @@ A few details specific to the view:
 
 Switching back to **One reading** restores the exact single-view face.
 
+## Reading colors (preview)
+
+> **Preview only:** These controls are in the issue #31 preview, not stable 1.6.0 or the current Marketplace build. See [PR #32](https://github.com/slawrensen/hwinfo-streamdeck/pull/32) for release status.
+
+Choose a two-row or three-row **View**, then open **Appearance** and set **Text → Theme**. **Reading colors** uses the same presets and color wells as the [four-reading key](sensor-reading.md#layout-four-readings-the-quad-grid):
+
+- **Signal**, **Pairs**, or **Uniform** applies a preset to the listed readings.
+- Click a reading's color well to choose its own number color. Two temperatures can have different colors, like DIMM 1 and DIMM 2 below.
+- **Auto** resets one reading; **Automatic** resets the listed readings. Readings without a chosen color follow the sensor-type option below, or normal text.
+
+Colors follow each reading through rotation, reordering and groups. Switching views or removing and re-adding a reading keeps its saved color. Individual colors work with **Type accents off**, including on Paper. Labels, units, footer, graphs and the selection indicator keep their existing styling.
+
+![Stream Deck Sensor Dial settings showing individual color wells: purple DIMM 1, cyan DIMM 2, gold Physical Memory Available and Physical Memory Load, and pink Page File Usage.]({{ '/assets/img/pi-dial-reading-colors-preview.png' | relative_url }})
+
+*Stream Deck settings panel with preview 1.6.92.0 installed, captured by the maintainer. The [production before/after comparison](https://github.com/slawrensen/hwinfo-streamdeck/blob/c0669cb37a7640fffa72ab35b1f95855001d5907/marketing/issue-31/custom-before-after.png) uses fixed sample data; neither is a physical-display photo.*
+
+For automatic category colors, enable **Color numbers by sensor type** and leave **Type accents** enabled: temperature numbers share pink, fans cyan, power gold and load purple. The option is off by default. Paper, Type accents off and unknown categories keep normal text. Automatic colors adjust for readability on each row's background.
+
+**Text → Theme** keeps your chosen colors exact; **Dim** dims them. A valid **Text → Custom** color, including an inherited deck default, overrides reading colors. Warning and critical values keep priority and the existing unit scoping. Leave both number-color controls at their defaults to keep the released appearance.
+
 ## Gestures
 
 These are the **Legacy** preset defaults, which every dial runs until you pick otherwise. The [Dial controls & presets](controls.md) page covers the Elite and Custom presets, press+rotate, touch zones, pause/pin, reset reach, and the HWiNFO Control key action.
@@ -113,6 +133,8 @@ Open the dial's Property Inspector to configure it. Most fields mirror the key a
 | **Label** | Custom label; blank falls back to the sensor's name. |
 | **Theme** | Preset gallery for this dial, or **Deck default** to follow the deck-wide theme. See [Themes](themes.md). |
 | **Text** | Text intensity for this dial: **Deck default**, **Theme**, **Dim**, or **Custom** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
+| **Color numbers by sensor type** | Preview only, multi-row views: opt into automatic category colors for normal numbers. Off by default. See [Reading colors](#reading-colors-preview). |
+| **Reading colors** | Preview only, multi-row views: choose a preset or individual number colors, with **Auto** to reset a reading. See [Reading colors](#reading-colors-preview). |
 | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the deck-wide **Data units** preference instead. |
 | **Unit** | Show temperatures in °F instead of °C. |
 | **Bar min** | Fixed low end of the range bar on the single view. Leave blank to auto-track the session low. |

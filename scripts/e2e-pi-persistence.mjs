@@ -57,7 +57,7 @@ const SEEDS = {
 	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
 	// The dial panel-truth leg: Custom preset with two touch zones (the
 	// dead-tap configuration) on the overview view (no bar to promise).
-	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview" },
+	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview", futureBlob: FUTURE_BLOB },
 	// A grouped custom list: one hand-dressed quad in the plan, then the
 	// uniform fill at density 4. Exercises the shrink-on-remove rules and
 	// the one-frame-per-edit invariant.
@@ -2300,6 +2300,67 @@ try {
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
+	const colorToggle = `document.getElementById('sensor-value-colors-toggle').shadowRoot.querySelector('input[type=checkbox]')`;
+	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
+	await evaluate(`${colorToggle}.click()`);
+	await sleep(500);
+	check("dial: toggle persists exact true with unknown and unrelated settings", store.settings.sensorValueColors === true && store.settings.touchZones === "two" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	await setSelect("dialView", "single");
+	await waitDom("dial: single view hides the option", `document.getElementById('sensor-value-colors').hidden`, 2000);
+	check("dial: hiding preserves the stored choice", store.settings.sensorValueColors === true);
+	await setSelect("dialView", "tworow");
+	await waitDom("dial: two-row restores the checked option", `!document.getElementById('sensor-value-colors').hidden && ${colorToggle}.checked`, 2000);
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	check("dial: reopening writes nothing", writes.length === mark);
+	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
+	await evaluate(`${colorToggle}.click()`);
+	await sleep(500);
+	check("dial: toggle persists exact false without dropping unknown settings", store.settings.sensorValueColors === false && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	store.settings.sensorValueColors = "true";
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	await waitDom("dial: malformed boolean displays off", `!${colorToggle}.checked`, 2000);
+	check("dial: malformed setting is not rewritten on opening", writes.length === mark && store.settings.sensorValueColors === "true");
+	await setSelect("dialView", "overview");
+	await sleep(500);
+	check("dial: unrelated edit preserves malformed and unknown settings", store.settings.sensorValueColors === "true" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+
+	// Individual colors use real native wells and the quad-style preset.
+	const colorPreset = `document.getElementById('reading-color-preset')`;
+	await waitDom("dial: automatic colors show the current sensor's readings", `${colorPreset}.value === 'automatic' && document.querySelectorAll('#reading-color-list input[type=color]').length > 1`, 2000);
+	await evaluate(`${colorPreset}.value='signal'; ${colorPreset}.dispatchEvent(new Event('change',{bubbles:true}))`);
+	await sleep(500);
+	const signalColors = { ...store.settings.readingColors };
+	const colorKeys = Object.keys(signalColors);
+	check("dial: Signal persists independent reading identities", colorKeys.length > 1 && signalColors[colorKeys[0]] === "#4CC2FF" && signalColors[colorKeys[1]] === "#FF7E8E");
+	mark = writes.length;
+	await evaluate(`(()=>{const e=document.querySelector('#reading-color-list input[type=color]'); e.focus(); e.value='#123abc'; e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+	await sleep(450);
+	check("dial: dragging a color well does not write per frame", writes.length === mark);
+	await evaluate(`(()=>{const e=document.querySelector('#reading-color-list input[type=color]'); e.dispatchEvent(new Event('change',{bubbles:true})); e.blur();})()`);
+	await sleep(500);
+	check("dial: closing a color well writes just that reading and preserves other settings", store.settings.readingColors[colorKeys[0]] === "#123abc" && store.settings.readingColors[colorKeys[1]] === "#FF7E8E" && deepEqual(store.settings.futureBlob, FUTURE_BLOB) && store.settings.sensorValueColors === "true");
+	await waitDom("dial: edited wells report Custom", `${colorPreset}.value === 'custom'`, 2000);
+	await setSelect("dialView", "single");
+	check("dial: single view retains custom reading colors", store.settings.readingColors[colorKeys[0]] === "#123abc");
+	await setSelect("dialView", "tworow");
+	store.settings.readingColors.future = { keep: "unknown" };
+	store.settings.readingColors.dormant = "#ABCDEF";
+	store.settings.rotationKeys = [...colorKeys].reverse();
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	check("dial: reopen and reordered readings write nothing", writes.length === mark);
+	await waitDom("dial: custom well survives reopening and reordering", `document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').value === '#123abc'`, 2000);
+	await evaluate(`document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').parentElement.querySelector('button').click()`);
+	await sleep(500);
+	check("dial: per-reading Auto resets only that reading", !Object.hasOwn(store.settings.readingColors, colorKeys[0]) && store.settings.readingColors[colorKeys[1]] === "#FF7E8E" && store.settings.readingColors.future?.keep === "unknown");
+	await evaluate(`${colorPreset}.value='automatic'; ${colorPreset}.dispatchEvent(new Event('change',{bubbles:true}))`);
+	await sleep(500);
+	check("dial: Automatic resets listed readings and preserves dormant and unknown entries", colorKeys.every((key) => !Object.hasOwn(store.settings.readingColors, key)) && store.settings.readingColors.dormant === "#ABCDEF" && store.settings.readingColors.future?.keep === "unknown" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
 
 	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
 	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.

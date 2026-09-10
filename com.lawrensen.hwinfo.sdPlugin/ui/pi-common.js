@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.6.0.0-3";
+	const PI_BUILD = "1.6.0.0-31b";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -33,6 +33,11 @@
 	const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 	// Mirrors QUAD_DEFAULT_COLORS in src/ui/key-renderer.ts.
 	const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
+	const COLOR_PRESETS = {
+		signal: QUAD_DEFAULT_COLORS,
+		pairs: ["#4CC2FF", "#4CC2FF", "#FF7E8E", "#FF7E8E"],
+		uniform: ["#4CC2FF", "#4CC2FF", "#4CC2FF", "#4CC2FF"]
+	};
 
 	let tree = null; // [{ name, readings: [{ key, label, unit, value, type }] }]
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
@@ -326,6 +331,7 @@
 
 	function renderRotationSet() {
 		if (rotationSetEl === null) return;
+		renderReadingColors();
 		// Never rebuild under a focused name field: a settings echo (rotation
 		// moved, autocycle stepped) would clobber the typing mid-word.
 		if (rotationSetEl.contains(document.activeElement) && document.activeElement.classList.contains("hw-group-name")) return;
@@ -2233,11 +2239,13 @@
 	const overviewRowsEl = document.getElementById("overview-rows");
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
+		const sensorValueColorsEl = document.getElementById("sensor-value-colors");
 		const barRangeEl = document.getElementById("bar-range");
 		const warnEl = document.querySelector('sdpi-textfield[setting="warnValue"]');
 		const critEl = document.querySelector('sdpi-textfield[setting="critValue"]');
 		const applyView = (value) => {
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
+			if (sensorValueColorsEl !== null) sensorValueColorsEl.hidden = overviewRowsEl.hidden;
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
 			if (barRangeEl !== null) barRangeEl.hidden = value === "tworow" || value === "overview";
 			// The multi-row views draw no bar: alerts tint the row VALUE
@@ -2249,6 +2257,21 @@
 		};
 		followSetting("dialView", applyView);
 	}
+	// An unbound component avoids its truthy coercion of malformed settings.
+	// Loading paints exact true without saving; only a user's edit persists.
+	const sensorColorsToggle = document.getElementById("sensor-value-colors-toggle");
+	if (sensorColorsToggle !== null) {
+		let painting = false;
+		const [, write] = useSettings("sensorValueColors", () => {}, null);
+		followSetting("sensorValueColors", (value) => {
+			painting = true;
+			sensorColorsToggle.value = value === true;
+			painting = false;
+		});
+		sensorColorsToggle.addEventListener("valuechange", () => {
+			if (!painting) write(sensorColorsToggle.value === true);
+		});
+	}
 
 	// Quad cell colors (reading PI only): one preset select plus four
 	// per-cell wells, all writing the single quadColors setting. The plugin
@@ -2256,11 +2279,7 @@
 	// snaps to "Custom" whenever the wells match no preset.
 	const quadPresetEl = document.getElementById("quad-color-preset");
 	if (quadPresetEl !== null) {
-		const QUAD_PRESETS = {
-			signal: QUAD_DEFAULT_COLORS,
-			pairs: ["#4CC2FF", "#4CC2FF", "#FF7E8E", "#FF7E8E"],
-			uniform: ["#4CC2FF", "#4CC2FF", "#4CC2FF", "#4CC2FF"]
-		};
+		const QUAD_PRESETS = COLOR_PRESETS;
 		const cellInputs = [1, 2, 3, 4].map((n) => document.getElementById(`quad-color-${n}`));
 		let quadColors = [...QUAD_DEFAULT_COLORS];
 		const adoptQuadColors = (value) => {
@@ -2296,6 +2315,96 @@
 			});
 		});
 		getQuadColors().then(applyQuadColors);
+	}
+
+	// Dial colors use the quad's preset/well idiom, but store identities rather
+	// than slots: rotation, group changes and reordering never move a color.
+	const readingColorList = document.getElementById("reading-color-list");
+	const readingColorPreset = document.getElementById("reading-color-preset");
+	let readingColors = {};
+	let readingColorsSignature = "";
+	const readingColorBinding = readingColorList === null ? null : useSettings("readingColors", adoptReadingColors, null);
+
+	function adoptReadingColors(value) {
+		// Keep unknown/dormant entries through edits, just like useSettings
+		// keeps unknown top-level fields. Invalid colors only affect display.
+		readingColors = typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
+		renderReadingColors();
+	}
+
+	function readingColorKeys() {
+		const picked = primaryPicker.selectedKey();
+		const set = rotationGroups === null ? rotationKeys : unionKeys(rotationGroups);
+		const keys = set.length > 0 ? set : (tree?.find((g) => g.readings.some((r) => r.key === picked))?.readings.map((r) => r.key) ?? []);
+		return [...new Set([...keys, picked].filter((key) => key !== ""))];
+	}
+
+	function readingColorOf(key) {
+		const color = Object.hasOwn(readingColors, key) ? readingColors[key] : undefined;
+		return typeof color === "string" && HEX_COLOR.test(color) ? color : null;
+	}
+
+	function renderReadingColors() {
+		if (readingColorList === null) return;
+		const rows = readingColorKeys().map((key) => ({ key, name: rotationNames[key] ?? readingLabelOf(key) ?? key, color: readingColorOf(key) }));
+		const signature = JSON.stringify(rows);
+		if (signature === readingColorsSignature) return;
+		readingColorPreset.value = rows.every((r) => r.color === null) ? "automatic" : (Object.keys(COLOR_PRESETS).find((preset) => rows.every((r, i) => r.color?.toUpperCase() === COLOR_PRESETS[preset][i % 4])) ?? "custom");
+		// Settings echoes and rotation must not close a native color picker.
+		if (readingColorList.contains(document.activeElement) && document.activeElement.type === "color") return;
+		readingColorsSignature = signature;
+		const frag = document.createDocumentFragment();
+		rows.forEach(({ key, name, color }, index) => {
+			const row = document.createElement("div");
+			row.className = "hw-quad-colors";
+			const well = document.createElement("input");
+			well.type = "color";
+			well.id = `reading-color-${index}`;
+			well.dataset.key = key;
+			well.value = color ?? "#FFFFFF";
+			well.title = `${name}: ${color ?? "Automatic; choose a number color"}`;
+			const label = document.createElement("label");
+			label.htmlFor = well.id;
+			label.textContent = name;
+			label.title = `${name} (${key})`;
+			const reset = document.createElement("button");
+			reset.type = "button";
+			reset.textContent = "Auto";
+			reset.title = `Use automatic number color for ${name}`;
+			reset.setAttribute("aria-label", reset.title);
+			reset.disabled = color === null;
+			reset.addEventListener("click", () => {
+				const next = { ...readingColors };
+				delete next[key];
+				readingColorBinding[1](next);
+				adoptReadingColors(next);
+			});
+			// Same commit boundary as quad wells: no writes per drag frame.
+			well.addEventListener("change", () => {
+				const next = { ...readingColors, [key]: well.value };
+				readingColorBinding[1](next);
+				adoptReadingColors(next);
+			});
+			row.append(well, label, reset);
+			frag.appendChild(row);
+		});
+		readingColorList.replaceChildren(frag);
+	}
+
+	if (readingColorBinding !== null) {
+		readingColorPreset.addEventListener("change", () => {
+			const preset = readingColorPreset.value;
+			if (preset !== "automatic" && !Object.hasOwn(COLOR_PRESETS, preset)) return;
+			const next = { ...readingColors };
+			readingColorKeys().forEach((key, index) => {
+				if (preset !== "automatic") next[key] = COLOR_PRESETS[preset][index % 4];
+				else delete next[key];
+			});
+			readingColorBinding[1](next);
+			adoptReadingColors(next);
+		});
+		readingColorList.addEventListener("focusout", () => queueMicrotask(renderReadingColors));
+		followSetting("readingColors", adoptReadingColors);
 	}
 
 	// --- theme preset gallery -------------------------------------------------

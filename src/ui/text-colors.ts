@@ -63,6 +63,45 @@ export function mixToward(color: string, toward: string, amount: number): string
 	return `#${channel(1)}${channel(3)}${channel(5)}`;
 }
 
+/** WCAG relative luminance for the validated sRGB theme/settings colors. */
+function luminance(color: string): number {
+	const linear = (offset: number): number => {
+		const channel = parseInt(color.slice(offset, offset + 2), 16) / 255;
+		return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * linear(1) + 0.7152 * linear(3) + 0.0722 * linear(5);
+}
+
+/** Built-in numeric foregrounds use a 4.5:1 floor on their actual surface.
+ * Already-readable colors remain byte-identical. Otherwise retain the hue
+ * while moving toward the higher-contrast endpoint. Custom Text deliberately
+ * bypasses this function: its contract is the exact user-selected color. */
+export function readableValueColor(color: string, background: string): string {
+	const bg = luminance(background);
+	const ratio = (candidate: string): number => {
+		const value = luminance(candidate);
+		return (Math.max(value, bg) + 0.05) / (Math.min(value, bg) + 0.05);
+	};
+	if (ratio(color) >= 4.5) return color;
+	const target = (bg + 0.05) / 0.05 >= 1.05 / (bg + 0.05) ? "#000000" : "#FFFFFF";
+	let low = 0;
+	let high = 1;
+	let result = target;
+	// Keep the passing, quantized candidate, not a rounded estimate of the
+	// threshold. A value just below 4.5 must never be rounded into a pass.
+	for (let i = 0; i < 12; i++) {
+		const middle = (low + high) / 2;
+		const candidate = mixToward(color, target, middle);
+		if (ratio(candidate) >= 4.5) {
+			high = middle;
+			result = candidate;
+		} else {
+			low = middle;
+		}
+	}
+	return result;
+}
+
 /**
  * Parses one scope of raw Text settings. Settings are untyped JSON at
  * runtime: only the exact mode markers count, and anything else (absent, "",

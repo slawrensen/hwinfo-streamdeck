@@ -39,6 +39,7 @@ import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, 
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
 import { statusDialText } from "../ui/state-screens";
+import { sensorValueColor } from "../ui/sensor-value-color";
 import { resolveTextColors, type TextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
@@ -66,6 +67,10 @@ export type DialSettings = {
 	textColor?: string;
 	/** Custom mode: labels, units and stats at lower intensity. */
 	textDimSecondary?: boolean;
+	/** Multi-row normal numbers use sensor-type colors only on exact true. */
+	sensorValueColors?: boolean;
+	/** Optional numeric color overrides by stable reading key; multi-row only. */
+	readingColors?: Record<string, string>;
 	/** Rotation set: rotate/autocycle move only through these picked readings. */
 	rotationKeys?: string[];
 	/**
@@ -957,7 +962,10 @@ function parseAutoCycleMs(raw: string | undefined): number | null {
 	return Number.isInteger(ms) && ms > 0 ? ms : null;
 }
 
-function composeDialSvg(state: InstanceState, status: PollerStatus): string {
+/** The render-only state, shared by runtime, regressions and sample galleries. */
+export type DialRenderState = Pick<InstanceState, "settings" | "stats" | "statMode" | "overlay" | "pinned" | "cyclePaused">;
+
+export function composeDialSvg(state: DialRenderState, status: PollerStatus, historyOf: (key: string) => readonly number[] | undefined = (key) => poller.getSeries(key)): string {
 	const settings = state.settings;
 	const config = loadThemes();
 	const themeId = effectiveThemeFor(settings);
@@ -989,7 +997,7 @@ function composeDialSvg(state: InstanceState, status: PollerStatus): string {
 	// out.
 	const view = dialViewOf(settings);
 	if (view !== "single") {
-		return composeOverviewSvg(state, snapshot, reading, config, themeId, view === "tworow" ? 2 : 3);
+		return composeOverviewSvg(state, snapshot, reading, config, themeId, view === "tworow" ? 2 : 3, historyOf);
 	}
 
 	const fahrenheit = settings.fahrenheit === true;
@@ -1086,7 +1094,7 @@ function rotationNamesOf(settings: DialSettings): Record<string, string> | undef
  * displayed stat from each member's own session, and warn/critical tint a
  * row's value under the same alertUnit scoping as the single view's bar.
  */
-function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, reading: Reading, config: ThemesConfig, themeId: string, rowCount: 2 | 3): string {
+function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, reading: Reading, config: ThemesConfig, themeId: string, rowCount: 2 | 3, historyOf: (key: string) => readonly number[] | undefined): string {
 	const settings = state.settings;
 	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
@@ -1120,13 +1128,15 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 	// like the single view's accent follows it.
 	const accent = typeAccentsEnabled() ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = resolvePalette(config, themeId, accent, "normal");
-	const text = resolveTextColors(palette, effectiveTextFor(settings), "normal");
+	const textSettings = effectiveTextFor(settings);
+	const text = resolveTextColors(palette, textSettings, "normal");
 	const warn = parseThreshold(settings.warnValue);
 	const crit = parseThreshold(settings.critValue);
 
 	const overviewRows: (OverviewRow & { history?: readonly number[] })[] = rows.map((member, index) => {
 		const selected = index === selectedIndex;
-		const shown = formatMeasurement(rowStatValue(member.value, state.stats.get(member.key), state.statMode), member.unit, measureOpts);
+		const nativeShown = rowStatValue(member.value, state.stats.get(member.key), state.statMode);
+		const shown = formatMeasurement(nativeShown, member.unit, measureOpts);
 		const scoped = thresholdsApplyTo(settings.alertUnit, member.unit);
 		const live = convertUnit(member.value, member.unit, fahrenheit).value;
 		const level = scoped ? alertLevel(live, warn, crit, settings.alertBelow === true) : "normal";
@@ -1137,10 +1147,14 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 			selected,
 			// An alerting row's value is the alert indicator and stays fixed;
 			// custom text never recolors it.
-			valueColor: level !== "normal" ? config.alerts[level].bg : text.value,
+			valueColor: level !== "normal" ? config.alerts[level].bg : sensorValueColor({
+				enabled: settings.sensorValueColors, readingColors: settings.readingColors, reading: member, value: nativeShown,
+				config, themeId, typeAccents: typeAccentsEnabled(), textSettings,
+				normalColor: text.value, background: rowCount === 2 && selected ? palette.track : palette.bg
+			}),
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.
-			...(rowCount === 2 ? { history: poller.getSeries(member.key) } : {})
+			...(rowCount === 2 ? { history: historyOf(member.key) } : {})
 		};
 	});
 

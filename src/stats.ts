@@ -41,22 +41,37 @@ type Observation = {
 	bindingRevision: number;
 };
 
+function observationResetReason(previous: Observation, reading: Reading, source: string, bindingRevision: number): SessionResetReason | undefined {
+	if (previous.source !== source) return "source";
+	if (previous.unit !== reading.unit) return "unit";
+	if (previous.type !== reading.type) return "type";
+	if (previous.bindingRevision !== bindingRevision) return "binding";
+	return undefined;
+}
+
 export class SessionStatsStore {
 	private readonly byKey = new Map<string, SessionStats>();
 	private readonly observations = new Map<string, Observation>();
+
+	/** Retained sessions still encounter boundaries while another reading is
+	 * selected. Validate them without accumulating off-selection samples;
+	 * actively sampled keys go through observe() so reset hints stay intact. */
+	validateRetained(snapshot: SensorSnapshot, source: string, sampledKeys: ReadonlySet<string>): void {
+		for (const [key, previous] of this.observations) {
+			if (sampledKeys.has(key)) continue;
+			const reading = snapshot.byKey.get(key);
+			if (reading === undefined || !Number.isFinite(reading.value) || observationResetReason(previous, reading, source, snapshot.bindingRevision ?? 0) !== undefined) {
+				this.reset([key]);
+			}
+		}
+	}
 
 	/** Sample-weighted local observations, never repeated held frames. A
 	 * provider/unit/link change starts a new session for that reading. */
 	observe(reading: Reading, snapshot: SensorSnapshot, source: string): SessionResetReason | undefined {
 		const bindingRevision = snapshot.bindingRevision ?? 0;
 		const previous = this.observations.get(reading.key);
-		let reason: SessionResetReason | undefined;
-		if (previous !== undefined) {
-			if (previous.source !== source) reason = "source";
-			else if (previous.unit !== reading.unit) reason = "unit";
-			else if (previous.type !== reading.type) reason = "type";
-			else if (previous.bindingRevision !== bindingRevision) reason = "binding";
-		}
+		const reason = previous === undefined ? undefined : observationResetReason(previous, reading, source, bindingRevision);
 		if (reason !== undefined) this.reset([reading.key]);
 		if (!Number.isFinite(reading.value)) {
 			this.reset([reading.key]);

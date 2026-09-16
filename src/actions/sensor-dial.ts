@@ -584,6 +584,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				keys.add(member.key);
 			}
 		}
+		state.stats.validateRetained(snapshot, source, keys);
 		for (const key of keys) {
 			const reading = snapshot.byKey.get(key);
 			if (reading !== undefined) {

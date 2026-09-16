@@ -285,6 +285,52 @@ describe("dial selection validates retained history before rendering", () => {
 		}
 	}
 
+	for (const boundary of ["missing", "source", "unit", "type", "nonfinite", "binding"] as const) {
+		it(`a retained unselected session ends at an observed ${boundary} boundary before reselection`, () => {
+			const f = fixture();
+			try {
+				const changed = {
+					...reading,
+					value: boundary === "nonfinite" ? Number.NaN : 999,
+					unit: boundary === "unit" ? "°F" : reading.unit,
+					type: boundary === "type" ? 5 : reading.type
+				};
+				let intermediate = f.complete(changed, 3);
+				if (boundary === "missing") {
+					const readings = intermediate.readings.filter((entry) => entry.key !== reading.key);
+					intermediate = { ...intermediate, readings, byKey: new Map(readings.map((entry) => [entry.key, entry])) };
+				}
+				if (boundary === "binding") intermediate = { ...intermediate, bindingRevision: 1 };
+				f.action.sampleStats(f.state, intermediate, boundary === "source" ? "gadget" : "shared-memory");
+				assert.equal(f.state.stats.get(reading.key), undefined, "clear the retained history at the boundary, while B is selected");
+
+				// A returns to its original source/unit/type while B remains
+				// selected. Merely validating A must not start sampling it.
+				const restored = { ...f.complete({ ...reading, value: 50 }, 4), bindingRevision: boundary === "binding" ? 2 : 0 };
+				f.action.sampleStats(f.state, restored, "shared-memory");
+				assert.equal(f.state.stats.get(reading.key), undefined, "off-selection values must not seed a replacement session");
+				f.setStatus({ state: "ok", source: "shared-memory", snapshot: restored });
+				f.settings();
+				assert.deepEqual(f.frames[0]?.stats, { min: 50, max: 50, sum: 50, count: 1 });
+				assert.doesNotMatch(f.frames[0]?.svg ?? "", /[▼▲]\s*(?:45|65)(?:\.0)?/);
+			} finally { f.close(); }
+		});
+	}
+
+	it("ordinary rotation preserves retained history without counting off-selection samples", () => {
+		const f = fixture();
+		try {
+			f.action.sampleStats(f.state, f.complete({ ...reading, value: 999 }, 3), "shared-memory");
+			assert.deepEqual(f.state.stats.get(reading.key), { min: 45, max: 65, sum: 110, count: 2 });
+			const restored = f.complete({ ...reading, value: 50 }, 4);
+			f.action.sampleStats(f.state, restored, "shared-memory");
+			assert.deepEqual(f.state.stats.get(reading.key), { min: 45, max: 65, sum: 110, count: 2 });
+			f.setStatus({ state: "ok", source: "shared-memory", snapshot: restored });
+			f.settings();
+			assert.deepEqual(f.frames[0]?.stats, { min: 45, max: 65, sum: 160, count: 3 });
+		} finally { f.close(); }
+	});
+
 	it("display-only conversion preserves the physical session during reselection", () => {
 		const f = fixture();
 		try {

@@ -76,7 +76,7 @@ for (const view of ["overview", "tworow"] as const) {
 	});
 }
 
-it("absent/off/junk settings preserve the v1.6.0 composition bytes, including every single dial", () => {
+it("absent/off/junk settings preserve the 1.7 readability baseline, including every single dial", () => {
 	const golden = JSON.parse(readFileSync(new URL("./golden/dial-color-baseline.json", import.meta.url), "utf8")) as Record<string, string>;
 	for (const [key, expected] of Object.entries(golden)) {
 		const [view, theme, textMode] = key.split("/");

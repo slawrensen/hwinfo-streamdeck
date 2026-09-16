@@ -78,7 +78,7 @@ Automatic quad identity colors also adjust for their background when needed. Sav
 
 The setting recolors **text only**. Backgrounds, theme and type accents, sparklines, bars, rings, range bars, tracks and separators keep their theme colors, status screens keep their fixed safety colors, and the [alert palettes](#alerts-override-everything) always override it: a warning key is amber with black text whatever Text says, and a dial's alert-colored bar or overview row value is never recolored.
 
-The issue #31 preview adds [individual reading colors](sensor-dial.md#reading-colors-preview) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls are not in stable 1.6.0.
+Version 1.7.0 adds [individual reading colors](sensor-dial.md#reading-colors) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls also appeared in the issue #31 preview and are absent from 1.6.0.
 
 ## Type accents
 

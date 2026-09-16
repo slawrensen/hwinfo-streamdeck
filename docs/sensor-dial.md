@@ -61,9 +61,12 @@ A few details specific to the view:
 
 Switching back to **One reading** restores the exact single-view face.
 
-## Reading colors (preview)
+## Reading colors
 
-> **Preview only:** These controls are in the issue #31 preview, not stable 1.6.0 or the current Marketplace build. See [PR #32](https://github.com/slawrensen/hwinfo-streamdeck/pull/32) for release status.
+Saved colors also follow explicitly confirmed Shared Memory/Gadget links.
+If both linked keys have their own color, the displayed key's choice wins.
+
+Available in 1.7.0 and the earlier issue #31 preview. Check the installed plugin version if the controls are absent; 1.6.0 does not include them.
 
 Choose a two-row or three-row **View**, then open **Appearance** and set **Text → Theme**. **Reading colors** uses the same presets and color wells as the [four-reading key](sensor-reading.md#layout-four-readings-the-quad-grid):
 
@@ -133,8 +136,8 @@ Open the dial's Property Inspector to configure it. Most fields mirror the key a
 | **Label** | Custom label; blank falls back to the sensor's name. |
 | **Theme** | Preset gallery for this dial, or **Deck default** to follow the deck-wide theme. See [Themes](themes.md). |
 | **Text** | Text intensity for this dial: **Deck default**, **Theme**, **Dim**, or **Custom** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
-| **Color numbers by sensor type** | Preview only, multi-row views: opt into automatic category colors for normal numbers. Off by default. See [Reading colors](#reading-colors-preview). |
-| **Reading colors** | Preview only, multi-row views: choose a preset or individual number colors, with **Auto** to reset a reading. See [Reading colors](#reading-colors-preview). |
+| **Color numbers by sensor type** | Multi-row views: opt into automatic category colors for normal numbers. Off by default. See [Reading colors](#reading-colors). |
+| **Reading colors** | Multi-row views: choose a preset or individual number colors, with **Auto** to reset a reading. See [Reading colors](#reading-colors). |
 | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the deck-wide **Data units** preference instead. |
 | **Unit** | Show temperatures in °F instead of °C. |
 | **Bar min** | Fixed low end of the range bar on the single view. Leave blank to auto-track the session low. |

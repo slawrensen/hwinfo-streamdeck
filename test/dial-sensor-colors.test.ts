@@ -6,6 +6,7 @@ import { beforeEach, it } from "node:test";
 import { dialGalleryFixture, renderGalleryDial } from "../scripts/lib/dial-gallery";
 import { composeDialSvg, type DialSettings } from "../src/actions/sensor-dial";
 import { SensorType, type Reading } from "../src/hwinfo/types";
+import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { stepReading } from "../src/rotation";
 import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
@@ -29,6 +30,41 @@ it("contrast primitive keeps passing colors exact and quantized corrections abov
 });
 
 beforeEach(() => applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "theme" }));
+
+it("confirmed source links preserve individual colors in curated and uncurated overview rows without changing settings", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		for (const curated of [false, true]) {
+			const fixture = dialGalleryFixture("overview");
+			fixture.state.settings.dialView = view;
+			fixture.state.settings.readingColors = { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" };
+			if (!curated) delete fixture.state.settings.rotationKeys;
+			const saved = structuredClone(fixture.state.settings);
+			const original = fixture.snapshot;
+			const expected = values(compose(fixture));
+			const links = original.readings.map((r, i) => ({ sharedMemory: r.key, gadget: `g:Sample:Reading${i}`, unit: r.unit, sensorType: r.type }));
+			const readings = original.readings.map((r, i) => ({ ...r, key: links[i]!.gadget }));
+			fixture.snapshot = applyReadingLinks({ ...original, readings, byKey: new Map(readings.map((r) => [r.key, r])) }, links, 1);
+			assert.deepEqual(values(compose(fixture)), expected, `${view}, curated=${curated}`);
+			fixture.snapshot = applyReadingLinks(original, links, 1);
+			assert.deepEqual(values(compose(fixture)), expected);
+			assert.deepEqual(fixture.state.settings, saved);
+		}
+	}
+});
+
+it("unlinked lookalike readings do not inherit colors and an explicit live-key color wins over its linked endpoint", () => {
+	const fixture = dialGalleryFixture("overview");
+	delete fixture.state.settings.rotationKeys;
+	fixture.state.settings.readingColors = { "31:0:2": "#FF7E8E" };
+	const original = fixture.snapshot;
+	const readings = original.readings.map((r, i) => i === 1 ? { ...r, key: "g:Sample:GPU" } : r);
+	fixture.snapshot = { ...original, readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	assert.notEqual(values(compose(fixture))[1], "#FF7E8E");
+	fixture.snapshot = applyReadingLinks(fixture.snapshot, [{ sharedMemory: "31:0:2", gadget: "g:Sample:GPU", unit: "°C", sensorType: SensorType.Temperature }], 1);
+	assert.equal(values(compose(fixture))[1], "#FF7E8E");
+	fixture.state.settings.readingColors["g:Sample:GPU"] = "#4CC2FF";
+	assert.equal(values(compose(fixture))[1], "#4CC2FF");
+});
 
 for (const view of ["overview", "tworow"] as const) {
 	it(`issue #31: production ${view} composition colors values by type`, () => {

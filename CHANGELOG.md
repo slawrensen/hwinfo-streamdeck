@@ -3,7 +3,16 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
-## 1.6.1.0 - Unreleased
+## 1.7.0.0 - Unreleased
+
+- Two-row and three-row dials can color each reading's number separately.
+  Appearance adds Reading colors with Signal, Pairs and Uniform presets,
+  individual color wells, and Auto resets. Colors follow each reading
+  through rotation, reordering, groups and confirmed cross-source links,
+  including with Type accents off.
+  An optional Color numbers by sensor type setting uses automatic category
+  colors. Valid Custom Text and alerts retain priority. Existing settings
+  keep their appearance when neither option is enabled.
 
 - Gadget readings with duplicate names are withheld instead of assigning
   encounter-order identities. Observed ambiguous names stay blocked across
@@ -37,6 +46,10 @@ Elgato Marketplace listing is a separate track.
   normal, dim, dense and dial alert views. Explicit custom text colors stay
   unchanged. Warning triangles and critical octagons add severity cues
   alongside color without replacing the reading.
+- Release builds validate exact tag and package versions before installing
+  dependencies, and only the separate release-staging job receives write
+  permission. The external soak monitor now distinguishes plugin and host
+  resources, process restarts and failed observations.
 
 ## 1.6.0.0 - 2026-09-04
 

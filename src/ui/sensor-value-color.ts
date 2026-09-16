@@ -6,7 +6,7 @@ import { classifyTypeAccent, resolvePalette, type ThemesConfig } from "./themes"
 export function sensorValueColor(options: {
 	enabled: unknown;
 	readingColors?: unknown;
-	reading: Pick<Reading, "key" | "type" | "unit" | "label">;
+	reading: Pick<Reading, "key" | "type" | "unit" | "label" | "linkedKeys">;
 	value: number;
 	config: ThemesConfig;
 	themeId: string;
@@ -21,9 +21,15 @@ export function sensorValueColor(options: {
 	// Explicit colors follow stable reading identity, like rotationNames.
 	// Salvage one entry at a time without rewriting settings. Like quad cell
 	// colors, chosen hues stay exact in Theme and use the existing Dim blend.
-	if (typeof readingColors === "object" && readingColors !== null && !Array.isArray(readingColors) && Object.hasOwn(readingColors, reading.key)) {
-		const color: unknown = (readingColors as Record<string, unknown>)[reading.key];
-		if (typeof color === "string" && HEX6.test(color)) return mode === "dim" ? mixToward(color, background, DIM_VALUE_BLEND) : color;
+	if (typeof readingColors === "object" && readingColors !== null && !Array.isArray(readingColors)) {
+		// A confirmed cross-source link is the same measurement. Preserve its
+		// color in an uncurated rotation too, where rows use the live key.
+		// An exact-key choice wins if both endpoints have saved colors.
+		for (const key of [reading.key, ...(reading.linkedKeys ?? [])]) {
+			if (!Object.hasOwn(readingColors, key)) continue;
+			const color: unknown = (readingColors as Record<string, unknown>)[key];
+			if (typeof color === "string" && HEX6.test(color)) return mode === "dim" ? mixToward(color, background, DIM_VALUE_BLEND) : color;
+		}
 	}
 	if (enabled !== true || !typeAccents) return normalColor;
 	const category = classifyTypeAccent(reading.type, reading.unit, reading.label);

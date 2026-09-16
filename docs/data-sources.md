@@ -3,20 +3,22 @@ title: Data sources
 nav_order: 8
 ---
 
-The plugin reads HWiNFO through one of two local interfaces. It picks the best one automatically, so most people never touch this, but knowing the trade-offs explains why some keys can't show min/max/avg, and what is needed to preserve a selection after HWiNFO's free 12-hour timer.
+The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory and can fall back to the Gadget registry. Switching sources does not automatically match saved readings.
+
+> This page describes the **unreleased 1.7 candidate**. Stable 1.6 has no explicit provider links, fills Gadget historical fields with the current value, and uses different freshness and identity handling. See [what changes from 1.6](whats-new-1.7.md).
 
 ## Shared Memory vs. Gadget registry
 
 | | **Shared Memory** (preferred) | **Gadget registry** (fallback) |
 | --- | --- | --- |
 | What it reads | `Global\HWiNFO_SENS_SM2` mapping | `HKCU\Software\HWiNFO64\VSB` registry key |
-| Sensor coverage | **everything** HWiNFO measures (~500+ readings) | only the sensors you tick in HWiNFO |
-| Min / max / average | ✅ full stats since HWiNFO started | current value only; historical modes display **N/A** |
+| Sensor coverage | readings HWiNFO publishes through Shared Memory | only the sensors you tick in HWiNFO |
+| Min / max / average | HWiNFO's statistics since start or its last reset | current value only; historical modes display **N/A** |
 | Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | ✅ no time limit |
-| Works across privilege levels | usually: fails only when HWiNFO is elevated and Stream Deck is not (see [Troubleshooting](troubleshooting.md)) | ✅ yes |
+| Windows access | depends on account, session and object permissions | reads the current user's registry; depends on account and key permissions |
 | Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Report value in Gadget** |
 
-Shared Memory is richer in every way except licensing: on the free version it switches itself off after 12 hours of runtime. The Gadget registry has none of that time pressure but only carries the current value of the specific readings you ticked, with no historical min/max/avg.
+Shared Memory provides hardware identities, a producer timestamp and HWiNFO's statistics. On the free version it switches off after 12 hours. Gadget has no such timer, but provides current values under name-based identities, without a producer timestamp or historical statistics.
 
 > **Note:** Because the Gadget source has no historical stats, a key or detail tile set to **Show: Minimum / Maximum / Average** displays **N/A** with an empty value while reading from it. When a key is on the Gadget source, the settings panel shows a small note explaining this.
 
@@ -42,7 +44,7 @@ The **Data source** setting defaults to **Auto**, and it's what most setups shou
 
 1. Uses **Shared Memory** whenever it's available.
 2. **Falls back to the Gadget registry** when Shared Memory isn't usable, for example after the free version's 12-hour timer expires, or if you turned Shared Memory Support off but still have Gadget reporting on.
-3. **Upgrades back to Shared Memory** on its own once it returns (probed roughly every 15 seconds while on the fallback), so restarting HWiNFO or re-enabling sharing quietly restores full stats with no clicks.
+3. **Switches back to Shared Memory** when it becomes readable, checked roughly every 15 seconds while on Gadget.
 
 There's one exception to the "prefer Shared Memory" rule: if Shared Memory is simply not running *and* you have Gadget reporting enabled but no sensors ticked, the plugin shows the more helpful **Tick sensors / in Gadget** guidance rather than a generic "Start HWiNFO".
 
@@ -50,7 +52,7 @@ There's one exception to the "prefer Shared Memory" rule: if Shared Memory is si
 
 Provider availability and reading identity are separate. Without explicit links, a saved Shared Memory key is missing on Gadget and a saved Gadget key is missing on Shared Memory. Selecting a similarly named reading is not proof of equivalence.
 
-The plugin runs **one reader** for the whole deck regardless of how many keys and dials are visible, so all of them share the same source at any moment.
+The plugin runs **one reader** across all connected decks, so all keys and dials share the same source.
 
 ## Advanced settings
 
@@ -129,16 +131,20 @@ catch observable contradictions; they cannot prove an atomic snapshot
 when a writer pauses in an intermediate state. Shared Memory provides the
 consistency mutex that Gadget lacks.
 
-Sparklines ingest subsecond changes plus advancing producer timestamps.
-Steady observations within the same producer second are not separate known
-samples. A skipped read, missing/non-finite reading, stale data, native-unit
-change or provider transition clears the segment while retaining the
-subscription. A cadence change clears all segments. No line bridges those
-gaps and no sample represents elapsed time without producer evidence.
+Sparklines collect changed values between producer timestamps as well as
+advancing timestamps. Repeated held frames do not add points. A skipped
+read, missing or non-finite reading, stale data, reading-type or native-unit
+change, or provider transition clears the segment while retaining the
+subscription. Link and cadence changes clear all segments.
+
+With no Sensor Reading key or Sensor Dial visible, polling stops and history
+stays in memory. Returning can append to those retained samples; a period
+without observations is not a measured continuous history. The line is spaced
+by samples, not elapsed time.
 
 Dial statistics are local, sample-weighted observations for selected and
 rotation/view readings. Repeated held frames do not count. Reset, missing or
-non-finite readings, stale/unavailable status, provider/unit/link changes
+non-finite readings, stale/unavailable status, provider/unit/type/link changes
 start a new session. Temporary mutex holds within the freshness grace add
 no duplicate samples; they do not reset the session until status goes stale.
 Hidden dials retain their existing 30-minute session lifetime. These numbers

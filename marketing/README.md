@@ -16,11 +16,12 @@ with released settings.
 
 Replace `shot-7-dial-views.png` (the customer's image), `shot-1-hero.png` and
 `thumbnail.png` with the corrected default renders here for the stable
-listing. Their normal numeric Text styling is achievable in 1.6.0. The
-colored versions require **Color numbers by sensor type** under Appearance,
-Text → Theme, and Type accents enabled. They are preview-only until a
-corrected stable Marketplace build is available. No Marketplace submission
-is made by regenerating these files.
+listing. Their normal numeric Text styling is achievable in 1.6.0.
+Automatic category colors require **Color numbers by sensor type** under
+Appearance, Text → Theme, and Type accents enabled. The unreleased 1.7
+candidate also has individual **Reading colors**, which work with Type
+accents off. Neither option exists in stable 1.6.0. Regenerating assets does
+not update the Marketplace listing.
 
 `issue-31/before-after.png` compares identical fixtures through the production
 composer, changing only the new setting. Both temperatures share pink, fan
@@ -123,9 +124,9 @@ npm run icons                               # renders imgs/plugin/marketplace(@2
 # then: sharp-resize marketplace@2x.png -> app-icon-288.png (288x288)
 ```
 
-All copy baked into these images follows `docs/release/COPY_RULES.md` (no em
-dashes, no "telemetry", claims that map to real behavior). The validator cannot
-read text inside a PNG, so check rendered strings by eye after regenerating.
+Copy baked into these images follows `docs/release/COPY_RULES.md`: plain
+language, no em dashes and claims supported by the product. The validator
+cannot read PNG text; inspect the rendered captions after regenerating.
 
 The additional `issue-31/custom-before-after.png` comparison is sample data
 through the same production dial composer. Generate it with
@@ -136,8 +137,29 @@ Appearance → Reading colors → Signal preset. CPU and GPU temperatures can
 therefore differ while graph lines keep their previous colors. This is preview
 evidence, not a physical screenshot or a claim about the stable Marketplace build.
 
-The docs image `docs/assets/img/pi-dial-reading-colors-preview.png` is the
+The historical docs image `docs/assets/img/pi-dial-reading-colors-preview.png` is the
 maintainer's unedited `multicolor.png` Stream Deck app capture, supplied on
 2026-09-09 with preview 1.6.92.0 installed. It shows the individual color
 controls for five readings. It is a settings-panel screenshot, not a photo
 of the physical display or a replacement for the stable Marketplace assets.
+
+## 1.7 documentation images
+
+These additions document the unreleased 1.7 candidate. They do not replace
+the stable Marketplace gallery:
+
+- `docs/assets/img/dial-reading-colors-1.7.png`: fixed sample data composed by
+  the production dial action. Three-row and two-row examples compare
+  automatic text with individual colors. Both sides use Void, Text → Theme
+  and Type accents off.
+- `docs/assets/img/reading-status-1.7.png`: simulated source states rendered
+  by the production key and dial code. It shows Source busy, no new Shared
+  Memory data and Gadget Age unknown.
+- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the shipped settings panel
+  captured through the local test host with live HWiNFO. The caption records
+  the running panel build, 1.7.0.0-1. It is a settings-panel capture.
+
+The first two are sample-data renders. None is a photograph of a physical
+display. Generate them with `npx tsx scripts/docs-v17-images.mjs`; capture
+the panel with `node scripts/capture-pi-reading-colors.mjs`. Provenance
+records sit beside the images.

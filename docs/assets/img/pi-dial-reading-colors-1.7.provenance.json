@@ -1,0 +1,86 @@
+{
+	"command": "node scripts/capture-pi-reading-colors.mjs",
+	"kind": "Real property-inspector screenshot",
+	"note": "Unmodified shipped panel, cropped to Appearance. The external title bar reports the running page's build marker. Captured in a separate mock Stream Deck harness with live HWiNFO Shared Memory. No installed app changes, hardware screenshot claim or sample readings.",
+	"captureTime": "2026-09-16T02:55:59.402Z",
+	"panelSha256": "250369dafa06439e925d698fbe9ce1680eff8de884b764738877d5931acc5193",
+	"file": "pi-dial-reading-colors-1.7.png",
+	"sha256": "ad4714dd89a6bf6c3115da253590e95d5448536d60b7581059b3d5f59c2b8cf7",
+	"width": 800,
+	"height": 1220,
+	"evidence": {
+		"build": "1.7.0.0-1",
+		"rows": [
+			{
+				"key": "f0000501:0:1000000",
+				"label": "CPU Temp",
+				"color": "#4cc2ff"
+			},
+			{
+				"key": "e0002000:0:1000000",
+				"label": "GPU Temp",
+				"color": "#ff7e8e"
+			},
+			{
+				"key": "f7006687:0:3000001",
+				"label": "Pump",
+				"color": "#38cd89"
+			},
+			{
+				"key": "e0002000:0:5000000",
+				"label": "GPU Power",
+				"color": "#d4ab33"
+			},
+			{
+				"key": "e0002000:0:7000000",
+				"label": "GPU Load",
+				"color": "#4cc2ff"
+			}
+		],
+		"preset": "signal",
+		"liveValue": "54.6 °C",
+		"statusHint": "",
+		"appliedSettings": {
+			"readingKey": "f0000501:0:1000000",
+			"rotationKeys": [
+				"f0000501:0:1000000",
+				"e0002000:0:1000000",
+				"f7006687:0:3000001",
+				"e0002000:0:5000000",
+				"e0002000:0:7000000"
+			],
+			"rotationNames": {
+				"f0000501:0:1000000": "CPU Temp",
+				"e0002000:0:1000000": "GPU Temp",
+				"f7006687:0:3000001": "Pump",
+				"e0002000:0:5000000": "GPU Power",
+				"e0002000:0:7000000": "GPU Load"
+			},
+			"dialView": "overview",
+			"overviewLabels": "full",
+			"theme": "void",
+			"textMode": "theme",
+			"sensorValueColors": false,
+			"readingColors": {
+				"f0000501:0:1000000": "#4cc2ff",
+				"e0002000:0:1000000": "#ff7e8e",
+				"f7006687:0:3000001": "#38cd89",
+				"e0002000:0:5000000": "#d4ab33",
+				"e0002000:0:7000000": "#4cc2ff"
+			}
+		},
+		"appliedGlobals": {
+			"theme": "void",
+			"typeAccents": "off",
+			"textMode": "theme",
+			"source": "shared-memory"
+		},
+		"liveDialSha256": "018a28e13622b3da676e3db3ee19d982094fbb1c5d56f093b147b5a84d82dfbe"
+	},
+	"sourceSha256": {
+		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "756d176cdbcec022c9521f0a6bf3638f773fe4ed59788f77ea3fa64e2eb6862d",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "46be6c0370c8017b99034441e0bb2a1de5bfa3cea7a02a6e305cf960abc0c025",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "3b55901f28e9386bda075ceb2ba6f8ed2edcdc9011b6a2fda309087cf2092c3d",
+		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "17eee3f6f7ea4074c624bc9dd76a46450deeb5695cb46b537dc5c6795b2a24a4"
+	}
+}

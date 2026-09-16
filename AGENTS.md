@@ -96,6 +96,15 @@ Dev loop: `streamdeck link com.lawrensen.hwinfo.sdPlugin` once, then
 
 ## Conventions
 
+- **Public copy is plain and specific.** Lead with what changes for the user,
+  the condition under which it works, and any action they need to take. Use
+  exact UI labels. Write as Stephen, first person singular when needed, not
+  a fictional team. Cut sales language, filler, metaphors and repeated
+  explanations. Do not invent anecdotes or imitate another person's voice.
+  Mark candidate features as unreleased; distinguish renderer samples,
+  settings-panel captures and hardware photographs. Claims need code, tests
+  or measured evidence. The maintainer's full checkout has the detailed
+  rules in `docs/release/COPY_RULES.md`; run the release-copy validator there.
 - **Tabs** for indentation. TypeScript strict: no `any`, explicit boundary
   types, `console.error` only (the probe and build scripts are exempt).
 - **No em dashes** in prose or user-facing strings. The lone em dash on an empty

@@ -3,7 +3,7 @@ title: Getting started
 nav_order: 3
 ---
 
-This page gets one live sensor onto a Stream Deck key in about a minute, then points you at everything else.
+Start with one sensor on a Stream Deck key. You can add layouts, themes and dials after that.
 
 > **Before you start.** This is a Windows-only plugin that reads a running copy of [HWiNFO](https://www.hwinfo.com/download/). You need Windows 10 or later, Stream Deck software **6.9+**, and HWiNFO publishing data on either **Shared Memory Support** (preferred) or **Gadget reporting**. If HWiNFO isn't running yet, do that first: see [Install & requirements](installation.md).
 
@@ -15,7 +15,7 @@ Install the plugin from the [Elgato Marketplace](https://marketplace.elgato.com/
 
 In the actions list, open **HWiNFO Sensors** and drag **Sensor Reading** onto any empty key.
 
-The key immediately shows a blue **"Pick a sensor / in settings"** screen. That's the plugin working, waiting for you to choose what to display. The settings panel (the property inspector) opens below the canvas at the same time.
+With a readable source, the key shows **Pick a sensor / in settings** on a black background. The settings panel opens below the canvas. If the key shows a source error instead, follow [Status screens](status-screens.md).
 
 > **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
 
@@ -30,13 +30,13 @@ Click the **Sensor** search box to open the picker. It lists every reading HWiNF
 
 ![The Sensor picker open with "gpu" typed in the search box, showing matching readings grouped under their sensors (a PSU's GPU/CPU rails, then the GPU itself), each row with its value, unit, and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
-Click a row to select it. The **Live value** line just under the picker previews the chosen reading (current value plus min / max / avg), and the key on your deck switches from the blue prompt to the live number straight away.
+Click a row to select it. **Live value** previews the reading, and the key shows it when data is available. HWiNFO's min/max/average require Shared Memory. In the **unreleased 1.7 candidate**, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changes from 1.6](whats-new-1.7.md).
 
-That's the whole loop: drag, pick, done. The key now updates roughly once a second (see [Poll every](data-sources.md#poll-every) under Advanced settings to change the rate). Your choice is stored by HWiNFO's stable sensor identity (on the Gadget source, by the source name and reading label as HWiNFO writes them), not by list position, so Shared Memory keys survive restarts and hardware reordering. Gadget requires unique names; see [identity and provider-link limits](data-sources.md).
+The plugin reads once a second by default; HWiNFO updates at its own rate. Change the plugin interval under [Poll every](data-sources.md#poll-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection. Gadget uses source names and reading labels. Switching between providers requires explicit links in the 1.7 candidate; see [data sources](data-sources.md).
 
 ## Where to go next
 
-Everything below is optional; the defaults already give you a clean live reading.
+Choose a guide for the next setting you want to change:
 
 - **[Sensor Reading (keys)](sensor-reading.md)**. Every key setting: custom **Label**, **Show** (current / min / max / average), **Decimals**, **Unit** (°F for temperatures), **Layout** (one reading, two stacked, three rows, or a quad grid of four), **Display** (sparkline, bar or ring), and press-to-cycle stat modes.
 - **[Sensor details (drill-down)](sensor-details.md)**. A key press can instead open a full page of related readings, with the pressed key staying live as the Back tile. One bundled view per deck type, installed on first use.

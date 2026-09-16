@@ -60,6 +60,13 @@ const BANNED = [
 	{ re: /(?<![\w-])elevate\b/i, why: '"elevate" (marketing sense; "elevated"/"un-elevate" are fine)' },
 	{ re: /\bstreamline\b/i, why: '"streamline"' },
 	{ re: /boost your productivity/i, why: '"boost your productivity"' },
+	{ re: /it(?:.s| is) worth noting/i, why: '"it is worth noting" filler' },
+	{ re: /at the end of the day/i, why: '"at the end of the day" filler' },
+	{ re: /\bin conclusion\b/i, why: '"in conclusion" filler' },
+	{ re: /^\s*(?:>\s*)?(?:\*\*)?bottom line\s*:/i, why: '"bottom line:" filler heading' },
+	{ re: /\beffortless(?:ly)?\b/i, why: '"effortless" claim' },
+	{ re: /\bunparalleled\b/i, why: '"unparalleled" claim' },
+	{ re: /\b(?:take|takes|taking)\b[^.!?\n]{0,80}\bto the next level\b/i, why: '"take it to the next level" claim' },
 ];
 
 function checkCopy(rel, { emDashOnly = false } = {}) {

@@ -61,7 +61,9 @@ Pause and pin survive page switches and profile changes for up to 30 minutes off
 
 ## Session stats are per reading
 
-Each reading keeps its own session min/max/average, keyed by HWiNFO's stable sensor identity. Rotate away and back and you find that reading's own session numbers again, not the neighbor's. Stats keep accumulating for every rotation-set member while other members are on screen, and while the dial is on another page (within the same 30-minute hidden window as pause and pin). One prerequisite: the plugin's poller only runs while a Sensor Reading key or Sensor Dial is on screen somewhere, so a page with none of them pauses the accumulation too.
+Each reading keeps local session min/max/average. Ordinary rotation preserves that session. The selected reading, rotation-set members and multi-row view readings accumulate while polling runs; hidden dials can keep collecting within the limits above. With no Sensor Reading key or Sensor Dial visible, polling stops.
+
+In the **unreleased 1.7 candidate**, repeated held frames do not count again, and averages are sample-weighted. Missing or non-finite readings, stale or unavailable data, and source, native-unit, type or pairing changes reset the affected sessions. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading) for the full rules.
 
 ## Thresholds and mixed units
 
@@ -83,7 +85,7 @@ Targeting is explicit. Give a dial a **Link ID** in its settings and put the sam
 
 ## Page swipe
 
-Swiping sideways on the touch strip switches Stream Deck pages. That gesture belongs to the Stream Deck app itself; no plugin receives it, and this one does not pretend to. What the plugin does guarantee: selection and labels are persisted settings and always survive; session stats, pause and pin state survive the page switch within the 30-minute hidden window described above.
+Swiping sideways on the touch strip switches Stream Deck pages. The app handles that gesture. Selection and labels are saved settings. Pause, pin and session state can survive a page switch within the hidden-dial limits above; session statistics still follow the reset rules.
 
 ## Settings migration
 

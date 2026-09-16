@@ -5,7 +5,9 @@ nav_order: 4
 
 The **Sensor Reading** action puts a live HWiNFO reading on a Stream Deck key: a value, its unit, a custom label, an optional [sparkline, bar, or ring display](#display-sparkline-bar-ring), and warn/critical coloring. A key can also [stack two readings](#layout-two-readings-on-one-key) as two compact rows, show [three readings as rows](#layout-three-readings-rows), or show [four readings in a quad grid](#layout-four-readings-the-quad-grid). Drag **HWiNFO Sensors → Sensor Reading** onto a key and pick a sensor to start.
 
-One face, one hierarchy: the value carries the light, the label identifies, and the unit stays deliberately quiet, with every element on the same fixed anchors as every other key, so a wall of mixed sensors reads as one instrument (the rules live in [the display system](themes.md#the-display-system)).
+Choose one to four readings per key. Each layout has fixed positions for its labels, values and units.
+
+> This page includes changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
 
 This page documents every setting in the key's settings panel. For the Stream Deck + dial, see [Sensor Dial](sensor-dial.md).
 
@@ -31,7 +33,7 @@ Custom text for the key. Leave it blank to use the sensor's own (HWiNFO-renamed)
 
 A live gallery of the seven presets: **Void** (default), **Graphite**, **Ultraviolet**, **Midnight**, **Forest**, **Ember**, and **Paper**. Pick one to theme **this key only**, or pick the **Deck default** chip to follow the deck-wide theme set under *Advanced → Deck theme*.
 
-Precedence: a per-key theme always wins; the deck theme only affects keys set to Deck default. The Deck default chip wears a dashed border and a link badge so it can't be mistaken for a preset chip, and names the theme it currently resolves to in its tooltip and the help line under the gallery (e.g. *Deck default · Void*). See [Themes](themes.md) for the full palette and type-accent details.
+Precedence: a per-key theme always wins; the deck theme only affects keys set to Deck default. The Deck default chip has a dashed border and a link badge. Its tooltip and the help line name the resolved theme (e.g. *Deck default · Void*). See [Themes](themes.md) for the full palette and type-accent details.
 
 ### Text
 
@@ -167,16 +169,17 @@ The zones are **fixed landmarks**, drawn as muted shades so they read as markers
 
 Sparkline notes:
 
-- It holds the last **36 samples**: one new point per genuinely fresh HWiNFO snapshot, at the slower of HWiNFO's own polling period (default 2 s) and the plugin's poll interval, never faster than one point per second.
-- History **survives leaving the page**: once a key has asked for a reading's history, the plugin keeps collecting it while the key is off screen, as long as a Sensor Reading key or Sensor Dial stays visible somewhere. With none visible (or the machine asleep) the poller stops entirely, so collection pauses and resumes from the same samples when a key comes back; the ring is spaced by sample, not by clock, so after a long pause the old samples sit next to the new ones until the line refills. (Before 1.4 a page unviewed for over a minute rebuilt its graphs from scratch.) History lives in plugin memory, so a plugin restart or Stream Deck app restart starts the lines fresh.
+- It holds the last **36 samples**. The 1.7 candidate accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO and the plugin's poll interval.
+- Collection continues for subscribed readings while any Sensor Reading key or Sensor Dial is visible. With none visible, polling stops and samples stay in memory. Returning can append to them; the line is spaced by samples and does not measure that pause.
+- A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. Link and poll-interval changes clear all segments. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
 - It **survives a °C/°F toggle** unchanged (same data, just relabelled), and a frozen HWiNFO holds the line's last real shape instead of flattening it.
 - The sparkline self-scales to its own visible min/max, so the shape reflects recent variation, not absolute magnitude.
 
-> **Note:** Changing the poll interval (*Advanced → Poll every*) resets sparkline history, because the ring is spaced by sample index and can't honestly span a cadence change. Keys configured before 1.2.x keep their old Sparkline checkbox behavior until you touch the Display select.
+> **Note:** Changing the poll interval (*Advanced → Poll every*) resets sparkline history, because the ring is spaced by sample index and does not preserve elapsed time across a cadence change. Keys configured before 1.2.x keep their old Sparkline checkbox behavior until you touch the Display select.
 
 ### Warn at / Critical at
 
-Thresholds in the **displayed unit**. When the live value crosses **Warn at**, the whole key flips to an amber field with black text; at **Critical at**, a red field with white text (aviation-style master caution/warning). These two alert palettes are global and never tinted per theme, so warn and crit stay unmistakable on any theme. Leave a field blank to disable it. Decimal commas are accepted (`70,5` works as `70.5`).
+When the current value reaches **Warn at**, the key becomes amber with black text; at **Critical at**, red with white text. These key palettes stay the same across themes. The 1.7 candidate also draws a warning triangle or critical octagon. Leave a field blank to disable it. Decimal commas are accepted (`70,5` works as `70.5`). Use the displayed temperature unit; byte and rate thresholds use the native value before [Data units](#advanced-deck-wide) re-tiering.
 
 See [Thresholds & alerts](thresholds-alerts.md) for the full behavior.
 
@@ -202,14 +205,15 @@ The detail view's own Back tile is this same Sensor Reading action with one diff
 
 ## Status screens
 
-If HWiNFO isn't providing data, the key shows a calm true-black status screen with a two-line message instead of a value:
+If the key cannot show a reading, it shows a two-line status message:
 
 | Key shows | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
 | **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
-| **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings (Auto mode falls back to Gadget by itself). |
+| **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings. Auto can use Gadget when enabled; saved selections need explicit links to work across sources. |
 | **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| **Age unknown / check Gadget** | Gadget has no producer timestamp. Check HWiNFO and Gadget reporting; unchanged registry values can be steady or left over after exit. |
 | **Tick sensors / in Gadget** | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Access denied / open settings** | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
@@ -226,7 +230,9 @@ The **Advanced** section in this panel holds plugin-wide settings shared by ever
 
 ![The expanded Advanced section of the settings panel at its real width: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, Support with the Copy support report button, and Config with the This key and Deck JSON wells, each with its Copy and Apply buttons, over the help line that explains them.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
 
-**Config** holds two JSON wells: **This key**, the exact settings this key runs on, and **Deck**, the plugin-wide settings. **Copy** fills an untouched well with the settings of the moment you press it and puts the document on the clipboard; save it to a file to back a hand-built layout up. Paste a saved document and press **Apply** to restore it, or to clone it onto another key here or on another machine. Apply replaces the whole document in one write and reloads the panel; fields this build does not know survive untouched. Reading keys in the document carry the sensor's friendly name after the key so the file stays readable; Apply strips the names, and settings always store bare keys. The wells live on the Sensor Reading and Sensor Dial panels only; the HWiNFO Control key holds just a command, a target and a reset scope, so I left it without wells and re-enter those by hand.
+**Config** has two JSON text boxes: **This key** for the action's settings and **Deck** for plugin-wide settings. **Copy** fills an untouched box with the current settings and copies the document to the clipboard. Save it to a file for backup. Paste a document and press **Apply** to replace the settings and reload the panel. Unknown fields are preserved.
+
+Exported reading keys include friendly names for reference; Apply strips those names before saving. Config is available on Sensor Reading and Sensor Dial panels. Re-enter HWiNFO Control commands, targets and reset scopes in its settings panel.
 
 **Data units** decides how byte quantities and transfer rates read, everywhere at once:
 

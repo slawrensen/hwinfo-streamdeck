@@ -5,14 +5,16 @@ Elgato Marketplace listing is a separate track.
 
 ## 1.7.0.0 - Unreleased
 
+Per-reading dial colors and reliability fixes in one release candidate.
+
 - Two-row and three-row dials can color each reading's number separately.
   Appearance adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading
   through rotation, reordering, groups and confirmed cross-source links,
   including with Type accents off.
   An optional Color numbers by sensor type setting uses automatic category
-  colors. Valid Custom Text and alerts retain priority. Existing settings
-  keep their appearance when neither option is enabled.
+  colors. Valid Custom Text and alerts retain priority. Both color options
+  are opt-in; existing settings do not enable them automatically.
 
 - Gadget readings with duplicate names are withheld instead of assigning
   encounter-order identities. Observed ambiguous names stay blocked across
@@ -34,6 +36,9 @@ Elgato Marketplace listing is a separate track.
   session statistics count observed changes and producer stamps once;
   missing readings, stale/unavailable data, unit/provider/link changes and
   explicit resets start a new session. Averages are sample-weighted.
+  Retained single-view sessions also reset when a reading disappears or
+  changes source, unit, type or pairing while another reading is selected.
+  Ordinary rotation preserves the session without counting unseen values.
 - Shared Memory's cached reader checks the owning sensor ID and instance
   before updating a value, including descriptor-only topology changes.
 - Gadget rereads each row before accepting a scan and withholds changing

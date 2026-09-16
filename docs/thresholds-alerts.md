@@ -3,7 +3,9 @@ title: Thresholds & Alerts
 nav_order: 7
 ---
 
-Thresholds turn a key (or dial bar) into a warning light. Set a **Warn at** and/or **Critical at** value, and the plugin colors the reading the moment its live value crosses the limit: amber for warn, red for critical.
+Set **Warn at** and/or **Critical at** to change the display when the current value reaches a limit: amber for warning, red for critical.
+
+> This page includes the color and shape changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
 
 Both fields are optional and independent: set one, the other, or neither. A key with no thresholds just shows its themed value.
 
@@ -15,9 +17,9 @@ Both fields are optional and independent: set one, the other, or neither. A key 
 | **Critical at** | Whole face flips to red field / white text | Range bar fill turns red (single view), or the alerting row's value (overview views) |
 | **Direction** (*Alert when value drops below thresholds*) | Flips the comparison so a *low* value is the alarm | Same |
 
-On a key the alert takes over the entire face; this is deliberate, aviation-style master caution/warning that reads across a whole wall of keys. On a Stream Deck + dial the touchscreen slot is too small for a full flip, so on the single view only the range bar's fill changes color and the label, value and range text stay themed. The two-row and three-row overview views draw no range bar, so there the alerting row's own value turns amber or red and the rest of the face stays themed. See [Sensor Dial](sensor-dial.md) for the rest of the dial.
+An alert recolors the whole key. On a single-reading dial it recolors the range bar fill; on a two-row or three-row dial it recolors the alerting row's value. The rest of the dial keeps its theme. See [Sensor Dial](sensor-dial.md).
 
-Thresholds have a second, quieter effect on any face that draws a range. A key whose **Display** is set to **Bar** or **Ring** (a one-reading-layout setting) marks the same limits on its track: muted amber from **Warn at** and muted red from **Critical at**, running toward the alarmed end, the low end when *Direction* alerts below. The dial's range bar marks them the same way. The zones are blended toward the face background so the live fill always reads over them, and a key's range, which is always automatic, widens just enough to keep a zone visible. A dial pinned with **Bar min** / **Bar max** is never widened; a zone outside those bounds is clipped. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
+Bar and Ring displays also mark threshold zones on the track: muted amber from **Warn at** and muted red from **Critical at**, toward the high end normally or the low end for below-threshold alerts. Automatic ranges expand to include the zones. A fixed dial **Bar min** / **Bar max** stays unchanged and clips zones outside it. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
 
 ![The property inspector showing the Warn at, Critical at and Direction settings with example values filled in.]({{ '/assets/img/settings-panel.png' | relative_url }})
 
@@ -50,15 +52,18 @@ By default higher is worse, the right setting for temperatures, power draw, and 
 
 With the box ticked, your **Warn at** / **Critical at** values become floors: the alert fires when the reading falls to or below them.
 
-## Colors are global and colorblind-safe
+<a id="colors-are-global-and-colorblind-safe"></a>
+## Alert colors and shapes
 
-The warn and critical palettes are **never themed**. Amber-warn and red-crit look identical on Void, Paper, Ember, or any other [theme](themes.md): an alert must be unmistakable regardless of the surrounding look. The two states are separated by luminance as well as hue (bright amber field vs. deep red field), so they stay distinguishable under any color-vision deficiency. Type accents don't apply to an alerting key either; the alert owns the whole palette.
+Key alert palettes stay the same across themes: amber with black text for warning, red with white text for critical. Type accents and Custom Text do not override them. Dial overview values use alert foreground colors adjusted for contrast against the row background.
+
+The 1.7 candidate also draws a triangle for warning and an octagon for critical on keys and dials. These shapes provide a cue alongside color. Physical recognition across devices and color-vision differences has not been established.
 
 ## Worked examples
 
 ### CPU temperature: warn 80, crit 90
 
-A typical desktop-CPU key in °C:
+Example values for a CPU temperature key in °C. Choose limits appropriate to your hardware:
 
 - **Warn at** `80`
 - **Critical at** `90`
@@ -66,7 +71,7 @@ A typical desktop-CPU key in °C:
 
 Idle and under load the key stays themed. At 80 °C it goes amber; at 90 °C it goes red. If you'd rather read the face in Fahrenheit, tick *Show temperatures in °F* **and** enter the thresholds in °F (e.g. `176` / `194`); the numbers must match the displayed unit.
 
-![HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+The [theme reference](themes.md#alerts-override-everything) lists the alert palettes. Its older sample board predates the 1.7 shape cues.
 
 ### Fan RPM: alert when it drops
 

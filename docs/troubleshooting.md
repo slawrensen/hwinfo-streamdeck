@@ -3,15 +3,15 @@ title: Troubleshooting
 nav_order: 11
 ---
 
-This page is the deep symptom → cause → fix guide. For quick answers see the [FAQ](faq.md); for the two interfaces the plugin reads, see [Data sources](data-sources.md).
+Find the message or symptom below. For setup, see [Data sources](data-sources.md).
 
-Every claim here matches the plugin's actual behaviour. HWiNFO must be running on the same Windows machine: this is a **Windows-only** plugin with **no telemetry**; nothing here phones home or needs the internet.
+> This page includes the **unreleased 1.7 candidate's** source and status behavior. See [what changes from 1.6](whats-new-1.7.md).
 
 > **First check, always:** is **HWiNFO** running, and is it publishing on at least one interface (**Shared Memory Support** *or* **Gadget reporting**)? Most status screens trace back to this. See [Data sources](data-sources.md).
 
 ## How to read a status screen
 
-When a key can't show live data it renders a two-line, true-black status screen instead of a value. Dials show an equivalent two-line touchscreen message. The exact text tells you what's wrong:
+When a key cannot show a reading, it shows a two-line status message. Dials use similar wording. The message names the observed state; it may not identify the underlying cause.
 
 | Key shows | Dial shows | Meaning |
 | --- | --- | --- |
@@ -28,7 +28,9 @@ When a key can't show live data it renders a two-line, true-black status screen 
 | **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
-![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing.]({{ '/assets/img/status-screens.png' | relative_url }})
+![Production-rendered key and dial examples for Source busy, no new Shared Memory data, and Gadget Age unknown.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
+
+*Simulated source states rendered by the 1.7 production code, not a hardware photograph.*
 
 ---
 
@@ -38,10 +40,10 @@ The plugin found HWiNFO on **neither** interface. In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
 2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit); see [Data sources](data-sources.md).
-3. **Portable HWiNFO window was closed.** The portable build only publishes while its window is open, and nothing auto-starts it. Reopen it (and add it to autostart yourself if you want it always on).
+3. **HWiNFO exited or stopped publishing sensors.** Start it and check Shared Memory Support or Gadget reporting. Minimizing a window is different from exiting the application.
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
-5. **HWiNFO just launched.** It can take a few seconds after start to create the shared-memory mapping. Wait, then the key recovers on its own; the plugin re-probes every tick.
-6. **The mapping exists but its consistency mutex doesn't.** Since 1.4.0.0 the plugin reads shared memory only while holding HWiNFO's consistency mutex, with no unguarded read path, so a mapping published without a reachable mutex is treated as HWiNFO still starting up (HWiNFO creates the mapping first and the mutex just after). During a normal start that window is brief and the key recovers on its own. If it never clears, enable **Gadget reporting** and tick the sensors you need: the Gadget registry doesn't use the mutex, and in the default **Auto** data source the plugin falls back to it by itself.
+5. **HWiNFO just launched.** It may not have published Shared Memory yet. The plugin retries on each poll.
+6. **Shared Memory's consistency mutex is unavailable.** The plugin requires that mutex before reading. If the condition persists, check HWiNFO's sharing settings and Windows access. Gadget is an alternative source, but saved Shared Memory selections need explicit links to work on it.
 
 ## Keys show "Shared Memory off"
 
@@ -49,16 +51,16 @@ HWiNFO's shared-memory mapping exists but its header is flagged **disabled** (in
 
 1. **Shared Memory Support was turned off** in HWiNFO Settings. Re-enable it.
 2. **Free version's 12-hour timer expired.** The free build auto-disables shared memory 12 hours after start and leaves the dead mapping behind. Toggle **Shared Memory Support** off and on to restart the timer, or restart HWiNFO. HWiNFO **Pro** removes the limit entirely.
-3. **You don't want to keep toggling it.** Enable **Gadget reporting** instead (**Configure Sensors → HWiNFO Gadget**: tick "Enable reporting to Gadget", then "Report value in Gadget" on the sensors you need). In the default **Auto** data source the plugin falls back to the Gadget registry by itself when shared memory dies, and upgrades back automatically when it returns.
+3. **Use Gadget reporting.** Under **Configure Sensors → HWiNFO Gadget**, tick **Enable reporting to Gadget**, then **Report value in Gadget** for the readings you need. Auto can switch to Gadget and back, but does not match saved readings by name. Select Gadget readings directly or use the 1.7 candidate's [explicit links](data-sources.md#link-readings-across-providers).
 
-> **Note:** If your **Data source** (Advanced) is set to **Shared Memory only**, the plugin will *not* fall back. Set it to **Auto** to get automatic Gadget fallback.
+> **Shared Memory only** never falls back. **Auto** can switch providers; reading identity, freshness and available statistics still depend on the selected source.
 
 ## Values are frozen / "Not updating"
 
 No Shared Memory producer timestamp or value revision advanced for more than ~15 seconds. Gadget instead shows **Age unknown / check Gadget** until a value change is observed, and again after 15 seconds without value evidence. A steady reading is not proof that HWiNFO stopped; the registry cannot establish its age.
 
 1. **HWiNFO's Sensors window was closed or HWiNFO was minimised to tray without sensor polling.** Reopen the Sensors window; HWiNFO must keep polling to update either interface.
-2. **Not the free version's 12-hour timer.** Expiry doesn't freeze values: it marks the shared-memory mapping `DEAD`, which shows **"Shared Memory off"** or silently falls back to the Gadget registry in Auto mode. (Pro removes the limit.)
+2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
 3. **HWiNFO itself crashed or hung.** Restart it. The plugin re-probes a fresh handle every 5 seconds while stale and recovers automatically.
 4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
 4. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.

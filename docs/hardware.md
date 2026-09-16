@@ -3,7 +3,9 @@ title: Hardware compatibility
 nav_order: 9.5
 ---
 
-What this plugin has actually been proven on, and how. I distinguish four levels of confidence and never blur them:
+The matrix records device coverage and the dated tests behind it. Historical
+hardware results do not qualify the unreleased 1.7 candidate; its hardware
+checks are still in progress.
 
 - **Physically verified**: ran on the real device in my hands, with a recorded result.
 - **SDK simulated**: exercised end to end against a mock Stream Deck WebSocket that replays the device's exact registration and events. Strong evidence, not hardware.
@@ -37,7 +39,16 @@ And the same claim as a photograph, not a render: my Stream Deck + XL running th
 
 ## Page swipe
 
-Sideways swipes on the touch strip are page navigation and belong to the Stream Deck app; there is no plugin swipe event to receive. The plugin's job is narrower and it does it: selection and labels always survive the swipe away and back (they are persisted settings), and session stats, pause and pin state survive for up to 30 minutes off screen. Sparkline history is not on that clock: the poller keeps collecting it for a key or a dial overview row that is off screen, for as long as a Sensor Reading key or Sensor Dial is visible somewhere to keep polling running, so a line swiped away and back under that condition comes back complete; with nothing visible, polling stops and the line resumes where it left off. Changing the poll interval is what starts the lines fresh, not paging away.
+The Stream Deck app handles sideways swipes. Selection and labels are saved
+settings. Hidden dials can retain pause, pin and session state for up to
+30 minutes, subject to the [hidden-dial limit](controls.md#pause-pin-and-reset-reach).
+
+In the 1.7 candidate, missing or invalid readings, stale or unavailable data,
+and source, unit, type or pairing changes reset affected sessions. Sparkline
+collection continues while a Sensor Reading key or Sensor Dial is visible
+somewhere. With none visible, polling stops and samples remain in memory.
+Returning can append to them; the line does not measure that unobserved
+interval. See [history rules](data-sources.md#freshness-and-local-history).
 
 ## Hardware test procedure
 

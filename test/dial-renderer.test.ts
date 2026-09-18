@@ -350,6 +350,58 @@ describe("overview content fitting", () => {
 	});
 });
 
+describe("overview unit column holds the 4-glyph rate units (the Mbps edge cut)", () => {
+	// How far each unit's INK reaches past its start x at 12 px/600 Segoe UI
+	// (rasterized at 8x on an unclipped canvas, 2026-09-18). Measured, not the
+	// renderer's own estimate, so the fit is checked against real glyphs: from
+	// the old fixed x=172, "Mbps" inked to 202.4 on the 200 px canvas.
+	const INK_REACH: Record<string, number> = { Mbps: 30.38, Gbps: 27.63, "MB/s": 28.13, "MT/s": 27.5, "MiB…": 30.5, RPM: 24.63, MHz: 25.25, kbps: 25.5, "KB/s": 24.38, "°C": 11.5, "%": 9.5, W: 11.5 };
+	const columns = (svg: string, unit: string, y = "36.8"): { value: number; unit: number } => {
+		const valueX = svg.match(new RegExp(`<text x="([0-9.]+)" y="${y}" text-anchor="end" [^>]*font-weight="700"`));
+		const unitX = svg.match(new RegExp(`<text x="([0-9.]+)" y="${y}" text-anchor="start" [^>]*font-size="12" font-weight="600" fill="${MIDNIGHT.unit}">${unit}</text>`));
+		assert.ok(valueX !== null && unitX !== null, `columns missing for ${unit}`);
+		return { value: Number(valueX[1]), unit: Number(unitX[1]) };
+	};
+
+	for (const unit of ["Mbps", "Gbps", "MB/s", "MT/s", "MiB…"]) {
+		it(`${unit}: the unit's ink ends inside the 200 px canvas and the value keeps its 4 px gap`, () => {
+			const at = columns(renderOverview({ rows: [overviewRow({ label: "Current DL rate", valueText: "390", unitText: unit })] }), unit);
+			const inkEnd = at.unit + (INK_REACH[unit] as number);
+			assert.ok(inkEnd <= 199, `${unit} from x=${at.unit} inks to ${inkEnd.toFixed(2)}`);
+			assert.equal(Math.round((at.unit - at.value) * 10) / 10, 4);
+		});
+	}
+
+	for (const unit of ["°C", "%", "W", "RPM", "MHz", "kbps", "KB/s"]) {
+		it(`${unit}: a unit the slot already held keeps x=172 and the value keeps x=168`, () => {
+			const svg = renderOverview({ rows: [overviewRow({ valueText: "390", unitText: unit })] });
+			assert.deepEqual(columns(svg, unit), { value: 168, unit: 172 });
+			assert.match(svg, /<text x="168" y="36\.8" /); // the bare integers, byte for byte
+			assert.match(svg, /<text x="172" y="36\.8" /);
+			assert.ok(172 + (INK_REACH[unit] as number) <= 199);
+		});
+	}
+
+	it("the columns stay shared: every row follows the widest visible unit", () => {
+		const svg = renderOverview({
+			rows: [overviewRow({ valueText: "390", unitText: "Mbps", selected: true }), overviewRow({ valueText: "7.20", unitText: "kbps" }), overviewRow({ unitText: "°C" })]
+		});
+		const first = columns(svg, "Mbps");
+		assert.ok(first.unit < 172);
+		assert.deepEqual(columns(svg, "kbps", "64.8"), first);
+		assert.deepEqual(columns(svg, "°C", "92.8"), first);
+	});
+
+	it("the label budget and its mask follow the moved value column", () => {
+		// "390" books 48 px at the 20 px step: the mask starts 50 px left of
+		// the value column wherever that column sits.
+		const moved = renderOverview({ rows: [overviewRow({ valueText: "390", unitText: "Mbps" })] });
+		const at = columns(moved, "Mbps");
+		assert.match(moved, new RegExp(`<rect x="${(at.value - 50).toFixed(1)}" y="17" width="${(200 - (at.value - 50)).toFixed(1)}" height="26" fill="${MIDNIGHT.bg}"/>`));
+		assert.match(renderOverview({ rows: [overviewRow({ valueText: "390", unitText: "RPM" })] }), new RegExp(`<rect x="118.0" y="17" width="82.0" height="26" fill="${MIDNIGHT.bg}"/>`));
+	});
+});
+
 describe("overview label prefix dedup (the shared words truncation would waste)", () => {
 	const open = (labels: string[]) => dedupeSharedLabelPrefix(labels, labels.map(() => false));
 

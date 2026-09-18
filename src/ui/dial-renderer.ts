@@ -9,7 +9,7 @@
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
  */
 import { HISTORY_LENGTH } from "../series";
-import { estimateFooterWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, type AlertLevel } from "./format";
+import { cappedUnit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, type AlertLevel } from "./format";
 import { barSegment, escapeXml, FONT, severityMarkSvg, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
@@ -43,9 +43,10 @@ function valueFontSize(text: string): 34 | 24 | 17 {
  * The context line sits at the top (default) or the bottom, under the rows
  * and above a thin rule.
  */
-const WIDE = { labelX: 12, valueRight: 168, unitLeft: 172, lineLeft: 2, lineRight: 196, lineGap: 6 } as const;
+const WIDE = { labelX: 12, valueRight: 168, unitLeft: 172, unitRight: 197, lineLeft: 2, lineRight: 196, lineGap: 6 } as const;
 /** Value size ladder: largest step where the widest visible value fits the
- * shared column (right edge fixed at x=168, ~110 px of room). */
+ * shared column (right edge at x=168 unless a wide unit slides both
+ * columns left, ~110 px of room). */
 const WIDE_LADDER = [20, 18, 16, 14, 13, 12] as const;
 const WIDE_VALUE_ROOM = 110;
 /** Flat 700-weight width estimate, 0.6 px per glyph per font px (the same
@@ -65,8 +66,9 @@ const WIDE_GEO = {
 	bottom: { lineBaseline: 95, rule: 81, rowsTop: 2, rowsBottom: 80, bandH: 24 }
 } as const;
 const ROW_VALUE_MAX = 12;
-/** Units live in a fixed 28 px slot (x=172 to the edge); 4 code points is
- * the widest that stays inside it ("Mbps" fits, "Mbit/s" ellipsizes). */
+/** Units cap at 4 code points ("Mbps" stays whole, "Mbit/s" ellipsizes).
+ * The cap counts glyphs, not pixels: wideUnitShift below is what keeps the
+ * capped unit on the canvas. */
 const WIDE_UNIT_MAX = 4;
 /** Footer pixel budget for the TWO-ROW face (x=6 to ~x=194 at y=96), fitted
  * by estimated glyph widths (fitFooter). Exported so the dial action sizes
@@ -94,6 +96,21 @@ export function wideValueFit(values: readonly string[]): { size: number; maxW: n
 	}
 	const floor = WIDE_LADDER[WIDE_LADDER.length - 1] as number;
 	return { size: floor, maxW: Math.max(0, ...values.map((v) => wideValueWidth(v, floor))) };
+}
+
+/**
+ * How far the shared value and unit columns slide left so the widest
+ * VISIBLE unit's ink ends by WIDE.unitRight (the two-row view's idiom: the
+ * widest unit places the anchors every row uses). Zero for every unit the
+ * slot from x=172 already holds (°C, %, W, RPM, MHz, kbps, KB/s), so those
+ * faces keep their columns to the byte. The 4-glyph rate units did not fit:
+ * from x=172 "Mbps" inks to 202.4 on the 200 px canvas and lost its s, with
+ * "MB/s" and "Gbps" on the edge. The estimate prices ink width, so the first
+ * glyph's left bearing (~1 px) rides on top; the 3 px to the edge absorb it.
+ */
+function wideUnitShift(units: readonly string[]): number {
+	const maxW = Math.max(0, ...units.map((unit) => estimateKeyTextWidth(unit, 12)));
+	return Math.max(0, Math.round((WIDE.unitLeft + maxW - WIDE.unitRight) * 10) / 10);
 }
 
 export interface OverviewRow {
@@ -158,8 +175,9 @@ function wideContextLine(baseline: number, contextText: string, statsText: strin
 
 /**
  * The overview face, V3 wide tile: rail groove and thumb on the left, one
- * shared right-anchored value column (ladder-sized) with a fixed unit
- * column, UPPERCASE pixel-fitted labels that fill to their own row's value,
+ * shared right-anchored value column (ladder-sized) with a unit column that
+ * only leaves x=172 for a unit too wide to end on the canvas from there,
+ * UPPERCASE pixel-fitted labels that fill to their own row's value,
  * optional separators, and the stats-priority context line. Same 200×100
  * pixmap contract as renderDial.
  */
@@ -170,9 +188,14 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 	const separators = opts.separators !== false;
 	const rows = opts.rows.slice(0, 3).map((row) => {
 		const valueText = truncateLabel(row.valueText, ROW_VALUE_MAX);
-		return { ...row, valueText, unitText: row.unitText === "" ? "" : truncateLabel(row.unitText, WIDE_UNIT_MAX) };
+		return { ...row, valueText, unitText: cappedUnit(row.unitText, WIDE_UNIT_MAX) };
 	});
 	const fit = wideValueFit(rows.map((row) => row.valueText));
+	// Both columns move together, so the value-to-unit gap never changes;
+	// one decimal at most, and the unshifted face prints the bare 168/172.
+	const shift = wideUnitShift(rows.map((row) => row.unitText));
+	const valueRight = Math.round((WIDE.valueRight - shift) * 10) / 10;
+	const unitLeft = Math.round((WIDE.unitLeft - shift) * 10) / 10;
 	const pitch = (g.rowsBottom - g.rowsTop) / 3;
 	const parts: string[] = [
 		...svgOpen(200, 100, palette.bg),
@@ -200,7 +223,7 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// letter-spacing the estimator does not model). Painting order is
 		// the real guarantee: the mask and the value draw after the label,
 		// so a hot estimate ends up under the value, never over it.
-		const labelRight = WIDE.valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
+		const labelRight = valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
 		const alerting = row.severity === "warn" || row.severity === "crit";
 		const labelX = alerting ? 28 : WIDE.labelX;
 		const label = fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - labelX) * 0.94));
@@ -210,10 +233,10 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 			// invisible (rows sit on plain bg), and renderer-proof where the
 			// label estimate ran hot (clipPath is unproven on this engine).
 			`<rect x="${labelRight.toFixed(1)}" y="${bandTop}" width="${(200 - labelRight).toFixed(1)}" height="${g.bandH}" fill="${palette.bg}"/>`,
-			`<text x="${WIDE.valueRight}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
+			`<text x="${valueRight}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
 		);
 		if (row.unitText !== "") {
-			parts.push(`<text x="${WIDE.unitLeft}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
+			parts.push(`<text x="${unitLeft}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
 		parts.push(severityMarkSvg(row.severity, 12, baseline - 12, 12, palette.value, palette.bg));
 	});
@@ -299,7 +322,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 		return {
 			...row,
 			valueText,
-			unitText: row.unitText === "" ? "" : truncateLabel(row.unitText, ROW_UNIT_MAX),
+			unitText: cappedUnit(row.unitText, ROW_UNIT_MAX),
 			size: twoRowValueFontSize(valueText)
 		};
 	});

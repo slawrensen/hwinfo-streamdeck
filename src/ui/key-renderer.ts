@@ -9,7 +9,7 @@
  * value and label glyph sizes flex with content.
  */
 import { HISTORY_LENGTH } from "../series";
-import { estimateKeyTextWidth, fitTextLadder, truncateLabel, type AlertLevel, type FittedText } from "./format";
+import { cappedUnit, estimateKeyTextWidth, fitTextLadder, truncateLabel, type AlertLevel, type FittedText } from "./format";
 import { themeTextColors, type QuadIdentity, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -585,7 +585,7 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 	const sharedBadge = opts.sharedBadge ?? "";
 	const rows = [0, 1, 2].map((i) => {
 		const row = opts.rows[i] ?? null;
-		return row === null ? null : { ...row, valueText: truncateLabel(row.valueText, TRIPLE_VALUE_MAX), unitText: truncateLabel(row.unitText, TRIPLE_UNIT_MAX) };
+		return row === null ? null : { ...row, valueText: truncateLabel(row.valueText, TRIPLE_VALUE_MAX), unitText: cappedUnit(row.unitText, TRIPLE_UNIT_MAX) };
 	});
 	const valueSize = tripleValueFontSize(rows);
 	// Fit every label first: the face-wide spread cap needs the smallest

@@ -52,6 +52,17 @@ const check = makeCheck((name) => results.errors.push(name));
 // The unknown future field a newer plugin version might store: it must
 // ride through every edit untouched, nesting and all.
 const FUTURE_BLOB = { nested: { deep: [1, "two", { three: 3 }] }, keep: "yes" };
+// A deck running on Gadget with confirmed links in the deck document, and
+// a dial whose selection, set and colors were saved while Shared Memory
+// was live: every saved key is an ALIAS of a live tree row (the runtime
+// hands the aliases over in each row's `keys`, src/pi-protocol.ts).
+const LINKED_SM = ["f0000501:0:1000000", "e0002000:0:1000000", "f7006687:0:3000001"];
+const LINKED_G = ["g:Link Source:CPU Temp", "g:Link Source:GPU Temp", "g:Link Source:Pump"];
+const LINKED_LINKS = [
+	{ sharedMemory: LINKED_SM[0], gadget: LINKED_G[0], unit: "°C", sensorType: 1 },
+	{ sharedMemory: LINKED_SM[1], gadget: LINKED_G[1], unit: "°C", sensorType: 1 },
+	{ sharedMemory: LINKED_SM[2], gadget: LINKED_G[2], unit: "RPM", sensorType: 3 }
+];
 const SEEDS = {
 	back: { readingKey: "cpu:0:0", detailRole: "back", futureBlob: FUTURE_BLOB },
 	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
@@ -145,10 +156,23 @@ const SEEDS = {
 		detailMode: "custom",
 		detailKeys: ["g:Test Source:Test Fan", "g:Gap Source:After Gap"],
 		futureBlob: FUTURE_BLOB
+	},
+	// A linked saved selection on the dial (run 10): keys saved under Shared
+	// Memory, the deck now on Gadget. The panel must resolve every saved key
+	// through the tree's aliases and never rewrite one; the color saved under
+	// a live twin is the one the face paints for the saved row.
+	linked: {
+		readingKey: LINKED_SM[0],
+		rotationKeys: [...LINKED_SM],
+		dialView: "overview",
+		readingColors: { [LINKED_G[1]]: "#FF7E8E", dormant: "#ABCDEF" },
+		futureBlob: FUTURE_BLOB
 	}
 };
 
 let mode = "back";
+/** The action the page served last registers as; getSettings replies carry it. */
+let pageAction = "com.lawrensen.hwinfo.reading";
 const store = { settings: structuredClone(SEEDS.back) };
 const writes = []; // every setSettings payload, in arrival order
 const globalWrites = []; // every setGlobalSettings payload, same order
@@ -230,6 +254,26 @@ const GADGET_TREE = {
 	source: "gadget",
 	hint: "Reading from the HWiNFO Gadget registry: current values only."
 };
+/** The tree the linked seed sees: Gadget live, and each row's `keys`
+ * carrying its Shared Memory endpoint, the way buildSensorTree hands the
+ * runtime's linkedKeys over. Served only in that mode. */
+const LINKED_TREE = {
+	event: "sensorTree",
+	groups: [
+		{
+			name: "Link Source",
+			matchName: "Link Source",
+			readings: [
+				{ key: LINKED_G[0], keys: [LINKED_G[0], LINKED_SM[0]], label: "CPU Temp", unit: "°C", value: 71.4, type: 1, display: "71.4 °C" },
+				{ key: LINKED_G[1], keys: [LINKED_G[1], LINKED_SM[1]], label: "GPU Temp", unit: "°C", value: 76.2, type: 1, display: "76.2 °C" },
+				{ key: LINKED_G[2], keys: [LINKED_G[2], LINKED_SM[2]], label: "Pump", unit: "RPM", value: 2850, type: 3, display: "2850 RPM" }
+			]
+		}
+	],
+	state: "ok",
+	source: "gadget",
+	hint: "Reading from the HWiNFO Gadget registry: current values only."
+};
 const THEMES = {
 	event: "themes",
 	effectiveDeckTheme: "void",
@@ -251,15 +295,19 @@ wss.on("connection", (ws) => {
 			case "getSettings":
 				// device rides along like the real app sends it: the sdpi
 				// client's getSettings filters replies on action, context
-				// AND device, and a missing field hangs that promise.
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
+				// AND device, and a missing field hangs that promise. The
+				// action is the one the open page registered as (the dial
+				// page registers the encoder action), for the same reason.
+				ws.send(JSON.stringify({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
 				break;
 			case "setSettings":
 				writes.push(structuredClone(msg.payload ?? {}));
 				store.settings = msg.payload ?? {};
 				break;
 			case "getGlobalSettings":
-				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: { theme: "void" } } }));
+				// The linked seed's deck document carries the confirmed pairs the
+				// plugin applied to give LINKED_TREE its aliases.
+				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: mode === "linked" ? { theme: "void", readingLinks: LINKED_LINKS } : { theme: "void" } } }));
 				break;
 			case "setGlobalSettings":
 				globalWrites.push(structuredClone(msg.payload ?? {}));
@@ -267,7 +315,7 @@ wss.on("connection", (ws) => {
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
 				if (event === "getSensorTree") {
-					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: mode === "gadget" ? GADGET_TREE : TREE });
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: mode === "gadget" ? GADGET_TREE : mode === "linked" ? LINKED_TREE : TREE });
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
@@ -308,7 +356,7 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget|linked)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
@@ -324,8 +372,10 @@ const server = createServer((req, res) => {
 	try {
 		let body = readFileSync(file);
 		if (file.endsWith("sensor-reading.html")) {
+			pageAction = "com.lawrensen.hwinfo.reading";
 			body = Buffer.from(body.toString("utf8").replace("</head>", `${bootstrap()}</head>`));
 		} else if (file.endsWith("sensor-dial.html")) {
+			pageAction = "com.lawrensen.hwinfo.dial";
 			body = Buffer.from(body.toString("utf8").replace("</head>", `${dialBootstrap()}</head>`));
 		}
 		res.writeHead(200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }).end(body);
@@ -2420,7 +2470,79 @@ try {
 		deepEqual(gadgetApplied.detailKeys, ["g:Gap Source:After Gap", "g:Test Source:Test Fan"]) && gadgetApplied.readingKey === "g:Test Source:Test Temp",
 		JSON.stringify({ readingKey: gadgetApplied.readingKey, detailKeys: gadgetApplied.detailKeys })
 	);
-	await sleep(1400); // the panel's self-reload after Apply settles before the browser goes down
+	await sleep(1400); // the panel's self-reload after Apply settles before the next navigation
+
+	// ---- run 10: a linked saved selection on the dial panel ---------------
+	// Settings saved while Shared Memory was live, the deck now on Gadget
+	// with confirmed links in the deck document: every tree row carries the
+	// saved key as an alias, and the panel must name, tick and color each
+	// saved key through that alias the way the face resolves it, without
+	// rewriting one. A key and its aliases are one member, so a membership
+	// tick is exactly one write and no set ever holds both endpoints.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/linked`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	check("linked: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const linkedTruth = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		placeholder: document.getElementById("picker-search").placeholder,
+		value: document.getElementById("picker-search").value,
+		missing: document.getElementById("picker-search").classList.contains("missing"),
+		chips: [...document.querySelectorAll("#rotation-set .hw-set-chip")].map((c) => ({ key: c.dataset.key, missing: c.classList.contains("missing"), name: c.querySelector(".hw-set-name")?.textContent ?? null })),
+		wells: [...document.querySelectorAll("#reading-color-list input[type=color]")].map((w) => ({ key: w.dataset.key, value: w.value, title: w.title, autoDisabled: w.parentElement.querySelector("button").disabled })),
+		preset: document.getElementById("reading-color-preset").value
+	})`)).result?.value ?? "{}"
+	);
+	check("linked: the picker names the saved key's live twin instead of asking to pick again", linkedTruth.value === "CPU Temp  ·  Link Source" && linkedTruth.missing === false && linkedTruth.placeholder === "Search sensors…", JSON.stringify({ value: linkedTruth.value, placeholder: linkedTruth.placeholder, missing: linkedTruth.missing }));
+	check("linked: every saved chip resolves to its label and none is missing", linkedTruth.chips?.length === 3 && linkedTruth.chips.every((c) => c.missing === false) && deepEqual(linkedTruth.chips.map((c) => c.name), ["CPU Temp", "GPU Temp", "Pump"]), JSON.stringify(linkedTruth.chips));
+	check("linked: the chips keep the saved keys", deepEqual(linkedTruth.chips?.map((c) => c.key), LINKED_SM), JSON.stringify(linkedTruth.chips?.map((c) => c.key)));
+	const linkedWell = linkedTruth.wells?.find((w) => w.key === LINKED_SM[1]);
+	check("linked: the saved row's well shows the color saved under its live twin, names that key, and Auto is enabled", linkedWell?.value === "#ff7e8e" && String(linkedWell?.title).includes(LINKED_G[1]) && linkedWell?.autoDisabled === false && linkedTruth.preset === "custom", JSON.stringify({ well: linkedWell, preset: linkedTruth.preset }));
+	// Headless Chrome does not deliver a focus event for a programmatic
+	// focus(); dispatch the stand-in the other legs use so the list opens.
+	const linkedOpen = await evaluate(`(() => {
+		const input = document.getElementById("picker-search");
+		if (!input) return "no search input";
+		input.focus();
+		input.dispatchEvent(new Event("focus"));
+		return "ok";
+	})()`);
+	check("linked: primary picker opened", linkedOpen.result?.value === "ok", String(linkedOpen.result?.value));
+	await sleep(600);
+	const linkedTicks = `[...document.querySelectorAll("#picker-list .hw-row")].map((r) => [r.dataset.key, r.querySelector(".hw-tick")?.checked, r.classList.contains("selected")])`;
+	await waitDom("linked: the live rows tick as members through their aliases and the selection highlights its live row", `JSON.stringify(${linkedTicks}) === ${JSON.stringify(JSON.stringify(LINKED_G.map((key, i) => [key, true, i === 0])))}`, 2000, `JSON.stringify(${linkedTicks})`);
+	mark = writes.length;
+	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await sleep(500);
+	check("linked: unticking the live twin is one write that drops the saved key and every alias of it", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2]]) && deepEqual(writes.at(-1)?.futureBlob, FUTURE_BLOB), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await sleep(500);
+	check("linked: ticking it back is one write, and no write ever holds both endpoints of a link", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2], LINKED_G[0]]) && writes.every((w) => !LINKED_LINKS.some((l) => w.rotationKeys?.includes(l.sharedMemory) && w.rotationKeys?.includes(l.gadget))), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#reading-color-list input[data-key="${LINKED_SM[1]}"]').parentElement.querySelector("button").click()`);
+	await sleep(500);
+	check("linked: Auto clears the inherited color under every key of that reading and keeps the dormant entry", writes.length === mark + 1 && !Object.hasOwn(store.settings.readingColors ?? {}, LINKED_G[1]) && !Object.hasOwn(store.settings.readingColors ?? {}, LINKED_SM[1]) && store.settings.readingColors?.dormant === "#ABCDEF" && deepEqual(store.settings.futureBlob, FUTURE_BLOB), JSON.stringify(store.settings.readingColors));
+	check("linked: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	// The fill is a read that lands asynchronously; wait for the well.
+	await waitDom("linked: the config document filled", `(document.getElementById("config-key")?.value ?? "").length > 2`, 3000, `document.getElementById("config-key")?.value ?? "missing"`);
+	const linkedDocText = (await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value;
+	let linkedDoc = null;
+	try {
+		linkedDoc = JSON.parse(linkedDocText);
+	} catch {
+		linkedDoc = null;
+	}
+	check(
+		"linked: the config document names a saved hex key through its alias and leaves the Gadget key bare",
+		linkedDoc?.readingKey === `${LINKED_SM[0]}  CPU Temp` && deepEqual(linkedDoc?.rotationKeys, [`${LINKED_SM[1]}  GPU Temp`, `${LINKED_SM[2]}  Pump`, LINKED_G[0]]),
+		linkedDoc === null ? `raw: ${String(linkedDocText).slice(0, 300)}` : JSON.stringify({ readingKey: linkedDoc?.readingKey, rotationKeys: linkedDoc?.rotationKeys })
+	);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

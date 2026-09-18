@@ -88,6 +88,7 @@ jobs:
         run: |
           $first = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
           npm run build:native
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $second = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
           if ($first -ne $second) {
             Write-Error "native build is not reproducible: $first != $second"
@@ -99,10 +100,13 @@ jobs:
       - name: Native integration suite
         run: npm run test:native
 
-      - name: Native manifest + packaging gate
-        run: |
-          node scripts/native-manifest.mjs
-          node scripts/validate-native.mjs
+      # One command per step: a multi-line run block reports only its last
+      # command's exit code, so a manifest refusal would pass as green here
+      # and surface two steps later as a missing file.
+      - name: Native manifest
+        run: node scripts/native-manifest.mjs
+      - name: Native packaging gate
+        run: node scripts/validate-native.mjs
 
       # The reproducibility check above only proves two builds inside this job
       # agree. The toolset inside the pinned runner image moves with image

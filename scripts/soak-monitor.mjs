@@ -30,6 +30,7 @@ import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { creationMs, selectSoakHost } from "./lib/soak-host.mjs";
+import { makeLogTail } from "./lib/soak-log-tail.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -89,75 +90,9 @@ function pickSticky(rows, previousPid) {
 }
 
 // ---------------------------------------------------------------------------
-// Log tail: newest plugin log, WARN/ERROR deltas, harness lines excluded.
-// Pre-existing content is the baseline and is never counted. Rotation is
-// detected by NTFS file identity (ino), not by path or size: the Stream
-// Deck SDK recreates the SAME .0.log path on plugin restart, and the new
-// file can grow past the old offset before the next poll, which a
-// path-or-shrink check silently misses (found against the live SDK).
+// Log tail: scripts/lib/soak-log-tail.mjs (newest plugin log, WARN/ERROR
+// deltas, harness lines excluded, nothing lost across a rotation).
 // ---------------------------------------------------------------------------
-
-const HARNESS_RE = /Harness Deck|Load Deck/;
-const LEVEL_RE = /\b(WARN|ERROR)\b/;
-
-function makeLogTail(dir) {
-	let file = null;
-	let fileIno = null;
-	let offset = 0;
-	let primed = false;
-	const newest = () => {
-		if (!fs.existsSync(dir)) {
-			return null;
-		}
-		const logs = fs
-			.readdirSync(dir)
-			.filter((f) => f.endsWith(".log"))
-			.map((f) => ({ p: path.join(dir, f), m: fs.statSync(path.join(dir, f)).mtimeMs }))
-			.sort((a, b) => b.m - a.m);
-		return logs[0]?.p ?? null;
-	};
-	return function poll() {
-		const current = newest();
-		if (current === null) {
-			return { warn: 0, error: 0, note: primed ? "" : "logs-missing" };
-		}
-		const st = fs.statSync(current, { bigint: true });
-		const size = Number(st.size);
-		if (!primed) {
-			// Baseline: only lines written after the soak starts count.
-			primed = true;
-			file = current;
-			fileIno = st.ino;
-			offset = size;
-			return { warn: 0, error: 0, note: "" };
-		}
-		let note = "";
-		if (current !== file || st.ino !== fileIno || size < offset) {
-			file = current;
-			fileIno = st.ino;
-			offset = 0;
-			note = "log-rotated";
-		}
-		if (size === offset) {
-			return { warn: 0, error: 0, note };
-		}
-		const fd = fs.openSync(current, "r");
-		const buf = Buffer.alloc(size - offset);
-		fs.readSync(fd, buf, 0, buf.length, offset);
-		fs.closeSync(fd);
-		offset = size;
-		let warn = 0;
-		let error = 0;
-		for (const line of buf.toString("utf8").split(/\r?\n/)) {
-			const m = LEVEL_RE.exec(line);
-			if (m && !HARNESS_RE.test(line)) {
-				if (m[1] === "WARN") warn++;
-				else error++;
-			}
-		}
-		return { warn, error, note };
-	};
-}
 
 // ---------------------------------------------------------------------------
 // Summary: shared by the live run and --summary, so one validated code path.

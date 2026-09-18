@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
 import { creationMs, selectSoakHost } from "../scripts/lib/soak-host.mjs";
+import { makeLogTail } from "../scripts/lib/soak-log-tail.mjs";
 
 const host = (pid = 20, session = 1, started = 1000) => ({
 	Name: "StreamDeck.exe", ProcessId: pid, SessionId: session, CreationDate: `/Date(${started})/`
@@ -101,5 +105,116 @@ describe("soak host attribution", () => {
 		for (const bad of [null, undefined, "0", "prefix/Date(1000)/", "/Date(-1)/", "/Date(9007199254740992)/"]) {
 			assert.equal(creationMs(bad), null);
 		}
+	});
+});
+
+// The soak gate's "New log WARN / ERROR lines" reads the plugin log through
+// this tail. The SDK rotates the log on every plugin start (.0.log becomes
+// .1.log, a fresh .0.log opens), so the lines written between the last poll
+// and a restart sit in the ROTATED file: the window a soak most needs.
+describe("soak log tail across a rotation", () => {
+	const WARN = "2026-09-18T00:00:10.000Z WARN  HwinfoPoller: HWiNFO unavailable [busy]\n";
+	const ERROR = "2026-09-18T00:00:11.000Z ERROR Uncaught exception: boom\n";
+	const INFO = "2026-09-18T00:00:12.000Z INFO  Device known: Stream Deck (StreamDeck, 5x3)\n";
+
+	/** A synthetic log directory with a clock of its own: every write stamps
+	 * the next second, so "newest by mtime" never rides on timer resolution. */
+	function logDir(t) {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-soak-tail-"));
+		t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+		let clock = 1_800_000_000;
+		const log = (index) => path.join(dir, `com.lawrensen.hwinfo.${index}.log`);
+		const append = (index, text) => {
+			fs.appendFileSync(log(index), text);
+			clock++;
+			fs.utimesSync(log(index), clock, clock);
+		};
+		/** The SDK's reIndex: shift every index up by one, then open a fresh .0.log. */
+		const rotate = (firstLines) => {
+			for (let i = 8; i >= 0; i--) {
+				if (fs.existsSync(log(i))) fs.renameSync(log(i), log(i + 1));
+			}
+			append(0, firstLines);
+		};
+		return { dir, log, append, rotate };
+	}
+
+	it("counts the lines written between the last poll and the rotation", (t) => {
+		const { dir, append, rotate } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+		append(0, WARN);
+		rotate(INFO);
+		assert.deepEqual(poll(), { warn: 1, error: 0, note: "log-rotated" });
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+	});
+
+	it("a poll between the SDK's rename and its first new line re-counts nothing", (t) => {
+		const { dir, log, append } = logDir(t);
+		append(0, WARN + WARN + ERROR); // history from before the soak
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, WARN);
+		assert.deepEqual(poll(), { warn: 1, error: 0, note: "" });
+		// A plugin start renames the log away; the new one does not exist
+		// until the plugin writes its first line.
+		fs.renameSync(log(0), log(1));
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+		fs.appendFileSync(log(1), ERROR); // the old process's last words
+		append(0, INFO + WARN);
+		assert.deepEqual(poll(), { warn: 1, error: 1, note: "log-rotated" });
+	});
+
+	it("counts both sides of the rotation once, and never the history from before the soak", (t) => {
+		const { dir, append, rotate } = logDir(t);
+		append(1, ERROR + ERROR); // an older log, already rotated before the soak
+		append(0, WARN + WARN); // the live log's own history: the baseline
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, INFO);
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+		append(0, ERROR);
+		rotate(INFO + WARN);
+		assert.deepEqual(poll(), { warn: 1, error: 1, note: "log-rotated" });
+		append(0, ERROR);
+		assert.deepEqual(poll(), { warn: 0, error: 1, note: "" });
+	});
+
+	it("two restarts inside one interval: the log between them is counted whole", (t) => {
+		const { dir, append, rotate } = logDir(t);
+		append(1, ERROR); // history
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, WARN);
+		rotate(INFO + ERROR); // first restart: this log is never the newest at a poll
+		rotate(INFO + WARN); // second restart
+		assert.deepEqual(poll(), { warn: 2, error: 1, note: "log-rotated" });
+	});
+
+	it("a tail that is gone is reported, never a silent zero", (t) => {
+		const { dir, log, append } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, ERROR);
+		// Pruned at the SDK's file cap: the tailed file leaves the directory.
+		// The replacement exists before the old one goes, so the two can
+		// never share a file identity.
+		append(9, INFO);
+		fs.rmSync(log(0));
+		fs.renameSync(log(9), log(0));
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "log-rotated-tail-lost" });
+	});
+
+	it("harness device lines stay excluded on both sides", (t) => {
+		const { dir, append, rotate } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, "2026-09-18T00:00:13.000Z WARN  Device gone: Harness Deck\n" + ERROR);
+		rotate("2026-09-18T00:00:14.000Z WARN  Device gone: Load Deck\n");
+		assert.deepEqual(poll(), { warn: 0, error: 1, note: "log-rotated" });
 	});
 });

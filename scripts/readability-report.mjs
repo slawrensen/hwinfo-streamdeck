@@ -7,10 +7,18 @@ import { compose } from "../src/actions/sensor-reading";
 import { composeDialSvg } from "../src/actions/sensor-dial";
 import { IDLE_GESTURE } from "../src/gestures";
 import { SessionStatsStore } from "../src/stats";
-import { escapeXml, QUAD_DEFAULT_COLORS } from "../src/ui/key-renderer";
+import { escapeXml, QUAD_DEFAULT_COLORS, quadIdentityOf } from "../src/ui/key-renderer";
 import { quadIdentityColor, resolveTextColors } from "../src/ui/text-colors";
 import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "../test/wcag";
+
+// The Elgato SDK logger (pulled in through src/actions) registers
+// process.once("uncaughtException") and swallows the first throw, so a broken
+// run used to exit 0 with the sheets written and the ratios missing.
+process.on("uncaughtException", (err) => {
+	console.error(err);
+	process.exitCode = 1;
+});
 
 const output = path.resolve(process.argv[2] ?? "release/audit-evidence/sprint-06-rendered");
 mkdirSync(output, { recursive: true });
@@ -78,8 +86,8 @@ const matrix = themes.map((theme) => {
 		dim: contrast(dimText.value, palette.bg),
 		unitStats: contrast(text.unit, palette.bg),
 		dimUnitStats: contrast(dimText.unit, palette.bg),
-		quadMin: Math.min(...QUAD_DEFAULT_COLORS.map((color) => contrast(quadIdentityColor(color, false, normal, text, palette), palette.bg))),
-		dimQuadMin: Math.min(...QUAD_DEFAULT_COLORS.map((color) => contrast(quadIdentityColor(color, false, dim, dimText, palette), palette.bg))),
+		quadMin: Math.min(...QUAD_DEFAULT_COLORS.map((_, i) => contrast(quadIdentityColor(quadIdentityOf(null, i), false, normal, text, palette), palette.bg))),
+		dimQuadMin: Math.min(...QUAD_DEFAULT_COLORS.map((_, i) => contrast(quadIdentityColor(quadIdentityOf(null, i), false, dim, dimText, palette), palette.bg))),
 		dialWarn: contrast(alertValueColor(config, "warn", palette.bg), palette.bg),
 		dialCrit: contrast(alertValueColor(config, "crit", palette.bg), palette.bg),
 		selectedDim: contrast(resolveTextColors({ ...palette, bg: palette.track }, dim, "normal").value, palette.track),

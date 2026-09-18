@@ -34,6 +34,18 @@ function run(name, args, opts = {}) {
 	});
 }
 
+/** `npm run test:native` as node arguments. package.json owns the command
+ * (CI runs that script), so this suite cannot drift from it: a hand-copied
+ * file list here once left test/native-manifest.test.ts out of the run. */
+function nativeTestArgs() {
+	const script = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).scripts?.["test:native"] ?? "";
+	const [runner, ...rest] = script.split(/\s+/).filter((token) => token.length > 0);
+	if (runner !== "tsx" || !rest.some((token) => /^test\/.+\.test\.ts$/.test(token))) {
+		throw new Error(`package.json test:native is not a "tsx --test <files>" script: ${script}`);
+	}
+	return ["--import", "tsx", ...rest];
+}
+
 /** pi-harness (long-running server) + capture-pi, with graceful stdin exit. */
 async function runPiCapture() {
 	console.log("\n=== pi-harness + capture-pi ===");
@@ -85,8 +97,9 @@ const steps = [
 	// core, which can flake the frame-timing assertions above.
 	// One file at a time: native-hwsm times a mutex-contended open against a
 	// 400 ms ceiling and ends on a 10k-read soak, both of which a sibling
-	// file running in parallel would skew.
-	["test:native", () => run("test:native", ["--import", "tsx", "--test", "--test-concurrency=1", "test/native-hwsm.test.ts", "test/gadget-provider.test.ts"])],
+	// file running in parallel would skew. The npm script carries that
+	// --test-concurrency=1 and the file list; both are read from it.
+	["test:native", () => run("test:native", nativeTestArgs())],
 	["contact-sheet", () => run("contact-sheet", ["--import", "tsx", "scripts/contact-sheet.mjs", path.join(outRoot, "contact")])],
 	["marketplace-shots", () => run("marketplace-shots", ["--import", "tsx", "scripts/marketplace-shots.mjs", path.join(outRoot, "shots")])],
 	["pi-capture", runPiCapture]

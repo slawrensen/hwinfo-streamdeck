@@ -210,7 +210,7 @@ Useful lines to look for:
 - `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `busy`, `access-denied`, `gadget-empty`, `bridge-failed`, `invalid`, `unsupported-platform`).
 - `Data source layout changed; reopened in place (shared-memory)`: HWiNFO's sensor list grew or shrank (starting a game that adds GPU readings does it) and the poller reopened at the new size and re-read within the same tick, so the values never left the keys. Logged at INFO; it is not an error.
 - `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid`, `not-running` or `busy`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
-- `Gadget slot <n> withheld: formatted value "…" does not agree with raw value "…"`: one Gadget row was withheld because its two registry fields contradict each other; the other rows keep working. Logged once per slot.
+- `Gadget slot <n> withheld: formatted value "…" does not agree with raw value "…"`: one Gadget row was withheld because its two registry fields contradict each other; the other rows keep working. Logged once per reading and slot while the plugin runs; a return to the Gadget source after time on Shared Memory can log it once more.
 - `Deck theme = … (source: …)`: the resolved deck-wide theme.
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
 - `Parent probe failed [<code>]`: the plugin could not inspect the Stream Deck app's process. It keeps running; the code names why (`EPERM` means the app is there but sealed off, anything else is unusual).

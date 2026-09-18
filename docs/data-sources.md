@@ -34,7 +34,7 @@ HWiNFO gives every ticked reading a numbered slot and leaves that number reserve
 
 The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Ordinary unique names survive reordering and restarts. Renaming either changes that identity. Missing or blank source names and labels are withheld; the plugin never substitutes a registry position for a name. Duplicate names are also withheld, and a name seen twice stays withheld for this Windows account across restarts: the plugin never lets the remaining reading adopt a name it once shared. To use those readings again, give both readings new distinct labels in HWiNFO and select them again; the reading that keeps the old name stays withheld. Deleting the [identity journal](#freshness-and-local-history) is the only reset.
 
-HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names. An old spelling that now matches two readings resolves to nothing until you reselect; that ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. Two kinds of old selection get no alias and need one reselection: a label spelled exactly `Reading 0` through `Reading 1023` (earlier versions invented those labels for a missing registry label, so an old selection cannot safely identify a real producer label; the real reading remains selectable under a new identity, and an explicit cross-source link to it must be updated), and a key carrying the old `~n` duplicate suffix. Other names, including `Reading 00` and `Reading 1024`, keep their existing identities. No saved settings are rewritten automatically.
+HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names. An old spelling that now matches two readings resolves to nothing until you reselect; that ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. Two kinds of old selection get no alias and need one reselection: a label spelled exactly `Reading 0` through `Reading 1023` (earlier versions invented those labels for a missing registry label, so an old selection cannot safely identify a real producer label; the real reading remains selectable under a new identity, and an explicit cross-source link to it must be updated), and a key carrying the old `~n` duplicate suffix. Other names, including `Reading 00` and `Reading 1024`, keep their existing identities. No saved settings are rewritten automatically. A dial still saves the reading it lands on when it rotates or auto cycles, in the new key format, so a Gadget dial without a rotation set needs one reselection if you go back to 1.6.0.
 
 The registry cannot reveal ambiguity that vanished before the first observation, or distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
 
@@ -105,8 +105,11 @@ Apply. Preserve its other fields. Example only; use your own keys:
 ```
 
 The type numbers are Temperature 1, Voltage 2, Fan 3, Current 4, Power 5,
-Clock 6, Usage 7, Other 8 (None 0). The unit is HWiNFO's native unit, before
-any display conversion. A link never converts units. A changed unit or type
+Clock 6, Usage 7, Other 8 (None 0), as Shared Memory reports them: HWiNFO
+types several percent readings as Other, and the type is checked on the
+Shared Memory side only, because the Gadget source has no type of its own.
+The unit is HWiNFO's native unit, before any display conversion; a Yes/No
+reading's unit is `Yes/No` on both sources. A link never converts units. A changed unit or type
 leaves the alternate selection missing until you verify and update the
 pair. Duplicate endpoints invalidate all conflicting pairs. Malformed rows
 are ignored; more than 128 rows disables the whole list. Ambiguous Gadget
@@ -135,12 +138,17 @@ provides evidence. New slots and renames advance the rendering revision but
 not freshness. After 15 seconds without value evidence, or before the first
 change, Gadget displays **Age unknown**. It may be steady or stopped;
 the plugin cannot tell. Shared Memory supplies a producer poll timestamp.
-Opening a source is never evidence: after a source switch, a page return or
-a reopen whose first reads are skipped, the held values keep their real age
-and source, and the stale screen names the source the values came from.
-So a page you return to more than 15 seconds after its last accepted read
-can show the stale screen for one poll when the first read on return is
-skipped, and dial sessions start again from the next accepted read.
+Opening a source is never evidence: after a source switch, a page change or
+a reopen, the held values keep their real age and source, and the stale
+screen names the source the values came from. A Shared Memory timestamp
+is aged by the clock HWiNFO wrote it from, so a HWiNFO that stopped
+polling, before or while the keys were off screen, shows as not updating
+on the first read. The Gadget baseline survives a page change, a drill-down
+and Back for 15 seconds; after a longer absence Gadget starts again at
+**Age unknown** until a value moves. A page you return to more than 15
+seconds after its last accepted read can show the stale screen for one poll
+when the first read on return is skipped, and dial sessions start again
+from the next accepted read.
 
 Each occupied Gadget row is read twice. If a field changes between those
 observations, the whole scan is withheld and retried on the next poll. A

@@ -39,7 +39,10 @@ Per-reading dial colors and reliability fixes in one release candidate.
   counterpart in the deck Config document. Links apply to keys, dense
   layouts, dials and custom detail lists in either provider direction.
   Nothing is inferred from similar names or values. Conflicting links and
-  changed native units or types are refused. A pairing edit takes effect
+  changed native units or types are refused. The type is checked on the
+  Shared Memory side, where it is HWiNFO's own, so a percent reading that
+  HWiNFO types as Other links in both directions, and a Yes/No reading
+  carries the unit `Yes/No` on both sources. A pairing edit takes effect
   at once on every key, dial and tile; re-applying or reordering the same
   pairs changes nothing. A rotation set or group that holds both endpoints
   of one pair steps through it as one reading, and a custom detail list
@@ -48,13 +51,24 @@ Per-reading dial colors and reliability fixes in one release candidate.
   present, with its label, tick and color.
 - Gadget starts with unknown freshness until a value change is observed.
   Unchanged registry values show Age unknown instead of claiming HWiNFO
-  stalled. A Yes/No reading's raw flip counts as value evidence. Gadget
-  historical fields are unavailable, with an N/A badge and an empty value
-  for MIN/MAX/AVG on keys and detail tiles.
+  stalled. A Yes/No reading's raw flip counts as value evidence, and its
+  unit no longer changes with the word, so a dial threshold set while it
+  reads No fires when it reads Yes. A Yes/No reading's Bar or Ring runs
+  empty to full on either source, and the dense rows that cap a unit's
+  width (triple keys, two-row and three-row dials) show its 0 or 1 without
+  a cut-off unit. Gadget historical fields are
+  unavailable, with an N/A badge and an empty value for MIN/MAX/AVG on keys
+  and detail tiles. The Gadget baseline survives a page change, a
+  drill-down and Back, so the page you land on shows values instead of
+  starting again at Age unknown, and a steady Gadget source is no longer
+  reopened every few seconds while it rests there.
 - Opening a source is never evidence of freshness. After a source switch,
-  a page return or a reopen whose first reads are skipped, the held values
-  keep their real age and source, and the stale screen names the source
-  the values came from.
+  a page change or a reopen, the held values keep their real age and
+  source, and the stale screen names the source the values came from. A
+  Shared Memory timestamp is aged by the clock HWiNFO wrote it from, so a
+  HWiNFO that stopped polling, before or while the keys were off screen,
+  no longer shows as live for 15 seconds after a page change, a Source
+  change or a plugin start.
 - Sparklines capture subsecond value changes and end their segment on a
   skipped read, missing reading, unit change, provider transition or
   stale window. Dial session statistics count observed changes and
@@ -74,8 +88,8 @@ Per-reading dial colors and reliability fixes in one release candidate.
   fields changed between the two reads. A row whose formatted value
   contradicts its raw value skips one scan like any interleave; when it
   contradicts itself on consecutive scans it is withheld on its own: the
-  other rows keep working, the plugin log names the slot, and the settings
-  panel says so.
+  other rows keep working, the plugin log names the reading and its slot
+  once, and the settings panel says so.
   This catches detectable partial writes; the registry still cannot prove
   an atomic producer update. Reopening the registry and metadata changes
   do not establish freshness.
@@ -94,6 +108,14 @@ Per-reading dial colors and reliability fixes in one release candidate.
   exact and replaces them while it is set. Warning triangles
   and critical octagons add severity cues alongside color without
   replacing the reading.
+- A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
+  screen edge: the value and unit columns slide left together when the
+  widest unit needs the room, and faces whose units already fit are
+  unchanged.
+- The HWiNFO Control key's success tick no longer sticks to the key when
+  the key leaves the screen inside the tick's moment (a Multi Action that
+  also switches the page does that): the icon is restored on the way out
+  and again when the key returns.
 - The Config document keeps a Gadget key whole, including trailing
   whitespace in its label; only leading whitespace is dropped.
 - Release builds validate exact tag and package versions before installing

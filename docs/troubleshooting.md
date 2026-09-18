@@ -57,7 +57,7 @@ HWiNFO's shared-memory mapping exists but its header is flagged **disabled** (in
 
 ## Values are frozen / "Not updating"
 
-No Shared Memory producer timestamp or value revision advanced for more than ~15 seconds. Gadget instead shows **Age unknown / check Gadget** until a value change is observed, and again after 15 seconds without value evidence. A steady reading is not proof that HWiNFO stopped; the registry cannot establish its age.
+No Shared Memory producer timestamp or value revision advanced for more than ~15 seconds. Gadget instead shows **Age unknown / check Gadget** until a value change is observed, and again after 15 seconds without value evidence. A steady reading is not proof that HWiNFO stopped; the registry cannot establish its age. Once either screen shows, sparklines clear and dial sessions end; the first live frame afterwards shows **stats reset: data gap** once. The screen names the source the held values came from, even after a source switch.
 
 1. **HWiNFO's Sensors window was closed or HWiNFO was minimised to tray without sensor polling.** Reopen the Sensors window; HWiNFO must keep polling to update either interface.
 2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
@@ -87,9 +87,9 @@ Gadget reads the current user's `HKCU` registry. It cannot read another user's G
 
 ## Keys show "Source error"
 
-The plugin could not open or validate the sensor source. This reason covers feed validation failures and failures reading or saving the local Gadget identity history. Restarting HWiNFO does not repair every one of these cases.
+The plugin could not open or validate the sensor source. This reason covers feed validation failures and failures reading or saving the local Gadget identity history (a corrupt journal, a write failure, or a journal over its 1 MiB cap). Restarting HWiNFO does not repair every one of these cases. In **Auto** mode a journal failure shows this screen only while Shared Memory is not running; a Shared Memory mapping that exists but is switched off is reported as **Shared Memory off** instead, and the log then carries that reason.
 
-Open the key or dial settings and choose **Copy support report** for support. Retain the relevant plugin log entry to identify the underlying failure; the support report includes the general reason, not the raw error message. Do not delete the Gadget identity journal to clear the screen: it preserves previously observed ambiguous names so a saved key cannot silently change owners.
+Open the key or dial settings and choose **Copy support report** for support. Retain the relevant plugin log entry (`HWiNFO unavailable [invalid]: Gadget identity history could not be read or saved`) to identify the underlying failure; the support report includes the general reason, not the raw error message. The journal lives under `%LOCALAPPDATA%\HWiNFO Sensors\`; restore it from a backup where you have one. Deleting it clears the screen but erases every observed ambiguous name, so a reading that once shared a name can adopt it again. See [Data sources](data-sources.md#freshness-and-local-history).
 
 ## Keys show "Sensor missing"
 
@@ -99,6 +99,7 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 2. **You renamed the sensor or its reading in HWiNFO** (custom labels change the resolved identity on the Gadget source).
 3. **HWiNFO profile / config change**, or you switched between shared memory and Gadget sources (the two expose different sensor sets).
 4. **The sensor simply isn't present yet**, e.g. a GPU that's asleep, or a drive that spun down.
+5. **An old Gadget selection with no alias** after the 1.7 upgrade: a label spelled exactly `Reading 0` through `Reading 1023`, a key carrying the old `~n` duplicate suffix, or an old spelling that now matches two readings. Most 1.6.0 Gadget selections keep working; see [Data sources](data-sources.md#enabling-gadget-reporting).
 
 **Fix:** open the key's settings and **pick the sensor again**. A dial shows **Sensor missing / waiting** and ignores turns while the sensor is gone, so a temporary dropout (an HWiNFO restart, a sleeping GPU) can't move it off your saved pick; it recovers by itself when the sensor returns. If the sensor is gone for good, pick a new reading in the dial's settings panel.
 
@@ -206,9 +207,10 @@ Useful lines to look for:
 
 - `Opened HWiNFO data source: shared-memory` / `gadget`: which interface is actually in use.
 - A `Shared memory returned` line: auto-fallback recovered and upgraded from the gadget registry.
-- `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `access-denied`, `gadget-empty`, `bridge-failed`, `invalid`, `unsupported-platform`).
+- `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `busy`, `access-denied`, `gadget-empty`, `bridge-failed`, `invalid`, `unsupported-platform`).
 - `Data source layout changed; reopened in place (shared-memory)`: HWiNFO's sensor list grew or shrank (starting a game that adds GPU readings does it) and the poller reopened at the new size and re-read within the same tick, so the values never left the keys. Logged at INFO; it is not an error.
-- `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid` or `not-running`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
+- `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid`, `not-running` or `busy`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
+- `Gadget slot <n> withheld: formatted value "…" does not agree with raw value "…"`: one Gadget row was withheld because its two registry fields contradict each other; the other rows keep working. Logged once per slot.
 - `Deck theme = … (source: …)`: the resolved deck-wide theme.
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
 - `Parent probe failed [<code>]`: the plugin could not inspect the Stream Deck app's process. It keeps running; the code names why (`EPERM` means the app is there but sealed off, anything else is unusual).

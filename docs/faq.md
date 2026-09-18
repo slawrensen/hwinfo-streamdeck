@@ -74,11 +74,11 @@ HWiNFO reserves a numbered slot for every ticked reading and keeps the number wh
 
 ### Why are min / max / avg showing the current value?
 
-Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. Versions through 1.6.0 filled those fields with the current value. The measurement-integrity update leaves them unavailable: historical modes on keys and detail tiles show N/A with an empty value.
+Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. Versions through 1.6.0 filled those fields with the current value. Since 1.7.0 they are unavailable: historical modes on keys and detail tiles show N/A with an empty value.
 
 This happens when Shared Memory isn't available, most commonly after the free version's 12-hour timeout in Auto mode, or if you've forced `Gadget registry only`. When it's active, the settings panel shows a note. To get real min/max/avg back, re-enable Shared Memory Support in HWiNFO (or use Pro).
 
-> Dials calculate local session statistics from accepted observations on either source. **Age unknown** or another unavailable state replaces the display and resets the session in the 1.7 candidate.
+> Dials calculate local session statistics from accepted observations on either source. **Age unknown** or another unavailable state replaces the display and resets the session in the 1.7 candidate; the first live frame afterwards shows **stats reset: data gap** once.
 
 ### What's the difference between the key's min/max/avg and the dial's?
 
@@ -95,12 +95,12 @@ The line holds 36 samples. Collection continues for subscribed readings while a 
 
 The **1.7 candidate** collects subsecond value changes as well as advancing producer timestamps. It does not count repeated held frames. How quickly the line fills depends on HWiNFO, the plugin's poll interval and the observed changes. With one accepted point every two seconds, 36 samples take about 72 seconds.
 
-A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. Link and poll-interval changes clear all segments. A plugin restart also starts fresh. See [collection rules](data-sources.md#freshness-and-local-history).
+A skipped read, missing or non-finite reading, stale data (once the 15-second window opens), source transition or native-unit/type change clears the affected segment. A poll-interval change clears all segments; a pairing edit clears only a segment whose saved key now stands for a different measurement. A plugin restart also starts fresh. See [collection rules](data-sources.md#freshness-and-local-history).
 
 Two more sparkline behaviors:
 
 - Toggling **°C/°F** no longer resets the graph: it stores native values and just relabels.
-- A **frozen** HWiNFO holds the line's last real shape instead of flattening it.
+- A **frozen** HWiNFO holds the line's last shape for up to 15 seconds instead of flattening it. Once the key reports **Not updating** the line is cleared, and it restarts when data resumes.
 
 Changing the plugin's **Poll every** interval (Advanced) *does* clear the ring: the history is index-spaced, not time-stamped, so it does not preserve elapsed time across a cadence change.
 
@@ -194,7 +194,7 @@ Yes. The free version has the Shared Memory limit described above. The portable 
 
 ### Do keys survive reboots, HWiNFO restarts, or reordering sensors in HWiNFO?
 
-Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Observed duplicate names are withheld across restarts; see the [identity limits](data-sources.md#enabling-gadget-reporting). If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
+Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Observed duplicate names are withheld across restarts, and most Gadget selections saved by 1.6.0 keep working after the 1.7 upgrade; see the [identity limits](data-sources.md#enabling-gadget-reporting) for the ones that need a reselection. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
 
 ### Can I use Stream Deck + dials without HWiNFO Pro?
 
@@ -219,6 +219,7 @@ They name the observed state and a next step. These are the 1.7 candidate's mess
 | `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
 | `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |
+| `Source error / open settings` | The sensor source could not be opened or validated, including a Gadget identity journal that could not be read or saved. Open settings and choose **Copy support report** for support. |
 | `Needs x64 / Windows` | Not a 64-bit Windows machine (Windows-on-ARM / other); unsupported. |
 | `Bridge failed / reinstall` | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 

@@ -35,7 +35,7 @@ Open **Press** in the key's settings:
 
 **All readings from this sensor source** lists the source's other published readings in HWiNFO's order. The opener's reading appears on Back and is excluded from the list and its count.
 
-**Custom sensor list** uses the readings and order you choose. It also supports individual tile sizes, labels and colors.
+**Custom sensor list** uses the readings and order you choose. It also supports individual tile sizes, labels and colors. The list shows one tile per measurement: two saved keys that resolve to the same reading through a confirmed source link or a legacy Gadget alias share one tile, and a key that resolves to the opener's own reading is left to the Back tile.
 
 **Readings matching a filter** matches the combined source name and reading label across the current source. Matches update each poll. The panel shows a match count, and the pattern becomes the title unless you set one. See [Filter patterns](#filter-patterns) for examples.
 

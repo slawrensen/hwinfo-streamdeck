@@ -16,7 +16,8 @@ Deck + and + XL dials show a single reading or a two- or three-row overview.
 </p>
 
 *Production renderers with sample readings and generated histories. This is
-a layout comparison, not a photograph of hardware.*
+a layout comparison, not a photograph of hardware. The board predates the
+1.7 alert shapes and contrast changes described below.*
 
 > **1.7 is a release candidate.** It combines per-reading dial colors with
 > source, identity and history fixes. [What changes for you](docs/whats-new-1.7.md).
@@ -57,8 +58,11 @@ across both sources. Similar names are not enough to identify the same sensor.
 
 Gadget has no producer heartbeat or atomic snapshot guarantee. **Age unknown**
 means the plugin cannot tell a steady reading from an old registry value.
-Duplicate Gadget names are withheld; give them distinct names in HWiNFO and
-select them again. See [source limits](docs/data-sources.md).
+Duplicate Gadget names are withheld, and a name seen twice stays withheld on
+that machine: give both readings new distinct names in HWiNFO and select them
+again. Most Gadget selections saved by 1.6.0 keep working after the upgrade;
+the [source guide](docs/data-sources.md#enabling-gadget-reporting) lists the
+ones that need a reselection.
 
 ## Sensor Reading (keys)
 
@@ -110,9 +114,12 @@ action, or set one deck default. **Text** offers Theme, Dim or Custom.
 Optional **Type accents** color display accents by sensor category.
 
 Warnings use amber and a triangle; critical alerts use red and an octagon.
-Alerts override decorative colors. Built-in numeric colors have at least
-4.5:1 authored contrast against their rendered background. Custom colors
-are kept as entered, so check those on your display.
+Alerts override decorative colors. Built-in value, unit and numeric
+statistic colors have at least 4.5:1 authored contrast against their
+rendered background, and Dim keeps labels at least as readable as units.
+Custom colors and saved reading, quad cell and tile colors are kept as
+entered in Theme mode and only dimmed in Dim mode, so check those on your
+display.
 
 [Themes](docs/themes.md) · [Alert behavior](docs/thresholds-alerts.md)
 
@@ -135,6 +142,7 @@ physical readability. See the [display reference](docs/themes.md#the-display-sys
 | **Age unknown** | Check Gadget reporting. Unchanged registry values cannot prove that HWiNFO is still updating. |
 | **Bridge failed** | Reinstall the plugin. If Windows reports a block, keep that report for support. |
 | **Access denied** | Check the Windows account, session and permissions. See the troubleshooting guide before changing elevation. |
+| **Source error** | Open settings and copy the support report. On Gadget this includes an identity journal that could not be read or saved. |
 | **Pick a sensor** | Select a reading in the action's settings. |
 | **Sensor missing** | Check the saved selection, the current source and any explicit source link. |
 

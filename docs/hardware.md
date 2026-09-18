@@ -44,7 +44,9 @@ settings. Hidden dials can retain pause, pin and session state for up to
 30 minutes, subject to the [hidden-dial limit](controls.md#pause-pin-and-reset-reach).
 
 In the 1.7 candidate, missing or invalid readings, stale or unavailable data,
-and source, unit, type or pairing changes reset affected sessions. Sparkline
+and source, unit or type changes reset affected sessions; a pairing edit
+resets only a session whose saved key now stands for a different
+measurement. Sparkline
 collection continues while a Sensor Reading key or Sensor Dial is visible
 somewhere. With none visible, polling stops and samples remain in memory.
 Returning can append to them; the line does not measure that unobserved

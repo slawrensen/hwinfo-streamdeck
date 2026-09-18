@@ -31,7 +31,7 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 
 Each layout uses fixed positions across themes. A one-reading key puts its label on baseline 32, value on 94 and unit on 114. The multi-reading layouts use their own grids. Renderer tests check these positions.
 
-In the 1.7 candidate, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds. This does not apply to labels, badges, Custom Text or individually chosen dial colors. A triangle marks warnings and an octagon marks critical alerts. Physical readability still needs device testing.
+In the 1.7 candidate, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). A triangle marks warnings and an octagon marks critical alerts. Physical readability still needs device testing.
 
 The illustrated boards use production renderers with sample scenarios, live inputs and generated histories. They are sample-data renders. Settings-panel captures and hardware photographs are identified separately.
 
@@ -65,12 +65,12 @@ The Deck default chip previews the resolved theme and identifies itself with:
 The dark themes use bright near-white values, and Ember uses amber. Both can be too much in a dark room or for light-sensitive eyes, so every key and dial has a **Text** setting directly under its theme gallery, with a deck-wide default under *Advanced → Deck text*:
 
 - **Theme** *(deck-wide default)*: the selected theme's own text colors.
-- **Dim**: lower-intensity text. Built-in value, unit and numeric session-statistic colors retain a 4.5:1 authored contrast floor, including on the selected dial row. Individually chosen dial colors are dimmed without that adjustment.
+- **Dim**: lower-intensity text. Built-in value, unit and numeric session-statistic colors retain a 4.5:1 authored contrast floor, including on the selected dial row, and labels stay at least as readable as units, so the selected row's name never reads dimmer than its neighbours; the accent bar marks the selection. Individually chosen dial, quad cell and tile colors are dimmed without that adjustment.
 - **Custom**: your own color. **Text color** sets it, and the main value uses it **exactly as picked**, never adjusted. **Dim labels, units and stats** decides the secondary text: ticked, labels, units, suffixes and MIN/MAX/AVG badges take the same hue at lower intensity; unticked, every textual element uses the exact color.
 
 Per-key and per-dial settings default to **Deck default**, which follows the deck-wide Text value; a local **Theme**, **Dim** or **Custom** wins over it, mirroring the theme precedence rule. An invalid custom color falls back to theme text.
 
-Automatic quad identity colors also adjust for their background when needed. Saved color choices stay intact. **Custom** text deliberately retains your exact color and can fall below the contrast floor; choose a readable foreground for your theme. Authored contrast does not establish recognition speed on a physical key.
+Automatic quad identity colors adjust for their background when needed. Saved quad cell colors and hand-grouped detail tile colors render exactly in Theme mode and are only dimmed in Dim mode. **Custom** text retains your exact color and can fall below the contrast floor; choose a readable foreground for your theme. Authored contrast does not establish recognition speed on a physical key.
 
 ![The Text select under the theme gallery, set to Custom, with the Text color well and the "Dim labels, units and stats" checkbox revealed.]({{ '/assets/img/pi-key-text.png' | relative_url }})
 

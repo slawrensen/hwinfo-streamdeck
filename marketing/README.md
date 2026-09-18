@@ -155,9 +155,9 @@ the stable Marketplace gallery:
 - `docs/assets/img/reading-status-1.7.png`: simulated source states rendered
   by the production key and dial code. It shows Source busy, no new Shared
   Memory data and Gadget Age unknown.
-- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the shipped settings panel
-  captured through the local test host with live HWiNFO. The caption records
-  the running panel build, 1.7.0.0-1. It is a settings-panel capture.
+- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the 1.7 candidate's
+  settings panel (build 1.7.0.0-1) captured through the local test host with
+  live HWiNFO. It is a settings-panel capture of an unreleased build.
 
 The first two are sample-data renders. None is a photograph of a physical
 display. Generate them with `npx tsx scripts/docs-v17-images.mjs`; capture

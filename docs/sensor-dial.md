@@ -67,6 +67,10 @@ Switching back to **One reading** restores the exact single-view face.
 
 Saved colors also follow explicitly confirmed Shared Memory/Gadget links.
 If both linked keys have their own color, the displayed key's choice wins.
+In an uncurated rotation the displayed key is the live key for unselected
+rows and the saved key for the selection, so a measurement with two saved
+colors can change color when rotation selects it. Keep one color per
+measurement to avoid that.
 
 These controls are in the unreleased 1.7 candidate and the earlier issue #31 preview. Stable 1.6.0 does not include them.
 
@@ -80,7 +84,7 @@ Colors follow each reading through rotation, reordering and groups. Switching vi
 
 ![The 1.7 settings panel's Appearance section with Text set to Theme, Color numbers by sensor type off, and individual color wells using the Signal preset.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*The shipped settings panel, captured through the local test host with live HWiNFO. The caption records build 1.7.0.0-1. This is a settings-panel capture.*
+*The 1.7 candidate's settings panel (captured at panel build 1.7.0.0-1; the Reading colors section is unchanged since), captured through the local test host with live HWiNFO. This is a settings-panel capture of an unreleased build.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -122,7 +126,7 @@ Rotation also protects your selection when HWiNFO temporarily stops publishing t
 The dial calculates local min/max/average for each reading. These are separate from HWiNFO's own statistics. The average is the sum of accepted observations divided by their count; it is not time-weighted. Repeated held frames do not count again.
 
 - The selected reading, rotation-set members and multi-row view readings accumulate while the poller runs. Ordinary rotation preserves a reading's session. Hidden dials can retain their state for up to 30 minutes, subject to the [hidden-dial limit](controls.md#pause-pin-and-reset-reach).
-- A missing or non-finite reading, stale or unavailable source, or a source, native-unit, type or pairing change resets the affected session. This also applies to retained readings while another reading is selected. The next accepted sample starts the new session.
+- A missing or non-finite reading, a stale or unavailable source, or a source, native-unit or type change resets the affected session; the first live frame after a stale or unavailable source shows **stats reset: data gap** once. A pairing edit resets a session only when its saved key now stands for a different measurement. This also applies to retained readings while another reading is selected. The next accepted sample starts the new session.
 - **Push** resets the current reading under the Legacy preset. **Reset reach** can widen that to the set or every dial. Other presets can assign reset to a different gesture.
 - Gadget can supply observations for these local statistics, but has no HWiNFO history or producer timestamp. **Age unknown** replaces the display when freshness cannot be established. See [Data sources](data-sources.md#freshness-and-local-history).
 
@@ -186,7 +190,7 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | **Age unknown** / check Gadget | Gadget has no producer timestamp. Before the first observed value change, or after 15 seconds without another, the plugin cannot tell whether the source is steady or stopped. Check HWiNFO and Gadget reporting. |
 | **Gadget empty** / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Access denied** / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| **Source error** / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
+| **Source error** / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data (the Gadget identity journal). In Auto mode this shows only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load. Reinstall the plugin from its release package, then restart it. Keep any Windows or security-software report for support. |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.

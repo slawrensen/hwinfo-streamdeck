@@ -12,12 +12,13 @@ in progress. The download links continue to point to the published release.
 | Change | What you see | What you need to do |
 | --- | --- | --- |
 | Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Open a multi-row dial's **Appearance > Reading colors**. Choose a preset or set each color. |
-| Linked source selections | A saved reading and its color can follow a switch between Shared Memory and Gadget. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
+| Linked source selections | A saved reading, its name and its color can follow a switch between Shared Memory and Gadget. A pairing edit applies at once on every key, dial and tile. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
 | Gadget freshness | **Age unknown** replaces a claim that unchanged registry values are definitely stale. | Check HWiNFO and Gadget reporting. A steady value alone cannot prove the producer is running. |
 | Gadget history | Key and detail MIN/MAX/AVG modes show **N/A** instead of presenting the current value as history. | Use Current, or enable Shared Memory for HWiNFO history. Dials have separate local statistics. |
-| Ambiguous Gadget names | Duplicate names are withheld instead of risking the wrong reading on a key. | Give them distinct names in HWiNFO and select them again. Some older reserved-name selections also need reselection. |
-| Sparklines and local statistics | Subsecond changes can enter the graph. Observed data gaps and source, unit or type changes end the old history segment. | No setup change. A fresh segment after a gap is expected. |
-| Alerts and contrast | Built-in numeric colors meet a 4.5:1 authored contrast floor. Warnings add a triangle; critical alerts add an octagon. | Check your custom colors on the actual display. They are kept as entered. |
+| Ambiguous Gadget names | Duplicate names are withheld instead of risking the wrong reading on a key, and a name seen twice stays withheld on that machine. | Give both readings new distinct names in HWiNFO and select them again; the reading that keeps the old name stays withheld. |
+| Old Gadget selections | Most Gadget selections saved by 1.6.0 keep working through a checked alias of their old key. | Reselect only a reading whose label reads exactly `Reading 0` to `Reading 1023`, a key that carried the old `~n` duplicate suffix, or an old key that now matches two readings. See [the source guide](data-sources.md#enabling-gadget-reporting). |
+| Sparklines and local statistics | Subsecond changes can enter the graph. Observed data gaps and source, unit or type changes end the old history segment; a dial says **stats reset: data gap** once when live data returns. | No setup change. A fresh segment after a gap is expected. |
+| Alerts and contrast | Built-in value, unit and numeric statistic colors meet a 4.5:1 authored contrast floor, and Dim keeps labels at least as readable as units. Warnings add a triangle; critical alerts add an octagon. | Check your custom colors on the actual display. Saved reading, quad cell and tile colors are kept as entered in Theme mode and only dimmed in Dim mode; a Custom Text color stays exact. |
 
 If you used the **1.6.92 color preview**, the color wells and presets are
 already familiar. The new work over that preview is source-link color
@@ -57,8 +58,10 @@ because it supplies hardware identifiers, history and a consistency mutex.
 *Production status renderers with controlled failure scenarios. These are
 rendered examples, not measurements from a hardware fault test.*
 
-Gadget rereads each row to catch fields that change during a scan. That
-catches some partial writes; it does not make the registry an atomic source.
+Gadget rereads each row to catch fields that change during a scan, and a row
+whose formatted value keeps contradicting its raw value is withheld on its own
+while the other rows keep working (the plugin log names the slot). That catches
+some partial writes; it does not make the registry an atomic source.
 The [source guide](data-sources.md) explains the remaining limits and pairing
 steps.
 
@@ -67,7 +70,7 @@ steps.
 An adversarial review found a dial-history gap: select reading A, rotate to
 B, let A disappear and return, then rotate back. A's old MIN/MAX could
 survive. Retained sessions now check for missing or invalid readings and
-source, unit, type or link changes while another reading is selected.
+source, unit or type changes, or a saved key that comes to stand for another measurement, while another reading is selected.
 Ordinary rotation still preserves the session and does not count unseen
 values as new samples.
 

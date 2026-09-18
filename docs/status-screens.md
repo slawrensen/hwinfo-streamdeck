@@ -25,7 +25,7 @@ Each key screen is two short lines. The first names the state; the second gives 
 | **Needs x64** / *Windows* | Unsupported platform: HWiNFO's interfaces aren't readable here. | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
 | **Pick a sensor** / *in settings* | The key works, but no sensor is selected yet. | Open the key's settings and choose a sensor from the picker. |
 | **Sensor missing** / *pick again* | The saved reading isn't in the current source output. | Check the selected source and the reading in HWiNFO. A provider switch needs an explicit reading link; renamed or ambiguous Gadget readings may need new names and reselection. |
-| **Source error** / *open settings* | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. | Open settings and choose **Copy support report** for support. |
+| **Source error** / *open settings* | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data (the Gadget identity journal). In Auto mode this shows only while Shared Memory is not running. | Open settings and choose **Copy support report** for support. See [Troubleshooting](troubleshooting.md#keys-show-source-error). |
 | **Bridge failed** / *reinstall* | The native HWiNFO bridge (`bin/hwsm.node`) could not load. | Reinstall the plugin from its release package, then restart it. Keep any Windows or security-software report for support. |
 
 > **Note:** *Start HWiNFO*, *Not updating*, and the rest come from the data source (see [Data sources](data-sources.md)). *Pick a sensor* and *Sensor missing* are about this specific key's selection; the data source is fine. *Bridge failed* is about the plugin's own install, not HWiNFO.
@@ -43,7 +43,7 @@ Dials show the same states in the touchscreen's two-slot layout (a title and a v
 | Age unknown | check Gadget *(gadget)* |
 | Access denied | open settings |
 | Gadget empty | tick sensors |
-| Needs x64 Windows | "—" (placeholder glyph) |
+| Needs x64 Windows | a lone dash (placeholder glyph, no next step) |
 | Source error | open settings |
 | Bridge failed | reinstall it *(the native bridge `bin/hwsm.node` didn't load; reinstall the plugin)* |
 | HWiNFO | rotate to pick *(no sensor selected yet; the hint line says "or use the settings panel")* |

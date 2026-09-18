@@ -15,12 +15,12 @@
 		"watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.lawrensen.hwinfo\"",
 		"lint": "eslint src scripts test --max-warnings 0",
 		"typecheck": "tsc --noEmit",
-		"test": "tsx --test --test-concurrency=1 test/themes.test.ts test/key-renderer.test.ts test/dial-renderer.test.ts test/dial-sensor-colors.test.ts test/measure.test.ts test/gauge.test.ts test/text-colors.test.ts test/compat.test.ts test/reader.test.ts test/format.test.ts test/state-screens.test.ts test/series.test.ts test/rotation.test.ts test/devices.test.ts test/gestures.test.ts test/controls.test.ts test/stats.test.ts test/diagnostics.test.ts test/gesture-replay.test.ts test/density.test.ts test/verify-pack-version.test.ts test/pi-build-token.test.ts test/detail-group.test.ts test/detail-filter-parity.test.ts test/press-engine.test.ts test/detail-navigation.test.ts test/detail-faces.test.ts test/detail-profiles.test.ts test/slot-bindings.test.ts test/detail-role.test.ts test/back-face.test.ts test/poller-series.test.ts test/parent-liveness.test.ts test/clock.test.ts test/hwinfo-control.test.ts test/measurement-integrity.test.ts test/release-inputs.test.ts test/gadget-value.test.ts test/soak-monitor.test.ts test/soak-host.test.mjs",
+		"test": "tsx --test --test-concurrency=1 test/themes.test.ts test/key-renderer.test.ts test/dial-renderer.test.ts test/dial-sensor-colors.test.ts test/measure.test.ts test/gauge.test.ts test/text-colors.test.ts test/compat.test.ts test/reader.test.ts test/format.test.ts test/state-screens.test.ts test/series.test.ts test/rotation.test.ts test/devices.test.ts test/gestures.test.ts test/controls.test.ts test/stats.test.ts test/diagnostics.test.ts test/gesture-replay.test.ts test/density.test.ts test/verify-pack-version.test.ts test/pi-build-token.test.ts test/detail-group.test.ts test/detail-filter-parity.test.ts test/press-engine.test.ts test/detail-navigation.test.ts test/detail-faces.test.ts test/detail-profiles.test.ts test/slot-bindings.test.ts test/detail-role.test.ts test/back-face.test.ts test/poller-series.test.ts test/poller-provenance.test.ts test/poller-links.test.ts test/parent-liveness.test.ts test/clock.test.ts test/hwinfo-control.test.ts test/measurement-integrity.test.ts test/release-inputs.test.ts test/gadget-value.test.ts test/soak-monitor.test.ts test/soak-host.test.mjs test/pi-alias-contract.test.ts",
 		"contact-sheet": "tsx scripts/contact-sheet.mjs",
 		"docs-shots": "tsx scripts/gen-docs-shots.mjs",
 		"changelog:page": "node scripts/gen-changelog-page.mjs",
 		"probe": "tsx src/probe.ts",
-		"test:native": "tsx --test --test-concurrency=1 test/native-hwsm.test.ts test/gadget-provider.test.ts",
+		"test:native": "tsx --test --test-concurrency=1 test/native-hwsm.test.ts test/gadget-provider.test.ts test/native-manifest.test.ts",
 		"e2e": "node scripts/e2e-harness.mjs",
 		"e2e:resilience": "node scripts/e2e-resilience.mjs",
 		"e2e:gadget": "node scripts/e2e-gadget.mjs",
@@ -38,8 +38,8 @@
 		"e2e:reading-links": "node scripts/e2e-reading-links.mjs"
 	},
 	"dependencies": {
-		"@elgato/streamdeck": "^2.1.0",
-		"@elgato/utils": "^0.4.5"
+		"@elgato/streamdeck": "^2.1.2",
+		"@elgato/utils": "^0.6.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -47,17 +47,17 @@
 		"@rollup/plugin-node-resolve": "^16.0.3",
 		"@rollup/plugin-terser": "^1.0.0",
 		"@rollup/plugin-typescript": "^12.3.0",
-		"@types/node": "^26.1.0",
-		"eslint": "^10.6.0",
-		"globals": "^17.7.0",
+		"@types/node": "^20.19.43",
+		"eslint": "^10.10.0",
+		"globals": "^17.12.0",
 		"koffi": "^3.1.0",
 		"node-gyp": "^12.4.0",
-		"rollup": "^4.62.2",
+		"rollup": "^4.63.3",
 		"sharp": "^0.35.4",
 		"tslib": "^2.8.1",
-		"tsx": "^4.23.0",
+		"tsx": "^4.23.13",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.62.1",
-		"ws": "^8.21.0"
+		"typescript-eslint": "^8.70.0",
+		"ws": "^8.21.3"
 	}
 }

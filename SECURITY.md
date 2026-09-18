@@ -9,8 +9,8 @@ the only maintainer; expect a first reply within seven days. Please do not
 describe an exploitable problem in a public issue before I have had a
 chance to ship a fix.
 
-Fixes ship on the newest release of each line I still maintain (currently
-the 1.6.x line; a maintenance branch keeps 1.x patchable after 2.0 exists).
+Fixes ship on the newest release of each line I still maintain (the newest
+1.x minor line; a maintenance branch keeps 1.x patchable after 2.0 exists).
 Anything older gets no fixes. The plugin has no update channel of its own;
 updates arrive through the Elgato Marketplace or the GitHub release page.
 
@@ -29,8 +29,10 @@ no handle, pointer, or generic Win32 call crosses its JavaScript boundary.
 there is no publisher certificate to check, only bytes. The bytes are
 checkable. Every GitHub release from 1.4.0 on prints the addon's SHA-256 in
 its release notes and attaches `release-native-manifest.json` carrying the
-same hash plus the build facts (PE hardening flags, imports, toolchain);
-releases before 1.4.0 predate the addon and publish the pack hash only. To
+same hash plus the build facts (PE hardening flags, imports, the compiler
+version, and from 1.7.0 the Windows SDK version, which earlier manifests
+record as unknown); releases before 1.4.0 predate the addon and publish
+the pack hash only. To
 verify the copy on your disk, run this in PowerShell and compare it with
 the release you installed:
 

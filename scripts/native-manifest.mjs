@@ -15,10 +15,12 @@ import { createRequire } from "node:module";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const target = process.argv[2] ?? path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node");
-const outPath = path.join(repoRoot, "release-native-manifest.json");
+// HWSM_MANIFEST_OUT redirects the file for tests, so a test run never
+// overwrites release evidence kept at the repo root.
+const outPath = process.env.HWSM_MANIFEST_OUT || path.join(repoRoot, "release-native-manifest.json");
 
 if (!fs.existsSync(target)) {
-	console.error(`native-manifest: ${path.relative(repoRoot, target)} not found — run \`npm run build\` first.`);
+	console.error(`native-manifest: ${path.relative(repoRoot, target)} not found; run \`npm run build\` first.`);
 	process.exit(1);
 }
 const bytes = fs.readFileSync(target);
@@ -128,6 +130,35 @@ if (process.platform === "win32" && process.arch === "x64") {
 }
 
 const strip = (v) => (v ?? "").replace(/[\\/]+$/, "");
+
+// Toolchain facts. The compiler version comes from the build environment
+// (release.yml exports HWSM_CL_VERSION from the cl.exe banner); "unknown" is
+// honest for a bare local run, but a release run must carry a real version,
+// so anything that does not start with major.minor.patch is refused there
+// instead of shipping in the manifest (the workflow's capture used to depend
+// on which cl.exe output stream arrived first).
+const inCi = Boolean(process.env.GITHUB_RUN_ID);
+const compilerVersion = process.env.HWSM_CL_VERSION || "unknown";
+if (inCi && !/^\d+\.\d+\.\d+/.test(compilerVersion)) {
+	console.error(`native-manifest: HWSM_CL_VERSION is ${JSON.stringify(compilerVersion)}, not a compiler version; the workflow must export the real cl.exe version before this step.`);
+	process.exit(1);
+}
+
+// node-gyp writes the Windows SDK MSBuild resolved into the generated
+// project, which is the exact SDK the addon was built against. The
+// developer-shell variable only exists inside a Visual Studio prompt, so it
+// is the fallback, not the source.
+function sdkVersionFromProject() {
+	const vcxproj = path.join(repoRoot, "native", "hwsm", "build", "hwsm.vcxproj");
+	if (!fs.existsSync(vcxproj)) return "";
+	const m = fs.readFileSync(vcxproj, "utf8").match(/<WindowsTargetPlatformVersion>([^<]+)<\/WindowsTargetPlatformVersion>/);
+	return m ? m[1].trim() : "";
+}
+const windowsSdkVersion = sdkVersionFromProject() || strip(process.env.WindowsSDKVersion) || "unknown";
+if (inCi && windowsSdkVersion === "unknown") {
+	console.warn("native-manifest: Windows SDK version not found in native/hwsm/build/hwsm.vcxproj or WindowsSDKVersion; recording \"unknown\".");
+}
+
 const manifest = {
 	file: path.basename(target),
 	sha256: createHash("sha256").update(bytes).digest("hex"),
@@ -142,10 +173,8 @@ const manifest = {
 	nativeVersion: buildInfo?.nativeVersion ?? null,
 	nativeSourceId: buildInfo?.nativeSourceId ?? null,
 	compileDefines: ["NAPI_VERSION=8"],
-	// Toolchain facts come from the build environment when it exports them
-	// (CI does); "unknown" is honest for a bare local run.
-	compilerVersion: process.env.HWSM_CL_VERSION || "unknown",
-	windowsSdkVersion: strip(process.env.WindowsSDKVersion) || "unknown",
+	compilerVersion,
+	windowsSdkVersion,
 	buildNodeVersion: process.version,
 	buildWorkflowRun: process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null
 };

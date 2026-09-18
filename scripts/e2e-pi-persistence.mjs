@@ -157,6 +157,15 @@ const SEEDS = {
 		detailKeys: ["g:Test Source:Test Fan", "g:Gap Source:After Gap"],
 		futureBlob: FUTURE_BLOB
 	},
+	// The panel opened before HWiNFO (run 12): the tree arrives empty with
+	// state "unavailable", and one saved key is genuinely absent from the
+	// live layout, so one leg can ask the panel both questions in turn.
+	down: {
+		readingKey: "ghost:0:0",
+		rotationKeys: ["cpu:0:0", "cpu:0:1", "ghost:0:0"],
+		dialView: "overview",
+		futureBlob: FUTURE_BLOB
+	},
 	// A linked saved selection on the dial (run 10): keys saved under Shared
 	// Memory, the deck now on Gadget. The panel must resolve every saved key
 	// through the tree's aliases and never rewrite one; the color saved under
@@ -176,6 +185,10 @@ let pageAction = "com.lawrensen.hwinfo.reading";
 const store = { settings: structuredClone(SEEDS.back) };
 const writes = []; // every setSettings payload, in arrival order
 const globalWrites = []; // every setGlobalSettings payload, same order
+const opened = []; // every url the panel asked the app to open
+/** The source is down: getSensorTree answers the unavailable tree. Set by
+ * seeding "down", cleared by any other seed and by /tree/up. */
+let treeDown = false;
 let piWs = null;
 const toPi = (obj) => piWs?.send(JSON.stringify(obj));
 
@@ -274,6 +287,16 @@ const LINKED_TREE = {
 	source: "gadget",
 	hint: "Reading from the HWiNFO Gadget registry: current values only."
 };
+/** The tree the panel gets while the source is down: src/pi-protocol.ts
+ * builds it with no groups and state "unavailable". It lists nothing, which
+ * says nothing about any saved key. */
+const DOWN_TREE = {
+	event: "sensorTree",
+	groups: [],
+	state: "unavailable",
+	source: "shared-memory",
+	hint: "HWiNFO is not running. Start HWiNFO with Shared Memory Support enabled."
+};
 const THEMES = {
 	event: "themes",
 	effectiveDeckTheme: "void",
@@ -312,10 +335,15 @@ wss.on("connection", (ws) => {
 			case "setGlobalSettings":
 				globalWrites.push(structuredClone(msg.payload ?? {}));
 				break;
+			// What the app does with a help link: hand the url to the default
+			// browser and leave the inspector where it is.
+			case "openUrl":
+				opened.push(msg.payload?.url ?? "");
+				break;
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
 				if (event === "getSensorTree") {
-					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: mode === "gadget" ? GADGET_TREE : mode === "linked" ? LINKED_TREE : TREE });
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: treeDown ? DOWN_TREE : mode === "gadget" ? GADGET_TREE : mode === "linked" ? LINKED_TREE : TREE });
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
@@ -356,11 +384,18 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget|linked)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget|linked|down)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
 		writes.length = 0;
+		treeDown = mode === "down";
+		res.writeHead(200).end("ok");
+		return;
+	}
+	// HWiNFO comes back mid-leg: the next tree fetch is one the source answered.
+	if (url === "/tree/up") {
+		treeDown = false;
 		res.writeHead(200).end("ok");
 		return;
 	}
@@ -2272,6 +2307,23 @@ try {
 	check("leg C: deck Copy was a read, not a write", writes.length === mark && globalWrites.length === gmarkDeck, `${writes.length - mark}/${globalWrites.length - gmarkDeck}`);
 	check("leg C: deck Copy reports Copied. through the legacy path", (await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value === "Copied.", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 
+	// leg C2: closing and reopening the fold is not a reason to lose a draft.
+	// The fold is toggled for its own reasons (on the dial it also holds the
+	// gestures), and the refill on open overwrote the hand-typed document
+	// with the stored one: the only place a reading link is authored, gone to
+	// one stray click. The well nobody touched must still refill, which is
+	// also the proof the two wells fill independently.
+	mark = writes.length;
+	const gmarkFold = globalWrites.length;
+	await evaluate(`(() => { document.getElementById("config-deck").value = "not the deck document"; return "ok"; })()`);
+	await evaluate(`(() => { document.querySelector('details[data-fold="advanced"]').open = false; return "ok"; })()`);
+	await sleep(300);
+	await evaluate(`(() => { document.querySelector('details[data-fold="advanced"]').open = true; return "ok"; })()`);
+	await sleep(900);
+	check("leg C2: the hand-edited draft survives a fold toggle", (await evaluate(`document.getElementById("config-key")?.value`)).result?.value === "{ draft", String((await evaluate(`document.getElementById("config-key")?.value`)).result?.value).slice(0, 80));
+	check("leg C2: the untouched well refills on the same toggle", (await evaluate(`document.getElementById("config-deck")?.value`)).result?.value === JSON.stringify({ theme: "void" }, null, "\t"), String((await evaluate(`document.getElementById("config-deck")?.value`)).result?.value).slice(0, 80));
+	check("leg C2: the toggle was a read, not a write", writes.length === mark && globalWrites.length === gmarkFold, `${writes.length - mark}/${globalWrites.length - gmarkFold}`);
+
 	// ---- run 7c: a real press survives the rename it tears down (leg R) --
 	// Every other leg drives the panel with element.click(), which fires no
 	// mousedown and so cannot see this: opening a cell rename and then
@@ -2543,6 +2595,134 @@ try {
 		linkedDoc?.readingKey === `${LINKED_SM[0]}  CPU Temp` && deepEqual(linkedDoc?.rotationKeys, [`${LINKED_SM[1]}  GPU Temp`, `${LINKED_SM[2]}  Pump`, LINKED_G[0]]),
 		linkedDoc === null ? `raw: ${String(linkedDocText).slice(0, 300)}` : JSON.stringify({ readingKey: linkedDoc?.readingKey, rotationKeys: linkedDoc?.rotationKeys })
 	);
+
+	// ---- run 11: the help link reads, and opens through the app ----------
+	// The panel's one external link sits in the Data source help line. Left
+	// unstyled the webview paints it its own dark blue on the #2d2d2d page,
+	// and followed in place it replaces the 400 px settings panel with a web
+	// page the inspector has no way back from. It must be readable, and a
+	// real click must reach the app as openUrl and leave the document alone.
+	// The docs host is blocked at the network layer so a regression fails
+	// here instead of reaching out.
+	await cdp("Network.enable");
+	await cdp("Network.setBlockedURLs", { urls: ["*docs.slawrensen.com*"] });
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("link: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(500);
+	// Contrast the WCAG way, over the colors the page actually computes: the
+	// help text around the link measures 3.99:1 on this background, so the
+	// link itself may not read worse than the sentence it sits in.
+	const linkTruth = JSON.parse(
+		(await evaluate(`JSON.stringify((() => {
+		const a = document.querySelector(".hw-help a");
+		if (a === null) return { found: false };
+		const channels = (c) => c.slice(c.indexOf("(") + 1, c.indexOf(")")).split(",").map(Number);
+		const lum = (c) => {
+			const [r, g, b] = channels(c).map((n) => n / 255).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const ratio = (x, y) => (Math.max(lum(x), lum(y)) + 0.05) / (Math.min(lum(x), lum(y)) + 0.05);
+		const bg = getComputedStyle(document.body).backgroundColor;
+		const color = getComputedStyle(a).color;
+		return { found: true, href: a.href, target: a.target, rel: a.rel, color, bg, contrast: Math.round(ratio(color, bg) * 100) / 100 };
+	})())`)).result?.value ?? "{}"
+	);
+	check("link: the help line carries the docs link", linkTruth.found === true && String(linkTruth.href).includes("data-sources.html#link-readings-across-providers"), JSON.stringify(linkTruth.href));
+	check("link: it reads on the panel background", linkTruth.contrast >= 4, JSON.stringify({ color: linkTruth.color, bg: linkTruth.bg, contrast: linkTruth.contrast }));
+	check("link: the markup keeps the new-window fallback", linkTruth.target === "_blank" && String(linkTruth.rel).includes("noopener"), JSON.stringify({ target: linkTruth.target, rel: linkTruth.rel }));
+	// The link wraps across two line boxes, so the bounding-box centre lands
+	// on the help div: click a point the page itself resolves to the anchor.
+	const linkPoint = JSON.parse(
+		(await evaluate(`JSON.stringify((() => {
+		const a = document.querySelector(".hw-help a");
+		if (a === null) return null;
+		a.scrollIntoView({ block: "center" });
+		for (const r of a.getClientRects()) {
+			const x = Math.round(r.left + Math.min(8, r.width / 2));
+			const y = Math.round(r.top + r.height / 2);
+			if (document.elementFromPoint(x, y) === a) return [x, y];
+		}
+		return null;
+	})())`)).result?.value ?? "null"
+	);
+	check("link: found a point that hits the anchor itself", Array.isArray(linkPoint), JSON.stringify(linkPoint));
+	if (Array.isArray(linkPoint)) {
+		mark = writes.length;
+		await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: linkPoint[0], y: linkPoint[1], button: "left", buttons: 1, clickCount: 1 });
+		await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: linkPoint[0], y: linkPoint[1], button: "left", buttons: 0, clickCount: 1 });
+		await sleep(900);
+		const afterClick = JSON.parse(
+			(await evaluate(`JSON.stringify({
+			url: location.href,
+			panel: document.getElementById("picker-search") !== null
+		})`)).result?.value ?? "{}"
+		);
+		check("link: the click left the settings panel in place", afterClick.panel === true && String(afterClick.url).endsWith("/ui/sensor-reading.html"), JSON.stringify(afterClick));
+		check("link: and reached the app as openUrl", opened.at(-1) === linkTruth.href, JSON.stringify(opened));
+		check("link: opening the docs wrote nothing", writes.length === mark, `${writes.length - mark} writes`);
+	}
+
+	// ---- run 11b: Tab out of a search box and its list closes -------------
+	// The results list is an absolutely positioned overlay. It used to close
+	// only on Escape, Enter or an outside mousedown, so a keyboard walk left
+	// it standing over the fields that now had focus and the user typed into
+	// a field they could not see.
+	mark = writes.length;
+	check("keyboard: clicked into the sensor search box", (await realClick("#picker-search")) === "ok");
+	await sleep(400);
+	check("keyboard: the results list is open", (await evaluate(`document.getElementById("picker-list")?.hidden === false`)).result?.value === true);
+	let tabbedOut = false;
+	for (let i = 0; i < 5 && !tabbedOut; i++) {
+		await cdp("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+		await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+		await sleep(200);
+		tabbedOut = (await evaluate(`document.activeElement !== null && document.activeElement.closest(".hw-picker") === null`)).result?.value === true;
+	}
+	check("keyboard: focus left the picker within five tabs", tabbedOut, `tabbedOut=${tabbedOut}`);
+	const tabState = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		listOpen: document.getElementById("picker-list")?.hidden === false,
+		focus: document.activeElement?.tagName ?? "none",
+		focusSetting: document.activeElement?.getAttribute?.("setting") ?? null
+	})`)).result?.value ?? "{}"
+	);
+	check("keyboard: the list closed when focus left the picker", tabState.listOpen === false, JSON.stringify(tabState));
+	check("keyboard: the walk wrote nothing", writes.length === mark, `${writes.length - mark} writes`);
+
+	// ---- run 12: a tree fetched while the source is down accuses nothing --
+	// HWiNFO not running means an empty tree, not a wrong selection. The
+	// picker and every saved chip must stay neutral while the hint says what
+	// is actually wrong, and say "not present" only once a tree HWiNFO
+	// answered does not list the key.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/down`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	check("down: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const pickerState = `JSON.stringify({
+		placeholder: document.getElementById("picker-search").placeholder,
+		missing: document.getElementById("picker-search").classList.contains("missing"),
+		chips: [...document.querySelectorAll("#rotation-set .hw-set-chip")].map((c) => c.classList.contains("missing")),
+		hint: document.getElementById("status-hint").textContent
+	})`;
+	const downTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("down: the picker stays neutral while HWiNFO is not running", downTruth.placeholder === "Search sensors…" && downTruth.missing === false, JSON.stringify({ placeholder: downTruth.placeholder, missing: downTruth.missing }));
+	check("down: no saved chip is accused of being gone", downTruth.chips?.length === 3 && downTruth.chips.every((m) => m === false), JSON.stringify(downTruth.chips));
+	check("down: the hint names the real problem instead", String(downTruth.hint).includes("HWiNFO is not running"), String(downTruth.hint));
+	// HWiNFO comes up; the live tree genuinely does not list ghost:0:0.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/tree/up`);
+	await evaluate(`document.getElementById("picker-refresh").click()`);
+	await sleep(1200);
+	const upTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("down: a live tree does name the key it cannot find", upTruth.placeholder === "⚠ Sensor not present. Pick again" && upTruth.missing === true, JSON.stringify({ placeholder: upTruth.placeholder, missing: upTruth.missing }));
+	check("down: and marks that chip alone", deepEqual(upTruth.chips, [false, false, true]), JSON.stringify(upTruth.chips));
+	check("down: neither state wrote anything", writes.length === 0, `${writes.length} writes`);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

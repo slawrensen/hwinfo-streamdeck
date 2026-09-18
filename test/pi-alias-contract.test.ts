@@ -46,7 +46,7 @@ const LINKS = [
 	{ sharedMemory: SM[1], gadget: G[1], unit: "°C", sensorType: SensorType.Temperature },
 	{ sharedMemory: SM[2], gadget: G[2], unit: "RPM", sensorType: SensorType.Fan }
 ];
-const NOT_PRESENT = "⚠ selected sensor not present. Pick again";
+const NOT_PRESENT = "⚠ Sensor not present. Pick again";
 const RESTING = "Search sensors…";
 
 function sample(key: string, id: number, label: string, type: SensorType, unit: string, value: number, sensorIndex = 0): Reading {

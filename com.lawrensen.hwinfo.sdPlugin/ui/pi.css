@@ -514,6 +514,13 @@ details > summary:hover {
 	line-height: 1.35;
 }
 
+/* The only links the panel carries sit in those help lines. Unstyled, the
+   webview paints them its own #0000EE, which is all but invisible on the
+   #2d2d2d page; this is the setup fold's blue. */
+.hw-help a {
+	color: #8ecbff;
+}
+
 .hw-hint {
 	margin: 6px 12px;
 	padding: 6px 8px;

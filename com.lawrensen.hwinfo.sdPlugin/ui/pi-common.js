@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-2";
+	const PI_BUILD = "1.7.0.0-3";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -106,6 +106,14 @@
 		return treeEntryOf(key)?.reading.label ?? null;
 	}
 
+	/** A saved key the live tree does not list, which is the only honest
+	 * "missing". Only a tree fetched while HWiNFO was up can say that: the
+	 * empty tree of an unavailable source would accuse every saved key of
+	 * being gone, while the panel's own hint says HWiNFO is not running. */
+	function keyIsMissing(key) {
+		return treeFetchedOk && readingLabelOf(key) === null;
+	}
+
 	// --- reading keys in the config document ---------------------------------
 	// A stored reading key is HWiNFO's stable identity ("f0000301:0:8000005"),
 	// which is exactly what the runtime needs and exactly what nobody can read.
@@ -184,6 +192,7 @@
 	let rotationGroups = null; // null = flat set; else [{ name, keys }]
 	let rotationNames = {}; // per-reading display names, keyed by reading key
 	let collectorIndex = 0; // which group new ticks land in (PI-local, not persisted)
+	let presetCanSwitchGroups = true; // set by the Controls preset block; see syncGroupsHelp
 
 	function adoptRotationKeys(value) {
 		rotationKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string") : [];
@@ -317,7 +326,7 @@
 		const chip = document.createElement("span");
 		// "current" paints the chip of the reading on the dial right now, so
 		// the open panel shows where rotation (and a group jump) landed.
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "") + (sameReading(key, primaryPicker.selectedKey()) ? " current" : "");
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "") + (sameReading(key, primaryPicker.selectedKey()) ? " current" : "");
 		chip.dataset.key = key;
 		const name = document.createElement("span");
 		name.className = "hw-set-name";
@@ -396,8 +405,15 @@
 				: "Ticks land in the group marked by the radio. “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name and keeps plain rotate inside one; any control map without that gesture (Legacy always, Custom until you map it) rotates through all groups as one flat list.";
 	}
 
+	// The note is about groups: a dial with one flat set has nothing to hint at.
+	function syncGroupsHelp() {
+		const el = document.getElementById("groups-preset-help");
+		if (el !== null) el.hidden = presetCanSwitchGroups || rotationGroups === null;
+	}
+
 	function renderRotationSet() {
 		if (rotationSetEl === null) return;
+		syncGroupsHelp();
 		renderReadingColors();
 		// Never rebuild under a focused name field: a settings echo (rotation
 		// moved, autocycle stepped) would clobber the typing mid-word.
@@ -1237,7 +1253,7 @@
 	function detailChip(key, index, tile, tileIdx, cellIdx, fullQuad) {
 		const label = readingLabelOf(key);
 		const chip = document.createElement("span");
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "");
 		chip.dataset.key = key;
 		// Real-mouse drag between tiles (the arrows stay for keyboards and
 		// synthetic input, which native drag never registers for). Dropping
@@ -1279,7 +1295,7 @@
 		const name = document.createElement("span");
 		name.className = "hw-set-name";
 		name.textContent = label ?? key;
-		if (tree !== null && label === null) {
+		if (keyIsMissing(key)) {
 			name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
 		}
 		// The cell's label override lives ON the name (click to rename, the
@@ -1363,7 +1379,7 @@
 		const label = readingLabelOf(key);
 		const holder = document.createElement("span");
 		const chip = document.createElement("span");
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "");
 		chip.dataset.key = key;
 		const name = document.createElement("span");
 		// `parked` opts out of the rename affordance: this chip holds no cell,
@@ -1743,14 +1759,22 @@
 			if (found !== null) {
 				searchEl.value = `${found.reading.label}  ·  ${found.group.name}`;
 				searchEl.placeholder = "Search sensors…";
+				searchEl.title = "";
 				searchEl.classList.remove("missing");
-			} else if (selectedKey !== "") {
+			} else if (selectedKey !== "" && treeFetchedOk) {
 				// Never put the warning into .value; it would act as a search filter.
+				// The box is 198 px wide at the shipped panel width, so the cue is
+				// short enough to read whole and the title carries the rest.
 				searchEl.value = "";
-				searchEl.placeholder = "⚠ selected sensor not present. Pick again";
+				searchEl.placeholder = "⚠ Sensor not present. Pick again";
+				searchEl.title = "The sensor saved here is not in HWiNFO's current output. Pick one again.";
 				searchEl.classList.add("missing");
 			} else {
+				// Nothing picked, or a tree fetched while the source was down: an
+				// unavailable source lists no readings, which says nothing about
+				// the saved key. Stay neutral until a live tree can answer.
 				searchEl.value = "";
+				searchEl.title = "";
 				// The collector never holds a selection (no bound setting), and
 				// its placeholder is owned by the HTML resting text and
 				// armDetailAdd's aim line: the generic reset here would wipe a
@@ -1961,6 +1985,8 @@
 		if (config.refresh) {
 			config.refresh.addEventListener("click", () => {
 				setTree(null);
+				// No tree in hand is not an answer to "is this key missing".
+				treeFetchedOk = false;
 				renderList();
 				requestTree();
 			});
@@ -1990,6 +2016,18 @@
 					config.onSelectionEcho?.(); // the set may render before the key arrives
 				})
 		};
+		// The keyboard's way out, on the same rule the outside mousedown uses:
+		// Tab moves focus on and the overlay list would stay open over the
+		// fields that now hold it. Read the focus that is ARRIVING, and only
+		// when it is a node: a focusout to nothing (the window lost focus)
+		// must not close the list out from under the user.
+		picker.root?.addEventListener("focusout", (ev) => {
+			const to = ev.relatedTarget;
+			if (!(to instanceof Node)) return;
+			if (picker.root.contains(to)) return;
+			if (picker.alsoWithin !== null && picker.alsoWithin.contains(to)) return;
+			closeList();
+		});
 		pickers.push(picker);
 		return picker;
 	}
@@ -2086,6 +2124,17 @@
 		}
 	});
 
+	// A help link opens in the user's own browser through the app. Followed
+	// in place it would replace this 400 px panel with the docs page, and the
+	// inspector has no way back; target="_blank" on the markup is the fallback
+	// for a host that never sees this click.
+	document.addEventListener("click", (ev) => {
+		const link = ev.target instanceof Element ? ev.target.closest("a[href^='http']") : null;
+		if (link === null) return;
+		ev.preventDefault();
+		streamDeckClient.send("openUrl", { url: link.href });
+	});
+
 	function setHint(text) {
 		hintEl.hidden = !text;
 		hintEl.textContent = text || "";
@@ -2178,6 +2227,15 @@
 				});
 			});
 		};
+		// Rotation groups only steer the dial while some gesture can cross a
+		// group boundary (schemeCanSwitchGroups, src/controls.ts): Elite maps
+		// one to press+rotate, Legacy maps none, and a Custom map has one only
+		// where the user picked it. The note by the groups editor says so, and
+		// hides itself the moment the map can switch.
+		const showGroupsHelp = async (preset) => {
+			presetCanSwitchGroups = preset === "custom" ? (await Promise.all(gestureBindings.map(([getGesture]) => getGesture()))).includes("stepGroup") : preset === "elite";
+			syncGroupsHelp();
+		};
 		let lastPreset = null;
 		const applyPreset = (value) => {
 			const preset = value === "elite" || value === "custom" ? value : "legacy";
@@ -2185,6 +2243,7 @@
 			lastPreset = preset;
 			controlsCustomEl.hidden = preset !== "custom";
 			if (controlsZonesEl !== null) controlsZonesEl.hidden = preset === "legacy";
+			showGroupsHelp(preset);
 		};
 		followSetting("controlPreset", applyPreset);
 	}
@@ -3098,9 +3157,12 @@
 			}
 			dirty.delete(el);
 		};
+		// A well the user has typed into keeps its draft: reopening the fold is
+		// not a reason to throw hand-typed JSON away, and the draft is the one
+		// place a reading link is authored. The two wells fill independently,
+		// so a key read that never resolves cannot leave the deck well empty.
 		const fill = async () => {
-			await fillWell(configKeyEl);
-			await fillWell(configDeckEl);
+			await Promise.all([configKeyEl, configDeckEl].filter((el) => !dirty.has(el)).map(fillWell));
 		};
 		// Filling is a read; it happens when the fold opens, never a write.
 		const fold = document.querySelector('details[data-fold="advanced"]');

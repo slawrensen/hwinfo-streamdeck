@@ -54,8 +54,18 @@ describe("state-screens: stale recovery hint follows the source", () => {
 		];
 		for (const status of statuses) {
 			assert.match(statusSentence(status), /Incomplete or ambiguous Gadget names are withheld/);
-			assert.match(statusSentence(status), /source names.*unique label.*select it again/);
+			// The journal is permanent per machine: renaming only the other
+			// duplicate frees nothing, so the remedy names both readings.
+			assert.match(statusSentence(status), /BOTH readings that shared a name new distinct labels.*select them again/);
+			assert.match(statusSentence(status), /keeps the old name stays withheld/);
 		}
+	});
+
+	it("a withheld contradictory Gadget row is named as its own condition", () => {
+		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, contradictoryReadingCount: 1 };
+		const sentence = statusSentence({ state: "ok", source: "gadget", snapshot });
+		assert.match(sentence, /formatted value contradicts its raw value is withheld; the plugin log names the slot/);
+		assert.doesNotMatch(sentence, /ambiguous Gadget names/);
 	});
 });
 

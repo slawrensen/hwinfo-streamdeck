@@ -17,8 +17,8 @@
  * reading in the same unit advance value evidence. Initial reads and topology
  * changes leave age unverified. Steady values cannot prove a producer exit.
  */
-import { GadgetIdentityGuard, gadgetReadingKey } from "./gadget-identity";
-import { gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
+import { GadgetIdentityGuard, gadgetReadingKey, legacyGadgetKey } from "./gadget-identity";
+import { gadgetDisplayIsNumeric, gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
@@ -93,6 +93,15 @@ export class GadgetRegistryProvider {
 	private lastChangeSec = 0;
 	private freshnessRevision = 0;
 	private lastValues = new Map<string, number>();
+	/** Slots whose formatted/raw disagreement was already reported once. */
+	private readonly reportedSlots = new Set<number>();
+	/** Unlogged notices by slot, so a reopen that adopts the previous
+	 * provider's report list can take back what it re-raised. */
+	private readonly pendingNotices = new Map<number, string>();
+	/** Consecutive scans each slot has contradicted itself. One sighting is
+	 * indistinguishable from reading between HWiNFO's two stores for a row,
+	 * so it skips the scan like any interleave; the second withholds the row. */
+	private contradictionStreak = new Map<number, number>();
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
 
@@ -116,7 +125,11 @@ export class GadgetRegistryProvider {
 		const provider = new GadgetRegistryProvider(key);
 		let snapshot: SensorSnapshot | null;
 		try {
-			snapshot = provider.read();
+			// One immediate retry: a scan skipped for a momentary interleave
+			// is usually whole on the next read, and a row that contradicts
+			// itself twice running is withheld on its own instead of keeping
+			// the whole source at "busy" forever.
+			snapshot = provider.read() ?? provider.read();
 		} catch (err) {
 			provider.close();
 			throw err;
@@ -125,7 +138,9 @@ export class GadgetRegistryProvider {
 			provider.close();
 			throw new HwinfoError("busy", "Gadget readings changed during the scan. Retrying automatically.");
 		}
-		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount) {
+		// Withheld rows are rows: a key whose only readings are withheld is
+		// not empty, and staying open lets the log and the panel say why.
+		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount && !snapshot.contradictoryReadingCount) {
 			provider.close();
 			// The key existing but holding no readings means HWiNFO IS (or was)
 			// running with Gadget support — "start HWiNFO" would mislead here.
@@ -142,6 +157,14 @@ export class GadgetRegistryProvider {
 		}
 	}
 
+	/** One warning per offending slot, drained by the poller's logger. The
+	 * strings are what HWiNFO's own Gadget tab shows; no other value leaks. */
+	notices(): string[] {
+		const lines = [...this.pendingNotices.values()];
+		this.pendingNotices.clear();
+		return lines;
+	}
+
 	private readEntries(): SensorSnapshot | null {
 		const sensors: SensorSource[] = [];
 		const sensorIndexByName = new Map<string, number>();
@@ -151,6 +174,12 @@ export class GadgetRegistryProvider {
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
 		const values = new Map<string, number>();
+		/** Reading key -> evidence key (name and, for numeric displays, unit). */
+		const evidenceKeys = new Map<string, string>();
+		/** Every keyed row's names, withheld ones included: a row that is
+		 * withheld this scan still owns its 1.6 spelling. */
+		const namedRows: { sensor: string; label: string }[] = [];
+		const contradictions: { slot: number; notice: string }[] = [];
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
 		// reading is ticked "Report value in Gadget" and keeps that
@@ -192,6 +221,7 @@ export class GadgetRegistryProvider {
 				// reject this same row. Keep the original bounded query order so
 				// the repeated identity check still spans the first value reads.
 				identityKeys.push(key);
+				namedRows.push({ sensor: sensorName, label });
 				const verifiedFormatted = this.key.queryString(`Value${i}`);
 				const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
 				if (formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
@@ -208,7 +238,13 @@ export class GadgetRegistryProvider {
 				const unit = gadgetUnitOf(formatted);
 				// HWiNFO writes ValueRaw with the system locale's decimal separator.
 				const value = Number.parseFloat(raw.replace(",", "."));
-				if (!gadgetValueAgrees(formatted, value)) return null;
+				// A formatted number that cannot describe the raw one is a
+				// contradiction in THIS row. What happens to it is decided
+				// after the scan (see below): never publish the row.
+				if (!gadgetValueAgrees(formatted, value)) {
+					contradictions.push({ slot: i, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
+					continue;
+				}
 
 				const reading: Reading = {
 					key,
@@ -229,7 +265,10 @@ export class GadgetRegistryProvider {
 				digestParts.push(JSON.stringify([i, key, unit, raw]));
 				// Compare only the same named reading in the same unit. A new
 				// slot or rename is topology, not evidence of a new measurement.
-				const evidenceKey = JSON.stringify([key, unit]);
+				// A word display (Yes/No) has no unit: its raw flip is the
+				// evidence, so the word must not partition it.
+				const evidenceKey = JSON.stringify([key, gadgetDisplayIsNumeric(formatted) ? unit : ""]);
+				evidenceKeys.set(key, evidenceKey);
 				values.set(evidenceKey, value);
 			}
 		} finally {
@@ -238,6 +277,26 @@ export class GadgetRegistryProvider {
 			// a partial scan still commits no values, digest or freshness.
 			blocked = this.identity.blocked(identityKeys);
 		}
+
+		// A first contradictory sighting cannot be told from a read that
+		// landed between HWiNFO's two stores for that row, so it skips the
+		// whole scan exactly like a detected interleave: the keys hold their
+		// values for a tick instead of flashing "Sensor missing". A slot that
+		// contradicts itself on consecutive scans is a persistent condition:
+		// it is withheld on its own, counted and logged once, and every
+		// healthy row keeps serving. A whole-scan refusal there would take
+		// the source down forever under a "retrying" screen.
+		const streak = new Map<number, number>();
+		for (const { slot } of contradictions) streak.set(slot, (this.contradictionStreak.get(slot) ?? 0) + 1);
+		this.contradictionStreak = streak;
+		if ([...streak.values()].some((count) => count < 2)) return null;
+		for (const { slot, notice } of contradictions) {
+			if (!this.reportedSlots.has(slot)) {
+				this.reportedSlots.add(slot);
+				this.pendingNotices.set(slot, notice);
+			}
+		}
+		const contradictoryCount = contradictions.length;
 
 		const digest = digestParts.join("|");
 		if (digest !== this.lastDigest) {
@@ -248,7 +307,7 @@ export class GadgetRegistryProvider {
 		let valueChanged = false;
 		const safeValues = new Map<string, number>();
 		for (const reading of safeReadings) {
-			const evidenceKey = JSON.stringify([reading.key, reading.unit]);
+			const evidenceKey = evidenceKeys.get(reading.key) as string;
 			const value = values.get(evidenceKey) as number;
 			const previous = this.lastValues.get(evidenceKey);
 			if (previous !== undefined && Number.isFinite(previous) && Number.isFinite(value) && previous !== value) valueChanged = true;
@@ -261,7 +320,30 @@ export class GadgetRegistryProvider {
 		}
 
 		for (const key of blocked) byKey.delete(key);
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: safeReadings, byKey, blockedReadingCount: incompleteIdentityCount + readings.length - safeReadings.length };
+		// Selections saved by 1.6 and earlier used "g:<source>:<label>" for
+		// every row, and HWiNFO's standard source names carry a colon, so
+		// nearly every old Gadget selection spells a key this build no
+		// longer mints. Republish that spelling as a checked alias of the
+		// row it names, but only when exactly one current row (withheld ones
+		// included) renders to it and no live row owns it outright: an
+		// ambiguous spelling resolves to nothing, never to a guess. The
+		// ambiguity is judged per scan and not journaled: once a colliding
+		// row is unticked, the remaining row answers to the shared spelling.
+		const legacyOwners = new Map<string, number>();
+		for (const row of namedRows) {
+			const legacy = legacyGadgetKey(row.sensor, row.label);
+			if (legacy !== null) legacyOwners.set(legacy, (legacyOwners.get(legacy) ?? 0) + 1);
+		}
+		const published = safeReadings.map((reading) => {
+			const legacy = legacyGadgetKey(sensors[reading.sensorIndex]?.name ?? "", reading.label);
+			if (legacy === null || legacyOwners.get(legacy) !== 1 || byKey.has(legacy)) return reading;
+			const linkedKeys = [reading.key, legacy];
+			const live: Reading = { ...reading, linkedKeys };
+			byKey.set(reading.key, live);
+			byKey.set(legacy, { ...reading, key: legacy, linkedKeys, aliasOf: reading.key });
+			return live;
+		});
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: published, byKey, blockedReadingCount: incompleteIdentityCount + readings.length - safeReadings.length, ...(contradictoryCount > 0 ? { contradictoryReadingCount: contradictoryCount } : {}) };
 	}
 
 	close(): void {
@@ -279,5 +361,14 @@ export class GadgetRegistryProvider {
 		this.valueRevision = from.valueRevision;
 		this.freshnessRevision = from.freshnessRevision;
 		this.lastValues = from.lastValues;
+		// The verification read inside open() ran before this adoption; a
+		// slot the previous provider already reported is not news.
+		for (const slot of from.reportedSlots) {
+			this.reportedSlots.add(slot);
+			this.pendingNotices.delete(slot);
+		}
+		for (const [slot, count] of from.contradictionStreak) {
+			this.contradictionStreak.set(slot, Math.max(count, this.contradictionStreak.get(slot) ?? 0));
+		}
 	}
 }

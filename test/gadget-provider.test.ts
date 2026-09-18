@@ -517,10 +517,10 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		assert.equal(readShape().readings.length, 0);
 	});
 
-	test("colon partitions and literal tildes never alias legacy keys", () => {
+	test("ambiguous colon partitions and literal tildes never alias legacy keys", () => {
 		shape([0, 1, 2], (i) => ({ sensor: ["GPU:0", "GPU", "GPU"][i], label: ["Temp", "0:Temp", "Temperature~1"][i], value: `${40 + i} °C`, raw: String(40 + i) }));
 		const snapshot = readShape();
-		assert.equal(snapshot.byKey.size, 3);
+		assert.equal(snapshot.byKey.size, 3, "two rows spell the same 1.6 key, so neither gets it back");
 		assert.equal(snapshot.byKey.get("g:GPU:0:Temp"), undefined, "legacy colon keys do not identify their partition");
 		assert.equal(snapshot.byKey.get("g:GPU:Temperature~1"), undefined, "literal suffix must not adopt an old duplicate selection");
 		assert.deepEqual(snapshot.readings.map((r) => r.value), [40, 41, 42]);
@@ -553,7 +553,7 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 		const provider = GadgetRegistryProvider.open();
 		try {
 			putValue("Value0", "176 °F");
-			assert.equal(provider.read(), null, "stable repeated fields still contradict each other");
+			assert.equal(provider.read(), null, "a first contradictory sighting skips the scan like any interleave");
 			putValue("ValueRaw0", "176");
 			assert.equal(readVerified(provider).readings[0]?.value, 176);
 			assert.equal(readVerified(provider).readings[0]?.unit, "°F");
@@ -777,6 +777,30 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 		} finally { provider.close(); }
 	});
 
+	test("a row that contradicts itself twice running withholds only itself while the rest of the scan keeps its evidence", () => {
+		shape([0, 8], (i) => ({ sensor: "Unique rejected prefix", label: `Measurement ${i}`, raw: "40", value: "40 °C" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const before = readVerified(provider);
+			putValue("Value0", "45 °C");
+			putValue("ValueRaw0", "45");
+			putValue("Value8", "99 °C");
+			assert.equal(provider.read(), null, "the first sighting skips the scan; nothing commits");
+			assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision);
+			const partial = readVerified(provider);
+			assert.deepEqual(labels(partial), ["Measurement 0"], "the healthy row serves");
+			assert.equal(partial.byKey.get("g:Unique rejected prefix:Measurement 0")?.value, 45);
+			assert.equal(partial.contradictoryReadingCount, 1);
+			assert.equal(partial.freshnessRevision, (before.freshnessRevision ?? 0) + 1, "the healthy row's change is evidence");
+			putValue("Value8", "40 °C");
+			const recovered = readVerified(provider);
+			assert.deepEqual(labels(recovered), ["Measurement 0", "Measurement 8"]);
+			assert.equal(recovered.blockedReadingCount, 0);
+			assert.equal(recovered.contradictoryReadingCount, undefined);
+			assert.equal(recovered.freshnessRevision, partial.freshnessRevision, "the recovered row's unchanged raw number is not new evidence");
+		} finally { provider.close(); }
+	});
+
 	test("a rejected scan fails closed if verified ambiguity cannot be journaled", () => {
 		shape([0, 8], (i) => ({ sensor: "Unwritable partial journal", label: i === 0 ? "Temperature" : "Other", raw: "40", value: "40 °C" }));
 		const provider = GadgetRegistryProvider.open();
@@ -829,5 +853,127 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 			shape([0, 1], () => ({ sensor: "Denied duplicate", label: "Temp", raw: "40", value: "40 °C" }));
 			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "invalid");
 		} finally { process.env.HWINFO_GADGET_IDENTITY_FILE = savedPath; }
+	});
+});
+
+describe("upgrade: legacy Gadget spellings resolve as checked aliases", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	// 1.6 saved "g:<source>:<label>" for every row, and HWiNFO's standard
+	// source names carry a colon, so nearly every old Gadget selection spells
+	// a key this build no longer mints. The provider republishes that
+	// spelling as an alias of the row it names, when it is unambiguous.
+	const source = "CPU [#0]: AMD Ryzen 9 9950X3D";
+	const legacy = `g:${source}:CPU (Tctl/Tdie)`;
+
+	test("an unambiguous 1.6 key resolves to its reading with the same value", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: source, label: "CPU (Tctl/Tdie)", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Plain", value: "1.5 V", raw: "1.5" }));
+		const snap = readShape();
+		const live = snap.readings.find((r) => r.label === "CPU (Tctl/Tdie)");
+		assert.ok(live);
+		assert.match(live.key, /^g2:/, "the current key stays unambiguous");
+		const alias = snap.byKey.get(legacy);
+		assert.ok(alias, "the 1.6 spelling is published");
+		assert.equal(alias.value, 55);
+		assert.equal(alias.aliasOf, live.key);
+		assert.deepEqual(alias.linkedKeys, [live.key, legacy]);
+		assert.deepEqual(live.linkedKeys, [live.key, legacy]);
+		assert.equal(snap.byKey.get("g:Alpha Source:Plain")?.linkedKeys, undefined, "a plain key needs no alias");
+	});
+
+	test("two rows rendering the same 1.6 spelling alias neither", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "A:B", label: "C", value: "1.0 V", raw: "1" } : { sensor: "A", label: "B:C", value: "2.0 V", raw: "2" }));
+		const snap = readShape();
+		assert.equal(snap.readings.length, 2);
+		assert.equal(snap.byKey.get("g:A:B:C"), undefined, "an ambiguous spelling resolves to nothing");
+		assert.ok(snap.readings.every((r) => r.linkedKeys === undefined));
+	});
+
+	test("a literal fallback label gets no legacy alias", () => {
+		shape([0], () => ({ sensor: source, label: "Reading 3", value: "3.0 V", raw: "3" }));
+		const snap = readShape();
+		assert.equal(snap.readings.length, 1);
+		assert.equal(snap.byKey.get(`g:${source}:Reading 3`), undefined);
+	});
+});
+
+describe("integrity: one contradictory row does not take the source down", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("a key whose only row is contradictory opens as withheld, not as empty", () => {
+		shape([0], () => ({ sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const snap = readVerified(provider);
+			assert.equal(snap.readings.length, 0);
+			assert.equal(snap.contradictoryReadingCount, 1);
+			assert.match(provider.notices()[0] ?? "", /slot 0/, "the notice survives the open so the poller can log it");
+		} finally {
+			provider.close();
+		}
+	});
+
+	test("a reopen that adopts the previous provider does not report the same slot again", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
+		const first = GadgetRegistryProvider.open();
+		let second: ReturnType<typeof GadgetRegistryProvider.open> | undefined;
+		try {
+			assert.equal(first.notices().length, 1);
+			second = GadgetRegistryProvider.open();
+			second.adoptFreshness(first);
+			assert.deepEqual(second.notices(), [], "the verification read's notice is taken back on adoption");
+			assert.equal(readVerified(second).contradictoryReadingCount, 1);
+			assert.deepEqual(second.notices(), []);
+		} finally {
+			first.close();
+			second?.close();
+		}
+	});
+
+	test("a withheld row still owns its 1.6 spelling, so a colliding sibling never adopts it", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "A:B", label: "C", value: "1.0 V", raw: "1" } : { sensor: "A", label: "B:C", value: "9.0 V", raw: "2" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const snap = readVerified(provider);
+			assert.equal(snap.readings.length, 1);
+			assert.equal(snap.contradictoryReadingCount, 1);
+			assert.equal(snap.byKey.get("g:A:B:C"), undefined, "the spelling stays ambiguous while its other owner is only withheld");
+		} finally {
+			provider.close();
+		}
+	});
+
+	test("the healthy rows serve, the odd row is withheld, counted and logged once", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const snap = readVerified(provider);
+			assert.deepEqual(labels(snap), ["Package"]);
+			assert.equal(snap.contradictoryReadingCount, 1);
+			const notices = provider.notices();
+			assert.equal(notices.length, 1);
+			assert.match(notices[0] ?? "", /slot 1/);
+			assert.match(notices[0] ?? "", /104\.0 °F/);
+			readVerified(provider);
+			assert.deepEqual(provider.notices(), [], "said once per slot");
+		} finally {
+			provider.close();
+		}
+	});
+});
+
+describe("integrity: a Yes/No reading's flip is value evidence", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("the raw 1 to 0 change advances freshness although the display word changed with it", () => {
+		shape([0], () => ({ sensor: "Drive", label: "Trim", value: "Yes", raw: "1" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const first = readVerified(provider);
+			assert.equal(first.freshnessRevision, 0);
+			assert.equal(first.pollTime, 0);
+			putValue("Value0", "No");
+			putValue("ValueRaw0", "0");
+			const second = readVerified(provider);
+			assert.equal(second.readings[0]?.value, 0);
+			assert.equal(second.freshnessRevision, 1);
+			assert.ok(second.pollTime > 0, "an observed change is the Gadget freshness evidence");
+		} finally {
+			provider.close();
+		}
 	});
 });

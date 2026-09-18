@@ -1,5 +1,11 @@
 const NUMERIC_PREFIX = /^\s*([-+−]?(?:\d[\d., \u00a0\u202f'’]*|[.,]\d+)(?:[eE][+-]?\d+)?)/u;
 
+/** Whether the formatted display starts with a number the raw value can be
+ * checked against. A Yes/No or other word display has no unit of its own. */
+export function gadgetDisplayIsNumeric(formatted: string): boolean {
+	return NUMERIC_PREFIX.test(formatted);
+}
+
 /** Extract units with the same number grammar used for contradiction
  * checks. Retain existing nonnumeric text rather than guessing a boolean. */
 export function gadgetUnitOf(formatted: string): string {

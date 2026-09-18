@@ -81,14 +81,22 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 	}
 }
 
+/** The Gadget-specific withholding notes appended to a hint sentence. A name
+ * that was ever seen twice on this machine stays withheld until BOTH readings
+ * carry names this machine has not seen shared, so the remedy names both. */
+function gadgetWithheldNotes(snapshot: { blockedReadingCount?: number; contradictoryReadingCount?: number }): string {
+	return (snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names in HWiNFO, and give BOTH readings that shared a name new distinct labels, then select them again; the reading that keeps the old name stays withheld." : "")
+		+ (snapshot.contradictoryReadingCount ? " A Gadget row whose formatted value contradicts its raw value is withheld; the plugin log names the slot." : "");
+}
+
 /** Human sentence for PI hints. */
 export function statusSentence(status: PollerStatus): string {
 	if (status.state === "ok") {
-		return status.source === "gadget" ? "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs." + (status.snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names and give each reading a unique label in HWiNFO, then select it again." : "") : "";
+		return status.source === "gadget" ? "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs." + gadgetWithheldNotes(status.snapshot) : "";
 	}
 	if (status.state === "stale") {
 		return status.source === "gadget"
-			? "Gadget freshness is unknown. Unchanged values may be steady readings or an old registry left after HWiNFO exits. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + (status.snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names and give each reading a unique label in HWiNFO, then select it again." : "")
+			? "Gadget freshness is unknown. Unchanged values may be steady readings or an old registry left after HWiNFO exits. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + gadgetWithheldNotes(status.snapshot)
 			: `No new Shared Memory measurement evidence for ${Math.round(status.staleForMs / 1000)}s. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads.`;
 	}
 	switch (status.reason) {

@@ -9,7 +9,9 @@ import { describe, it } from "node:test";
 
 import { renderDial, renderDialOverview, renderDialTwoRow, twoRowValueFontSize, wideValueFit, type DialOverviewOptions, type DialRenderOptions, type DialTwoRowOptions, type OverviewRow, type TwoRowRow } from "../src/ui/dial-renderer";
 import { dedupeSharedLabelPrefix, wrapLabelTwoLines } from "../src/ui/format";
+import { resolveTextColors, type TextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
+import { contrast } from "./wcag";
 
 const config = loadThemes();
 const MIDNIGHT = resolvePalette(config, "midnight", null, "normal");
@@ -559,5 +561,74 @@ describe("dial text colors", () => {
 	it("caller-fixed row value colors (alert indicators) pass through untouched", () => {
 		const svg = renderOverview({ rows: [overviewRow({ valueColor: "#CB2114" }), overviewRow({ label: "GPU Hot Spot", selected: false })], text: custom });
 		assert.match(svg, /fill="#CB2114">56\.3</);
+	});
+});
+
+describe("Dim keeps the selection cue on the multi-row views", () => {
+	// The label token marks the selected row, the unit token paints the
+	// others. Dim lifts the unit to the numeric floor, so the label must not
+	// end up under it: on the face (overview, resolved by the text module)
+	// and on the two-row selected band, where the caller resolves the label
+	// on the track exactly as it resolves the unit there.
+	const dim: TextSettings = { mode: "dim", color: undefined, dimSecondary: false };
+	const labelFill = (svg: string, label: string): string => (svg.match(new RegExp(`letter-spacing="0.4" fill="(#[0-9A-F]{6})">${label}<`)) as RegExpMatchArray)[1] as string;
+	const twoRowLabelFill = (svg: string, y: number): string => (svg.match(new RegExp(`<text x="12" y="${y}" [^>]*fill="(#[0-9A-Fa-f]{6})"`)) as RegExpMatchArray)[1] as string;
+
+	for (const name of Object.keys(config.themes)) {
+		const palette = resolvePalette(config, name, null, "normal");
+		const text = resolveTextColors(palette, dim, "normal");
+		const band = resolveTextColors({ ...palette, bg: palette.track }, dim, "normal");
+
+		it(`${name} overview: the selected row label reads no dimmer than an unselected one`, () => {
+			const svg = renderDialOverview({ rows: [overviewRow({ selected: true }), overviewRow({ label: "GPU Temp" })], contextText: "session", statsText: "▼42.0 ▲78.5", palette, text });
+			const selected = labelFill(svg, "CPU PACKAGE");
+			const unselected = labelFill(svg, "GPU TEMP");
+			assert.equal(selected, text.label);
+			assert.equal(unselected, text.unit);
+			assert.ok(contrast(selected, palette.bg) >= contrast(unselected, palette.bg), `selected ${selected} ${contrast(selected, palette.bg).toFixed(2)} dimmer than unselected ${unselected} ${contrast(unselected, palette.bg).toFixed(2)}`);
+			assert.ok(contrast(unselected, palette.bg) >= 4.5);
+		});
+
+		it(`${name} two-row: the caller's track-resolved label is drawn on the selected band and ignored on the other row`, () => {
+			const rows = [
+				twoRowRow({ selected: true, unitColor: band.unit, selectedLabelColor: band.label }),
+				twoRowRow({ label: "GPU Temp", selected: false, unitColor: text.unit, selectedLabelColor: band.label })
+			];
+			const svg = renderTwoRow({ rows, palette, text });
+			assert.equal(twoRowLabelFill(svg, 17), band.label);
+			assert.equal(twoRowLabelFill(svg, 59), text.unit, "an unselected row keeps the unit token as the selection cue");
+			assert.ok(contrast(band.label, palette.track) >= contrast(band.unit, palette.track), "label >= unit on the band");
+			assert.ok(contrast(band.label, palette.track) >= 4.5 && contrast(text.unit, palette.bg) >= 4.5, "both rows' labels meet the numeric floor on their own surface");
+		});
+
+		it(`${name} two-row without a caller label: the face label lifts to its unit's ratio on the band`, () => {
+			const svg = renderTwoRow({ rows: [twoRowRow({ selected: true, unitColor: band.unit }), twoRowRow({ label: "GPU Temp", selected: false })], palette, text });
+			const selected = twoRowLabelFill(svg, 17);
+			assert.ok(contrast(selected, palette.track) >= contrast(band.unit, palette.track), `${selected} reads under its unit ${band.unit} on the track`);
+			assert.ok(contrast(selected, palette.track) >= 4.5);
+		});
+	}
+
+	it("Theme mode keeps the selected two-row label's bytes (it already outreads its unit on the band)", () => {
+		const theme = resolveTextColors(MIDNIGHT, { mode: "theme", color: undefined, dimSecondary: false }, "normal");
+		const band = resolveTextColors({ ...MIDNIGHT, bg: MIDNIGHT.track }, { mode: "theme", color: undefined, dimSecondary: false }, "normal");
+		assert.equal(band.label, MIDNIGHT.label);
+		const svg = renderTwoRow({ rows: [twoRowRow({ selected: true, unitColor: band.unit }), twoRowRow({ label: "GPU", selected: false })], text: theme });
+		assert.equal(twoRowLabelFill(svg, 17), MIDNIGHT.label);
+		assert.equal(renderTwoRow({ rows: [twoRowRow({ selected: true }), twoRowRow({ label: "GPU", selected: false })] }), renderTwoRow({ rows: [twoRowRow({ selected: true }), twoRowRow({ label: "GPU", selected: false })], text: theme }));
+	});
+
+	it("Custom text stays exact on the selected band", () => {
+		const custom = { value: "#660000", label: "#550505", unit: "#440A0A", badge: "#440A0A" };
+		const svg = renderTwoRow({ rows: [twoRowRow({ selected: true, unitColor: "#440A0A", selectedLabelColor: "#550505" }), twoRowRow({ label: "GPU", selected: false })], text: custom });
+		assert.equal(twoRowLabelFill(svg, 17), "#550505");
+		const fallback = renderTwoRow({ rows: [twoRowRow({ selected: true, unitColor: "#440A0A" }), twoRowRow({ label: "GPU", selected: false })], text: custom });
+		assert.equal(twoRowLabelFill(fallback, 17), "#550505", "a label that outreads its unit is never touched");
+	});
+
+	it("the dial marks keep the mark's own backing (no rule runs under them)", () => {
+		assert.match(render({ severity: "warn" }), /translate\(174 10\)"><rect x="-1" y="-1" width="16" height="16"/);
+		assert.match(renderOverview({ rows: [overviewRow({ severity: "crit" })] }), /translate\(12 [0-9.]+\)"><rect x="-1" y="-1" width="14" height="14"/);
+		assert.match(renderTwoRow({ rows: [twoRowRow({ severity: "warn", selected: true })] }), /translate\(12 5\)"><rect x="-1" y="-1" width="15" height="15"/);
 	});
 });

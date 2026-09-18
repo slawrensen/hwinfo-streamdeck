@@ -15,7 +15,7 @@ import type { PollerStatus } from "../poller";
 import type { Reading } from "../hwinfo/types";
 import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
 import { alertLevel, convertUnit, parseThreshold, readingStatBadge, statValue } from "../ui/format";
-import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
+import { quadIdentityOf, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { keyLabel, missingReadingScreen, statusScreen } from "../ui/state-screens";
 import { quadIdentityColor, resolveTextColors, type TextSettings } from "../ui/text-colors";
@@ -227,7 +227,8 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 	const micros = chunkMicroLabels(readings.map((reading) => reading?.label));
 	return renderQuadKey({
 		cells: readings.slice(0, 4).map((reading, i): QuadKeyCell => {
-			const color = quadIdentityColor(spec?.colors[i] ?? (QUAD_DEFAULT_COLORS[i] as string), labeled, ctx.text, text, palette);
+			// A hand-grouped tile color is a chosen hue and renders exact.
+			const color = quadIdentityColor(quadIdentityOf(spec?.colors[i], i), labeled, ctx.text, text, palette);
 			const label = specLabel(spec, i) ?? micros[i] ?? "";
 			if (reading === undefined) {
 				// The same positional placeholder as the rows above.

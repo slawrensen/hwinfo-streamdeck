@@ -72,27 +72,29 @@ function luminance(color: string): number {
 	return 0.2126 * linear(1) + 0.7152 * linear(3) + 0.0722 * linear(5);
 }
 
-/** Built-in numeric foregrounds use a 4.5:1 floor on their actual surface.
- * Already-readable colors remain byte-identical. Otherwise retain the hue
- * while moving toward the higher-contrast endpoint. Custom Text deliberately
- * bypasses this function: its contract is the exact user-selected color. */
-export function readableValueColor(color: string, background: string): string {
+/** WCAG contrast ratio between two validated #RRGGBB colors. */
+export function contrastRatio(a: string, b: string): number {
+	const x = luminance(a);
+	const y = luminance(b);
+	return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** The one lifting primitive. A color that already reads at `floor`:1 or
+ * better on `background` remains byte-identical. Otherwise retain the hue
+ * while moving toward the higher-contrast endpoint until it passes. */
+export function readableColor(color: string, background: string, floor: number): string {
+	if (contrastRatio(color, background) >= floor) return color;
 	const bg = luminance(background);
-	const ratio = (candidate: string): number => {
-		const value = luminance(candidate);
-		return (Math.max(value, bg) + 0.05) / (Math.min(value, bg) + 0.05);
-	};
-	if (ratio(color) >= 4.5) return color;
 	const target = (bg + 0.05) / 0.05 >= 1.05 / (bg + 0.05) ? "#000000" : "#FFFFFF";
 	let low = 0;
 	let high = 1;
 	let result = target;
 	// Keep the passing, quantized candidate, not a rounded estimate of the
-	// threshold. A value just below 4.5 must never be rounded into a pass.
+	// threshold. A value just below the floor must never round into a pass.
 	for (let i = 0; i < 12; i++) {
 		const middle = (low + high) / 2;
 		const candidate = mixToward(color, target, middle);
-		if (ratio(candidate) >= 4.5) {
+		if (contrastRatio(candidate, background) >= floor) {
 			high = middle;
 			result = candidate;
 		} else {
@@ -100,6 +102,23 @@ export function readableValueColor(color: string, background: string): string {
 		}
 	}
 	return result;
+}
+
+/** Built-in numeric foregrounds use a 4.5:1 floor on their actual surface.
+ * Custom Text and chosen per-reading or quad cell colors deliberately
+ * bypass this function: their contract is the exact user-selected color. */
+export function readableValueColor(color: string, background: string): string {
+	return readableColor(color, background, 4.5);
+}
+
+/** Keeps a secondary token from reading dimmer than its reference on the
+ * same surface. The unit token lifts to the numeric floor; the label token
+ * then lifts at least to the unit's ratio, so the theme's label over unit
+ * hierarchy survives every mode (dials mark the selected row with the label
+ * token and paint the other rows in the unit token). A label that already
+ * reads better than its reference remains byte-identical. */
+export function noDimmerThan(color: string, reference: string, background: string): string {
+	return readableColor(color, background, contrastRatio(reference, background));
 }
 
 /**
@@ -130,28 +149,36 @@ export function appliedTextMode(settings: TextSettings): TextMode {
 	return settings.mode === "custom" && settings.color === undefined ? "theme" : settings.mode;
 }
 
-/** The theme's own text tokens, as a TextColors (the identity resolution). */
+/** The theme's own text tokens, as a TextColors (the identity resolution).
+ * The unit meets the numeric floor and the label reads no dimmer than it;
+ * every shipped theme already orders its tokens that way, so this returns
+ * the palette tokens byte-identical. */
 export function themeTextColors(palette: Palette): TextColors {
-	return { value: palette.value, label: palette.label, unit: readableValueColor(palette.unit, palette.bg), badge: palette.accent };
+	const unit = readableValueColor(palette.unit, palette.bg);
+	return { value: palette.value, label: noDimmerThan(palette.label, unit, palette.bg), unit, badge: palette.accent };
 }
+
+/** One quad slot's identity as the action resolved it: the hue, and whether
+ * a person chose it (a saved quadColors entry, a hand-grouped detail tile
+ * color) or the slot fell back to its automatic default. */
+export type QuadIdentity = { readonly color: string; readonly chosen: boolean };
 
 /**
  * A quad cell's identity color under the effective Text setting. The slot
  * colors are textual (the value glyphs, or the micro-label), so Custom
  * governs them too: the exact color for values, the secondary shade for
- * micro-labels. Dim lowers identity hues; Theme retains them where they meet
- * the contrast floor. Both modes adjust unreadable hues for the surface.
+ * micro-labels. A chosen hue follows the dial per-reading color contract
+ * (sensor-value-color.ts): exact in Theme, only blended in Dim, never
+ * lifted. The automatic defaults keep the readable lift for the surface.
  * Shared by the standalone quad layout and the detail view's dense tiles.
  */
-export function quadIdentityColor(identity: string, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
+export function quadIdentityColor(identity: QuadIdentity, labeled: boolean, settings: TextSettings, text: TextColors, palette: { bg: string }): string {
 	const mode = appliedTextMode(settings);
 	if (mode === "custom") {
 		return labeled ? text.label : text.value;
 	}
-	if (mode === "dim") {
-		return readableValueColor(mixToward(identity, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND), palette.bg);
-	}
-	return readableValueColor(identity, palette.bg);
+	const color = mode === "dim" ? mixToward(identity.color, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : identity.color;
+	return identity.chosen ? color : readableValueColor(color, palette.bg);
 }
 
 /**
@@ -165,10 +192,14 @@ export function resolveTextColors(palette: Palette, settings: TextSettings, leve
 		return themeTextColors(palette);
 	}
 	if (mode === "dim") {
+		// The unit lifts to the numeric floor (statistics are numbers); the
+		// label then lifts at least to the unit's ratio, or Dim would invert
+		// the theme's label over unit hierarchy on every face.
+		const unit = readableValueColor(mixToward(palette.unit, palette.bg, DIM_SECONDARY_BLEND), palette.bg);
 		return {
 			value: readableValueColor(mixToward(palette.value, palette.bg, DIM_VALUE_BLEND), palette.bg),
-			label: mixToward(palette.label, palette.bg, DIM_SECONDARY_BLEND),
-			unit: readableValueColor(mixToward(palette.unit, palette.bg, DIM_SECONDARY_BLEND), palette.bg),
+			label: noDimmerThan(mixToward(palette.label, palette.bg, DIM_SECONDARY_BLEND), unit, palette.bg),
+			unit,
 			badge: mixToward(palette.accent, palette.bg, DIM_SECONDARY_BLEND)
 		};
 	}

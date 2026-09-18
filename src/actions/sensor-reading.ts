@@ -18,10 +18,10 @@ import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, readingStatBadge, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
-import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
+import { QUAD_DEFAULT_COLORS, quadIdentityOf, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
-import { HEX6, quadIdentityColor, resolveTextColors } from "../ui/text-colors";
+import { HEX6, quadIdentityColor, resolveTextColors, type QuadIdentity } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
@@ -140,14 +140,16 @@ function nonEmptyStringOf(value: unknown): string | undefined {
 
 /** Per-entry salvage of the quad identity colors: each slot independently
  *  keeps a valid #RRGGBB override or falls back to that slot's default, so
- *  one hand-edited bad hex costs exactly one cell. */
-function quadColorsOf(settings: ReadingSettings): readonly [string, string, string, string] {
+ *  one hand-edited bad hex costs exactly one cell. Each entry says which it
+ *  was, because a chosen color renders exact and a default keeps its
+ *  readable lift; the settings are never rewritten either way. */
+function quadColorsOf(settings: ReadingSettings): readonly QuadIdentity[] {
 	const raw: unknown = settings.quadColors;
 	const entries: readonly unknown[] = Array.isArray(raw) ? raw : [];
-	return QUAD_DEFAULT_COLORS.map((fallback, i) => {
+	return QUAD_DEFAULT_COLORS.map((_, i) => {
 		const entry = entries[i];
-		return typeof entry === "string" && HEX6.test(entry) ? entry : fallback;
-	}) as unknown as readonly [string, string, string, string];
+		return quadIdentityOf(typeof entry === "string" && HEX6.test(entry) ? entry : null, i);
+	});
 }
 
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
@@ -700,7 +702,7 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3, settings.quadLabel4];
 	return renderQuadKey({
 		severity: level,
-		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as string, labeled, textSettings, text, palette)))),
+		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as QuadIdentity, labeled, textSettings, text, palette)))),
 		labels: labeled,
 		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
 		palette,

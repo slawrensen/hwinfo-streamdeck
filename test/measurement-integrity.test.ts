@@ -202,6 +202,118 @@ describe("dial appearance synchronizes history before its first frame", () => {
 	}
 });
 
+describe("a data gap ends dial sessions and says so once on the first live frame", () => {
+	type Tick = { instances: Map<string, InstanceState>; hidden: Map<string, { at: number; state: InstanceState }>; renderAll(): void; onPollerTick(status: PollerStatus): void };
+	function dial(): { action: Tick; state: InstanceState } {
+		const state: InstanceState = { settings: { readingKey: reading.key }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const action = Object.create(SensorDialAction.prototype) as Tick;
+		action.instances = new Map([["ctx", state]]);
+		action.hidden = new Map();
+		action.renderAll = () => {};
+		Object.defineProperty(action, "actions", { get: () => [] });
+		return { action, state };
+	}
+	const ok = (value: number, pollTime: number): PollerStatus => ({ state: "ok", source: "shared-memory", snapshot: snapshot({ ...reading, value }, pollTime) });
+	for (const gap of [
+		{ state: "stale", source: "shared-memory", snapshot: snapshot(), staleForMs: 16_000 },
+		{ state: "unavailable", reason: "not-running", message: "fixture feed absent" }
+	] satisfies PollerStatus[]) {
+		it(`${gap.state}: the collapsed min/max is explained once, then normal sampling resumes`, () => {
+			const { action, state } = dial();
+			try {
+				action.onPollerTick(ok(40, 1));
+				action.onPollerTick(ok(60, 2));
+				assert.deepEqual(state.stats.get(reading.key), { min: 40, max: 60, sum: 100, count: 2 });
+				const overlayText = (): string | undefined => (state.overlay as { text: string } | null)?.text;
+				action.onPollerTick(gap);
+				assert.equal(state.stats.get(reading.key), undefined, "a frozen or absent producer ends the session");
+				assert.equal(overlayText(), undefined, "the status face is showing; nothing to explain yet");
+				action.onPollerTick(ok(50, 3));
+				assert.equal(overlayText(), "stats reset: data gap");
+				assert.deepEqual(state.stats.get(reading.key), { min: 50, max: 50, sum: 50, count: 1 });
+				state.overlay = null;
+				action.onPollerTick(ok(51, 4));
+				assert.equal(state.overlay, null, "said once");
+				assert.equal(state.stats.get(reading.key)?.count, 2);
+			} finally {
+				if (state.overlayTimer) clearTimeout(state.overlayTimer);
+			}
+		});
+	}
+	for (const route of ["hidden", "replayed"] as const) {
+		it(`${route}: a dial that was ${route === "hidden" ? "off-screen" : "announced again"} across the gap still gets its one explanation`, () => {
+			type Lifecycle = Tick & { traceLifecycle(): void; pushTriggerDescriptions(): void; onWillAppear(event: unknown): void; onWillDisappear(event: unknown): void };
+			const { action, state } = dial();
+			const lifecycle = action as unknown as Lifecycle;
+			lifecycle.traceLifecycle = () => {};
+			lifecycle.pushTriggerDescriptions = () => {};
+			let latest: PollerStatus = ok(40, 1);
+			const retain = mock.method(poller, "retain", () => {});
+			const release = mock.method(poller, "release", () => {});
+			const getStatus = mock.method(poller, "getStatus", () => latest);
+			const event = { action: { id: "ctx", device: { id: "fixture", name: "Fixture" }, isDial: () => false, coordinates: { column: 0, row: 0 } }, payload: { settings: state.settings } };
+			try {
+				action.onPollerTick(ok(40, 1));
+				action.onPollerTick(ok(60, 2));
+				if (route === "hidden") lifecycle.onWillDisappear(event);
+				latest = { state: "unavailable", reason: "not-running", message: "fixture feed absent" };
+				action.onPollerTick(latest);
+				latest = ok(50, 3);
+				lifecycle.onWillAppear(event);
+				const returned = action.instances.get("ctx");
+				assert.ok(returned);
+				assert.equal(returned.stats.get(reading.key)?.min, 50, "the session restarted");
+				action.onPollerTick(latest);
+				assert.equal((returned.overlay as { text: string } | null)?.text, "stats reset: data gap");
+			} finally {
+				for (const entry of action.instances.values()) if (entry.overlayTimer) clearTimeout(entry.overlayTimer);
+				retain.mock.restore();
+				release.mock.restore();
+				getStatus.mock.restore();
+			}
+		});
+	}
+	it("a dial that appears while the source is still out owes the explanation too", () => {
+		type Lifecycle = Tick & { traceLifecycle(): void; pushTriggerDescriptions(): void; onWillAppear(event: unknown): void; onWillDisappear(event: unknown): void };
+		const { action, state } = dial();
+		const lifecycle = action as unknown as Lifecycle;
+		lifecycle.traceLifecycle = () => {};
+		lifecycle.pushTriggerDescriptions = () => {};
+		let latest: PollerStatus = ok(40, 1);
+		const retain = mock.method(poller, "retain", () => {});
+		const release = mock.method(poller, "release", () => {});
+		const getStatus = mock.method(poller, "getStatus", () => latest);
+		const event = { action: { id: "ctx", device: { id: "fixture", name: "Fixture" }, isDial: () => false, coordinates: { column: 0, row: 0 } }, payload: { settings: state.settings } };
+		try {
+			action.onPollerTick(ok(40, 1));
+			lifecycle.onWillDisappear(event);
+			// Nothing else keeps the poller ticking: the gap is first seen at the appear.
+			latest = { state: "stale", source: "shared-memory", snapshot: snapshot(), staleForMs: 16_000 };
+			lifecycle.onWillAppear(event);
+			const returned = action.instances.get("ctx");
+			assert.ok(returned);
+			assert.equal(returned.stats.get(reading.key), undefined);
+			action.onPollerTick(ok(50, 3));
+			assert.equal((returned.overlay as { text: string } | null)?.text, "stats reset: data gap");
+		} finally {
+			for (const entry of action.instances.values()) if (entry.overlayTimer) clearTimeout(entry.overlayTimer);
+			retain.mock.restore();
+			release.mock.restore();
+			getStatus.mock.restore();
+		}
+	});
+	it("a dial with no session yet has nothing to explain", () => {
+		const { action, state } = dial();
+		try {
+			action.onPollerTick({ state: "unavailable", reason: "not-running", message: "fixture" });
+			action.onPollerTick(ok(50, 3));
+			assert.equal(state.overlay, null);
+		} finally {
+			if (state.overlayTimer) clearTimeout(state.overlayTimer);
+		}
+	});
+});
+
 describe("dial selection validates retained history before rendering", () => {
 	type DialState = InstanceState;
 	type SettingsEvent = Parameters<SensorDialAction["onDidReceiveSettings"]>[0];
@@ -300,13 +412,18 @@ describe("dial selection validates retained history before rendering", () => {
 					const readings = intermediate.readings.filter((entry) => entry.key !== reading.key);
 					intermediate = { ...intermediate, readings, byKey: new Map(readings.map((entry) => [entry.key, entry])) };
 				}
-				if (boundary === "binding") intermediate = { ...intermediate, bindingRevision: 1 };
+				if (boundary === "binding") {
+					// The saved key now stands for a different measurement (a
+					// re-paired link): the entry is an alias of another key.
+					const repaired = { ...changed, aliasOf: "f0009999:0:1000009" };
+					intermediate = { ...intermediate, readings: [repaired, ...intermediate.readings.slice(1)], byKey: new Map([[repaired.key, repaired], ...[...intermediate.byKey].filter(([key]) => key !== repaired.key)]) };
+				}
 				f.action.sampleStats(f.state, intermediate, boundary === "source" ? "gadget" : "shared-memory");
 				assert.equal(f.state.stats.get(reading.key), undefined, "clear the retained history at the boundary, while B is selected");
 
 				// A returns to its original source/unit/type while B remains
 				// selected. Merely validating A must not start sampling it.
-				const restored = { ...f.complete({ ...reading, value: 50 }, 4), bindingRevision: boundary === "binding" ? 2 : 0 };
+				const restored = f.complete({ ...reading, value: 50 }, 4);
 				f.action.sampleStats(f.state, restored, "shared-memory");
 				assert.equal(f.state.stats.get(reading.key), undefined, "off-selection values must not seed a replacement session");
 				f.setStatus({ state: "ok", source: "shared-memory", snapshot: restored });
@@ -447,9 +564,13 @@ describe("refutation: historical and local statistics", () => {
 		store.observe({ ...reading, value: NaN }, snapshot(), "gadget");
 		assert.equal(store.get(reading.key), undefined);
 		store.observe(reading, snapshot(), "shared-memory");
-		assert.equal(store.observe({ ...reading, value: 50 }, { ...snapshot(), bindingRevision: 2 }, "shared-memory"), "binding");
-		assert.equal(store.get(reading.key)?.min, 50);
-		assert.equal(store.observe({ ...reading, value: 70, type: 5 }, { ...snapshot(), bindingRevision: 2 }, "shared-memory"), "type");
+		// Gaining an alias for the same measurement is not a pairing change.
+		assert.equal(store.observe({ ...reading, value: 50, linkedKeys: [reading.key, link.gadget] }, { ...snapshot(), bindingRevision: 2 }, "shared-memory"), undefined);
+		assert.equal(store.get(reading.key)?.min, 40);
+		// The saved key standing for another measurement is.
+		assert.equal(store.observe({ ...reading, value: 55, aliasOf: "f0009999:0:1000009" }, { ...snapshot(), bindingRevision: 3 }, "shared-memory"), "binding");
+		assert.equal(store.get(reading.key)?.min, 55);
+		assert.equal(store.observe({ ...reading, value: 70, type: 5, aliasOf: "f0009999:0:1000009" }, { ...snapshot(), bindingRevision: 3 }, "shared-memory"), "type");
 		assert.equal(store.get(reading.key)?.min, 70);
 	});
 });

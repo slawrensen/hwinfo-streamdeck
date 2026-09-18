@@ -73,7 +73,7 @@
 		"crit": {
 			"bg": "#CB2114",
 			"value": "#FFFFFF",
-			"label": "#FFDCD6",
+			"label": "#FFE1DB",
 			"unit": "#FCE1DD",
 			"accent": "#FFDCD6",
 			"track": "#A81A0C"

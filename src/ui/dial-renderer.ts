@@ -11,7 +11,7 @@
 import { HISTORY_LENGTH } from "../series";
 import { estimateFooterWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, type AlertLevel } from "./format";
 import { barSegment, escapeXml, FONT, severityMarkSvg, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
-import { themeTextColors, type TextColors } from "./text-colors";
+import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
@@ -255,6 +255,12 @@ export interface TwoRowRow {
 	severity?: AlertLevel;
 	/** Units share the selected row's actual surface with its value. */
 	unitColor?: string;
+	/** This row's label fill when it is the selected row, resolved on the
+	 * track band like unitColor (resolveTextColors keeps that label no dimmer
+	 * than its unit in every mode). Unselected rows ignore it: they take the
+	 * unit token, which is the selection cue. Absent, the renderer lifts the
+	 * face label to read no dimmer than this row's unit on the band. */
+	selectedLabelColor?: string;
 	label: string;
 	valueText: string;
 	unitText: string;
@@ -317,13 +323,20 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 		}
 		const alerting = row.severity === "warn" || row.severity === "crit";
 		const lines = wrapLabelTwoLines(row.label, alerting ? TWO_ROW_LINE1_MAX - 3 : TWO_ROW_LINE1_MAX, line2Max);
+		// The label token marks the selected row; the unit token paints the
+		// other. The selected row sits on the track, where the face label
+		// can read dimmer than the row's own unit (Dim lifts units to the
+		// numeric floor), so the caller resolves the label there too; failing
+		// that, the label lifts to its unit's ratio on the band. A label that
+		// already passes (every theme in Theme mode) keeps its bytes.
+		const labelColor = row.selected ? (row.selectedLabelColor ?? noDimmerThan(text.label, row.unitColor ?? text.unit, rowBg)) : text.unit;
 		parts.push(
-			`<text x="${alerting ? 30 : 12}" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(lines[0] as string)}</text>`
+			`<text x="${alerting ? 30 : 12}" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[0] as string)}</text>`
 		);
 		parts.push(severityMarkSvg(row.severity, 12, top + 1, 13, palette.value, rowBg));
 		if (lines.length > 1) {
 			parts.push(
-				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(lines[1] as string)}</text>`
+				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[1] as string)}</text>`
 			);
 		} else if (row.history !== undefined) {
 			// The freed line hosts the trend: self-normalized over its own

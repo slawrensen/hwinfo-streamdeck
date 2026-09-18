@@ -37,7 +37,7 @@ const SPEC_THEMES: Record<string, [string, string, string, string, string, strin
 /** Alert rows are spec-ordered bg,value,label,unit,accent,track. */
 const SPEC_ALERTS: Record<"warn" | "crit", [string, string, string, string, string, string]> = {
 	warn: ["#E8940D", "#1C1200", "#402C00", "#503900", "#402C00", "#C67A06"],
-	crit: ["#CB2114", "#FFFFFF", "#FFDCD6", "#FCE1DD", "#FFDCD6", "#A81A0C"]
+	crit: ["#CB2114", "#FFFFFF", "#FFE1DB", "#FCE1DD", "#FFDCD6", "#A81A0C"]
 };
 
 const SPEC_TYPE_ACCENTS: Record<string, string> = {

@@ -383,9 +383,10 @@ async function scenario(send) {
 			await sleep(500);
 			results.quadBadgeFrame = quadLatest();
 			// Junk slots 3/4 and a junk color entry: slots drop, colors salvage
-			// per entry, the grid itself stays. Use an already-readable color
-			// so this salvage assertion is independent of contrast correction.
-			quadSet({ readingKey: k1, keyLayout: "quad", secondaryReadingKey: k2, quadReadingKey3: { junk: true }, quadReadingKey4: "", quadColors: ["#ABCDEF", 42, "nope", null] });
+			// per entry, the grid itself stays. The saved color is deliberately
+			// dark (about 2:1 on the void face): a chosen quad color renders
+			// exact, never lifted, so the frame must carry it byte for byte.
+			quadSet({ readingKey: k1, keyLayout: "quad", secondaryReadingKey: k2, quadReadingKey3: { junk: true }, quadReadingKey4: "", quadColors: ["#123456", 42, "nope", null] });
 			await sleep(500);
 			results.quadJunkSlotFrame = quadLatest();
 			// Warn recolor from the primary thresholds: the whole key takes the
@@ -911,8 +912,8 @@ async function finish() {
 		(results.quadBadgeFrame ?? "no frame").slice(0, 120)
 	);
 	check(
-		"quad junk slots drop only their cells; colors salvage per entry",
-		hasCross(results.quadJunkSlotFrame) && results.quadJunkSlotFrame.includes("#ABCDEF") && results.quadJunkSlotFrame.includes("#FF7E8E") && !results.quadJunkSlotFrame.includes('y="112"'),
+		"quad junk slots drop only their cells; a saved dark color renders exact and the default beside it salvages",
+		hasCross(results.quadJunkSlotFrame) && results.quadJunkSlotFrame.includes('fill="#123456"') && results.quadJunkSlotFrame.includes("#FF7E8E") && !results.quadJunkSlotFrame.includes('y="112"'),
 		(results.quadJunkSlotFrame ?? "no frame").slice(0, 120)
 	);
 	check(

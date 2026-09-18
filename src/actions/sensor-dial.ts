@@ -28,6 +28,7 @@ import { parseResetScope, resolveControls, schemeCanSwitchGroups, triggerDescrip
 import { deviceCapabilities, tapCanvasWidth } from "../devices";
 import { registerDiagnostics } from "../diagnostics";
 import { IDLE_GESTURE, routeGesture, type GestureState } from "../gestures";
+import { liveKeyOf, readingMatchesKey } from "../hwinfo/reading-links";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
@@ -163,6 +164,9 @@ export type InstanceState = {
 	deviceId: string;
 	/** A threshold edit is waiting for a resolvable reading to stamp its unit. */
 	pendingAlertUnitStamp: boolean;
+	/** A stale or unavailable tick ended this dial's sessions; the first live
+	 * frame afterwards says so once, so a collapsed min/max is explained. */
+	gapReset?: boolean;
 	/** Readings this instance holds poller series subscriptions for (the
 	 * two-row view's sparklines); synced each tick, released on disappear.
 	 * Not restored across hiding: poller subscriptions are permanent for the
@@ -244,6 +248,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			overlayTimer: null,
 			deviceId: ev.action.device.id,
 			pendingAlertUnitStamp: restored?.pendingAlertUnitStamp ?? false,
+			// A gap that ended this dial's sessions while it was hidden, or
+			// before a replayed appear, is still owed its one explanation.
+			gapReset: restored?.gapReset ?? false,
 			rowSeries: new Set()
 		};
 		this.instances.set(ev.action.id, state);
@@ -257,6 +264,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (status.state === "ok") {
 			this.sampleStats(state, status.snapshot, status.source);
 		} else {
+			if (state.stats.size > 0) state.gapReset = true;
 			state.stats.reset();
 		}
 		this.renderAll(status, ev.action.id);
@@ -460,13 +468,21 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			return;
 		}
 		const key = readingKeyOf(state.settings);
+		// A reset aims at measurements: a reading sampled under two confirmed
+		// spellings (its saved key and its live row) resets under both.
+		const status = poller.getStatus();
+		const snapshot = status.state === "unavailable" ? undefined : status.snapshot;
+		const resetKeys = (keys: readonly string[]): void => {
+			state.stats.reset(keys);
+			state.stats.resetIdentities(new Set(keys.map((k) => { const reading = snapshot?.byKey.get(k); return reading === undefined ? k : liveKeyOf(reading); })));
+		};
 		if (scope === "set") {
-			state.stats.reset([...(rotationKeysOf(state.settings) ?? []), ...(key === undefined ? [] : [key])]);
+			resetKeys([...(rotationKeysOf(state.settings) ?? []), ...(key === undefined ? [] : [key])]);
 			this.showOverlay(state, "set stats reset");
 			return;
 		}
 		if (key !== undefined) {
-			state.stats.reset([key]);
+			resetKeys([key]);
 		}
 		this.showOverlay(state, "stats reset");
 	}
@@ -500,13 +516,15 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		} else {
 			next = stepReading(stepListOf(state.settings, key, groups, snapshot), key, ticks);
 		}
-		if (next === undefined || next.key === state.settings.readingKey) {
+		// Landing on the measurement already selected (its other confirmed
+		// spelling) is no move: never rewrite the saved key for nothing.
+		if (next === undefined || readingMatchesKey(next, state.settings.readingKey)) {
 			return;
 		}
 		// A group jump names its landing group; set before adopting so the
 		// adopt's own render already paints the overlay.
 		if (granularity === "group" && groups !== undefined) {
-			const landed = activeGroupIndex(groups, next.key);
+			const landed = activeGroupIndex(groups, next.key, snapshot);
 			if (landed !== -1) {
 				this.showOverlay(state, groupDisplayName(groups, landed));
 			}
@@ -540,6 +558,13 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			// its true session, and hidden members keep alert coverage. The
 			// two-row view's sparkline subscriptions ride the same sweep.
 			for (const state of this.instances.values()) {
+				if (state.gapReset === true) {
+					// The status face hid the reset while the source was out;
+					// name it on the first live frame so the collapsed
+					// min/max is not read as a plugin fault.
+					state.gapReset = false;
+					this.showOverlay(state, sessionResetMessage("gap"));
+				}
 				this.sampleStats(state, status.snapshot, status.source);
 				this.syncRowSeries(state, status.snapshot);
 			}
@@ -562,8 +587,17 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			}
 			this.autoCycle(status, now);
 		} else {
-			for (const state of this.instances.values()) state.stats.reset();
-			for (const entry of this.hidden.values()) entry.state.stats.reset();
+			// A stale or unavailable source ends every session (a frozen or
+			// absent producer is not evidence). Remember which dials lost a
+			// session so the return to live data can say so.
+			for (const state of this.instances.values()) {
+				if (state.stats.size > 0) state.gapReset = true;
+				state.stats.reset();
+			}
+			for (const entry of this.hidden.values()) {
+				if (entry.state.stats.size > 0) entry.state.gapReset = true;
+				entry.state.stats.reset();
+			}
 		}
 		this.renderAll(status);
 		pushPreviewToPi(status, this.manifestId, this.instances, false);
@@ -662,7 +696,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				// version. Ungrouped and Legacy dials pass their own list.
 				const alertList = groups !== undefined && schemeCanSwitchGroups(resolveControls(state.settings)) ? rotationReadings(groups.flatMap((g) => g.keys), key, status.snapshot) : list;
 				const target = autoCycleTarget(list, alertList, key, this.criticalKeys(state, alertList), state.settings.alertInterrupt === true);
-				if (target === undefined || target.key === key) {
+				if (target === undefined || readingMatchesKey(target, key)) {
 					// Held (critical member on screen, or nowhere to go):
 					// wait a full interval before looking again.
 					state.nextCycleAt = now + interval;
@@ -1063,7 +1097,7 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 
 	// Title precedence: the per-dial label (transient or fixed), then the
 	// reading's own per-member name, then HWiNFO's label.
-	const label = customLabelOf(settings) ?? rotationNamesOf(settings)?.[reading.key] ?? reading.label;
+	const label = customLabelOf(settings) ?? readingNameOf(rotationNamesOf(settings), reading) ?? reading.label;
 	// A transient hint owns the whole stats line for its moment (appending it
 	// to min/max would run past the 200 px canvas); persistent states replace
 	// only the trailing "session" tag. Belt and braces: the line is truncated
@@ -1091,6 +1125,17 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 
 function customLabelOf(settings: DialSettings): string | undefined {
 	return typeof settings.label === "string" && settings.label.trim() !== "" ? settings.label.trim() : undefined;
+}
+
+/** A reading's per-member name: saved under the key it shows as, else under
+ *  a confirmed alias of it, the same walk the reading colors take, so a
+ *  renamed reading keeps its name on whichever provider is live. */
+function readingNameOf(names: Record<string, string> | undefined, reading: Pick<Reading, "key" | "linkedKeys">): string | undefined {
+	if (names === undefined) return undefined;
+	for (const key of [reading.key, ...(reading.linkedKeys ?? [])]) {
+		if (Object.hasOwn(names, key)) return names[key];
+	}
+	return undefined;
 }
 
 /** Settings are untyped JSON: keep non-empty string names under string keys
@@ -1138,7 +1183,7 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 	const names = rotationNamesOf(settings);
 	const customLabel = customLabelOf(settings);
 	const candidates = rows.map((member, index) => {
-		const override = index === selectedIndex && customLabel !== undefined ? customLabel : names?.[member.key];
+		const override = index === selectedIndex && customLabel !== undefined ? customLabel : readingNameOf(names, member);
 		return { text: override ?? member.label, locked: override !== undefined };
 	});
 	const shorten = settings.overviewLabels !== "full";
@@ -1180,6 +1225,8 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 				config, themeId, typeAccents: typeAccentsEnabled(), textSettings,
 				normalColor: rowText.value, background: rowBg
 			}),
+			// The selected two-row band resolves its label on the track like its unit.
+			selectedLabelColor: rowText.label,
 			unitColor: rowText.unit,
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.

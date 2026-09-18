@@ -76,16 +76,141 @@ for (const view of ["overview", "tworow"] as const) {
 	});
 }
 
-it("absent/off/junk settings preserve the 1.7 readability baseline, including every single dial", () => {
-	const golden = JSON.parse(readFileSync(new URL("./golden/dial-color-baseline.json", import.meta.url), "utf8")) as Record<string, string>;
-	for (const [key, expected] of Object.entries(golden)) {
-		const [view, theme, textMode] = key.split("/");
-		const fixture = dialGalleryFixture(view === "overview" ? "overview" : "tworow");
-		fixture.state.settings = { ...fixture.state.settings, dialView: view, theme, textMode, textColor: "#123abc" };
-		for (const raw of [undefined, false, null, "true", "on", 1, {}, [], ...(view === "single" ? [true] : [])]) {
+/**
+ * The 1.6.0 reference. test/golden/dial-color-baseline.json holds the fd1cab6
+ * sha256 of 63 default-settings faces (3 views x 7 themes x 3 text modes),
+ * captured on the 1.6.0 renderer. 1.7 draws 40 of them differently, and only
+ * in text fills; SINCE_1_6_0 names every moved role with its 1.6.0 and 1.7
+ * token. The test puts exactly those fills back and requires the 1.6.0 hash,
+ * so any other byte change fails, a stale entry fails, and a missing entry
+ * fails. Keys absent from the table are byte-identical to 1.6.0 (all 21
+ * Custom faces, and the single and overview faces on Paper in Theme).
+ *
+ * Why the 40 moved: every theme's unit token rose to the numeric 4.5:1 floor
+ * in themes.json (units and statistics are numbers); the Dim mode lifts its
+ * unit to that floor and then its label to the unit's ratio, so Dim keeps
+ * the label over unit hierarchy; the selected two-row band (the track)
+ * resolves its unit there, and the Dim value is lifted on that surface too;
+ * Ember and Paper in Dim also lift the value to the floor.
+ */
+const HEX = "(#[0-9A-F]{6})";
+const ROLES: Record<string, Record<string, RegExp>> = {
+	single: {
+		title: new RegExp(`(<text x="12" y="24" [^>]*fill=")${HEX}`, "g"),
+		value: new RegExp(`(<text x="12" y="58" [^>]*fill=")${HEX}`, "g"),
+		unit: new RegExp(`(<tspan dx="6" font-size="17" font-weight="600" fill=")${HEX}`, "g"),
+		stats: new RegExp(`(<text x="12" y="78" [^>]*fill=")${HEX}`, "g")
+	},
+	tworow: {
+		selectedLabel: new RegExp(`(<text x="12" y="(?:17|40)" [^>]*fill=")${HEX}`, "g"),
+		selectedValue: new RegExp(`(<text x="[0-9.]+" y="40" text-anchor="end" [^>]*fill=")${HEX}`, "g"),
+		selectedUnit: new RegExp(`(<text x="[0-9]+[.][0-9]" y="40" text-anchor="start" [^>]*fill=")${HEX}`, "g"),
+		unselectedLabel: new RegExp(`(<text x="12" y="(?:59|82)" [^>]*fill=")${HEX}`, "g"),
+		unselectedValue: new RegExp(`(<text x="[0-9.]+" y="82" text-anchor="end" [^>]*fill=")${HEX}`, "g"),
+		unselectedUnit: new RegExp(`(<text x="[0-9]+[.][0-9]" y="82" text-anchor="start" [^>]*fill=")${HEX}`, "g"),
+		footer: new RegExp(`(<text x="6" y="96" [^>]*fill=")${HEX}`, "g")
+	},
+	overview: {
+		selectedLabel: new RegExp(`(letter-spacing="0.4" fill=")${HEX}(">CPU TEMP<)`, "g"),
+		unselectedLabels: new RegExp(`(letter-spacing="0.4" fill=")${HEX}(">(?:GPU TEMP|PUMP)<)`, "g"),
+		values: new RegExp(`(<text x="168" y="[0-9.]+" text-anchor="end" [^>]*fill=")${HEX}`, "g"),
+		units: new RegExp(`(<text x="172" y="[0-9.]+" text-anchor="start" [^>]*fill=")${HEX}`, "g"),
+		context: new RegExp(`(<text x="2" y="11" [^>]*fill=")${HEX}`, "g"),
+		stats: new RegExp(`(<text x="196" y="11" text-anchor="end" [^>]*fill=")${HEX}`, "g")
+	}
+};
+const SINCE_1_6_0: Record<string, Record<string, readonly [before: string, after: string]>> = {
+	"single/void/theme": { unit: ["#667082", "#6B7586"], stats: ["#667082", "#6B7586"] },
+	"single/void/dim": { title: ["#555C67", "#6F757E"], unit: ["#474E5B", "#6F757E"], stats: ["#474E5B", "#6F757E"] },
+	"single/graphite/theme": { unit: ["#757F91", "#7A8495"], stats: ["#757F91", "#7A8495"] },
+	"single/graphite/dim": { title: ["#696F7C", "#7E848F"], unit: ["#5A6170", "#7D848F"], stats: ["#5A6170", "#7D848F"] },
+	"single/ultraviolet/theme": { unit: ["#7C6C9F", "#8171A2"], stats: ["#7C6C9F", "#8171A2"] },
+	"single/ultraviolet/dim": { title: ["#695B83", "#7F7496"], unit: ["#5C4D79", "#7F7495"], stats: ["#5C4D79", "#7F7495"] },
+	"single/midnight/theme": { unit: ["#627896", "#687E9A"], stats: ["#627896", "#687E9A"] },
+	"single/midnight/dim": { title: ["#566780", "#6E7D92"], unit: ["#475973", "#6E7D90"], stats: ["#475973", "#6E7D90"] },
+	"single/forest/theme": { unit: ["#5D7D6F", "#638274"], stats: ["#5D7D6F", "#638274"] },
+	"single/forest/dim": { title: ["#526B5E", "#6B8175"], unit: ["#435D51", "#6B8076"], stats: ["#435D51", "#6B8076"] },
+	"single/ember/theme": { unit: ["#8A6326", "#926E35"], stats: ["#8A6326", "#926E35"] },
+	"single/ember/dim": { title: ["#735323", "#8B7149"], value: ["#946B2D", "#956D2F"], unit: ["#61451B", "#857252"], stats: ["#61451B", "#857252"] },
+	"single/paper/dim": { title: ["#7A776F", "#6A6761"], value: ["#6D6B65", "#696762"], unit: ["#8A867A", "#6B675E"], stats: ["#8A867A", "#6B675E"] },
+	"tworow/void/theme": { selectedUnit: ["#667082", "#798292"], unselectedLabel: ["#667082", "#6B7586"], unselectedUnit: ["#667082", "#6B7586"], footer: ["#667082", "#6B7586"] },
+	"tworow/void/dim": { selectedLabel: ["#555C67", "#7C828C"], selectedValue: ["#949494", "#9D9FA2"], selectedUnit: ["#474E5B", "#7C828C"], unselectedLabel: ["#474E5B", "#6F757E"], unselectedUnit: ["#474E5B", "#6F757E"], footer: ["#474E5B", "#6F757E"] },
+	"tworow/graphite/theme": { selectedLabel: ["#8B93A3", "#8E96A5"], selectedUnit: ["#757F91", "#8E96A5"], unselectedLabel: ["#757F91", "#7A8495"], unselectedUnit: ["#757F91", "#7A8495"], footer: ["#757F91", "#7A8495"] },
+	"tworow/graphite/dim": { selectedLabel: ["#696F7C", "#9096A1"], selectedValue: ["#989A9F", "#9FA2A9"], selectedUnit: ["#5A6170", "#9096A1"], unselectedLabel: ["#5A6170", "#7D848F"], unselectedUnit: ["#5A6170", "#7D848F"], footer: ["#5A6170", "#7D848F"] },
+	"tworow/ultraviolet/theme": { selectedUnit: ["#7C6C9F", "#8D7FAB"], unselectedLabel: ["#7C6C9F", "#8171A2"], unselectedUnit: ["#7C6C9F", "#8171A2"], footer: ["#7C6C9F", "#8171A2"] },
+	"tworow/ultraviolet/dim": { selectedLabel: ["#695B83", "#8C80A4"], selectedValue: ["#948CA1", "#9D92B0"], selectedUnit: ["#5C4D79", "#8C80A4"], unselectedLabel: ["#5C4D79", "#7F7495"], unselectedUnit: ["#5C4D79", "#7F7495"], footer: ["#5C4D79", "#7F7495"] },
+	"tworow/midnight/theme": { selectedUnit: ["#627896", "#768AA3"], unselectedLabel: ["#627896", "#687E9A"], unselectedUnit: ["#627896", "#687E9A"], footer: ["#627896", "#687E9A"] },
+	"tworow/midnight/dim": { selectedLabel: ["#566780", "#7B8A9F"], selectedValue: ["#8E96A1", "#939DAB"], selectedUnit: ["#475973", "#7B8A9E"], unselectedLabel: ["#475973", "#6E7D90"], unselectedUnit: ["#475973", "#6E7D90"], footer: ["#475973", "#6E7D90"] },
+	"tworow/forest/theme": { selectedUnit: ["#5D7D6F", "#748F83"], unselectedLabel: ["#5D7D6F", "#638274"], unselectedUnit: ["#5D7D6F", "#638274"], footer: ["#5D7D6F", "#638274"] },
+	"tworow/forest/dim": { selectedLabel: ["#526B5E", "#798E83"], selectedValue: ["#8B9A91", "#90A298"], selectedUnit: ["#435D51", "#798E83"], unselectedLabel: ["#435D51", "#6B8076"], unselectedUnit: ["#435D51", "#6B8076"], footer: ["#435D51", "#6B8076"] },
+	"tworow/ember/theme": { selectedUnit: ["#8A6326", "#9A7944"], unselectedLabel: ["#8A6326", "#926E35"], unselectedUnit: ["#8A6326", "#926E35"], footer: ["#8A6326", "#926E35"] },
+	"tworow/ember/dim": { selectedLabel: ["#735323", "#967A51"], selectedValue: ["#946B2D", "#A37633"], selectedUnit: ["#61451B", "#917B59"], unselectedLabel: ["#61451B", "#857252"], unselectedValue: ["#946B2D", "#956D2F"], unselectedUnit: ["#61451B", "#857252"], footer: ["#61451B", "#857252"] },
+	"tworow/paper/theme": { selectedUnit: ["#615D4F", "#595548"] },
+	"tworow/paper/dim": { selectedLabel: ["#7A776F", "#57554F"], selectedValue: ["#6D6B65", "#57554E"], selectedUnit: ["#8A867A", "#58554C"], unselectedLabel: ["#8A867A", "#6B675E"], unselectedValue: ["#6D6B65", "#696762"], unselectedUnit: ["#8A867A", "#6B675E"], footer: ["#8A867A", "#6B675E"] },
+	"overview/void/theme": { unselectedLabels: ["#667082", "#6B7586"], units: ["#667082", "#6B7586"], stats: ["#667082", "#6B7586"] },
+	"overview/void/dim": { selectedLabel: ["#555C67", "#6F757E"], unselectedLabels: ["#474E5B", "#6F757E"], units: ["#474E5B", "#6F757E"], context: ["#555C67", "#6F757E"], stats: ["#474E5B", "#6F757E"] },
+	"overview/graphite/theme": { unselectedLabels: ["#757F91", "#7A8495"], units: ["#757F91", "#7A8495"], stats: ["#757F91", "#7A8495"] },
+	"overview/graphite/dim": { selectedLabel: ["#696F7C", "#7E848F"], unselectedLabels: ["#5A6170", "#7D848F"], units: ["#5A6170", "#7D848F"], context: ["#696F7C", "#7E848F"], stats: ["#5A6170", "#7D848F"] },
+	"overview/ultraviolet/theme": { unselectedLabels: ["#7C6C9F", "#8171A2"], units: ["#7C6C9F", "#8171A2"], stats: ["#7C6C9F", "#8171A2"] },
+	"overview/ultraviolet/dim": { selectedLabel: ["#695B83", "#7F7496"], unselectedLabels: ["#5C4D79", "#7F7495"], units: ["#5C4D79", "#7F7495"], context: ["#695B83", "#7F7496"], stats: ["#5C4D79", "#7F7495"] },
+	"overview/midnight/theme": { unselectedLabels: ["#627896", "#687E9A"], units: ["#627896", "#687E9A"], stats: ["#627896", "#687E9A"] },
+	"overview/midnight/dim": { selectedLabel: ["#566780", "#6E7D92"], unselectedLabels: ["#475973", "#6E7D90"], units: ["#475973", "#6E7D90"], context: ["#566780", "#6E7D92"], stats: ["#475973", "#6E7D90"] },
+	"overview/forest/theme": { unselectedLabels: ["#5D7D6F", "#638274"], units: ["#5D7D6F", "#638274"], stats: ["#5D7D6F", "#638274"] },
+	"overview/forest/dim": { selectedLabel: ["#526B5E", "#6B8175"], unselectedLabels: ["#435D51", "#6B8076"], units: ["#435D51", "#6B8076"], context: ["#526B5E", "#6B8175"], stats: ["#435D51", "#6B8076"] },
+	"overview/ember/theme": { unselectedLabels: ["#8A6326", "#926E35"], units: ["#8A6326", "#926E35"], stats: ["#8A6326", "#926E35"] },
+	"overview/ember/dim": { selectedLabel: ["#735323", "#8B7149"], unselectedLabels: ["#61451B", "#857252"], values: ["#946B2D", "#956D2F"], units: ["#61451B", "#857252"], context: ["#735323", "#8B7149"], stats: ["#61451B", "#857252"] },
+	"overview/paper/dim": { selectedLabel: ["#7A776F", "#6A6761"], unselectedLabels: ["#8A867A", "#6B675E"], values: ["#6D6B65", "#696762"], units: ["#8A867A", "#6B675E"], context: ["#7A776F", "#6A6761"], stats: ["#8A867A", "#6B675E"] }
+};
+const golden = JSON.parse(readFileSync(new URL("./golden/dial-color-baseline.json", import.meta.url), "utf8")) as Record<string, string>;
+const sha256 = (svg: string): string => createHash("sha256").update(svg).digest("hex");
+const roleFills = (svg: string, re: RegExp): string[] => [...svg.matchAll(re)].map((m) => m[2] as string);
+const goldenFixture = (key: string): Fixture => {
+	const [view, theme, textMode] = key.split("/");
+	const fixture = dialGalleryFixture(view === "overview" ? "overview" : "tworow");
+	fixture.state.settings = { ...fixture.state.settings, dialView: view, theme, textMode, textColor: "#123abc" } as DialSettings;
+	return fixture;
+};
+/** The face as 1.6.0 drew it: each enumerated role's fill put back, after
+ * checking that the face draws that role in the enumerated 1.7 token and
+ * that every text fill on the face belongs to some role. */
+const asOf160 = (key: string, svg: string): string => {
+	const view = key.split("/")[0] as string;
+	const roles = ROLES[view] as Record<string, RegExp>;
+	const moved = SINCE_1_6_0[key] ?? {};
+	const claimed = Object.values(roles).reduce((n, re) => n + roleFills(svg, re).length, 0);
+	assert.equal(claimed, (svg.match(/<(?:text|tspan)[^>]*fill="#[0-9A-F]{6}"/g) ?? []).length, `${key}: a text fill escapes the role table`);
+	let reverted = svg;
+	for (const [role, entry] of Object.entries(moved)) {
+		const re = roles[role];
+		assert.ok(re !== undefined, `${key}: unknown role ${role}`);
+		const [before, after] = entry;
+		assert.deepEqual([...new Set(roleFills(svg, re as RegExp))], [after], `${key}: ${role} draws ${after} now`);
+		assert.notEqual(before, after);
+		reverted = reverted.replace(re as RegExp, (m: string, _pre: string, fill: string) => m.replace(fill, before));
+	}
+	return reverted;
+};
+
+it("every raw sensorValueColors variant renders byte-identical to the undefined variant on every default face", () => {
+	for (const key of Object.keys(golden)) {
+		const view = key.split("/")[0] as string;
+		const fixture = goldenFixture(key);
+		fixture.state.settings = { ...fixture.state.settings, sensorValueColors: undefined } as DialSettings;
+		const base = compose(fixture);
+		for (const raw of [false, null, "true", "on", 1, {}, [], ...(view === "single" ? [true] : [])]) {
 			fixture.state.settings = { ...fixture.state.settings, sensorValueColors: raw } as DialSettings;
-			assert.equal(createHash("sha256").update(compose(fixture)).digest("hex"), expected, `${key}, ${JSON.stringify(raw)}`);
+			assert.equal(compose(fixture), base, `${key}, ${JSON.stringify(raw)}`);
 		}
+	}
+});
+
+it("default faces since 1.6.0: the fd1cab6 golden holds once exactly the enumerated text fills are put back", () => {
+	assert.equal(Object.keys(golden).length, 63);
+	assert.equal(Object.keys(SINCE_1_6_0).length, 40);
+	for (const [key, expected] of Object.entries(golden)) {
+		const svg = compose(goldenFixture(key));
+		assert.equal(sha256(asOf160(key, svg)), expected, `${key}: bytes other than the enumerated fills differ from 1.6.0`);
+		if (SINCE_1_6_0[key] !== undefined) assert.notEqual(sha256(svg), expected, `${key}: enumerated as moved but byte-identical to 1.6.0`);
 	}
 });
 
@@ -208,11 +333,14 @@ it("alerts keep priority over Custom and sensor colors, with native-unit scoping
 	}
 });
 
-it("gallery fixtures equal production composition with explicit achievable settings", () => {
+it("the docs gallery draws the golden-pinned Void faces: what the runtime composes for those settings, not a look-alike", () => {
+	// renderGalleryDial feeds the docs and marketplace images. Pinning it to
+	// the stored 1.6.0 reference (through the same enumeration) means a
+	// fixture or helper drift shows up here instead of in a screenshot.
 	for (const view of ["tworow", "overview"] as const) {
-		for (const enabled of [false, true]) assert.equal(renderGalleryDial(view, enabled), compose(dialGalleryFixture(view, enabled)));
-		const colors = { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:4": "#38CD89" };
-		assert.equal(renderGalleryDial(view, false, colors), compose(dialGalleryFixture(view, false, colors)));
+		const key = `${view}/void/theme`;
+		assert.equal(sha256(asOf160(key, renderGalleryDial(view))), golden[key], key);
+		assert.notEqual(renderGalleryDial(view, true), renderGalleryDial(view), "the sensor color opt-in changes the gallery face");
 	}
 });
 

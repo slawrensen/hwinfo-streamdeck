@@ -25,24 +25,56 @@ export function parseReadingLinks(raw: unknown): readonly ReadingLink[] {
 	return valid.filter((link) => counts.get(link.sharedMemory) === 1 && counts.get(link.gadget) === 1);
 }
 
+/**
+ * The meaning of a validated link list, independent of the order the
+ * document lists the pairs in. Every sharedMemory key is unique after the
+ * conflict filter, so the sort is total and two documents that pair the
+ * same keys the same way produce the same signature. The stored document
+ * keeps the user's order; only comparisons use this.
+ */
+export function readingLinksSignature(links: readonly ReadingLink[]): string {
+	return JSON.stringify([...links].sort((a, b) => (a.sharedMemory < b.sharedMemory ? -1 : a.sharedMemory > b.sharedMemory ? 1 : 0)));
+}
+
+/** The provider's own key behind an entry: the entry's key, or the key a
+ * confirmed alias stands for. Sessions and history follow this identity. */
+export function liveKeyOf(reading: Pick<Reading, "key" | "aliasOf">): string {
+	return reading.aliasOf ?? reading.key;
+}
+
+/**
+ * Derives the published view from a provider's own snapshot: every
+ * confirmed pair whose exactly one endpoint the provider publishes gains
+ * an alias entry for the other endpoint. Always derived from the RAW
+ * snapshot, never from an already-aliased one (a second pass over aliases
+ * would trip the two-live-entries guard and keep removed pairs alive).
+ * Provider-published aliases (a legacy Gadget key kept resolvable) fold
+ * into the same group, so one measurement has one alias list everywhere.
+ */
 export function applyReadingLinks(snapshot: SensorSnapshot, links: readonly ReadingLink[], bindingRevision: number): SensorSnapshot {
 	if (links.length === 0) return bindingRevision === 0 ? snapshot : { ...snapshot, bindingRevision };
 	const byKey = new Map(snapshot.byKey);
-	const aliases = new Map<string, readonly string[]>();
+	// Live key -> every key that resolves to it (the live key first).
+	const groups = new Map<string, readonly string[]>();
 	for (const link of links) {
 		const primary = snapshot.byKey.get(link.sharedMemory);
 		const fallback = snapshot.byKey.get(link.gadget);
 		// Never choose between two live entries or reinterpret changed units.
 		if ((primary === undefined) === (fallback === undefined)) continue;
-		const reading = primary ?? fallback;
-		if (reading === undefined || reading.unit !== link.unit || reading.type !== link.sensorType) continue;
-		const linkedKeys = [link.sharedMemory, link.gadget];
-		aliases.set(reading.key, linkedKeys);
-		for (const key of linkedKeys) byKey.set(key, { ...reading, key, linkedKeys });
+		const found = primary ?? fallback;
+		if (found === undefined || found.unit !== link.unit || found.type !== link.sensorType) continue;
+		const live = found.aliasOf === undefined ? found : (snapshot.byKey.get(found.aliasOf) ?? found);
+		const previous = groups.get(live.key) ?? live.linkedKeys ?? [live.key];
+		groups.set(live.key, [...new Set([live.key, ...previous, link.sharedMemory, link.gadget])]);
+	}
+	for (const [liveKey, group] of groups) {
+		const live = snapshot.byKey.get(liveKey);
+		if (live === undefined) continue;
+		for (const key of group) byKey.set(key, key === liveKey ? { ...live, linkedKeys: group } : { ...live, key, linkedKeys: group, aliasOf: liveKey });
 	}
 	const readings = snapshot.readings.map((reading) => {
-		const linkedKeys = aliases.get(reading.key);
-		return linkedKeys === undefined ? reading : { ...reading, linkedKeys };
+		const group = groups.get(reading.key);
+		return group === undefined ? reading : { ...reading, linkedKeys: group };
 	});
 	return { ...snapshot, readings, byKey, bindingRevision };
 }

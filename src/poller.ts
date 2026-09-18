@@ -17,6 +17,13 @@
  * exception is a present-but-empty Gadget key: it opens, and the bounded VSB
  * scan runs before the source is refused as "gadget-empty".
  *
+ * Evidence contract: opening a provider is not receiving a measurement.
+ * `lastAdvanceAt` moves only when an accepted observation carries new
+ * producer evidence, so a source switch, a reopen probe or a page return
+ * whose first reads are skipped keeps the held observation's real age, and
+ * the published `source` is always the provenance of the snapshot held in
+ * the status, never merely the provider that happens to be open.
+ *
  * A poisoned session (the hwsm bridge invalidates on any layout change; a
  * game start adding GPU readings does it routinely) is reopened at the new
  * exact size and re-read WITHIN the same tick, and a reopen failure rides
@@ -31,9 +38,9 @@ import { EventEmitter } from "node:events";
 
 import { monotonicNow } from "./clock";
 import { GadgetRegistryProvider } from "./hwinfo/gadget-registry";
-import { applyReadingLinks, parseReadingLinks, type ReadingLink } from "./hwinfo/reading-links";
+import { applyReadingLinks, liveKeyOf, parseReadingLinks, readingLinksSignature, type ReadingLink } from "./hwinfo/reading-links";
 import { SharedMemoryProvider, type SnapshotProvider, type SnapshotSource } from "./hwinfo/provider";
-import { HwinfoError, type HwinfoUnavailableReason, type SensorSnapshot } from "./hwinfo/types";
+import { HwinfoError, type HwinfoUnavailableReason, type Reading, type SensorSnapshot } from "./hwinfo/types";
 import { pushSample } from "./series";
 
 export type PollerStatus =
@@ -79,16 +86,32 @@ class HwinfoPoller extends EventEmitter {
 	private revisionProvider: SnapshotProvider | null = null;
 	private lastFreshnessRevision: number | undefined;
 	private seriesSource: SnapshotSource | undefined;
-	private readonly seriesUnits = new Map<string, string>();
+	/** Per subscribed key: the measurement identity (live key, type, unit)
+	 * its ring currently describes. A change ends the segment in place. */
+	private readonly seriesIdentity = new Map<string, string>();
 	private readingLinks: readonly ReadingLink[] = [];
+	/** The empty list's signature, so the first delivery of an absent or
+	 * empty document (every launch) is not a pairing change. */
+	private readingLinksSignature = readingLinksSignature([]);
 	private bindingRevision = 0;
+	/** Monotonic time of the last accepted observation that carried new
+	 * producer evidence; 0 until the first one. Never set by an open. */
 	private lastAdvanceAt = 0;
+	/** Monotonic time of the last accepted (non-null) read, evidence or not.
+	 * Bounds the transient hold for a source that has no evidence clock yet
+	 * (a cold Gadget key shows Age unknown without ever advancing). */
+	private lastAcceptedAt = 0;
 	private lastReopenProbeAt = 0;
 	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
 	private heldFreshness: { source: SnapshotSource; pollTime: number; advanceAt: number; valueRevision?: number; freshnessRevision?: number; gadget?: GadgetRegistryProvider } | null = null;
 	private lastUpgradeProbeAt = 0;
 	/** Nonzero while a transient failure is being ridden out on held values. */
 	private holdingSince = 0;
+	/** The provider's own observation behind the published status and its
+	 * provenance. The status snapshot is DERIVED from it (reading links
+	 * applied); a pairing edit re-derives from here, never from the
+	 * already-aliased view. Cleared whenever the status goes unavailable. */
+	private lastRaw: { snapshot: SensorSnapshot; source: SnapshotSource } | null = null;
 	private status: PollerStatus = { state: "unavailable", reason: "not-running", message: "Not polled yet." };
 	// Per-reading recent-value ring backing the key sparkline. It lives here,
 	// not in per-key action state, so it outlives every willAppear (the action
@@ -107,12 +130,50 @@ class HwinfoPoller extends EventEmitter {
 		return this.status;
 	}
 
+	/**
+	 * Adopts the deck's explicit cross-provider pairs. The list is compared
+	 * by meaning (readingLinksSignature), so re-applying or reordering the
+	 * same pairs changes nothing. A real change republishes the held
+	 * observation under the new pairing at once: a removed alias stops
+	 * resolving at the settings commit, not at the next successful read,
+	 * and consumers see one consistent view (re-derived from the raw
+	 * observation) through the same tick event a read would emit. The
+	 * re-emit carries no new measurement, so sessions and rings (which
+	 * dedupe on producer evidence and identity) gain no samples from it.
+	 */
 	setReadingLinks(raw: unknown): void {
 		const links = parseReadingLinks(raw);
-		if (JSON.stringify(links) === JSON.stringify(this.readingLinks)) return;
+		const signature = readingLinksSignature(links);
+		if (signature === this.readingLinksSignature) return;
+		this.readingLinksSignature = signature;
 		this.readingLinks = links;
 		this.bindingRevision++;
-		for (const ring of this.series.values()) ring.length = 0;
+		if (this.lastRaw !== null && this.status.state !== "unavailable") {
+			const snapshot = applyReadingLinks(this.lastRaw.snapshot, links, this.bindingRevision);
+			this.status = this.status.state === "ok" ? { state: "ok", snapshot, source: this.status.source } : { ...this.status, snapshot };
+			// A ring whose saved key now stands for another measurement (or
+			// for nothing) ends before anyone draws it under the new pairing.
+			for (const [key, ring] of this.series) this.alignRing(key, ring, snapshot);
+			this.emit("tick", this.status);
+		}
+	}
+
+	/**
+	 * Keeps a ring describing one measurement in one unit. A key the
+	 * snapshot cannot resolve, a non-finite value, a saved key that came to
+	 * stand for another measurement (a re-paired link) or a rewritten unit
+	 * ends the segment in place. Returns the reading the ring may be fed.
+	 */
+	private alignRing(key: string, ring: number[], snapshot: SensorSnapshot): Reading | undefined {
+		const reading = snapshot.byKey.get(key);
+		if (reading === undefined || !Number.isFinite(reading.value)) {
+			ring.length = 0;
+			return undefined;
+		}
+		const identity = `${liveKeyOf(reading)}|${reading.type}:${reading.unit}`;
+		if (this.seriesIdentity.get(key) !== identity) ring.length = 0;
+		this.seriesIdentity.set(key, identity);
+		return reading;
 	}
 
 	/** Redacted data-source facts for the support report (no sensor values). */
@@ -246,6 +307,12 @@ class HwinfoPoller extends EventEmitter {
 		};
 	}
 
+	/**
+	 * Carries the held freshness into a same-source replacement session. A
+	 * different source, or no held record at all (a cold open, a page
+	 * return, an explicit source switch), leaves `lastAdvanceAt` where the
+	 * last accepted observation put it: the open itself is not evidence.
+	 */
 	private restoreFreshness(): void {
 		const held = this.heldFreshness;
 		if (held !== null && held.source === this.provider?.source) {
@@ -254,8 +321,6 @@ class HwinfoPoller extends EventEmitter {
 			this.lastValueRevision = held.valueRevision;
 			this.lastFreshnessRevision = held.freshnessRevision;
 			if (held.gadget && this.provider instanceof GadgetRegistryProvider) this.provider.adoptFreshness(held.gadget);
-		} else if (held === null) {
-			this.lastAdvanceAt = monotonicNow();
 		}
 		this.heldFreshness = null;
 	}
@@ -286,9 +351,13 @@ class HwinfoPoller extends EventEmitter {
 				// Gadget reporting and just needs to tick sensors — that beats
 				// shared memory's generic "not running", but must never mask a
 				// more specific primary diagnosis (access-denied, disabled).
+				// The same goes for a Gadget key that opened but whose scan
+				// was refused (a changing registry, or an unreadable identity
+				// journal): HWiNFO is set up for Gadget, so "start HWiNFO"
+				// would send the user the wrong way.
 				if (
 					fallback instanceof HwinfoError &&
-					(fallback.reason === "gadget-empty" || fallback.reason === "busy") &&
+					(fallback.reason === "gadget-empty" || fallback.reason === "busy" || fallback.reason === "invalid") &&
 					primary instanceof HwinfoError &&
 					primary.reason === "not-running"
 				) {
@@ -325,8 +394,13 @@ class HwinfoPoller extends EventEmitter {
 				snapshot = this.provider.read();
 				this.logger.info(`Data source layout changed; reopened in place (${this.provider.source})`);
 			}
+			for (const line of this.provider.notices?.() ?? []) this.logger.warn(line);
 			this.holdingSince = 0;
-			if (snapshot !== null) snapshot = applyReadingLinks(snapshot, this.readingLinks, this.bindingRevision);
+			if (snapshot !== null) {
+				this.lastRaw = { snapshot, source: this.provider.source };
+				this.lastAcceptedAt = monotonicNow();
+				snapshot = applyReadingLinks(snapshot, this.readingLinks, this.bindingRevision);
+			}
 			if (snapshot !== null) {
 				const sourceChanged = this.seriesSource !== this.provider.source;
 				if (sourceChanged) {
@@ -349,17 +423,13 @@ class HwinfoPoller extends EventEmitter {
 				// genuinely fresh snapshot: a frozen or stale source must never
 				// push duplicate points (that would flatten the line in place
 				// and churn setImage for no new data). Native values in; the
-				// key renderer self-normalizes.
+				// key renderer self-normalizes. A ring describes one
+				// measurement in one unit: when the saved key comes to stand
+				// for another (a re-paired link) or the unit is rewritten, the
+				// segment ends in place.
 				for (const [key, ring] of this.series) {
-					const reading = snapshot.byKey.get(key);
-					if (reading === undefined || !Number.isFinite(reading.value)) {
-						ring.length = 0;
-						continue;
-					}
-					const unit = `${reading.type}:${reading.unit}`;
-					if (this.seriesUnits.get(key) !== unit) ring.length = 0;
-					this.seriesUnits.set(key, unit);
-					if (evidenceChanged && (stampChanged || ring.length === 0 || ring.at(-1) !== reading.value)) {
+					const reading = this.alignRing(key, ring, snapshot);
+					if (reading !== undefined && evidenceChanged && (stampChanged || ring.length === 0 || ring.at(-1) !== reading.value)) {
 						pushSample(ring, reading.value);
 					}
 				}
@@ -372,12 +442,16 @@ class HwinfoPoller extends EventEmitter {
 			}
 			// Freshness is judged even when the read was skipped (mutex busy) —
 			// a consumer wedged on the mutex must not freeze us at "ok" forever.
+			// With no accepted observation yet there is nothing to be stale:
+			// the source stays open and the read is simply retried next tick.
 			const staleForMs = monotonicNow() - this.lastAdvanceAt;
-			if (staleForMs > STALE_AFTER_MS) {
+			if (this.lastAdvanceAt !== 0 && staleForMs > STALE_AFTER_MS) {
 				for (const ring of this.series.values()) ring.length = 0;
 				// The data is frozen. If HWiNFO exited we would never notice through
-				// our held handles — probe a fresh open.
-				const source = this.provider.source;
+				// our held handles — probe a fresh open. What gets published is
+				// the snapshot's own provenance: a fresh read names the provider
+				// that produced it, a held one keeps the source it came from.
+				const source = snapshot !== null ? this.provider.source : this.status.state !== "unavailable" ? this.status.source : this.provider.source;
 				this.probeReopen();
 				const last = snapshot ?? (this.status.state !== "unavailable" ? this.status.snapshot : null);
 				if (last !== null) {
@@ -401,7 +475,11 @@ class HwinfoPoller extends EventEmitter {
 				// staleness, surfaces immediately. A held status always
 				// postdates an advance, so lastAdvanceAt is set.
 				const transient = err.reason === "invalid" || err.reason === "not-running" || err.reason === "busy";
-				if (transient && this.status.state !== "unavailable" && monotonicNow() - this.lastAdvanceAt <= STALE_AFTER_MS) {
+				// The hold is bounded by the evidence clock; a source that has
+				// none yet (a cold Gadget key held at Age unknown) is bounded
+				// by its last accepted read instead, never by process uptime.
+				const heldSince = this.lastAdvanceAt !== 0 ? this.lastAdvanceAt : this.lastAcceptedAt;
+				if (transient && this.status.state !== "unavailable" && monotonicNow() - heldSince <= STALE_AFTER_MS) {
 					if (this.holdingSince === 0) {
 						this.holdingSince = monotonicNow();
 						this.logger.info(`Holding last values while the data source reopens [${err.reason}]: ${err.message}`);
@@ -412,11 +490,13 @@ class HwinfoPoller extends EventEmitter {
 						this.logger.warn(`HWiNFO unavailable [${err.reason}]: ${err.message}`);
 					}
 					this.status = { state: "unavailable", reason: err.reason, message: err.message };
+					this.lastRaw = null;
 				}
 			} else {
 				this.holdingSince = 0;
 				this.logger.error("Unexpected poll failure", err);
 				this.status = { state: "unavailable", reason: "invalid", message: String(err) };
+				this.lastRaw = null;
 			}
 		}
 		this.emit("tick", this.status);
@@ -457,8 +537,10 @@ class HwinfoPoller extends EventEmitter {
 			const upgraded = SharedMemoryProvider.open();
 			this.provider.close();
 			this.provider = upgraded;
+			// The first accepted shared-memory read counts as an advance
+			// through its stamp; the open itself changes nothing about the
+			// age of the Gadget observation still on the keys.
 			this.lastPollTime = -1;
-			this.lastAdvanceAt = now;
 			this.logger.info("Shared memory returned — upgraded from the gadget registry");
 		} catch {
 			// Still unavailable — stay on the gadget registry.

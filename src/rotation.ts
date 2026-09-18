@@ -4,7 +4,34 @@
  * behavior is unit-testable without the Stream Deck runtime.
  */
 import type { Reading, SensorSnapshot } from "./hwinfo/types";
-import { readingMatchesKey } from "./hwinfo/reading-links";
+import { liveKeyOf, readingMatchesKey } from "./hwinfo/reading-links";
+
+/**
+ * Resolves picked keys to readings in picked order, skipping keys the
+ * snapshot does not publish. Two keys that resolve to one measurement (a
+ * confirmed link's two endpoints both ticked) yield one entry, the first
+ * picked, so a set can never list the same reading twice or strand a step
+ * on the duplicate. The saved keys themselves are never rewritten.
+ */
+function pickedReadings(keys: readonly string[], snapshot: SensorSnapshot): readonly Reading[] {
+	const seen = new Set<string>();
+	const list: Reading[] = [];
+	for (const key of keys) {
+		const reading = snapshot.byKey.get(key);
+		if (reading === undefined || seen.has(liveKeyOf(reading))) continue;
+		seen.add(liveKeyOf(reading));
+		list.push(reading);
+	}
+	return list;
+}
+
+/** The list position of the current selection: the entry saved under that
+ * exact key first, else the entry a confirmed link resolves it to. */
+function indexOfKey(list: readonly Reading[], currentKey: string | undefined): number {
+	if (currentKey === undefined) return -1;
+	const exact = list.findIndex((r) => r.key === currentKey);
+	return exact !== -1 ? exact : list.findIndex((r) => readingMatchesKey(r, currentKey));
+}
 
 /**
  * The list a dial moves through. A rotation set (readings ticked in the
@@ -17,11 +44,14 @@ export function rotationReadings(setKeys: readonly string[] | undefined, current
 	// Settings arrive as untyped JSON: a malformed rotationKeys (a string has
 	// a truthy .length too) must degrade to "no set", never throw mid-tick.
 	if (Array.isArray(setKeys) && setKeys.length > 0) {
-		return setKeys.map((key) => snapshot.byKey.get(key)).filter((r): r is Reading => r !== undefined);
+		return pickedReadings(setKeys, snapshot);
 	}
 	const current = currentKey !== undefined && currentKey !== "" ? snapshot.byKey.get(currentKey) : undefined;
 	if (current !== undefined) {
-		return snapshot.readings.filter((r) => r.sensorIndex === current.sensorIndex).map((r) => readingMatchesKey(r, currentKey) ? current : r);
+		// The provider's own entries, whichever spelling the selection is
+		// saved under: the selection resolves through indexOfKey, and a
+		// row's name, color and session never depend on what is selected.
+		return snapshot.readings.filter((r) => r.sensorIndex === current.sensorIndex);
 	}
 	return snapshot.readings;
 }
@@ -34,7 +64,7 @@ export function stepReading(list: readonly Reading[], currentKey: string | undef
 	if (list.length === 0) {
 		return undefined;
 	}
-	const index = currentKey === undefined ? -1 : list.findIndex((r) => readingMatchesKey(r, currentKey));
+	const index = indexOfKey(list, currentKey);
 	if (index === -1) {
 		return list[0];
 	}
@@ -95,12 +125,21 @@ export function rotationGroupsOf(raw: unknown): readonly RotationGroup[] | undef
 	return groups.length >= 2 ? groups : undefined;
 }
 
-/** Lowest-index group containing the key; -1 with no owner (or no key). */
-export function activeGroupIndex(groups: readonly RotationGroup[], currentKey: string | undefined): number {
+/** Lowest-index group containing the key; -1 with no owner (or no key).
+ *  With a snapshot, a group that holds another confirmed spelling of the
+ *  same measurement owns it too (the exact spelling wins when both exist),
+ *  so a selection picked under the live provider's key stays inside the
+ *  group its saved spelling was ticked into. */
+export function activeGroupIndex(groups: readonly RotationGroup[], currentKey: string | undefined, snapshot?: SensorSnapshot): number {
 	if (currentKey === undefined || currentKey === "") {
 		return -1;
 	}
-	return groups.findIndex((g) => g.keys.includes(currentKey));
+	const exact = groups.findIndex((g) => g.keys.includes(currentKey));
+	if (exact !== -1 || snapshot === undefined) {
+		return exact;
+	}
+	const aliases = snapshot.byKey.get(currentKey)?.linkedKeys;
+	return aliases === undefined ? -1 : groups.findIndex((g) => g.keys.some((key) => aliases.includes(key)));
 }
 
 /** The group's display name for overlays and hints: as typed, or "group N".
@@ -121,9 +160,9 @@ export function groupDisplayName(groups: readonly RotationGroup[], index: number
  * into the groups instead of stranding it.
  */
 export function groupReadings(groups: readonly RotationGroup[], currentKey: string | undefined, snapshot: SensorSnapshot): readonly Reading[] {
-	const index = activeGroupIndex(groups, currentKey);
+	const index = activeGroupIndex(groups, currentKey, snapshot);
 	const group = groups[index === -1 ? 0 : index];
-	return group === undefined ? [] : group.keys.map((key) => snapshot.byKey.get(key)).filter((r): r is Reading => r !== undefined);
+	return group === undefined ? [] : pickedReadings(group.keys, snapshot);
 }
 
 /**
@@ -146,7 +185,7 @@ export function stepGroup(groups: readonly RotationGroup[], currentKey: string |
 	if (present.length === 0) {
 		return undefined;
 	}
-	const position = present.findIndex((p) => p.index === activeGroupIndex(groups, currentKey));
+	const position = present.findIndex((p) => p.index === activeGroupIndex(groups, currentKey, snapshot));
 	if (position === -1) {
 		return present[0]?.first;
 	}
@@ -173,7 +212,8 @@ export function stepSensorSource(list: readonly Reading[], currentKey: string | 
 			sources.push(reading.sensorIndex);
 		}
 	}
-	const current = currentKey === undefined ? undefined : list.find((r) => readingMatchesKey(r, currentKey));
+	const position = indexOfKey(list, currentKey);
+	const current = position === -1 ? undefined : list[position];
 	if (current === undefined) {
 		return list[0];
 	}
@@ -198,7 +238,7 @@ export function overviewWindow(list: readonly Reading[], currentKey: string | un
 	if (list.length === 0 || size <= 0) {
 		return { rows: [], selectedIndex: -1 };
 	}
-	const index = currentKey === undefined ? -1 : list.findIndex((r) => readingMatchesKey(r, currentKey));
+	const index = indexOfKey(list, currentKey);
 	const start = index === -1 ? 0 : Math.max(0, Math.min(index - Math.floor((size - 1) / 2), list.length - size));
 	const rows = list.slice(start, start + size);
 	return { rows, selectedIndex: index === -1 ? -1 : index - start };
@@ -219,10 +259,14 @@ export function overviewWindow(list: readonly Reading[], currentKey: string | un
  */
 export function autoCycleTarget(list: readonly Reading[], alertList: readonly Reading[], currentKey: string | undefined, criticalKeys: ReadonlySet<string>, alertAware: boolean): Reading | undefined {
 	if (alertAware) {
-		if (currentKey !== undefined && criticalKeys.has(currentKey)) {
+		// The selection is the entry it resolves to, whichever spelling it
+		// is saved under: a critical reading holds the cycle, and the hunt
+		// never "moves" onto the measurement already on the dial.
+		const current = alertList[indexOfKey(alertList, currentKey)];
+		if ((current !== undefined && criticalKeys.has(current.key)) || (currentKey !== undefined && criticalKeys.has(currentKey))) {
 			return undefined;
 		}
-		const alerting = alertList.find((r) => r.key !== currentKey && criticalKeys.has(r.key));
+		const alerting = alertList.find((r) => r !== current && r.key !== currentKey && criticalKeys.has(r.key));
 		if (alerting !== undefined) {
 			return alerting;
 		}

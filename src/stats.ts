@@ -10,6 +10,7 @@
  * thrash the moment the sampled set outgrew it, silently resetting every
  * session each tick.
  */
+import { liveKeyOf } from "./hwinfo/reading-links";
 import type { Reading, SensorSnapshot } from "./hwinfo/types";
 
 export type SessionStats = {
@@ -19,13 +20,14 @@ export type SessionStats = {
 	count: number;
 };
 
-export type SessionResetReason = "source" | "unit" | "type" | "binding";
+export type SessionResetReason = "source" | "unit" | "type" | "binding" | "gap";
 
 const RESET_MESSAGES: Record<SessionResetReason, string> = {
 	source: "stats reset: source changed",
 	unit: "stats reset: units changed",
 	type: "stats reset: reading changed",
-	binding: "stats reset: pairing changed"
+	binding: "stats reset: pairing changed",
+	gap: "stats reset: data gap"
 };
 
 export function sessionResetMessage(reason: SessionResetReason): string {
@@ -38,14 +40,18 @@ type Observation = {
 	source: string;
 	type: Reading["type"];
 	unit: string;
-	bindingRevision: number;
+	/** The provider key the saved key stood for when this was observed. A
+	 * saved key that comes to stand for another measurement (a re-paired
+	 * link) starts a new session; merely gaining or losing an alias while it
+	 * keeps resolving to the same measurement does not. */
+	identity: string;
 };
 
-function observationResetReason(previous: Observation, reading: Reading, source: string, bindingRevision: number): SessionResetReason | undefined {
+function observationResetReason(previous: Observation, reading: Reading, source: string): SessionResetReason | undefined {
 	if (previous.source !== source) return "source";
 	if (previous.unit !== reading.unit) return "unit";
 	if (previous.type !== reading.type) return "type";
-	if (previous.bindingRevision !== bindingRevision) return "binding";
+	if (previous.identity !== liveKeyOf(reading)) return "binding";
 	return undefined;
 }
 
@@ -60,7 +66,7 @@ export class SessionStatsStore {
 		for (const [key, previous] of this.observations) {
 			if (sampledKeys.has(key)) continue;
 			const reading = snapshot.byKey.get(key);
-			if (reading === undefined || !Number.isFinite(reading.value) || observationResetReason(previous, reading, source, snapshot.bindingRevision ?? 0) !== undefined) {
+			if (reading === undefined || !Number.isFinite(reading.value) || observationResetReason(previous, reading, source) !== undefined) {
 				this.reset([key]);
 			}
 		}
@@ -69,9 +75,8 @@ export class SessionStatsStore {
 	/** Sample-weighted local observations, never repeated held frames. A
 	 * provider/unit/link change starts a new session for that reading. */
 	observe(reading: Reading, snapshot: SensorSnapshot, source: string): SessionResetReason | undefined {
-		const bindingRevision = snapshot.bindingRevision ?? 0;
 		const previous = this.observations.get(reading.key);
-		const reason = previous === undefined ? undefined : observationResetReason(previous, reading, source, bindingRevision);
+		const reason = previous === undefined ? undefined : observationResetReason(previous, reading, source);
 		if (reason !== undefined) this.reset([reading.key]);
 		if (!Number.isFinite(reading.value)) {
 			this.reset([reading.key]);
@@ -79,7 +84,7 @@ export class SessionStatsStore {
 		}
 		if (reason === undefined && previous?.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
 		this.sample(reading.key, reading.value);
-		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, bindingRevision });
+		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, identity: liveKeyOf(reading) });
 		return reason;
 	}
 
@@ -138,6 +143,18 @@ export class SessionStatsStore {
 		for (const key of keys) {
 			this.byKey.delete(key);
 			this.observations.delete(key);
+		}
+	}
+
+	/** Resets every session observed for one of these measurement
+	 * identities, under whichever saved spelling it was sampled: a reset
+	 * aimed at a reading must not leave its other spelling's session behind. */
+	resetIdentities(identities: ReadonlySet<string>): void {
+		for (const [key, observation] of this.observations) {
+			if (identities.has(observation.identity)) {
+				this.byKey.delete(key);
+				this.observations.delete(key);
+			}
 		}
 	}
 

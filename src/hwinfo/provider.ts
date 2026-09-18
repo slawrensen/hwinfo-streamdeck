@@ -24,6 +24,9 @@ export interface SnapshotProvider {
 	 * interleave). Throws {@link HwinfoError} when the backend is gone.
 	 */
 	read(): SensorSnapshot | null;
+	/** One-time diagnostic lines the provider wants logged (a withheld row,
+	 * named by slot); drained by the poller after each read. Optional. */
+	notices?(): string[];
 	close(): void;
 }
 

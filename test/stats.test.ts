@@ -103,3 +103,20 @@ describe("thresholdsApplyTo (mixed-unit safety)", () => {
 		assert.equal(thresholdsApplyTo("", "RPM"), false);
 	});
 });
+
+describe("a reset aims at measurements", () => {
+	it("resetIdentities clears every spelling sampled for one measurement and nothing else", async () => {
+		const { SessionStatsStore } = await import("../src/stats");
+		const store = new SessionStatsStore();
+		const snapshot = { pollTime: 1, version: 1, revision: 0, sensors: [], readings: [], byKey: new Map() };
+		const live = { key: "f0001234:0:1000001", type: 1, sensorIndex: 0, id: 1, label: "Temperature", unit: "°C", value: 40, valueMin: 40, valueMax: 40, valueAvg: 40 };
+		const alias = { ...live, key: "g:GPU:Temperature", aliasOf: live.key, linkedKeys: [live.key, "g:GPU:Temperature"] };
+		const other = { ...live, key: "f0001234:0:1000002", id: 2, value: 70 };
+		for (const reading of [live, alias, other]) store.observe(reading, snapshot, "shared-memory");
+		assert.equal(store.size, 3);
+		store.resetIdentities(new Set([live.key]));
+		assert.equal(store.get(live.key), undefined);
+		assert.equal(store.get(alias.key), undefined, "the other spelling's session goes with it");
+		assert.deepEqual(store.get(other.key), { min: 70, max: 70, sum: 70, count: 1 });
+	});
+});

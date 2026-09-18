@@ -259,13 +259,17 @@ export function detailRoleOf(settings: { detailRole?: unknown }): DetailRole | u
  * apply, so settings written through it never carry one, but a document
  * pasted straight into a settings file by hand does. A shared-memory key
  * is colon-separated hex and never contains whitespace, so it ends at the
- * first run of it. A Gadget key is "g:<source>:<label>", the names as
- * HWiNFO writes them, so it carries spaces of its own (issue #21 meets
- * custom mode) and already reads as a name: it is kept whole, and the
- * panel never appends a name to one.
+ * first run of it. A Gadget key is "g:<source>:<label>", the names exactly
+ * as HWiNFO writes them, so it carries spaces of its own (issue #21 meets
+ * custom mode) and already reads as a name: it is kept whole, trailing
+ * whitespace included, and the panel never appends a name to one.
  */
 export function bareReadingKey(entry: string): string {
-	const trimmed = entry.trim();
+	// Leading whitespace is a hand indent, never identity: no key starts
+	// with it. Trailing whitespace on a Gadget key IS identity (a label
+	// ending in a space is a different reading from the one without), so a
+	// recognized Gadget key is kept whole to its last character.
+	const trimmed = entry.trimStart();
 	if (trimmed.startsWith("g:")) {
 		return trimmed;
 	}

@@ -25,8 +25,15 @@ export interface SensorSource {
 
 /** A single reading, e.g. "CPU (Tctl/Tdie) = 56.3 °C". */
 export interface Reading {
-	/** Explicit user-confirmed equivalent keys on another provider. */
+	/** Every key that resolves to this measurement (its provider key and the
+	 * confirmed aliases: explicit cross-provider links, and legacy Gadget keys
+	 * kept resolvable), in the runtime's lookup order. Absent when the key
+	 * stands alone. */
 	readonly linkedKeys?: readonly string[];
+	/** The provider's own key when this entry is a confirmed alias of it;
+	 * absent on the provider's own entry. Personalization stays keyed by the
+	 * saved key; sessions and history follow this identity. */
+	readonly aliasOf?: string;
 	/**
 	 * Stable identity of this reading across HWiNFO restarts:
 	 * `sensorId:sensorInstance:readingId` (hex), with `~n` appended for
@@ -65,6 +72,9 @@ export interface SensorSnapshot {
 	readonly bindingRevision?: number;
 	/** Gadget readings withheld because their names are incomplete or ambiguous. */
 	readonly blockedReadingCount?: number;
+	/** Gadget rows withheld because the formatted value contradicts the raw
+	 * value; the plugin log names the slot. */
+	readonly contradictoryReadingCount?: number;
 	/** Measurement evidence, distinct from render/topology revision. Shared
 	 * memory counts producer stamps or finite same-unit value changes; Gadget
 	 * counts only finite same-unit value changes. Initial decoding is zero. */

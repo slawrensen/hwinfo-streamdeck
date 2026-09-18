@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
+import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, groupReadings, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../src/rotation";
 
 function reading(key: string, sensorIndex: number): Reading {
@@ -36,6 +37,60 @@ describe("rotationReadings", () => {
 	it("an empty set behaves like no set", () => {
 		const list = rotationReadings([], "a:0:2", snap);
 		assert.deepEqual(list.map((r) => r.key), ["a:0:1", "a:0:2"]);
+	});
+
+	it("both endpoints of one confirmed pair in a set are one reading", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		const list = rotationReadings(["a:0:1", "g:X:1", "a:0:2"], "g:X:1", linked);
+		assert.deepEqual(list.map((r) => r.key), ["a:0:1", "a:0:2"], "the first picked spelling stays, the alias is not a second row");
+		assert.equal(stepReading(list, "g:X:1", 1)?.key, "a:0:2", "a forward turn moves");
+		assert.equal(stepReading(list, "g:X:1", -1)?.key, "a:0:2", "and wraps backward");
+		assert.equal(overviewWindow(list, "g:X:1", 3).selectedIndex, 0, "the selection is the row the alias resolves to");
+		assert.equal(autoCycleTarget(list, list, "g:X:1", new Set(), false)?.key, "a:0:2", "the auto cycle never holds on the alias");
+		const groups = rotationGroupsOf([{ name: "one", keys: ["g:X:1", "a:0:1"] }, { name: "two", keys: ["b:0:1"] }]);
+		assert.ok(groups);
+		assert.deepEqual(groupReadings(groups, "a:0:1", linked).map((r) => r.key), ["g:X:1"], "groups collapse the pair the same way");
+	});
+
+	it("without a set the rows are the provider's own entries, and an alias-spelled selection resolves onto its row", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		// A row's name, color and session never depend on what is selected.
+		const list = rotationReadings(undefined, "g:X:1", linked);
+		assert.deepEqual(list.map((r) => r.key), ["a:0:1", "a:0:2"]);
+		assert.deepEqual(rotationReadings(undefined, "a:0:1", linked).map((r) => r.key), ["a:0:1", "a:0:2"]);
+		assert.equal(overviewWindow(list, "g:X:1", 3).selectedIndex, 0);
+		assert.equal(stepReading(list, "g:X:1", 1)?.key, "a:0:2");
+		assert.equal(stepSensorSource([...list, ...rotationReadings(["b:0:1"], undefined, linked)], "g:X:1", 1)?.key, "b:0:1");
+	});
+
+	it("an exact entry wins over a linked one when a list carries both", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		const alias = linked.byKey.get("g:X:1");
+		const live = linked.byKey.get("a:0:1");
+		const other = linked.byKey.get("a:0:2");
+		assert.ok(alias && live && other);
+		assert.equal(stepReading([live, other, alias], "g:X:1", 1)?.key, "a:0:1", "stepping from the alias entry itself wraps to the first");
+	});
+
+	it("a group owns a selection saved under its other confirmed spelling", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		const groups = rotationGroupsOf([{ name: "one", keys: ["b:0:1"] }, { name: "two", keys: ["a:0:1", "a:0:2"] }]);
+		assert.ok(groups);
+		assert.equal(activeGroupIndex(groups, "g:X:1"), -1, "without a snapshot only the exact spelling is known");
+		assert.equal(activeGroupIndex(groups, "g:X:1", linked), 1, "the group holding the saved spelling owns the live pick");
+		assert.deepEqual(groupReadings(groups, "g:X:1", linked).map((r) => r.key), ["a:0:1", "a:0:2"], "plain rotation stays inside that group");
+		assert.equal(stepGroup(groups, "g:X:1", 1, linked)?.key, "b:0:1", "and a group jump leaves from it");
+		const both = rotationGroupsOf([{ name: "exact", keys: ["g:X:1"] }, { name: "alias", keys: ["a:0:1", "a:0:2"] }]);
+		assert.ok(both);
+		assert.equal(activeGroupIndex(both, "g:X:1", linked), 0, "the exact spelling wins when two groups could claim it");
+	});
+
+	it("the alert-aware cycle holds on a critical reading selected under its other spelling", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		const list = rotationReadings(["a:0:1", "a:0:2"], "g:X:1", linked);
+		assert.equal(autoCycleTarget(list, list, "g:X:1", new Set(["a:0:1"]), true), undefined, "the critical selection holds the cycle");
+		assert.equal(autoCycleTarget(list, list, "g:X:1", new Set(["a:0:2"]), true)?.key, "a:0:2", "another critical member still interrupts");
+		assert.equal(autoCycleTarget(list, list, "g:X:1", new Set(), true)?.key, "a:0:2", "with no alert it steps on");
 	});
 
 	it("a malformed set (settings are untyped JSON) degrades to no set", () => {

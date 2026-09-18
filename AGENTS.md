@@ -58,8 +58,12 @@ Rules that keep it sound:
   The loader refuses a mismatched addon (fails closed as "bridge-failed").
   Bump BOTH on any API shape/meaning change.
 - The native version (`HWSM_NATIVE_VERSION_*`, also the version resource)
-  changes only when native source behavior changes, so TypeScript-only
-  releases ship byte-identical native bytes.
+  changes only when native source behavior changes. A TypeScript-only
+  release keeps the native version and source id; its bytes reproduce
+  within one runner image but can move when the image's MSVC toolset
+  moves (1.5.1 and 1.6.0 built different bytes from identical source), so
+  the release workflow compares each build with the previous release's
+  manifest and annotates the run when the bytes drift.
 - The consistency mutex is mandatory; there is no unguarded read path. The
   header is re-validated under the mutex on every read against the
   session's exact mapped length (checked arithmetic, 64 MiB bound).
@@ -96,6 +100,15 @@ Dev loop: `streamdeck link com.lawrensen.hwinfo.sdPlugin` once, then
 
 ## Conventions
 
+- **Public copy is plain and specific.** Lead with what changes for the user,
+  the condition under which it works, and any action they need to take. Use
+  exact UI labels. Write as Stephen, first person singular when needed, not
+  a fictional team. Cut sales language, filler, metaphors and repeated
+  explanations. Do not invent anecdotes or imitate another person's voice.
+  Mark candidate features as unreleased; distinguish renderer samples,
+  settings-panel captures and hardware photographs. Claims need code, tests
+  or measured evidence. The maintainer's full checkout has the detailed
+  rules in `docs/release/COPY_RULES.md`; run the release-copy validator there.
 - **Tabs** for indentation. TypeScript strict: no `any`, explicit boundary
   types, `console.error` only (the probe and build scripts are exempt).
 - **No em dashes** in prose or user-facing strings. The lone em dash on an empty
@@ -144,7 +157,9 @@ split so soak numbers stay honest.
 ## Distribution
 
 - **GitHub Releases** (un-DRM'd, direct download): push a `vX.Y.Z` tag and
-  `.github/workflows/release.yml` builds, packs, hashes, and publishes.
+  `.github/workflows/release.yml` builds, packs, hashes, and stages a draft
+  release that I publish by hand after checking the pack against the local
+  candidate.
 - **Elgato Marketplace** (DRM applied on Elgato's side): a separate submission.
 - `CHANGELOG.md` is the release history; `docs/changelog.md` mirrors it on the
   site (`npm run changelog:page` regenerates it).

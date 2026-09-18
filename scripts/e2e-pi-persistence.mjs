@@ -52,12 +52,23 @@ const check = makeCheck((name) => results.errors.push(name));
 // The unknown future field a newer plugin version might store: it must
 // ride through every edit untouched, nesting and all.
 const FUTURE_BLOB = { nested: { deep: [1, "two", { three: 3 }] }, keep: "yes" };
+// A deck running on Gadget with confirmed links in the deck document, and
+// a dial whose selection, set and colors were saved while Shared Memory
+// was live: every saved key is an ALIAS of a live tree row (the runtime
+// hands the aliases over in each row's `keys`, src/pi-protocol.ts).
+const LINKED_SM = ["f0000501:0:1000000", "e0002000:0:1000000", "f7006687:0:3000001"];
+const LINKED_G = ["g:Link Source:CPU Temp", "g:Link Source:GPU Temp", "g:Link Source:Pump"];
+const LINKED_LINKS = [
+	{ sharedMemory: LINKED_SM[0], gadget: LINKED_G[0], unit: "°C", sensorType: 1 },
+	{ sharedMemory: LINKED_SM[1], gadget: LINKED_G[1], unit: "°C", sensorType: 1 },
+	{ sharedMemory: LINKED_SM[2], gadget: LINKED_G[2], unit: "RPM", sensorType: 3 }
+];
 const SEEDS = {
 	back: { readingKey: "cpu:0:0", detailRole: "back", futureBlob: FUTURE_BLOB },
 	plain: { readingKey: "cpu:0:0", warnValue: "80", futureBlob: FUTURE_BLOB },
 	// The dial panel-truth leg: Custom preset with two touch zones (the
 	// dead-tap configuration) on the overview view (no bar to promise).
-	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview" },
+	dial: { readingKey: "cpu:0:0", controlPreset: "custom", touchZones: "two", dialView: "overview", futureBlob: FUTURE_BLOB },
 	// A grouped custom list: one hand-dressed quad in the plan, then the
 	// uniform fill at density 4. Exercises the shrink-on-remove rules and
 	// the one-frame-per-edit invariant.
@@ -145,13 +156,39 @@ const SEEDS = {
 		detailMode: "custom",
 		detailKeys: ["g:Test Source:Test Fan", "g:Gap Source:After Gap"],
 		futureBlob: FUTURE_BLOB
+	},
+	// The panel opened before HWiNFO (run 12): the tree arrives empty with
+	// state "unavailable", and one saved key is genuinely absent from the
+	// live layout, so one leg can ask the panel both questions in turn.
+	down: {
+		readingKey: "ghost:0:0",
+		rotationKeys: ["cpu:0:0", "cpu:0:1", "ghost:0:0"],
+		dialView: "overview",
+		futureBlob: FUTURE_BLOB
+	},
+	// A linked saved selection on the dial (run 10): keys saved under Shared
+	// Memory, the deck now on Gadget. The panel must resolve every saved key
+	// through the tree's aliases and never rewrite one; the color saved under
+	// a live twin is the one the face paints for the saved row.
+	linked: {
+		readingKey: LINKED_SM[0],
+		rotationKeys: [...LINKED_SM],
+		dialView: "overview",
+		readingColors: { [LINKED_G[1]]: "#FF7E8E", dormant: "#ABCDEF" },
+		futureBlob: FUTURE_BLOB
 	}
 };
 
 let mode = "back";
+/** The action the page served last registers as; getSettings replies carry it. */
+let pageAction = "com.lawrensen.hwinfo.reading";
 const store = { settings: structuredClone(SEEDS.back) };
 const writes = []; // every setSettings payload, in arrival order
 const globalWrites = []; // every setGlobalSettings payload, same order
+const opened = []; // every url the panel asked the app to open
+/** The source is down: getSensorTree answers the unavailable tree. Set by
+ * seeding "down", cleared by any other seed and by /tree/up. */
+let treeDown = false;
 let piWs = null;
 const toPi = (obj) => piWs?.send(JSON.stringify(obj));
 
@@ -230,6 +267,36 @@ const GADGET_TREE = {
 	source: "gadget",
 	hint: "Reading from the HWiNFO Gadget registry: current values only."
 };
+/** The tree the linked seed sees: Gadget live, and each row's `keys`
+ * carrying its Shared Memory endpoint, the way buildSensorTree hands the
+ * runtime's linkedKeys over. Served only in that mode. */
+const LINKED_TREE = {
+	event: "sensorTree",
+	groups: [
+		{
+			name: "Link Source",
+			matchName: "Link Source",
+			readings: [
+				{ key: LINKED_G[0], keys: [LINKED_G[0], LINKED_SM[0]], label: "CPU Temp", unit: "°C", value: 71.4, type: 1, display: "71.4 °C" },
+				{ key: LINKED_G[1], keys: [LINKED_G[1], LINKED_SM[1]], label: "GPU Temp", unit: "°C", value: 76.2, type: 1, display: "76.2 °C" },
+				{ key: LINKED_G[2], keys: [LINKED_G[2], LINKED_SM[2]], label: "Pump", unit: "RPM", value: 2850, type: 3, display: "2850 RPM" }
+			]
+		}
+	],
+	state: "ok",
+	source: "gadget",
+	hint: "Reading from the HWiNFO Gadget registry: current values only."
+};
+/** The tree the panel gets while the source is down: src/pi-protocol.ts
+ * builds it with no groups and state "unavailable". It lists nothing, which
+ * says nothing about any saved key. */
+const DOWN_TREE = {
+	event: "sensorTree",
+	groups: [],
+	state: "unavailable",
+	source: "shared-memory",
+	hint: "HWiNFO is not running. Start HWiNFO with Shared Memory Support enabled."
+};
 const THEMES = {
 	event: "themes",
 	effectiveDeckTheme: "void",
@@ -251,23 +318,32 @@ wss.on("connection", (ws) => {
 			case "getSettings":
 				// device rides along like the real app sends it: the sdpi
 				// client's getSettings filters replies on action, context
-				// AND device, and a missing field hangs that promise.
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
+				// AND device, and a missing field hangs that promise. The
+				// action is the one the open page registered as (the dial
+				// page registers the encoder action), for the same reason.
+				ws.send(JSON.stringify({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
 				break;
 			case "setSettings":
 				writes.push(structuredClone(msg.payload ?? {}));
 				store.settings = msg.payload ?? {};
 				break;
 			case "getGlobalSettings":
-				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: { theme: "void" } } }));
+				// The linked seed's deck document carries the confirmed pairs the
+				// plugin applied to give LINKED_TREE its aliases.
+				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: mode === "linked" ? { theme: "void", readingLinks: LINKED_LINKS } : { theme: "void" } } }));
 				break;
 			case "setGlobalSettings":
 				globalWrites.push(structuredClone(msg.payload ?? {}));
 				break;
+			// What the app does with a help link: hand the url to the default
+			// browser and leave the inspector where it is.
+			case "openUrl":
+				opened.push(msg.payload?.url ?? "");
+				break;
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
 				if (event === "getSensorTree") {
-					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: mode === "gadget" ? GADGET_TREE : TREE });
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: treeDown ? DOWN_TREE : mode === "gadget" ? GADGET_TREE : mode === "linked" ? LINKED_TREE : TREE });
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
@@ -308,11 +384,18 @@ function dialBootstrap() {
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const server = createServer((req, res) => {
 	const url = (req.url ?? "/").split("?")[0];
-	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget)$/);
+	const seedMatch = url.match(/^\/seed\/(back|plain|dial|grouped|bench|cap|salvage|density|adopted|repick|gadget|linked|down)$/);
 	if (seedMatch !== null) {
 		mode = seedMatch[1];
 		store.settings = structuredClone(SEEDS[mode]);
 		writes.length = 0;
+		treeDown = mode === "down";
+		res.writeHead(200).end("ok");
+		return;
+	}
+	// HWiNFO comes back mid-leg: the next tree fetch is one the source answered.
+	if (url === "/tree/up") {
+		treeDown = false;
 		res.writeHead(200).end("ok");
 		return;
 	}
@@ -324,8 +407,10 @@ const server = createServer((req, res) => {
 	try {
 		let body = readFileSync(file);
 		if (file.endsWith("sensor-reading.html")) {
+			pageAction = "com.lawrensen.hwinfo.reading";
 			body = Buffer.from(body.toString("utf8").replace("</head>", `${bootstrap()}</head>`));
 		} else if (file.endsWith("sensor-dial.html")) {
+			pageAction = "com.lawrensen.hwinfo.dial";
 			body = Buffer.from(body.toString("utf8").replace("</head>", `${dialBootstrap()}</head>`));
 		}
 		res.writeHead(200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }).end(body);
@@ -2145,11 +2230,11 @@ try {
 	await sleep(1400); // the panel reloads itself after an apply
 	check("leg S: the reloaded panel shows the chips in the pasted order", (await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value === JSON.stringify(["bench:0:2", "bench:0:0", "bench:0:5"]), String((await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value));
 	await evaluate(`(() => {
-		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper" });
+		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } });
 		document.getElementById("config-deck-apply").click();
 	})()`);
 	await sleep(700);
-	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
+	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
 
 	// ---- leg C: Copy hands out the settings of now, not of fold-open -----
@@ -2221,6 +2306,23 @@ try {
 	check("leg C: deck Copy filled the deck well with the deck document", legCDeck !== null && legCDeck.theme === "void" && legCDeck.detailKeys === undefined && legCDeck.readingKey === undefined, JSON.stringify(legCDeck)?.slice(0, 120));
 	check("leg C: deck Copy was a read, not a write", writes.length === mark && globalWrites.length === gmarkDeck, `${writes.length - mark}/${globalWrites.length - gmarkDeck}`);
 	check("leg C: deck Copy reports Copied. through the legacy path", (await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value === "Copied.", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
+
+	// leg C2: closing and reopening the fold is not a reason to lose a draft.
+	// The fold is toggled for its own reasons (on the dial it also holds the
+	// gestures), and the refill on open overwrote the hand-typed document
+	// with the stored one: the only place a reading link is authored, gone to
+	// one stray click. The well nobody touched must still refill, which is
+	// also the proof the two wells fill independently.
+	mark = writes.length;
+	const gmarkFold = globalWrites.length;
+	await evaluate(`(() => { document.getElementById("config-deck").value = "not the deck document"; return "ok"; })()`);
+	await evaluate(`(() => { document.querySelector('details[data-fold="advanced"]').open = false; return "ok"; })()`);
+	await sleep(300);
+	await evaluate(`(() => { document.querySelector('details[data-fold="advanced"]').open = true; return "ok"; })()`);
+	await sleep(900);
+	check("leg C2: the hand-edited draft survives a fold toggle", (await evaluate(`document.getElementById("config-key")?.value`)).result?.value === "{ draft", String((await evaluate(`document.getElementById("config-key")?.value`)).result?.value).slice(0, 80));
+	check("leg C2: the untouched well refills on the same toggle", (await evaluate(`document.getElementById("config-deck")?.value`)).result?.value === JSON.stringify({ theme: "void" }, null, "\t"), String((await evaluate(`document.getElementById("config-deck")?.value`)).result?.value).slice(0, 80));
+	check("leg C2: the toggle was a read, not a write", writes.length === mark && globalWrites.length === gmarkFold, `${writes.length - mark}/${globalWrites.length - gmarkFold}`);
 
 	// ---- run 7c: a real press survives the rename it tears down (leg R) --
 	// Every other leg drives the panel with element.click(), which fires no
@@ -2300,6 +2402,67 @@ try {
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
+	const colorToggle = `document.getElementById('sensor-value-colors-toggle').shadowRoot.querySelector('input[type=checkbox]')`;
+	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
+	await evaluate(`${colorToggle}.click()`);
+	await sleep(500);
+	check("dial: toggle persists exact true with unknown and unrelated settings", store.settings.sensorValueColors === true && store.settings.touchZones === "two" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	await setSelect("dialView", "single");
+	await waitDom("dial: single view hides the option", `document.getElementById('sensor-value-colors').hidden`, 2000);
+	check("dial: hiding preserves the stored choice", store.settings.sensorValueColors === true);
+	await setSelect("dialView", "tworow");
+	await waitDom("dial: two-row restores the checked option", `!document.getElementById('sensor-value-colors').hidden && ${colorToggle}.checked`, 2000);
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	check("dial: reopening writes nothing", writes.length === mark);
+	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
+	await evaluate(`${colorToggle}.click()`);
+	await sleep(500);
+	check("dial: toggle persists exact false without dropping unknown settings", store.settings.sensorValueColors === false && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+	store.settings.sensorValueColors = "true";
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	await waitDom("dial: malformed boolean displays off", `!${colorToggle}.checked`, 2000);
+	check("dial: malformed setting is not rewritten on opening", writes.length === mark && store.settings.sensorValueColors === "true");
+	await setSelect("dialView", "overview");
+	await sleep(500);
+	check("dial: unrelated edit preserves malformed and unknown settings", store.settings.sensorValueColors === "true" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
+
+	// Individual colors use real native wells and the quad-style preset.
+	const colorPreset = `document.getElementById('reading-color-preset')`;
+	await waitDom("dial: automatic colors show the current sensor's readings", `${colorPreset}.value === 'automatic' && document.querySelectorAll('#reading-color-list input[type=color]').length > 1`, 2000);
+	await evaluate(`${colorPreset}.value='signal'; ${colorPreset}.dispatchEvent(new Event('change',{bubbles:true}))`);
+	await sleep(500);
+	const signalColors = { ...store.settings.readingColors };
+	const colorKeys = Object.keys(signalColors);
+	check("dial: Signal persists independent reading identities", colorKeys.length > 1 && signalColors[colorKeys[0]] === "#4CC2FF" && signalColors[colorKeys[1]] === "#FF7E8E");
+	mark = writes.length;
+	await evaluate(`(()=>{const e=document.querySelector('#reading-color-list input[type=color]'); e.focus(); e.value='#123abc'; e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+	await sleep(450);
+	check("dial: dragging a color well does not write per frame", writes.length === mark);
+	await evaluate(`(()=>{const e=document.querySelector('#reading-color-list input[type=color]'); e.dispatchEvent(new Event('change',{bubbles:true})); e.blur();})()`);
+	await sleep(500);
+	check("dial: closing a color well writes just that reading and preserves other settings", store.settings.readingColors[colorKeys[0]] === "#123abc" && store.settings.readingColors[colorKeys[1]] === "#FF7E8E" && deepEqual(store.settings.futureBlob, FUTURE_BLOB) && store.settings.sensorValueColors === "true");
+	await waitDom("dial: edited wells report Custom", `${colorPreset}.value === 'custom'`, 2000);
+	await setSelect("dialView", "single");
+	check("dial: single view retains custom reading colors", store.settings.readingColors[colorKeys[0]] === "#123abc");
+	await setSelect("dialView", "tworow");
+	store.settings.readingColors.future = { keep: "unknown" };
+	store.settings.readingColors.dormant = "#ABCDEF";
+	store.settings.rotationKeys = [...colorKeys].reverse();
+	mark = writes.length;
+	await cdp("Page.reload", {});
+	await sleep(3500);
+	check("dial: reopen and reordered readings write nothing", writes.length === mark);
+	await waitDom("dial: custom well survives reopening and reordering", `document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').value === '#123abc'`, 2000);
+	await evaluate(`document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').parentElement.querySelector('button').click()`);
+	await sleep(500);
+	check("dial: per-reading Auto resets only that reading", !Object.hasOwn(store.settings.readingColors, colorKeys[0]) && store.settings.readingColors[colorKeys[1]] === "#FF7E8E" && store.settings.readingColors.future?.keep === "unknown");
+	await evaluate(`${colorPreset}.value='automatic'; ${colorPreset}.dispatchEvent(new Event('change',{bubbles:true}))`);
+	await sleep(500);
+	check("dial: Automatic resets listed readings and preserves dormant and unknown entries", colorKeys.every((key) => !Object.hasOwn(store.settings.readingColors, key)) && store.settings.readingColors.dormant === "#ABCDEF" && store.settings.readingColors.future?.keep === "unknown" && deepEqual(store.settings.futureBlob, FUTURE_BLOB));
 
 	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
 	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.
@@ -2359,7 +2522,207 @@ try {
 		deepEqual(gadgetApplied.detailKeys, ["g:Gap Source:After Gap", "g:Test Source:Test Fan"]) && gadgetApplied.readingKey === "g:Test Source:Test Temp",
 		JSON.stringify({ readingKey: gadgetApplied.readingKey, detailKeys: gadgetApplied.detailKeys })
 	);
-	await sleep(1400); // the panel's self-reload after Apply settles before the browser goes down
+	await sleep(1400); // the panel's self-reload after Apply settles before the next navigation
+
+	// ---- run 10: a linked saved selection on the dial panel ---------------
+	// Settings saved while Shared Memory was live, the deck now on Gadget
+	// with confirmed links in the deck document: every tree row carries the
+	// saved key as an alias, and the panel must name, tick and color each
+	// saved key through that alias the way the face resolves it, without
+	// rewriting one. A key and its aliases are one member, so a membership
+	// tick is exactly one write and no set ever holds both endpoints.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/linked`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	check("linked: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const linkedTruth = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		placeholder: document.getElementById("picker-search").placeholder,
+		value: document.getElementById("picker-search").value,
+		missing: document.getElementById("picker-search").classList.contains("missing"),
+		chips: [...document.querySelectorAll("#rotation-set .hw-set-chip")].map((c) => ({ key: c.dataset.key, missing: c.classList.contains("missing"), name: c.querySelector(".hw-set-name")?.textContent ?? null })),
+		wells: [...document.querySelectorAll("#reading-color-list input[type=color]")].map((w) => ({ key: w.dataset.key, value: w.value, title: w.title, autoDisabled: w.parentElement.querySelector("button").disabled })),
+		preset: document.getElementById("reading-color-preset").value
+	})`)).result?.value ?? "{}"
+	);
+	check("linked: the picker names the saved key's live twin instead of asking to pick again", linkedTruth.value === "CPU Temp  ·  Link Source" && linkedTruth.missing === false && linkedTruth.placeholder === "Search sensors…", JSON.stringify({ value: linkedTruth.value, placeholder: linkedTruth.placeholder, missing: linkedTruth.missing }));
+	check("linked: every saved chip resolves to its label and none is missing", linkedTruth.chips?.length === 3 && linkedTruth.chips.every((c) => c.missing === false) && deepEqual(linkedTruth.chips.map((c) => c.name), ["CPU Temp", "GPU Temp", "Pump"]), JSON.stringify(linkedTruth.chips));
+	check("linked: the chips keep the saved keys", deepEqual(linkedTruth.chips?.map((c) => c.key), LINKED_SM), JSON.stringify(linkedTruth.chips?.map((c) => c.key)));
+	const linkedWell = linkedTruth.wells?.find((w) => w.key === LINKED_SM[1]);
+	check("linked: the saved row's well shows the color saved under its live twin, names that key, and Auto is enabled", linkedWell?.value === "#ff7e8e" && String(linkedWell?.title).includes(LINKED_G[1]) && linkedWell?.autoDisabled === false && linkedTruth.preset === "custom", JSON.stringify({ well: linkedWell, preset: linkedTruth.preset }));
+	// Headless Chrome does not deliver a focus event for a programmatic
+	// focus(); dispatch the stand-in the other legs use so the list opens.
+	const linkedOpen = await evaluate(`(() => {
+		const input = document.getElementById("picker-search");
+		if (!input) return "no search input";
+		input.focus();
+		input.dispatchEvent(new Event("focus"));
+		return "ok";
+	})()`);
+	check("linked: primary picker opened", linkedOpen.result?.value === "ok", String(linkedOpen.result?.value));
+	await sleep(600);
+	const linkedTicks = `[...document.querySelectorAll("#picker-list .hw-row")].map((r) => [r.dataset.key, r.querySelector(".hw-tick")?.checked, r.classList.contains("selected")])`;
+	await waitDom("linked: the live rows tick as members through their aliases and the selection highlights its live row", `JSON.stringify(${linkedTicks}) === ${JSON.stringify(JSON.stringify(LINKED_G.map((key, i) => [key, true, i === 0])))}`, 2000, `JSON.stringify(${linkedTicks})`);
+	mark = writes.length;
+	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await sleep(500);
+	check("linked: unticking the live twin is one write that drops the saved key and every alias of it", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2]]) && deepEqual(writes.at(-1)?.futureBlob, FUTURE_BLOB), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await sleep(500);
+	check("linked: ticking it back is one write, and no write ever holds both endpoints of a link", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2], LINKED_G[0]]) && writes.every((w) => !LINKED_LINKS.some((l) => w.rotationKeys?.includes(l.sharedMemory) && w.rotationKeys?.includes(l.gadget))), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
+	mark = writes.length;
+	await evaluate(`document.querySelector('#reading-color-list input[data-key="${LINKED_SM[1]}"]').parentElement.querySelector("button").click()`);
+	await sleep(500);
+	check("linked: Auto clears the inherited color under every key of that reading and keeps the dormant entry", writes.length === mark + 1 && !Object.hasOwn(store.settings.readingColors ?? {}, LINKED_G[1]) && !Object.hasOwn(store.settings.readingColors ?? {}, LINKED_SM[1]) && store.settings.readingColors?.dormant === "#ABCDEF" && deepEqual(store.settings.futureBlob, FUTURE_BLOB), JSON.stringify(store.settings.readingColors));
+	check("linked: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	// The fill is a read that lands asynchronously; wait for the well.
+	await waitDom("linked: the config document filled", `(document.getElementById("config-key")?.value ?? "").length > 2`, 3000, `document.getElementById("config-key")?.value ?? "missing"`);
+	const linkedDocText = (await evaluate(`document.getElementById("config-key")?.value ?? "missing"`)).result?.value;
+	let linkedDoc = null;
+	try {
+		linkedDoc = JSON.parse(linkedDocText);
+	} catch {
+		linkedDoc = null;
+	}
+	check(
+		"linked: the config document names a saved hex key through its alias and leaves the Gadget key bare",
+		linkedDoc?.readingKey === `${LINKED_SM[0]}  CPU Temp` && deepEqual(linkedDoc?.rotationKeys, [`${LINKED_SM[1]}  GPU Temp`, `${LINKED_SM[2]}  Pump`, LINKED_G[0]]),
+		linkedDoc === null ? `raw: ${String(linkedDocText).slice(0, 300)}` : JSON.stringify({ readingKey: linkedDoc?.readingKey, rotationKeys: linkedDoc?.rotationKeys })
+	);
+
+	// ---- run 11: the help link reads, and opens through the app ----------
+	// The panel's one external link sits in the Data source help line. Left
+	// unstyled the webview paints it its own dark blue on the #2d2d2d page,
+	// and followed in place it replaces the 400 px settings panel with a web
+	// page the inspector has no way back from. It must be readable, and a
+	// real click must reach the app as openUrl and leave the document alone.
+	// The docs host is blocked at the network layer so a regression fails
+	// here instead of reaching out.
+	await cdp("Network.enable");
+	await cdp("Network.setBlockedURLs", { urls: ["*docs.slawrensen.com*"] });
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("link: opened the Advanced fold", (await evaluate(`(() => {
+		const fold = document.querySelector('details[data-fold="advanced"]');
+		if (!fold) return "missing";
+		fold.open = true;
+		return "ok";
+	})()`)).result?.value === "ok");
+	await sleep(500);
+	// Contrast the WCAG way, over the colors the page actually computes: the
+	// help text around the link measures 3.99:1 on this background, so the
+	// link itself may not read worse than the sentence it sits in.
+	const linkTruth = JSON.parse(
+		(await evaluate(`JSON.stringify((() => {
+		const a = document.querySelector(".hw-help a");
+		if (a === null) return { found: false };
+		const channels = (c) => c.slice(c.indexOf("(") + 1, c.indexOf(")")).split(",").map(Number);
+		const lum = (c) => {
+			const [r, g, b] = channels(c).map((n) => n / 255).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const ratio = (x, y) => (Math.max(lum(x), lum(y)) + 0.05) / (Math.min(lum(x), lum(y)) + 0.05);
+		const bg = getComputedStyle(document.body).backgroundColor;
+		const color = getComputedStyle(a).color;
+		return { found: true, href: a.href, target: a.target, rel: a.rel, color, bg, contrast: Math.round(ratio(color, bg) * 100) / 100 };
+	})())`)).result?.value ?? "{}"
+	);
+	check("link: the help line carries the docs link", linkTruth.found === true && String(linkTruth.href).includes("data-sources.html#link-readings-across-providers"), JSON.stringify(linkTruth.href));
+	check("link: it reads on the panel background", linkTruth.contrast >= 4, JSON.stringify({ color: linkTruth.color, bg: linkTruth.bg, contrast: linkTruth.contrast }));
+	check("link: the markup keeps the new-window fallback", linkTruth.target === "_blank" && String(linkTruth.rel).includes("noopener"), JSON.stringify({ target: linkTruth.target, rel: linkTruth.rel }));
+	// The link wraps across two line boxes, so the bounding-box centre lands
+	// on the help div: click a point the page itself resolves to the anchor.
+	const linkPoint = JSON.parse(
+		(await evaluate(`JSON.stringify((() => {
+		const a = document.querySelector(".hw-help a");
+		if (a === null) return null;
+		a.scrollIntoView({ block: "center" });
+		for (const r of a.getClientRects()) {
+			const x = Math.round(r.left + Math.min(8, r.width / 2));
+			const y = Math.round(r.top + r.height / 2);
+			if (document.elementFromPoint(x, y) === a) return [x, y];
+		}
+		return null;
+	})())`)).result?.value ?? "null"
+	);
+	check("link: found a point that hits the anchor itself", Array.isArray(linkPoint), JSON.stringify(linkPoint));
+	if (Array.isArray(linkPoint)) {
+		mark = writes.length;
+		await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: linkPoint[0], y: linkPoint[1], button: "left", buttons: 1, clickCount: 1 });
+		await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: linkPoint[0], y: linkPoint[1], button: "left", buttons: 0, clickCount: 1 });
+		await sleep(900);
+		const afterClick = JSON.parse(
+			(await evaluate(`JSON.stringify({
+			url: location.href,
+			panel: document.getElementById("picker-search") !== null
+		})`)).result?.value ?? "{}"
+		);
+		check("link: the click left the settings panel in place", afterClick.panel === true && String(afterClick.url).endsWith("/ui/sensor-reading.html"), JSON.stringify(afterClick));
+		check("link: and reached the app as openUrl", opened.at(-1) === linkTruth.href, JSON.stringify(opened));
+		check("link: opening the docs wrote nothing", writes.length === mark, `${writes.length - mark} writes`);
+	}
+
+	// ---- run 11b: Tab out of a search box and its list closes -------------
+	// The results list is an absolutely positioned overlay. It used to close
+	// only on Escape, Enter or an outside mousedown, so a keyboard walk left
+	// it standing over the fields that now had focus and the user typed into
+	// a field they could not see.
+	mark = writes.length;
+	check("keyboard: clicked into the sensor search box", (await realClick("#picker-search")) === "ok");
+	await sleep(400);
+	check("keyboard: the results list is open", (await evaluate(`document.getElementById("picker-list")?.hidden === false`)).result?.value === true);
+	let tabbedOut = false;
+	for (let i = 0; i < 5 && !tabbedOut; i++) {
+		await cdp("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+		await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 });
+		await sleep(200);
+		tabbedOut = (await evaluate(`document.activeElement !== null && document.activeElement.closest(".hw-picker") === null`)).result?.value === true;
+	}
+	check("keyboard: focus left the picker within five tabs", tabbedOut, `tabbedOut=${tabbedOut}`);
+	const tabState = JSON.parse(
+		(await evaluate(`JSON.stringify({
+		listOpen: document.getElementById("picker-list")?.hidden === false,
+		focus: document.activeElement?.tagName ?? "none",
+		focusSetting: document.activeElement?.getAttribute?.("setting") ?? null
+	})`)).result?.value ?? "{}"
+	);
+	check("keyboard: the list closed when focus left the picker", tabState.listOpen === false, JSON.stringify(tabState));
+	check("keyboard: the walk wrote nothing", writes.length === mark, `${writes.length - mark} writes`);
+
+	// ---- run 12: a tree fetched while the source is down accuses nothing --
+	// HWiNFO not running means an empty tree, not a wrong selection. The
+	// picker and every saved chip must stay neutral while the hint says what
+	// is actually wrong, and say "not present" only once a tree HWiNFO
+	// answered does not list the key.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/down`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	check("down: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const pickerState = `JSON.stringify({
+		placeholder: document.getElementById("picker-search").placeholder,
+		missing: document.getElementById("picker-search").classList.contains("missing"),
+		chips: [...document.querySelectorAll("#rotation-set .hw-set-chip")].map((c) => c.classList.contains("missing")),
+		hint: document.getElementById("status-hint").textContent
+	})`;
+	const downTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("down: the picker stays neutral while HWiNFO is not running", downTruth.placeholder === "Search sensors…" && downTruth.missing === false, JSON.stringify({ placeholder: downTruth.placeholder, missing: downTruth.missing }));
+	check("down: no saved chip is accused of being gone", downTruth.chips?.length === 3 && downTruth.chips.every((m) => m === false), JSON.stringify(downTruth.chips));
+	check("down: the hint names the real problem instead", String(downTruth.hint).includes("HWiNFO is not running"), String(downTruth.hint));
+	// HWiNFO comes up; the live tree genuinely does not list ghost:0:0.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/tree/up`);
+	await evaluate(`document.getElementById("picker-refresh").click()`);
+	await sleep(1200);
+	const upTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("down: a live tree does name the key it cannot find", upTruth.placeholder === "⚠ Sensor not present. Pick again" && upTruth.missing === true, JSON.stringify({ placeholder: upTruth.placeholder, missing: upTruth.missing }));
+	check("down: and marks that chip alone", deepEqual(upTruth.chips, [false, false, true]), JSON.stringify(upTruth.chips));
+	check("down: neither state wrote anything", writes.length === 0, `${writes.length} writes`);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

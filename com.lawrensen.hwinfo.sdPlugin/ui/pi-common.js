@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.6.0.0-3";
+	const PI_BUILD = "1.7.0.0-3";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -33,8 +33,19 @@
 	const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 	// Mirrors QUAD_DEFAULT_COLORS in src/ui/key-renderer.ts.
 	const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
+	const COLOR_PRESETS = {
+		signal: QUAD_DEFAULT_COLORS,
+		pairs: ["#4CC2FF", "#4CC2FF", "#FF7E8E", "#FF7E8E"],
+		uniform: ["#4CC2FF", "#4CC2FF", "#4CC2FF", "#4CC2FF"]
+	};
 
-	let tree = null; // [{ name, readings: [{ key, label, unit, value, type }] }]
+	let tree = null; // [{ name, readings: [{ key, keys, label, unit, value, type, display }] }]
+	// Every key a tree row answers to, mapped to its { group, reading }: the
+	// row's own key and each alias the runtime resolves to it (a confirmed
+	// cross-source link, a legacy Gadget key the provider republishes), in
+	// the row's `keys`. A row's own key always wins over another row's
+	// alias. Rebuilt with the tree, so every lookup below is one map read.
+	let treeIndex = new Map();
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
 	let treeRequestPending = false;
 
@@ -43,19 +54,64 @@
 		streamDeckClient.send("sendToPlugin", { event: "getSensorTree" });
 	}
 
+	function setTree(groups) {
+		tree = groups;
+		treeIndex = new Map();
+		if (tree === null) return;
+		for (const group of tree) {
+			for (const reading of group.readings) treeIndex.set(reading.key, { group, reading });
+		}
+		for (const group of tree) {
+			for (const reading of group.readings) {
+				for (const alias of Array.isArray(reading.keys) ? reading.keys : []) {
+					if (!treeIndex.has(alias)) treeIndex.set(alias, { group, reading });
+				}
+			}
+		}
+	}
+
 	// All value formatting comes from the plugin (its measurement authority):
 	// tree rows carry a `display` string and the preview a `display` object,
 	// so the panel can never drift from what the key or dial face shows.
 
-	function readingLabelOf(key) {
-		if (tree !== null) {
-			for (const group of tree) {
-				for (const reading of group.readings) {
-					if (reading.key === key) return reading.label;
-				}
+	/** The tree row a saved key resolves to ({ group, reading }), or null:
+	 * the row keyed by it, else the row whose alias list carries it. What
+	 * the runtime resolves through a confirmed link, this panel names,
+	 * ticks and colors through the same row. The saved key itself is never
+	 * rewritten and no name matching happens: a key no row lists is absent. */
+	function treeEntryOf(key) {
+		return typeof key === "string" ? (treeIndex.get(key) ?? null) : null;
+	}
+
+	/** Every key that names the same measurement as `key`: the key itself
+	 * first, then the row's own key and its aliases, the order the dial
+	 * walks for a row's color and name. A key no row resolves stands alone. */
+	function readingKeysOf(key) {
+		const keys = [key];
+		const entry = treeEntryOf(key);
+		if (entry !== null) {
+			for (const alias of [entry.reading.key, ...(Array.isArray(entry.reading.keys) ? entry.reading.keys : [])]) {
+				if (!keys.includes(alias)) keys.push(alias);
 			}
 		}
-		return null;
+		return keys;
+	}
+
+	/** Whether two saved keys name one measurement. */
+	function sameReading(a, b) {
+		return a === b || readingKeysOf(a).includes(b);
+	}
+
+	function readingLabelOf(key) {
+		return treeEntryOf(key)?.reading.label ?? null;
+	}
+
+	/** A saved key the live tree does not list, which is the only honest
+	 * "missing". Only a tree fetched while HWiNFO was up can say that: the
+	 * empty tree of an unavailable source would accuse every saved key of
+	 * being gone, while the panel's own hint says HWiNFO is not running. */
+	function keyIsMissing(key) {
+		return treeFetchedOk && readingLabelOf(key) === null;
 	}
 
 	// --- reading keys in the config document ---------------------------------
@@ -74,15 +130,20 @@
 	const KEY_SCALAR_FIELDS = ["readingKey", "secondaryReadingKey", "quadReadingKey3", "quadReadingKey4"];
 	const KEY_LIST_FIELDS = ["detailKeys", "rotationKeys"];
 
-	/** The key alone. A shared-memory key is colon-separated hex and never
-	 * contains a space, so everything before the first run of whitespace is
-	 * the key and anything after it an appended name. A Gadget key is kept
-	 * whole: its spaces are HWiNFO's own (issue #21 meets custom mode), and
-	 * cutting at the first one left "g:Test" behind and every chip missing. */
+	/** The key alone. Leading whitespace is a hand indent, never identity:
+	 * no key starts with it. A Gadget key ("g:") is then kept whole to its
+	 * last character: its spaces are HWiNFO's own (issue #21 meets custom
+	 * mode; cutting at the first one left "g:Test" behind and every chip
+	 * missing), and a label ending in whitespace is a different reading
+	 * from the one without, so trimming the tail swapped identities through
+	 * Copy and Apply. Every other key (colon-separated hex, a g2: token)
+	 * never contains whitespace, so it ends at the first run of it and
+	 * anything after is an appended name. Mirrors bareReadingKey in
+	 * src/detail/detail-settings.ts; keep the two together. */
 	function bareKey(value) {
 		if (typeof value !== "string") return value;
-		const trimmed = value.trim();
-		return trimmed.startsWith("g:") ? trimmed : (trimmed.split(/\s+/)[0] ?? "");
+		const lead = value.trimStart();
+		return lead.startsWith("g:") ? lead : (lead.split(/\s+/)[0] ?? "");
 	}
 
 	/** The key with its friendly name appended, or the bare key when no name
@@ -131,6 +192,7 @@
 	let rotationGroups = null; // null = flat set; else [{ name, keys }]
 	let rotationNames = {}; // per-reading display names, keyed by reading key
 	let collectorIndex = 0; // which group new ticks land in (PI-local, not persisted)
+	let presetCanSwitchGroups = true; // set by the Controls preset block; see syncGroupsHelp
 
 	function adoptRotationKeys(value) {
 		rotationKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string") : [];
@@ -195,8 +257,22 @@
 		collectorIndex = Math.max(0, Math.min(collectorIndex, last));
 	}
 
+	/** A key and its aliases are one member: the dial steps a measurement
+	 * once however many of its keys the set holds, so a live row whose
+	 * saved twin is in the set ticks as in. */
 	function memberOfRotation(key) {
-		return rotationGroups !== null ? rotationGroups.some((g) => g.keys.includes(key)) : rotationKeys.includes(key);
+		const keys = readingKeysOf(key);
+		const holds = (list) => list.some((k) => keys.includes(k));
+		return rotationGroups !== null ? rotationGroups.some((g) => holds(g.keys)) : holds(rotationKeys);
+	}
+
+	/** A reading's per-member name: saved under the key it shows as, else
+	 * under a confirmed alias of it, the walk the dial title takes. */
+	function readingNameOf(key) {
+		for (const k of readingKeysOf(key)) {
+			if (Object.hasOwn(rotationNames, k)) return rotationNames[k];
+		}
+		return undefined;
 	}
 
 	/**
@@ -224,9 +300,14 @@
 
 	function setRotationMembership(key, present) {
 		if (rotationBinding === null || !key) return;
+		// Already in through the key or an alias of it: nothing to write; a
+		// second endpoint would only be a duplicate the runtime collapses.
 		if (present === memberOfRotation(key)) return;
+		// Leaving takes the key and every alias of its reading out, so one
+		// untick never leaves the same measurement in under another key.
+		const keys = readingKeysOf(key);
 		if (rotationGroups === null) {
-			rotationKeys = present ? [...rotationKeys, key] : rotationKeys.filter((k) => k !== key);
+			rotationKeys = present ? [...rotationKeys, key] : rotationKeys.filter((k) => !keys.includes(k));
 		} else if (present) {
 			// New ticks land in the marked collector group.
 			const target = rotationGroups[collectorIndex];
@@ -234,7 +315,7 @@
 		} else {
 			// Unticking removes the reading from every group holding it.
 			for (const group of rotationGroups) {
-				group.keys = group.keys.filter((k) => k !== key);
+				group.keys = group.keys.filter((k) => !keys.includes(k));
 			}
 		}
 		writeRotation(rotationGroups !== null);
@@ -245,11 +326,11 @@
 		const chip = document.createElement("span");
 		// "current" paints the chip of the reading on the dial right now, so
 		// the open panel shows where rotation (and a group jump) landed.
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "") + (key === primaryPicker.selectedKey() ? " current" : "");
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "") + (sameReading(key, primaryPicker.selectedKey()) ? " current" : "");
 		chip.dataset.key = key;
 		const name = document.createElement("span");
 		name.className = "hw-set-name";
-		name.textContent = rotationNames[key] ?? label ?? key;
+		name.textContent = readingNameOf(key) ?? label ?? key;
 		name.title = "Click to rename how this reading shows on the dial";
 		const remove = document.createElement("button");
 		remove.type = "button";
@@ -324,8 +405,16 @@
 				: "Ticks land in the group marked by the radio. “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name and keeps plain rotate inside one; any control map without that gesture (Legacy always, Custom until you map it) rotates through all groups as one flat list.";
 	}
 
+	// The note is about groups: a dial with one flat set has nothing to hint at.
+	function syncGroupsHelp() {
+		const el = document.getElementById("groups-preset-help");
+		if (el !== null) el.hidden = presetCanSwitchGroups || rotationGroups === null;
+	}
+
 	function renderRotationSet() {
 		if (rotationSetEl === null) return;
+		syncGroupsHelp();
+		renderReadingColors();
 		// Never rebuild under a focused name field: a settings echo (rotation
 		// moved, autocycle stepped) would clobber the typing mid-word.
 		if (rotationSetEl.contains(document.activeElement) && document.activeElement.classList.contains("hw-group-name")) return;
@@ -442,19 +531,39 @@
 		renderDetailList(); // the implicit fill grouping follows Tile shows
 	}
 
+	/** Whether a key is the opener's own reading, by the key itself or by
+	 * an alias of it: the runtime shows that reading on the Back tile and
+	 * filters every key resolving to it out of the list (detail-group.ts). */
+	function isDetailPrimary(key) {
+		return detailPrimaryKey !== "" && sameReading(key, detailPrimaryKey);
+	}
+
+	/** The listed key that names the same reading as `key`, if any: an
+	 * alias already in the list is that reading's one membership, the way
+	 * the runtime keeps one tile per measurement. */
+	function listedAliasOf(key) {
+		return detailKeys.find((k) => sameReading(k, key));
+	}
+
 	/** The list as the DECK builds it: detailKeys minus the adopted
 	 * primary (detail-group.ts filters it onto the Back tile), the only
 	 * order the tile walk, cell indices and the note may count in. */
 	function listedDetailKeys() {
-		return detailKeys.filter((k) => k !== detailPrimaryKey);
+		return detailKeys.filter((k) => !isDetailPrimary(k));
 	}
 
-	/** A listed position back to its detailKeys slot: positions at or
-	 * past the adopted primary's raw slot shift one to step over it;
-	 * identity when the primary is not in the list. */
+	/** A listed position back to its detailKeys slot: every parked
+	 * primary entry (the opener's key, or an alias of it) is stepped
+	 * over; identity when none is in the list. A position past the end
+	 * lands past the end of detailKeys. */
 	function rawDetailIndex(listedIdx) {
-		const primaryAt = detailKeys.indexOf(detailPrimaryKey);
-		return primaryAt >= 0 && listedIdx >= primaryAt ? listedIdx + 1 : listedIdx;
+		let listed = 0;
+		for (let raw = 0; raw < detailKeys.length; raw++) {
+			if (isDetailPrimary(detailKeys[raw])) continue;
+			if (listed === listedIdx) return raw;
+			listed++;
+		}
+		return detailKeys.length;
 	}
 
 	/** The whole LISTED list as tiles: explicit plan entries, then the
@@ -671,7 +780,10 @@
 			// "Unknown sensor" display fallback the runtime never sees.
 			const sourceName = group.matchName ?? group.name;
 			for (const reading of group.readings) {
-				if (reading.key !== detailPrimaryKey && matches(`${sourceName} ${reading.label}`)) count++;
+				// The primary is skipped by the key or an alias of it, the
+				// runtime's readingMatchesKey: a dormant saved key still
+				// names the live row on the Back tile.
+				if (!isDetailPrimary(reading.key) && matches(`${sourceName} ${reading.label}`)) count++;
 			}
 		}
 		el.hidden = false;
@@ -781,8 +893,10 @@
 	 * 128 cap): the tick that triggered it repaints instead of lying. */
 	function addDetailKey(key) {
 		// The primary is refused, not added-and-hidden: it already shows on
-		// the Back tile, and the runtime filters it out of the list.
-		if (!key || key === detailPrimaryKey || detailKeys.includes(key) || detailKeys.length >= DETAIL_KEYS_MAX) return false;
+		// the Back tile, and the runtime filters it out of the list. So is
+		// a reading the list already holds under another of its keys: the
+		// deck builds one tile for it, so the panel shows one chip.
+		if (!key || isDetailPrimary(key) || listedAliasOf(key) !== undefined || detailKeys.length >= DETAIL_KEYS_MAX) return false;
 		if (detailArm !== null) {
 			const walk = detailTileWalk();
 			const tile = walk[detailArm.tileIdx];
@@ -1122,7 +1236,7 @@
 	function addDetailSource(group) {
 		let landed = "";
 		for (const reading of group.readings) {
-			if (reading.key !== detailPrimaryKey && !detailKeys.includes(reading.key) && detailKeys.length < DETAIL_KEYS_MAX) {
+			if (!isDetailPrimary(reading.key) && listedAliasOf(reading.key) === undefined && detailKeys.length < DETAIL_KEYS_MAX) {
 				detailKeys.push(reading.key);
 				landed = reading.key; // the block's last chip carries the flash
 			}
@@ -1139,7 +1253,7 @@
 	function detailChip(key, index, tile, tileIdx, cellIdx, fullQuad) {
 		const label = readingLabelOf(key);
 		const chip = document.createElement("span");
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "");
 		chip.dataset.key = key;
 		// Real-mouse drag between tiles (the arrows stay for keyboards and
 		// synthetic input, which native drag never registers for). Dropping
@@ -1181,7 +1295,7 @@
 		const name = document.createElement("span");
 		name.className = "hw-set-name";
 		name.textContent = label ?? key;
-		if (tree !== null && label === null) {
+		if (keyIsMissing(key)) {
 			name.title = "Not in the current HWiNFO layout; keeps its place and shows as missing";
 		}
 		// The cell's label override lives ON the name (click to rename, the
@@ -1261,27 +1375,27 @@
 	 * shift any dressing or count in the note. Remove works (no tile
 	 * shrinks; see removeDetailKey); rename stays refused and reorder,
 	 * overrides and colors do not apply (it has no cell). */
-	function parkedPrimaryChip() {
-		const label = readingLabelOf(detailPrimaryKey);
+	function parkedPrimaryChip(key) {
+		const label = readingLabelOf(key);
 		const holder = document.createElement("span");
 		const chip = document.createElement("span");
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "");
-		chip.dataset.key = detailPrimaryKey;
+		chip.className = "hw-set-chip" + (keyIsMissing(key) ? " missing" : "");
+		chip.dataset.key = key;
 		const name = document.createElement("span");
 		// `parked` opts out of the rename affordance: this chip holds no cell,
 		// so the delegated click refuses it, and the text cursor and hover
 		// underline every other name wears were an invitation to nothing.
 		name.className = "hw-set-name parked";
-		name.textContent = `${label ?? detailPrimaryKey} (Back tile)`;
+		name.textContent = `${label ?? key} (Back tile)`;
 		name.title = "This key's own sensor: it shows on the Back tile and is not listed in the view";
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "hw-set-remove";
-		remove.dataset.key = detailPrimaryKey;
+		remove.dataset.key = key;
 		remove.title = "Remove from the detail list";
 		// Named for the same reason every other glyph button is: a bare "×"
 		// announces as nothing at all.
-		remove.setAttribute("aria-label", `Remove ${label ?? detailPrimaryKey} from the detail list`);
+		remove.setAttribute("aria-label", `Remove ${label ?? key} from the detail list`);
 		remove.textContent = "×";
 		chip.append(name, remove);
 		holder.appendChild(chip);
@@ -1445,9 +1559,10 @@
 		const frag = document.createDocumentFragment();
 		const listed = listedDetailKeys();
 		const walk = detailTileWalk();
-		// The parked primary leads, the way the Back tile leads the view.
-		if (detailPrimaryKey !== "" && detailKeys.includes(detailPrimaryKey)) {
-			frag.appendChild(parkedPrimaryChip());
+		// The parked primary leads, the way the Back tile leads the view: the
+		// opener's own key, or an alias of it, wherever the list holds one.
+		for (const key of detailKeys) {
+			if (isDetailPrimary(key)) frag.appendChild(parkedPrimaryChip(key));
 		}
 		// The unarmed landing point: the last tile with a free cell, else
 		// the trailing ghost tile that stands for "a new tile at the end".
@@ -1630,14 +1745,11 @@
 						null
 					);
 
+		/** The tree row the selection resolves to, by its key or an alias of
+		 * it; null while the tree is absent, nothing is selected, or the
+		 * reading is not in HWiNFO's current output. */
 		function findSelected() {
-			if (tree === null || selectedKey === "") return null;
-			for (const group of tree) {
-				for (const reading of group.readings) {
-					if (reading.key === selectedKey) return { group, reading };
-				}
-			}
-			return null;
+			return selectedKey === "" ? null : treeEntryOf(selectedKey);
 		}
 
 		function showSelection() {
@@ -1647,14 +1759,22 @@
 			if (found !== null) {
 				searchEl.value = `${found.reading.label}  ·  ${found.group.name}`;
 				searchEl.placeholder = "Search sensors…";
+				searchEl.title = "";
 				searchEl.classList.remove("missing");
-			} else if (selectedKey !== "") {
+			} else if (selectedKey !== "" && treeFetchedOk) {
 				// Never put the warning into .value; it would act as a search filter.
+				// The box is 198 px wide at the shipped panel width, so the cue is
+				// short enough to read whole and the title carries the rest.
 				searchEl.value = "";
-				searchEl.placeholder = "⚠ selected sensor not present. Pick again";
+				searchEl.placeholder = "⚠ Sensor not present. Pick again";
+				searchEl.title = "The sensor saved here is not in HWiNFO's current output. Pick one again.";
 				searchEl.classList.add("missing");
 			} else {
+				// Nothing picked, or a tree fetched while the source was down: an
+				// unavailable source lists no readings, which says nothing about
+				// the saved key. Stay neutral until a live tree can answer.
 				searchEl.value = "";
+				searchEl.title = "";
 				// The collector never holds a selection (no bound setting), and
 				// its placeholder is owned by the HTML resting text and
 				// armDetailAdd's aim line: the generic reset here would wipe a
@@ -1680,6 +1800,9 @@
 			const tokens = filtering ? tokensOf(raw) : [];
 
 			const frag = document.createDocumentFragment();
+			// The selection's row, resolved once: a saved key the tree lists
+			// under an alias highlights the live row it names.
+			const selected = findSelected()?.reading ?? null;
 			let shown = 0;
 			let hidden = 0;
 			for (let gi = 0; gi < tree.length; gi++) {
@@ -1715,7 +1838,7 @@
 						frag.appendChild(header);
 					}
 					const row = document.createElement("div");
-					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "");
+					row.className = "hw-row" + (reading === selected ? " selected" : "");
 					row.dataset.key = reading.key;
 					if (config.tick !== undefined) {
 						// One membership pattern wherever a list HAS membership
@@ -1861,7 +1984,9 @@
 
 		if (config.refresh) {
 			config.refresh.addEventListener("click", () => {
-				tree = null;
+				setTree(null);
+				// No tree in hand is not an answer to "is this key missing".
+				treeFetchedOk = false;
 				renderList();
 				requestTree();
 			});
@@ -1891,6 +2016,18 @@
 					config.onSelectionEcho?.(); // the set may render before the key arrives
 				})
 		};
+		// The keyboard's way out, on the same rule the outside mousedown uses:
+		// Tab moves focus on and the overlay list would stay open over the
+		// fields that now hold it. Read the focus that is ARRIVING, and only
+		// when it is a node: a focusout to nothing (the window lost focus)
+		// must not close the list out from under the user.
+		picker.root?.addEventListener("focusout", (ev) => {
+			const to = ev.relatedTarget;
+			if (!(to instanceof Node)) return;
+			if (picker.root.contains(to)) return;
+			if (picker.alsoWithin !== null && picker.alsoWithin.contains(to)) return;
+			closeList();
+		});
 		pickers.push(picker);
 		return picker;
 	}
@@ -1939,15 +2076,19 @@
 					// The row body is the same toggle as its checkbox: one
 					// affordance, two hit areas. Adds respect the armed tile;
 					// removals shrink the tile that held the reading.
+					// Membership is per reading, not per spelling: a row whose
+					// saved twin is listed reads as in, and leaving removes the
+					// listed key, whichever endpoint that is.
 					onPick: (key) => {
-						if (key === detailPrimaryKey) return;
-						if (detailKeys.includes(key)) removeDetailKey(key);
+						if (isDetailPrimary(key)) return;
+						const listed = listedAliasOf(key);
+						if (listed !== undefined) removeDetailKey(listed);
 						else addDetailKey(key);
 					},
 					tick: (key) =>
-						key === detailPrimaryKey
+						isDetailPrimary(key)
 							? { on: true, disabled: true, title: "This key's own sensor: the Back tile already shows it." }
-							: { on: detailKeys.includes(key), title: "Ticked readings are in the view. Untick to remove; the tile that held it shrinks." },
+							: { on: listedAliasOf(key) !== undefined, title: "Ticked readings are in the view. Untick to remove; the tile that held it shrinks." },
 					onTick: (key, next) => {
 						if (next) {
 							// A refused add (the 128 cap) leaves the native
@@ -1955,7 +2096,7 @@
 							// shows the membership that exists.
 							if (addDetailKey(key) === false) detailPicker.renderList();
 						} else {
-							removeDetailKey(key);
+							removeDetailKey(listedAliasOf(key) ?? key);
 						}
 					},
 					onGroupAdd: addDetailSource,
@@ -1981,6 +2122,17 @@
 		for (const picker of pickers) {
 			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) picker.close();
 		}
+	});
+
+	// A help link opens in the user's own browser through the app. Followed
+	// in place it would replace this 400 px panel with the docs page, and the
+	// inspector has no way back; target="_blank" on the markup is the fallback
+	// for a host that never sees this click.
+	document.addEventListener("click", (ev) => {
+		const link = ev.target instanceof Element ? ev.target.closest("a[href^='http']") : null;
+		if (link === null) return;
+		ev.preventDefault();
+		streamDeckClient.send("openUrl", { url: link.href });
 	});
 
 	function setHint(text) {
@@ -2075,6 +2227,15 @@
 				});
 			});
 		};
+		// Rotation groups only steer the dial while some gesture can cross a
+		// group boundary (schemeCanSwitchGroups, src/controls.ts): Elite maps
+		// one to press+rotate, Legacy maps none, and a Custom map has one only
+		// where the user picked it. The note by the groups editor says so, and
+		// hides itself the moment the map can switch.
+		const showGroupsHelp = async (preset) => {
+			presetCanSwitchGroups = preset === "custom" ? (await Promise.all(gestureBindings.map(([getGesture]) => getGesture()))).includes("stepGroup") : preset === "elite";
+			syncGroupsHelp();
+		};
 		let lastPreset = null;
 		const applyPreset = (value) => {
 			const preset = value === "elite" || value === "custom" ? value : "legacy";
@@ -2082,6 +2243,7 @@
 			lastPreset = preset;
 			controlsCustomEl.hidden = preset !== "custom";
 			if (controlsZonesEl !== null) controlsZonesEl.hidden = preset === "legacy";
+			showGroupsHelp(preset);
 		};
 		followSetting("controlPreset", applyPreset);
 	}
@@ -2233,11 +2395,13 @@
 	const overviewRowsEl = document.getElementById("overview-rows");
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
+		const sensorValueColorsEl = document.getElementById("sensor-value-colors");
 		const barRangeEl = document.getElementById("bar-range");
 		const warnEl = document.querySelector('sdpi-textfield[setting="warnValue"]');
 		const critEl = document.querySelector('sdpi-textfield[setting="critValue"]');
 		const applyView = (value) => {
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
+			if (sensorValueColorsEl !== null) sensorValueColorsEl.hidden = overviewRowsEl.hidden;
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
 			if (barRangeEl !== null) barRangeEl.hidden = value === "tworow" || value === "overview";
 			// The multi-row views draw no bar: alerts tint the row VALUE
@@ -2249,6 +2413,21 @@
 		};
 		followSetting("dialView", applyView);
 	}
+	// An unbound component avoids its truthy coercion of malformed settings.
+	// Loading paints exact true without saving; only a user's edit persists.
+	const sensorColorsToggle = document.getElementById("sensor-value-colors-toggle");
+	if (sensorColorsToggle !== null) {
+		let painting = false;
+		const [, write] = useSettings("sensorValueColors", () => {}, null);
+		followSetting("sensorValueColors", (value) => {
+			painting = true;
+			sensorColorsToggle.value = value === true;
+			painting = false;
+		});
+		sensorColorsToggle.addEventListener("valuechange", () => {
+			if (!painting) write(sensorColorsToggle.value === true);
+		});
+	}
 
 	// Quad cell colors (reading PI only): one preset select plus four
 	// per-cell wells, all writing the single quadColors setting. The plugin
@@ -2256,11 +2435,7 @@
 	// snaps to "Custom" whenever the wells match no preset.
 	const quadPresetEl = document.getElementById("quad-color-preset");
 	if (quadPresetEl !== null) {
-		const QUAD_PRESETS = {
-			signal: QUAD_DEFAULT_COLORS,
-			pairs: ["#4CC2FF", "#4CC2FF", "#FF7E8E", "#FF7E8E"],
-			uniform: ["#4CC2FF", "#4CC2FF", "#4CC2FF", "#4CC2FF"]
-		};
+		const QUAD_PRESETS = COLOR_PRESETS;
 		const cellInputs = [1, 2, 3, 4].map((n) => document.getElementById(`quad-color-${n}`));
 		let quadColors = [...QUAD_DEFAULT_COLORS];
 		const adoptQuadColors = (value) => {
@@ -2296,6 +2471,129 @@
 			});
 		});
 		getQuadColors().then(applyQuadColors);
+	}
+
+	// Dial colors use the quad's preset/well idiom, but store identities rather
+	// than slots: rotation, group changes and reordering never move a color.
+	const readingColorList = document.getElementById("reading-color-list");
+	const readingColorPreset = document.getElementById("reading-color-preset");
+	let readingColors = {};
+	let readingColorsSignature = "";
+	const readingColorBinding = readingColorList === null ? null : useSettings("readingColors", adoptReadingColors, null);
+
+	function adoptReadingColors(value) {
+		// Keep unknown/dormant entries through edits, just like useSettings
+		// keeps unknown top-level fields. Invalid colors only affect display.
+		readingColors = typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
+		renderReadingColors();
+	}
+
+	/** One row per measurement: the set's saved keys (the keys the dial
+	 * rows use) when a set exists, else the picked reading's whole source
+	 * under its live keys; the pick itself adds a row only when no listed
+	 * key already names its reading. */
+	function readingColorKeys() {
+		const picked = primaryPicker.selectedKey();
+		const set = rotationGroups === null ? rotationKeys : unionKeys(rotationGroups);
+		const keys = set.length > 0 ? set : (treeEntryOf(picked)?.group.readings.map((r) => r.key) ?? []);
+		const rows = [];
+		for (const key of [...keys, picked]) {
+			if (key !== "" && !rows.some((row) => sameReading(row, key))) rows.push(key);
+		}
+		return rows;
+	}
+
+	/** The color a row renders, resolved the way the dial resolves it
+	 * (src/ui/sensor-value-color.ts): the row's own key first, then every
+	 * alias of its reading, first valid hex wins. Returns { color, key }
+	 * so the well can name the key the color is saved under, or null. */
+	function readingColorOf(key) {
+		for (const k of readingKeysOf(key)) {
+			const color = Object.hasOwn(readingColors, k) ? readingColors[k] : undefined;
+			if (typeof color === "string" && HEX_COLOR.test(color)) return { color, key: k };
+		}
+		return null;
+	}
+
+	/** `colors` without any entry for `key`'s reading: the key and every
+	 * alias of it, so a reset clears what the dial paints and a choice
+	 * leaves exactly one explicit entry per measurement. Entries for other
+	 * readings' keys, dormant or unknown, stay exactly as they are. */
+	function withoutReadingColor(colors, key) {
+		const next = { ...colors };
+		for (const k of readingKeysOf(key)) delete next[k];
+		return next;
+	}
+
+	function renderReadingColors() {
+		if (readingColorList === null) return;
+		const rows = readingColorKeys().map((key) => {
+			const found = readingColorOf(key);
+			return { key, name: readingNameOf(key) ?? readingLabelOf(key) ?? key, color: found === null ? null : found.color, from: found === null ? key : found.key };
+		});
+		const signature = JSON.stringify(rows);
+		if (signature === readingColorsSignature) return;
+		readingColorPreset.value = rows.every((r) => r.color === null) ? "automatic" : (Object.keys(COLOR_PRESETS).find((preset) => rows.every((r, i) => r.color?.toUpperCase() === COLOR_PRESETS[preset][i % 4])) ?? "custom");
+		// Settings echoes and rotation must not close a native color picker.
+		if (readingColorList.contains(document.activeElement) && document.activeElement.type === "color") return;
+		readingColorsSignature = signature;
+		const frag = document.createDocumentFragment();
+		rows.forEach(({ key, name, color, from }, index) => {
+			const row = document.createElement("div");
+			row.className = "hw-quad-colors";
+			const well = document.createElement("input");
+			well.type = "color";
+			well.id = `reading-color-${index}`;
+			well.dataset.key = key;
+			well.value = color ?? "#FFFFFF";
+			// A color inherited through a link names the key it is saved
+			// under, so the panel says where a color it did not write came from.
+			well.title = `${name}: ${color ?? "Automatic; choose a number color"}${from === key ? "" : ` (saved under ${from})`}`;
+			const label = document.createElement("label");
+			label.htmlFor = well.id;
+			label.textContent = name;
+			label.title = `${name} (${key})`;
+			const reset = document.createElement("button");
+			reset.type = "button";
+			reset.textContent = "Auto";
+			reset.title = `Use automatic number color for ${name}`;
+			reset.setAttribute("aria-label", reset.title);
+			reset.disabled = color === null;
+			reset.addEventListener("click", () => {
+				const next = withoutReadingColor(readingColors, key);
+				readingColorBinding[1](next);
+				adoptReadingColors(next);
+			});
+			// Same commit boundary as quad wells: no writes per drag frame.
+			well.addEventListener("change", () => {
+				const next = withoutReadingColor(readingColors, key);
+				next[key] = well.value;
+				readingColorBinding[1](next);
+				adoptReadingColors(next);
+			});
+			row.append(well, label, reset);
+			frag.appendChild(row);
+		});
+		readingColorList.replaceChildren(frag);
+	}
+
+	if (readingColorBinding !== null) {
+		readingColorPreset.addEventListener("change", () => {
+			const preset = readingColorPreset.value;
+			if (preset !== "automatic" && !Object.hasOwn(COLOR_PRESETS, preset)) return;
+			// Every listed reading loses its entries under every key it has,
+			// then a preset writes the row key: one explicit entry per
+			// measurement, and Automatic clears exactly what the dial paints.
+			let next = { ...readingColors };
+			readingColorKeys().forEach((key, index) => {
+				next = withoutReadingColor(next, key);
+				if (preset !== "automatic") next[key] = COLOR_PRESETS[preset][index % 4];
+			});
+			readingColorBinding[1](next);
+			adoptReadingColors(next);
+		});
+		readingColorList.addEventListener("focusout", () => queueMicrotask(renderReadingColors));
+		followSetting("readingColors", adoptReadingColors);
 	}
 
 	// --- theme preset gallery -------------------------------------------------
@@ -2453,7 +2751,7 @@
 			return;
 		}
 		if (p.event === "sensorTree") {
-			tree = p.groups;
+			setTree(p.groups);
 			treeFetchedOk = p.state === "ok";
 			treeRequestPending = false;
 			setHint(p.hint);
@@ -2599,7 +2897,7 @@
 				// the reading's own label; commit on change, Enter blurs.
 				const chip = nameEl.closest(".hw-set-chip");
 				const chipKey = chip?.dataset.key;
-				if (chip === null || chipKey === undefined || chipKey === detailPrimaryKey) return;
+				if (chip === null || chipKey === undefined || isDetailPrimary(chipKey)) return;
 				const tileIdx = Number(chip.dataset.tile);
 				const cellIdx = Number(chip.dataset.cell);
 				const spec = detailTiles[tileIdx];
@@ -2710,7 +3008,7 @@
 				const input = document.createElement("input");
 				input.type = "text";
 				input.className = "hw-group-name hw-chip-rename";
-				input.value = rotationNames[key] ?? "";
+				input.value = readingNameOf(key) ?? "";
 				input.placeholder = readingLabelOf(key) ?? key;
 				input.dataset.key = key;
 				input.spellcheck = false;
@@ -2783,8 +3081,11 @@
 			if (ev.target.classList.contains("hw-chip-rename")) {
 				const key = ev.target.dataset.key;
 				const name = ev.target.value.trim();
-				if (name === "") delete rotationNames[key];
-				else rotationNames[key] = name;
+				// One name per measurement, like one color: the chip's own key
+				// carries it and the aliases' entries go, so the dial title and
+				// this chip read the same answer whichever provider is live.
+				for (const k of readingKeysOf(key)) delete rotationNames[k];
+				if (name !== "") rotationNames[key] = name;
 				namesBinding[1]({ ...rotationNames });
 				renderRotationSet();
 				return;
@@ -2856,9 +3157,12 @@
 			}
 			dirty.delete(el);
 		};
+		// A well the user has typed into keeps its draft: reopening the fold is
+		// not a reason to throw hand-typed JSON away, and the draft is the one
+		// place a reading link is authored. The two wells fill independently,
+		// so a key read that never resolves cannot leave the deck well empty.
 		const fill = async () => {
-			await fillWell(configKeyEl);
-			await fillWell(configDeckEl);
+			await Promise.all([configKeyEl, configDeckEl].filter((el) => !dirty.has(el)).map(fillWell));
 		};
 		// Filling is a read; it happens when the fold opens, never a write.
 		const fold = document.querySelector('details[data-fold="advanced"]');

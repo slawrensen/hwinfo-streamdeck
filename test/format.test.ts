@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { alertLevel, convertUnit, fitTextLadder, type DecimalsSetting } from "../src/ui/format";
+import { alertLevel, cappedUnit, convertUnit, fitTextLadder, type DecimalsSetting } from "../src/ui/format";
 import { formatMeasurement } from "../src/ui/measure";
 import { measureOptionsFrom } from "../src/ui/theme-store";
 
@@ -117,5 +117,15 @@ describe("fitTextLadder stays bounded on pathological labels", () => {
 		assert.equal(fitted.fontSize, 16);
 		assert.ok(fitted.text.endsWith("…"));
 		assert.ok(elapsed < 2000, `pathological label took ${elapsed.toFixed(0)} ms; the pre-cut keeps it in single-digit milliseconds`);
+	});
+});
+
+describe("cappedUnit (width-capped dense rows)", () => {
+	it("keeps a unit that fits, ellipsizes one that does not, and draws no boolean unit", () => {
+		assert.equal(cappedUnit("Mbps", 4), "Mbps");
+		assert.equal(cappedUnit("Mbit/s", 4), "Mbi…");
+		assert.equal(cappedUnit("", 4), "");
+		// "Yes/…" beside a 0 says nothing; the 0 or 1 carries the state.
+		assert.equal(cappedUnit("Yes/No", 5), "");
 	});
 });

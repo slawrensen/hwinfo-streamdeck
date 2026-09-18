@@ -79,16 +79,20 @@ wss.on("connection", (ws) => {
 			case "getSettings": {
 				// The PI's own messages carry its registration uuid ("pi-ctx"),
 				// never an action context; only plugin messages name a real one.
+				// device rides along like the real app sends it: the sdpi
+				// client's getSettings filters replies on action, context AND
+				// device, and a missing field hangs that promise, which left
+				// the Config wells empty under this harness.
 				const ctx = store.settings[msg.context] !== undefined ? msg.context : current.context;
 				const page = Object.values(PAGES).find((p) => p.context === ctx) ?? current;
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: page.action, context: ctx, payload: { settings: store.settings[ctx], coordinates: page.coordinates } }));
+				ws.send(JSON.stringify({ event: "didReceiveSettings", action: page.action, context: ctx, device: "dev1", payload: { settings: store.settings[ctx], coordinates: page.coordinates } }));
 				break;
 			}
 			case "setSettings": {
 				const ctx = store.settings[msg.context] !== undefined ? msg.context : current.context;
 				const page = Object.values(PAGES).find((p) => p.context === ctx) ?? current;
 				store.settings[ctx] = msg.payload ?? {};
-				toPlugin({ event: "didReceiveSettings", action: page.action, context: ctx, payload: { settings: store.settings[ctx], coordinates: page.coordinates, isInMultiAction: false } });
+				toPlugin({ event: "didReceiveSettings", action: page.action, context: ctx, device: "dev1", payload: { settings: store.settings[ctx], coordinates: page.coordinates, isInMultiAction: false } });
 				break;
 			}
 			case "getGlobalSettings":

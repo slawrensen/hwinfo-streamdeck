@@ -1,7 +1,136 @@
 # Changelog
 
-One entry per version. Tagged versions are published as GitHub releases; the
-Elgato Marketplace listing is a separate track.
+One entry per version. A tagged version is built and staged as a draft GitHub
+release by the workflow; I publish the draft by hand. The Elgato Marketplace
+listing is a separate track.
+
+## 1.7.0.0 - Unreleased
+
+Per-reading dial colors and reliability fixes in one release candidate.
+
+- Two-row and three-row dials can color each reading's number separately.
+  Appearance adds Reading colors with Signal, Pairs and Uniform presets,
+  individual color wells, and Auto resets. Colors follow each reading
+  through rotation, reordering, groups and confirmed cross-source links,
+  including with Type accents off. An optional Color numbers by sensor
+  type setting uses automatic category colors. Valid Custom Text and
+  alerts retain priority. Both color options are opt-in; existing settings
+  do not enable them automatically.
+- Gadget readings with duplicate names are withheld instead of being
+  numbered in encounter order. A name seen twice under this Windows account stays
+  withheld across restarts, recorded in a local journal of name hashes.
+  To use those readings again, give both readings new distinct names in
+  HWiNFO and select them again; the reading that keeps the old name stays
+  withheld. Deleting the journal is the only reset. Sparse slots and names
+  containing spaces keep working.
+- Most Gadget selections saved by 1.6.0 keep working after the upgrade.
+  HWiNFO's standard source names ("CPU [#0]: <model>") carry a colon, and
+  1.7 stores readings with a colon or tilde in the name under a new key
+  format, so the provider republishes the 1.6 spelling as a checked alias
+  when exactly one current reading renders to it and no live reading owns
+  that spelling. Keys, dense layouts, dials, rotation sets, groups, custom
+  detail lists, and per-reading names and colors saved under the old
+  spelling resolve through it. An old spelling that now matches two
+  readings resolves to nothing until you reselect. Selections whose label
+  reads exactly "Reading 0" through "Reading 1023", and selections that
+  carried the old "~n" duplicate suffix, get no alias and need one
+  reselection.
+- Advanced users can explicitly link a Shared Memory key and its Gadget
+  counterpart in the deck Config document. Links apply to keys, dense
+  layouts, dials and custom detail lists in either provider direction.
+  Nothing is inferred from similar names or values. Conflicting links and
+  changed native units or types are refused. The type is checked on the
+  Shared Memory side, where it is HWiNFO's own, so a percent reading that
+  HWiNFO types as Other links in both directions, and a Yes/No reading
+  carries the unit `Yes/No` on both sources. A pairing edit takes effect
+  at once on every key, dial and tile; re-applying or reordering the same
+  pairs changes nothing. A rotation set or group that holds both endpoints
+  of one pair steps through it as one reading, and a custom detail list
+  shows one tile per measurement. Per-reading names and colors follow a
+  confirmed alias, and the settings panel shows a linked saved key as
+  present, with its label, tick and color.
+- Gadget starts with unknown freshness until a value change is observed.
+  Unchanged registry values show Age unknown instead of claiming HWiNFO
+  stalled. A Yes/No reading's raw flip counts as value evidence, and its
+  unit no longer changes with the word, so a dial threshold set while it
+  reads No fires when it reads Yes. A Yes/No reading's Bar or Ring runs
+  empty to full on either source, and the dense rows that cap a unit's
+  width (triple keys, two-row and three-row dials) show its 0 or 1 without
+  a cut-off unit. Gadget historical fields are
+  unavailable, with an N/A badge and an empty value for MIN/MAX/AVG on keys
+  and detail tiles. The Gadget baseline survives a page change, a
+  drill-down and Back, so the page you land on shows values instead of
+  starting again at Age unknown, and a steady Gadget source is no longer
+  reopened every few seconds while it rests there.
+- Opening a source is never evidence of freshness. After a source switch,
+  a page change or a reopen, the held values keep their real age and
+  source, and the stale screen names the source the values came from. A
+  Shared Memory timestamp is aged by the clock HWiNFO wrote it from, so a
+  HWiNFO that stopped polling, before or while the keys were off screen,
+  no longer shows as live for 15 seconds after a page change, a Source
+  change or a plugin start.
+- Sparklines capture subsecond value changes and end their segment on a
+  skipped read, missing reading, unit change, provider transition or
+  stale window. Dial session statistics count observed changes and
+  producer stamps once; missing readings, stale or unavailable data, unit
+  or provider changes and explicit resets start a new session, and the
+  first live frame after a stale or unavailable tick shows "stats reset:
+  data gap" once. A pairing edit ends a session or sparkline segment only
+  where the saved key now stands for a different measurement; adding or
+  removing an alias for the same measurement resets nothing. Averages are
+  sample-weighted. Retained single-view sessions also reset when a reading
+  disappears or changes source, unit, type or measurement while another
+  reading is selected. Ordinary rotation preserves the session without
+  counting unseen values.
+- Shared Memory's cached reader checks the owning sensor ID and instance
+  before updating a value, including descriptor-only topology changes.
+- Gadget rereads each row before accepting a scan and retries a scan whose
+  fields changed between the two reads. A row whose formatted value
+  contradicts its raw value skips one scan like any interleave; when it
+  contradicts itself on consecutive scans it is withheld on its own: the
+  other rows keep working, the plugin log names the reading and its slot
+  once, and the settings panel says so.
+  This catches detectable partial writes; the registry still cannot prove
+  an atomic producer update. Reopening the registry and metadata changes
+  do not establish freshness.
+- In Auto mode with Shared Memory not running, a Gadget scan refused
+  because the identity journal could not be read or saved shows Source
+  error instead of Start HWiNFO. A Shared Memory mapping that exists but
+  is switched off is still reported as Shared Memory is off.
+- Source statistic capabilities are explicit. Dial sessions show a brief
+  reset reason when their measurement, native unit, type or source
+  changes, and once after a data gap.
+- Built-in value, unit and numeric statistic colors keep at least 4.5:1
+  authored contrast in normal, dim, dense and dial alert views, and Dim
+  keeps labels at least as readable as units. Saved reading colors, saved
+  quad cell colors and hand-grouped tile colors render exactly in Theme
+  mode and are only dimmed in Dim mode; a valid Custom Text color stays
+  exact and replaces them while it is set. Warning triangles
+  and critical octagons add severity cues alongside color without
+  replacing the reading.
+- A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
+  screen edge: the value and unit columns slide left together when the
+  widest unit needs the room, and faces whose units already fit are
+  unchanged.
+- The HWiNFO Control key's success tick no longer sticks to the key when
+  the key leaves the screen inside the tick's moment (a Multi Action that
+  also switches the page does that): the icon is restored on the way out
+  and again when the key returns.
+- The Config document keeps a Gadget key whole, including trailing
+  whitespace in its label; only leading whitespace is dropped.
+- Release builds validate exact tag and package versions before installing
+  dependencies, and only the separate release-staging job receives write
+  permission; it stages a draft release rather than publishing one. The
+  external soak monitor now distinguishes plugin and host resources,
+  process restarts and failed observations.
+- `release-native-manifest.json` records the Windows SDK version the addon
+  was built against, the release run refuses a compiler version that is
+  not a version, and it compares the built `hwsm.node` with the previous
+  release's manifest and annotates the run when the bytes moved without a
+  native source change.
+- The bundle ships `@elgato/streamdeck` 2.1.2 with `@elgato/utils` 0.6.0,
+  and the release and CI workflows run on the Node 24 generation of their
+  pinned actions. The native addon source is unchanged.
 
 ## 1.6.0.0 - 2026-09-04
 

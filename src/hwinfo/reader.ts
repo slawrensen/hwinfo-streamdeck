@@ -11,9 +11,10 @@
  * number. {@link SnapshotParser} therefore decodes the full skeleton once
  * and on subsequent ticks only re-reads the volatile doubles into the same
  * structures, verifying per entry that the identity words (type, sensor
- * index, id) AND the raw unit bytes still match. Any header, identity, or
- * unit change ⇒ full rebuild. A mid-session label rename is also possible
- * and is knowingly NOT detected (stale label until the next rebuild): a
+ * index, id), the owning sensor ID/instance and the raw unit bytes still
+ * match. Any header, identity, or unit change causes a full rebuild. A
+ * mid-session label rename is also possible and is knowingly NOT detected
+ * (stale label until the next rebuild): a
  * stale name is cosmetic, a stale unit is a wrong number.
  */
 import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
@@ -70,6 +71,7 @@ interface MutableReading {
 interface MutableSnapshot {
 	pollTime: number;
 	valueRevision: number;
+	freshnessRevision: number;
 	version: number;
 	revision: number;
 	sensors: readonly SensorSource[];
@@ -146,6 +148,20 @@ export class SnapshotParser {
 	 * steady-state ticks alloc-free (the guards are raw word compares).
 	 */
 	private refresh(dv: DataView, snap: MutableSnapshot): boolean {
+		const sensorSectionOffset = dv.getUint32(HEADER.sensorSectionOffset, true);
+		const sensorElementSize = dv.getUint32(HEADER.sensorElementSize, true);
+		// Entry sensorIndex is only a position. An owner descriptor can be
+		// rewritten without changing that position or any entry identity word.
+		// Validate owners before accepting values under the cached stable keys.
+		for (let i = 0, o = sensorSectionOffset; i < snap.sensors.length; i++, o += sensorElementSize) {
+			const sensor = snap.sensors[i] as SensorSource;
+			if (
+				dv.getUint32(o + SENSOR.id, true) !== sensor.id ||
+				dv.getUint32(o + SENSOR.instance, true) !== sensor.instance
+			) {
+				return false;
+			}
+		}
 		const entrySectionOffset = dv.getUint32(HEADER.entrySectionOffset, true);
 		const entryElementSize = dv.getUint32(HEADER.entryElementSize, true);
 		const entryHasUtf8 = entryElementSize >= ENTRY_UTF8_SIZE;
@@ -153,6 +169,7 @@ export class SnapshotParser {
 		const identity = this.identity;
 		const unitWords = this.unitWords;
 		let changed = false;
+		let evidenceChanged = false;
 		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			if (
 				dv.getUint32(o + ENTRY.type, true) !== identity[i * 3] ||
@@ -173,12 +190,18 @@ export class SnapshotParser {
 					}
 				}
 			}
+		}
+		// Validate the entire identity skeleton before mutating cached values.
+		// Otherwise a late rebuild could lose an earlier value change when
+		// comparing its newly decoded readings with the previous snapshot.
+		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
 			// Object.is, not !==: a NaN entry would otherwise read as changed
 			// on every tick, re-boxing the double and bumping the revision on
 			// identical bytes (which would defeat the detail render gate).
 			const r = readings[i] as MutableReading;
 			const value = dv.getFloat64(o + ENTRY.value, true);
 			if (!Object.is(r.value, value)) {
+				if (Number.isFinite(r.value) && Number.isFinite(value)) evidenceChanged = true;
 				r.value = value;
 				changed = true;
 			}
@@ -202,12 +225,14 @@ export class SnapshotParser {
 		if (snap.pollTime !== pollTime) {
 			snap.pollTime = pollTime;
 			changed = true;
+			evidenceChanged = true;
 		}
 		if (changed) {
 			// See SensorSnapshot.valueRevision: the change counter pollTime's
 			// one-second grain cannot carry.
 			snap.valueRevision++;
 		}
+		if (evidenceChanged) snap.freshnessRevision++;
 		return true;
 	}
 
@@ -309,7 +334,12 @@ export class SnapshotParser {
 		// A rebuild is a data change by definition (layout growth, unit flip),
 		// even when pollTime and the reading count happen to match: carry the
 		// revision line forward and bump it.
-		this.snapshot = { pollTime, valueRevision: (this.snapshot?.valueRevision ?? 0) + 1, version, revision, sensors, readings, byKey };
+		const previous = this.snapshot;
+		const evidenceChanged = previous !== null && (previous.pollTime !== pollTime || readings.some((reading) => {
+			const old = previous.byKey.get(reading.key);
+			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
+		}));
+		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}
 }

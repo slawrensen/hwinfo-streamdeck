@@ -18,6 +18,11 @@ import { loadThemes, resolvePalette } from "./ui/themes";
 
 type TreeReading = {
 	key: string;
+	/** Every key that resolves to this reading, its own key first, then
+	 * confirmed aliases (explicit cross-provider links, legacy Gadget keys)
+	 * in the runtime's lookup order. A saved key found here is present, so
+	 * the panel can name it, tick it and color it without name matching. */
+	keys: string[];
 	label: string;
 	unit: string;
 	value: number;
@@ -144,6 +149,7 @@ export function buildSensorTree(status: PollerStatus): SensorTreePayload {
 			const m = formatMeasurement(reading.value, reading.unit, treeOpts);
 			group.readings.push({
 				key: reading.key,
+				keys: [reading.key, ...(reading.linkedKeys ?? []).filter((key) => key !== reading.key)],
 				label: reading.label,
 				unit: reading.unit,
 				value: reading.value,
@@ -195,7 +201,7 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 	payload.display = {
 		value: m.valueText,
 		unit: m.unitText,
-		stats: `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
+		stats: status.source === "gadget" ? "Historical statistics unavailable in Gadget" : `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
 		bg: palette.bg,
 		valueColor: text.value,
 		statsColor: text.unit

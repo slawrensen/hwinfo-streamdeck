@@ -3,32 +3,32 @@ title: Status screens
 nav_order: 9
 ---
 
-When a key or dial can't show a live reading, it shows a **status screen** instead of a value. Each one names the problem on the first line and the fix on the second. They aren't errors to dismiss: they're the plugin telling you exactly what to do next, and every one clears itself the moment HWiNFO is back.
+When a key or dial cannot show a reading, it shows a **status screen** instead of a value. The first line names the observed state; the second gives a next step. Source recovery is automatic when readable data returns. A native bridge load failure can require an installation repair and plugin restart.
 
-> **New in 1.1.6: OLED-black redesign.** The key status screens are now a true-black background with two short lines: a soft-white headline and a dim fix line (previously three lines of hard white on dark grey). Same guidance, far less glare on OLED Stream Deck hardware. The examples below use the exact 1.1.6 wording.
+> This page describes the **unreleased 1.7 candidate**. The image uses simulated source states rendered by production code. It is not a hardware photograph.
 
 ## Key screens
 
-Each key screen is two short lines. The first names the state; the second is the fix.
+Each key screen is two short lines. The first names the state; the second gives the next step.
 
-![The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing]({{ '/assets/img/status-screens.png' | relative_url }})
+![Production-rendered key and dial status examples: Source busy and retrying; Not updating or No new data with check sharing; Age unknown with check Gadget.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
 
 | Key shows | What it means | How to fix it |
 | --- | --- | --- |
 | **Start HWiNFO** / *not detected* | HWiNFO isn't running, or isn't publishing on either interface. | Start HWiNFO in Sensors-only mode with **Shared Memory Support** enabled; or, on the free version, enable **Gadget reporting** (no 12-hour limit) and tick the sensors you need. |
-| **HWiNFO busy** / *retrying* | HWiNFO is running, but its shared memory was locked by another reader at the instant the plugin connected. Momentary contention, not a fault. | Nothing to do. The plugin retries on the next poll; held values stay on screen in the meantime. |
-| **Shared Memory** / *is off* | HWiNFO reports Shared Memory Support as disabled. | Re-enable it in HWiNFO **Settings**. On the free version it switches off after 12 hours. In **Auto** mode the plugin also falls back to the Gadget registry on its own; no action strictly required. |
-| **Not updating** / *check sharing* | Data is frozen: the same values keep coming back. Shown when reading **Shared Memory**. | The Sensors window was closed or HWiNFO stopped polling. Reopen the Sensors window; if it keeps happening, restart HWiNFO. (The free version's 12-hour expiry shows **Shared Memory off** instead, or falls back to Gadget in Auto mode.) |
-| **Not updating** / *check Gadget* | Same frozen state, but shown when reading the **Gadget registry**. | Check that HWiNFO is still running with Gadget reporting enabled. |
-| **Access denied** / *un-elevate* | Windows blocked access to the shared memory: a privilege mismatch. HWiNFO is running elevated ("Run as administrator") while Stream Deck isn't. | Restart HWiNFO **without** elevation, or run **both** elevated. On the free version, Gadget reporting works across privilege levels. |
-| **Tick sensors** / *in Gadget* | Gadget reporting is enabled but the registry is empty: nothing is ticked. | In the HWiNFO sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for the values you want. |
+| **Source busy** / *retrying* | The sensor source was busy or changed during a read. | The plugin retries automatically on the next poll. |
+| **Shared Memory** / *is off* | HWiNFO reports Shared Memory Support as disabled. | Re-enable it in HWiNFO **Settings**. On the free version it switches off after 12 hours. Auto can use Gadget when enabled; saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources. |
+| **Not updating** / *check sharing* | No new Shared Memory measurement evidence has been observed within the grace period. | Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| **Age unknown** / *check Gadget* | Unchanged Gadget values do not distinguish a steady reading from persistent values left after exit. | Check HWiNFO and Gadget reporting. |
+| **Access denied** / *open settings* | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. | Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| **Tick sensors** / *in Gadget* | The Gadget registry is present but has no readable sensor rows. | In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Needs x64** / *Windows* | Unsupported platform: HWiNFO's interfaces aren't readable here. | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
 | **Pick a sensor** / *in settings* | The key works, but no sensor is selected yet. | Open the key's settings and choose a sensor from the picker. |
-| **Sensor missing** / *pick again* | The saved sensor isn't in HWiNFO's current output. | A hardware/driver change or a renamed sensor profile dropped it. Open settings and pick the sensor again. |
-| **HWiNFO error** / *restart HWiNFO* | Rare. The shared memory didn't validate: HWiNFO may be mid-restart or an incompatible/corrupt layout. | Usually clears on the next poll; if it persists, restart HWiNFO. |
-| **Plugin damaged** / *reinstall* | The plugin's own native HWiNFO bridge (`bin/hwsm.node`) is missing or was blocked from loading, most often an antivirus quarantine or a half-finished install. | Reinstall the plugin by double-clicking the `.streamDeckPlugin` file. If it comes back, restore or allow `bin/hwsm.node` in your antivirus; the file is unsigned, so check it first against the release's published SHA-256 ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). Restarting HWiNFO cannot fix this one. |
+| **Sensor missing** / *pick again* | The saved reading isn't in the current source output. | Check the selected source and the reading in HWiNFO. A provider switch needs an explicit reading link; renamed or ambiguous Gadget readings may need new names and reselection. |
+| **Source error** / *open settings* | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data (the Gadget identity journal). In Auto mode this shows only while Shared Memory is not running. | Open settings and choose **Copy support report** for support. See [Troubleshooting](troubleshooting.md#keys-show-source-error). |
+| **Bridge failed** / *reinstall* | The native HWiNFO bridge (`bin/hwsm.node`) could not load. | Reinstall the plugin from its release package, then restart it. Keep any Windows or security-software report for support. |
 
-> **Note:** *Start HWiNFO*, *Not updating*, and the rest come from the data source (see [Data sources](data-sources.md)). *Pick a sensor* and *Sensor missing* are about this specific key's selection; the data source is fine. *Plugin damaged* is about the plugin's own install, not HWiNFO.
+> **Note:** *Start HWiNFO*, *Not updating*, and the rest come from the data source (see [Data sources](data-sources.md)). *Pick a sensor* and *Sensor missing* are about this specific key's selection; the data source is fine. *Bridge failed* is about the plugin's own install, not HWiNFO.
 
 ## Dial screens (Stream Deck +)
 
@@ -37,14 +37,15 @@ Dials show the same states in the touchscreen's two-slot layout (a title and a v
 | Dial title | Dial value |
 | --- | --- |
 | Start HWiNFO | not detected |
-| HWiNFO busy | retrying |
+| Source busy | retrying |
 | Shared Memory off | enable in HWiNFO |
-| HWiNFO stalled | check sharing *(shared memory)* / check Gadget *(gadget)* |
-| Access denied | un-elevate HWiNFO |
+| No new data | check sharing *(shared memory)* |
+| Age unknown | check Gadget *(gadget)* |
+| Access denied | open settings |
 | Gadget empty | tick sensors |
-| Needs x64 Windows | "—" (placeholder glyph) |
-| HWiNFO error | restart HWiNFO |
-| Plugin damaged | reinstall it *(the native bridge `bin/hwsm.node` didn't load; reinstall the plugin)* |
+| Needs x64 Windows | a lone dash (placeholder glyph, no next step) |
+| Source error | open settings |
+| Bridge failed | reinstall it *(the native bridge `bin/hwsm.node` didn't load; reinstall the plugin)* |
 | HWiNFO | rotate to pick *(no sensor selected yet; the hint line says "or use the settings panel")* |
 | Sensor missing | waiting *(the saved sensor isn't in HWiNFO's output; the hint says "reselect in settings")* |
 
@@ -54,13 +55,13 @@ While **Sensor missing / waiting** shows, the dial ignores turns so a temporary 
 
 ## Recovery is automatic
 
-You never have to remove and re-add a key. The plugin keeps probing in the background:
+Source errors do not require removing the key. While a reading action is visible, the plugin retries:
 
-- When HWiNFO is gone, it re-attempts a full open on **every** poll tick (a cheap failing call), so keys light up again within a second or two of HWiNFO returning.
-- When data goes **stale** (frozen for more than ~15 s), it probes a fresh connection every ~5 s to tell "frozen but alive" apart from "HWiNFO exited."
-- In **Auto** mode, while running on the Gadget fallback it probes shared memory every ~15 s and silently **upgrades** back to it the moment it returns.
-- When a read fails **transiently**, the plugin rides it out instead of flashing a screen. An HWiNFO layout change (starting a game that adds GPU readings does it) poisons the open session; the poller reopens the data source at the new size and re-reads it in the same tick, so live values never leave the keys. If that reopen doesn't land at once, the last values stay on screen for up to ~15 s before any status screen appears. *Access denied*, *Shared Memory off* and *Tick sensors* still appear at once: riding those out would only hide a setup problem you have to fix.
+- When the source is unavailable, it tries to open it on every poll tick.
+- When Shared Memory has no new measurement evidence for about 15 seconds, it checks a fresh connection about every 5 seconds. Gadget uses **Age unknown** because unchanged registry values do not establish whether HWiNFO is still publishing.
+- In **Auto** mode on Gadget, it checks for Shared Memory about every 15 seconds and switches back when it can read it. Saved selections still need the appropriate identity or an explicit link.
+- A transient read failure can retain the last display within the freshness grace period. A layout change triggers a reopen and another read. If recovery fails, the source status replaces the reading. *Access denied*, *Shared Memory off* and *Tick sensors* appear without that grace period.
 
-So the fix is on the HWiNFO side (re-enable sharing, tick a sensor, un-elevate) and the deck catches up by itself. No restart of Stream Deck or the plugin is needed. **Plugin damaged** is the one exception: that failure sticks for the life of the plugin process, so it takes a reinstall rather than a wait.
+Source failures are retried automatically. **Bridge failed** remains cached for the plugin process, so after repairing the installation, restart the plugin. A loader error alone does not establish whether a file is damaged, missing or blocked.
 
 > **Related:** the *Shared Memory off*, *Not updating*, and *Tick sensors* screens all trace back to how HWiNFO is publishing; see [Data sources](data-sources.md) for the Shared Memory vs. Gadget trade-offs and the 12-hour free-version timer.

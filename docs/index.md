@@ -5,44 +5,57 @@ description: >-
   Live HWiNFO sensor readings on your Elgato Stream Deck.
 ---
 
-**HWiNFO Sensors** puts live [HWiNFO](https://www.hwinfo.com) readings (temperatures, clocks, fan speeds, usage, power, voltages and everything else HWiNFO measures) directly onto your Elgato Stream Deck. A key shows one value with an optional warn/critical color and a sparkline, bar or ring under it, stacks two readings, lists three as compact rows, or splits into a quad grid of four; on a Stream Deck + or Stream Deck + XL each dial gets a touchscreen readout with a range bar and per-reading session min/max, and you rotate to switch readings or list them in a two- or three-row overview. Seven display themes (per key or deck-wide) keep every key on the same visual language, the Text setting picks the value color, and data units render decimal or binary deck-wide. The design goal is a wall that reads like one instrument: the same anchors on every key, one bright element per face, and alert colors that override everything else.
+**HWiNFO Sensors** puts temperatures, clocks, fan speeds, usage and power on
+your Stream Deck. It reads HWiNFO locally. Windows 10+ x64, free, MIT licensed,
+no ads, no telemetry.
 
-![HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline, below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+![Seven themes, alert states, multi-reading keys and dial views.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
-## What you get
+*Production renderers with sample readings and generated histories. This is
+a layout comparison, not a hardware photograph. The board predates the 1.7
+alert shapes and contrast changes.*
 
-- **Live keys.** One HWiNFO reading per key, one bright element per face: the value carries the light, the label identifies, the unit stays deliberately quiet so the number's silhouette reads at a glance. Custom label, and a live preview while you pick.
-- **Multi-readout layouts.** Stack a [second reading](sensor-reading.md#layout-two-readings-on-one-key) under the first, list [three as compact rows](sensor-reading.md#layout-three-readings-rows), or split a key into a [quad grid](sensor-reading.md#layout-four-readings-the-quad-grid) of four color-coded cells; a dial can list its rotation as a [two- or three-row overview](sensor-dial.md#overview-view), the two-row face with live trend sparklines.
-- **Sensor details (drill-down).** Set a key's Press to open details and the deck switches to a [plugin-managed page](sensor-details.md) listing every reading of that sensor's source, a custom list you build, or everything matching a filter, with the pressed key staying live as the Back tile. Each tile can carry up to four readings, and a custom list can size and dress its tiles one by one.
-- **Stream Deck + and + XL dials.** Touchscreen value with a range bar and session ▼min/▲max kept per reading; rotate to step through readings, push to reset the session, touch to cycle stats.
-- **Rotation on your terms.** Build a [rotation set](sensor-dial.md#rotation-set-ignore-turns-and-auto-cycle) (any readings, in your order, across sensors), tick **Ignore turns** so a bump can't move the dial, or let the **auto cycle** tour the set on a timer that holds while a reading is critical. Three [control presets](controls.md) (Legacy, Elite, Custom) map the gestures, up to three-zone touch.
-- **HWiNFO Control key.** Drive Sensor Dials from any key, pedal, G-key or Multi Action step: switch readings, pause or pin, reset session stats, targeted at one [Link ID](controls.md#the-hwinfo-control-key-action) or every dial.
-- **Seven themes.** Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper, set per key or once for the whole deck, plus optional sensor-type accent colors. All seven follow one [display system](themes.md#the-display-system): true-black instrument faces with a measured brightness hierarchy.
-- **Thresholds and alerts.** Set a warn and critical value; the key flips to amber, then red (aviation-style master caution/warning). Alert colors are global and never themed, so they stay unmistakable.
-- **Sparkline, bar or ring.** The Display setting draws recent history along the bottom of a key, or a bar or downward-opening ring showing where the value sits in its range, warn and critical zones marked toward the alarmed end. History keeps collecting for readings that are off screen while a Sensor Reading key or Sensor Dial stays visible somewhere; with none visible, polling stops (that is the zero-cost idle) and the line resumes where it left off when a key returns.
-- **Text color.** Theme, Dim or Custom text per key, per dial, or once for the deck; alert colors always win.
-- **Data units.** Decimal (KB, MB, GB, rates in Mbps) or binary (KiB, MiB, GiB, rates in MiB/s), set once for the whole deck. Thresholds keep the unit the face shows.
-- **Stat modes.** Show the current value or HWiNFO's min / max / average; press a key to cycle through them.
-- **Dual data source with auto-fallback.** Reads HWiNFO's Shared Memory (full min/max/avg) when available and silently falls back to the Gadget registry (no 12-hour limit on the free version), then upgrades back on its own.
+> **1.7 is a release candidate.** The current docs describe its reliability
+> changes and dial colors. [See what changes for you](whats-new-1.7.md).
+> Hardware qualification is still in progress.
 
-## Facts
+## What it does
 
-> **Windows only, HWiNFO-dependent.** HWiNFO is a Windows application; this plugin reads its Shared Memory or Gadget-registry interface locally. It needs 64-bit Windows 10 or later and Stream Deck software 6.9+. **MIT licensed, no ads, no telemetry.** Independent project, not affiliated with or endorsed by REALiX/HWiNFO.
+- **Keys:** one to four readings, custom labels, current or historical values,
+  and a sparkline, bar or ring on single-reading keys.
+- **Dials:** a single reading or a two- or three-row overview. Rotate through
+  readings, use named groups or enable auto-cycle. Local session statistics
+  record accepted observations.
+- **Colors:** seven themes, per-action or deck-wide text settings, and
+  individual reading colors on multi-row dials in 1.7. Alerts take priority.
+- **Details:** press a key to open a page for its source, a custom list or a
+  filter. Return with the Back tile.
+- **Controls:** drive dials from a key or Multi Action. Switch readings,
+  pause auto-cycle, pin a reading or reset local statistics.
+
+Shared Memory supplies current values and HWiNFO's MIN/MAX/AVG. Gadget is a
+current-value fallback with limited freshness evidence. Saved readings need
+[explicit links](data-sources.md#link-readings-across-providers) to work across
+the two sources. Read the [source guide](data-sources.md) before relying on
+fallback.
 
 ## Start here
 
-New to the plugin? Follow these two pages in order:
+1. [Install the plugin](installation.md) and enable sharing in HWiNFO.
+2. [Add your first reading](getting-started.md) and set its label and alerts.
 
-1. **[Installation](installation.md)**: install the plugin and enable Shared Memory Support (or Gadget reporting) in HWiNFO.
-2. **[Getting started](getting-started.md)**: drop a **Sensor Reading** key, pick a sensor, and set a label, theme and thresholds.
+| Guide | Covers |
+| --- | --- |
+| [Sensor Reading](sensor-reading.md) | Key layouts, history and press behavior |
+| [Sensor details](sensor-details.md) | Detail pages, custom tiles and Back navigation |
+| [Sensor Dial](sensor-dial.md) | Dial views, rotation, session statistics and reading colors |
+| [Controls](controls.md) | Gesture presets and the HWiNFO Control action |
+| [Themes](themes.md) | Themes, text colors and display geometry |
+| [Thresholds and alerts](thresholds-alerts.md) | Warning and critical states |
+| [Data sources](data-sources.md) | Sharing, fallback, identity and freshness limits |
+| [Hardware](hardware.md) | Physically tested devices and simulated coverage |
+| [Troubleshooting](troubleshooting.md) | Status messages and fixes |
 
-From there:
-
-- **[Sensor Reading (keys)](sensor-reading.md)**: every key setting and the press-to-cycle behavior.
-- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, Tile shows, grouped custom tiles, filter patterns and the Back tile.
-- **[Sensor Dial (Stream Deck +)](sensor-dial.md)**: the dial's rotate / push / touch controls, rotation sets, auto cycle and range bar.
-- **[Dial controls & presets](controls.md)**: the Legacy, Elite and Custom presets, touch zones, pause/pin, reset reach, and the HWiNFO Control key action.
-- **[Themes and alerts](themes.md)**: the seven presets, type accents, and how alerts override everything.
-- **[Data sources](data-sources.md)**: Shared Memory vs. Gadget registry, and how auto-fallback works.
-- **[Hardware compatibility](hardware.md)**: what is physically verified, what is SDK simulated, and how to report your device.
-- **[Troubleshooting](troubleshooting.md)**: what each status screen (*Start HWiNFO*, *Shared Memory off*, *Not updating*, *Access denied*, …) means and how to fix it.
+Requires Stream Deck software 6.9+ and [HWiNFO](https://www.hwinfo.com) running
+on the same Windows PC. Not affiliated with or endorsed by REALiX or Elgato.
+HWiNFO belongs to REALiX; Stream Deck and Elgato are trademarks of Corsair.

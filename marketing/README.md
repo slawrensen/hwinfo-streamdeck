@@ -1,21 +1,46 @@
 # Marketing assets
 
-The Elgato Marketplace listing images for HWiNFO Sensors. Nothing here is a
-mockup: the boards are drawn by the plugin's own renderers (`src/ui/`) from
-live HWiNFO readings on the dev machine, and the one photograph is the plugin
-running on real hardware, nothing staged. The
-marketing is the product output. That is the point, and it is why these files
-live in the open repo instead of a private drive.
+The Elgato Marketplace listing images for HWiNFO Sensors. The boards use
+production renderers with sample scenarios, live HWiNFO inputs and generated
+histories. They are sample-data renders, not physical screenshots.
+`shot-2-hardware.png` is the photograph of the plugin on real hardware.
+Multi-row dials now go through the runtime action composer, including its
+formatting, settings and color precedence.
+
+Issue #31 exposed a gallery mismatch: the released script supplied per-row
+`palette.accent` directly, while the 1.6.0 action used normal Text colors.
+The historical [1.6.0 script and assets](https://github.com/slawrensen/hwinfo-streamdeck/tree/v1.6.0/marketing)
+remain in that release; the [original script](https://github.com/slawrensen/hwinfo-streamdeck/blob/v1.6.0/scripts/marketplace-shots.mjs)
+records their source. The colored multi-row examples were not achievable
+with released settings.
+
+Replace `shot-7-dial-views.png` (the customer's image), `shot-1-hero.png` and
+`thumbnail.png` with the corrected default renders here for the stable
+listing. Their normal numeric Text styling is achievable in 1.6.0.
+Automatic category colors require **Color numbers by sensor type** under
+Appearance, Text → Theme, and Type accents enabled. The unreleased 1.7
+candidate also has individual **Reading colors**, which work with Type
+accents off. Neither option exists in stable 1.6.0. Regenerating assets does
+not update the Marketplace listing.
+
+`issue-31/before-after.png` compares identical fixtures through the production
+composer, changing only the new setting. Both temperatures share pink, fan
+uses cyan, power gold and load purple. Labels, units, graphs, selection and
+footer keep their ordinary styling. Explicit valid Custom Text overrides
+sensor coloring; Dim applies the existing blend with a numeric contrast
+floor on the actual row background. Alerts retain priority; accents off,
+Paper and unknown categories keep normal text.
 
 | File | Use | Spec |
 | --- | --- | --- |
 | `app-icon-288.png` | Marketplace app icon | 288x288 |
 | `thumbnail.png` | Listing thumbnail | 1920x960 |
-| `shot-1-hero.png` | Gallery 1: full deck of live readings | 1920x960 |
+| `shot-1-hero.png` | Gallery 1: sample-data deck render | 1920x960 |
 | `shot-2-hardware.png` | Gallery 2: real Stream Deck + XL photograph board | 1920x960 |
 | `shot-3-themes.png` | Gallery 3: all seven themes + alert states | 1920x960 |
 | `shot-4-settings.png` | Gallery 4: the real settings panel | 1920x960 |
 | `shot-5-dials.png` | Gallery 5: Stream Deck + dials | 1920x960 |
+| `shot-7-dial-views.png` | Gallery 7: production-composed sample dial views | 1920x960 |
 | `hwinfo-streamdeckxlplus.png` | Photo master: Camera Raw develop of the Sony A7 III capture | source |
 | `hwinfo-streamdeckxlplus-squared.png` | Photo master as the board consumes it; the board's default source | source |
 
@@ -32,6 +57,11 @@ HWiNFO running:
 ```bash
 npx tsx scripts/marketplace-shots.mjs marketing
 ```
+
+The default keeps multi-row sensor coloring off. To generate explicitly
+marked preview boards in a separate output directory, append
+`--sensor-value-colors`. Generate the reproducible comparison without live
+HWiNFO using `npx tsx scripts/dial-color-comparison.mjs`.
 
 Shot 4 composites three real property-inspector screenshots, so it needs a
 capture directory. Full pipeline:
@@ -94,6 +124,42 @@ npm run icons                               # renders imgs/plugin/marketplace(@2
 # then: sharp-resize marketplace@2x.png -> app-icon-288.png (288x288)
 ```
 
-All copy baked into these images follows `docs/release/COPY_RULES.md` (no em
-dashes, no "telemetry", claims that map to real behavior). The validator cannot
-read text inside a PNG, so check rendered strings by eye after regenerating.
+Copy baked into these images follows `docs/release/COPY_RULES.md`: plain
+language, no em dashes and claims supported by the product. The validator
+cannot read PNG text; inspect the rendered captions after regenerating.
+
+The additional `issue-31/custom-before-after.png` comparison is sample data
+through the same production dial composer. Generate it with
+`npx tsx scripts/dial-color-comparison.mjs marketing/issue-31 --custom`.
+Both sides use Text: Theme, Type accents: OFF, identical readings, histories,
+selection and layout. Only `readingColors` changes, using the achievable
+Appearance → Reading colors → Signal preset. CPU and GPU temperatures can
+therefore differ while graph lines keep their previous colors. This is preview
+evidence, not a physical screenshot or a claim about the stable Marketplace build.
+
+The historical docs image `docs/assets/img/pi-dial-reading-colors-preview.png` is the
+maintainer's unedited `multicolor.png` Stream Deck app capture, supplied on
+2026-09-09 with preview 1.6.92.0 installed. It shows the individual color
+controls for five readings. It is a settings-panel screenshot, not a photo
+of the physical display or a replacement for the stable Marketplace assets.
+
+## 1.7 documentation images
+
+These additions document the unreleased 1.7 candidate. They do not replace
+the stable Marketplace gallery:
+
+- `docs/assets/img/dial-reading-colors-1.7.png`: fixed sample data composed by
+  the production dial action. Three-row and two-row examples compare
+  automatic text with individual colors. Both sides use Void, Text → Theme
+  and Type accents off.
+- `docs/assets/img/reading-status-1.7.png`: simulated source states rendered
+  by the production key and dial code. It shows Source busy, no new Shared
+  Memory data and Gadget Age unknown.
+- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the 1.7 candidate's
+  settings panel (build 1.7.0.0-1) captured through the local test host with
+  live HWiNFO. It is a settings-panel capture of an unreleased build.
+
+The first two are sample-data renders. None is a photograph of a physical
+display. Generate them with `npx tsx scripts/docs-v17-images.mjs`; capture
+the panel with `node scripts/capture-pi-reading-colors.mjs`. Provenance
+records sit beside the images.

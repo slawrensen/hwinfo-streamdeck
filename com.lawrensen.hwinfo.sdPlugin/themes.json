@@ -8,7 +8,7 @@
 			"bg": "#000000",
 			"label": "#7A8393",
 			"value": "#FFFFFF",
-			"unit": "#667082",
+			"unit": "#6B7586",
 			"accent": "#4CC2FF",
 			"track": "#161A21"
 		},
@@ -16,7 +16,7 @@
 			"bg": "#1A1C22",
 			"label": "#8B93A3",
 			"value": "#F4F6FA",
-			"unit": "#757F91",
+			"unit": "#7A8495",
 			"accent": "#55C7FF",
 			"track": "#2A2F3A"
 		},
@@ -24,7 +24,7 @@
 			"bg": "#10061F",
 			"label": "#8F80AE",
 			"value": "#F3EDFF",
-			"unit": "#7C6C9F",
+			"unit": "#8171A2",
 			"accent": "#C08BFF",
 			"track": "#261544"
 		},
@@ -32,7 +32,7 @@
 			"bg": "#071120",
 			"label": "#788CA9",
 			"value": "#EFF6FF",
-			"unit": "#627896",
+			"unit": "#687E9A",
 			"accent": "#6FCFFF",
 			"track": "#152238"
 		},
@@ -40,7 +40,7 @@
 			"bg": "#05130C",
 			"label": "#739181",
 			"value": "#ECFBF2",
-			"unit": "#5D7D6F",
+			"unit": "#638274",
 			"accent": "#3FE09A",
 			"track": "#12271B"
 		},
@@ -48,7 +48,7 @@
 			"bg": "#000000",
 			"label": "#A47632",
 			"value": "#FFB84D",
-			"unit": "#8A6326",
+			"unit": "#926E35",
 			"accent": "#E0912F",
 			"track": "#1E1305"
 		},
@@ -66,18 +66,22 @@
 			"bg": "#E8940D",
 			"value": "#1C1200",
 			"label": "#402C00",
-			"unit": "#553C00",
+			"unit": "#503900",
 			"accent": "#402C00",
 			"track": "#C67A06"
 		},
 		"crit": {
 			"bg": "#CB2114",
 			"value": "#FFFFFF",
-			"label": "#FFDCD6",
-			"unit": "#F8C2B9",
+			"label": "#FFE1DB",
+			"unit": "#FCE1DD",
 			"accent": "#FFDCD6",
 			"track": "#A81A0C"
 		}
+	},
+	"alertValues": {
+		"warn": "#E8A43C",
+		"crit": "#FF7568"
 	},
 	"typeAccents": {
 		"temperature": "#FF7E8E",

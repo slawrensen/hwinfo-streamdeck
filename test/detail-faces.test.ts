@@ -12,9 +12,10 @@ import { pageOf } from "../src/detail/detail-group";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
 import { QUAD_DEFAULT_COLORS, renderReadingKey, renderStatusKey } from "../src/ui/key-renderer";
-import { effectiveTextSettings, parseTextSettings } from "../src/ui/text-colors";
+import { DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, readableValueColor } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
+import { contrast } from "./wcag";
 
 function reading(key: string, value: number, unit = "°C", label = key): Reading {
 	return { key, type: unit === "W" ? SensorType.Power : SensorType.Temperature, sensorIndex: 0, id: 0, label, unit, value, valueMin: value - 10, valueMax: value + 10, valueAvg: value };
@@ -288,6 +289,24 @@ describe("hand-grouped tile specs (composeChunkFace + spec)", () => {
 		assert.ok(bare.includes(`fill="${QUAD_DEFAULT_COLORS[1] as string}">38`), "the first value wears the color that traveled with its reading");
 		assert.ok(!bare.includes(`fill="${QUAD_DEFAULT_COLORS[0] as string}">38`), "and not the default its position would hand it");
 	});
+
+	// A hand-grouped tile color follows the dial per-reading color contract:
+	// exact in Theme whatever its contrast, only blended in Dim, never
+	// lifted. The unset cells beside it keep the automatic readable defaults.
+	it("a dark hand-grouped tile color renders exact in Theme and only blended in Dim", () => {
+		const palette = resolvePalette(config, config.defaultTheme, "temperature", "normal");
+		assert.ok(contrast("#123456", palette.bg) < 4.5, "the fixture starts below the numeric floor");
+		const theme = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { cellLabels: false, colors: ["#123456", null, null, null] }));
+		assert.ok(theme.includes('fill="#123456">38'), "the chosen color reaches the value byte-exact");
+		assert.ok(theme.includes(`fill="${readableValueColor(QUAD_DEFAULT_COLORS[1] as string, palette.bg)}">44`), "the default beside it keeps its readable lift");
+		const labeled = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { colors: ["#123456", null, null, null] }));
+		assert.ok(labeled.includes('fill="#123456">MEMO<'), "the chosen color carries the micro-label byte-exact");
+		const dimCtx = { ...ctxOf(), text: effectiveTextSettings(parseTextSettings({ textMode: "dim" }), null) };
+		const dim = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, dimCtx, spec(4, { cellLabels: false, colors: ["#123456", null, null, null] }));
+		const blended = mixToward("#123456", palette.bg, DIM_VALUE_BLEND);
+		assert.ok(dim.includes(`fill="${blended}">38`), `Dim blends the chosen color to ${blended} and stops there`);
+		assert.ok(contrast(blended, palette.bg) < 4.5, "no lift happened");
+	});
 });
 
 describe("chunk micro-label stripping", () => {
@@ -318,28 +337,44 @@ describe("chunk micro-label stripping", () => {
 });
 
 describe("dense tile goldens", () => {
-	// Byte-locks for the three new face families, like the archive pins in
+	// Byte-locks for the three dense face families, like the archive pins in
 	// detail-profiles.test.ts: same fixed snapshot, default theme, default
-	// measure. A hash move means the composed bytes changed for everyone;
-	// change it ONLY alongside a deliberate face change.
+	// measure. The hashes are the 1.6.0 faces and stay the reference. What a
+	// later release draws differently is enumerated in SINCE_1_6_0 and put
+	// back before hashing, so the entry states exactly which bytes were
+	// allowed to move and every other byte still compares exactly. Extend the
+	// list ONLY alongside a deliberate face change.
+	// September 2026 (1.7): the void unit token rose to the numeric 4.5 floor
+	// in themes.json. On these faces that is every unit text and tspan and
+	// nothing else: 2 fills on the dual, 3 on the triple, 4 on the quad.
 	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
+	const SINCE_1_6_0: ReadonlyArray<readonly [before: string, after: string]> = [["#667082", "#6B7586"]];
+	const asOf160 = (svg: string, movedFills: number): string => {
+		let out = svg;
+		for (const [before, after] of SINCE_1_6_0) {
+			assert.equal(out.split(after).length - 1, movedFills, `${after} must appear exactly ${movedFills} times`);
+			assert.ok(!out.includes(before), `${before} is the 1.6.0 token and cannot still be drawn`);
+			out = out.replaceAll(after, before);
+		}
+		return out;
+	};
 
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(svg), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(asOf160(svg, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(svg), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		assert.equal(golden(asOf160(svg, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
 	});
 
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(svg), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		assert.equal(golden(asOf160(svg, 4)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

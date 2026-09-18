@@ -5,6 +5,7 @@
  * projections; never touches the SDK or the poller.
  */
 import type { SensorSnapshot } from "../hwinfo/types";
+import { liveKeyOf, readingMatchesKey } from "../hwinfo/reading-links";
 import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailDensity, type DetailMode, type DetailTileSpec } from "./detail-settings";
 
 /**
@@ -55,7 +56,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 			mode,
 			primaryKey,
 			title: customTitle ?? "Custom set",
-			keys: detailKeysOf(settings).filter((key) => key !== primaryKey)
+			keys: customKeys(snapshot, primaryKey, detailKeysOf(settings))
 		};
 	}
 	if (snapshot === null) {
@@ -74,7 +75,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 		const matches = compileDetailFilter(pattern);
 		const keys: string[] = [];
 		for (const reading of snapshot.readings) {
-			if (reading.key === primaryKey) {
+			if (readingMatchesKey(reading, primaryKey)) {
 				continue;
 			}
 			const sourceName = snapshot.sensors[reading.sensorIndex]?.name ?? "";
@@ -103,7 +104,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 	}
 	const keys: string[] = [];
 	for (const reading of snapshot.readings) {
-		if (reading.sensorIndex === primary.sensorIndex && reading.key !== primaryKey) {
+		if (reading.sensorIndex === primary.sensorIndex && !readingMatchesKey(reading, primaryKey)) {
 			keys.push(reading.key);
 		}
 	}
@@ -114,6 +115,32 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 		title: customTitle ?? sourceName ?? primary.label,
 		keys
 	};
+}
+
+/**
+ * The custom list without the opener's own reading, which lives on the Back
+ * tile. With a snapshot, a listed key that a confirmed link resolves to the
+ * primary's measurement is excluded like the exact key is, and two listed
+ * keys resolving to one measurement keep only the first (one reading, one
+ * tile). Unresolvable keys keep their position: the list never shifts
+ * because a sensor is asleep, and the saved keys are never rewritten.
+ */
+function customKeys(snapshot: SensorSnapshot | null, primaryKey: string, keys: readonly string[]): readonly string[] {
+	const primary = snapshot?.byKey.get(primaryKey);
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const key of keys) {
+		if (key === primaryKey) continue;
+		const reading = snapshot?.byKey.get(key);
+		if (reading !== undefined) {
+			const identity = liveKeyOf(reading);
+			if (primary !== undefined && identity === liveKeyOf(primary)) continue;
+			if (seen.has(identity)) continue;
+			seen.add(identity);
+		}
+		out.push(key);
+	}
+	return out;
 }
 
 /** One logical page of a group under a device's reading-slot capacity. */

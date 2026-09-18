@@ -15,7 +15,7 @@ import type { PollerStatus } from "../poller";
 
 export function tickSignature(status: PollerStatus): string {
 	if (status.state === "ok") {
-		return `ok:${status.source}:${status.snapshot.pollTime}:${status.snapshot.valueRevision ?? 0}:${status.snapshot.readings.length}`;
+		return `ok:${status.source}:${status.snapshot.pollTime}:${status.snapshot.valueRevision ?? 0}:${status.snapshot.readings.length}${status.snapshot.bindingRevision ? `:links${status.snapshot.bindingRevision}` : ""}`;
 	}
 	// Stale and unavailable states hold still by definition: the values are
 	// frozen (stale) or absent, so the face only changes with the state.

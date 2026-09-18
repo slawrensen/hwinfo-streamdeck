@@ -121,6 +121,24 @@ details > summary:hover {
 	cursor: pointer;
 }
 
+/* Dial reading colors reuse the quad wells; names keep large rotation sets clear. */
+.hw-reading-colors {
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.hw-reading-colors .hw-quad-colors {
+	margin-bottom: 4px;
+}
+
+.hw-reading-colors label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .hw-picker-list {
 	position: absolute;
 	top: 100%;
@@ -367,6 +385,7 @@ details > summary:hover {
 }
 
 .hw-config-row button,
+.hw-reading-colors button,
 .hw-set-actions button,
 .hw-support {
 	background: #3d3d3d;
@@ -493,6 +512,13 @@ details > summary:hover {
 	font-family: "Segoe UI", Arial, sans-serif;
 	font-size: 8pt;
 	line-height: 1.35;
+}
+
+/* The only links the panel carries sit in those help lines. Unstyled, the
+   webview paints them its own #0000EE, which is all but invisible on the
+   #2d2d2d page; this is the setup fold's blue. */
+.hw-help a {
+	color: #8ecbff;
 }
 
 .hw-hint {

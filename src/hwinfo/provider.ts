@@ -18,10 +18,15 @@ export type SnapshotSource = "shared-memory" | "gadget";
 export interface SnapshotProvider {
 	readonly source: SnapshotSource;
 	/**
-	 * One consistent snapshot. `null` means "skip this tick" (transient, e.g.
-	 * mutex busy). Throws {@link HwinfoError} when the backend is gone.
+	 * One accepted source observation. Shared memory is mutex-consistent;
+	 * Gadget validates each row twice but provides no atomicity contract.
+	 * `null` means "skip this tick" (mutex busy or a detected Gadget field
+	 * interleave). Throws {@link HwinfoError} when the backend is gone.
 	 */
 	read(): SensorSnapshot | null;
+	/** One-time diagnostic lines the provider wants logged (a withheld row,
+	 * named by slot); drained by the poller after each read. Optional. */
+	notices?(): string[];
 	close(): void;
 }
 

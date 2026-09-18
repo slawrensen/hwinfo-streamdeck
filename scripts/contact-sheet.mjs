@@ -76,8 +76,8 @@ for (let i = 0; i < themes.length; i++) {
 
 	const faces = [
 		renderReadingKey({ label: reading.label, valueText: reading.value, unitText: reading.unit, statBadge: "", history, palette: resolvePalette(config, theme, accent, "normal") }),
-		renderReadingKey({ label: reading.label, valueText: "87", unitText: reading.unit, statBadge: "", history, palette: resolvePalette(config, theme, accent, "warn") }),
-		renderReadingKey({ label: reading.label, valueText: "104", unitText: reading.unit, statBadge: "MAX", palette: resolvePalette(config, theme, accent, "crit") })
+		renderReadingKey({ severity: "warn", label: reading.label, valueText: "87", unitText: reading.unit, statBadge: "", history, palette: resolvePalette(config, theme, accent, "warn") }),
+		renderReadingKey({ severity: "crit", label: reading.label, valueText: "104", unitText: reading.unit, statBadge: "MAX", palette: resolvePalette(config, theme, accent, "crit") })
 	];
 	for (let row = 0; row < faces.length; row++) {
 		composites.push({ input: await png(faces[row]), left: x, top: HEADER + row * CELL });
@@ -178,6 +178,7 @@ const dials = [
 		palette: dialPal
 	})],
 	["critical", renderDial({
+		severity: "crit",
 		title: "GPU Hot Spot",
 		valueText: "104",
 		unitText: "°C · MAX",

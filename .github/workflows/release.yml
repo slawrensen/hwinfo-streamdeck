@@ -14,12 +14,15 @@
 # The UI e2e suites need a live plugin against a mock Stream Deck socket, so
 # they stay local (`npm run suite:full`); this gate runs the static + unit +
 # native-integration checks, same as ci.yml. The runner label and Node 20
-# build headers are pinned deliberately — see ci.yml for the reasoning.
+# build headers are pinned deliberately; see ci.yml for the reasoning and
+# for what the label pin does not hold still (the MSVC toolset).
 #
 # Each release publishes two verifiable facts: the outer package SHA-256 and
 # release-native-manifest.json (the exact hwsm.node hash, PE hardening,
 # imports, and toolchain). A double clean build proves the native binary is
-# reproducible in this pinned environment before anything is published.
+# reproducible in this pinned environment before anything is published, and
+# the drift check below says when the bytes moved against the previous
+# release without a native source change.
 name: release
 
 on:
@@ -27,18 +30,31 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write # required for the GITHUB_TOKEN to create the release
+  contents: read
 
 jobs:
-  release:
+  build:
     runs-on: windows-2025
+    outputs:
+      ver: ${{ steps.verify.outputs.ver }}
+      sha: ${{ steps.hash.outputs.sha }}
+      size: ${{ steps.hash.outputs.size }}
+      nativesha: ${{ steps.hash.outputs.nativesha }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
           cache: npm
+
+      - name: Verify exact release versions before running dependency code
+        id: verify
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/verify-release-tag.mjs
 
       - run: npm ci
       - name: Print toolchain versions
@@ -48,8 +64,19 @@ jobs:
           npx node-gyp --version
           $cl = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\cl.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1
           if ($cl) {
-            & $cl.FullName 2>&1 | Select-Object -First 1
-            "HWSM_CL_VERSION=$((& $cl.FullName 2>&1 | Select-Object -First 1) -replace '.*Version ','' -replace ' for.*','')" | Out-File -FilePath $env:GITHUB_ENV -Append
+            # cl.exe prints its usage line on stdout and the version banner on
+            # stderr, and which one reaches the merged stream first is not
+            # deterministic: the 1.6.0 release step printed the usage line to
+            # the log and, one call later, captured the version. Match the
+            # banner over the whole output and fall back to the file version,
+            # so the value is a real version either way; native-manifest.mjs
+            # refuses anything else.
+            $m = [regex]::Match((& $cl.FullName 2>&1 | Out-String), 'Version (\d+\.\d+\.\d+)')
+            $clVersion = if ($m.Success) { $m.Groups[1].Value } else { [regex]::Match((Get-Item $cl.FullName).VersionInfo.FileVersion, '\d+\.\d+\.\d+').Value }
+            Write-Output "cl.exe $clVersion ($($cl.FullName))"
+            "HWSM_CL_VERSION=$clVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            Write-Warning "no cl.exe under Program Files; the native manifest step will refuse to run without a compiler version"
           }
       - run: npm run lint
       - run: npm run typecheck
@@ -61,6 +88,7 @@ jobs:
         run: |
           $first = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
           npm run build:native
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $second = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
           if ($first -ne $second) {
             Write-Error "native build is not reproducible: $first != $second"
@@ -72,10 +100,58 @@ jobs:
       - name: Native integration suite
         run: npm run test:native
 
-      - name: Native manifest + packaging gate
+      # One command per step: a multi-line run block reports only its last
+      # command's exit code, so a manifest refusal would pass as green here
+      # and surface two steps later as a missing file.
+      - name: Native manifest
+        run: node scripts/native-manifest.mjs
+      - name: Native packaging gate
+        run: node scripts/validate-native.mjs
+
+      # The reproducibility check above only proves two builds inside this job
+      # agree. The toolset inside the pinned runner image moves with image
+      # updates, so unchanged native source built different hwsm.node bytes
+      # for 1.5.1 and 1.6.0 with nothing saying so. Compare with the previous
+      # public release's manifest and annotate the run when the source id is
+      # unchanged but the bytes moved; the runbook's pre-publish comparison
+      # then has both compiler versions in front of it. A missing previous
+      # manifest or an API failure is reported, not fatal: this is a release
+      # gate the maintainer reads, not one the runner image can veto.
+      - name: Native drift check against the previous release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          node scripts/native-manifest.mjs
-          node scripts/validate-native.mjs
+          $api = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
+          try {
+            $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GH_REPO/releases/latest" -Headers $api
+          } catch {
+            Write-Output "::notice title=native drift check skipped::no previous release readable ($($_.Exception.Message))"
+            exit 0
+          }
+          $asset = $latest.assets | Where-Object { $_.name -eq "release-native-manifest.json" } | Select-Object -First 1
+          if (-not $asset) {
+            Write-Output "::notice title=native drift check skipped::previous release $($latest.tag_name) carries no release-native-manifest.json"
+            exit 0
+          }
+          try {
+            Invoke-WebRequest -Uri $asset.url -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/octet-stream" } -OutFile previous-native-manifest.json
+            $prev = Get-Content previous-native-manifest.json -Raw | ConvertFrom-Json
+          } catch {
+            Write-Output "::notice title=native drift check skipped::could not read the previous manifest ($($_.Exception.Message))"
+            exit 0
+          }
+          $cur = Get-Content release-native-manifest.json -Raw | ConvertFrom-Json
+          Write-Output "previous $($latest.tag_name): sha256 $($prev.sha256) source $($prev.nativeSourceId) compiler $($prev.compilerVersion) sdk $($prev.windowsSdkVersion)"
+          Write-Output "this build: sha256 $($cur.sha256) source $($cur.nativeSourceId) compiler $($cur.compilerVersion) sdk $($cur.windowsSdkVersion)"
+          if ($prev.nativeSourceId -eq $cur.nativeSourceId -and $prev.sha256 -ne $cur.sha256) {
+            Write-Output "::warning title=native bytes drifted::hwsm.node changed with unchanged native source: $($latest.tag_name) built $($prev.sha256) with compiler $($prev.compilerVersion); this run built $($cur.sha256) with compiler $($cur.compilerVersion). Compare before publishing (RELEASE_RUNBOOK.md)."
+          } elseif ($prev.sha256 -eq $cur.sha256) {
+            Write-Output "hwsm.node is byte-identical to $($latest.tag_name)"
+          } else {
+            Write-Output "native source changed since $($latest.tag_name); different bytes are expected"
+          }
 
       # The pack script shells out to the Elgato CLI (`streamdeck pack`); it is a
       # global tool, not a project dependency, so install it here. Pinned to an
@@ -88,20 +164,6 @@ jobs:
 
       - name: Pack plugin
         run: npm run pack
-
-      - name: Verify packed version matches the tag
-        id: verify
-        shell: pwsh
-        run: |
-          $manifest = Get-Content com.lawrensen.hwinfo.sdPlugin/manifest.json -Raw | ConvertFrom-Json
-          $tag = "${{ github.ref_name }}".TrimStart('v')            # v1.1.8 -> 1.1.8
-          $ver = $manifest.Version                                  # 1.1.8.0
-          if (-not $ver.StartsWith("$tag.") -and $ver -ne $tag) {
-            Write-Error "manifest Version $ver does not match tag $tag; bump manifest.json before tagging"
-            exit 1
-          }
-          "ver=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Output "manifest $ver matches tag $tag"
 
       - name: Compute SHA-256
         id: hash
@@ -116,33 +178,52 @@ jobs:
           "nativesha=$($native.sha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Output "pack SHA-256 $sha ($size bytes); hwsm.node SHA-256 $($native.sha256)"
 
-      # Pinned to a commit SHA: this is the only third-party action in the
-      # repo and it runs inside the contents:write job that publishes the
-      # binary, so a moving tag here would hand that job to whatever the tag
-      # points at tomorrow. Pins freeze the version their major pointed at
-      # when written; Dependabot proposes newer versions (including new
-      # majors) by PR, where the bump is a reviewed diff.
+      - name: Transfer only the validated release files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate
+          path: |
+            release/com.lawrensen.hwinfo.streamDeckPlugin
+            release-native-manifest.json
+            native/hwsm/build/Release/hwsm.pdb
+          if-no-files-found: error
+          retention-days: 7
+
+  # Dependency installs, repository scripts and native builds never receive
+  # the release token. This job downloads data and invokes pinned actions.
+  stage:
+    needs: build
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    steps:
+      - name: Download the validated release files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
       - name: Stage the GitHub Release as a draft
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           # Draft first: the assets land where only the maintainer can see
           # them, get verified against the local candidate, and go public
           # with `gh release edit <tag> --draft=false`. /releases/latest
           # keeps pointing at the previous release until then.
           draft: true
-          name: HWiNFO Sensors ${{ steps.verify.outputs.ver }}
+          name: HWiNFO Sensors ${{ needs.build.outputs.ver }}
           files: |
-            release/com.lawrensen.hwinfo.streamDeckPlugin
-            release-native-manifest.json
-            native/hwsm/build/Release/hwsm.pdb
+            candidate/release/com.lawrensen.hwinfo.streamDeckPlugin
+            candidate/release-native-manifest.json
+            candidate/native/hwsm/build/Release/hwsm.pdb
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            Built and published automatically from `${{ github.ref_name }}`.
+            Built automatically for version `${{ needs.build.outputs.ver }}` and staged for maintainer verification.
 
-            **Pack SHA-256:** `${{ steps.hash.outputs.sha }}` (${{ steps.hash.outputs.size }} bytes)
-            **Native hwsm.node SHA-256:** `${{ steps.hash.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
+            **Pack SHA-256:** `${{ needs.build.outputs.sha }}` (${{ needs.build.outputs.size }} bytes)
+            **Native hwsm.node SHA-256:** `${{ needs.build.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
 
-            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.ref_name }}/SECURITY.md).
+            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.sha }}/SECURITY.md).
 
             Install: download the `.streamDeckPlugin` below and double-click it, or install from the Elgato Marketplace once approved. See the [documentation](https://docs.slawrensen.com/hwinfo-streamdeck/) for setup and troubleshooting.

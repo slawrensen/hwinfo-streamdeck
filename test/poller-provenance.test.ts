@@ -52,6 +52,16 @@ const realNow = performance.now;
 performance.now = () => now;
 after(() => { performance.now = realNow; });
 
+// Shared Memory stamps are UTC epoch seconds, and a stamp with no earlier
+// stamp to compare against is aged by the wall clock. Pinned to the moment
+// the fixture stamp was written unless a case moves it.
+const STAMPED_AT = 1_700_000_100_000;
+let wall = STAMPED_AT;
+const realDateNow = Date.now;
+Date.now = () => wall;
+after(() => { Date.now = realDateNow; });
+beforeEach(() => { wall = STAMPED_AT; });
+
 // The upgrade probe's only path. Absent unless a case says otherwise, so a
 // Gadget phase never silently upgrades on a leftover seam from an earlier case.
 const noSharedMemory = (): Provider => { throw new HwinfoError("not-running", "canned: shared memory absent"); };
@@ -200,6 +210,123 @@ describe("provenance: a provider swap whose first reads are skipped", () => {
 		} finally {
 			subject.release();
 		}
+	});
+
+	it("a frozen producer stays stale across a page return whose first read is accepted", () => {
+		const subject = isolated();
+		now = 100_000;
+		subject.openProvider = () => provider("shared-memory", () => smSnap);
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		subject.retain();
+		expectHeld(subject, "ok", "shared-memory", smSnap, 0);
+		now += STALE + 1_000;
+		subject.tick();
+		expectHeld(subject, "stale", "shared-memory", smSnap, STALE + 1_000, STALE + 1_000);
+		subject.release();
+		now += 2_000;
+		subject.retain(); // same stamp, read accepted: reopening is not evidence
+		try {
+			expectHeld(subject, "stale", "shared-memory", smSnap, STALE + 3_000, STALE + 3_000);
+			// The producer advances: live on that read.
+			const advanced = snap("f0001234:0:1000001", 52, 1_700_000_130);
+			subject.openProvider = () => provider("shared-memory", () => advanced);
+			subject.provider = provider("shared-memory", () => advanced);
+			now += 1_000;
+			subject.tick();
+			expectHeld(subject, "ok", "shared-memory", advanced, 0);
+		} finally {
+			subject.release();
+		}
+	});
+
+	it("a producer that polled once more and then stopped during the absence is not live on the return", () => {
+		const subject = isolated();
+		now = 100_000;
+		let current = smSnap;
+		subject.openProvider = () => provider("shared-memory", () => current);
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		subject.retain();
+		expectHeld(subject, "ok", "shared-memory", smSnap, 0);
+		subject.release();
+		// One more poll two seconds after the plugin's last read, then nothing.
+		current = snap("f0001234:0:1000001", 63, 1_700_000_102);
+		now += 60_000;
+		wall = STAMPED_AT + 60_000;
+		subject.retain();
+		try {
+			expectHeld(subject, "stale", "shared-memory", current, 58_000, 58_000);
+		} finally {
+			subject.release();
+		}
+	});
+
+	it("the evidence clock never runs backwards when the wall clock steps", () => {
+		const subject = isolated();
+		now = 100_000;
+		let current = smSnap;
+		subject.openProvider = () => provider("shared-memory", () => current);
+		subject.tick();
+		expectHeld(subject, "ok", "shared-memory", smSnap, 0);
+		// The wall clock jumps an hour ahead; the producer keeps polling.
+		wall = STAMPED_AT + 3_600_000;
+		current = snap("f0001234:0:1000001", 52, 1_700_000_101);
+		now += 1_000;
+		subject.tick();
+		expectHeld(subject, "ok", "shared-memory", current, 1_000);
+		assert.equal(subject.lastAdvanceAt, 100_000, "an advance already earned is never pushed back");
+	});
+
+	it("a frozen producer stays stale across a Source change that lands on the same source", () => {
+		const subject = isolated();
+		now = 100_000;
+		subject.openProvider = () => provider("shared-memory", () => smSnap);
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		subject.retain();
+		try {
+			now += STALE + 1_000;
+			subject.tick();
+			assert.equal(subject.getStatus().state, "stale");
+			subject.setSourceMode("shared-memory"); // Auto was already on shared memory
+			expectHeld(subject, "stale", "shared-memory", smSnap, STALE + 1_000, STALE + 1_000);
+		} finally {
+			subject.release();
+		}
+	});
+
+	it("a stamp that was already old when first seen is published with its real age", () => {
+		const subject = isolated();
+		now = 100_000;
+		wall = STAMPED_AT + 60_000; // HWiNFO stopped polling a minute before the plugin looked
+		subject.openProvider = () => provider("shared-memory", () => smSnap);
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		subject.tick();
+		expectHeld(subject, "stale", "shared-memory", smSnap, 60_000, 60_000);
+		// A healthy producer's stamp is a second or two old: live at once.
+		const healthy = isolated();
+		wall = STAMPED_AT + 1_900;
+		healthy.openProvider = () => provider("shared-memory", () => smSnap);
+		healthy.tick();
+		expectHeld(healthy, "ok", "shared-memory", smSnap, 1_900);
+		// A stamp from the future (a clock stepped back) cannot be aged.
+		const skewed = isolated();
+		wall = STAMPED_AT - 30_000;
+		skewed.openProvider = () => provider("shared-memory", () => smSnap);
+		skewed.tick();
+		expectHeld(skewed, "ok", "shared-memory", smSnap, 0);
+	});
+
+	it("a steady Gadget source is not reopened while it rests at Age unknown", () => {
+		const subject = isolated();
+		now = 100_000;
+		let opened = 0;
+		subject.openProvider = () => { opened++; return provider("gadget", () => gadgetSnap); };
+		subject.tick();
+		for (let i = 0; i < 60; i++) {
+			now += 1_000;
+			subject.tick();
+		}
+		assert.equal(subject.getStatus().state, "stale");
+		assert.equal(opened, 1, "steady values are the resting state, not a reason to reopen the key");
 	});
 
 	it("a session that has never observed anything neither goes stale nor churns reopen probes", () => {

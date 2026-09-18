@@ -32,6 +32,9 @@ process.env.HWINFO_VSB_KEY = VSB_SUBKEY;
 const identityFile = path.join(os.tmpdir(), `hwinfo-gadget-identity-${process.pid}.jsonl`);
 process.env.HWINFO_GADGET_IDENTITY_FILE = identityFile;
 const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry");
+// After the environment above: the poller imports the provider, which
+// freezes HWINFO_VSB_KEY at module load.
+const { poller } = await import("../src/poller");
 
 after(() => fs.rmSync(identityFile, { force: true }));
 
@@ -540,7 +543,7 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 
 describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win32-x64 only" : false }, () => {
 	test("formatted locales retain native raw precision and the correct unit", () => {
-		const cases = [["2,295.0 MHz", "2295.04", "MHz", 2295.04], ["2.295,0 MHz", "2295,04", "MHz", 2295.04], ["2'295.0 MHz", "2295.04", "MHz", 2295.04], ["2\u202f295,0 MHz", "2295,04", "MHz", 2295.04], ["−1,2 A", "-1,249", "A", -1.249], ["1.23e4 Hz", "12345", "Hz", 12345], ["Yes", "1", "Yes", 1]] as const;
+		const cases = [["2,295.0 MHz", "2295.04", "MHz", 2295.04], ["2.295,0 MHz", "2295,04", "MHz", 2295.04], ["2'295.0 MHz", "2295.04", "MHz", 2295.04], ["2\u202f295,0 MHz", "2295,04", "MHz", 2295.04], ["−1,2 A", "-1,249", "A", -1.249], ["1.23e4 Hz", "12345", "Hz", 12345], ["Yes", "1", "Yes/No", 1], ["No", "0", "Yes/No", 0], ["On", "1", "On", 1]] as const;
 		shape(cases.map((_, i) => i), (i) => ({ sensor: "Locale fixture", label: `Case ${i}`, value: cases[i]![0], raw: cases[i]![1] }));
 		const snapshot = readShape();
 		for (const [i, entry] of cases.entries()) {
@@ -909,6 +912,45 @@ describe("integrity: one contradictory row does not take the source down", { ski
 		}
 	});
 
+	test("another reading contradicting in an already reported slot is reported by name", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.match(provider.notices().join("\n"), /Hot Spot/);
+			putValue("Label1", "Rail");
+			putValue("Value1", "10 W");
+			putValue("ValueRaw1", "99");
+			provider.read();
+			provider.read();
+			const lines = provider.notices();
+			assert.equal(lines.length, 1, "slot numbers are reused; the row the panel points at must be the one the log names");
+			assert.match(lines[0] ?? "", /Rail/);
+			provider.read();
+			assert.deepEqual(provider.notices(), [], "and it is said once");
+		} finally {
+			provider.close();
+		}
+	});
+
+	test("an old baseline is not adopted, but what was reported stays reported", () => {
+		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
+		const first = GadgetRegistryProvider.open();
+		let second: ReturnType<typeof GadgetRegistryProvider.open> | undefined;
+		try {
+			first.notices();
+			putValue("Value0", "56.0 °C");
+			putValue("ValueRaw0", "56");
+			assert.ok(readVerified(first).pollTime > 0, "precondition: the first session observed a change");
+			second = GadgetRegistryProvider.open();
+			second.adoptFreshness(first, false);
+			assert.deepEqual(second.notices(), []);
+			assert.equal(readVerified(second).pollTime, 0, "values held from a long absence are no baseline: Age unknown until a change is seen");
+		} finally {
+			first.close();
+			second?.close();
+		}
+	});
+
 	test("a reopen that adopts the previous provider does not report the same slot again", () => {
 		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
 		const first = GadgetRegistryProvider.open();
@@ -954,6 +996,63 @@ describe("integrity: one contradictory row does not take the source down", { ski
 			assert.deepEqual(provider.notices(), [], "said once per slot");
 		} finally {
 			provider.close();
+		}
+	});
+});
+
+describe("integrity: one reading link resolves on both providers", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("a percent reading HWiNFO types as Other and a boolean across its flip", () => {
+		const load = { sharedMemory: "f0000301:0:8000005", unit: "%", sensorType: 8 };
+		const flag = { sharedMemory: "f0000401:0:8000009", unit: "Yes/No", sensorType: 8 };
+		shape([0, 1], (i) => (i === 0 ? { sensor: "System", label: "Physical Memory Load", value: "43.5 %", raw: "43.5" } : { sensor: "CPU", label: "Thermal Throttling", value: "No", raw: "0" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const before = readVerified(provider);
+			const [loadKey, flagKey] = before.readings.map((reading) => reading.key) as [string, string];
+			const links = [{ ...load, gadget: loadKey }, { ...flag, gadget: flagKey }];
+			const onGadget = applyReadingLinks(before, links, 1);
+			assert.equal(onGadget.byKey.get(load.sharedMemory)?.value, 43.5, "Gadget guesses Usage from the percent sign; the pair is still the pair");
+			assert.equal(onGadget.byKey.get(flag.sharedMemory)?.value, 0);
+			putValue("Value1", "Yes");
+			putValue("ValueRaw1", "1");
+			const flipped = applyReadingLinks(readVerified(provider), links, 1);
+			assert.equal(flipped.byKey.get(flag.sharedMemory)?.value, 1, "the unit is the same unit on both sides of the flip");
+			assert.equal(flipped.byKey.get(flag.sharedMemory)?.unit, "Yes/No");
+			// The same rows on shared memory, where the type is HWiNFO's own.
+			const reading = (key: string, unit: string, value: number): Reading => ({ key, type: 8, sensorIndex: 0, id: 1, label: "fixture", unit, value, valueMin: value, valueMax: value, valueAvg: value });
+			const rows = [reading(load.sharedMemory, "%", 43.5), reading(flag.sharedMemory, "Yes/No", 1)];
+			const sharedMemory: SensorSnapshot = { ...before, readings: rows, byKey: new Map(rows.map((row) => [row.key, row])) };
+			const onSharedMemory = applyReadingLinks(sharedMemory, links, 1);
+			assert.equal(onSharedMemory.byKey.get(loadKey)?.value, 43.5);
+			assert.equal(onSharedMemory.byKey.get(flagKey)?.value, 1);
+			const wrongType = applyReadingLinks(sharedMemory, [{ ...links[0]!, sensorType: 7 }], 1);
+			assert.equal(wrongType.byKey.has(loadKey), false, "the shared-memory endpoint is still held to the type HWiNFO reports");
+		} finally {
+			provider.close();
+		}
+	});
+});
+
+describe("integrity: a page change keeps the Gadget baseline", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("values stay on the keys across the last release and the next retain", () => {
+		type Subject = { setSourceMode(mode: "gadget"): void; retain(): void; release(): void; tick(): void; getStatus(): { state: string } };
+		const subject = new (poller.constructor as unknown as { new (): Subject })();
+		shape([0], () => ({ sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" }));
+		subject.setSourceMode("gadget");
+		subject.retain();
+		try {
+			assert.equal(subject.getStatus().state, "stale", "a first read is a baseline: Age unknown");
+			putValue("Value0", "56.0 °C");
+			putValue("ValueRaw0", "56");
+			subject.tick();
+			assert.equal(subject.getStatus().state, "ok", "precondition: a change was observed");
+			// On a single deck every page change, drill-down entry and Back
+			// releases the last action before the next page's first retain.
+			subject.release();
+			subject.retain();
+			assert.equal(subject.getStatus().state, "ok", "the page being entered shows values, not Age unknown");
+		} finally {
+			subject.release();
 		}
 	});
 });

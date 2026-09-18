@@ -7,10 +7,15 @@ export function gadgetDisplayIsNumeric(formatted: string): boolean {
 }
 
 /** Extract units with the same number grammar used for contradiction
- * checks. Retain existing nonnumeric text rather than guessing a boolean. */
+ * checks. HWiNFO's boolean readings display the word itself, and Shared
+ * Memory reports their unit as "Yes/No": the same one unit here keeps a
+ * threshold, a session and a reading link on the reading across the flip
+ * (the word as the unit changed exactly when the value did). Any other
+ * nonnumeric text is retained rather than guessed at. */
 export function gadgetUnitOf(formatted: string): string {
 	const match = NUMERIC_PREFIX.exec(formatted);
-	return (match ? formatted.slice(match[0].length) : formatted).trim();
+	const unit = (match ? formatted.slice(match[0].length) : formatted).trim();
+	return match === null && (unit === "Yes" || unit === "No") ? "Yes/No" : unit;
 }
 
 /** Whether the formatted numeric precision can describe the authoritative

@@ -102,7 +102,9 @@ describe("refutation: identity and explicit links", () => {
 		for (const key of [link.sharedMemory, link.gadget]) {
 			const other = key === link.gadget ? link.sharedMemory : link.gadget;
 			assert.equal(applyReadingLinks(snapshot({ ...reading, key, unit: "°F" }), [link], 1).byKey.get(other), undefined);
-			assert.equal(applyReadingLinks(snapshot({ ...reading, key, type: 5 }), [link], 1).byKey.get(other), undefined);
+			// The type is HWiNFO's own only on shared memory. Gadget infers it
+			// from the unit, which is compared above, so it is not held there.
+			assert.equal(applyReadingLinks(snapshot({ ...reading, key, type: 5 }), [link], 1).byKey.has(other), key === link.gadget);
 			assert.equal(applyReadingLinks({ ...snapshot(), readings: [], byKey: new Map() }, [link], 1).byKey.size, 0);
 		}
 	});

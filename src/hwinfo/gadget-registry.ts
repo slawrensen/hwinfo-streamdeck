@@ -93,8 +93,10 @@ export class GadgetRegistryProvider {
 	private lastChangeSec = 0;
 	private freshnessRevision = 0;
 	private lastValues = new Map<string, number>();
-	/** Slots whose formatted/raw disagreement was already reported once. */
-	private readonly reportedSlots = new Set<number>();
+	/** The reading each slot's formatted/raw disagreement was reported for.
+	 * Slot numbers are reused: another reading contradicting in a reported
+	 * slot is news, the same one on a later scan or session is not. */
+	private readonly reportedSlots = new Map<number, string>();
 	/** Unlogged notices by slot, so a reopen that adopts the previous
 	 * provider's report list can take back what it re-raised. */
 	private readonly pendingNotices = new Map<number, string>();
@@ -179,7 +181,7 @@ export class GadgetRegistryProvider {
 		/** Every keyed row's names, withheld ones included: a row that is
 		 * withheld this scan still owns its 1.6 spelling. */
 		const namedRows: { sensor: string; label: string }[] = [];
-		const contradictions: { slot: number; notice: string }[] = [];
+		const contradictions: { slot: number; identity: string; notice: string }[] = [];
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
 		// reading is ticked "Report value in Gadget" and keeps that
@@ -242,7 +244,7 @@ export class GadgetRegistryProvider {
 				// contradiction in THIS row. What happens to it is decided
 				// after the scan (see below): never publish the row.
 				if (!gadgetValueAgrees(formatted, value)) {
-					contradictions.push({ slot: i, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
+					contradictions.push({ slot: i, identity: `${sensorName}\u0000${label}`, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
 					continue;
 				}
 
@@ -290,9 +292,9 @@ export class GadgetRegistryProvider {
 		for (const { slot } of contradictions) streak.set(slot, (this.contradictionStreak.get(slot) ?? 0) + 1);
 		this.contradictionStreak = streak;
 		if ([...streak.values()].some((count) => count < 2)) return null;
-		for (const { slot, notice } of contradictions) {
-			if (!this.reportedSlots.has(slot)) {
-				this.reportedSlots.add(slot);
+		for (const { slot, identity, notice } of contradictions) {
+			if (this.reportedSlots.get(slot) !== identity) {
+				this.reportedSlots.set(slot, identity);
 				this.pendingNotices.set(slot, notice);
 			}
 		}
@@ -355,17 +357,22 @@ export class GadgetRegistryProvider {
 	 * provider would otherwise treat a frozen registry as newly changed and
 	 * flap the status back to "ok" for another stale window.
 	 */
-	adoptFreshness(from: GadgetRegistryProvider): void {
-		this.lastDigest = from.lastDigest;
-		this.lastChangeSec = from.lastChangeSec;
-		this.valueRevision = from.valueRevision;
-		this.freshnessRevision = from.freshnessRevision;
-		this.lastValues = from.lastValues;
+	adoptFreshness(from: GadgetRegistryProvider, baseline = true): void {
+		// What was already reported stays reported however long ago it was.
+		// The value baseline is the caller's call: it is comparable only
+		// while it is recent.
+		if (baseline) {
+			this.lastDigest = from.lastDigest;
+			this.lastChangeSec = from.lastChangeSec;
+			this.valueRevision = from.valueRevision;
+			this.freshnessRevision = from.freshnessRevision;
+			this.lastValues = from.lastValues;
+		}
 		// The verification read inside open() ran before this adoption; a
 		// slot the previous provider already reported is not news.
-		for (const slot of from.reportedSlots) {
-			this.reportedSlots.add(slot);
-			this.pendingNotices.delete(slot);
+		for (const [slot, identity] of from.reportedSlots) {
+			if (this.reportedSlots.get(slot) === identity) this.pendingNotices.delete(slot);
+			else if (!this.reportedSlots.has(slot)) this.reportedSlots.set(slot, identity);
 		}
 		for (const [slot, count] of from.contradictionStreak) {
 			this.contradictionStreak.set(slot, Math.max(count, this.contradictionStreak.get(slot) ?? 0));

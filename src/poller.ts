@@ -20,9 +20,13 @@
  * Evidence contract: opening a provider is not receiving a measurement.
  * `lastAdvanceAt` moves only when an accepted observation carries new
  * producer evidence, so a source switch, a reopen probe or a page return
- * whose first reads are skipped keeps the held observation's real age, and
- * the published `source` is always the provenance of the snapshot held in
- * the status, never merely the provider that happens to be open.
+ * keeps the held observation's real age, and the published `source` is
+ * always the provenance of the snapshot held in the status, never merely
+ * the provider that happens to be open. The freshness record survives the
+ * poller stopping with the last visible action (every page change on a
+ * single deck does that), and a Shared Memory stamp is aged by the wall
+ * clock it was written from, so a producer that had already stopped, before
+ * or during an absence, never reads as live for a window.
  *
  * A poisoned session (the hwsm bridge invalidates on any layout change; a
  * game start adding GPU readings does it routinely) is reopened at the new
@@ -61,6 +65,17 @@ const STALE_AFTER_MS = Number(process.env.HWINFO_STALE_AFTER_MS ?? "") || 15_000
 const REOPEN_PROBE_MS = Number(process.env.HWINFO_REOPEN_PROBE_MS ?? "") || 5_000;
 /** While on the gadget fallback in auto mode, probe shared memory this often. */
 const UPGRADE_PROBE_MS = Number(process.env.HWINFO_UPGRADE_PROBE_MS ?? "") || 15_000;
+
+/**
+ * How old a Shared Memory stamp already is, by the wall clock it was written
+ * from (HWiNFO stamps each poll with UTC epoch seconds). A stamp that is not
+ * a wall-clock time (test fixtures count from small integers) or that lies
+ * in the future cannot be aged and counts as new.
+ */
+function stampAgeMs(pollTime: number): number {
+	if (!(pollTime > 1_000_000_000)) return 0;
+	return Math.max(0, Date.now() - pollTime * 1000);
+}
 
 export function parsePollInterval(raw: unknown): number {
 	const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : Number.NaN;
@@ -103,7 +118,7 @@ class HwinfoPoller extends EventEmitter {
 	private lastAcceptedAt = 0;
 	private lastReopenProbeAt = 0;
 	/** Freshness surviving a stale probe whose reopen threw (see probeReopen). */
-	private heldFreshness: { source: SnapshotSource; pollTime: number; advanceAt: number; valueRevision?: number; freshnessRevision?: number; gadget?: GadgetRegistryProvider } | null = null;
+	private heldFreshness: { source: SnapshotSource; pollTime: number; advanceAt: number; heldAt: number; valueRevision?: number; freshnessRevision?: number; gadget?: GadgetRegistryProvider } | null = null;
 	private lastUpgradeProbeAt = 0;
 	/** Nonzero while a transient failure is being ridden out on held values. */
 	private holdingSince = 0;
@@ -253,7 +268,10 @@ class HwinfoPoller extends EventEmitter {
 		}
 		this.mode = mode;
 		this.logger.info(`Source mode set to ${mode}`);
-		this.heldFreshness = null;
+		// The mode is a preference, not a source: Auto to Shared Memory while
+		// on shared memory reopens the same producer, whose age carries over.
+		// A different source discards the record in restoreFreshness.
+		this.preserveFreshness();
 		this.dropProvider();
 		if (this.timer !== null) {
 			this.tick();
@@ -281,8 +299,13 @@ class HwinfoPoller extends EventEmitter {
 			clearInterval(this.timer);
 			this.timer = null;
 		}
+		// On a single deck every page change, drill-down entry and Back
+		// releases the last action before the first one of the next page
+		// retains: the record must outlive that gap, or a Gadget source would
+		// fall back to "Age unknown" on every page and a frozen Shared Memory
+		// stamp would read as new.
+		this.preserveFreshness();
 		this.dropProvider();
-		this.heldFreshness = null;
 		// Info on purpose: the e2e exit-hygiene check greps for this line to
 		// prove the poller idles (timer cleared, provider closed) with no keys.
 		this.logger.info("Stopped (no visible actions)");
@@ -301,6 +324,7 @@ class HwinfoPoller extends EventEmitter {
 			source: this.provider.source,
 			pollTime: this.lastPollTime,
 			advanceAt: this.lastAdvanceAt,
+			heldAt: monotonicNow(),
 			valueRevision: this.lastValueRevision,
 			freshnessRevision: this.lastFreshnessRevision,
 			...(this.provider instanceof GadgetRegistryProvider ? { gadget: this.provider } : {})
@@ -309,9 +333,11 @@ class HwinfoPoller extends EventEmitter {
 
 	/**
 	 * Carries the held freshness into a same-source replacement session. A
-	 * different source, or no held record at all (a cold open, a page
-	 * return, an explicit source switch), leaves `lastAdvanceAt` where the
-	 * last accepted observation put it: the open itself is not evidence.
+	 * different source, or no held record at all (a cold open), leaves
+	 * `lastAdvanceAt` where the last accepted observation put it: the open
+	 * itself is not evidence. A Gadget baseline is comparable only while it
+	 * is recent: against values held from a long absence, a change that
+	 * happened at any point in between would pose as a change seen now.
 	 */
 	private restoreFreshness(): void {
 		const held = this.heldFreshness;
@@ -320,7 +346,9 @@ class HwinfoPoller extends EventEmitter {
 			this.lastAdvanceAt = held.advanceAt;
 			this.lastValueRevision = held.valueRevision;
 			this.lastFreshnessRevision = held.freshnessRevision;
-			if (held.gadget && this.provider instanceof GadgetRegistryProvider) this.provider.adoptFreshness(held.gadget);
+			if (held.gadget && this.provider instanceof GadgetRegistryProvider) {
+				this.provider.adoptFreshness(held.gadget, monotonicNow() - held.heldAt <= STALE_AFTER_MS);
+			}
 		}
 		this.heldFreshness = null;
 	}
@@ -387,12 +415,18 @@ class HwinfoPoller extends EventEmitter {
 				// Poisoned session (layout changed): reopen at the new exact size
 				// and read again within the same tick, so live values never leave
 				// the keys. A failure here falls to the hold in the outer catch.
+				const poisoned = this.provider.source;
 				this.preserveFreshness();
 				this.dropProvider();
 				this.provider = this.openProvider();
 				this.restoreFreshness();
 				snapshot = this.provider.read();
-				this.logger.info(`Data source layout changed; reopened in place (${this.provider.source})`);
+				// Auto mode can come back on the other source (the free
+				// version's expiry does exactly that): a provider change is
+				// logged as one, never as an in-place reopen.
+				this.logger.info(this.provider.source === poisoned
+					? `Data source layout changed; reopened in place (${this.provider.source})`
+					: `Opened HWiNFO data source: ${this.provider.source} (${poisoned} became unreadable)`);
 			}
 			for (const line of this.provider.notices?.() ?? []) this.logger.warn(line);
 			this.holdingSince = 0;
@@ -418,7 +452,17 @@ class HwinfoPoller extends EventEmitter {
 				const evidenceChanged = this.provider.source === "gadget"
 					? (snapshot.freshnessRevision ?? 0) > 0 && (stampChanged || snapshot.freshnessRevision !== this.lastFreshnessRevision)
 					: stampChanged || revisionChanged;
-				if (evidenceChanged) this.lastAdvanceAt = monotonicNow();
+				if (evidenceChanged) {
+					// A stamp is as old as the wall clock it was written from says:
+					// a producer that polled once more and then stopped while no
+					// key was visible must not read as live for a window on the
+					// page return. Values seen changing between two reads of one
+					// session are evidence of now. The evidence clock never runs
+					// backwards, whatever the wall clock does.
+					const stampOnly = this.provider.source === "shared-memory" && !revisionChanged;
+					const at = monotonicNow() - (stampOnly ? stampAgeMs(snapshot.pollTime) : 0);
+					this.lastAdvanceAt = (this.lastAdvanceAt === 0 ? at : Math.max(this.lastAdvanceAt, at)) || -1;
+				}
 				// Feed every tracked ring, on-screen or not, but only on a
 				// genuinely fresh snapshot: a frozen or stale source must never
 				// push duplicate points (that would flatten the line in place
@@ -452,7 +496,13 @@ class HwinfoPoller extends EventEmitter {
 				// the snapshot's own provenance: a fresh read names the provider
 				// that produced it, a held one keeps the source it came from.
 				const source = snapshot !== null ? this.provider.source : this.status.state !== "unavailable" ? this.status.source : this.provider.source;
-				this.probeReopen();
+				// The probe exists to release OUR handles on a named section.
+				// A registry key has no such lifetime, a deleted key already
+				// fails the ordinary read, and steady values are the resting
+				// state of a healthy Gadget source: probing there only reopens
+				// and rescans the key every few seconds for as long as nothing
+				// moves.
+				if (this.provider.source !== "gadget") this.probeReopen();
 				const last = snapshot ?? (this.status.state !== "unavailable" ? this.status.snapshot : null);
 				if (last !== null) {
 					this.status = { state: "stale", snapshot: last, source, staleForMs };

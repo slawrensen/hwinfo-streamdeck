@@ -100,6 +100,11 @@ describe("thresholdsApplyTo (mixed-unit safety)", () => {
 
 	it("the empty string is a real unit (unitless readings), not a wildcard", () => {
 		assert.equal(thresholdsApplyTo("", ""), true);
+		// A threshold stamped on a Gadget boolean by 1.6.0 carries the word.
+		assert.equal(thresholdsApplyTo("No", "Yes/No"), true);
+		assert.equal(thresholdsApplyTo("Yes", "Yes/No"), true);
+		assert.equal(thresholdsApplyTo("Yes", "°C"), false);
+		assert.equal(thresholdsApplyTo("Yes/No", "Yes"), false);
 		assert.equal(thresholdsApplyTo("", "RPM"), false);
 	});
 });

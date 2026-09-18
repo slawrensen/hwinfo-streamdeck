@@ -62,7 +62,11 @@ export function applyReadingLinks(snapshot: SensorSnapshot, links: readonly Read
 		// Never choose between two live entries or reinterpret changed units.
 		if ((primary === undefined) === (fallback === undefined)) continue;
 		const found = primary ?? fallback;
-		if (found === undefined || found.unit !== link.unit || found.type !== link.sensorType) continue;
+		// The type is HWiNFO's own only on the shared-memory endpoint. Gadget
+		// infers it from the display unit, which is already compared, so
+		// holding that guess to the reported type could only refuse a true
+		// pair (HWiNFO types several "%" readings as Other, not Usage).
+		if (found === undefined || found.unit !== link.unit || (found === primary && found.type !== link.sensorType)) continue;
 		const live = found.aliasOf === undefined ? found : (snapshot.byKey.get(found.aliasOf) ?? found);
 		const previous = groups.get(live.key) ?? live.linkedKeys ?? [live.key];
 		groups.set(live.key, [...new Set([live.key, ...previous, link.sharedMemory, link.gadget])]);

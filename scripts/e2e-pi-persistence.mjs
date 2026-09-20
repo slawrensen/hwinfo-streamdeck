@@ -2764,6 +2764,42 @@ try {
 	check("down: a live tree does name the key it cannot find", upTruth.placeholder === "⚠ Sensor not present. Pick again" && upTruth.missing === true, JSON.stringify({ placeholder: upTruth.placeholder, missing: upTruth.missing }));
 	check("down: and marks that chip alone", deepEqual(upTruth.chips, [false, false, true]), JSON.stringify(upTruth.chips));
 	check("down: neither state wrote anything", writes.length === 0, `${writes.length} writes`);
+
+	// A stale Gadget tree still has an accepted snapshot. Its absent-key
+	// cue must agree with Live value, while an unavailable tree stays neutral.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/gadget`);
+	store.settings = {
+		readingKey: "g:Test Source:Missing",
+		rotationKeys: ["g:Test Source:Test Temp", "g:Test Source:Test Fan", "g:Test Source:Missing"],
+		dialView: "overview",
+		futureBlob: FUTURE_BLOB
+	};
+	const staleGadgetSeed = structuredClone(store.settings);
+	const staleGlobalMark = globalWrites.length;
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
+	await sleep(3500);
+	const gadgetUp = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("stale Gadget: a current tree marks only the absent selection", gadgetUp.missing === true && deepEqual(gadgetUp.chips, [false, false, true]), JSON.stringify(gadgetUp));
+	const staleHint = "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support.";
+	const sendGadgetPayload = (payload) => toPi({ event: "sendToPropertyInspector", action: pageAction, context: `ctx-${mode}`, payload });
+	sendGadgetPayload({ ...GADGET_TREE, state: "stale", hint: staleHint });
+	sendGadgetPayload({ event: "preview", state: "stale", source: "gadget", hint: staleHint, missing: true });
+	await sleep(600);
+	const gadgetStale = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	const stalePreview = (await evaluate(`document.getElementById("preview-value").textContent`)).result?.value;
+	check("stale Gadget: the picker agrees with the missing live preview", stalePreview === "sensor missing" && gadgetStale.placeholder === "⚠ Sensor not present. Pick again" && gadgetStale.missing === true, JSON.stringify({ preview: stalePreview, ...gadgetStale }));
+	check("stale Gadget: present chips stay valid and only the absent chip is marked", deepEqual(gadgetStale.chips, [false, false, true]), JSON.stringify(gadgetStale.chips));
+	check("stale Gadget: the freshness hint remains visible", gadgetStale.hint === staleHint, String(gadgetStale.hint));
+	sendGadgetPayload({ event: "sensorTree", groups: [], state: "unavailable", hint: DOWN_TREE.hint });
+	sendGadgetPayload({ event: "preview", state: "unavailable", hint: DOWN_TREE.hint, missing: false });
+	await sleep(600);
+	const gadgetDown = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("stale Gadget: losing the source clears every missing cue", gadgetDown.placeholder === "Search sensors…" && gadgetDown.missing === false && deepEqual(gadgetDown.chips, [false, false, false]), JSON.stringify(gadgetDown));
+	await evaluate(`document.getElementById("picker-refresh").click()`);
+	await sleep(1200);
+	const gadgetRecovered = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
+	check("stale Gadget: a recovered tree restores only the genuine missing cue", gadgetRecovered.placeholder === "⚠ Sensor not present. Pick again" && gadgetRecovered.missing === true && deepEqual(gadgetRecovered.chips, [false, false, true]), JSON.stringify(gadgetRecovered));
+	check("stale Gadget: source states never rewrite saved settings", writes.length === 0 && globalWrites.length === staleGlobalMark && deepEqual(store.settings, staleGadgetSeed), `${writes.length} key writes, ${globalWrites.length - staleGlobalMark} global writes`);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

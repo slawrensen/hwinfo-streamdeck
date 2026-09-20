@@ -25,7 +25,7 @@ import { composeDialSvg, type DialRenderState } from "../src/actions/sensor-dial
 import { resolveDetailGroup } from "../src/detail/detail-group";
 import { composeChunkFace } from "../src/detail/detail-faces";
 import { detailTilesOf } from "../src/detail/detail-settings";
-import type { DeviceDetailState } from "../src/detail/navigation";
+import { DetailNavigator, type DeviceDetailState } from "../src/detail/navigation";
 import { applyReadingLinks, parseReadingLinks } from "../src/hwinfo/reading-links";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import { buildPreview, buildSensorTree } from "../src/pi-protocol";
@@ -499,6 +499,117 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 };
 
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
+
+describe("remaining PI review regressions", () => {
+	it("a stale snapshot retains missing cues, unavailable clears them, and recovery requests a fresh tree", async () => {
+		const status = linkedStatus();
+		const m = await openPanel("dial", { readingKey: "gone:0:1", rotationKeys: ["gone:0:1"] }, status);
+		const stale: PollerStatus = { ...status, state: "stale", staleForMs: 16_000 };
+		m.feed(buildSensorTree(stale));
+		m.feed(buildPreview(stale, { readingKey: "gone:0:1" }, false));
+		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		assert.equal(m.el("picker-search").placeholder, NOT_PRESENT);
+		assert.ok(chips(m)[0]!.classList.contains("missing"));
+		const before = m.sent.length;
+		m.feed(buildPreview(status, { readingKey: "gone:0:1" }, false));
+		assert.equal(m.sent.length, before + 1, "ok after stale still requests a fresh tree");
+		m.feed({ event: "sensorTree", state: "unavailable", groups: [], hint: "Down" });
+		assert.equal(m.el("picker-search").placeholder, RESTING);
+		assert.ok(!chips(m)[0]!.classList.contains("missing"));
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("linked duplicate cells cannot lend their label to the next tile, in the panel or an open detail session", async () => {
+		const status = linkedStatus();
+		const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [SM[1], G[1], SM[2]], detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["DUPLICATE"] }, { size: 1, labels: ["PUMP"] }] };
+		const original = JSON.stringify(seed);
+		const nav = new DetailNavigator({ switchProfile: async () => {} });
+		assert.equal(await nav.enter({ deviceId: "review", deviceType: 0, settings: seed, snapshot: status.snapshot }), "entered");
+		assert.deepEqual(nav.pageFor(nav.stateFor("review")!).specs.slice(0, 2).map((s) => s?.labels), [["GPU"], ["PUMP"]]);
+		const m = await openPanel("reading", seed, status);
+		assert.deepEqual(chipNames(m, "detail-list"), ["GPU", "PUMP"]);
+		assert.equal(m.writes.length, 0);
+		assert.equal(JSON.stringify(seed), original);
+		nav.shutdown();
+	});
+
+	it("unlinking before an edit restores source cells and styles without writing settings", async () => {
+		const status = linkedStatus();
+		const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [G[0], SM[1], G[1], SM[2], "gone:0:1"], detailTiles: [{ size: 4, labels: ["GPU", "DUPLICATE", "PUMP", "MISSING"], colors: ["#AAAA11", "#FF0000", "#00FF00", "#0000FF"], automaticColors: [true, false, false, true], cellLabels: false }] };
+		const m = await openPanel("reading", seed, status);
+		const nav = new DetailNavigator({ switchProfile: async () => {} });
+		await nav.enter({ deviceId: "review", deviceType: 0, settings: seed, snapshot: status.snapshot });
+		const projected = nav.pageFor(nav.stateFor("review")!);
+		assert.deepEqual(projected.chunks[0], [SM[1], SM[2], "gone:0:1"]);
+		assert.deepEqual(projected.specs[0], { size: 3, labels: ["GPU", "PUMP", "MISSING"], colors: ["#AAAA11", "#00FF00", "#0000FF"], automaticColors: [true, false, true], cellLabels: false });
+		assert.deepEqual(chipNames(m, "detail-list"), ["CPU Temp (Back tile)", "GPU", "PUMP", "MISSING"]);
+		for (let i = 0; i < 3; i++) m.feed(buildSensorTree(status));
+		m.echo("detailDensity", "2");
+		m.echo("readingKey", G[0]); // the same primary via its other endpoint
+		await m.flush();
+		assert.equal(m.writes.length, 0, "tree and unrelated setting adoption never commits the projection");
+		const unlinked = linkedStatus([]);
+		m.feed(buildSensorTree(unlinked));
+		nav.refresh("review", unlinked.snapshot);
+		assert.deepEqual(chipNames(m, "detail-list").slice(1), ["GPU", "DUPLICATE", "PUMP", "MISSING"]);
+		// Navigation retains its own raw primary, so an unlink makes the
+		// Gadget primary a listed reading again, just as before projection.
+		assert.deepEqual(nav.pageFor(nav.stateFor("review")!).specs[0], detailTilesOf(seed)[0]);
+		assert.deepEqual(plain(m.store.detailTiles), seed.detailTiles);
+		assert.deepEqual(plain(m.store.detailKeys), seed.detailKeys);
+		assert.equal(m.writes.length, 0);
+		nav.shutdown();
+	});
+
+	it("editing a survivor after projection commits one visible layout and unlink cannot resurrect hidden cells", async () => {
+		const status = linkedStatus();
+		const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [SM[1], G[1], SM[2]], detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["DUPLICATE"] }, { size: 1, labels: ["PUMP"] }] };
+		const m = await openPanel("reading", seed, status);
+		assert.ok(m.el("detail-list").querySelectorAll(".hw-set-note").some((n) => n.textContent.includes("Editing this list saves the shown layout")));
+		const pump = chips(m, "detail-list").find((c) => c.dataset.key === SM[2])!;
+		m.el("detail-list").fire("click", { target: pump.querySelector('.hw-detail-move[data-move="-1"]')! });
+		assert.deepEqual(plain(m.store.detailKeys), [SM[2], SM[1]]);
+		assert.deepEqual(detailTilesOf(m.store).map((s) => s.labels), [["PUMP"], ["GPU"]]);
+		assert.equal(m.writes.filter((w) => w.name === "detailKeys").length, 1);
+		m.feed(buildSensorTree(linkedStatus([])));
+		assert.deepEqual(chipNames(m, "detail-list"), ["PUMP", "GPU"]);
+		const remove = chips(m, "detail-list")[0]!.querySelector(".hw-set-remove")!;
+		m.el("detail-list").fire("click", { target: remove });
+		assert.deepEqual(plain(m.store.detailKeys), [SM[1]]);
+		assert.deepEqual(detailTilesOf(m.store).map((s) => s.labels), [["GPU"]]);
+	});
+
+	it("a link update during a rename still edits the same saved reading", async () => {
+		const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [SM[1], G[1], SM[2]], detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["DUPLICATE"] }, { size: 1, labels: ["PUMP"] }] };
+		const m = await openPanel("reading", seed, linkedStatus([]));
+		const pump = chips(m, "detail-list").find((c) => c.dataset.key === SM[2])!;
+		m.el("detail-list").fire("click", { target: pump.querySelector(".hw-set-name")! });
+		const input = m.el("detail-list").querySelector(".hw-cell-rename")!;
+		input.value = "COOLANT";
+		m.feed(buildSensorTree(linkedStatus()));
+		m.el("detail-list").fire("change", { target: input });
+		assert.deepEqual(detailTilesOf(m.store).map((s) => s.labels), [["GPU"], ["COOLANT"]]);
+		assert.deepEqual(plain(m.store.detailKeys), [SM[1], SM[2]]);
+	});
+
+	for (const gesture of ["held size press", "whole tile drag"] as const) {
+		it(`a link projection safely cancels an obsolete ${gesture}`, async () => {
+			const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [SM[1], G[1], SM[2], "gone:0:1"], detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["DUPLICATE"] }, { size: 1, labels: ["PUMP"] }, { size: 1, labels: ["OTHER"] }] };
+			const m = await openPanel("reading", seed, linkedStatus([]));
+			const holder = chips(m, "detail-list").find((c) => c.dataset.key === SM[2])!.closest(".hw-tile")!;
+			const button = holder.querySelector(".hw-tile-size")!;
+			const data = new Map<string, string>();
+			const dataTransfer = { setData: (type: string, value: string) => data.set(type, value), getData: (type: string) => data.get(type) ?? "", effectAllowed: "", dropEffect: "" };
+			if (gesture === "held size press") m.el("detail-list").fire("mousedown", { target: button });
+			else holder.querySelector(".hw-tile-grip")!.fire("dragstart", { dataTransfer });
+			m.feed(buildSensorTree(linkedStatus()));
+			if (gesture === "held size press") m.el("detail-list").fire("click", { target: button });
+			else chips(m, "detail-list")[0]!.closest(".hw-tile")!.fire("drop", { dataTransfer, clientX: -1 });
+			assert.equal(m.writes.length, 0, "an obsolete index cannot resize or move its new occupant");
+			assert.deepEqual(plain(m.store.detailKeys), seed.detailKeys);
+		});
+	}
+});
 
 describe("detail colors retain automatic provenance through the production panel", () => {
 	const readings = Array.from({ length: 9 }, (_, i) => sample(`tile:0:${i}`, i, `Reading ${i}`, SensorType.Voltage, "V", i + 1));

@@ -134,7 +134,13 @@ as saved, and per-reading names and colors saved under either endpoint
 follow the confirmed pair. A pairing edit takes effect at once on every key,
 dial and tile; re-applying or reordering the same pairs changes nothing. A
 rotation set or group that holds both endpoints of one pair steps through it
-as one reading, and a custom detail list shows one tile per measurement. The
+as one reading, and a custom detail list shows one cell per measurement. If
+the list already contains both keys, the first wins. The duplicate cell and
+its own label and color are hidden together, so later readings keep their
+tile styling. Unlinking restores the original layout unless you edit the
+detail list or one of its tiles: that explicit edit saves the shown layout.
+Opening the panel, refreshing sensors, or changing other settings does not
+rewrite the saved list or tile plan. The
 settings panel shows a linked saved key as present, with its label, tick and
 color. Removing a pair stops that fallback without rewriting any action. A
 dial session or sparkline segment ends for a pairing edit only when its

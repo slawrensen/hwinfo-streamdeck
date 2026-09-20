@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-4";
+	const PI_BUILD = "1.7.0.0-5";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -47,6 +47,7 @@
 	// alias. Rebuilt with the tree, so every lookup below is one map read.
 	let treeIndex = new Map();
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
+	let treeHasSnapshot = false; // ok or stale, unlike an unavailable empty tree
 	let treeRequestPending = false;
 
 	function requestTree() {
@@ -106,12 +107,12 @@
 		return treeEntryOf(key)?.reading.label ?? null;
 	}
 
-	/** A saved key the live tree does not list, which is the only honest
-	 * "missing". Only a tree fetched while HWiNFO was up can say that: the
+	/** A saved key the last snapshot does not list, including a held stale
+	 * snapshot, just like the live preview's missing-reading check. The
 	 * empty tree of an unavailable source would accuse every saved key of
 	 * being gone, while the panel's own hint says HWiNFO is not running. */
 	function keyIsMissing(key) {
-		return treeFetchedOk && readingLabelOf(key) === null;
+		return treeHasSnapshot && readingLabelOf(key) === null;
 	}
 
 	// --- reading keys in the config document ---------------------------------
@@ -472,6 +473,7 @@
 	const DETAIL_KEYS_MAX = 128; // mirrors the plugin parser's cap
 	const DETAIL_TILES_MAX = 128; // mirrors detailTilesOf's own cap, distinct in the parser
 	let detailKeys = [];
+	let detailSourceKeys = [];
 	// This key's own sensor: the runtime shows it on the Back tile and
 	// filters it out of the list, so the panel must refuse to add it and
 	// must park an adopted copy (hand-edited, or the opener re-picked onto
@@ -488,6 +490,9 @@
 	// reason as the primary: the Tile shows select's own write is never
 	// echoed back to this panel.
 	let detailTiles = [];
+	let detailSourceTiles = [];
+	let detailDuplicatesHidden = false;
+	let detailProjectionVersion = 0;
 	let detailUniform = 1;
 	const detailTilesBinding = detailListEl === null ? null : useSettings("detailTiles", adoptDetailTiles, null);
 	// Merge-only sibling of the tiles binding (no callback, no debounce, no
@@ -500,7 +505,7 @@
 	function adoptDetailTiles(value) {
 		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
 		// salvage, so the panel always shows what the runtime would build.
-		detailTiles = !Array.isArray(value)
+		detailSourceTiles = !Array.isArray(value)
 			? []
 			: value.slice(0, DETAIL_TILES_MAX).map((entry) => {
 					const raw = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? entry : {};
@@ -520,6 +525,7 @@
 					}
 					return { size, labels, colors, cellLabels: raw.cellLabels !== false, automaticColors };
 				});
+		projectDetailState();
 		revalidateDetailAim();
 		renderDetailList();
 	}
@@ -530,6 +536,7 @@
 		// #detail-list under an in-flight chip drag or landing flash.
 		if (next === detailUniform) return;
 		detailUniform = next;
+		projectDetailState();
 		revalidateDetailAim(); // the regrouped walk may have no cell for a standing aim
 		renderDetailList(); // the implicit fill grouping follows Tile shows
 	}
@@ -553,6 +560,46 @@
 	 * order the tile walk, cell indices and the note may count in. */
 	function listedDetailKeys() {
 		return detailKeys.filter((k) => !isDetailPrimary(k));
+	}
+
+	/** Mirror projectDetailTiles and customKeys in detail-group.ts. Keep
+	 * saved source copies so a tree/link update is read-only and unlinking
+	 * restores the authored layout. Only an explicit detail edit commits
+	 * the visible projection through writeDetailState. */
+	function projectDetailState() {
+		const before = JSON.stringify([detailKeys, detailTiles.map((t) => t.size)]);
+		const source = detailSourceKeys.filter((k) => !isDetailPrimary(k));
+		const seen = new Set();
+		const kept = new Set(source.filter((key) => {
+			const identity = treeEntryOf(key)?.reading.key ?? key;
+			if (seen.has(identity)) return false;
+			seen.add(identity);
+			return true;
+		}));
+		detailDuplicatesHidden = kept.size !== source.length;
+		detailKeys = detailSourceKeys.filter((key) => isDetailPrimary(key) || kept.has(key));
+		detailTiles = cloneTiles(detailSourceTiles);
+		if (detailDuplicatesHidden) {
+			let head = 0;
+			detailTiles = detailTiles.flatMap((spec) => {
+				const cells = Array.from({ length: spec.size }, (_, i) => i).filter((i) => source[head + i] === undefined || kept.has(source[head + i]));
+				head += spec.size;
+				return cells.length === 0 ? [] : [{ size: cells.length, labels: cells.map((i) => spec.labels[i]), colors: cells.map((i) => spec.colors[i]), cellLabels: spec.cellLabels, automaticColors: cells.map((i) => spec.automaticColors[i]) }];
+			});
+		}
+		if (before !== JSON.stringify([detailKeys, detailTiles.map((t) => t.size)])) {
+			// Numeric tile targets cannot survive a changed projection. A
+			// held press can keep its old DOM until mouseup; reject that
+			// control instead of applying it to a different reading.
+			detailProjectionVersion++;
+			detailTileDrag = null;
+			disarmDetailAim();
+		}
+	}
+
+	function currentDetailTarget(target) {
+		const holder = target.closest(".hw-tile");
+		return holder === null || holder.dataset.projection === String(detailProjectionVersion);
 	}
 
 	/** A listed position back to its detailKeys slot: every parked
@@ -630,11 +677,27 @@
 		writeDetailTiles(next);
 	}
 
+	/** A tree update can reshape the walk while a rename/color editor is
+	 * open. Find its saved key again instead of dressing a new occupant of
+	 * the old tile/cell. A now-hidden duplicate has no editable cell. */
+	function editDetailCell(key, mutate) {
+		const index = listedDetailKeys().indexOf(key);
+		if (index < 0) return;
+		const walk = detailTileWalk();
+		const tileIdx = walk.findIndex((tile) => index >= tile.head && index < tile.head + tile.size);
+		if (tileIdx >= 0) editTile(tileIdx, (spec) => mutate(spec, index - walk[tileIdx].head));
+	}
+
 	/** Every list or tile edit persists through here: detailTiles staged
 	 * (merged, unsaved), detailKeys saved, so the app stores one frame
 	 * carrying BOTH fields. Solo edits re-assert the other field for free,
 	 * which also self-heals a store that went stale. */
 	function writeDetailState() {
+		// An explicit edit accepts the shown layout. Update both source
+		// copies before publishing so a later tree cannot resurrect it.
+		detailSourceKeys = [...detailKeys];
+		detailSourceTiles = cloneTiles(detailTiles);
+		detailDuplicatesHidden = false;
 		// An edit can shorten the walk out from under a standing aim (a
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
@@ -665,13 +728,14 @@
 		// move and remove need one chip per key), and the same cap applies, so
 		// the panel never shows chips past what the runtime lists.
 		const seen = new Set();
-		detailKeys = Array.isArray(value)
+		detailSourceKeys = Array.isArray(value)
 			? value
 					.filter((k) => typeof k === "string")
 					.map((k) => bareKey(k))
 					.filter((k) => k !== "" && !seen.has(k) && seen.add(k))
 					.slice(0, DETAIL_KEYS_MAX)
 			: [];
+		projectDetailState();
 		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
@@ -683,6 +747,7 @@
 		// re-delivers the unchanged key forever.
 		if (next === detailPrimaryKey) return;
 		detailPrimaryKey = next;
+		projectDetailState();
 		revalidateDetailAim(); // the walk excludes the primary, so a re-pick reshapes it
 		renderDetailList(); // the parked Back-tile chip follows the opener's sensor
 		detailPicker?.renderList();
@@ -1364,9 +1429,9 @@
 			well.title = "This cell's identity color on the quad tile";
 			well.value = (tile.spec !== null ? tile.spec.colors[cellIdx] : null) ?? QUAD_DEFAULT_COLORS[cellIdx] ?? "#4CC2FF";
 			well.addEventListener("change", () => {
-				editTile(tileIdx, (t) => {
-					t.colors[cellIdx] = well.value;
-					t.automaticColors[cellIdx] = false;
+				editDetailCell(key, (t, cell) => {
+					t.colors[cell] = well.value;
+					t.automaticColors[cell] = false;
 				});
 			});
 			chip.append(well);
@@ -1565,6 +1630,7 @@
 		const frag = document.createDocumentFragment();
 		const listed = listedDetailKeys();
 		const walk = detailTileWalk();
+		if (detailDuplicatesHidden) frag.appendChild(setNote("Linked duplicate entries are hidden. Editing this list saves the shown layout; unlinking before an edit restores the original."));
 		// The parked primary leads, the way the Back tile leads the view: the
 		// opener's own key, or an alias of it, wherever the list holds one.
 		for (const key of detailKeys) {
@@ -1578,6 +1644,7 @@
 		walk.forEach((tile, tileIdx) => {
 			const holder = document.createElement("span");
 			holder.className = "hw-tile" + (tile.spec !== null ? " planned" : "");
+			holder.dataset.projection = String(detailProjectionVersion);
 			// A whole-tile drag targets TILE boundaries: the holder's left
 			// half lands the dragged tile before this one, the right half
 			// after it. The list is a wrapping flex row and the tiles are
@@ -1627,6 +1694,7 @@
 			grip.setAttribute("aria-label", `Move tile ${tileIdx + 1}; arrow keys reorder it from the keyboard`);
 			grip.textContent = "⠿";
 			grip.addEventListener("dragstart", (ev) => {
+				if (!currentDetailTarget(grip)) { ev.preventDefault(); return; }
 				detailTileDrag = tileIdx;
 				ev.dataTransfer.setData("text/plain", `tile:${tileIdx}`);
 				ev.dataTransfer.effectAllowed = "move";
@@ -1685,6 +1753,7 @@
 			// marker is the landing point.
 			const ghost = document.createElement("span");
 			ghost.className = "hw-tile ghost";
+			ghost.dataset.projection = String(detailProjectionVersion);
 			wireGhostDrop(ghost);
 			ghost.appendChild(detailAddMarker("end", false, !atCap && detailArm === null, atCap));
 			frag.appendChild(ghost);
@@ -1767,7 +1836,7 @@
 				searchEl.placeholder = "Search sensors…";
 				searchEl.title = "";
 				searchEl.classList.remove("missing");
-			} else if (selectedKey !== "" && treeFetchedOk) {
+			} else if (selectedKey !== "" && treeHasSnapshot) {
 				// Never put the warning into .value; it would act as a search filter.
 				// The box is 198 px wide at the shipped panel width, so the cue is
 				// short enough to read whole and the title carries the rest.
@@ -1993,6 +2062,7 @@
 				setTree(null);
 				// No tree in hand is not an answer to "is this key missing".
 				treeFetchedOk = false;
+				treeHasSnapshot = false;
 				renderList();
 				requestTree();
 			});
@@ -2759,6 +2829,8 @@
 		if (p.event === "sensorTree") {
 			setTree(p.groups);
 			treeFetchedOk = p.state === "ok";
+			treeHasSnapshot = p.state === "ok" || p.state === "stale";
+			projectDetailState();
 			treeRequestPending = false;
 			setHint(p.hint);
 			for (const picker of pickers) picker.onTree();
@@ -2782,6 +2854,7 @@
 	if (quadPicker4 !== null) quadPicker4.init();
 	if (detailBinding !== null) {
 		detailListEl.addEventListener("keydown", (ev) => {
+			if (ev.target instanceof Element && !currentDetailTarget(ev.target)) return;
 			// The tile grip's keyboard leg: arrows move the whole tile the
 			// way a drag does, and focus follows the moved tile's grip.
 			const grip = ev.target instanceof Element ? ev.target.closest(".hw-tile-grip") : null;
@@ -2870,6 +2943,7 @@
 			if (!(ev.relatedTarget instanceof Node) || !detailListEl.contains(ev.relatedTarget)) sweepCarets(null);
 		});
 		detailListEl.addEventListener("click", (ev) => {
+			if (!currentDetailTarget(ev.target)) return;
 			const move = ev.target.closest(".hw-detail-move");
 			if (move !== null && !move.disabled) {
 				const key = move.closest(".hw-set-chip")?.dataset.key;
@@ -2912,6 +2986,7 @@
 				input.className = "hw-group-name hw-chip-rename hw-cell-rename";
 				input.dataset.tile = String(tileIdx);
 				input.dataset.cell = String(cellIdx);
+				input.dataset.key = chipKey;
 				input.value = spec !== undefined ? (spec.labels[cellIdx] ?? "") : "";
 				input.placeholder = readingLabelOf(chipKey) ?? chipKey;
 				input.spellcheck = false;
@@ -2979,8 +3054,8 @@
 		detailListEl.addEventListener("change", (ev) => {
 			const input = ev.target;
 			if (!(input instanceof HTMLInputElement) || !input.classList.contains("hw-cell-rename")) return;
-			editTile(Number(input.dataset.tile), (t) => {
-				t.labels[Number(input.dataset.cell)] = input.value.trim();
+			editDetailCell(input.dataset.key, (t, cell) => {
+				t.labels[cell] = input.value.trim();
 			});
 		});
 		detailListEl.addEventListener("focusout", (ev) => {

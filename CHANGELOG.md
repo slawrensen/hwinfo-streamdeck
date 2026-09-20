@@ -51,9 +51,17 @@ Per-reading dial colors and reliability fixes in one release candidate.
   at once on every key, dial and tile; re-applying or reordering the same
   pairs changes nothing. A rotation set or group that holds both endpoints
   of one pair steps through it as one reading, and a custom detail list
-  shows one tile per measurement. Per-reading names and colors follow a
+  shows one cell per measurement. If a custom list already contains both
+  keys, the duplicate cell's label and color are hidden with it, preserving
+  later tiles' styling. Unlinking restores the saved layout unless an
+  explicit detail-list or tile edit saves the shown layout. Per-reading
+  names and colors follow a
   confirmed alias, and the settings panel shows a linked saved key as
   present, with its label, tick and color.
+- A stale sensor snapshot keeps the picker's missing-reading cue, matching
+  Live value; an unavailable source still leaves the picker neutral. Bar
+  and Ring help now distinguishes Shared Memory session min/max from
+  Gadget's moving window of 36 samples, which restarts after a gap.
 - Gadget starts with unknown freshness until a value change is observed.
   Unchanged registry values show Age unknown instead of claiming HWiNFO
   stalled. A Yes/No reading's raw flip counts as value evidence, and its

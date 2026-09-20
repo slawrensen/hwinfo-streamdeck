@@ -11,7 +11,7 @@
  */
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
-import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
+import { pageOf, projectDetailTiles, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
 import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
 
@@ -356,7 +356,7 @@ export class DetailNavigator {
 
 	/** The current logical page projection for a device's state. */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan);
+		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, projectDetailTiles(state.group, state.tilePlan));
 	}
 
 	/**
@@ -427,10 +427,10 @@ export class DetailNavigator {
 		if (group === null) {
 			return;
 		}
-		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]);
+		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]) || JSON.stringify(group.sourceKeys) !== JSON.stringify(state.group.sourceKeys);
 		if (changed) {
 			state.group = group;
-			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan).offset;
+			state.offset = this.pageFor(state).offset;
 		}
 	}
 

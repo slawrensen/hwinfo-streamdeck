@@ -12,10 +12,13 @@
  * reuses the key and the bridge's native buffer, so a read allocates only
  * the value names it queries and the JavaScript strings it returns.
  *
- * Freshness: the registry is NOT cleared when HWiNFO exits, so absence can't
- * be detected structurally. Only changes to an already observed, unambiguous
- * reading in the same unit advance value evidence. Initial reads and topology
- * changes leave age unverified. Steady values cannot prove a producer exit.
+ * Freshness: a clean exit of HWiNFO 8.48 deletes the key, but a HWiNFO that
+ * is killed or crashes leaves it behind with its last values, and one very
+ * large untick can leave a frozen block of old rows until HWiNFO exits. So a
+ * present key, or a present row, proves no producer. Only changes to an
+ * already observed, unambiguous reading in the same unit advance value
+ * evidence. Initial reads and topology changes leave age unverified. Steady
+ * values cannot prove a producer exit.
  */
 import { gadgetReadingKey, legacyGadgetKey } from "./gadget-identity";
 import { gadgetDisplayIsNumeric, gadgetRawValue, gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
@@ -80,7 +83,7 @@ function toHwinfoError(err: unknown): unknown {
 		return err;
 	}
 	if (code === "HWSM_REGISTRY_NOT_FOUND" || hwsmWin32(err) === ERROR_KEY_DELETED) {
-		return new HwinfoError("not-running", `HWiNFO Gadget registry key HKCU\\${VSB_SUBKEY} is not present: enable Gadget reporting in HWiNFO, or start HWiNFO.`);
+		return new HwinfoError("not-running", `HWiNFO Gadget registry key HKCU\\${VSB_SUBKEY} is not present: start HWiNFO, enable reporting to Gadget and tick at least one reading (HWiNFO creates the key once a reading is ticked).`);
 	}
 	if (code === "HWSM_REGISTRY_ACCESS_DENIED") {
 		return new HwinfoError("access-denied", `Reading HKCU\\${VSB_SUBKEY} was denied.`);
@@ -124,9 +127,10 @@ export class GadgetRegistryProvider {
 
 	/**
 	 * Opens the backend, verifying the key exists AND currently has entries.
-	 * A present-but-empty key throws "gadget-empty" — the user has Gadget
-	 * reporting set up and needs to tick sensors, which (only) outranks a
-	 * generic "not-running" from shared memory in the poller's auto mode.
+	 * A present-but-empty key fails the verification read as "gadget-empty"
+	 * (see read): the user has Gadget reporting set up and needs to tick
+	 * sensors, which (only) outranks a generic "not-running" from shared
+	 * memory in the poller's auto mode.
 	 */
 	static open(): GadgetRegistryProvider {
 		if (process.platform !== "win32") {
@@ -156,23 +160,33 @@ export class GadgetRegistryProvider {
 			provider.close();
 			throw new HwinfoError("busy", "Gadget readings changed during the scan. Retrying automatically.");
 		}
-		// Withheld rows are rows: a key whose only readings are withheld is
-		// not empty, and staying open lets the log and the panel say why.
-		if (snapshot.readings.length === 0 && !snapshot.blockedReadingCount && !snapshot.contradictoryReadingCount) {
-			provider.close();
-			// The key existing but holding no readings means HWiNFO IS (or was)
-			// running with Gadget support — "start HWiNFO" would mislead here.
-			throw new HwinfoError("gadget-empty", `HKCU\\${VSB_SUBKEY} exists but holds no readings: in HWiNFO's sensor window open Configure Sensors, HWiNFO Gadget tab, and tick "Report value in Gadget" for the sensors you need.`);
-		}
 		return provider;
 	}
 
+	/**
+	 * One scan. Null is a skipped scan (an interleave, the first sighting of
+	 * a shared name or of a contradiction): it says nothing about the key,
+	 * emptiness included. A COMPLETE scan that finds no rows at all throws
+	 * "gadget-empty", under a live session exactly as at the open: a key
+	 * emptied while this provider holds it must reach the same screen a cold
+	 * open would, and the poller's reopen on every tick brings the readings
+	 * back as soon as one is ticked again.
+	 */
 	read(): SensorSnapshot | null {
+		let snapshot: SensorSnapshot | null;
 		try {
-			return this.readEntries();
+			snapshot = this.readEntries();
 		} catch (err) {
 			throw toHwinfoError(err);
 		}
+		// Withheld rows are rows: a key whose only readings are withheld is
+		// not empty, and staying open lets the log and the panel say why.
+		if (snapshot !== null && snapshot.readings.length === 0 && !snapshot.blockedReadingCount && !snapshot.contradictoryReadingCount) {
+			// The key existing but holding no readings means HWiNFO IS (or was)
+			// running with Gadget support: "start HWiNFO" would mislead here.
+			throw new HwinfoError("gadget-empty", `HKCU\\${VSB_SUBKEY} exists but holds no readings: in HWiNFO's sensor window open Configure Sensors, HWiNFO Gadget tab, and tick "Report value in Gadget" for the sensors you need.`);
+		}
+		return snapshot;
 	}
 
 	/** One warning per offending slot or shared name, drained by the poller's
@@ -200,16 +214,18 @@ export class GadgetRegistryProvider {
 		const namedRows: { slot: number; key: string; sensor: string; label: string }[] = [];
 		const contradictions: { slot: number; identity: string; notice: string }[] = [];
 
-		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
-		// reading is ticked "Report value in Gadget" and keeps that
-		// reservation while the reading is disabled in the sensor window,
-		// writing nothing into the slot: a permanent hole. So a missing
-		// Sensor<i> is an unused slot, never an end-of-list marker, and the
-		// scan runs the whole bounded range. queryString returns null for
-		// exactly one condition, ERROR_FILE_NOT_FOUND; every other registry
-		// failure throws, so skipping a null cannot swallow a real fault.
-		// A scan that returns or throws from inside this loop saw only a
-		// prefix of the rows: it commits nothing, names included.
+		// The indexes are SPARSE. HWiNFO numbers the ticked readings in
+		// sensor order and renumbers them densely after every tick or
+		// untick, so an untick leaves no gap. A reading that stays ticked
+		// but is not being written (one disabled in the sensor window)
+		// keeps its number with nothing in the slot: a permanent hole
+		// (issue #21). So a missing Sensor<i> is an unused slot, never an
+		// end-of-list marker, and the scan runs the whole bounded range.
+		// queryString returns null for exactly one condition,
+		// ERROR_FILE_NOT_FOUND; every other registry failure throws, so
+		// skipping a null cannot swallow a real fault. A scan that returns
+		// or throws from inside this loop saw only a prefix of the rows:
+		// it commits nothing, names included.
 		for (let i = 0; i < MAX_ENTRIES; i++) {
 			const sensorName = this.key.queryString(`Sensor${i}`);
 			if (sensorName === null) {

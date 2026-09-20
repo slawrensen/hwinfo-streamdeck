@@ -497,11 +497,11 @@ class HwinfoPoller extends EventEmitter {
 				// that produced it, a held one keeps the source it came from.
 				const source = snapshot !== null ? this.provider.source : this.status.state !== "unavailable" ? this.status.source : this.provider.source;
 				// The probe exists to release OUR handles on a named section.
-				// A registry key has no such lifetime, a deleted key already
-				// fails the ordinary read, and steady values are the resting
-				// state of a healthy Gadget source: probing there only reopens
-				// and rescans the key every few seconds for as long as nothing
-				// moves.
+				// A registry key has no such lifetime, a deleted or emptied key
+				// already fails the ordinary read, and steady values are the
+				// resting state of a healthy Gadget source: probing there only
+				// reopens and rescans the key every few seconds for as long as
+				// nothing moves.
 				if (this.provider.source !== "gadget") this.probeReopen();
 				const last = snapshot ?? (this.status.state !== "unavailable" ? this.status.snapshot : null);
 				if (last !== null) {

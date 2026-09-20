@@ -3,9 +3,10 @@
  * elsewhere). Drives the real provider over the real hwsm addon against a
  * real synthetic HKCU key, because the defect this suite exists for lives
  * in the seam between them: HWiNFO leaves permanent holes in the VSB
- * numbering (a reading keeps its reserved VSBidx while it is unticked in
- * the sensor window), and the reader used to treat the first missing
- * `SensorN` as the end of the list.
+ * numbering (a reading that stays ticked but is not being written, one
+ * disabled in the sensor window, keeps its VSBidx with nothing in the
+ * slot), and the reader used to treat the first missing `SensorN` as the
+ * end of the list.
  *
  * Runs in CI with the rest of `npm run test:native`, after build:native.
  *
@@ -21,8 +22,11 @@ import { after, describe, mock, test } from "node:test";
 import { gadgetReadingKey, legacyGadgetKey } from "../src/hwinfo/gadget-identity";
 import type { HwsmGadgetKey } from "../src/hwinfo/hwsm-loader";
 import { applyReadingLinks } from "../src/hwinfo/reading-links";
+import { HwinfoError } from "../src/hwinfo/types";
+import { statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
 
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
+import type { PollerStatus } from "../src/poller";
 
 const onWindows = process.platform === "win32" && process.arch === "x64";
 const VSB_SUBKEY = `Software\\HwinfoGadgetNT_${process.pid}`;
@@ -34,6 +38,7 @@ const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry")
 // After the environment above: the poller imports the provider, which
 // freezes HWINFO_VSB_KEY at module load.
 const { poller } = await import("../src/poller");
+const { SharedMemoryProvider } = await import("../src/hwinfo/provider");
 
 /** The bound the reader scans to; mirrors MAX_ENTRIES in the provider. */
 const MAX_ENTRIES = 1024;
@@ -1408,6 +1413,119 @@ describe("integrity: a page change keeps the Gadget baseline", { skip: !onWindow
 			subject.release();
 		}
 	});
+});
+
+describe("integrity: a key emptied under a live session is an empty key", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	const cpuPackage: Row = { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" };
+
+	test("a complete scan that finds no rows at all reports gadget-empty, as the open does", () => {
+		shape([0, 1, 2]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).readings.length, 3);
+			// Every value goes; the key itself stays.
+			for (const slot of [0, 1, 2]) dropSlot(slot);
+			assert.equal(reasonOf(() => provider.read()), "gadget-empty");
+			assert.equal(reasonOf(() => provider.read()), "gadget-empty", "and on every scan while it stays empty");
+			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "gadget-empty", "the same verdict a cold open reaches");
+		} finally { provider.close(); }
+	});
+
+	test("a skipped scan, and a scan whose every row is withheld, is not an empty key", () => {
+		const twin: Row = { sensor: "GPU [#0]: Example GPU", label: "GPU Fan1", value: "1800 RPM", raw: "1800" };
+		// A standing pair alone: the first sighting is skipped, then both rows are withheld.
+		shapeRows([cpuPackage, twin]);
+		let provider = GadgetRegistryProvider.open();
+		try {
+			putSlot(2, { ...twin, value: "35 %", raw: "35" });
+			dropSlot(0);
+			assert.equal(provider.read(), null, "a first sighting is skipped, and a skipped scan says nothing about the key");
+			const standing = readVerified(provider);
+			assert.equal(standing.readings.length, 0);
+			assert.equal(standing.blockedReadingCount, 2);
+		} finally { provider.close(); }
+		// A contradictory row alone: one scan of grace, then withheld.
+		shapeRows([cpuPackage]);
+		provider = GadgetRegistryProvider.open();
+		try {
+			putValue("Value0", "131.0 °F");
+			assert.equal(provider.read(), null, "the contradiction grace is a skipped scan");
+			const withheld = readVerified(provider);
+			assert.equal(withheld.readings.length, 0);
+			assert.equal(withheld.contradictoryReadingCount, 1);
+		} finally { provider.close(); }
+		// A row with no label alone.
+		shapeRows([cpuPackage]);
+		provider = GadgetRegistryProvider.open();
+		try {
+			dropValue("Label0");
+			const incomplete = readVerified(provider);
+			assert.equal(incomplete.readings.length, 0);
+			assert.equal(incomplete.blockedReadingCount, 1);
+		} finally { provider.close(); }
+		// The only row removed between the two observations of it.
+		shapeRows([cpuPackage]);
+		provider = GadgetRegistryProvider.open();
+		const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+		let removed = false;
+		Reflect.set(provider, "key", {
+			queryString(name: string): string | null {
+				const value = nativeKey.queryString(name);
+				if (!removed && name === "Sensor0") {
+					removed = true;
+					dropSlot(0);
+				}
+				return value;
+			},
+			close: () => nativeKey.close()
+		});
+		try {
+			assert.equal(provider.read(), null, "an interleave is a skipped scan, not an empty one");
+			assert.ok(removed);
+		} finally { provider.close(); }
+	});
+
+	for (const mode of ["gadget", "auto"] as const) {
+		test(`${mode} mode: the poller reaches Tick sensors on its own, says so once, and recovers when a reading is ticked again`, () => {
+			type Subject = { setSourceMode(mode: "gadget" | "auto"): void; retain(): void; release(): void; tick(): void; getStatus(): PollerStatus };
+			const subject = new (poller.constructor as unknown as { new (): Subject })();
+			const warnings: string[] = [];
+			Reflect.set(subject, "logger", { info() {}, warn: (line: string) => warnings.push(line), error() {} });
+			// Auto falls back to Gadget only while Shared Memory is not running.
+			const seam = mock.method(SharedMemoryProvider, "open", () => { throw new HwinfoError("not-running", "canned: shared memory absent"); });
+			shapeRows([cpuPackage]);
+			subject.setSourceMode(mode);
+			subject.retain();
+			try {
+				putValue("Value0", "56.0 °C");
+				putValue("ValueRaw0", "56");
+				subject.tick();
+				assert.equal(subject.getStatus().state, "ok", "precondition: a live Gadget session");
+				// Every value goes; the key itself stays.
+				dropSlot(0);
+				subject.tick();
+				const emptied = subject.getStatus();
+				assert.equal(emptied.state, "unavailable");
+				assert.equal(emptied.state === "unavailable" ? emptied.reason : "", "gadget-empty");
+				assert.deepEqual(statusScreen(emptied)?.lines, ["Tick sensors", "in Gadget"]);
+				assert.deepEqual(statusDialText(emptied), { title: "Gadget empty", value: "tick sensors" });
+				assert.match(statusSentence(emptied), /present but has no readable sensor rows/);
+				for (let i = 0; i < 3; i++) subject.tick();
+				assert.deepEqual(subject.getStatus(), emptied, "the screen stands while the key stays empty");
+				assert.deepEqual(warnings.map((line) => /\[([a-z-]+)\]/.exec(line)?.[1]), ["gadget-empty"], "logged once");
+				// A reading is ticked again: no page change, no restart.
+				putSlot(0, { ...cpuPackage, value: "57.0 °C", raw: "57" });
+				subject.tick();
+				const back = subject.getStatus();
+				assert.notEqual(back.state, "unavailable");
+				assert.equal(back.state === "unavailable" ? undefined : back.snapshot.byKey.get(gadgetReadingKey(cpuPackage.sensor, cpuPackage.label))?.value, 57);
+				assert.equal(warnings.length, 1);
+			} finally {
+				subject.release();
+				seam.mock.restore();
+			}
+		});
+	}
 });
 
 describe("integrity: a Yes/No reading's flip is value evidence", { skip: !onWindows ? "win32-x64 only" : false }, () => {

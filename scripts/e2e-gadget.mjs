@@ -301,7 +301,7 @@ try {
 	surface("willDisappear");
 	await sleep(300);
 
-	// 7. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
+	// 7. Freeze (HWiNFO killed or hung: key remains, values stop changing) → stale.
 	clearInterval(updater);
 	await expectFrame("frozen registry → unknown freshness", (svg) => svg.includes("Age unknown"), 12000);
 
@@ -314,8 +314,9 @@ try {
 	regDeleteKey();
 	await expectFrame("key deleted → 'Start HWiNFO'", (svg) => svg.includes("Start HWiNFO"), 10000);
 
-	// 10. Key present but EMPTY (gadget enabled, nothing ticked) — must NOT be
-	// diagnosed as "start HWiNFO"; the user needs to tick sensors instead.
+	// 10. Key present but EMPTY (unticking everything can leave that; reporting
+	// enabled with nothing ticked writes no key at all). It must NOT be
+	// diagnosed as "start HWiNFO": the user needs to tick sensors instead.
 	execSync(`reg add "${REG_PATH}" /f`, { stdio: "ignore" });
 	await expectFrame("empty key → 'Tick sensors' (gadget-empty)", (svg) => svg.includes("Tick sensors"), 10000);
 

@@ -220,7 +220,7 @@ If the key cannot show a reading, it shows a two-line status message:
 | **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
 | **Bridge failed / reinstall** | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 | **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
-| **Source error / open settings** | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data (the Gadget identity journal). In Auto mode this shows only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
+| **Source error / open settings** | The sensor source could not be opened or validated. In Auto mode a Gadget failure shows this only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
 
 The settings panel shows the matching plain-language explanation and fix while the key is in one of these states. Full details are on [Status screens](status-screens.md).
 

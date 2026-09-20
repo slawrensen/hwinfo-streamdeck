@@ -382,16 +382,16 @@ describe("auto mode reports a refused Gadget scan instead of an absent HWiNFO", 
 		return subject.getStatus();
 	}
 
-	it("an unreadable identity journal surfaces with its own instruction", () => {
-		const status = attempt(new HwinfoError("not-running", "HWSM_NOT_FOUND: mapping not found"), new HwinfoError("invalid", "Gadget identity history could not be read or saved. Restore the local identity journal or use Shared Memory Support."));
+	it("a Gadget value that is not text surfaces as its own reason", () => {
+		const status = attempt(new HwinfoError("not-running", "HWSM_NOT_FOUND: mapping not found"), new HwinfoError("invalid", "HWSM_REGISTRY_WRONG_TYPE: RegQueryValueExW: the value is not REG_SZ"));
 		assert.equal(status.state, "unavailable");
 		if (status.state !== "unavailable") return;
 		assert.equal(status.reason, "invalid");
-		assert.match(status.message, /identity journal/);
+		assert.match(status.message, /not REG_SZ/);
 	});
 
 	it("a specific shared-memory diagnosis still outranks the fallback", () => {
-		const status = attempt(new HwinfoError("access-denied", "mapping denied"), new HwinfoError("invalid", "journal"));
+		const status = attempt(new HwinfoError("access-denied", "mapping denied"), new HwinfoError("invalid", "HWSM_REGISTRY_WRONG_TYPE: RegQueryValueExW: the value is not REG_SZ"));
 		assert.equal(status.state, "unavailable");
 		if (status.state !== "unavailable") return;
 		assert.equal(status.reason, "access-denied");

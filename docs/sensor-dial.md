@@ -41,7 +41,7 @@ Three things keep the short labels readable:
 
   ![The dial's Rotation set in the settings panel: two chips already renamed to "CPU" and "GPU" (the first highlighted because that reading is on the dial), and a third chip open in its inline rename box with the typed name selected, above the line reading "Rotation moves through these 3 readings only".]({{ '/assets/img/pi-dial-rename.png' | relative_url }})
 
-  For example, rename two `SPD Hub Temperature` readings to `DIMM 1` and `DIMM 2` for display. This does not change HWiNFO's names or repair ambiguous Gadget identities.
+  For example, rename two `SPD Hub Temperature` readings to `DIMM 1` and `DIMM 2` for display. This does not change HWiNFO's names, so it does not separate two Gadget readings that share a name.
 
 See the [current rendered dial examples](#reading-colors) below. Older gallery images may show number colors that stable 1.6 could not produce through its settings.
 
@@ -190,7 +190,7 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | **Age unknown** / check Gadget | Gadget has no producer timestamp. Before the first observed value change, or after 15 seconds without another, the plugin cannot tell whether the source is steady or stopped. Check HWiNFO and Gadget reporting. |
 | **Gadget empty** / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Access denied** / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| **Source error** / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data (the Gadget identity journal). In Auto mode this shows only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
+| **Source error** / open settings | The sensor source could not be opened or validated. In Auto mode a Gadget failure shows this only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load. Reinstall the plugin from its release package, then restart it. Keep any Windows or security-software report for support. |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.

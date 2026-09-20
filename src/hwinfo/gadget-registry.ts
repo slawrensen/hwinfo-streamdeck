@@ -17,10 +17,17 @@
  * reading in the same unit advance value evidence. Initial reads and topology
  * changes leave age unverified. Steady values cannot prove a producer exit.
  */
-import { GadgetIdentityGuard, gadgetReadingKey, legacyGadgetKey } from "./gadget-identity";
+import { gadgetReadingKey, legacyGadgetKey } from "./gadget-identity";
 import { gadgetDisplayIsNumeric, gadgetRawValue, gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
+
+/** Where a name seen on more than one row stands. "suspect": one sighting,
+ * and that scan was skipped as a possibly torn read. "held": on more than
+ * one row on consecutive complete scans, so its rows are withheld.
+ * "releasing": held, and the last complete scan no longer showed it on more
+ * than one row; still withheld, forgotten when the next scan agrees. */
+type NameState = "suspect" | "held" | "releasing";
 
 /** Overridable so the gadget e2e can point at a synthetic key. */
 const VSB_SUBKEY = process.env.HWINFO_VSB_KEY || "Software\\HWiNFO64\\VSB";
@@ -83,7 +90,6 @@ function toHwinfoError(err: unknown): unknown {
 
 export class GadgetRegistryProvider {
 	readonly source = "gadget";
-	private readonly identity = new GadgetIdentityGuard(VSB_SUBKEY);
 
 	private lastDigest = "";
 	/** Counts digest changes: the same fact valueRevision carries for shared
@@ -97,13 +103,22 @@ export class GadgetRegistryProvider {
 	 * Slot numbers are reused: another reading contradicting in a reported
 	 * slot is news, the same one on a later scan or session is not. */
 	private readonly reportedSlots = new Map<number, string>();
-	/** Unlogged notices by slot, so a reopen that adopts the previous
-	 * provider's report list can take back what it re-raised. */
-	private readonly pendingNotices = new Map<number, string>();
+	/** Unlogged notices, by slot for a contradiction and by reading key for
+	 * a shared name, so a reopen that adopts the previous provider's report
+	 * lists can take back what it re-raised. */
+	private readonly pendingNotices = new Map<number | string, string>();
 	/** Consecutive scans each slot has contradicted itself. One sighting is
 	 * indistinguishable from reading between HWiNFO's two stores for a row,
 	 * so it skips the scan like any interleave; the second withholds the row. */
 	private contradictionStreak = new Map<number, number>();
+	/** Names seen on more than one row, by reading key (see readEntries).
+	 * Rebuilt by every complete scan, so an entry lives while its name is
+	 * shared plus one scan. In memory only: nothing here reaches the disk or
+	 * outlives the process. */
+	private nameStates = new Map<string, NameState>();
+	/** Shared names the log already carries, so a standing pair is one line.
+	 * An entry goes when its name is forgotten: sharing it again is news. */
+	private readonly reportedNames = new Set<string>();
 
 	private constructor(private readonly key: HwsmGadgetKey) {}
 
@@ -129,8 +144,9 @@ export class GadgetRegistryProvider {
 		try {
 			// One immediate retry: a scan skipped for a momentary interleave
 			// is usually whole on the next read, and a row that contradicts
-			// itself twice running is withheld on its own instead of keeping
-			// the whole source at "busy" forever.
+			// itself, or a name that sits on two rows, twice running is
+			// withheld on its own instead of keeping the whole source at
+			// "busy" forever.
 			snapshot = provider.read() ?? provider.read();
 		} catch (err) {
 			provider.close();
@@ -159,8 +175,9 @@ export class GadgetRegistryProvider {
 		}
 	}
 
-	/** One warning per offending slot, drained by the poller's logger. The
-	 * strings are what HWiNFO's own Gadget tab shows; no other value leaks. */
+	/** One warning per offending slot or shared name, drained by the poller's
+	 * logger. The strings are what HWiNFO's own Gadget tab shows; no other
+	 * value leaks. */
 	notices(): string[] {
 		const lines = [...this.pendingNotices.values()];
 		this.pendingNotices.clear();
@@ -171,7 +188,6 @@ export class GadgetRegistryProvider {
 		const sensors: SensorSource[] = [];
 		const sensorIndexByName = new Map<string, number>();
 		const readings: Reading[] = [];
-		const identityKeys: string[] = [];
 		let incompleteIdentityCount = 0;
 		const byKey = new Map<string, Reading>();
 		const digestParts: string[] = [];
@@ -179,8 +195,9 @@ export class GadgetRegistryProvider {
 		/** Reading key -> evidence key (name and, for numeric displays, unit). */
 		const evidenceKeys = new Map<string, string>();
 		/** Every keyed row's names, withheld ones included: a row that is
-		 * withheld this scan still owns its 1.6 spelling. */
-		const namedRows: { sensor: string; label: string }[] = [];
+		 * withheld this scan still owns its 1.6 spelling, and still counts
+		 * toward its own name. */
+		const namedRows: { slot: number; key: string; sensor: string; label: string }[] = [];
 		const contradictions: { slot: number; identity: string; notice: string }[] = [];
 
 		// The indexes are SPARSE. HWiNFO reserves a VSB index the moment a
@@ -191,92 +208,121 @@ export class GadgetRegistryProvider {
 		// scan runs the whole bounded range. queryString returns null for
 		// exactly one condition, ERROR_FILE_NOT_FOUND; every other registry
 		// failure throws, so skipping a null cannot swallow a real fault.
-		let blocked: ReadonlySet<string>;
-		try {
-			for (let i = 0; i < MAX_ENTRIES; i++) {
-				const sensorName = this.key.queryString(`Sensor${i}`);
-				if (sensorName === null) {
-					continue;
-				}
-				const labelField = this.key.queryString(`Label${i}`);
-				const formattedField = this.key.queryString(`Value${i}`);
-				const rawField = this.key.queryString(`ValueRaw${i}`);
-				// Gadget has no atomic row or producer sequence. One bounded
-				// validation pass catches observable field interleavings and
-				// withholds the entire scan before measurement evidence commits.
-				// A writer paused in an intermediate state can still look stable;
-				// agreement here is not an atomicity or producer-liveness claim.
-				const verifiedSensor = this.key.queryString(`Sensor${i}`);
-				const verifiedLabel = this.key.queryString(`Label${i}`);
-				if (sensorName !== verifiedSensor || labelField !== verifiedLabel) return null;
-				// Registry positions identify scan locations, never readings.
-				// Preserve meaningful producer names exactly, but withhold an
-				// incomplete row instead of inventing a persistent slot label.
-				if (!sensorName.trim() || !labelField?.trim()) {
-					incompleteIdentityCount++;
-					continue;
-				}
-				const label = labelField;
-				const key = gadgetReadingKey(sensorName, label);
-				// Name identity is evidence independently of numeric eligibility.
-				// Capture it before a numeric reread can throw or validation can
-				// reject this same row. Keep the original bounded query order so
-				// the repeated identity check still spans the first value reads.
-				identityKeys.push(key);
-				namedRows.push({ sensor: sensorName, label });
-				const verifiedFormatted = this.key.queryString(`Value${i}`);
-				const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
-				if (formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
-				const formatted = formattedField ?? "";
-				const raw = rawField ?? "";
-
-				let sensorIndex = sensorIndexByName.get(sensorName);
-				if (sensorIndex === undefined) {
-					sensorIndex = sensors.length;
-					sensorIndexByName.set(sensorName, sensorIndex);
-					sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
-				}
-
-				const unit = gadgetUnitOf(formatted);
-				const value = gadgetRawValue(raw);
-				// A formatted number that cannot describe the raw one is a
-				// contradiction in THIS row. What happens to it is decided
-				// after the scan (see below): never publish the row.
-				if (!gadgetValueAgrees(formatted, value)) {
-					contradictions.push({ slot: i, identity: `${sensorName}\u0000${label}`, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
-					continue;
-				}
-
-				const reading: Reading = {
-					key,
-					type: inferType(unit),
-					sensorIndex,
-					id: i,
-					label,
-					unit,
-					// The gadget interface exposes only the current value.
-					value,
-					statistics: "unavailable",
-					valueMin: Number.NaN,
-					valueMax: Number.NaN,
-					valueAvg: Number.NaN
-				};
-				readings.push(reading);
-				byKey.set(key, reading);
-				digestParts.push(JSON.stringify([i, key, unit, raw]));
-				// Compare only the same named reading in the same unit. A new
-				// slot or rename is topology, not evidence of a new measurement.
-				// A word display (Yes/No) has no unit: its raw flip is the
-				// evidence, so the word must not partition it.
-				const evidenceKey = JSON.stringify([key, gadgetDisplayIsNumeric(formatted) ? unit : ""]);
-				evidenceKeys.set(key, evidenceKey);
-				values.set(evidenceKey, value);
+		// A scan that returns or throws from inside this loop saw only a
+		// prefix of the rows: it commits nothing, names included.
+		for (let i = 0; i < MAX_ENTRIES; i++) {
+			const sensorName = this.key.queryString(`Sensor${i}`);
+			if (sensorName === null) {
+				continue;
 			}
-		} finally {
-			// Verified identities remain evidence even when this or a later row
-			// rejects the scan. Persist them before any return or thrown error;
-			// a partial scan still commits no values, digest or freshness.
-			blocked = this.identity.blocked(identityKeys);
+			const labelField = this.key.queryString(`Label${i}`);
+			const formattedField = this.key.queryString(`Value${i}`);
+			const rawField = this.key.queryString(`ValueRaw${i}`);
+			// Gadget has no atomic row or producer sequence. One bounded
+			// validation pass catches observable field interleavings and
+			// withholds the entire scan before measurement evidence commits.
+			// A writer paused in an intermediate state can still look stable;
+			// agreement here is not an atomicity or producer-liveness claim.
+			const verifiedSensor = this.key.queryString(`Sensor${i}`);
+			const verifiedLabel = this.key.queryString(`Label${i}`);
+			if (sensorName !== verifiedSensor || labelField !== verifiedLabel) return null;
+			// Registry positions identify scan locations, never readings.
+			// Preserve meaningful producer names exactly, but withhold an
+			// incomplete row instead of inventing a persistent slot label.
+			if (!sensorName.trim() || !labelField?.trim()) {
+				incompleteIdentityCount++;
+				continue;
+			}
+			const label = labelField;
+			const key = gadgetReadingKey(sensorName, label);
+			// A row counts toward its name whatever becomes of its number:
+			// a twin that is withheld as contradictory below, or carries no
+			// usable value, still makes the name ambiguous. Keep the original
+			// bounded query order so the repeated identity check still spans
+			// the first value reads.
+			namedRows.push({ slot: i, key, sensor: sensorName, label });
+			const verifiedFormatted = this.key.queryString(`Value${i}`);
+			const verifiedRaw = this.key.queryString(`ValueRaw${i}`);
+			if (formattedField !== verifiedFormatted || rawField !== verifiedRaw) return null;
+			const formatted = formattedField ?? "";
+			const raw = rawField ?? "";
+
+			let sensorIndex = sensorIndexByName.get(sensorName);
+			if (sensorIndex === undefined) {
+				sensorIndex = sensors.length;
+				sensorIndexByName.set(sensorName, sensorIndex);
+				sensors.push({ index: sensorIndex, id: 0, instance: sensorIndex, name: sensorName });
+			}
+
+			const unit = gadgetUnitOf(formatted);
+			const value = gadgetRawValue(raw);
+			// A formatted number that cannot describe the raw one is a
+			// contradiction in THIS row. What happens to it is decided
+			// after the scan (see below): never publish the row.
+			if (!gadgetValueAgrees(formatted, value)) {
+				contradictions.push({ slot: i, identity: `${sensorName}\u0000${label}`, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
+				continue;
+			}
+
+			const reading: Reading = {
+				key,
+				type: inferType(unit),
+				sensorIndex,
+				id: i,
+				label,
+				unit,
+				// The gadget interface exposes only the current value.
+				value,
+				statistics: "unavailable",
+				valueMin: Number.NaN,
+				valueMax: Number.NaN,
+				valueAvg: Number.NaN
+			};
+			readings.push(reading);
+			byKey.set(key, reading);
+			digestParts.push(JSON.stringify([i, key, unit, raw]));
+			// Compare only the same named reading in the same unit. A new
+			// slot or rename is topology, not evidence of a new measurement.
+			// A word display (Yes/No) has no unit: its raw flip is the
+			// evidence, so the word must not partition it.
+			const evidenceKey = JSON.stringify([key, gadgetDisplayIsNumeric(formatted) ? unit : ""]);
+			evidenceKeys.set(key, evidenceKey);
+			values.set(evidenceKey, value);
+		}
+
+		// A name on more than one row. HWiNFO renumbers the rows densely and
+		// not atomically: after any tick or untick it rewrites them one slot
+		// at a time, and the reading the rewrite is passing sits in two
+		// adjacent slots for that moment. So a first sighting skips the scan
+		// like any interleave. The rewrite leaves a row in under a
+		// millisecond and two scans are never closer than one scan takes, so
+		// a name shared on consecutive complete scans is a standing pair
+		// (HWiNFO reports some readings twice under one name, a fan in RPM
+		// and in percent; a block it left behind can repeat a live row): its
+		// rows are withheld, and only they. Leaving takes two clean scans as
+		// well: a tick makes a reading ABSENT for that same moment, and a
+		// twin hidden that way must not hand the shared name to the other
+		// one for a tick.
+		const rowsByName = new Map<string, typeof namedRows>();
+		for (const row of namedRows) {
+			const rows = rowsByName.get(row.key);
+			if (rows === undefined) rowsByName.set(row.key, [row]);
+			else rows.push(row);
+		}
+		const nameStates = new Map<string, NameState>();
+		let firstSighting = false;
+		for (const [key, rows] of rowsByName) {
+			if (rows.length < 2) continue;
+			const known = this.nameStates.has(key);
+			nameStates.set(key, known ? "held" : "suspect");
+			if (!known) firstSighting = true;
+		}
+		for (const [key, state] of this.nameStates) {
+			if (state === "held" && !nameStates.has(key)) nameStates.set(key, "releasing");
+		}
+		this.nameStates = nameStates;
+		for (const key of this.reportedNames) {
+			if (!nameStates.has(key)) this.reportedNames.delete(key);
 		}
 
 		// A first contradictory sighting cannot be told from a read that
@@ -290,7 +336,11 @@ export class GadgetRegistryProvider {
 		const streak = new Map<number, number>();
 		for (const { slot } of contradictions) streak.set(slot, (this.contradictionStreak.get(slot) ?? 0) + 1);
 		this.contradictionStreak = streak;
-		if ([...streak.values()].some((count) => count < 2)) return null;
+		// Both records advance on every complete scan before either may skip
+		// it. Skipping for one before the other advanced would take a key
+		// holding a standing pair AND a standing contradiction two skips to
+		// confirm, and open() reads only twice.
+		if (firstSighting || [...streak.values()].some((count) => count < 2)) return null;
 		for (const { slot, identity, notice } of contradictions) {
 			if (this.reportedSlots.get(slot) !== identity) {
 				this.reportedSlots.set(slot, identity);
@@ -298,6 +348,19 @@ export class GadgetRegistryProvider {
 			}
 		}
 		const contradictoryCount = contradictions.length;
+		// Past the skip every recorded name is "held" or "releasing", and a
+		// row carrying one is withheld. The log says so once, on the scan the
+		// name is first held.
+		const blocked: ReadonlySet<string> = new Set(nameStates.keys());
+		for (const [key, state] of nameStates) {
+			const rows = rowsByName.get(key) ?? [];
+			const [named] = rows;
+			if (state !== "held" || named === undefined || this.reportedNames.has(key)) continue;
+			this.reportedNames.add(key);
+			const slots = rows.map((row) => row.slot);
+			const remedy = slots.length === 2 ? "Untick or relabel one of them in HWiNFO and the other comes back on its own." : "Untick or relabel them in HWiNFO until one is left, and it comes back on its own.";
+			this.pendingNotices.set(key, `Gadget slots ${slots.slice(0, -1).join(", ")} and ${slots.at(-1)} withheld while they report one name (${named.sensor} / ${named.label}). ${remedy}`);
+		}
 
 		const digest = digestParts.join("|");
 		if (digest !== this.lastDigest) {
@@ -328,8 +391,8 @@ export class GadgetRegistryProvider {
 		// row it names, but only when exactly one current row (withheld ones
 		// included) renders to it and no live row owns it outright: an
 		// ambiguous spelling resolves to nothing, never to a guess. The
-		// ambiguity is judged per scan and not journaled: once a colliding
-		// row is unticked, the remaining row answers to the shared spelling.
+		// ambiguity is judged per scan: once a colliding row is unticked,
+		// the remaining row answers to the shared spelling.
 		const legacyOwners = new Map<string, number>();
 		for (const row of namedRows) {
 			const legacy = legacyGadgetKey(row.sensor, row.label);
@@ -375,6 +438,17 @@ export class GadgetRegistryProvider {
 		}
 		for (const [slot, count] of from.contradictionStreak) {
 			this.contradictionStreak.set(slot, Math.max(count, this.contradictionStreak.get(slot) ?? 0));
+		}
+		// A name the previous provider held stays held. A key HWiNFO is still
+		// refilling after a restart can show one twin alone, and this
+		// provider must not publish it on the strength of that one scan.
+		// What its own verification read recorded stands.
+		for (const [key, state] of from.nameStates) {
+			if (!this.nameStates.has(key)) this.nameStates.set(key, state);
+		}
+		for (const key of from.reportedNames) {
+			if (this.reportedNames.has(key)) this.pendingNotices.delete(key);
+			else this.reportedNames.add(key);
 		}
 	}
 }

@@ -11,10 +11,8 @@ assert.equal(process.platform, "win32");
 const token = `${process.pid}_${randomUUID()}`;
 const subkey = `Software\\HwinfoGadgetBenchmark_${token}`;
 const registryPath = `HKCU\\${subkey}`;
-const identityFile = join(tmpdir(), `hwinfo-gadget-benchmark-${token}.jsonl`);
 const registryFile = join(tmpdir(), `hwinfo-gadget-benchmark-${token}.reg`);
 process.env.HWINFO_VSB_KEY = subkey;
-process.env.HWINFO_GADGET_IDENTITY_FILE = identityFile;
 const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry.ts");
 let provider;
 try {
@@ -43,6 +41,5 @@ try {
 } finally {
 	provider?.close();
 	try { execFileSync("reg", ["delete", registryPath, "/f"], { stdio: "ignore" }); } catch { /* absent if setup failed */ }
-	rmSync(identityFile, { force: true });
 	rmSync(registryFile, { force: true });
 }

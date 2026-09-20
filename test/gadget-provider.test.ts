@@ -18,6 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, mock, test } from "node:test";
+import { gadgetReadingKey, legacyGadgetKey } from "../src/hwinfo/gadget-identity";
 import type { HwsmGadgetKey } from "../src/hwinfo/hwsm-loader";
 import { applyReadingLinks } from "../src/hwinfo/reading-links";
 
@@ -29,14 +30,10 @@ const REG_PATH = `HKCU\\${VSB_SUBKEY}`;
 
 // Dynamic, because the module snapshots HWINFO_VSB_KEY at load time.
 process.env.HWINFO_VSB_KEY = VSB_SUBKEY;
-const identityFile = path.join(os.tmpdir(), `hwinfo-gadget-identity-${process.pid}.jsonl`);
-process.env.HWINFO_GADGET_IDENTITY_FILE = identityFile;
 const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry");
 // After the environment above: the poller imports the provider, which
 // freezes HWINFO_VSB_KEY at module load.
 const { poller } = await import("../src/poller");
-
-after(() => fs.rmSync(identityFile, { force: true }));
 
 /** The bound the reader scans to; mirrors MAX_ENTRIES in the provider. */
 const MAX_ENTRIES = 1024;
@@ -133,6 +130,67 @@ function readVerified(provider: ReturnType<typeof GadgetRegistryProvider.open>):
 
 const ids = (snap: SensorSnapshot): number[] => snap.readings.map((r) => r.id);
 const labels = (snap: SensorSnapshot): string[] => snap.readings.map((r) => r.label);
+
+type Provider = ReturnType<typeof GadgetRegistryProvider.open>;
+type Row = Required<Quartet>;
+
+/** Uniquely named rows under one source; the value tracks the name. */
+function probes(sensor: string, count: number): Row[] {
+	return Array.from({ length: count }, (_, i) => ({ sensor, label: `Probe ${i}`, value: `${40 + i}.0 °C`, raw: `${40 + i}.0` }));
+}
+
+/** Replaces the key with `rows` as one dense run, the way a HWiNFO start writes it. */
+function shapeRows(rows: readonly Row[]): void {
+	shape(rows.map((_, i) => i), (i) => rows[i] as Row);
+}
+
+/** One whole slot in place: the unit HWiNFO's renumber writes between two scans. */
+function putSlot(i: number, row: Row): void {
+	putValue(`Sensor${i}`, row.sensor);
+	putValue(`Label${i}`, row.label);
+	putValue(`Value${i}`, row.value);
+	putValue(`ValueRaw${i}`, row.raw);
+}
+
+function dropSlot(i: number): void {
+	for (const field of ["Sensor", "Label", "Value", "ValueRaw"]) dropValue(`${field}${i}`);
+}
+
+/**
+ * HWiNFO unticks rows[r]: every later row moves down one slot, written
+ * ascending one whole slot at a time, and the old top slot is deleted last.
+ * Between two writes one reading sits in two adjacent slots. Returns what a
+ * scan after every single slot write saw.
+ */
+function untick(provider: Provider, rows: readonly Row[], r: number): (SensorSnapshot | null)[] {
+	const torn: (SensorSnapshot | null)[] = [];
+	for (let slot = r; slot < rows.length - 1; slot++) {
+		putSlot(slot, rows[slot + 1] as Row);
+		torn.push(provider.read());
+	}
+	dropSlot(rows.length - 1);
+	return torn;
+}
+
+/**
+ * HWiNFO ticks `added` at position r: it and every later row are written one
+ * slot up, ascending. Between two writes the row being moved sits in no slot.
+ */
+function tick(provider: Provider, rows: readonly Row[], r: number, added: Row): (SensorSnapshot | null)[] {
+	const next = [...rows.slice(0, r), added, ...rows.slice(r)];
+	const torn: (SensorSnapshot | null)[] = [];
+	for (let slot = r; slot < next.length; slot++) {
+		putSlot(slot, next[slot] as Row);
+		torn.push(provider.read());
+	}
+	return torn;
+}
+
+/** What a separate process publishes from the same key, with nothing shared but the registry. */
+function readInChildProcess(): Reading[] {
+	const script = 'const { GadgetRegistryProvider } = await import("./src/hwinfo/gadget-registry.ts"); const p = GadgetRegistryProvider.open(); try { process.stdout.write(JSON.stringify(p.read().readings)); } finally { p.close(); }';
+	return JSON.parse(execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], { encoding: "utf8" })) as Reading[];
+}
 
 /** The HwinfoError reason a call fails with, or "<no throw>". */
 function reasonOf(fn: () => unknown): string {
@@ -478,14 +536,17 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		for (const label of unchanged) assert.equal(snapshot.byKey.get(`g:Literal label boundary:${label}`)?.value, 40);
 	});
 
-	test("literal fallback label duplicates stay withheld after removal and restart", () => {
+	test("literal fallback label duplicates are withheld only while both are present", () => {
 		const sensor = "Duplicate literal fallback";
 		shape([0, 7], (i) => ({ sensor, label: "Reading 17", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
-		assert.deepEqual(readShape().readings, []);
+		const both = readShape();
+		assert.deepEqual(both.readings, []);
+		assert.equal(both.blockedReadingCount, 2);
 		dropValue("Sensor0");
 		const survivor = readShape();
-		assert.deepEqual(survivor.readings, []);
-		assert.equal(survivor.blockedReadingCount, 1);
+		assert.deepEqual(survivor.readings.map((reading) => reading.value), [80], "a fresh provider remembers nothing: the reading that is left has the name to itself");
+		assert.equal(survivor.blockedReadingCount, 0);
+		assert.equal(survivor.byKey.has(`g:${sensor}:Reading 17`), false, "and still never under the old positional spelling");
 	});
 
 	test("complete producer names retain significant surrounding spaces", () => {
@@ -493,21 +554,24 @@ describe("integrity: Gadget name identity", { skip: !onWindows ? "win32-x64 only
 		assert.equal(readShape().byKey.get("g: Source with spaces : Reading with spaces ")?.value, 40);
 	});
 
-	test("removing slot zero never substitutes slot one for the saved base key", () => {
+	test("removing slot zero hands slot one the base key only after two clean scans, and never an encounter-order suffix", () => {
 		shape([0, 1], (i) => ({ sensor: "GPU", label: "Temperature", value: `${i ? 80 : 40} °C`, raw: i ? "80" : "40" }));
 		const provider = GadgetRegistryProvider.open();
 		try {
-			readVerified(provider);
+			assert.equal(readVerified(provider).byKey.get("g:GPU:Temperature"), undefined, "while both are ticked neither is guessed at");
 			dropValue("Sensor0");
 			const afterGap = readVerified(provider);
-			assert.equal(afterGap.byKey.get("g:GPU:Temperature"), undefined, "80 must never replace the removed 40");
+			assert.equal(afterGap.byKey.get("g:GPU:Temperature"), undefined, "one scan showing the name once is not enough");
 			assert.equal(afterGap.byKey.get("g:GPU:Temperature~1"), undefined, "encounter-order suffixes are not identities");
+			const released = readVerified(provider);
+			assert.equal(released.byKey.get("g:GPU:Temperature")?.value, 80, "the name now means the reading that is left");
+			assert.equal(released.byKey.get("g:GPU:Temperature~1"), undefined);
 		} finally {
 			provider.close();
 		}
 		const restarted = GadgetRegistryProvider.open();
 		try {
-			assert.equal(readVerified(restarted).byKey.get("g:GPU:Temperature"), undefined, "a reopen must remember observed ambiguity");
+			assert.equal(readVerified(restarted).byKey.get("g:GPU:Temperature")?.value, 80, "a reopen remembers nothing");
 		} finally {
 			restarted.close();
 		}
@@ -632,9 +696,9 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 	});
 });
 
-describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+describe("refutation: Gadget ambiguity lasts while it stands, and no longer", { skip: !onWindows ? "win32-x64 only" : false }, () => {
 	for (const numericState of ["contradictory", "changing formatted", "changing raw", "missing formatted", "missing raw", "nonfinite raw", "throwing formatted reread", "throwing raw reread"] as const) {
-		test(`stable duplicate identity survives its own ${numericState} numeric fields`, () => {
+		test(`a twin with ${numericState} numeric fields still shares its name, and only while it stands`, () => {
 			const source = `Own row ${numericState}`;
 			const savedKey = `g:${source}:Temperature`;
 			shape([0, 8], (i) => ({ sensor: source, label: i === 0 ? "Temperature" : "Other", raw: "40", value: "40 °C" }));
@@ -660,27 +724,41 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 					},
 					close: () => nativeKey.close()
 				});
-				const rejected = !numericState.startsWith("missing") && numericState !== "nonfinite raw";
+				// A scan the twin's own numeric reread cuts short saw only a
+				// prefix of the rows. One that runs to the end sees the name
+				// twice for the first time. Either way nothing publishes.
+				const cutShort = numericState.startsWith("changing") || numericState.startsWith("throwing");
 				if (numericState.startsWith("throwing")) assert.throws(() => provider.read(), /fixture numeric reread failure/);
-				else if (rejected) assert.equal(provider.read(), null, "invalid values never publish a partial snapshot");
-				else assert.equal(readVerified(provider).byKey.get(savedKey), undefined, "unavailable values do not disguise duplicate identity");
+				else assert.equal(provider.read(), null, cutShort ? "invalid values never publish a partial snapshot" : "a first sighting of a shared name skips the scan");
 				assert.equal(visits.get("Sensor1"), 2);
 				assert.equal(visits.get("Label1"), 2);
 				assert.ok([...visits.values()].every((count) => count <= 2), "identity protection does not add row retries");
-				if (rejected) assert.equal(Reflect.get(provider, "valueRevision"), before.valueRevision);
+				assert.equal(Reflect.get(provider, "valueRevision"), before.valueRevision);
 				assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision);
 				Reflect.set(provider, "key", nativeKey);
+				// The twin stands. A scan that was cut short recorded no name,
+				// so the next complete one is the first sighting.
+				if (cutShort) assert.equal(provider.read(), null, "a scan that was cut short is no sighting");
+				const held = readVerified(provider);
+				assert.equal(held.byKey.get(savedKey), undefined, "a row counts toward its name whatever its number is worth");
+				assert.deepEqual(labels(held), ["Other"]);
+				assert.equal(held.blockedReadingCount, numericState === "contradictory" ? 1 : 2);
+				assert.equal(held.contradictoryReadingCount, numericState === "contradictory" ? 1 : undefined, "a contradictory twin is counted as contradictory, and still shares the name");
+				const link = [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }];
+				assert.equal(applyReadingLinks(held, link, 1).byKey.get("f0001234:0:1000001"), undefined, "a withheld name cannot be linked");
 				dropValue("Sensor0");
 				putValue("Value1", "80 °C");
 				putValue("ValueRaw1", "80");
-				const recovered = readVerified(provider);
-				assert.equal(recovered.byKey.get(savedKey), undefined, "the numerically repaired survivor cannot adopt the removed owner");
-				assert.equal(recovered.blockedReadingCount, 1);
-				assert.equal(recovered.freshnessRevision, before.freshnessRevision);
-				const linked = applyReadingLinks(recovered, [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }], 1);
-				assert.equal(linked.byKey.get("f0001234:0:1000001"), undefined);
+				const releasing = readVerified(provider);
+				assert.equal(releasing.byKey.get(savedKey), undefined, "one scan showing the name once is not enough");
+				assert.equal(releasing.blockedReadingCount, 1);
+				const released = readVerified(provider);
+				assert.equal(released.byKey.get(savedKey)?.value, 80, "two clean scans: the name means the reading that is left");
+				assert.equal(released.blockedReadingCount, 0);
+				assert.equal(released.freshnessRevision, before.freshnessRevision, "a name changing hands is not a measured change");
+				assert.equal(applyReadingLinks(released, link, 1).byKey.get("f0001234:0:1000001")?.value, 80);
 			} finally { provider.close(); }
-			assert.equal(readShape().byKey.get(savedKey), undefined, "reopening cannot forget coherent identity evidence");
+			assert.equal(readShape().byKey.get(savedKey)?.value, 80, "a fresh provider remembers nothing");
 		});
 	}
 
@@ -713,7 +791,7 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 	}
 
 	for (const failure of ["field interleave", "numeric contradiction", "query error"] as const) {
-		test(`verified duplicate history survives a later ${failure}`, () => {
+		test(`a scan rejected by a later ${failure} commits no values, and is a sighting only if it ran to the end`, () => {
 			const source = `Partial scan ${failure}`;
 			const savedKey = `g:${source}:Temperature`;
 			shape([0, 8], (i) => ({ sensor: source, label: i === 0 ? "Temperature" : "Other", raw: i === 0 ? "40" : "10", value: `${i === 0 ? 40 : 10} °C` }));
@@ -749,16 +827,30 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 				assert.equal(Reflect.get(provider, "valueRevision"), before.valueRevision, "no rejected digest commits");
 				assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision, "no rejected measurement evidence commits");
 				Reflect.set(provider, "key", nativeKey);
+				// The pair stands. A scan cut short by an interleave or an error
+				// saw only a prefix of the rows and recorded no name, so the next
+				// complete scan is the first sighting. A scan that ran to the end
+				// and was skipped for the contradiction did see every name: both
+				// records advanced together, and the next scan confirms both.
+				if (failure !== "numeric contradiction") assert.equal(provider.read(), null, "a scan that was cut short is no sighting");
+				const held = readVerified(provider);
+				assert.equal(held.byKey.get(savedKey), undefined, "neither 45 nor 80: the name is on two rows");
+				assert.equal(held.blockedReadingCount, 2);
+				assert.equal(held.contradictoryReadingCount, failure === "numeric contradiction" ? 1 : undefined);
+				const link = [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }];
+				assert.equal(applyReadingLinks(held, link, 1).byKey.get("f0001234:0:1000001"), undefined, "an explicit link cannot reach a withheld name");
 				dropValue("Sensor0");
 				putValue("Value8", "10 °C");
-				const after = readVerified(provider);
-				assert.equal(after.byKey.get(savedKey), undefined, "80 must never replace the removed 40 after a rejected scan");
-				assert.equal(after.blockedReadingCount, 1);
-				assert.equal(after.freshnessRevision, before.freshnessRevision);
-				const linked = applyReadingLinks(after, [{ sharedMemory: "f0001234:0:1000001", gadget: savedKey, unit: "°C", sensorType: 1 }], 1);
-				assert.equal(linked.byKey.get("f0001234:0:1000001"), undefined, "an explicit alias cannot revive a denied owner");
+				const releasing = readVerified(provider);
+				assert.equal(releasing.byKey.get(savedKey), undefined, "one scan showing the name once is not enough");
+				assert.equal(releasing.blockedReadingCount, 1);
+				const released = readVerified(provider);
+				assert.equal(released.byKey.get(savedKey)?.value, 80, "two clean scans: the name means the reading that is left");
+				assert.equal(released.blockedReadingCount, 0);
+				assert.equal(released.freshnessRevision, before.freshnessRevision, "a name changing hands is not a measured change");
+				assert.equal(applyReadingLinks(released, link, 1).byKey.get("f0001234:0:1000001")?.value, 80);
 			} finally { provider.close(); }
-			assert.equal(readShape().byKey.get(savedKey), undefined, "a reopened provider keeps the prefix ambiguity");
+			assert.equal(readShape().byKey.get(savedKey)?.value, 80, "a reopened provider remembers nothing");
 		});
 	}
 
@@ -804,31 +896,11 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 		} finally { provider.close(); }
 	});
 
-	test("a rejected scan fails closed if verified ambiguity cannot be journaled", () => {
-		shape([0, 8], (i) => ({ sensor: "Unwritable partial journal", label: i === 0 ? "Temperature" : "Other", raw: "40", value: "40 °C" }));
-		const provider = GadgetRegistryProvider.open();
-		try {
-			putValue("Sensor1", "Unwritable partial journal");
-			putValue("Label1", "Temperature");
-			putValue("Value1", "80 °C");
-			putValue("ValueRaw1", "80");
-			putValue("Value8", "99 °C");
-			// A real file cannot be the parent of the journal destination.
-			// Point only this provider's guard there after its clean open.
-			if (!fs.existsSync(identityFile)) fs.writeFileSync(identityFile, "");
-			Reflect.set(Reflect.get(provider, "identity") as object, "file", path.join(identityFile, "impossible-child"));
-			assert.equal(reasonOf(() => provider.read()), "invalid", "a null/busy result must not hide failed identity persistence");
-		} finally { provider.close(); }
-	});
-
-	test("a separate process cannot adopt a disappeared duplicate", () => {
+	test("a separate process publishes the reading a disappeared duplicate left behind", () => {
 		shape([0, 1], (i) => ({ sensor: "Restart GPU", label: "Temperature", raw: i ? "80" : "40", value: `${i ? 80 : 40} °C` }));
-		readShape();
+		assert.deepEqual(readShape().readings, [], "while both are ticked neither publishes");
 		dropValue("Sensor0");
-		const script = 'const { GadgetRegistryProvider } = await import("./src/hwinfo/gadget-registry.ts"); const p = GadgetRegistryProvider.open(); try { process.stdout.write(JSON.stringify(p.read().readings)); } finally { p.close(); }';
-		const stdout = execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], { encoding: "utf8" });
-		assert.deepEqual(JSON.parse(stdout), []);
-		assert.doesNotMatch(fs.readFileSync(identityFile, "utf8"), /Restart GPU|Temperature|^(?:40|80)$/m);
+		assert.deepEqual(readInChildProcess().map((reading) => [reading.key, reading.value]), [["g:Restart GPU:Temperature", 80]], "nothing about the pair was left anywhere another process could read");
 	});
 
 	test("duplicate values cannot manufacture producer evidence on an unchanged scan", () => {
@@ -839,23 +911,304 @@ describe("refutation: persistent Gadget ambiguity", { skip: !onWindows ? "win32-
 		} finally { provider.close(); }
 	});
 
-	test("a corrupt journal fails closed and never discards history", () => {
-		const saved = fs.readFileSync(identityFile, "utf8");
+});
+
+describe("integrity: a doubled Gadget name is withheld only while it stands", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	// Measured on HWiNFO 8.48: after any tick or untick it renumbers the rows
+	// densely and rewrites them one whole slot at a time, ascending, so a scan
+	// between two writes sees a frontier. An untick shows one reading in two
+	// adjacent slots, a tick shows one in none. HWiNFO also reports some
+	// readings twice under one source name and label out of the box (a GPU fan
+	// once in RPM and once in percent), and a shift-click range ticks both.
+	const GPU = "GPU [#0]: Example GPU";
+	const fanRpm: Row = { sensor: GPU, label: "GPU Fan1", value: "1800 RPM", raw: "1800" };
+	const fanPct: Row = { sensor: GPU, label: "GPU Fan1", value: "35 %", raw: "35" };
+	const shared = gadgetReadingKey(GPU, "GPU Fan1");
+	const sharedLegacy = legacyGadgetKey(GPU, "GPU Fan1") as string;
+
+	test("an untick rewritten slot by slot skips the torn scans and loses no name", () => {
+		const rows = probes("CPU [#0]: Removal tear", 12);
+		shapeRows(rows);
+		const provider = GadgetRegistryProvider.open();
 		try {
-			fs.writeFileSync(identityFile, "incomplete history");
-			shape([0]);
-			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "invalid");
-			assert.equal(fs.readFileSync(identityFile, "utf8"), "incomplete history");
-		} finally { fs.writeFileSync(identityFile, saved); }
+			assert.equal(readVerified(provider).readings.length, 12);
+			const torn = untick(provider, rows, 3);
+			const left = rows.filter((_, i) => i !== 3);
+			for (const scan of ["first", "second"]) {
+				const settled = readVerified(provider);
+				assert.deepEqual(labels(settled), left.map((row) => row.label), `the ${scan} scan after the rewrite publishes every remaining name`);
+				assert.equal(settled.blockedReadingCount, 0, `the ${scan} scan after the rewrite withholds nothing`);
+				for (const row of left) assert.equal(settled.byKey.get(gadgetReadingKey(row.sensor, row.label))?.value, Number(row.raw), "every name kept its own value");
+			}
+			assert.deepEqual(torn.map((snap) => (snap === null ? "skipped" : `published ${snap.readings.length}`)), torn.map(() => "skipped"), "every frontier position shows a name twice for the first time, so every torn scan is skipped");
+		} finally { provider.close(); }
 	});
 
-	test("an unwritable journal destination cannot return ambiguous readings", () => {
-		const savedPath = process.env.HWINFO_GADGET_IDENTITY_FILE;
+	test("a tick rewritten slot by slot hides one reading per scan and loses no name", () => {
+		const rows = probes("CPU [#0]: Insert tear", 12);
+		const before = rows.filter((_, i) => i !== 3);
+		shapeRows(before);
+		const provider = GadgetRegistryProvider.open();
 		try {
-			process.env.HWINFO_GADGET_IDENTITY_FILE = path.join(identityFile, "impossible-child");
-			shape([0, 1], () => ({ sensor: "Denied duplicate", label: "Temp", raw: "40", value: "40 °C" }));
-			assert.equal(reasonOf(() => GadgetRegistryProvider.open()), "invalid");
-		} finally { process.env.HWINFO_GADGET_IDENTITY_FILE = savedPath; }
+			// The reverse edit: Probe 3 is ticked again.
+			const torn = tick(provider, before, 3, rows[3] as Row);
+			for (const [step, snap] of torn.entries()) {
+				if (snap !== null) assert.equal(snap.blockedReadingCount, 0, `step ${step}: a reading in no slot is no reason to withhold another`);
+			}
+			for (const scan of ["first", "second"]) {
+				const settled = readVerified(provider);
+				assert.deepEqual(labels(settled), rows.map((row) => row.label), `the ${scan} scan after the rewrite publishes every name`);
+				assert.equal(settled.blockedReadingCount, 0);
+			}
+		} finally { provider.close(); }
+	});
+
+	test("nothing about a torn rewrite is remembered by a fresh provider or another process", () => {
+		const rows = probes("CPU [#0]: Forgotten tear", 8);
+		shapeRows(rows);
+		const provider = GadgetRegistryProvider.open();
+		try { untick(provider, rows, 2); } finally { provider.close(); }
+		const left = rows.filter((_, i) => i !== 2).map((row) => row.label);
+		const fresh = readShape();
+		assert.deepEqual(labels(fresh), left);
+		assert.equal(fresh.blockedReadingCount, 0);
+		assert.deepEqual(readInChildProcess().map((reading) => reading.label), left, "a separate process starts from the registry alone");
+	});
+
+	test("a standing pair skips one scan, then only its two rows are withheld", () => {
+		const healthy = probes("CPU [#0]: Standing pair", 3);
+		shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row, healthy[2] as Row]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).byKey.get(shared)?.value, 1800, "one ticked GPU Fan1 is an ordinary reading");
+			putSlot(4, fanPct);
+			assert.equal(provider.read(), null, "a first sighting cannot be told from a torn read: the scan is skipped and the keys hold their values");
+			for (let scan = 2; scan <= 4; scan++) {
+				const standing = readVerified(provider);
+				assert.deepEqual(labels(standing), ["Probe 0", "Probe 1", "Probe 2"], `scan ${scan}: the healthy rows serve`);
+				assert.equal(standing.blockedReadingCount, 2, `scan ${scan}`);
+				assert.equal(standing.byKey.get(shared), undefined, "neither twin is guessed at");
+				assert.equal(standing.byKey.get(sharedLegacy), undefined, "nor under the 1.6 spelling");
+			}
+		} finally { provider.close(); }
+		// A cold start over the same pair: open()'s second read confirms it.
+		const cold = readShape();
+		assert.deepEqual(labels(cold), ["Probe 0", "Probe 1", "Probe 2"]);
+		assert.equal(cold.blockedReadingCount, 2);
+	});
+
+	test("unticking one twin brings the other back on the second clean scan, under both spellings", () => {
+		const healthy = probes("CPU [#0]: Untick a twin", 2);
+		shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row, fanPct]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).blockedReadingCount, 2);
+			dropSlot(3);
+			const first = readVerified(provider);
+			assert.equal(first.byKey.get(shared), undefined, "one scan showing the name once is not enough: a tick in progress hides a twin for exactly one scan");
+			assert.equal(first.byKey.get(sharedLegacy), undefined);
+			assert.equal(first.blockedReadingCount, 1);
+			const second = readVerified(provider);
+			assert.equal(second.byKey.get(shared)?.value, 1800);
+			assert.equal(second.byKey.get(shared)?.unit, "RPM");
+			assert.equal(second.byKey.get(sharedLegacy)?.value, 1800, "the 1.6 spelling follows");
+			assert.equal(second.byKey.get(sharedLegacy)?.aliasOf, shared);
+			assert.equal(second.blockedReadingCount, 0);
+		} finally { provider.close(); }
+	});
+
+	test("relabelling one twin brings both back after two clean scans", () => {
+		const healthy = probes("CPU [#0]: Relabel a twin", 2);
+		shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row, fanPct]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).blockedReadingCount, 2);
+			putValue("Label3", "GPU Fan1 percent");
+			const renamed = gadgetReadingKey(GPU, "GPU Fan1 percent");
+			const first = readVerified(provider);
+			assert.equal(first.byKey.get(renamed)?.value, 35, "the new name was never shared, so it publishes at once");
+			assert.equal(first.byKey.get(shared), undefined);
+			assert.equal(first.blockedReadingCount, 1);
+			const second = readVerified(provider);
+			assert.equal(second.byKey.get(shared)?.value, 1800);
+			assert.equal(second.byKey.get(renamed)?.value, 35);
+			assert.equal(second.blockedReadingCount, 0);
+		} finally { provider.close(); }
+	});
+
+	test("while both twins stay ticked, no torn scan of an unrelated tick hands either one the name", () => {
+		const base = probes("CPU [#0]: Pair under a tear", 10);
+		const rows = [...base.slice(0, 2), fanRpm, ...base.slice(2, 7), fanPct, ...base.slice(7)];
+		shapeRows(rows);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).blockedReadingCount, 2);
+			// The rewrite passes each twin in turn: for one scan that twin is in
+			// no slot and the other looks unique.
+			const torn = tick(provider, rows, 1, { sensor: GPU, label: "Newly ticked", value: "1.100 V", raw: "1.100" });
+			for (const [step, snap] of torn.entries()) {
+				assert.ok(snap, `step ${step}: a held name seen on two rows again is no first sighting, so nothing is skipped`);
+				assert.equal(snap.byKey.get(shared), undefined, `step ${step}: a twin took the shared name`);
+				assert.equal(snap.byKey.get(sharedLegacy), undefined, `step ${step}: a twin took the 1.6 spelling`);
+			}
+			const settled = readVerified(provider);
+			assert.equal(settled.readings.length, 11);
+			assert.equal(settled.blockedReadingCount, 2);
+		} finally { provider.close(); }
+	});
+
+	test("a frozen block HWiNFO left behind withholds only the name it shares, and the name returns once the block is gone", () => {
+		const source = "CPU [#0]: Stale twin";
+		const live = probes(source, 6);
+		// Shrinking a selection by some 440 rows in one OK leaves the old top
+		// block behind, frozen, until HWiNFO exits.
+		const frozen: Row[] = [{ sensor: source, label: "Left behind 0", value: "1.0 °C", raw: "1.0" }, { ...(live[2] as Row), value: "2.0 °C", raw: "2.0" }, { sensor: source, label: "Left behind 2", value: "3.0 °C", raw: "3.0" }];
+		shape([...live.keys(), 440, 441, 442], (i) => (i < 440 ? live[i] : frozen[i - 440]) as Row);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const standing = readVerified(provider);
+			assert.deepEqual(labels(standing), ["Probe 0", "Probe 1", "Probe 3", "Probe 4", "Probe 5", "Left behind 0", "Left behind 2"], "the live row and its frozen twin are withheld; every other row serves");
+			assert.equal(standing.blockedReadingCount, 2);
+			for (const slot of [440, 441, 442]) dropSlot(slot);
+			const first = readVerified(provider);
+			assert.equal(first.byKey.get(gadgetReadingKey(source, "Probe 2")), undefined);
+			assert.equal(first.blockedReadingCount, 1);
+			const second = readVerified(provider);
+			assert.deepEqual(labels(second), live.map((row) => row.label));
+			assert.equal(second.byKey.get(gadgetReadingKey(source, "Probe 2"))?.value, 42, "the live reading, with no user action");
+			assert.equal(second.blockedReadingCount, 0);
+		} finally { provider.close(); }
+	});
+
+	test("the log names a doubled name once, on the scan it is first withheld, and again only after it was forgotten", () => {
+		const healthy = probes("CPU [#0]: Notice", 1);
+		shapeRows([healthy[0] as Row, fanRpm]);
+		const first = GadgetRegistryProvider.open();
+		let second: Provider | undefined;
+		try {
+			putSlot(2, fanPct);
+			assert.equal(first.read(), null);
+			assert.deepEqual(first.notices(), [], "a first sighting may be a torn read: nothing is said yet");
+			readVerified(first);
+			const lines = first.notices();
+			assert.equal(lines.length, 1);
+			assert.match(lines[0] ?? "", /slots 1 and 2/);
+			assert.match(lines[0] ?? "", /GPU \[#0\]: Example GPU \/ GPU Fan1/);
+			assert.match(lines[0] ?? "", /[Uu]ntick or relabel one/);
+			readVerified(first);
+			assert.deepEqual(first.notices(), [], "said once while the pair stands");
+			// One scan showing the name once does not forget it, so the pair
+			// showing again is not news.
+			dropSlot(2);
+			readVerified(first);
+			putSlot(2, fanPct);
+			readVerified(first);
+			assert.deepEqual(first.notices(), []);
+			second = GadgetRegistryProvider.open();
+			second.adoptFreshness(first);
+			assert.deepEqual(second.notices(), [], "the verification read's notice is taken back on adoption");
+			readVerified(second);
+			assert.deepEqual(second.notices(), []);
+			// Two clean scans forget the name; colliding again is news.
+			dropSlot(2);
+			readVerified(second);
+			assert.equal(readVerified(second).byKey.get(shared)?.value, 1800);
+			putSlot(2, fanPct);
+			assert.equal(second.read(), null);
+			readVerified(second);
+			assert.equal(second.notices().length, 1);
+		} finally {
+			first.close();
+			second?.close();
+		}
+	});
+
+	test("three rows under one name are named together, and the remedy is to leave one", () => {
+		// A stock pair plus a copy of one of them in a block HWiNFO left behind.
+		const healthy = probes("CPU [#0]: Three rows", 1);
+		shape([0, 1, 2, 440], (i) => (i === 0 ? healthy[0] : i === 2 ? fanPct : fanRpm) as Row);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const standing = readVerified(provider);
+			assert.deepEqual(labels(standing), ["Probe 0"]);
+			assert.equal(standing.blockedReadingCount, 3);
+			const lines = provider.notices();
+			assert.equal(lines.length, 1);
+			assert.match(lines[0] ?? "", /slots 1, 2 and 440 withheld while they report one name/);
+			assert.match(lines[0] ?? "", /until one is left/);
+		} finally { provider.close(); }
+	});
+
+	test("a reopen that adopts the previous provider does not release a held name early, or skip when its twin returns", () => {
+		const healthy = probes("CPU [#0]: Refill", 2);
+		const full = [healthy[0] as Row, fanRpm, healthy[1] as Row, fanPct];
+		shapeRows(full);
+		const before = GadgetRegistryProvider.open();
+		let reopened: Provider | undefined;
+		try {
+			assert.equal(readVerified(before).blockedReadingCount, 2);
+			before.notices();
+			// HWiNFO exits (the key goes with it) and starts again, refilling
+			// the key row by row: a scan can land when only one twin is back.
+			shapeRows(full.slice(0, 3));
+			reopened = GadgetRegistryProvider.open();
+			reopened.adoptFreshness(before, false);
+			const half = readVerified(reopened);
+			assert.equal(half.byKey.get(shared), undefined, "one twin alone on a half-filled key does not take the name");
+			assert.equal(half.blockedReadingCount, 1);
+			putSlot(3, fanPct);
+			const filled = reopened.read();
+			assert.ok(filled, "a held name seen on two rows again is no first sighting: no skipped scan");
+			assert.equal(filled.byKey.get(shared), undefined);
+			assert.equal(filled.blockedReadingCount, 2);
+			assert.deepEqual(reopened.notices(), [], "and the pair was already named");
+		} finally {
+			before.close();
+			reopened?.close();
+		}
+	});
+
+	test("a doubled name writes nothing to disk, and the provider needs no LOCALAPPDATA", () => {
+		const healthy = probes("CPU [#0]: No file", 2);
+		shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row, fanPct]);
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-gadget-nofile-"));
+		const saved = { LOCALAPPDATA: process.env.LOCALAPPDATA, TEMP: process.env.TEMP, TMP: process.env.TMP };
+		try {
+			// Everywhere a provider could think of writing now lands in `dir`.
+			process.env.TEMP = dir;
+			process.env.TMP = dir;
+			for (const localAppData of [dir, undefined]) {
+				if (localAppData === undefined) delete process.env.LOCALAPPDATA;
+				else process.env.LOCALAPPDATA = localAppData;
+				const provider = GadgetRegistryProvider.open();
+				try {
+					const standing = readVerified(provider);
+					assert.deepEqual(labels(standing), ["Probe 0", "Probe 1"]);
+					assert.equal(standing.blockedReadingCount, 2);
+				} finally { provider.close(); }
+				assert.deepEqual(fs.readdirSync(dir), [], localAppData === undefined ? "nothing written with LOCALAPPDATA unset" : "nothing written under LOCALAPPDATA");
+			}
+		} finally {
+			for (const [name, value] of Object.entries(saved)) {
+				if (value === undefined) delete process.env[name];
+				else process.env[name] = value;
+			}
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("a standing pair and a standing contradictory row on one key still open, each counted", () => {
+		const healthy = probes("CPU [#0]: Combined", 2);
+		shapeRows([healthy[0] as Row, healthy[1] as Row, fanRpm, fanPct, { sensor: GPU, label: "Hot Spot", value: "104.0 °F", raw: "40" }]);
+		// open() reads twice. Both records must advance on the first read, or
+		// the second skips again and the source reads busy forever.
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const snap = readVerified(provider);
+			assert.deepEqual(labels(snap), ["Probe 0", "Probe 1"]);
+			assert.equal(snap.blockedReadingCount, 2);
+			assert.equal(snap.contradictoryReadingCount, 1);
+		} finally { provider.close(); }
 	});
 });
 

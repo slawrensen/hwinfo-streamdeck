@@ -70,7 +70,8 @@ export interface Reading {
 export interface SensorSnapshot {
 	/** Rendering invalidation for changed explicit provider links. */
 	readonly bindingRevision?: number;
-	/** Gadget readings withheld because their names are incomplete or ambiguous. */
+	/** Gadget readings withheld because their names are incomplete, or
+	 * shared with another row until two scans running show otherwise. */
 	readonly blockedReadingCount?: number;
 	/** Gadget rows withheld because the formatted value contradicts the raw
 	 * value; the plugin log names the slot. */

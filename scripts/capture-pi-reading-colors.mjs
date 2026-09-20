@@ -49,7 +49,7 @@ const stop = () => {
 const watchdog = setTimeout(() => { stop(); console.error("PI capture exceeded 90 seconds"); process.exit(2); }, 90_000);
 watchdog.unref();
 try {
-	harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: root, env: { ...process.env, HWINFO_GADGET_IDENTITY_FILE: path.join(profile, "gadget-identity.jsonl") }, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+	harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: root, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
 	harness.stdout.on("data", (chunk) => { harnessOutput += chunk.toString(); });
 	harness.stderr.on("data", (chunk) => { harnessOutput += chunk.toString(); });
 	for (let attempt = 0; attempt < 40 && !harnessOutput.includes("PI at"); attempt++) await sleep(100);

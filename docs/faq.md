@@ -194,7 +194,7 @@ Yes. The free version has the Shared Memory limit described above. The portable 
 
 ### Do keys survive reboots, HWiNFO restarts, or reordering sensors in HWiNFO?
 
-Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Observed duplicate names are withheld across restarts, and most Gadget selections saved by 1.6.0 keep working after the 1.7 upgrade; see the [identity limits](data-sources.md#enabling-gadget-reporting) for the ones that need a reselection. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
+Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Two ticked Gadget readings that share a source name and label are both withheld while both are ticked (untick or relabel one of them in HWiNFO and the other comes back on its own), and most Gadget selections saved by 1.6.0 keep working after the 1.7 upgrade; see the [identity limits](data-sources.md#enabling-gadget-reporting) for the ones that need a reselection. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
 
 ### Can I use Stream Deck + dials without HWiNFO Pro?
 
@@ -219,7 +219,7 @@ They name the observed state and a next step. These are the 1.7 candidate's mess
 | `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
 | `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |
-| `Source error / open settings` | The sensor source could not be opened or validated, including a Gadget identity journal that could not be read or saved. Open settings and choose **Copy support report** for support. |
+| `Source error / open settings` | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
 | `Needs x64 / Windows` | Not a 64-bit Windows machine (Windows-on-ARM / other); unsupported. |
 | `Bridge failed / reinstall` | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 

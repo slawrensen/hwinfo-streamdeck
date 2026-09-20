@@ -58,11 +58,13 @@ across both sources. Similar names are not enough to identify the same sensor.
 
 Gadget has no producer heartbeat or atomic snapshot guarantee. **Age unknown**
 means the plugin cannot tell a steady reading from an old registry value.
-Duplicate Gadget names are withheld, and a name seen twice stays withheld on
-that machine: give both readings new distinct names in HWiNFO and select them
-again. Most Gadget selections saved by 1.6.0 keep working after the upgrade;
-the [source guide](docs/data-sources.md#enabling-gadget-reporting) lists the
-ones that need a reselection.
+Two ticked Gadget readings that share a source name and label are both
+withheld while both are ticked (HWiNFO reports some readings twice under one
+name, such as a GPU fan in RPM and in percent): untick or relabel one of them
+in HWiNFO and the other comes back on its own. Most Gadget selections saved
+by 1.6.0 keep working after the upgrade; the
+[source guide](docs/data-sources.md#enabling-gadget-reporting) lists the ones
+that need a reselection.
 
 ## Sensor Reading (keys)
 
@@ -142,7 +144,7 @@ physical readability. See the [display reference](docs/themes.md#the-display-sys
 | **Age unknown** | Check Gadget reporting. Unchanged registry values cannot prove that HWiNFO is still updating. |
 | **Bridge failed** | Reinstall the plugin. If Windows reports a block, keep that report for support. |
 | **Access denied** | Check the Windows account, session and permissions. See the troubleshooting guide before changing elevation. |
-| **Source error** | Open settings and copy the support report. On Gadget this includes an identity journal that could not be read or saved. |
+| **Source error** | Open settings and copy the support report. |
 | **Pick a sensor** | Select a reading in the action's settings. |
 | **Sensor missing** | Check the saved selection, the current source and any explicit source link. |
 

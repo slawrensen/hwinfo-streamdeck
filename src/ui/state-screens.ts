@@ -81,11 +81,11 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 	}
 }
 
-/** The Gadget-specific withholding notes appended to a hint sentence. A name
- * that was ever seen twice on this machine stays withheld until BOTH readings
- * carry names this machine has not seen shared, so the remedy names both. */
+/** The Gadget-specific withholding notes appended to a hint sentence. A
+ * shared name is withheld only while two ticked readings carry it, so the
+ * remedy is to act on one of them. */
 function gadgetWithheldNotes(snapshot: { blockedReadingCount?: number; contradictoryReadingCount?: number }): string {
-	return (snapshot.blockedReadingCount ? " Incomplete or ambiguous Gadget names are withheld. Check source names in HWiNFO, and give BOTH readings that shared a name new distinct labels, then select them again; the reading that keeps the old name stays withheld." : "")
+	return (snapshot.blockedReadingCount ? " Gadget rows with an incomplete name are withheld, and so are two ticked readings that share a source name and label (HWiNFO lists some twice, such as a fan in RPM and in percent). Untick or relabel one of the two in HWiNFO and the other comes back on its own." : "")
 		+ (snapshot.contradictoryReadingCount ? " A Gadget row whose formatted value contradicts its raw value is withheld; the plugin log names the slot." : "");
 }
 
@@ -115,7 +115,7 @@ export function statusSentence(status: PollerStatus): string {
 		case "bridge-failed":
 			return "The native HWiNFO bridge (bin/hwsm.node) could not load. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A load failure alone does not identify the cause.";
 		default:
-			return "The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose \"Copy support report\" for support.";
+			return "The sensor source could not be opened or validated. Open settings and choose \"Copy support report\" for support.";
 	}
 }
 

@@ -19,7 +19,7 @@ const port = 28993;
 const mapping = `Local\\HwinfoLinks_${process.pid}`;
 const registry = `Software\\HwinfoLinks_${process.pid}`;
 const regPath = `HKCU\\${registry}`;
-const env = { ...process.env, HWINFO_SM2_NAME: mapping, HWINFO_SM2_MUTEX_NAME: `${mapping}_MUTEX`, HWINFO_VSB_KEY: registry, HWINFO_GADGET_IDENTITY_FILE: path.join(output, "identity.jsonl"), HWINFO_UPGRADE_PROBE_MS: "1000", HWINFO_STALE_AFTER_MS: "4000", HWINFO_REOPEN_PROBE_MS: "1000" };
+const env = { ...process.env, HWINFO_SM2_NAME: mapping, HWINFO_SM2_MUTEX_NAME: `${mapping}_MUTEX`, HWINFO_VSB_KEY: registry, HWINFO_UPGRADE_PROBE_MS: "1000", HWINFO_STALE_AFTER_MS: "4000", HWINFO_REOPEN_PROBE_MS: "1000" };
 const links = [0, 1, 2, 3].map((i) => ({ sharedMemory: `f0001234:0:${(0x1000004 + i).toString(16)}`, gadget: `g:Test Source:Core ${i} VID`, unit: "V", sensorType: 2 }));
 const values = ["1.05", "1.15", "1.25", "1.35"];
 const gadgetValues = ["1.45", "1.55", "1.65", "1.75"];

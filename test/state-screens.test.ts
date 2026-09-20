@@ -46,18 +46,22 @@ describe("state-screens: stale recovery hint follows the source", () => {
 		assert.match(statusSentence(stale("shared-memory")), /Shared Memory/);
 	});
 
-	it("withheld Gadget names explain incomplete identity as well as ambiguity", () => {
-		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, blockedReadingCount: 1 };
+	it("withheld Gadget names explain an incomplete name as well as a shared one, and promise nothing permanent", () => {
+		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, blockedReadingCount: 2 };
 		const statuses: PollerStatus[] = [
 			{ state: "ok", source: "gadget", snapshot },
 			{ state: "stale", source: "gadget", snapshot, staleForMs: 20_000 }
 		];
 		for (const status of statuses) {
-			assert.match(statusSentence(status), /Incomplete or ambiguous Gadget names are withheld/);
-			// The journal is permanent per machine: renaming only the other
-			// duplicate frees nothing, so the remedy names both readings.
-			assert.match(statusSentence(status), /BOTH readings that shared a name new distinct labels.*select them again/);
-			assert.match(statusSentence(status), /keeps the old name stays withheld/);
+			const sentence = statusSentence(status);
+			assert.match(sentence, /Gadget rows with an incomplete name are withheld/);
+			assert.match(sentence, /two ticked readings that share a source name and label/);
+			// Two ticked readings that share a name are withheld only while
+			// both are ticked: acting on ONE of them is the whole remedy.
+			assert.doesNotMatch(sentence, /BOTH/);
+			assert.doesNotMatch(sentence, /stays withheld/);
+			assert.match(sentence, /untick or relabel one of the two in HWiNFO/i);
+			assert.match(sentence, /the other comes back on its own/);
 		}
 	});
 
@@ -65,7 +69,7 @@ describe("state-screens: stale recovery hint follows the source", () => {
 		const snapshot: SensorSnapshot = { ...EMPTY_SNAPSHOT, contradictoryReadingCount: 1 };
 		const sentence = statusSentence({ state: "ok", source: "gadget", snapshot });
 		assert.match(sentence, /formatted value contradicts its raw value is withheld; the plugin log names the slot/);
-		assert.doesNotMatch(sentence, /ambiguous Gadget names/);
+		assert.doesNotMatch(sentence, /incomplete name|share a source name/);
 	});
 });
 
@@ -146,8 +150,8 @@ describe("state-screens: failure reasons shared by both providers", () => {
 		assert.doesNotMatch(statusSentence(status), /shared.memory object|elevat|restart/i);
 	});
 
-	it("invalid Gadget identity history never promises a producer restart repairs local data", () => {
-		for (const message of ["Gadget identity history could not be read or saved.", "Shared memory header did not validate."]) {
+	it("an invalid source on either provider never promises that a producer restart repairs it", () => {
+		for (const message of ["HWSM_REGISTRY_WRONG_TYPE: RegQueryValueExW: the value is not REG_SZ", "Shared memory header did not validate."]) {
 			const status: PollerStatus = { state: "unavailable", reason: "invalid", message };
 			assert.deepEqual(statusScreen(status)?.lines, ["Source error", "open settings"]);
 			assert.deepEqual(statusDialText(status), { title: "Source error", value: "open settings" });

@@ -15,7 +15,7 @@ in progress. The download links continue to point to the published release.
 | Linked source selections | A saved reading, its name and its color can follow a switch between Shared Memory and Gadget. A pairing edit applies at once on every key, dial and tile. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
 | Gadget freshness | **Age unknown** replaces a claim that unchanged registry values are definitely stale. | Check HWiNFO and Gadget reporting. A steady value alone cannot prove the producer is running. |
 | Gadget history | Key and detail MIN/MAX/AVG modes show **N/A** instead of presenting the current value as history. | Use Current, or enable Shared Memory for HWiNFO history. Dials have separate local statistics. |
-| Ambiguous Gadget names | Duplicate names are withheld instead of risking the wrong reading on a key, and a name seen twice stays withheld on that machine. | Give both readings new distinct names in HWiNFO and select them again; the reading that keeps the old name stays withheld. |
+| Shared Gadget names | Two ticked readings that share a source name and label are both withheld while both are ticked, instead of risking the wrong reading on a key. HWiNFO reports some readings twice under one name, such as a GPU fan in RPM and in percent, and a shift-click range ticks both. | Untick or relabel one of the two in HWiNFO. The other comes back on its own. |
 | Old Gadget selections | Most Gadget selections saved by 1.6.0 keep working through a checked alias of their old key. | Reselect only a reading whose label reads exactly `Reading 0` to `Reading 1023`, a key that carried the old `~n` duplicate suffix, or an old key that now matches two readings. See [the source guide](data-sources.md#enabling-gadget-reporting). |
 | Sparklines and local statistics | Subsecond changes can enter the graph. Observed data gaps and source, unit or type changes end the old history segment; a dial says **stats reset: data gap** once when live data returns. | No setup change. A fresh segment after a gap is expected. |
 | Alerts and contrast | Built-in value, unit and numeric statistic colors meet a 4.5:1 authored contrast floor, and Dim keeps labels at least as readable as units. | Check your custom colors on the actual display. Saved reading, quad cell and tile colors are kept as entered in Theme mode and only dimmed in Dim mode; a Custom Text color stays exact. |
@@ -50,8 +50,9 @@ Custom Text. See [dial color settings](sensor-dial.md#reading-colors).
 
 The plugin should not label a current value as an average or choose between
 two readings with the same Gadget name. Those cases now show unavailable
-history or withhold the reading. Shared Memory remains the preferred source
-because it supplies hardware identifiers, history and a consistency mutex.
+history, or withhold both readings while they share the name. Shared Memory
+remains the preferred source because it supplies hardware identifiers,
+history and a consistency mutex.
 
 ![Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
 

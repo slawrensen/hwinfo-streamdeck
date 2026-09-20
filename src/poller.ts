@@ -380,9 +380,9 @@ class HwinfoPoller extends EventEmitter {
 				// shared memory's generic "not running", but must never mask a
 				// more specific primary diagnosis (access-denied, disabled).
 				// The same goes for a Gadget key that opened but whose scan
-				// was refused (a changing registry, or an unreadable identity
-				// journal): HWiNFO is set up for Gadget, so "start HWiNFO"
-				// would send the user the wrong way.
+				// was refused (a changing registry, or a value that is not
+				// text): HWiNFO is set up for Gadget, so "start HWiNFO" would
+				// send the user the wrong way.
 				if (
 					fallback instanceof HwinfoError &&
 					(fallback.reason === "gadget-empty" || fallback.reason === "busy" || fallback.reason === "invalid") &&

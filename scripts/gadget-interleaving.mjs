@@ -5,17 +5,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 assert.equal(process.platform, "win32", "this investigation requires Windows");
 const token = `${process.pid}_${randomUUID()}`;
 const subkey = `Software\\HwinfoGadgetInterleaving_${token}`;
 const registryPath = `HKCU\\${subkey}`;
-const identityFile = join(tmpdir(), `hwinfo-gadget-interleaving-${token}.jsonl`);
 process.env.HWINFO_VSB_KEY = subkey;
-process.env.HWINFO_GADGET_IDENTITY_FILE = identityFile;
 const { GadgetRegistryProvider } = await import("../src/hwinfo/gadget-registry.ts");
 const generations = [
 	{ Sensor0: "Fixture GPU A", Label0: "Temperature A", Value0: "40 °C", ValueRaw0: "40" },
@@ -76,5 +71,4 @@ try {
 } finally {
 	provider?.close();
 	try { execFileSync("reg", ["delete", registryPath, "/f"], { stdio: "ignore" }); } catch { /* absent if setup failed */ }
-	rmSync(identityFile, { force: true });
 }

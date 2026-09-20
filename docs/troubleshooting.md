@@ -25,7 +25,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 | **Pick a sensor** / in settings | HWiNFO / rotate to pick | No sensor selected on this key/dial yet. |
 | **Sensor missing** / pick again | Sensor missing / waiting | The saved sensor isn't in HWiNFO's current output. |
 | **Needs x64** / Windows | Needs x64 Windows | 32-bit or Windows-on-ARM: unsupported. |
-| **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. The failure may involve the feed or saved identity data. Open settings and choose **Copy support report** for support. |
+| **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
 ![Production-rendered key and dial examples for Source busy, no new Shared Memory data, and Gadget Age unknown.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
@@ -87,9 +87,9 @@ Gadget reads the current user's `HKCU` registry. It cannot read another user's G
 
 ## Keys show "Source error"
 
-The plugin could not open or validate the sensor source. This reason covers feed validation failures and failures reading or saving the local Gadget identity history (a corrupt journal, a write failure, or a journal over its 1 MiB cap). Restarting HWiNFO does not repair every one of these cases. In **Auto** mode a journal failure shows this screen only while Shared Memory is not running; a Shared Memory mapping that exists but is switched off is reported as **Shared Memory off** instead, and the log then carries that reason.
+The plugin could not open or validate the sensor source. This reason covers feed validation failures on either source: a Shared Memory layout that does not validate, or a Gadget registry value that cannot be read as text. Restarting HWiNFO does not repair every one of these cases. In **Auto** mode a Gadget failure shows this screen only while Shared Memory is not running; a Shared Memory mapping that exists but is switched off is reported as **Shared Memory off** instead, and the log then carries that reason.
 
-Open the key or dial settings and choose **Copy support report** for support. Retain the relevant plugin log entry (`HWiNFO unavailable [invalid]: Gadget identity history could not be read or saved`) to identify the underlying failure; the support report includes the general reason, not the raw error message. The journal lives under `%LOCALAPPDATA%\HWiNFO Sensors\`; restore it from a backup where you have one. Deleting it clears the screen but erases every observed ambiguous name, so a reading that once shared a name can adopt it again. See [Data sources](data-sources.md#freshness-and-local-history).
+Open the key or dial settings and choose **Copy support report** for support. Retain the relevant plugin log entry (it starts with `HWiNFO unavailable [invalid]:`) to identify the underlying failure; the support report includes the general reason, not the raw error message.
 
 ## Keys show "Sensor missing"
 
@@ -100,6 +100,7 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 3. **HWiNFO profile / config change**, or you switched between shared memory and Gadget sources (the two expose different sensor sets).
 4. **The sensor simply isn't present yet**, e.g. a GPU that's asleep, or a drive that spun down.
 5. **An old Gadget selection with no alias** after the 1.7 upgrade: a label spelled exactly `Reading 0` through `Reading 1023`, a key carrying the old `~n` duplicate suffix, or an old spelling that now matches two readings. Most 1.6.0 Gadget selections keep working; see [Data sources](data-sources.md#enabling-gadget-reporting).
+6. **Two ticked Gadget readings share a source name and label** (1.7). Both are withheld while both are ticked, and the settings panel says that names are withheld. This one needs no reselection: see [below](#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 
 **Fix:** open the key's settings and **pick the sensor again**. A dial shows **Sensor missing / waiting** and ignores turns while the sensor is gone, so a temporary dropout (an HWiNFO restart, a sleeping GPU) can't move it off your saved pick; it recovers by itself when the sensor returns. If the sensor is gone for good, pick a new reading in the dial's settings panel.
 
@@ -121,6 +122,7 @@ HWiNFO gives every reading you tick **Report value in Gadget** a numbered regist
 1. **Update the plugin** to 1.6.0 or later, then click **⟳ refresh** in the picker.
 2. **Check the tick itself.** Only readings with **Report value in Gadget** ticked are written, and only while they are enabled in the sensor window.
 3. **The scan is bounded.** The plugin reads slots 0 to 1023, far above any set a person ticks by hand; a reading parked above that is not read.
+4. **Two ticked readings share a name** (1.7). HWiNFO reports some readings twice under one source name and label, for example a GPU fan once in RPM and once in percent, and a shift-click range ticks both. The registry has nothing else to tell them apart, so both are withheld while both are ticked; the other readings keep working and the plugin log names the two slots. Untick one of the two in HWiNFO, or give one a different label, and the other comes back on its own after two polls.
 
 ## Plugin shows nothing at all / the action is missing
 
@@ -211,6 +213,7 @@ Useful lines to look for:
 - `Data source layout changed; reopened in place (shared-memory)`: HWiNFO's sensor list grew or shrank (starting a game that adds GPU readings does it) and the poller reopened at the new size and re-read within the same tick, so the values never left the keys. Logged at INFO; it is not an error.
 - `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid`, `not-running` or `busy`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
 - `Gadget slot <n> withheld: formatted value "…" does not agree with raw value "…"`: one Gadget row was withheld because its two registry fields contradict each other; the other rows keep working. Logged once per reading and slot while the plugin runs; a return to the Gadget source after time on Shared Memory can log it once more.
+- `Gadget slots <a> and <b> withheld while they report one name (…)`: two ticked Gadget readings share a source name and label, and both are withheld while they do; the other rows keep working. Logged once while the name stays shared, and again only if it was free for two polls and is shared anew; a return to the Gadget source after time on Shared Memory can log it once more.
 - `Deck theme = … (source: …)`: the resolved deck-wide theme.
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
 - `Parent probe failed [<code>]`: the plugin could not inspect the Stream Deck app's process. It keeps running; the code names why (`EPERM` means the app is there but sealed off, anything else is unusual).

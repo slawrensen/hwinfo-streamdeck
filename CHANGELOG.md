@@ -16,13 +16,17 @@ Per-reading dial colors and reliability fixes in one release candidate.
   type setting uses automatic category colors. Valid Custom Text and
   alerts retain priority. Both color options are opt-in; existing settings
   do not enable them automatically.
-- Gadget readings with duplicate names are withheld instead of being
-  numbered in encounter order. A name seen twice under this Windows account stays
-  withheld across restarts, recorded in a local journal of name hashes.
-  To use those readings again, give both readings new distinct names in
-  HWiNFO and select them again; the reading that keeps the old name stays
-  withheld. Deleting the journal is the only reset. Sparse slots and names
-  containing spaces keep working.
+- Two ticked Gadget readings that share a source name and label are both
+  withheld while both are ticked, instead of being numbered in encounter
+  order. HWiNFO reports some readings twice under one name (a GPU fan once
+  in RPM and once in percent, for example), and a shift-click range ticks
+  both. Untick or relabel one of the two in HWiNFO and the other comes
+  back on its own after two polls. Nothing is written to disk and nothing
+  is remembered after a plugin restart. HWiNFO rewrites its Gadget rows
+  one at a time after a tick or untick, so a name seen on two rows for the
+  first time skips that one poll like any torn read; only a name still on
+  two rows at the next poll is withheld, and the plugin log names the
+  slots once. Sparse slots and names containing spaces keep working.
 - Most Gadget selections saved by 1.6.0 keep working after the upgrade.
   HWiNFO's standard source names ("CPU [#0]: <model>") carry a colon, and
   1.7 stores readings with a colon or tilde in the name under a new key
@@ -93,10 +97,11 @@ Per-reading dial colors and reliability fixes in one release candidate.
   This catches detectable partial writes; the registry still cannot prove
   an atomic producer update. Reopening the registry and metadata changes
   do not establish freshness.
-- In Auto mode with Shared Memory not running, a Gadget scan refused
-  because the identity journal could not be read or saved shows Source
-  error instead of Start HWiNFO. A Shared Memory mapping that exists but
-  is switched off is still reported as Shared Memory is off.
+- In Auto mode with Shared Memory not running, a Gadget key that opened
+  but whose scan was refused shows Source busy (the registry changed
+  during the scan) or Source error (a registry value that cannot be read
+  as text) instead of Start HWiNFO. A Shared Memory mapping that exists
+  but is switched off is still reported as Shared Memory is off.
 - Source statistic capabilities are explicit. Dial sessions show a brief
   reset reason when their measurement, native unit, type or source
   changes, and once after a data gap.

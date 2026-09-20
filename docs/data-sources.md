@@ -32,11 +32,13 @@ In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget*
 
 HWiNFO gives every ticked reading a numbered slot and leaves that number reserved even while the reading itself is switched off, so the numbering can carry permanent gaps. The plugin reads across them (since 1.6.0; earlier versions stopped at the first gap, see [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up)).
 
-The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Ordinary unique names survive reordering and restarts. Renaming either changes that identity. Missing or blank source names and labels are withheld; the plugin never substitutes a registry position for a name. Duplicate names are also withheld, and a name seen twice stays withheld for this Windows account across restarts: the plugin never lets the remaining reading adopt a name it once shared. To use those readings again, give both readings new distinct labels in HWiNFO and select them again; the reading that keeps the old name stays withheld. Deleting the [identity journal](#freshness-and-local-history) is the only reset.
+The registry carries no sensor ids, so a key picked while on the Gadget source is identified by the source name and reading label as HWiNFO writes them. Ordinary unique names survive reordering and restarts. Renaming either changes that identity. Missing or blank source names and labels are withheld; the plugin never substitutes a registry position for a name.
+
+Two ticked readings that share a source name and label are both withheld while both are ticked: the registry has nothing else to tell them apart, and the plugin does not choose between them. HWiNFO itself reports some readings twice under one name (a GPU fan once in RPM and once in percent, for example), and a shift-click range ticks both. Untick one of the two in HWiNFO, or give one a different label, and the other comes back on its own after two polls; the name then means the reading that is left. The other readings keep working throughout, the settings panel says that names are withheld, and the plugin log names the slots once. Nothing about this is written to disk or remembered after a plugin restart.
 
 HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names. An old spelling that now matches two readings resolves to nothing until you reselect; that ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. Two kinds of old selection get no alias and need one reselection: a label spelled exactly `Reading 0` through `Reading 1023` (earlier versions invented those labels for a missing registry label, so an old selection cannot safely identify a real producer label; the real reading remains selectable under a new identity, and an explicit cross-source link to it must be updated), and a key carrying the old `~n` duplicate suffix. Other names, including `Reading 00` and `Reading 1024`, keep their existing identities. No saved settings are rewritten automatically. A dial still saves the reading it lands on when it rotates or auto cycles, in the new key format, so a Gadget dial without a rotation set needs one reselection if you go back to 1.6.0.
 
-The registry cannot reveal ambiguity that vanished before the first observation, or distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
+A name is all the registry offers. A key saved under a name that two readings shared shows whichever reading still carries it, and the registry cannot distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
 
 ## Auto mode
 
@@ -46,7 +48,7 @@ The **Data source** setting defaults to **Auto**, and it's what most setups shou
 2. **Falls back to the Gadget registry** when Shared Memory isn't usable, for example after the free version's 12-hour timer expires, or if you turned Shared Memory Support off but still have Gadget reporting on.
 3. **Switches back to Shared Memory** when it becomes readable, checked roughly every 15 seconds while on Gadget.
 
-There's one exception to the "prefer Shared Memory" rule: if Shared Memory is simply not running *and* you have Gadget reporting enabled but no sensors ticked, the plugin shows the more helpful **Tick sensors / in Gadget** guidance rather than a generic "Start HWiNFO". The same goes for a Gadget key that opened but whose scan was refused: a registry changing during the scan shows **Source busy / retrying**, and an identity journal that could not be read or saved shows **Source error / open settings**. A Shared Memory mapping that exists but is switched off is still reported as **Shared Memory / is off**.
+There's one exception to the "prefer Shared Memory" rule: if Shared Memory is simply not running *and* you have Gadget reporting enabled but no sensors ticked, the plugin shows the more helpful **Tick sensors / in Gadget** guidance rather than a generic "Start HWiNFO". The same goes for a Gadget key that opened but whose scan was refused: a registry changing during the scan shows **Source busy / retrying**, and a registry value that cannot be read as text shows **Source error / open settings**. A Shared Memory mapping that exists but is switched off is still reported as **Shared Memory / is off**.
 
 > **Note:** When the free version disables Shared Memory it leaves the named mapping behind flagged with a `DEAD` marker rather than removing it. As of 1.1.5/1.1.6 the plugin validates that marker the moment it opens the mapping, so Auto mode reliably falls back to the Gadget registry instead of getting stuck on the **Shared Memory / is off** screen. (Earlier versions could strand there.)
 
@@ -112,9 +114,9 @@ The unit is HWiNFO's native unit, before any display conversion; a Yes/No
 reading's unit is `Yes/No` on both sources. A link never converts units. A changed unit or type
 leaves the alternate selection missing until you verify and update the
 pair. Duplicate endpoints invalidate all conflicting pairs. Malformed rows
-are ignored; more than 128 rows disables the whole list. Ambiguous Gadget
-readings cannot be linked while withheld. Names and current values alone
-are never used for automatic matching.
+are ignored; more than 128 rows disables the whole list. Gadget readings
+that share a name cannot be linked while withheld. Names and current values
+alone are never used for automatic matching.
 
 Both saved endpoint keys keep working in regular/dense keys, dials and
 custom detail lists. Existing labels, colors, ordering and settings remain
@@ -164,6 +166,16 @@ catch observable contradictions; they cannot prove an atomic snapshot
 when a writer pauses in an intermediate state. Shared Memory provides the
 consistency mutex that Gadget lacks.
 
+HWiNFO renumbers its Gadget rows after every tick or untick and rewrites
+them one at a time, so for a moment one reading can sit in two slots, or in
+none. A scan that sees a name on two rows for the first time is withheld
+and retried like any other torn read, and the keys hold their values for
+that poll. A name still on two rows at the next scan belongs to
+[two ticked readings](#enabling-gadget-reporting): those rows are withheld
+on their own, and released once two scans in a row show the name on one
+row, because a single such scan can be the moment one of the two is in no
+slot.
+
 Sparklines collect changed values between producer timestamps as well as
 advancing timestamps. Repeated held frames do not add points. A skipped
 read, missing or non-finite reading, stale data, reading-type or native-unit
@@ -187,14 +199,3 @@ measurement. Temporary mutex holds within the freshness grace add
 no duplicate samples; they do not reset the session until status goes stale.
 Hidden dials retain their existing 30-minute session lifetime. These numbers
 are not HWiNFO history or time-weighted averages.
-
-The identity deny list lives under `%LOCALAPPDATA%\HWiNFO Sensors\` as
-`gadget-identity-<registry-key-hash>.jsonl`. It stores only hashes of names,
-never readings, and sends nothing anywhere. Keep it when moving or restoring
-this user's setup. The journal is append-only and capped at 1 MiB.
-Corruption, a write failure or a journal over that cap stops Gadget reads
-with **Source error** (in Auto mode only while Shared Memory is not running;
-a switched-off mapping is reported as **Shared Memory is off** instead), and
-the plugin log names the identity journal. Restore the journal from a backup
-or use Shared Memory. Deleting the journal is the only reset: it erases every
-observed ambiguity, so a reading that once shared a name can adopt it again.

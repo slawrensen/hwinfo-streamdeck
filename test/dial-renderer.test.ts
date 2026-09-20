@@ -16,29 +16,6 @@ import { contrast } from "./wcag";
 const config = loadThemes();
 const MIDNIGHT = resolvePalette(config, "midnight", null, "normal");
 
-describe("persistent non-color dial severity", () => {
-	for (const severity of ["warn", "crit"] as const) {
-		it(`${severity}: single dial reserves title space and keeps the numeric anchor`, () => {
-			const svg = render({ severity, title: "A deliberately long title" });
-			assert.match(svg, new RegExp(`data-severity="${severity}" transform="translate\\(174 10\\)"`));
-			assert.match(svg, /<text x="12" y="58"[^>]*>56\.3<tspan/);
-		});
-		it(`${severity}: overview shifts only the alerting row label, leaving numbers fixed`, () => {
-			const svg = renderOverview({ rows: [overviewRow({ severity }), overviewRow({})] });
-			assert.equal(svg.match(/data-severity=/g)?.length, 1);
-			assert.match(svg, /<text x="28" y="36\.8"/);
-			assert.match(svg, /<text x="12" y="64\.8"/);
-			assert.match(svg, /<text x="168" y="36\.8"/);
-		});
-		it(`${severity}: two-row markers occupy the title band and clear the numeric mask`, () => {
-			const svg = renderTwoRow({ rows: [twoRowRow({ severity, selected: true })] });
-			assert.match(svg, new RegExp(`data-severity="${severity}" transform="translate\\(12 5\\)"`));
-			assert.match(svg, /<text x="30" y="17"/);
-			assert.match(svg, /<text x="172\.0" y="40"/);
-		});
-	}
-});
-
 function render(overrides: Partial<DialRenderOptions>): string {
 	return renderDial({
 		title: "CPU Package",
@@ -676,11 +653,5 @@ describe("Dim keeps the selection cue on the multi-row views", () => {
 		assert.equal(twoRowLabelFill(svg, 17), "#550505");
 		const fallback = renderTwoRow({ rows: [twoRowRow({ selected: true, unitColor: "#440A0A" }), twoRowRow({ label: "GPU", selected: false })], text: custom });
 		assert.equal(twoRowLabelFill(fallback, 17), "#550505", "a label that outreads its unit is never touched");
-	});
-
-	it("the dial marks keep the mark's own backing (no rule runs under them)", () => {
-		assert.match(render({ severity: "warn" }), /translate\(174 10\)"><rect x="-1" y="-1" width="16" height="16"/);
-		assert.match(renderOverview({ rows: [overviewRow({ severity: "crit" })] }), /translate\(12 [0-9.]+\)"><rect x="-1" y="-1" width="14" height="14"/);
-		assert.match(renderTwoRow({ rows: [twoRowRow({ severity: "warn", selected: true })] }), /translate\(12 5\)"><rect x="-1" y="-1" width="15" height="15"/);
 	});
 });

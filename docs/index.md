@@ -13,7 +13,7 @@ no ads, no telemetry.
 
 *Production renderers with sample readings and generated histories. This is
 a layout comparison, not a hardware photograph. The board predates the 1.7
-alert shapes and contrast changes.*
+contrast changes.*
 
 > **1.7 is a release candidate.** The current docs describe its reliability
 > changes and dial colors. [See what changes for you](whats-new-1.7.md).

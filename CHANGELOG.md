@@ -105,9 +105,7 @@ Per-reading dial colors and reliability fixes in one release candidate.
   keeps labels at least as readable as units. Saved reading colors, saved
   quad cell colors and hand-grouped tile colors render exactly in Theme
   mode and are only dimmed in Dim mode; a valid Custom Text color stays
-  exact and replaces them while it is set. Warning triangles
-  and critical octagons add severity cues alongside color without
-  replacing the reading.
+  exact and replaces them while it is set.
 - A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
   screen edge: the value and unit columns slide left together when the
   widest unit needs the room, and faces whose units already fit are

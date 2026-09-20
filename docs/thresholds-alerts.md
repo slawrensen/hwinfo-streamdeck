@@ -5,7 +5,7 @@ nav_order: 7
 
 Set **Warn at** and/or **Critical at** to change the display when the current value reaches a limit: amber for warning, red for critical.
 
-> This page includes the color and shape changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page includes the color changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
 
 Both fields are optional and independent: set one, the other, or neither. A key with no thresholds just shows its themed value.
 
@@ -53,11 +53,11 @@ By default higher is worse, the right setting for temperatures, power draw, and 
 With the box ticked, your **Warn at** / **Critical at** values become floors: the alert fires when the reading falls to or below them.
 
 <a id="colors-are-global-and-colorblind-safe"></a>
-## Alert colors and shapes
+## Alert colors
 
 Key alert palettes stay the same across themes: amber with black text for warning, red with white text for critical. Type accents and Custom Text do not override them. Dial overview values use alert foreground colors adjusted for contrast against the row background.
 
-The 1.7 candidate also draws a triangle for warning and an octagon for critical on keys and dials. These shapes provide a cue alongside color. Physical recognition across devices and color-vision differences has not been established.
+Physical recognition across devices and color-vision differences has not been established.
 
 ## Worked examples
 
@@ -71,7 +71,7 @@ Example values for a CPU temperature key in °C. Choose limits appropriate to yo
 
 Idle and under load the key stays themed. At 80 °C it goes amber; at 90 °C it goes red. If you'd rather read the face in Fahrenheit, tick *Show temperatures in °F* **and** enter the thresholds in °F (e.g. `176` / `194`); the numbers must match the displayed unit.
 
-The [theme reference](themes.md#alerts-override-everything) lists the alert palettes. Its older sample board predates the 1.7 shape cues.
+The [theme reference](themes.md#alerts-override-everything) lists the alert palettes. Its older sample board predates the 1.7 contrast adjustments.
 
 ### Fan RPM: alert when it drops
 

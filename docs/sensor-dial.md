@@ -173,7 +173,7 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 
 Dials take the same **Warn at** / **Critical at** thresholds as keys, compared against the **live** value. But the alert shows differently, and differently per view: on the single view only the **range bar's fill** flips to the alert color (amber for warn, red for critical) while the label, value and rest of the face stay in your chosen theme; the two [overview](#overview-view) layouts have no range bar, so there the alerting row's **value text** carries the color instead.
 
-The 1.7 candidate also draws a warning triangle or critical octagon. Overview alert values adjust for contrast against the row background. Alerts take priority over individual reading colors and Custom Text. See [Themes & alerts](themes.md).
+In the 1.7 candidate, overview alert values adjust for contrast against the row background. Alerts take priority over individual reading colors and Custom Text. See [Themes & alerts](themes.md).
 
 > **Note:** The single view has no sparkline; its range bar is the at-a-glance indicator there. The two-row [overview](#overview-view) draws real sparklines for its visible readings.
 

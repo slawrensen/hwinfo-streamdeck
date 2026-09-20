@@ -179,7 +179,7 @@ Sparkline notes:
 
 ### Warn at / Critical at
 
-When the current value reaches **Warn at**, the key becomes amber with black text; at **Critical at**, red with white text. These key palettes stay the same across themes. The 1.7 candidate also draws a warning triangle or critical octagon. Leave a field blank to disable it. Decimal commas are accepted (`70,5` works as `70.5`). Use the displayed temperature unit; byte and rate thresholds use the native value before [Data units](#advanced-deck-wide) re-tiering.
+When the current value reaches **Warn at**, the key becomes amber with black text; at **Critical at**, red with white text. These key palettes stay the same across themes. Leave a field blank to disable it. Decimal commas are accepted (`70,5` works as `70.5`). Use the displayed temperature unit; byte and rate thresholds use the native value before [Data units](#advanced-deck-wide) re-tiering.
 
 See [Thresholds & alerts](thresholds-alerts.md) for the full behavior.
 

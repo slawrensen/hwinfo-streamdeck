@@ -89,6 +89,17 @@ describe("Back tile", () => {
 		assert.ok(warned.includes(warnBg), "warn palette background expected");
 	});
 
+	it("an alerting Back tile is the calm tile recolored: no severity mark at warn or crit", () => {
+		const geometryOf = (svg: string): string => svg.replace(/#[0-9A-Fa-f]{6}/g, "#");
+		const calm = composeBackFace(stateOf(), ok, ctxOf());
+		for (const [level, presentation] of [["warn", { warnValue: "50" }], ["crit", { warnValue: "40", critValue: "50" }]] as const) {
+			const svg = composeBackFace(stateOf({ presentation }), ok, ctxOf());
+			assert.ok(svg.includes(resolvePalette(config, config.defaultTheme, null, level).bg), `${level} palette background expected`);
+			assert.doesNotMatch(svg, /data-severity/);
+			assert.equal(geometryOf(svg), geometryOf(calm), `${level}: something other than color differs from the calm tile`);
+		}
+	});
+
 	it("stays operable through unavailable data and a missing primary", () => {
 		const gone = composeBackFace(stateOf(), down, ctxOf());
 		assert.match(gone, /Start HWiNFO/);

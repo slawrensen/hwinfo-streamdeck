@@ -23,7 +23,7 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 
 ![Earlier production-rendered examples of seven themes, alert palettes, key layouts and dial views, using sample scenarios and generated histories.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
-*This earlier board predates the 1.7 contrast adjustments and alert shapes. See the [1.7 reading-color examples](sensor-dial.md#reading-colors) for the new dial options.*
+*This earlier board predates the 1.7 contrast adjustments. See the [1.7 reading-color examples](sensor-dial.md#reading-colors) for the new dial options.*
 
 > **Note:** New installs start on **Void**. Installs configured before themes were added keep **Graphite** as the deck default. Selecting a theme replaces that default.
 
@@ -31,7 +31,7 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 
 Each layout uses fixed positions across themes. A one-reading key puts its label on baseline 32, value on 94 and unit on 114. The multi-reading layouts use their own grids. Renderer tests check these positions.
 
-In the 1.7 candidate, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). A triangle marks warnings and an octagon marks critical alerts. Physical readability still needs device testing.
+In the 1.7 candidate, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). Physical readability still needs device testing.
 
 The illustrated boards use production renderers with sample scenarios, live inputs and generated histories. They are sample-data renders. Settings-panel captures and hardware photographs are identified separately.
 
@@ -109,7 +109,7 @@ When a value crosses a threshold (see [Alerts & thresholds](thresholds-alerts.md
 
 On **keys**, the whole face flips: background, label, value, accent and track all recolor from the alert palette. On **dials** (Stream Deck +) the rest of the touchscreen stays themed: in the single view the **range bar fill** changes, and in the two-row and three-row overview views an alerting row's **value** uses a separate foreground hue adjusted for readable contrast.
 
-A **triangle** marks a warning and an **octagon** marks a critical condition on keys and dials. The shape persists while the condition remains active, without idle animation. Whole-key alert palettes remain global; type accents do not replace them. Physical recognition across displays and color-vision differences still requires device testing.
+Whole-key alert palettes remain global; type accents do not replace them. Physical recognition across displays and color-vision differences still requires device testing.
 
 ---
 

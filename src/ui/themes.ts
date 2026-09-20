@@ -159,9 +159,11 @@ export function loadThemes(): ThemesConfig {
 /**
  * Resolves the final six tokens for one render.
  *
- * Alerts win outright: the whole key is recolored — accent and track
- * included, from the global alert palette, never tinted per theme. The
- * separately rendered severity shape distinguishes warning from critical.
+ * Alerts win outright: the whole key is recolored, accent and track
+ * included, from the global alert palette, never tinted per theme. Warning
+ * is an amber field with near-black text and critical a red field with
+ * white text, so the two levels differ in field luminance (about 2.8x) and
+ * in text polarity as well as in hue; test/themes.test.ts pins both.
  * Otherwise the type accent, when enabled and known, replaces the accent
  * token only — except on themes that opt out (paper).
  */

@@ -144,7 +144,7 @@ Alerts always track the **live** value (not the displayed stat: a key showing MA
 
 On a **dial**, the alert colors the range-bar fill instead of the whole face; the touchscreen slot is too small for a full field flip. Once you set thresholds, the bar's track also marks the warn and critical bands in dimmed amber and red, so you can see where the trip points sit before the value reaches them. The two **Overview** views (two rows and three rows) have no range bar: there an alerting row shows its **value** in the alert color instead. See [Sensor Dial](sensor-dial.md).
 
-To disable an alert, clear **Warn at** and **Critical at**. Key alert palettes stay the same across themes. The 1.7 candidate adds a warning triangle and critical octagon; physical recognition across displays and color-vision differences remains unverified.
+To disable an alert, clear **Warn at** and **Critical at**. Key alert palettes stay the same across themes. Physical recognition across displays and color-vision differences remains unverified.
 
 ### How do I reset a dial's session min/max?
 

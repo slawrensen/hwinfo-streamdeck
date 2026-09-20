@@ -19,7 +19,6 @@ import {
 	renderStatusKey,
 	renderTripleKey,
 	ringValueFontSize,
-	severityMarkSvg,
 	tripleValueFontSize,
 	valueFontSize,
 	type DualKeyOptions,
@@ -36,35 +35,6 @@ import { loadThemes, resolvePalette } from "../src/ui/themes";
 
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
-
-describe("persistent non-color key severity", () => {
-	for (const severity of ["warn", "crit"] as const) {
-		it(`${severity}: the single face keeps its number and adds a distinct shape in the badge gap`, () => {
-			const svg = render({ severity, statBadge: "MAX", returnMark: true });
-			assert.match(svg, new RegExp(`data-severity="${severity}"`));
-			assert.match(svg, /data-severity="[^"]+" transform="translate\(114 38\)"/);
-			assert.match(svg, />56\.3<\/text>/);
-			assert.doesNotMatch(svg, /<animate/);
-			const shape = svg.match(/data-severity="[^"]+"[^>]*><rect[^>]*\/><polygon points="([^"]+)"/);
-			assert.ok(shape);
-			assert.equal(shape[1]?.split(" ").length, severity === "warn" ? 3 : 8);
-		});
-		it(`${severity}: dense faces reserve the separator's right gap and preserve all value runs`, () => {
-			for (const [svg, y] of [
-				[renderDual({ severity, sharedBadge: "MAX", returnMark: true }), 64],
-				[renderTriple({ severity, sharedBadge: "MAX", returnMark: true }), 40],
-				[renderQuad({ severity, sharedBadge: "MAX", labels: true, returnMark: true }), 65]
-			] as const) {
-				assert.match(svg, new RegExp(`data-severity="${severity}" transform="translate\\(114 ${y}\\)"`));
-				assert.match(svg, />MAX</);
-				assert.ok(svg.includes("<text"));
-			}
-		});
-	}
-	it("a normal face has no attention marker", () => {
-		assert.doesNotMatch(render({}), /data-severity/);
-	});
-});
 
 function render(overrides: Partial<ReadingKeyOptions>): string {
 	return renderReadingKey({
@@ -1149,49 +1119,6 @@ describe("escapeXml folds XML-illegal code units", () => {
 			assert.doesNotMatch(svg, XML_ILLEGAL);
 			assert.ok(svg.includes(FOLD), "the illegal unit was folded, not dropped");
 		}
-	});
-});
-
-describe("severity mark backing clears the whole rule to its right", () => {
-	// The dual divider, triple separators and quad cross arm all end at
-	// x=132; the mark's backing starts at x=113 and must reach at least that
-	// far or a track-colored stub survives beside the mark. Read from the
-	// SVG geometry, so it holds on any rasterizer.
-	function backing(svg: string): { left: number; right: number; top: number; bottom: number } {
-		const m = svg.match(/data-severity="[^"]+" transform="translate\((\d+) (\d+)\)"><rect x="-1" y="-1" width="(\d+)" height="(\d+)"/);
-		assert.ok(m, "no severity backing in the face");
-		const [x, y, w, h] = (m as RegExpMatchArray).slice(1, 5).map(Number) as [number, number, number, number];
-		return { left: x - 1, right: x - 1 + w, top: y - 1, bottom: y - 1 + h };
-	}
-	function rules(svg: string): Array<{ top: number; bottom: number; right: number }> {
-		return [...svg.matchAll(/<rect x="12" y="(\d+)" width="120" height="2" fill="[^"]+"\/>/g)].map((m) => ({ top: Number(m[1]), bottom: Number(m[1]) + 2, right: 132 }));
-	}
-
-	for (const severity of ["warn", "crit"] as const) {
-		for (const [name, svg] of [
-			["dual", renderDual({ severity })],
-			["triple", renderTriple({ severity })],
-			["quad", renderQuad({ severity })]
-		] as const) {
-			it(`${severity} ${name}: the backing spans from the mark's left margin past the rule's end`, () => {
-				const b = backing(svg);
-				const crossing = rules(svg).filter((r) => r.top < b.bottom && r.bottom > b.top);
-				assert.ok(crossing.length >= 1, "a rule runs under the mark on this layout");
-				assert.equal(b.left, 113, "the 1 px left margin stays");
-				for (const r of crossing) {
-					assert.ok(b.right >= r.right, `backing ends at x=${b.right}, the rule at x=${r.right}: a ${r.right - b.right} px stub would survive`);
-				}
-			});
-		}
-	}
-
-	it("the single key keeps the mark's own 1 px margin (nothing runs under it)", () => {
-		assert.deepEqual(backing(render({ severity: "warn" })), { left: 113, right: 131, top: 37, bottom: 55 });
-	});
-
-	it("severityMarkSvg defaults its clearing edge to the mark's own margin", () => {
-		assert.equal(severityMarkSvg("warn", 10, 10, 16, "#FFFFFF", "#000000"), severityMarkSvg("warn", 10, 10, 16, "#FFFFFF", "#000000", 27));
-		assert.match(severityMarkSvg("crit", 10, 10, 16, "#FFFFFF", "#000000", 40), /<rect x="-1" y="-1" width="31" height="18"/);
 	});
 });
 

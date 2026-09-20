@@ -17,7 +17,7 @@ Deck + and + XL dials show a single reading or a two- or three-row overview.
 
 *Production renderers with sample readings and generated histories. This is
 a layout comparison, not a photograph of hardware. The board predates the
-1.7 alert shapes and contrast changes described below.*
+1.7 contrast changes described below.*
 
 > **1.7 is a release candidate.** It combines per-reading dial colors with
 > source, identity and history fixes. [What changes for you](docs/whats-new-1.7.md).
@@ -113,7 +113,7 @@ Choose **Void, Graphite, Ultraviolet, Midnight, Forest, Ember or Paper** per
 action, or set one deck default. **Text** offers Theme, Dim or Custom.
 Optional **Type accents** color display accents by sensor category.
 
-Warnings use amber and a triangle; critical alerts use red and an octagon.
+Warnings use amber; critical alerts use red.
 Alerts override decorative colors. Built-in value, unit and numeric
 statistic colors have at least 4.5:1 authored contrast against their
 rendered background, and Dim keeps labels at least as readable as units.

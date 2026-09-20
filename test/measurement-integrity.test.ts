@@ -12,7 +12,7 @@ import { poller, type PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
 import { convertUnit, readingStatBadge, statValue } from "../src/ui/format";
 import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-store";
-import { loadThemes } from "../src/ui/themes";
+import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
 
 const link = { sharedMemory: "f0001234:0:1000001", gadget: "g:GPU:Temperature", unit: "°C", sensorType: 1 };
@@ -37,23 +37,86 @@ describe("readability through production action composition", () => {
 						const background = dialView === "tworow" && /y="40"/.test(element[0]) ? palette.track : palette.bg;
 						assert.ok(contrast(element[1]!, background) >= 4.5, `${theme} ${dialView} ${level} numeric/unit run: ${element[2]}`);
 					}
-					if (level !== "normal") assert.match(svg, new RegExp(`data-severity="${level}"`));
-					else assert.doesNotMatch(svg, /data-severity/);
+					assert.doesNotMatch(svg, /data-severity/, `${theme} ${dialView} ${level}: a dial alert is a color, never a drawn mark`);
 				}
 			});
 		}
 	}
-	it("all key layouts pass primary severity to the renderer without losing values", () => {
-		const extra = { ...reading, key: "f0001234:0:1000002", id: 2, value: 55 };
-		const source = { ...snapshot(), readings: [reading, extra], byKey: new Map([[reading.key, reading], [extra.key, extra]]) };
-		for (const keyLayout of ["single", "dual", "triple", "quad"]) {
-			for (const level of ["warn", "crit"]) {
-				const svg = compose({ readingKey: reading.key, secondaryReadingKey: extra.key, keyLayout, warnValue: "30", critValue: level === "crit" ? "35" : "60" }, { state: "ok", source: "shared-memory", snapshot: source });
-				assert.match(svg, new RegExp(`data-severity="${level}"`));
-				assert.match(svg, />40(?:\.0)?(?:<tspan|<\/text>)/);
-			}
+});
+
+describe("an alert changes colors and nothing else: no severity mark, no text moved to make room for one", () => {
+	/** A face with every #RRGGBB folded to one token: what is left is its
+	 * geometry and text, so two faces that differ only in color compare equal. */
+	const geometryOf = (svg: string): string => svg.replace(/#[0-9A-Fa-f]{6}/g, "#");
+	const config = loadThemes();
+	const THRESHOLDS = { normal: { warnValue: "50", critValue: "60" }, warn: { warnValue: "30", critValue: "60" }, crit: { warnValue: "30", critValue: "35" } } as const;
+	// 27 characters: the two-row label line holds it whole, and the single
+	// view cuts it at 17. The second reading stays under every threshold.
+	const hot: Reading = { ...reading, label: "Memory Junction Temp Sensor" };
+	const calm: Reading = { ...reading, key: "f0001234:0:1000002", id: 2, label: "GPU Hot Spot", value: 20 };
+	const both: SensorSnapshot = { ...snapshot(hot), readings: [hot, calm], byKey: new Map([[hot.key, hot], [calm.key, calm]]) };
+	const ok: PollerStatus = { state: "ok", source: "shared-memory", snapshot: both };
+
+	for (const keyLayout of ["single", "dual", "triple", "quad"]) {
+		for (const returnMark of [false, true]) {
+			it(`${keyLayout} key${returnMark ? " as a Back tile" : ""}: warn and crit draw the calm face's geometry on the alert palette`, () => {
+				const face = (level: keyof typeof THRESHOLDS): string => compose({ readingKey: hot.key, secondaryReadingKey: calm.key, keyLayout, theme: "void", displayMode: "none", ...THRESHOLDS[level] }, ok, returnMark);
+				for (const level of ["warn", "crit"] as const) {
+					const svg = face(level);
+					assert.doesNotMatch(svg, /data-severity/);
+					assert.ok(svg.includes(`<rect width="144" height="144" fill="${config.alerts[level].bg}"/>`), `${level}: the whole key takes the alert field`);
+					assert.match(svg, />40(?:\.0)?(?:<tspan|<\/text>)/);
+					assert.equal(geometryOf(svg), geometryOf(face("normal")), `${keyLayout} ${level}: something other than color differs from the calm face`);
+				}
+			});
 		}
-	});
+	}
+
+	function dial(dialView: string, level: keyof typeof THRESHOLDS): string {
+		const state: InstanceState = {
+			settings: { readingKey: hot.key, rotationKeys: [hot.key, calm.key], dialView, theme: "void", alertUnit: "°C", ...THRESHOLDS[level] },
+			stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+		};
+		return composeDialSvg(state, ok, () => [1, 2, 3, 2, 4]);
+	}
+
+	for (const level of ["warn", "crit"] as const) {
+		it(`${level}: no dial view draws a severity group`, () => {
+			for (const dialView of ["single", "overview", "tworow"]) {
+				assert.doesNotMatch(dial(dialView, level), /data-severity/, dialView);
+			}
+		});
+
+		it(`${level}: an alerting overview row's label starts at the same x as the calm row under it`, () => {
+			const svg = dial("overview", level);
+			const labelXs = [...svg.matchAll(/<text x="([0-9.]+)" y="[0-9.]+" text-anchor="start" [^>]*letter-spacing="0\.4"/g)].map((m) => m[1]);
+			assert.deepEqual(labelXs, ["12", "12"], "one label per row, both on the shared left edge");
+			assert.match(svg, new RegExp(`fill="${alertValueColor(config, level, config.themes.void!.bg)}">40\\.0</text>`), "the alerting row still takes the alert value color");
+			assert.equal(geometryOf(svg), geometryOf(dial("overview", "normal")), "the alerting row keeps the calm row's label fit, mask and columns");
+		});
+
+		it(`${level}: the single view's title is cut exactly like a calm dial's`, () => {
+			const title = (svg: string): string | undefined => svg.match(/<text x="12" y="24"[^>]*>[^<]*<\/text>/)?.[0];
+			const svg = dial("single", level);
+			assert.ok(title(svg)?.endsWith(">Memory Junction …</text>"), `17-character cut expected, got ${title(svg)}`);
+			assert.equal(title(svg), title(dial("single", "normal")));
+			// The thresholds move the bar's zones and the alert fills it; every
+			// byte above the bar is the calm dial's, colors included.
+			const aboveBar = (face: string): string => face.replace(/<rect x="[0-9.]+" y="84"[^>]*\/>/g, "");
+			assert.equal(aboveBar(svg), aboveBar(dial("single", "normal")));
+		});
+
+		it(`${level}: the two-row view keeps the alerting row's label whole on its own line at x=12, and its trend under it`, () => {
+			const labelLine = (svg: string): string | undefined => svg.match(/<text [^>]*>Memory Junction[^<]*<\/text>/)?.[0];
+			const svg = dial("tworow", level);
+			assert.match(labelLine(svg) ?? "", /^<text x="12" y="17" [^>]*>Memory Junction Temp Sensor<\/text>$/);
+			assert.equal(labelLine(svg), labelLine(dial("tworow", "normal")));
+			// A label pushed onto the value line takes the sparkline's place, so
+			// a narrower label line would cost an alerting row its trend.
+			assert.equal(svg.match(/<polyline /g)?.length, 2, "both rows draw their sparkline");
+			assert.equal(geometryOf(svg), geometryOf(dial("tworow", "normal")), "no second label line, mark or mask differs from the calm face");
+		});
+	}
 });
 
 describe("refutation: identity and explicit links", () => {

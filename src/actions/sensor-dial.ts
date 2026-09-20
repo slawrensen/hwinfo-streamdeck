@@ -1110,7 +1110,6 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 	const maxText = formatStat(stats.max, reading.unit, measureOpts);
 	const statsLine = overlay !== null && overlay.until > Date.now() ? overlay.text : isDataUnit(reading.unit) ? `▼${minText} ▲${maxText} ${stateTag}` : `▼ ${minText}   ▲ ${maxText}   ${stateTag}`;
 	return renderDial({
-		severity: level,
 		title: label,
 		valueText: shown.valueText,
 		unitText: `${shown.unitText}${badge !== "" ? " · " + badge : ""}`.trim(),
@@ -1213,7 +1212,6 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 		const rowBg = rowCount === 2 && selected ? palette.track : palette.bg;
 		const rowText = resolveTextColors({ ...palette, bg: rowBg }, effectiveTextFor(settings), "normal");
 		return {
-			severity: level,
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,
 			unitText: shown.unitText,

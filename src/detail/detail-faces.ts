@@ -63,7 +63,6 @@ export function composeBackFace(state: DeviceDetailState, status: PollerStatus, 
 	const text = resolveTextColors(palette, ctx.text, level);
 	const measured = formatMeasurement(reading.value, reading.unit, ctx.measure);
 	return renderReadingKey({
-		severity: level,
 		label: keyLabel(p.label, reading.label),
 		valueText: measured.valueText,
 		unitText: measured.unitText,

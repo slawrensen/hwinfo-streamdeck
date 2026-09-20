@@ -66,7 +66,7 @@ Gadget reporting never expires on the free version, but it only exposes the sens
 2. In the HWiNFO **sensor window**, click **Configure Sensors** and open the **HWiNFO Gadget** tab.
 3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Shift-click selects a range, so you can tick many at once.
 
-The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. If you enable Gadget reporting but don't tick any sensors, keys show **Tick sensors / in Gadget** until you do.
+The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. HWiNFO 8.48 creates that key only once a reading is ticked: with reporting enabled and nothing ticked, keys show **Start HWiNFO / not detected** while HWiNFO is running. **Tick sensors / in Gadget** appears when the key is there but holds no rows, which unticking everything can leave.
 
 You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, select **Advanced → Data source → Gadget registry only** before choosing them. The 1.7 candidate shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
 
@@ -74,7 +74,7 @@ You can enable **both** interfaces. Auto prefers Shared Memory and can switch to
 
 The portable build of HWiNFO works identically, but there is no installer to wire things up for you:
 
-- **Keep HWiNFO running and publishing sensors.** Exiting it stops new data. Shared Memory can show **Not updating** or **Start HWiNFO**; Gadget can retain old registry values and show **Age unknown** in the 1.7 candidate.
+- **Keep HWiNFO running and publishing sensors.** Exiting it stops new data, and keys show **Start HWiNFO**. A killed or crashed HWiNFO can leave old Gadget values behind, which the 1.7 candidate shows as **Age unknown**.
 - **Add it to autostart yourself.** There's no installer to register Auto Start, so if you want it running at login you must add the executable to your own startup (e.g. a Startup-folder shortcut or Task Scheduler).
 - **Review access settings if needed.** **Access denied / open settings** means Windows refused access needed to read the sensor source. Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck; the error alone does not identify which access rule failed. See [Troubleshooting](troubleshooting.md#keys-show-access-denied).
 

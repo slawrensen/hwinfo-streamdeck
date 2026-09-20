@@ -162,7 +162,7 @@ Bar and Ring find their range automatically:
 
 - **Percentages** (and duty cycles) run 0 to 100.
 - **Yes/No readings** run 0 to 1.
-- Everything else spans the **values actually seen**: HWiNFO's session min/max plus the plugin's own recent samples, so the gauge settles as the session accumulates. There are no manual bounds to type.
+- Everything else spans the **values actually seen**. On Shared Memory that is HWiNFO's session min/max plus the plugin's own recent samples. Gadget has no min/max, so there the range follows a moving window of the last 36 samples and starts again after a gap. There are no manual bounds to type.
 - **Warn at / Critical at** draw amber and red zones that escalate **toward the alarmed end**: amber then red at the high side normally, mirrored to the low side when *Direction* alerts below, the classic instrument convention (a fuel gauge is red at empty, a tachometer at the top). The range widens to keep the zones visible.
 
 The zones are **fixed landmarks**, drawn as muted shades so they read as markers, not state; the **moving fill is the live value**, and it keeps its full color (accent normally, amber/red while alerting) so it always stands out over them. The gauge follows the **live** value even while the key's text shows MIN, MAX, or AVG, exactly like alert coloring. The dual, triple and quad layouts have no strip, so the Display row hides there.
@@ -213,7 +213,7 @@ If the key cannot show a reading, it shows a two-line status message:
 | **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings. Auto can use Gadget when enabled; saved selections need explicit links to work across sources. |
 | **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| **Age unknown / check Gadget** | Gadget has no producer timestamp. Check HWiNFO and Gadget reporting; unchanged registry values can be steady or left over after exit. |
+| **Age unknown / check Gadget** | Gadget has no producer timestamp. Check HWiNFO and Gadget reporting; unchanged values can be steady or left by a kill or crash. |
 | **Tick sensors / in Gadget** | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Access denied / open settings** | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |

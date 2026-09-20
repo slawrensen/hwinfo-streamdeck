@@ -96,7 +96,7 @@ export function statusSentence(status: PollerStatus): string {
 	}
 	if (status.state === "stale") {
 		return status.source === "gadget"
-			? "Gadget freshness is unknown. Unchanged values may be steady readings or an old registry left after HWiNFO exits. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + gadgetWithheldNotes(status.snapshot)
+			? "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + gadgetWithheldNotes(status.snapshot)
 			: `No new Shared Memory measurement evidence for ${Math.round(status.staleForMs / 1000)}s. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads.`;
 	}
 	switch (status.reason) {

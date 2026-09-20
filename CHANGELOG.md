@@ -97,6 +97,11 @@ Per-reading dial colors and reliability fixes in one release candidate.
   This catches detectable partial writes; the registry still cannot prove
   an atomic producer update. Reopening the registry and metadata changes
   do not establish freshness.
+- Correction to the 1.6.0.0 entry: the Gadget scan does not cost the same
+  whatever the number of ticked readings; its 2.7 ms was measured with 13
+  readings ticked, and the cost grows with the selection, to about 150 ms
+  per poll with all 554 readings on my bench ticked (measured in PERF.md,
+  2026-09-20), so tick the readings you put on the deck.
 - In Auto mode with Shared Memory not running, a Gadget key that opened
   but whose scan was refused shows Source busy (the registry changed
   during the scan) or Source error (a registry value that cannot be read

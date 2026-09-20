@@ -19,7 +19,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 | **Source busy** / retrying | Source busy / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
 | **Not updating** / check sharing | No new data / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| **Age unknown** / check Gadget | Age unknown / check Gadget | Gadget has no heartbeat. Steady readings and an old registry left after exit are indistinguishable. |
+| **Age unknown** / check Gadget | Age unknown / check Gadget | Gadget has no heartbeat. Steady readings look the same as ones a killed or crashed HWiNFO left. |
 | **Access denied** / open settings | Access denied / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | **Tick sensors** / in Gadget | Gadget empty / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | **Pick a sensor** / in settings | HWiNFO / rotate to pick | No sensor selected on this key/dial yet. |
@@ -39,7 +39,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 The plugin found HWiNFO on **neither** interface. In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
-2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit); see [Data sources](data-sources.md).
+2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit). Enabling reporting alone is not enough: HWiNFO writes nothing to the registry until a reading is ticked, so this screen stays. See [Data sources](data-sources.md).
 3. **HWiNFO exited or stopped publishing sensors.** Start it and check Shared Memory Support or Gadget reporting. Minimizing a window is different from exiting the application.
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It may not have published Shared Memory yet. The plugin retries on each poll.
@@ -61,9 +61,9 @@ No Shared Memory producer timestamp or value revision advanced for more than ~15
 
 1. **HWiNFO's Sensors window was closed or HWiNFO was minimised to tray without sensor polling.** Reopen the Sensors window; HWiNFO must keep polling to update either interface.
 2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
-3. **HWiNFO itself crashed or hung.** Restart it. The plugin re-probes a fresh handle every 5 seconds while stale and recovers automatically.
+3. **HWiNFO itself crashed or hung.** Restart it. On Shared Memory the plugin checks a fresh connection about every 5 seconds while stale; on Gadget the next value change brings the keys back. Both recover on their own.
 4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
-4. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.
+5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.
 
 ## Keys freeze, and only closing the Stream Deck app brings them back
 
@@ -109,7 +109,7 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 The settings-panel sensor list is populated live from whatever source is active:
 
 1. **HWiNFO isn't up yet.** Start HWiNFO, then click the **⟳ refresh** button next to the search box.
-2. **On the Gadget source with nothing ticked**: the key shows **"Tick sensors / in Gadget."** In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for each value you want. The registry key exists but is empty until you do.
+2. **On the Gadget source with nothing ticked**: the key shows **Start HWiNFO / not detected** while HWiNFO is running, because HWiNFO 8.48 creates the registry key only once a reading is ticked. In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for each value you want. **Tick sensors / in Gadget** means the key is there but holds no rows, which unticking everything can leave.
 3. **Shared memory is disabled/expired** and you're forced to **Gadget only**; same fix as above.
 4. **Search filter too narrow.** Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 
@@ -117,7 +117,7 @@ The settings-panel sensor list is populated live from whatever source is active:
 
 ## Only some of the readings I ticked in Gadget show up
 
-HWiNFO gives every reading you tick **Report value in Gadget** a numbered registry slot and keeps that number reserved while the reading is unticked in the sensor window, writing nothing into it, so the numbering can carry permanent gaps. Plugin versions before 1.6.0 stopped reading at the first gap: with a hole early in the list only the readings before it reached the picker, the keys and the detail view, and a hole at the very first slot showed **Tick sensors / in Gadget** over a full registry. Since 1.6.0 the plugin reads every published slot. If you still see fewer readings than you ticked:
+HWiNFO gives every reading you tick **Report value in Gadget** a numbered registry slot. A reading that stays ticked but is not being written, such as one disabled in the sensor window, keeps its number with nothing in the slot, so the numbering can carry permanent gaps. Unticking a reading leaves no gap: HWiNFO renumbers the rest. Plugin versions before 1.6.0 stopped reading at the first gap: with a hole early in the list only the readings before it reached the picker, the keys and the detail view, and a hole at the very first slot showed **Tick sensors / in Gadget** over a full registry. Since 1.6.0 the plugin reads every published slot. If you still see fewer readings than you ticked:
 
 1. **Update the plugin** to 1.6.0 or later, then click **⟳ refresh** in the picker.
 2. **Check the tick itself.** Only readings with **Report value in Gadget** ticked are written, and only while they are enabled in the sensor window.

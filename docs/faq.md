@@ -70,7 +70,7 @@ A provider switch does not translate saved identities by itself. Configure expli
 
 ### I ticked many readings in Gadget but only a few show up. Why?
 
-HWiNFO reserves a numbered slot for every ticked reading and keeps the number while the reading is unticked, so the list carries gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press **⟳** in the picker. Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
+HWiNFO gives every ticked reading a numbered slot, and a reading that stays ticked but is not being written (one disabled in the sensor window, for example) leaves its slot empty, so the list can carry gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press **⟳** in the picker. Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 
 ### Why are min / max / avg showing the current value?
 
@@ -214,7 +214,7 @@ They name the observed state and a next step. These are the 1.7 candidate's mess
 | `Source busy / retrying` | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
 | `Not updating / check sharing` | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| `Age unknown / check Gadget` | Gadget has no producer timestamp. The plugin cannot tell whether unchanged registry values are steady or left over after HWiNFO stopped. Check HWiNFO and Gadget reporting. |
+| `Age unknown / check Gadget` | Gadget has no producer timestamp. The plugin cannot tell whether unchanged values are steady or left by a killed or crashed HWiNFO. Check HWiNFO and Gadget reporting. |
 | `Access denied / open settings` | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
 | `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
 | `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |

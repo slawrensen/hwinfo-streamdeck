@@ -27,6 +27,54 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-09-20: what a Gadget scan costs as the selection grows
+
+Harnesses: `node --import tsx scripts/gadget-scan-benchmark.mjs` on a
+throwaway HKCU subkey (the default is the 39-row sparse fixture of the
+2026-09-07 entry; `--rows N` writes N dense rows in the shapes HWiNFO 8.48
+writes, five REG_SZ fields a row), and
+`node --import tsx scripts/gadget-scan-live.mjs`, which times the same
+provider read-only over the key HWiNFO itself is writing (120 scans, 250 ms
+apart). Windows x64, Node v24.16.0, the 1.7.0.0 candidate's provider over
+the native bridge. A scan runs synchronously on the plugin's one thread,
+inside the poll tick.
+
+| Key | Rows | Queries per scan | p50 | p95 |
+| --- | ---: | ---: | ---: | ---: |
+| throwaway, default fixture | 39 sparse | 1,297 | 5.12 ms | 5.51 ms |
+| throwaway, `--rows 500` | 500 dense | 4,524 | 121.9 ms | 123.9 ms |
+| throwaway, `--rows 1000` | 1,000 dense | 8,024 | 376.4 ms | 380.0 ms |
+| HWiNFO 8.48's own key, rewritten every 2 s | 554 | not counted | 151.8 ms | 158.9 ms |
+
+The live run's slowest scan took 161.2 ms. 1 of its 120 scans was skipped
+for an interleave, and no row contradicted itself. The 500 and 1,000-row
+numbers were first taken with a scratch script that writes the same rows; a
+re-run through `--rows` the same day gave 121.9 / 123.1 ms (500 samples)
+and 376.5 / 379.3 ms (`--samples 200`), and the default fixture 5.12 /
+5.31 ms.
+
+The query count still follows the 2026-09-07 entry's `1024 + 7N`, but the
+time does not scale with it. One query costs more the more values the key
+holds. Dividing each p50 above by its query count gives about 3.9 µs a
+query on the default fixture (156 values in the key), 27 µs at 2,500
+values and 47 µs at 5,000, which is what a by-name lookup that walks the
+key's values would give. A scan therefore grows roughly with the square of
+the ticked readings, and the 8,192 queries of a full key cannot be priced
+from the 39-row number.
+
+This corrects the 2026-09-04 entry and the 1.6.0.0 changelog line that
+rests on it. "The cost is set by the bound, not by how many readings are
+ticked" was measured with 13 readings ticked and holds only for a selection
+that small; the 0.3% and 1.1% of one core are 13-reading figures. With
+every reading on my bench ticked (554 rows) a scan takes about 150 ms:
+about 15% of the thread at the default 1 s poll and about 60% at the
+fastest 250 ms poll. Somewhere between 500 and 1,000 ticked rows a scan
+outlasts that 250 ms interval; the poller runs on `setInterval` with a
+synchronous tick, so from there the next tick is due as soon as the last
+one ends. `docs/data-sources.md` now says to tick the readings that are on
+the deck. These are short runs on one machine, not a host-resource budget,
+a physical-device result or a soak.
+
 ### 2026-09-07: bounded Gadget row validation, synthetic registry
 
 Harness: `node --import tsx scripts/gadget-scan-benchmark.mjs`, Windows x64,
@@ -91,6 +139,8 @@ ERROR_FILE_NOT_FOUND, so the cost is set by the bound, not by how many
 readings are ticked: at the default 1 s poll it is about 0.3% of one
 core, at the fastest 250 ms poll about 1.1%, and the shared-memory
 path, the default source and the one Auto mode prefers, pays nothing.
+(Corrected 2026-09-20: that holds for the 13 readings measured here.
+The cost grows with the selection; see that entry.)
 Earlier entries carry "n/a" for the Gadget tick because the key was
 absent on this machine; this is the file's first before-and-after row
 for it.

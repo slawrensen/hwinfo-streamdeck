@@ -161,7 +161,7 @@ One strip under the value, on the single layout only:
 Bar and Ring find their range automatically:
 
 - **Percentages** (and duty cycles) run 0 to 100.
-- **Yes/No readings** run 0 to 1.
+- **Yes/No readings** run 0 to 1. The key shows the word HWiNFO shows, Yes or No; a threshold compares the 0 or 1 behind it.
 - Everything else spans the **values actually seen**. On Shared Memory that is HWiNFO's session min/max plus the plugin's own recent samples. Gadget has no min/max, so there the range follows a moving window of the last 36 samples and starts again after a gap. There are no manual bounds to type.
 - **Warn at / Critical at** draw amber and red zones that escalate **toward the alarmed end**: amber then red at the high side normally, mirrored to the low side when *Direction* alerts below, the classic instrument convention (a fuel gauge is red at empty, a tachometer at the top). The range widens to keep the zones visible.
 

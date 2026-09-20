@@ -57,10 +57,11 @@ Per-reading dial colors and reliability fixes in one release candidate.
   Unchanged registry values show Age unknown instead of claiming HWiNFO
   stalled. A Yes/No reading's raw flip counts as value evidence, and its
   unit no longer changes with the word, so a dial threshold set while it
-  reads No fires when it reads Yes. A Yes/No reading's Bar or Ring runs
-  empty to full on either source, and the dense rows that cap a unit's
-  width (triple keys, two-row and three-row dials) show its 0 or 1 without
-  a cut-off unit. Gadget historical fields are
+  reads No fires when it reads Yes. A Yes/No reading now reads as the word
+  HWiNFO itself shows, Yes or No, on keys, dials and tiles, instead of the
+  0.00 it had carried since 1.6.0; thresholds still compare the 0 or 1
+  underneath. Its Bar or Ring runs empty to full on either source. Gadget
+  historical fields are
   unavailable, with an N/A badge and an empty value for MIN/MAX/AVG on keys
   and detail tiles. The Gadget baseline survives a page change, a
   drill-down and Back, so the page you land on shows values instead of

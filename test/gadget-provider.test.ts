@@ -1075,4 +1075,27 @@ describe("integrity: a Yes/No reading's flip is value evidence", { skip: !onWind
 			provider.close();
 		}
 	});
+
+	test("the raw field HWiNFO really writes is the word, and it carries the same value", () => {
+		// Captured from HWiNFO 8.48 on a live key: Value "No", ValueRaw "No".
+		// Shared Memory reports the same reading as 0 or 1 in "Yes/No".
+		const flag = { sharedMemory: "f0000401:0:8000009", unit: "Yes/No", sensorType: 8 };
+		shape([0], () => ({ sensor: "CPU [#0]: Example", label: "Thermal Throttling (HTC)", value: "No", raw: "No" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const first = readVerified(provider);
+			assert.equal(first.readings[0]?.value, 0, "No reads as 0, not as an unavailable value");
+			assert.equal(first.readings[0]?.unit, "Yes/No");
+			const links = [{ ...flag, gadget: first.readings[0]?.key as string }];
+			assert.equal(applyReadingLinks(first, links, 1).byKey.get(flag.sharedMemory)?.value, 0);
+			putValue("Value0", "Yes");
+			putValue("ValueRaw0", "Yes");
+			const second = readVerified(provider);
+			assert.equal(second.readings[0]?.value, 1);
+			assert.equal(second.freshnessRevision, 1, "the flip is value evidence on the real shape too");
+			assert.equal(applyReadingLinks(second, links, 1).byKey.get(flag.sharedMemory)?.value, 1);
+		} finally {
+			provider.close();
+		}
+	});
 });

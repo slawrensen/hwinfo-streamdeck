@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { gadgetUnitOf, gadgetValueAgrees } from "../src/hwinfo/gadget-value";
+import { gadgetRawValue, gadgetUnitOf, gadgetValueAgrees } from "../src/hwinfo/gadget-value";
 
 describe("Gadget formatted/raw numeric consistency", () => {
 	it("rejects a paused native-unit rewrite with contradictory numbers", () => {
@@ -28,6 +28,14 @@ describe("Gadget formatted/raw numeric consistency", () => {
 	it("keeps boolean/nonnumeric and unavailable raw readings explicit", () => {
 		for (const text of ["Yes", "No", "On", "Off", "Unavailable", ""]) assert.equal(gadgetValueAgrees(text, 1), true);
 		assert.equal(gadgetValueAgrees("40 °C", Number.NaN), true, "a nonfinite raw value remains unavailable, never repaired from display text");
+	});
+	it("reads a boolean reading's raw field as HWiNFO writes it", () => {
+		// HWiNFO 8.48 writes ValueRaw "Yes" or "No" for these rows, not 1 or 0.
+		assert.equal(gadgetRawValue("Yes"), 1);
+		assert.equal(gadgetRawValue("No"), 0);
+		assert.equal(gadgetRawValue("1"), 1, "a numeric raw value is still the number");
+		assert.equal(gadgetRawValue("2295,04"), 2295.04, "the locale decimal comma still parses");
+		for (const raw of ["On", "yes", "Unavailable", ""]) assert.ok(Number.isNaN(gadgetRawValue(raw)), `${JSON.stringify(raw)} stays unavailable`);
 	});
 	it("rejects malformed numeric grouping rather than accepting a numeric prefix", () => {
 		for (const text of ["1.2.3 °C", "1,23,45 W", "12 34 V"]) assert.equal(gadgetValueAgrees(text, 1), false, text);

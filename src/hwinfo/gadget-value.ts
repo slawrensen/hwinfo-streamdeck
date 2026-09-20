@@ -18,6 +18,17 @@ export function gadgetUnitOf(formatted: string): string {
 	return match === null && (unit === "Yes" || unit === "No") ? "Yes/No" : unit;
 }
 
+/** The number a row's raw field carries. HWiNFO writes it with the system
+ * locale's decimal separator, and writes a boolean reading's raw field as
+ * the word itself ("Yes" or "No", seen on 8.48), not as 1 or 0: the word
+ * reads as the number Shared Memory reports for the same reading. Any other
+ * text stays unavailable, and nothing is repaired from the display field. */
+export function gadgetRawValue(raw: string): number {
+	if (raw === "Yes") return 1;
+	if (raw === "No") return 0;
+	return Number.parseFloat(raw.replace(",", "."));
+}
+
 /** Whether the formatted numeric precision can describe the authoritative
  * raw value. Agreement is a contradiction check, never an atomicity claim.
  * Nonnumeric/boolean displays and unavailable raw values remain unchanged. */

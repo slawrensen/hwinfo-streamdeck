@@ -18,7 +18,7 @@
  * changes leave age unverified. Steady values cannot prove a producer exit.
  */
 import { GadgetIdentityGuard, gadgetReadingKey, legacyGadgetKey } from "./gadget-identity";
-import { gadgetDisplayIsNumeric, gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
+import { gadgetDisplayIsNumeric, gadgetRawValue, gadgetUnitOf, gadgetValueAgrees } from "./gadget-value";
 import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
@@ -238,8 +238,7 @@ export class GadgetRegistryProvider {
 				}
 
 				const unit = gadgetUnitOf(formatted);
-				// HWiNFO writes ValueRaw with the system locale's decimal separator.
-				const value = Number.parseFloat(raw.replace(",", "."));
+				const value = gadgetRawValue(raw);
 				// A formatted number that cannot describe the raw one is a
 				// contradiction in THIS row. What happens to it is decided
 				// after the scan (see below): never publish the row.

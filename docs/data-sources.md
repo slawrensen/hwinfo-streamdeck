@@ -36,7 +36,17 @@ The registry carries no sensor ids, so a key picked while on the Gadget source i
 
 Two ticked readings that share a source name and label are both withheld while both are ticked: the registry has nothing else to tell them apart, and the plugin does not choose between them. HWiNFO itself reports some readings twice under one name (a GPU fan once in RPM and once in percent, for example), and a shift-click range ticks both. Untick one of the two in HWiNFO, or give one a different label, and the other comes back on its own after two polls; the name then means the reading that is left. The other readings keep working throughout, the settings panel says that names are withheld, and the plugin log names the slots once. Nothing about this is written to disk or remembered after a plugin restart.
 
-HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names. An old spelling that now matches two readings resolves to nothing until you reselect; that ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. Two kinds of old selection get no alias and need one reselection: a label spelled exactly `Reading 0` through `Reading 1023` (earlier versions invented those labels for a missing registry label, so an old selection cannot safely identify a real producer label; the real reading remains selectable under a new identity, and an explicit cross-source link to it must be updated), and a key carrying the old `~n` duplicate suffix. Other names, including `Reading 00` and `Reading 1024`, keep their existing identities. No saved settings are rewritten automatically. A dial still saves the reading it lands on when it rotates or auto cycles, in the new key format, so a Gadget dial without a rotation set needs one reselection if you go back to 1.6.0.
+HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Most selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright, except for the cases below. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names.
+
+These old selections get no alias and need one reselection:
+
+- A label spelled exactly `Reading 0` through `Reading 1023`. Earlier versions invented those labels when the registry label was missing, so an old selection cannot safely identify a real producer label. The real named reading remains selectable under a new identity.
+- Any literal tilde (`~`) in either the source name or reading label, even in a unique name such as `CPU~Package`, `Hot~Spot` or `Core~`.
+- A key carrying the old `~n` duplicate suffix.
+
+The tilde restriction prevents an old duplicate key from being mistaken for a literal name. Reselect these readings in the picker and update any explicit cross-source link that uses the old key. Other names, including `Reading 00` and `Reading 1024`, keep working.
+
+An old spelling that now matches two readings does not resolve while it is ambiguous. That ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. No saved settings are rewritten automatically. A dial still saves the reading it lands on when it rotates or auto cycles, in the new key format, so a Gadget dial without a rotation set needs one reselection if you go back to 1.6.0.
 
 A name is all the registry offers. A key saved under a name that two readings shared shows whichever reading still carries it, and the registry cannot distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
 
@@ -145,7 +155,10 @@ a reopen, the held values keep their real age and source, and the stale
 screen names the source the values came from. A Shared Memory timestamp
 is aged by the clock HWiNFO wrote it from, so a HWiNFO that stopped
 polling, before or while the keys were off screen, shows as not updating
-on the first read. The Gadget baseline survives a page change, a drill-down
+on the first read. The same rule applies after a delayed poll: a newer
+timestamp on an unchanged value still carries its producer age, rather
+than starting a new 15-second grace period when the plugin reads it.
+The Gadget baseline survives a page change, a drill-down
 and Back for 15 seconds; after a longer absence Gadget starts again at
 **Age unknown** until a value moves. A page you return to more than 15
 seconds after its last accepted read can show the stale screen for one poll

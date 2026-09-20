@@ -446,6 +446,8 @@ class HwinfoPoller extends EventEmitter {
 				const stampChanged = snapshot.pollTime !== this.lastPollTime;
 				// Revisions belong to one parser, not the producer. Its initial
 				// decode after reopen must never refresh a frozen timestamp.
+				// freshnessRevision counts finite value changes only; stamp-only
+				// evidence must keep its producer age even within one parser.
 				const evidenceRevision = snapshot.freshnessRevision ?? snapshot.valueRevision;
 				const previousEvidenceRevision = this.lastFreshnessRevision ?? this.lastValueRevision;
 				const revisionChanged = this.revisionProvider === this.provider && evidenceRevision !== undefined && evidenceRevision !== previousEvidenceRevision;

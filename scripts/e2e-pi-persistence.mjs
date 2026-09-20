@@ -1067,7 +1067,7 @@ try {
 	// default: an untouched cell is never frozen.
 	check(
 		"leg G2: the pink, MINE and the worn identity colors traveled with their chips",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "MINE", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", null], cellLabels: true }),
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "MINE", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", null], cellLabels: true, automaticColors: [true, true, false, false] }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 	mark = writes.length;
@@ -1093,8 +1093,8 @@ try {
 	check(
 		"leg G3: the quad shrank keeping MINE and the pink on their chips, and the leaver carried its worn color into the grown tail",
 		deepEqual(frame.detailTiles?.map((t) => t.size), [3, 3, 4]) &&
-			deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["MINE", "", ""], colors: ["#38CD89", "#FF00AA", null], cellLabels: true }) &&
-			deepEqual(frame.detailTiles?.[2], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, "#FF7E8E"], cellLabels: true }),
+			deepEqual(frame.detailTiles?.[0], { size: 3, labels: ["MINE", "", ""], colors: ["#38CD89", "#FF00AA", null], cellLabels: true, automaticColors: [true, false, false] }) &&
+			deepEqual(frame.detailTiles?.[2], { size: 4, labels: ["", "", "", ""], colors: [null, null, null, "#FF7E8E"], cellLabels: true, automaticColors: [false, false, false, true] }),
 		JSON.stringify({ sizes: frame.detailTiles?.map((t) => t.size), first: frame.detailTiles?.[0], tail: frame.detailTiles?.[2] })
 	);
 	check(
@@ -1181,7 +1181,7 @@ try {
 	check("leg L1: the cells reordered", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3", "bench:0:0", "bench:0:4", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg L1: no chip changed color, and the pink and MINE traveled with theirs",
-		frame.detailTiles?.length === 1 && deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF7E8E", "#38CD89", "#D4AB33", "#FF00AA"], cellLabels: true }),
+		frame.detailTiles?.length === 1 && deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF7E8E", "#38CD89", "#D4AB33", "#FF00AA"], cellLabels: true, automaticColors: [true, true, true, false] }),
 		JSON.stringify(frame.detailTiles)
 	);
 
@@ -1196,7 +1196,7 @@ try {
 	// never changed hands, so they keep exactly what was stored.
 	check(
 		"leg L2: the pink followed its chip up, MINE rode the other chip down",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", "MINE"], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#D4AB33"], cellLabels: true }),
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", "MINE"], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#D4AB33"], cellLabels: true, automaticColors: [true, true, false, true] }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 
@@ -1214,8 +1214,8 @@ try {
 	check(
 		"leg L3: MINE and its color crossed into the materialized fill, the incomer carried its own back",
 		deepEqual(frame.detailTiles, [
-			{ size: 4, labels: ["", "", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#4CC2FF"], cellLabels: true },
-			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true }
+			{ size: 4, labels: ["", "", "", ""], colors: ["#FF7E8E", "#38CD89", "#FF00AA", "#4CC2FF"], cellLabels: true, automaticColors: [true, true, false, true] },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true, automaticColors: [true, false, false, false] }
 		]),
 		JSON.stringify(frame.detailTiles)
 	);
@@ -1250,7 +1250,7 @@ try {
 	check("leg L4: the chip landed at the caret, not the tile's end", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:0", "bench:0:3", "bench:0:5", "bench:0:6", "bench:0:7"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg L4: every chip kept its own color through the chrome reorder",
-		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89", "#FF00AA"], cellLabels: true }),
+		deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89", "#FF00AA"], cellLabels: true, automaticColors: [true, true, true, false] }),
 		JSON.stringify(frame.detailTiles?.[0])
 	);
 
@@ -1279,8 +1279,8 @@ try {
 	check(
 		"leg L5: the park kept the pink on the parked chip",
 		deepEqual(frame.detailTiles, [
-			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true },
-			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true },
+			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true, automaticColors: [true, true, true] },
+			{ size: 4, labels: ["MINE", "", "", ""], colors: ["#D4AB33", null, null, null], cellLabels: true, automaticColors: [true, false, false, false] },
 			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
@@ -1296,9 +1296,9 @@ try {
 	check(
 		"leg L6: the grown cell wears MINE and its own color beside the pink",
 		deepEqual(frame.detailTiles, [
-			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true },
+			{ size: 3, labels: ["", "", ""], colors: ["#4CC2FF", "#FF7E8E", "#38CD89"], cellLabels: true, automaticColors: [true, true, true] },
 			{ size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true },
-			{ size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true }
+			{ size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true, automaticColors: [true, false] }
 		]),
 		JSON.stringify(frame.detailTiles)
 	);
@@ -1330,7 +1330,7 @@ try {
 	check("leg L7: membership shifted without a flat-list shear", deepEqual(frame.detailKeys, ["bench:0:4", "bench:0:1", "bench:0:2", "bench:0:5", "bench:0:6", "bench:0:7", "bench:0:3", "bench:0:0"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg L7: the dressed pair beside it is byte-stable",
-		deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true }),
+		deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["MINE", ""], colors: ["#D4AB33", "#FF00AA"], cellLabels: true, automaticColors: [true, false] }),
 		JSON.stringify(frame.detailTiles?.[2])
 	);
 
@@ -1357,9 +1357,9 @@ try {
 	check(
 		"leg L8: the walk froze and the pink survived as its own tile",
 		deepEqual(frame.detailTiles, [
-			{ size: 2, labels: ["", ""], colors: ["#4CC2FF", "#FF7E8E"], cellLabels: true },
-			{ size: 4, labels: ["", "", "", ""], colors: ["#38CD89", null, null, null], cellLabels: true },
-			{ size: 1, labels: ["MINE"], colors: ["#D4AB33"], cellLabels: true },
+			{ size: 2, labels: ["", ""], colors: ["#4CC2FF", "#FF7E8E"], cellLabels: true, automaticColors: [true, true] },
+			{ size: 4, labels: ["", "", "", ""], colors: ["#38CD89", null, null, null], cellLabels: true, automaticColors: [true, false, false, false] },
+			{ size: 1, labels: ["MINE"], colors: ["#D4AB33"], cellLabels: true, automaticColors: [true] },
 			{ size: 1, labels: [""], colors: ["#FF00AA"], cellLabels: true }
 		]),
 		JSON.stringify(frame.detailTiles)
@@ -1487,7 +1487,7 @@ try {
 	check("leg M: the chip crossed the tile boundary", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:0", "bench:0:2", "bench:0:4", "bench:0:3", "bench:0:5"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg M: the color follows its reading only where a tile paints one",
-		deepEqual(frame.detailTiles, [{ size: 4, labels: ["", "Solo", "", ""], colors: ["#FF7E8E", "#4CC2FF", null, null], cellLabels: false }]),
+		deepEqual(frame.detailTiles, [{ size: 4, labels: ["", "Solo", "", ""], colors: ["#FF7E8E", "#4CC2FF", null, null], cellLabels: false, automaticColors: [true, true, false, false] }]),
 		JSON.stringify(frame.detailTiles)
 	);
 
@@ -2332,7 +2332,7 @@ try {
 	// inside the press. replaceChildren took the pressed control with it,
 	// Blink dropped the click, and the user's press did nothing. The writes
 	// still go out at once; only the repaint waits for the press to finish.
-	// This is the one leg in the suite that dispatches real mouse input.
+	// Use held mouse input so a repaint can run during a physical-style press.
 	const realClick = async (sel) => {
 		const at = JSON.parse(
 			(await evaluate(`(() => {
@@ -2380,6 +2380,47 @@ try {
 	const legR = writes.slice(mark);
 	check("leg R: the rename committed", legR.some((w) => w.detailTiles?.[0]?.labels?.includes("Renamed")), JSON.stringify(legR.map((w) => w.detailTiles?.[0]?.labels)));
 	check("leg R: and the press that committed it also landed", legR.some((w) => !w.detailKeys?.includes("bench:0:3")), JSON.stringify(legR.map((w) => w.detailKeys?.length)));
+
+	// Automatic hues must travel without becoming chosen colors. The deck
+	// lifts automatic colors for Paper; a chosen color intentionally stays
+	// exact, so raw hue equality alone cannot prove a reorder kept contrast.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
+	store.settings = { ...store.settings, theme: "paper", detailKeys: store.settings.detailKeys.slice(0, 4), detailTiles: [{ size: 4, cellLabels: false }] };
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("automatic detail colors: opening wrote nothing", writes.length === 0);
+	mark = writes.length;
+	check("automatic detail colors: moved the first chip with a real mouse", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="1"]')) === "ok");
+	await sleep(700);
+	frame = atomic("automatic detail colors: ordinary move", writes.slice(mark));
+	check("automatic detail colors: the readings swapped", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:0", "bench:0:2", "bench:0:3"]));
+	check("automatic detail colors: both moved hues retain contrast correction",
+		deepEqual(frame.detailTiles?.[0]?.colors, ["#FF7E8E", "#4CC2FF", null, null]) &&
+		deepEqual(frame.detailTiles?.[0]?.automaticColors, [true, true, false, false]), JSON.stringify(frame.detailTiles));
+	const automaticPlan = structuredClone(frame.detailTiles);
+	mark = writes.length;
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await sleep(3500);
+	check("automatic detail colors: reload preserves provenance without writing", writes.length === mark && deepEqual(store.settings.detailTiles, automaticPlan));
+	// Choosing even the same raw hue must turn off automatic correction for
+	// that cell alone. Native wells dispatch change on a committed choice.
+	await evaluate(`(() => {
+		const well = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-tile-color');
+		well.value = "#4cc2ff";
+		well.dispatchEvent(new Event("change", { bubbles: true }));
+	})()`);
+	await sleep(700);
+	frame = atomic("automatic detail colors: explicit color choice", writes.slice(mark));
+	check("automatic detail colors: choosing a color changes only its provenance",
+		frame.detailTiles?.[0]?.colors?.[1] === "#4cc2ff" && frame.detailTiles?.[0]?.automaticColors?.[1] !== true &&
+		frame.detailTiles?.[0]?.automaticColors?.[0] === true && deepEqual(frame.futureBlob, FUTURE_BLOB), JSON.stringify(frame.detailTiles));
+	mark = writes.length;
+	check("automatic detail colors: moved the chosen chip with a real mouse", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="1"]')) === "ok");
+	await sleep(700);
+	frame = atomic("automatic detail colors: chosen move", writes.slice(mark));
+	check("automatic detail colors: the actual choice remains chosen after moving",
+		frame.detailKeys?.[2] === "bench:0:0" && frame.detailTiles?.[0]?.colors?.[2] === "#4cc2ff" &&
+		frame.detailTiles?.[0]?.automaticColors?.[2] !== true && frame.detailTiles?.[0]?.automaticColors?.[0] === true, JSON.stringify(frame.detailTiles));
 
 	// ---- run 8: the dial panel tells the runtime truth -------------------
 	// Custom preset + two touch zones is the dead-tap configuration

@@ -445,6 +445,22 @@ describe("detailTiles parsing (hand-grouped custom pages)", () => {
 		assert.deepEqual(detailTilesOf({}), []);
 		assert.deepEqual(detailTilesOf({ detailTiles: "4,2,1" }), []);
 	});
+
+	it("automatic color provenance requires an exact true flag paired with a valid stored hue", () => {
+		const input = { detailTiles: [
+			{ size: 4, colors: ["#4CC2FF", "#FF7E8E", "invalid", "#FFFFFF"], automaticColors: [true, "true", true, 1, true] },
+			{ size: 2, colors: ["#123456", "#654321"], automaticColors: "true" },
+			{ size: 1, automaticColors: [true] },
+			{ size: 4, colors: ["#123456", "#123456", "#123456", "#123456"], automaticColors: ["true", 1, null, false] }
+		] };
+		const before = JSON.stringify(input);
+		const parsed = detailTilesOf(input);
+		assert.deepEqual(parsed[0]?.automaticColors, [true, false, false, false]);
+		assert.equal(parsed[1]?.automaticColors, undefined, "malformed flags preserve legacy chosen semantics");
+		assert.equal(parsed[2]?.automaticColors, undefined, "an absent color has no stored provenance");
+		assert.equal(parsed[3]?.automaticColors, undefined, "truthy and null flags never turn chosen colors automatic");
+		assert.equal(JSON.stringify(input), before, "salvage parsing never rewrites the input");
+	});
 });
 
 describe("hand-grouped pagination (mixed tile sizes)", () => {

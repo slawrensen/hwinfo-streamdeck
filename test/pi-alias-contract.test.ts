@@ -23,6 +23,9 @@ import vm from "node:vm";
 
 import { composeDialSvg, type DialRenderState } from "../src/actions/sensor-dial";
 import { resolveDetailGroup } from "../src/detail/detail-group";
+import { composeChunkFace } from "../src/detail/detail-faces";
+import { detailTilesOf } from "../src/detail/detail-settings";
+import type { DeviceDetailState } from "../src/detail/navigation";
 import { applyReadingLinks, parseReadingLinks } from "../src/hwinfo/reading-links";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import { buildPreview, buildSensorTree } from "../src/pi-protocol";
@@ -30,6 +33,9 @@ import type { PollerStatus } from "../src/poller";
 import { rotationReadings } from "../src/rotation";
 import { SessionStatsStore } from "../src/stats";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
+import { loadThemes } from "../src/ui/themes";
+import { DIM_VALUE_BLEND, mixToward } from "../src/ui/text-colors";
+import { contrast } from "./wcag";
 
 /** A status with data: every fixture here is one. */
 type OkStatus = Extract<PollerStatus, { state: "ok" }>;
@@ -493,6 +499,170 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 };
 
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
+
+describe("detail colors retain automatic provenance through the production panel", () => {
+	const readings = Array.from({ length: 9 }, (_, i) => sample(`tile:0:${i}`, i, `Reading ${i}`, SensorType.Voltage, "V", i + 1));
+	const snapshot: SensorSnapshot = { pollTime: 1, version: 2, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "Tile fixture" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	const status: OkStatus = { state: "ok", source: "shared-memory", snapshot };
+	const keys = readings.slice(1, 5).map((r) => r.key);
+	const seed = { readingKey: readings[0]!.key, detailKeys: keys, detailMode: "custom", detailDensity: "4", detailTiles: [{ size: 4, cellLabels: false }] };
+	const config = loadThemes();
+	const colors = (m: Mounted, theme: string, mode: "theme" | "dim"): Map<string, string> => {
+		const svg = composeChunkFace({ presentation: { theme } } as DeviceDetailState, m.store.detailKeys as string[], "current", status, {
+			config, deckThemeId: theme, typeAccents: false,
+			measure: { decimals: "auto", fahrenheit: false, dataUnits: "decimal" },
+			text: { mode, color: undefined, dimSecondary: false }
+		}, detailTilesOf(m.store)[0]);
+		return new Map([...svg.matchAll(/font-weight="700" fill="([^"]+)">([^<]+)<\/text>/g)].map((match) => [match[2]!, match[1]!]));
+	};
+	function clickChip(m: Mounted, key: string, selector: string): void {
+		const chip = chips(m, "detail-list").find((c) => c.dataset.key === key);
+		const control = chip?.querySelector(selector);
+		assert.ok(control, `${key} has ${selector}`);
+		m.el("detail-list").fire("click", { target: control });
+	}
+	for (const mode of ["theme", "dim"] as const) {
+		it(`${mode}: an ordinary move preserves each automatic number color on Paper and after a theme change`, async () => {
+			const m = await openPanel("reading", seed, status);
+			const before = colors(m, "paper", mode);
+			const darkBefore = colors(m, "void", mode);
+			clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+			assert.deepEqual(plain(m.store.detailKeys), [keys[1], keys[0], keys[2], keys[3]]);
+			assert.deepEqual(colors(m, "paper", mode), before, "moving cannot turn an automatic color into a chosen color");
+			assert.deepEqual(colors(m, "void", mode), darkBefore, "the same hue follows the reading on another theme");
+			for (const color of colors(m, "paper", mode).values()) assert.ok(contrast(color, config.themes.paper!.bg) >= 4.5);
+			const reopened = await openPanel("reading", plain(m.store), status);
+			assert.deepEqual(colors(reopened, "paper", mode), before, "saved provenance survives panel reload");
+		});
+	}
+
+	it("a chosen color equal to the slot default survives pruning and a later automatic move", async () => {
+		const m = await openPanel("reading", { ...seed, detailTiles: [{ size: 4, colors: ["#4CC2FF", null, null, null] }] }, status);
+		const first = chips(m, "detail-list")[0]!;
+		const well = first.querySelector(".hw-tile-color")!;
+		well.value = "#4CC2FF";
+		well.fire("change");
+		assert.equal(detailTilesOf(m.store)[0]?.colors[0], "#4CC2FF", "a chosen default hue is not equivalent to automatic");
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+		assert.equal(detailTilesOf(m.store)[0]?.colors[1], "#4CC2FF");
+	});
+
+	it("removing a quad cell and growing the tile retains an already carried automatic hue and labels", async () => {
+		const m = await openPanel("reading", { ...seed, detailTiles: [{ size: 4, cellLabels: false, labels: ["A", "B", "C", "D"] }] }, status);
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+		const before = colors(m, "paper", "theme");
+		clickChip(m, keys[0]!, ".hw-set-remove");
+		assert.deepEqual(detailTilesOf(m.store)[0]?.labels, ["B", "C", "D"]);
+		const arm = m.el("detail-list").querySelector('.hw-add[data-arm="0"]');
+		assert.ok(arm);
+		m.el("detail-list").fire("click", { target: arm });
+		m.el("pickerd-search").fire("focus");
+		clickTick(m, readings[5]!.key, true, "pickerd-list");
+		const after = colors(m, "paper", "theme");
+		assert.equal(after.get("3.00"), before.get("3.00"), "the previously moved hue keeps its automatic correction");
+		assert.deepEqual(detailTilesOf(m.store)[0]?.automaticColors, [true, false, false, false]);
+	});
+
+	it("returning automatic hues to their original cells prunes a redundant plan", async () => {
+		const m = await openPanel("reading", { ...seed, detailTiles: [] }, status);
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+		assert.ok(detailTilesOf(m.store).length > 0);
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="-1"]');
+		assert.deepEqual(plain(m.store.detailTiles), []);
+	});
+
+	it("choosing a carried hue clears its automatic flag and keeps exact Theme and blended Dim colors", async () => {
+		const m = await openPanel("reading", seed, status);
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+		const well = chips(m, "detail-list").find((c) => c.dataset.key === keys[0])!.querySelector(".hw-tile-color")!;
+		well.value = "#4CC2FF";
+		well.fire("change");
+		assert.equal(detailTilesOf(m.store)[0]?.automaticColors?.[1], false);
+		assert.equal(colors(m, "paper", "theme").get("2.00"), "#4CC2FF");
+		assert.equal(colors(m, "paper", "dim").get("2.00"), mixToward("#4CC2FF", config.themes.paper!.bg, DIM_VALUE_BLEND));
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="-1"]');
+		assert.equal(colors(m, "paper", "theme").get("2.00"), "#4CC2FF", "chosen semantics also survive another move");
+	});
+
+	it("an automatic hue never freezes an implicit partial tail or ghost into the plan", async () => {
+		const m = await openPanel("reading", { ...seed, detailKeys: readings.slice(1, 7).map((r) => r.key) }, status);
+		clickChip(m, keys[3]!, '.hw-detail-move[data-move="1"]');
+		assert.equal(detailTilesOf(m.store).length, 1, "the partial tail remains uniform fill");
+		m.echo("detailDensity", "1");
+		await m.flush();
+		assert.deepEqual(m.el("detail-list").querySelectorAll(".hw-tile:not(.ghost)").map((tile) => tile.querySelectorAll(".hw-set-chip").length), [4, 1, 1]);
+		const g = await openPanel("reading", seed, status);
+		const ghost = g.el("detail-list").querySelector(".hw-tile.ghost");
+		assert.ok(ghost);
+		ghost.fire("drop", { dataTransfer: { getData: () => keys[0] } });
+		assert.equal(detailTilesOf(g.store).length, 1, "auto-only ghost leaver does not create its own tile");
+		assert.equal(detailTilesOf(g.store)[0]?.size, 3);
+	});
+
+	it("shrinking untouched automatic cells back to the uniform density still prunes the plan", async () => {
+		const m = await openPanel("reading", { ...seed, detailDensity: "3", detailKeys: readings.slice(1, 7).map((r) => r.key), detailTiles: [{ size: 4 }] }, status);
+		clickChip(m, keys[0]!, ".hw-set-remove");
+		assert.deepEqual(plain(m.store.detailTiles), []);
+		m.echo("detailDensity", "1");
+		await m.flush();
+		assert.deepEqual(m.el("detail-list").querySelectorAll(".hw-tile:not(.ghost)").map((tile) => tile.querySelectorAll(".hw-set-chip").length), [1, 1, 1, 1, 1]);
+	});
+
+	it("a cross-tile drop that grows a quad carries an automatic hue without making it chosen", async () => {
+		const m = await openPanel("reading", { ...seed, detailKeys: readings.slice(1, 8).map((r) => r.key), detailTiles: [{ size: 4, cellLabels: false }, { size: 3, cellLabels: false }] }, status);
+		const before = colors(m, "paper", "theme").get("2.00");
+		const target = chips(m, "detail-list").find((c) => c.dataset.key === readings[7]!.key)!;
+		target.fire("drop", { clientX: 1, dataTransfer: { getData: () => keys[0] } });
+		const plan = detailTilesOf(m.store);
+		assert.equal(plan[0]?.size, 3);
+		assert.equal(plan[1]?.size, 4);
+		assert.equal(plan[1]?.automaticColors?.[3], true);
+		const targetPanel = { ...m, store: { ...m.store, detailKeys: (m.store.detailKeys as string[]).slice(3), detailTiles: [plan[1]] } };
+		assert.equal(colors(targetPanel, "paper", "theme").get("2.00"), before);
+	});
+
+	it("whole-tile movement clones the automatic flags with the colors", async () => {
+		const m = await openPanel("reading", { ...seed, detailKeys: readings.slice(1).map((r) => r.key), detailTiles: [{ size: 4, cellLabels: false }, { size: 4, cellLabels: false }] }, status);
+		clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+		const before = colors(m, "paper", "dim");
+		const grip = m.el("detail-list").querySelector('.hw-tile-grip[data-tile="0"]');
+		assert.ok(grip);
+		m.el("detail-list").fire("keydown", { target: grip, key: "ArrowDown" });
+		const plan = detailTilesOf(m.store);
+		assert.deepEqual(plan[1]?.automaticColors, [true, true, false, false]);
+		const movedPanel = { ...m, store: { ...m.store, detailKeys: (m.store.detailKeys as string[]).slice(4), detailTiles: [plan[1]] } };
+		assert.deepEqual(colors(movedPanel, "paper", "dim"), before);
+	});
+
+	for (const destination of ["small tile", "ghost"] as const) {
+		it(`a previously stored automatic hue still travels to a ${destination}`, async () => {
+			const m = await openPanel("reading", { ...seed, detailKeys: destination === "ghost" ? keys : readings.slice(1, 7).map((r) => r.key) }, status);
+			clickChip(m, keys[0]!, '.hw-detail-move[data-move="1"]');
+			const target = destination === "ghost" ? m.el("detail-list").querySelector(".hw-tile.ghost") : chips(m, "detail-list").find((c) => c.dataset.key === readings[6]!.key);
+			assert.ok(target);
+			target.fire("drop", { clientX: 1, dataTransfer: { getData: () => keys[0] } });
+			const plan = detailTilesOf(m.store);
+			const tile = plan.at(-1)!;
+			const index = destination === "ghost" ? 0 : 2;
+			assert.equal(tile.colors[index], "#4CC2FF", "storage still controls whether a hue travels to a smaller tile");
+			assert.equal(tile.automaticColors?.[index], true, "travel does not make the stored hue chosen");
+		});
+	}
+
+	it("the panel and runtime salvage provenance identically without rewriting on open", async () => {
+		for (const automaticColors of [undefined, "true", true, 1, null, [true, "true", true, 1, true]]) {
+			const raw = [{ size: 4, colors: ["#4CC2FF", "#FF7E8E", "junk", "#FFFFFF"], automaticColors }];
+			const before = JSON.stringify(raw);
+			const m = await openPanel("reading", { ...seed, detailTiles: raw }, status);
+			assert.equal(m.writes.length, 0);
+			assert.equal(JSON.stringify(raw), before);
+			const abc = m.el("detail-list").querySelector(".hw-tile-abc");
+			assert.ok(abc);
+			m.el("detail-list").fire("click", { target: abc });
+			assert.deepEqual(detailTilesOf(m.store), detailTilesOf({ detailTiles: raw.map((tile) => ({ ...tile, cellLabels: false })) }));
+		}
+	});
+});
 
 describe("a saved Shared Memory selection and set while the Gadget provider is live", () => {
 	const status = linkedStatus();

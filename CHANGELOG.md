@@ -35,10 +35,11 @@ Per-reading dial colors and reliability fixes in one release candidate.
   that spelling. Keys, dense layouts, dials, rotation sets, groups, custom
   detail lists, and per-reading names and colors saved under the old
   spelling resolve through it. An old spelling that now matches two
-  readings resolves to nothing until you reselect. Selections whose label
-  reads exactly "Reading 0" through "Reading 1023", and selections that
-  carried the old "~n" duplicate suffix, get no alias and need one
-  reselection.
+  readings does not resolve while it is ambiguous. Selections whose label
+  reads exactly "Reading 0" through "Reading 1023", whose source name or
+  reading label contains any literal tilde ("~"), or whose old key carried
+  the "~n" duplicate suffix get no alias and need one reselection. This
+  includes unique names such as "Hot~Spot" and "CPU~Package".
 - Advanced users can explicitly link a Shared Memory key and its Gadget
   counterpart in the deck Config document. Links apply to keys, dense
   layouts, dials and custom detail lists in either provider direction.
@@ -73,7 +74,9 @@ Per-reading dial colors and reliability fixes in one release candidate.
   Shared Memory timestamp is aged by the clock HWiNFO wrote it from, so a
   HWiNFO that stopped polling, before or while the keys were off screen,
   no longer shows as live for 15 seconds after a page change, a Source
-  change or a plugin start.
+  change or a plugin start. This also applies when a poll is delayed:
+  a newer timestamp on an unchanged value cannot make an already-old
+  sample fresh again.
 - Sparklines capture subsecond value changes and end their segment on a
   skipped read, missing reading, unit change, provider transition or
   stale window. Dial session statistics count observed changes and
@@ -113,10 +116,12 @@ Per-reading dial colors and reliability fixes in one release candidate.
   changes, and once after a data gap.
 - Built-in value, unit and numeric statistic colors keep at least 4.5:1
   authored contrast in normal, dim, dense and dial alert views, and Dim
-  keeps labels at least as readable as units. Saved reading colors, saved
-  quad cell colors and hand-grouped tile colors render exactly in Theme
-  mode and are only dimmed in Dim mode; a valid Custom Text color stays
-  exact and replaces them while it is set.
+  keeps labels at least as readable as units. Individually chosen reading,
+  quad cell and detail tile colors render exactly in Theme mode and are
+  only dimmed in Dim mode; a valid Custom Text color stays exact and
+  replaces them while it is set. Moving readings in a custom detail list
+  keeps automatic colors adjusted for the theme instead of turning them
+  into chosen colors.
 - A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
   screen edge: the value and unit columns slide left together when the
   widest unit needs the room, and faces whose units already fit are
@@ -127,6 +132,12 @@ Per-reading dial colors and reliability fixes in one release candidate.
   and again when the key returns.
 - The Config document keeps a Gadget key whole, including trailing
   whitespace in its label; only leading whitespace is dropped.
+- The settings panel keeps unapplied Config edits when Advanced is closed
+  and reopened, closes the sensor picker when keyboard focus leaves it,
+  and no longer marks saved selections as missing while the source is
+  unavailable.
+- Invalid control characters in labels are replaced instead of breaking
+  the key or dial image.
 - Release builds validate exact tag and package versions before installing
   dependencies, and only the separate release-staging job receives write
   permission; it stages a draft release rather than publishing one. The

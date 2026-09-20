@@ -112,12 +112,17 @@ describe("producer evidence is distinct from topology revisions", () => {
 			assert.ok((next.valueRevision ?? 0) > initialRevision, "render invalidation still notices rebuilds");
 		}
 	});
-	it("same-unit value changes and producer stamps count, including changes during a rebuild", () => {
+	it("finite same-unit value changes count through rebuilds while timestamps remain separate evidence", () => {
 		const parser = new SnapshotParser();
 		parser.parse(compose([CPU], [entry], { pollTime: 700 }));
 		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 41 }], { pollTime: 700 })).freshnessRevision, 1);
 		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 42 }], { pollTime: 700, revision: 3 })).freshnessRevision, 2);
-		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 42 }], { pollTime: 701, revision: 3 })).freshnessRevision, 3);
+		for (const revision of [3, 4]) {
+			const next = parser.parse(compose([CPU], [{ ...entry, value: 42 }], { pollTime: 700 + revision, revision }));
+			assert.equal(next.pollTime, 700 + revision);
+			assert.equal(next.freshnessRevision, 2, "a stamp-only fast path or rebuild carries no numeric-change evidence");
+		}
+		assert.equal(parser.parse(compose([CPU], [{ ...entry, value: 43 }], { pollTime: 705, revision: 4 })).freshnessRevision, 3, "a value change still counts when the stamp also advances");
 	});
 	it("a later entry rewrite cannot consume an earlier value change before rebuild", () => {
 		const parser = new SnapshotParser();

@@ -226,8 +226,10 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 	const micros = chunkMicroLabels(readings.map((reading) => reading?.label));
 	return renderQuadKey({
 		cells: readings.slice(0, 4).map((reading, i): QuadKeyCell => {
-			// A hand-grouped tile color is a chosen hue and renders exact.
-			const color = quadIdentityColor(quadIdentityOf(spec?.colors[i], i), labeled, ctx.text, text, palette);
+			// A moved automatic hue keeps its contrast correction; an existing
+			// saved color remains chosen unless provenance explicitly says otherwise.
+			const identity = quadIdentityOf(spec?.colors[i], i);
+			const color = quadIdentityColor(spec?.automaticColors?.[i] === true ? { ...identity, chosen: false } : identity, labeled, ctx.text, text, palette);
 			const label = specLabel(spec, i) ?? micros[i] ?? "";
 			if (reading === undefined) {
 				// The same positional placeholder as the rows above.

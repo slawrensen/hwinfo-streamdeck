@@ -119,9 +119,9 @@ Warnings use amber; critical alerts use red.
 Alerts override decorative colors. Built-in value, unit and numeric
 statistic colors have at least 4.5:1 authored contrast against their
 rendered background, and Dim keeps labels at least as readable as units.
-Custom colors and saved reading, quad cell and tile colors are kept as
-entered in Theme mode and only dimmed in Dim mode, so check those on your
-display.
+Custom colors and individually chosen reading, quad cell and tile colors
+are kept as entered in Theme mode and only dimmed in Dim mode, so check
+those on your display.
 
 [Themes](docs/themes.md) · [Alert behavior](docs/thresholds-alerts.md)
 

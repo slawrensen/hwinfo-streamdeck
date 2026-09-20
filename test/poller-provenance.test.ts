@@ -20,6 +20,8 @@ import assert from "node:assert/strict";
 import { after, afterEach, beforeEach, describe, it, mock } from "node:test";
 
 import { tickSignature } from "../src/detail/tick-signature";
+import { ENTRY, ENTRY_CLASSIC_SIZE, HEADER, HEADER_SIZE, MAGIC_ACTIVE, SENSOR, SENSOR_CLASSIC_SIZE } from "../src/hwinfo/layout";
+import { SnapshotParser } from "../src/hwinfo/reader";
 import { HwinfoError, SensorType, type SensorSnapshot } from "../src/hwinfo/types";
 import type { PollerStatus } from "../src/poller";
 import { statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
@@ -95,6 +97,129 @@ function expectGadgetCues(status: PollerStatus): void {
 	assert.match(statusSentence(status), /Gadget/);
 	assert.equal(tickSignature(status), "stale:gadget");
 }
+
+/** Real parser input, so its stamp/value revision contract participates in
+ * the poller test. Only the byte transport and clocks are synthetic. */
+function sharedMemoryFixture(): { bytes: Buffer; entry: number; open(): Provider } {
+	const entry = HEADER_SIZE + SENSOR_CLASSIC_SIZE;
+	const bytes = Buffer.alloc(entry + ENTRY_CLASSIC_SIZE);
+	bytes.writeUInt32LE(MAGIC_ACTIVE, HEADER.magic);
+	bytes.writeUInt32LE(1, HEADER.version);
+	bytes.writeUInt32LE(2, HEADER.revision);
+	bytes.writeBigInt64LE(BigInt(STAMPED_AT / 1000), HEADER.pollTime);
+	bytes.writeUInt32LE(HEADER_SIZE, HEADER.sensorSectionOffset);
+	bytes.writeUInt32LE(SENSOR_CLASSIC_SIZE, HEADER.sensorElementSize);
+	bytes.writeUInt32LE(1, HEADER.sensorElementCount);
+	bytes.writeUInt32LE(entry, HEADER.entrySectionOffset);
+	bytes.writeUInt32LE(ENTRY_CLASSIC_SIZE, HEADER.entryElementSize);
+	bytes.writeUInt32LE(1, HEADER.entryElementCount);
+	bytes.writeUInt32LE(0xf0001234, HEADER_SIZE + SENSOR.id);
+	bytes.write("GPU", HEADER_SIZE + SENSOR.labelOrig, "latin1");
+	bytes.writeUInt32LE(SensorType.Temperature, entry + ENTRY.type);
+	bytes.writeUInt32LE(0x1000001, entry + ENTRY.id);
+	bytes.write("Temperature", entry + ENTRY.labelOrig, "latin1");
+	bytes.write("°C", entry + ENTRY.unit, "latin1");
+	for (const offset of [ENTRY.value, ENTRY.valueMin, ENTRY.valueMax, ENTRY.valueAvg]) bytes.writeDoubleLE(50, entry + offset);
+	return { bytes, entry, open() {
+		const parser = new SnapshotParser();
+		return provider("shared-memory", () => parser.parse(bytes));
+	} };
+}
+
+describe("Shared Memory parser evidence reaches the poller with its real age", () => {
+	for (const rebuild of [false, true]) {
+		it(`a delayed timestamp-only ${rebuild ? "rebuild" : "fast-path read"} is stale, while a later finite value change is fresh`, () => {
+			const subject = isolated();
+			const fixture = sharedMemoryFixture();
+			subject.openProvider = fixture.open;
+			subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+			now = 100_000;
+			subject.tick();
+			assert.equal(subject.getStatus().state, "ok");
+			assert.equal(subject.diagnostics().sampleAgeMs, 0);
+			const session = subject.provider;
+			// The producer polled at +2s, then froze. The same open parser
+			// next observes that stamp at +20s, without any numeric change.
+			fixture.bytes.writeBigInt64LE(BigInt(STAMPED_AT / 1000 + 2), HEADER.pollTime);
+			if (rebuild) fixture.bytes.writeUInt32LE(3, HEADER.revision);
+			now += 20_000;
+			wall += 20_000;
+			subject.tick();
+			assert.equal(subject.provider, session, "the same parser observed both frames");
+			assert.equal(subject.getStatus().state, "stale", "an 18-second-old stamp must not acquire observation-time freshness");
+			assert.equal(subject.diagnostics().sampleAgeMs, 18_000);
+			now += 1_000;
+			wall += 1_000;
+			subject.tick();
+			assert.equal(subject.diagnostics().sampleAgeMs, 19_000, "identical bytes do not extend the evidence window");
+			// Numeric evidence still works when the producer stamp is frozen.
+			fixture.bytes.writeDoubleLE(51, fixture.entry + ENTRY.value);
+			now += 1_000;
+			wall += 1_000;
+			subject.tick();
+			assert.equal(subject.getStatus().state, "ok");
+			assert.equal(subject.diagnostics().sampleAgeMs, 0);
+		});
+	}
+
+	it("unchanged values with a current producer stamp remain live", () => {
+		const subject = isolated();
+		const fixture = sharedMemoryFixture();
+		subject.openProvider = fixture.open;
+		now = 100_000;
+		subject.tick();
+		for (let i = 1; i <= 4; i++) {
+			now += 10_000;
+			wall += 10_000;
+			fixture.bytes.writeBigInt64LE(BigInt(wall / 1000), HEADER.pollTime);
+			subject.tick();
+			assert.equal(subject.getStatus().state, "ok");
+			assert.equal(subject.diagnostics().sampleAgeMs, 0);
+		}
+	});
+
+	it("a wall-clock jump cannot retract earned evidence or hide a finite value change", () => {
+		const subject = isolated();
+		const fixture = sharedMemoryFixture();
+		subject.openProvider = fixture.open;
+		now = 100_000;
+		subject.tick();
+		now += 1_000;
+		wall += 3_600_000;
+		fixture.bytes.writeBigInt64LE(BigInt(STAMPED_AT / 1000 + 1), HEADER.pollTime);
+		subject.tick();
+		assert.equal(subject.lastAdvanceAt, 100_000, "an old stamp cannot refresh or retract already earned evidence");
+		assert.equal(subject.diagnostics().sampleAgeMs, 1_000);
+		fixture.bytes.writeDoubleLE(51, fixture.entry + ENTRY.value);
+		now += 1_000;
+		subject.tick();
+		assert.equal(subject.getStatus().state, "ok");
+		assert.equal(subject.diagnostics().sampleAgeMs, 0, "a finite same-unit change still supplies current evidence despite clock skew");
+	});
+
+	it("a new parser after stop ages its first stamp even if values changed during the absence", () => {
+		const subject = isolated();
+		const fixture = sharedMemoryFixture();
+		subject.openProvider = fixture.open;
+		subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+		now = 100_000;
+		subject.retain();
+		const previous = subject.provider;
+		subject.release();
+		fixture.bytes.writeBigInt64LE(BigInt(STAMPED_AT / 1000 + 2), HEADER.pollTime);
+		fixture.bytes.writeDoubleLE(63, fixture.entry + ENTRY.value);
+		now += 20_000;
+		wall += 20_000;
+		subject.retain();
+		try {
+			assert.notEqual(subject.provider, previous);
+			assert.equal(subject.getStatus().state, "stale");
+			assert.equal(subject.diagnostics().sampleAgeMs, 18_000);
+		} finally {
+			subject.release();
+		}
+	});
+});
 
 describe("provenance: a provider swap whose first reads are skipped", () => {
 	it("automatic upgrade to shared memory keeps the Gadget observation, its source and its age", () => {

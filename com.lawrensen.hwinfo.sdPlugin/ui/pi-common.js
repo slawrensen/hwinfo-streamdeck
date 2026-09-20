@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-3";
+	const PI_BUILD = "1.7.0.0-4";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -509,13 +509,16 @@
 					// object must not salvage into dressing the deck ignores.
 					const rawLabels = Array.isArray(raw.labels) ? raw.labels : [];
 					const rawColors = Array.isArray(raw.colors) ? raw.colors : [];
+					const rawAutomatic = Array.isArray(raw.automaticColors) ? raw.automaticColors : [];
 					const labels = [];
 					const colors = [];
+					const automaticColors = [];
 					for (let i = 0; i < size; i++) {
 						labels.push(typeof rawLabels[i] === "string" ? rawLabels[i].trim() : "");
 						colors.push(typeof rawColors[i] === "string" && HEX_COLOR.test(rawColors[i]) ? rawColors[i] : null);
+						automaticColors.push(colors[i] !== null && rawAutomatic[i] === true);
 					}
-					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
+					return { size, labels, colors, cellLabels: raw.cellLabels !== false, automaticColors };
 				});
 		revalidateDetailAim();
 		renderDetailList();
@@ -595,7 +598,7 @@
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
-		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
+		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors] }));
 	}
 
 	/** A walk tile's spec at exactly the cells it fills, always a fresh
@@ -605,7 +608,7 @@
 	function occupancySpec(tile, occupied) {
 		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
 		const size = Math.min(spec.size, occupied);
-		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels };
+		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true) };
 	}
 
 	/** Extends the plan with default entries (at the uniform fill size,
@@ -614,7 +617,7 @@
 	function materializedTiles(through) {
 		const next = cloneTiles(detailTiles);
 		for (let t = detailTiles.length; t <= through; t++) {
-			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true });
+			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true, automaticColors: Array.from({ length: detailUniform }, () => false) });
 		}
 		return next;
 	}
@@ -636,7 +639,7 @@
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
-		detailTilesStage[1](cloneTiles(detailTiles));
+		detailTilesStage[1](cloneTiles(detailTiles).map(({ automaticColors, ...tile }) => automaticColors.some(Boolean) ? { ...tile, automaticColors } : tile));
 		detailBinding[1]([...detailKeys]);
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow the edit
@@ -645,10 +648,9 @@
 	function writeDetailTiles(next) {
 		// Trailing entries that only restate the uniform fill are noise:
 		// prune them so the stored plan stays exactly the hand-made part.
-		// A quad wearing exactly the default identity colors renders the same
-		// as one storing none, so a shuffle that lands every cell back on its
-		// own default prunes away instead of freezing a tile into the plan.
-		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
+		// Only AUTOMATIC default hues are redundant. A chosen color equal to
+		// a palette hue deliberately bypasses the automatic contrast floor.
+		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && t.automaticColors[i] === true && c === QUAD_DEFAULT_COLORS[i]));
 		while (next.length > 0 && isDefault(next[next.length - 1])) {
 			next.pop();
 		}
@@ -908,6 +910,7 @@
 					next[detailArm.tileIdx].size += 1;
 					next[detailArm.tileIdx].labels.push("");
 					next[detailArm.tileIdx].colors.push(null);
+					next[detailArm.tileIdx].automaticColors.push(false);
 				}
 				const cell = Math.min(occupied, next[detailArm.tileIdx].size - 1);
 				// tile.head and cell are LISTED positions; the splice lands
@@ -963,6 +966,7 @@
 				next[tileIdx].size -= 1;
 				next[tileIdx].labels.splice(cell, 1);
 				next[tileIdx].colors.splice(cell, 1);
+				next[tileIdx].automaticColors.splice(cell, 1);
 			}
 		}
 		detailKeys = detailKeys.filter((k) => k !== key);
@@ -975,18 +979,17 @@
 
 	/** What a chip WEARS in the cell it currently sits in: its stored
 	 * label, and its stored color or, on a quad, the identity color that
-	 * cell renders by default. `explicit` marks a color the user actually
-	 * chose, which travels anywhere; an inherited default is only worth
-	 * carrying between quads, where dropping it would recolor the chip. A
-	 * tile is a quad when four READINGS sit in it: a ×4 tail holding two
-	 * paints a dual face with no identity colors at all, so a chip leaving
-	 * it wears none and must not carry one off. */
+	 * cell renders by default. Stored hues travel anywhere, whether chosen
+	 * or previously carried automatic colors. The separate `automatic`
+	 * flag keeps their rendering provenance. An unstored default is only
+	 * worn by a full quad, never by a partial tail's dual/triple face. */
 	function wornDressing(tile, cell) {
 		const stored = tile.spec !== null ? (tile.spec.colors[cell] ?? null) : null;
 		return {
 			label: tile.spec !== null ? (tile.spec.labels[cell] ?? "") : "",
 			color: stored ?? (tileReadings(tile) === 4 ? (QUAD_DEFAULT_COLORS[cell] ?? null) : null),
-			explicit: stored !== null
+			stored: stored !== null,
+			automatic: stored === null || tile.spec.automaticColors[cell] === true
 		};
 	}
 
@@ -1011,7 +1014,7 @@
 		const cellAt = [];
 		walk.forEach((tile, idx) => {
 			for (let c = 0; c < occupiedOf(tile); c++) {
-				stored.push({ label: tile.spec !== null ? (tile.spec.labels[c] ?? "") : "", color: tile.spec !== null ? (tile.spec.colors[c] ?? null) : null });
+				stored.push({ label: tile.spec !== null ? (tile.spec.labels[c] ?? "") : "", color: tile.spec !== null ? (tile.spec.colors[c] ?? null) : null, automatic: tile.spec?.automaticColors[c] === true });
 				worn.push(wornDressing(tile, c));
 				tileAt.push(idx);
 				cellAt.push(c);
@@ -1023,15 +1026,15 @@
 		after.splice(at, 0, ...after.splice(from, 1));
 		travel.splice(at, 0, ...travel.splice(from, 1));
 		// A cell keeps its stored dressing while its occupant is unchanged. An
-		// inherited default lands only where it will be worn, which means a
-		// tile holding four READINGS: writing one into a ×4 tail that renders
-		// a dual froze that tile into the plan (so it stopped following Tile
-		// shows) to store a color the deck never paints.
+		// inherited default lands only where it is worn, a tile holding four
+		// readings. Carrying one into an implicit partial tail would freeze
+		// that tail out of the uniform fill to store an invisible color.
 		const dressing = listed.map((key, i) => {
 			if (after[i] === key) return stored[i];
 			const t = walk[tileAt[i]];
 			const d = travel[i];
-			return { label: d.label, color: occupiedOf(t) === 4 || d.explicit ? d.color : null };
+			const color = occupiedOf(t) === 4 || d.stored ? d.color : null;
+			return { label: d.label, color, automatic: color !== null && d.automatic };
 		});
 		let through = detailTiles.length - 1;
 		dressing.forEach((d, i) => {
@@ -1043,6 +1046,7 @@
 			if (tileAt[i] > through) return;
 			next[tileAt[i]].labels[cellAt[i]] = d.label;
 			next[tileAt[i]].colors[cellAt[i]] = d.color;
+			next[tileAt[i]].automaticColors[cellAt[i]] = d.automatic;
 		});
 		return next;
 	}
@@ -1107,15 +1111,13 @@
 		const occupiedOf = (tile) => tileReadings(tile, listed);
 		const cell = from - walk[fromTileIdx].head;
 		const dressing = wornDressing(walk[fromTileIdx], cell);
-		// An inherited quad default is worth carrying between quads, never
-		// worth freezing a whole tile out of the fill for: only a label or
-		// a color the user chose makes a chip dressed in its own right.
-		const dressed = dressing.label !== "" || dressing.explicit;
-		// Only a tile RENDERING four readings paints per-cell identity colors,
-		// so an inherited default is stored only where it will actually be
-		// worn; a chosen color rides along whatever the chip lands in. The
-		// argument is the destination's reading count, not its stored size.
-		const carried = (renders) => (renders === 4 || dressing.explicit ? dressing.color : null);
+		// Preserve the old carry gate: only a label or STORED hue freezes a
+		// tail/ghost into the plan. A stored automatic hue travels just as it
+		// did before, while its provenance keeps the contrast correction.
+		const dressed = dressing.label !== "" || dressing.stored;
+		const carried = (renders) => (renders === 4 || dressing.stored ? dressing.color : null);
+		const automatic = (renders) => carried(renders) !== null && dressing.automatic;
+		const parkedSpec = () => ({ size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true, automaticColors: [automatic(1)] });
 		const next =
 			targetKey === null && dressed
 				? walk.map((tile) => occupancySpec(tile, occupiedOf(tile)))
@@ -1131,13 +1133,14 @@
 			next[fromTileIdx].size -= 1;
 			next[fromTileIdx].labels.splice(cell, 1);
 			next[fromTileIdx].colors.splice(cell, 1);
+			next[fromTileIdx].automaticColors.splice(cell, 1);
 		}
 		let landAt;
 		let parkedAt = null; // where a full-target park spliced a tile in, else null
 		if (targetKey === null) {
 			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
 			if (dressed) {
-				next.push({ size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
+				next.push(parkedSpec());
 			}
 		} else {
 			const target = walk[targetTileIdx];
@@ -1154,17 +1157,19 @@
 				if (!spare) next[targetAt].size += 1;
 				next[targetAt].labels.splice(cellInTarget, 0, dressing.label);
 				next[targetAt].colors.splice(cellInTarget, 0, carried(occupiedOf(target) + 1));
+				next[targetAt].automaticColors.splice(cellInTarget, 0, automatic(occupiedOf(target) + 1));
 				// The splice pushed the trailing EMPTY cell past the tile's own
 				// size; a spec must stay exactly as long as it says it is.
 				next[targetAt].labels.length = next[targetAt].size;
 				next[targetAt].colors.length = next[targetAt].size;
+				next[targetAt].automaticColors.length = next[targetAt].size;
 				landAt = tIdx + (after ? 1 : 0) - (from < tIdx + (after ? 1 : 0) ? 1 : 0);
 			} else {
 				// Full target: the chip becomes its own tile on the dropped
 				// side, and the spec splice keeps every later tile's members.
 				const sideBefore = !after && tIdx === target.head;
 				parkedAt = sideBefore ? targetAt : targetAt + 1;
-				next.splice(parkedAt, 0, { size: 1, labels: [dressing.label], colors: [carried(1)], cellLabels: true });
+				next.splice(parkedAt, 0, parkedSpec());
 				const boundary = sideBefore ? target.head : target.head + occupiedOf(target);
 				landAt = boundary - (from < boundary ? 1 : 0);
 			}
@@ -1361,6 +1366,7 @@
 			well.addEventListener("change", () => {
 				editTile(tileIdx, (t) => {
 					t.colors[cellIdx] = well.value;
+					t.automaticColors[cellIdx] = false;
 				});
 			});
 			chip.append(well);
@@ -2924,6 +2930,7 @@
 					t.size = grown;
 					t.labels = Array.from({ length: grown }, (_, i) => t.labels[i] ?? "");
 					t.colors = Array.from({ length: grown }, (_, i) => t.colors[i] ?? null);
+					t.automaticColors = Array.from({ length: grown }, (_, i) => t.automaticColors[i] === true);
 				});
 				// Same follow the move arrows use: the rebuild destroyed
 				// the pressed control, and chained Enter must keep working.

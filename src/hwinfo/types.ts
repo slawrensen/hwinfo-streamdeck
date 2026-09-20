@@ -76,9 +76,9 @@ export interface SensorSnapshot {
 	/** Gadget rows withheld because the formatted value contradicts the raw
 	 * value; the plugin log names the slot. */
 	readonly contradictoryReadingCount?: number;
-	/** Measurement evidence, distinct from render/topology revision. Shared
-	 * memory counts producer stamps or finite same-unit value changes; Gadget
-	 * counts only finite same-unit value changes. Initial decoding is zero. */
+	/** Finite same-measurement value changes, distinct from render/topology
+	 * revision. Initial decoding is zero. Producer timestamps travel only in
+	 * pollTime so their evidence can be aged independently of value changes. */
 	readonly freshnessRevision?: number;
 	/** Unix seconds of HWiNFO's last sensor poll. Gadget uses the time of an
 	 * observed value change, or zero when no change has been observed. */

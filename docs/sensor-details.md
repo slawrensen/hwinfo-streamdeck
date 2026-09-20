@@ -45,7 +45,7 @@ The custom-list editor lets you mix tile sizes and formatting:
 
 - Click a tile's size to cycle through one to four readings. Set cell labels, quad colors or a quad's labels-on/off option. Ungrouped readings use **Tile shows**.
 - The arrows and drags within a tile reorder readings through the existing tile pattern. Dragging a reading to another tile shrinks the source tile and grows the destination. The blue caret marks the insertion point. A full four-reading tile cannot accept another cell; the reading becomes its own tile beside it.
-- Labels and colors move with the reading, including default quad colors. Other readings keep their colors. If two readings end up with the same color, change one using its color control.
+- Labels and colors move with the reading, including default quad colors. Automatic colors keep adjusting for the theme; moving a reading does not turn them into a chosen color. Other readings keep their colors. If two readings end up with the same color, change one using its color control.
 - Removing a reading shrinks its tile without pulling a reading from the next tile. Use the tile's plus to add another. Resizing or shrinking a tile created by **Tile shows** saves it as an explicit group.
 
 Source and filter lists update with HWiNFO and do not support these fixed tile groups.

@@ -190,6 +190,9 @@ export type DetailTileSpec = {
 	readonly labels: readonly string[];
 	/** Per-cell #RRGGBB quad identity overrides; null keeps the default. */
 	readonly colors: readonly (string | null)[];
+	/** A stored hue carried from an automatic quad cell still receives theme
+	 * contrast correction. Absent/false keeps legacy chosen-color semantics. */
+	readonly automaticColors?: readonly boolean[];
 	/** The quad micro-label variant; false shows color-coded bare values. */
 	readonly cellLabels: boolean;
 };
@@ -213,17 +216,20 @@ export function detailTilesOf(settings: { detailTiles?: unknown }): readonly Det
 	}
 	const tiles: DetailTileSpec[] = [];
 	for (const entry of raw.slice(0, DETAIL_TILES_MAX)) {
-		const record = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? (entry as { size?: unknown; labels?: unknown; colors?: unknown; cellLabels?: unknown }) : {};
+		const record = typeof entry === "object" && entry !== null && !Array.isArray(entry) ? (entry as { size?: unknown; labels?: unknown; colors?: unknown; automaticColors?: unknown; cellLabels?: unknown }) : {};
 		const size = detailDensityOf({ detailDensity: record.size });
 		const rawLabels = Array.isArray(record.labels) ? record.labels : [];
 		const rawColors = Array.isArray(record.colors) ? record.colors : [];
+		const rawAutomatic = Array.isArray(record.automaticColors) ? record.automaticColors : [];
 		const labels: string[] = [];
 		const colors: (string | null)[] = [];
+		const automaticColors: boolean[] = [];
 		for (let i = 0; i < size; i++) {
 			labels.push(typeof rawLabels[i] === "string" ? (rawLabels[i] as string).trim() : "");
 			colors.push(typeof rawColors[i] === "string" && HEX6.test(rawColors[i] as string) ? (rawColors[i] as string) : null);
+			automaticColors.push(colors[i] !== null && rawAutomatic[i] === true);
 		}
-		tiles.push({ size, labels, colors, cellLabels: record.cellLabels !== false });
+		tiles.push({ size, labels, colors, ...(automaticColors.some(Boolean) ? { automaticColors } : {}), cellLabels: record.cellLabels !== false });
 	}
 	return tiles;
 }

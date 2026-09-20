@@ -4,6 +4,7 @@
 //   mapping present, mutex ABSENT  → "Start HWiNFO" (never an unguarded read)
 //   mutex appears                  → live value (recovery)
 //   published layout GROWS mid-run → session invalidates → reopen → live again
+//   late timestamp-only update     → producer age retained → stale face
 //   protocol-mismatched hwsm.node  → "Bridge failed" (loader fails closed)
 //
 // The mismatch leg runs a second plugin instance from a scratch bundle whose
@@ -86,7 +87,7 @@ function spawnPlugin(entry, cwd, port, uuid) {
 
 // --- leg 1: mutex-absent, recovery, layout growth ---------------------------
 const frames = [];
-const { wss } = makeServer(PORT, "ctx-edge", frames);
+const { wss, send } = makeServer(PORT, "ctx-edge", frames);
 
 const fake = spawn(process.execPath, [path.join(repoRoot, "scripts", "fake-hwinfo.mjs"), "--no-mutex"], {
 	env: { ...process.env, HWINFO_SM2_NAME: MAPPING_NAME, HWINFO_SM2_MUTEX_NAME: MUTEX_NAME },
@@ -98,6 +99,26 @@ await new Promise((resolve, reject) => {
 	});
 	setTimeout(() => reject(new Error("fake provider did not become ready")), 5000);
 });
+
+/** Wait for the producer to acknowledge a command before timing its effect. */
+function freezeProducer() {
+	return new Promise((resolve, reject) => {
+		let output = "";
+		const onData = (data) => {
+			output += data.toString();
+			if (!output.includes("MODE freeze")) return;
+			clearTimeout(deadline);
+			fake.stdout.off("data", onData);
+			resolve();
+		};
+		const deadline = setTimeout(() => {
+			fake.stdout.off("data", onData);
+			reject(new Error("fake provider did not acknowledge freeze"));
+		}, 3000);
+		fake.stdout.on("data", onData);
+		fake.stdin.write("freeze\n");
+	});
+}
 
 const plugin = spawnPlugin("bin/plugin.js", pluginDir, PORT, "e2e-native-edge");
 
@@ -135,6 +156,21 @@ try {
 
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
 	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });
+
+	// Keep the same provider/parser and establish a frozen-value baseline.
+	// The next freeze command republishes only the producer timestamp. Its
+	// age exceeds this harness's 2500 ms grace before the next 5000 ms poll:
+	// a parser revision must not turn that old heartbeat into fresh values.
+	await freezeProducer();
+	await sleep(1200);
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "5000" } } });
+	await sleep(1100);
+	await freezeProducer();
+	await expectFrame(frames, "late timestamp-only update retains producer age and shows stale", (svg) => svg.includes("Not updating"), 6000);
+
+	fake.stdin.write("alive\n");
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "1000" } } });
+	await expectFrame(frames, "new producer values recover the stale key", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 5000);
 } finally {
 	const gone = Promise.all([plugin, mismatchPlugin].map((p) => new Promise((r) => { p.once("exit", r); p.kill(); })));
 	fake.kill();

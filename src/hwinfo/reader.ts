@@ -225,7 +225,6 @@ export class SnapshotParser {
 		if (snap.pollTime !== pollTime) {
 			snap.pollTime = pollTime;
 			changed = true;
-			evidenceChanged = true;
 		}
 		if (changed) {
 			// See SensorSnapshot.valueRevision: the change counter pollTime's
@@ -335,10 +334,10 @@ export class SnapshotParser {
 		// even when pollTime and the reading count happen to match: carry the
 		// revision line forward and bump it.
 		const previous = this.snapshot;
-		const evidenceChanged = previous !== null && (previous.pollTime !== pollTime || readings.some((reading) => {
+		const evidenceChanged = previous !== null && readings.some((reading) => {
 			const old = previous.byKey.get(reading.key);
 			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
-		}));
+		});
 		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}

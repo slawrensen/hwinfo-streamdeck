@@ -22,14 +22,17 @@ const HARNESS_RE = /Harness Deck|Load Deck/;
 const LEVEL_RE = /\b(WARN|ERROR)\b/;
 
 /** WARN/ERROR lines in `file` between two byte offsets, added to `totals`. */
-function tally(file, from, to, totals) {
+function tally(file, from, to, totals, expectedIno) {
 	if (to <= from) {
 		return;
 	}
 	const fd = fs.openSync(file, "r");
 	const buf = Buffer.alloc(to - from);
-	fs.readSync(fd, buf, 0, buf.length, from);
-	fs.closeSync(fd);
+	try {
+		const opened = fs.fstatSync(fd, { bigint: true });
+		if (opened.ino !== expectedIno || opened.size < BigInt(to)) throw new Error("Plugin log changed while opening; observation incomplete");
+		if (fs.readSync(fd, buf, 0, buf.length, from) !== buf.length) throw new Error("Plugin log short read; observation incomplete");
+	} finally { fs.closeSync(fd); }
 	for (const line of buf.toString("utf8").split(/\r?\n/)) {
 		const m = LEVEL_RE.exec(line);
 		if (m && !HARNESS_RE.test(line)) {
@@ -66,14 +69,14 @@ export function makeLogTail(dir) {
 		if (old === undefined) {
 			return false;
 		}
-		tally(old.p, Math.min(offset, Number(old.st.size)), Number(old.st.size), totals);
+		tally(old.p, Math.min(offset, Number(old.st.size)), Number(old.st.size), totals, old.st.ino);
 		// Two restarts inside one interval leave a whole log between the
 		// tailed file and the newest: never tailed, so every line is new.
 		// The tailed file was the newest at the previous poll, so only a
 		// log written since then can carry a later mtime.
 		for (const f of others) {
 			if (f !== old && f.st.mtimeNs > old.st.mtimeNs) {
-				tally(f.p, 0, Number(f.st.size), totals);
+				tally(f.p, 0, Number(f.st.size), totals, f.st.ino);
 			}
 		}
 		return true;
@@ -95,19 +98,21 @@ export function makeLogTail(dir) {
 		}
 		const totals = { warn: 0, error: 0 };
 		let note = "";
+		let readFrom = offset;
 		if (current !== file && st.ino === fileIno && size >= offset) {
 			// The SDK renames the log away at a plugin start and only creates
 			// the new one with its first line. A poll inside that gap finds
 			// the tailed file under its new name: nothing rotated past it.
-			file = current;
 		} else if (current !== file || st.ino !== fileIno || size < offset) {
 			// A lost tail says so: the summary must not read clean silently.
 			note = drainRotated(current, totals) ? "log-rotated" : "log-rotated-tail-lost";
-			file = current;
-			fileIno = st.ino;
-			offset = 0;
+			readFrom = 0;
 		}
-		tally(current, offset, size, totals);
+		tally(current, readFrom, size, totals, st.ino);
+		// Commit the cursor only after every read succeeds. A failed sample
+		// becomes unknown in the monitor and the next poll retries its tail.
+		file = current;
+		fileIno = st.ino;
 		offset = size;
 		return { ...totals, note };
 	};

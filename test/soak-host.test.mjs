@@ -121,7 +121,11 @@ describe("soak log tail across a rotation", () => {
 	 * the next second, so "newest by mtime" never rides on timer resolution. */
 	function logDir(t) {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-soak-tail-"));
-		t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+		t.after(() => {
+			assert.equal(path.dirname(path.resolve(dir)), path.resolve(os.tmpdir()));
+			assert(path.basename(dir).startsWith("hwinfo-soak-tail-"));
+			fs.rmSync(dir, { recursive: true, force: true });
+		});
 		let clock = 1_800_000_000;
 		const log = (index) => path.join(dir, `com.lawrensen.hwinfo.${index}.log`);
 		const append = (index, text) => {
@@ -138,6 +142,41 @@ describe("soak log tail across a rotation", () => {
 		};
 		return { dir, log, append, rotate };
 	}
+
+	it("fails closed on stat/open rotation races and retries the ERROR tail", (t) => {
+		const { dir, log, append, rotate } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, ERROR);
+		const realOpen = fs.openSync;
+		let changed = false;
+		try {
+			fs.openSync = (file, ...args) => {
+				if (file === log(0) && !changed) { changed = true; rotate(INFO); }
+				return realOpen(file, ...args);
+			};
+			assert.throws(() => poll(), /observation incomplete/);
+		} finally { fs.openSync = realOpen; }
+		assert.deepEqual(poll(), { warn: 0, error: 1, note: "log-rotated" });
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+	});
+
+	it("never advances the old cursor after a short read during rotation", (t) => {
+		const { dir, append, rotate } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, ERROR);
+		rotate(INFO + WARN);
+		const realRead = fs.readSync;
+		try {
+			fs.readSync = (fd, buf, offset, length, position) => realRead(fd, buf, offset, length - 1, position);
+			assert.throws(() => poll(), /observation incomplete/);
+		} finally { fs.readSync = realRead; }
+		assert.deepEqual(poll(), { warn: 1, error: 1, note: "log-rotated" });
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+	});
 
 	it("counts the lines written between the last poll and the rotation", (t) => {
 		const { dir, append, rotate } = logDir(t);

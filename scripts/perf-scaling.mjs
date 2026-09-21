@@ -165,6 +165,7 @@ async function runCase(config, repeat) {
 	server.on("connection", (ws) => {
 		socket = ws;
 		ws.on("message", (data) => {
+			const receivedAt = clock();
 			try {
 				const msg = JSON.parse(data.toString());
 				if (msg.event === "registerPlugin") {
@@ -185,7 +186,7 @@ async function runCase(config, repeat) {
 				bytes += data.length;
 				if (generation === null) throw new Error(`Missing live value for ${msg.context}`);
 				if (!sampleFrames.has(msg.context)) sampleFrames.set(msg.context, svg);
-				if (generation > 0) frames.push({ context: msg.context, generation, at: clock() });
+				if (generation > 0) frames.push({ context: msg.context, generation, at: receivedAt });
 			} catch (error) { collectorError = String(error); }
 		});
 	});

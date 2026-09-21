@@ -32,8 +32,8 @@ import { buildPreview, buildSensorTree } from "../src/pi-protocol";
 import type { PollerStatus } from "../src/poller";
 import { rotationReadings } from "../src/rotation";
 import { SessionStatsStore } from "../src/stats";
-import { applyGlobalThemeSettings } from "../src/ui/theme-store";
-import { loadThemes } from "../src/ui/themes";
+import { applyGlobalThemeSettings, effectiveThemeFor } from "../src/ui/theme-store";
+import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { DIM_VALUE_BLEND, mixToward } from "../src/ui/text-colors";
 import { contrast } from "./wcag";
 
@@ -505,6 +505,24 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
 
 describe("remaining PI review regressions", () => {
+	it("an unknown local theme seeds Custom text from its runtime fallback under a nondefault deck", async () => {
+		const config = loadThemes();
+		for (const theme of ["__proto__", "constructor", "unknown-theme"]) {
+			const m = mountPanel("dial", { readingKey: SM[0], theme }, {}, { textControls: true });
+			await m.flush();
+			m.echo("theme", theme);
+			m.feed({ event: "themes", ...config, effectiveDeckTheme: "paper" });
+			await m.flush();
+			assert.equal(m.el("text-color").value, resolvePalette(config, effectiveThemeFor({ theme }), null, "normal").value.toLowerCase(), theme);
+			assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Paper");
+			assert.equal(m.store.theme, theme, "salvage does not rewrite the setting");
+			assert.equal(m.writes.length, 0);
+			m.echo("theme", "");
+			await m.flush();
+			assert.equal(m.el("text-color").value, config.themes.paper!.value.toLowerCase(), "an absent override still follows the deck");
+		}
+	});
+
 	it("prototype-named theme settings keep the gallery and custom color seed usable", async () => {
 		const m = mountPanel("dial", { readingKey: SM[0] }, {}, { textControls: true });
 		await m.flush();

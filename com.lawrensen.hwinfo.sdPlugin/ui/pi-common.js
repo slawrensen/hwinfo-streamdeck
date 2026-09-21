@@ -2782,7 +2782,10 @@
 	// color: the truthful "custom starts from what you see" seed.
 	function themeValueSeed() {
 		if (themesConfig === null) return "#ffffff";
-		const palette = themesConfig.themes[Object.hasOwn(themesConfig.themes, themeOverride) ? themeOverride : resolvedDeckId()];
+		// Empty follows the deck. An unknown explicit id follows the runtime
+		// palette resolver's spec default, even on a different deck theme.
+		const id = themeOverride === "" ? resolvedDeckId() : Object.hasOwn(themesConfig.themes, themeOverride) ? themeOverride : themesConfig.defaultTheme;
+		const palette = themesConfig.themes[id];
 		return palette ? palette.value.toLowerCase() : "#ffffff";
 	}
 

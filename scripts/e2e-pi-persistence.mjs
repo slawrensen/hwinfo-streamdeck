@@ -2830,6 +2830,9 @@ try {
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });
 	await sleep(500);
 	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Deck default · Void"`)).result?.value === true);
+	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "paper" });
+	await sleep(500);
+	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Deck default · Paper"`)).result?.value === true);
 
 	// Hold the real socket reply while the user edits each config textarea.
 	// This races the production async fill path, with no helper extraction.

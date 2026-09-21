@@ -1,6 +1,6 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Twenty-three states: the key PI's settings view,
+// the theme gallery are present. States include the key PI's settings view,
 // open picker (marketplace shot 4), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, the Press section on Open
 // sensor details, the same block with the Second Back checkbox ticked, the
@@ -60,8 +60,8 @@ function killChromeTree() {
 }
 
 // Hard stop so a wedged CDP call can never hang the caller — but never at
-// the price of an orphaned chrome tree. Eleven captures with real-time
-// waits need more headroom than the old two.
+// the price of an orphaned chrome tree. The full capture sequence includes
+// real-time waits between panel states.
 const watchdog = setTimeout(() => {
 	console.error("[capture] watchdog: 240s elapsed — aborting");
 	killChromeTree();
@@ -113,9 +113,11 @@ try {
 		});
 	const viewport = (height) => cdp("Emulation.setDeviceMetricsOverride", { width: 400, height, deviceScaleFactor: 2, mobile: false });
 	const evaluate = (expression) => cdp("Runtime.evaluate", { expression, returnByValue: true });
+	let captureCount = 0;
 	const capture = async (name) => {
 		const shot = await cdp("Page.captureScreenshot", { format: "png" });
 		writeFileSync(path.join(outDir, name), Buffer.from(shot.data, "base64"));
+		captureCount++;
 		log(`${name} captured`);
 	};
 	/** Clip-capture one region at the panel's full 400 px width. rectRes must
@@ -131,6 +133,7 @@ try {
 		}
 		const shot = await cdp("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: clip.y, width: 400, height: clip.h, scale: 1 } });
 		writeFileSync(path.join(outDir, name), Buffer.from(shot.data, "base64"));
+		captureCount++;
 		log(`${name} captured`);
 	};
 	/** Fail loudly when a driven element has been renamed away: a silent miss
@@ -761,7 +764,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 23 PI states to ${outDir}`);
+	console.log(`captured ${captureCount} PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

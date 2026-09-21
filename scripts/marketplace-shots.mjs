@@ -5,6 +5,7 @@
 // Emits gallery boards; shot 2 is the photograph from shot2-hardware.mjs.
 // and a dedicated thumbnail.png.
 // Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir]
+import "./lib/script-failures.mjs";
 import path from "node:path";
 import sharp from "sharp";
 import { renderGalleryDial } from "./lib/dial-gallery";

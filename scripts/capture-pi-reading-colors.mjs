@@ -2,19 +2,19 @@
 // bundle and live HWiNFO, but never builds, installs or restarts Stream Deck.
 // Usage: node scripts/capture-pi-reading-colors.mjs [outDir=docs/assets/img]
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import WebSocket from "ws";
+import { browserDebuggerPort, cleanupBrowser, createBrowserProfile, createChildCleanup } from "./lib/process-ownership.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.resolve(process.argv[2] ?? path.join(root, "docs/assets/img"));
-const profile = mkdtempSync(path.join(tmpdir(), "hwinfo-docs-pi-"));
-const debugPort = 29223;
+const profile = createBrowserProfile("hwinfo-docs-pi-");
+const browserStartedAt = new Date().toISOString();
 const base = "http://127.0.0.1:28997";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const sha256 = (content) => createHash("sha256").update(content).digest("hex");
@@ -35,30 +35,48 @@ let harness;
 let chrome;
 let socket;
 let harnessOutput = "";
-const stopTree = (child) => {
-	if (child?.pid && child.exitCode === null) spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-};
+let harnessError;
+let chromeError;
+const children = createChildCleanup({ runDirectories: [path.join(root, "com.lawrensen.hwinfo.sdPlugin"), profile] });
 const stop = () => {
 	socket?.terminate();
-	stopTree(chrome);
-	stopTree(harness);
-	// Chrome can relaunch itself and outlive the original spawn PID. Sweep
-	// only this run's unique profile, never the user's other browser tabs.
-	spawnSync("powershell.exe", ["-NoProfile", "-Command", `Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${profile.replaceAll("'", "''")}') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: "ignore", windowsHide: true, timeout: 15_000 });
+	// Try both independent cleanup paths even if one reports a survivor.
+	const failures = [];
+	for (const clean of [() => cleanupBrowser(profile, browserStartedAt), () => children.cleanup()]) {
+		try { clean(); } catch (error) { failures.push(error); }
+	}
+	if (failures.length) throw new AggregateError(failures, "PI capture cleanup failed");
 };
-const watchdog = setTimeout(() => { stop(); console.error("PI capture exceeded 90 seconds"); process.exit(2); }, 90_000);
+const watchdog = setTimeout(() => {
+	try { stop(); } catch (error) { console.error(error); }
+	console.error("PI capture exceeded 90 seconds");
+	process.exit(2);
+}, 90_000);
 watchdog.unref();
 try {
 	harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: root, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+	harness.once("error", (error) => { harnessError = error; });
 	harness.stdout.on("data", (chunk) => { harnessOutput += chunk.toString(); });
 	harness.stderr.on("data", (chunk) => { harnessOutput += chunk.toString(); });
-	for (let attempt = 0; attempt < 40 && !harnessOutput.includes("PI at"); attempt++) await sleep(100);
+	children.observe();
+	for (let attempt = 0; attempt < 40 && !harnessOutput.includes("PI at"); attempt++) {
+		await sleep(100);
+		if (harnessError) throw harnessError;
+		if (harness.exitCode !== null) throw new Error(`Harness exited: ${harnessOutput}`);
+	}
 	assert.ok(harnessOutput.includes("PI at"), `Harness did not start: ${harnessOutput}`);
-	chrome = spawn("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", ["--headless=new", "--disable-gpu", `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profile}`, "--hide-scrollbars", "about:blank"], { stdio: "ignore", windowsHide: true });
+	children.observe();
+	chrome = spawn("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", ["--headless=new", "--disable-gpu", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--hide-scrollbars", "about:blank"], { stdio: "ignore", windowsHide: true });
+	chrome.once("error", (error) => { chromeError = error; });
 	let target;
 	for (let attempt = 0; attempt < 40 && !target; attempt++) {
 		await sleep(100);
-		try { target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json()).find((tab) => tab.type === "page"); } catch { /* Chrome is starting. */ }
+		if (chromeError) throw chromeError;
+		if (chrome.exitCode !== null) throw new Error("Chrome exited before its debugger started");
+		try {
+			const debugPort = browserDebuggerPort(profile);
+			target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`, { signal: AbortSignal.timeout(700) })).json()).find((tab) => tab.type === "page");
+		} catch { /* Chrome is starting. */ }
 	}
 	assert.ok(target, "Chrome debugger did not start");
 	socket = new WebSocket(target.webSocketDebuggerUrl, { maxPayload: 64 * 1024 * 1024 });

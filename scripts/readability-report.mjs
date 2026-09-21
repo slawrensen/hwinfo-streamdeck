@@ -1,5 +1,6 @@
 // Production-composed fixture faces, not live measurements or hardware captures.
 // node --import tsx scripts/readability-report.mjs [output-directory]
+import "./lib/script-failures.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
@@ -11,14 +12,6 @@ import { escapeXml, QUAD_DEFAULT_COLORS, quadIdentityOf } from "../src/ui/key-re
 import { quadIdentityColor, resolveTextColors } from "../src/ui/text-colors";
 import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "../test/wcag";
-
-// The Elgato SDK logger (pulled in through src/actions) registers
-// process.once("uncaughtException") and swallows the first throw, so a broken
-// run used to exit 0 with the sheets written and the ratios missing.
-process.on("uncaughtException", (err) => {
-	console.error(err);
-	process.exitCode = 1;
-});
 
 const output = path.resolve(process.argv[2] ?? "release/audit-evidence/sprint-06-rendered");
 mkdirSync(output, { recursive: true });

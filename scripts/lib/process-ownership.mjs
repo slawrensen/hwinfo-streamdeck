@@ -1,7 +1,7 @@
 // Cleanup authority comes from a process identity or a disposable profile,
 // never a product name, headless flag, PID alone, or shared profile prefix.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,9 +9,13 @@ export function processIdentity(row) {
 	return `${row.pid}:${row.createdAt}`;
 }
 
-export function processSnapshot() {
-	const script = "$rows = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' or Name='chrome.exe'\" | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; parentPid = $_.ParentProcessId; name = $_.Name; commandLine = $_.CommandLine; createdAt = $_.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ') } }); ConvertTo-Json -InputObject $rows -Depth 2";
-	return JSON.parse(execFileSync("powershell.exe", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 30_000, windowsHide: true }).trim() || "[]");
+export function processSnapshot({ execute = execFileSync } = {}) {
+	const script = "$ErrorActionPreference = 'Stop'; $rows = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' or Name='chrome.exe'\" -ErrorAction Stop | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; parentPid = $_.ParentProcessId; name = $_.Name; commandLine = $_.CommandLine; createdAt = $_.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ') } }); ConvertTo-Json -InputObject $rows -Depth 2";
+	const rows = JSON.parse(execute("powershell.exe", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 30_000, windowsHide: true }));
+	if (!Array.isArray(rows) || rows.some((row) => !row || !Number.isInteger(row.pid) || row.pid <= 0 || !Number.isInteger(row.parentPid) || row.parentPid < 0 || typeof row.createdAt !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(row.createdAt))) {
+		throw new Error("Invalid process snapshot");
+	}
+	return rows;
 }
 
 /** Every link must refer to a parent present with its recorded creation
@@ -71,6 +75,40 @@ export function createBrowserProfile(prefix) {
 		}
 	}
 	return mkdtempSync(path.join(directory, prefix));
+}
+
+/** Port zero is discovered from the profile created for this browser, never
+ * from a shared fixed debugger endpoint which could belong to another run. */
+export function browserDebuggerPort(profile) {
+	const port = Number(readFileSync(path.join(profile, "DevToolsActivePort"), "utf8").split(/\r?\n/)[0]);
+	if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error("Invalid browser debugger port");
+	return port;
+}
+
+/** Record descendants while their ancestors are observable, retaining their
+ * identities after a harness exits. Unobserved orphans fail cleanup but never
+ * grant permission to kill a process by its old parent PID alone. */
+export function createChildCleanup({ pid = process.pid, snapshot = processSnapshot, terminate = terminateProcesses, runDirectories = [] } = {}) {
+	const before = snapshot();
+	const root = before.find((row) => row.pid === pid);
+	if (!root) throw new Error("Cannot establish capture process identity");
+	const rootId = processIdentity(root);
+	const recorded = new Map([[rootId, root]]);
+	const observe = () => {
+		const rows = snapshot();
+		const owned = ownedDescendants(rows, new Set(recorded.keys()));
+		for (const row of owned) recorded.set(processIdentity(row), row);
+		return { rows, owned: owned.filter((row) => processIdentity(row) !== rootId) };
+	};
+	return {
+		observe,
+		cleanup() {
+			for (let pass = 0; pass < 2; pass++) terminate(observe().owned);
+			const { rows, owned } = observe();
+			const { ambiguous } = classifyNewProcesses(before, rows, [...recorded.values()], runDirectories);
+			if (owned.length || ambiguous.length) throw new Error(`Capture cleanup left ${owned.length} owned and ${ambiguous.length} ambiguous process(es)`);
+		}
+	};
 }
 
 /** Chrome echoes its user-data-dir on child command lines. Match the whole

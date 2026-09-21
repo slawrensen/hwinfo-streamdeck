@@ -188,7 +188,7 @@ createServer((req, res) => {
 	}
 }).listen(HTTP_PORT, "127.0.0.1", () => console.log(`PI at http://127.0.0.1:${HTTP_PORT}/  (ws ${WS_PORT})`));
 
-const plugin = spawn(process.execPath, ["bin/plugin.js", "-port", String(WS_PORT), "-pluginUUID", "pi-harness", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
+const plugin = spawn(process.execPath, [path.join(pluginDir, "bin/plugin.js"), "-port", String(WS_PORT), "-pluginUUID", "pi-harness", "-registerEvent", "registerPlugin", "-info", JSON.stringify(info)], {
 	cwd: pluginDir,
 	stdio: ["ignore", "inherit", "inherit"]
 });

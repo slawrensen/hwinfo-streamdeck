@@ -1,5 +1,6 @@
 // Documentation boards from unchanged production composition. No live reads.
 // Usage: npx tsx scripts/docs-v17-images.mjs [outDir=docs/assets/img]
+import "./lib/script-failures.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";

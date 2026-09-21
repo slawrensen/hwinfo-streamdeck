@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-6" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-7" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -190,17 +190,17 @@
 		<div class="hw-section">Alerts</div>
 
 		<sdpi-item label="Warn at">
-			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns amber (display units)"></sdpi-textfield>
+			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns amber (see units below)"></sdpi-textfield>
 		</sdpi-item>
 
 		<sdpi-item label="Critical at">
-			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns red (display units)"></sdpi-textfield>
+			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns red (see units below)"></sdpi-textfield>
 		</sdpi-item>
 
 		<sdpi-item label="Direction">
 			<sdpi-checkbox setting="alertBelow" label="Alert when value drops below thresholds"></sdpi-checkbox>
 		</sdpi-item>
-		<div class="hw-help">Warn at and Critical at use display units, the same numbers the dial shows, °F included when Unit is on.</div>
+		<div class="hw-help">Warn at and Critical at use the live reading, with temperatures in °F when Unit is on. For bytes and rates, use HWiNFO's original number and unit before Data units changes the display scale.</div>
 
 		<details data-fold="advanced">
 			<summary>Dial gestures &amp; advanced</summary>
@@ -383,7 +383,7 @@
 			<div class="hw-help">The exact settings this dial runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another dial or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.7.0.0-6"></script>
-		<script src="pi-control.js?v=1.7.0.0-6"></script>
+		<script src="pi-common.js?v=1.7.0.0-7"></script>
+		<script src="pi-control.js?v=1.7.0.0-7"></script>
 	</body>
 </html>

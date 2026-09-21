@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-6";
+	const PI_BUILD = "1.7.0.0-7";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -2485,8 +2485,8 @@
 			// there (the dial renderer's alert indicator), so the threshold
 			// placeholders must promise the mechanism the view really has.
 			const single = value !== "tworow" && value !== "overview";
-			setPlaceholder(warnEl, single ? "bar turns amber (display units)" : "row value turns amber (display units)");
-			setPlaceholder(critEl, single ? "bar turns red (display units)" : "row value turns red (display units)");
+			setPlaceholder(warnEl, single ? "bar turns amber (see units below)" : "row value turns amber (see units below)");
+			setPlaceholder(critEl, single ? "bar turns red (see units below)" : "row value turns red (see units below)");
 		};
 		followSetting("dialView", applyView);
 	}

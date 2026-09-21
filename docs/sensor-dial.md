@@ -157,8 +157,8 @@ Open the dial's Property Inspector to configure it. Most fields mirror the key a
 | **Bar max** | Fixed high end of the range bar on the single view. Leave blank to auto-track the session high. |
 | **On alert** | Makes the auto cycle alert-aware: it jumps to a critical member of the rotation set instead of waiting its turn, and holds there while the reading stays critical. Off by default. |
 | **Label mode** | Whether a custom label clears when rotation moves to another reading (default), or stays as a fixed title. |
-| **Warn at** | Value at which the bar fill turns amber (in the displayed unit). |
-| **Critical at** | Value at which the bar fill turns red (in the displayed unit). |
+| **Warn at** | Live value at which the bar fill turns amber. Use the displayed temperature unit; byte and rate values use HWiNFO's original unit before Data units changes the display scale. |
+| **Critical at** | Live value at which the bar fill turns red, using the same units as Warn at. |
 | **Direction** | "Alert when value drops below thresholds" flips the comparison: for fan RPM, free space, and other where-lower-is-worse readings. |
 
 Thresholds and the manual bar range are **unit-scoped**: they only apply to readings in the unit they were typed against, so a °C threshold can never misfire on an RPM reading you rotate to. Details on the [controls page](controls.md#thresholds-and-mixed-units).

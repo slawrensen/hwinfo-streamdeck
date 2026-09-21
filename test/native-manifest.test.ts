@@ -17,6 +17,21 @@ const addon = join(ROOT, "com.lawrensen.hwinfo.sdPlugin/bin/hwsm.node");
 // The generated project is where the script reads the SDK version from; a
 // checkout whose addon was copied in has none.
 const project = join(ROOT, "native/hwsm/build/hwsm.vcxproj");
+// Check the generated build, not binding.gyp's declared intent: Node's
+// common.gypi can override target_defaults warning settings.
+describe("native compiler warning policy", { skip: !existsSync(project) && "native project not generated" }, () => {
+	for (const target of ["hwsm", "hwsm_test", "hwsm_protomm"]) {
+		it(`${target} enables level 4 warnings as errors in every configuration`, () => {
+			const xml = fs.readFileSync(join(ROOT, `native/hwsm/build/${target}.vcxproj`), "utf8");
+			const configurations = [...xml.matchAll(/<ItemDefinitionGroup[^>]*>([\s\S]*?)<\/ItemDefinitionGroup>/g)];
+			assert.ok(configurations.length >= 2, "Debug and Release definitions must be present");
+			for (const [, configuration] of configurations) {
+				assert.match(configuration!, /<WarningLevel>Level4<\/WarningLevel>/);
+				assert.match(configuration!, /<TreatWarningAsError>true<\/TreatWarningAsError>/);
+			}
+		});
+	}
+});
 // Never the repo root: a kept release-native-manifest.json is release evidence.
 const outDir = fs.mkdtempSync(join(os.tmpdir(), "hwsm-manifest-"));
 const out = join(outDir, "release-native-manifest.json");

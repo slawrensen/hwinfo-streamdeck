@@ -13,13 +13,26 @@ where they appear.
 
 Metric notes:
 
-- **tick** = one production poll: mutex acquire + native region copy +
+- **tick** in the historical parser benchmarks = one provider read: mutex acquire + native region copy +
   decode to `SensorSnapshot`. `raw copy` is the copy alone, so
   `tick − raw copy` ≈ pure parse cost.
 - **alloc/tick** = sum of positive `heapUsed` deltas per iteration (allocation
   rate, garbage included). **retained** = gc→gc `heapUsed` growth across the
   whole 1,000-iteration pass (not per tick); near zero means steady state.
 - Process CPU % is lifetime average (CPU seconds / uptime).
+
+For full production-bundle scaling, use `npm run perf:scaling`. The focused
+workflow and metric boundaries are in [scripts/PERFORMANCE.md](scripts/PERFORMANCE.md).
+It separates synchronous callback work, loop drain, mock-host update latency,
+generation coverage and measured-window CPU. These are distinct from the
+historical provider-only "tick" numbers and from physical display latency.
+
+At 250 ms the shared-memory reader scans the entire published inventory on each
+poll. Unchanged snapshots suppress key composition; any changed reading can
+make all visible keys compose again. Dials still sample statistics and compose
+on polling, including their rotation sets; identical feedback suppresses socket
+transmission afterward. The scaling matrix varies inventory, visible actions,
+producer cadence and richer UI work separately so these costs can be measured.
 
 v1.1 targets: ≥5× fewer µs/tick, near-zero steady-state alloc/tick, smaller
 `.streamDeckPlugin` with zero behavior change, RSS soak slope < 1 MB/30 min,

@@ -1,8 +1,7 @@
-# Static + unit + native verification on every push/PR. The UI e2e suites
-# need a live plugin process against a mock Stream Deck socket, so they stay
-# local (`npm run suite:full`); the native integration suite creates its own
-# Win32 named objects (Local\ namespace + a synthetic HKCU key) and runs
-# fine on hosted runners.
+# Static, unit, native and built-plugin recovery verification on every
+# push/PR. Recovery uses an isolated synthetic producer and mock Stream Deck
+# socket on the hosted runner. The full browser/capture suite remains local
+# (`npm run suite:full`); neither harness proves physical device behavior.
 #
 # The runner label is pinned (not windows-latest) so a wholesale image family
 # change is a reviewed diff here. That is all the pin buys: the MSVC toolset
@@ -66,6 +65,20 @@ jobs:
       - run: npm run build
       - name: Native integration suite
         run: npm run test:native
+      - name: Built-plugin producer recovery
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          Get-FileHash com.lawrensen.hwinfo.sdPlugin/bin/plugin.js, com.lawrensen.hwinfo.sdPlugin/bin/hwsm.node -Algorithm SHA256 | Format-List Algorithm, Hash, Path
+          npm run e2e:resilience
+      - name: Retain recovery stock logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: producer-recovery-logs
+          path: com.lawrensen.hwinfo.sdPlugin/logs/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Native packaging gate
         run: node scripts/validate-native.mjs
       - name: Synthetic 250 ms scaling smoke

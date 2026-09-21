@@ -34,11 +34,12 @@ This is the canonical guide for anyone, human or AI agent, working in the repo.
 | `npm run release:validate` | lint + typecheck + unit + the release-copy validator; the validator needs internal release docs, so it passes only on the maintainer's full checkout |
 | `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin` (Elgato CLI) |
 
-The UI e2e suites need a live plugin process against a mock Stream Deck
-socket, so they run locally (`npm run suite:full`). CI (pinned windows-2025
-runner) runs lint + typecheck + unit + build + the native integration suite,
-plus an ABI matrix that loads the same Node-20-built `hwsm.node` under Node
-20, 22, and 24 without rebuilding.
+The full UI/browser suite runs locally (`npm run suite:full`). CI (pinned
+windows-2025 runner) runs lint + typecheck + unit + build + the native
+integration suite and built-plugin producer recovery against isolated named
+objects and a mock Stream Deck socket. An ABI matrix loads the same
+Node-20-built `hwsm.node` under Node 20, 22, and 24 without rebuilding.
+The mock socket does not prove physical device behavior.
 
 ## Native addon (hwsm)
 

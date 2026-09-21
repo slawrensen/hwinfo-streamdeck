@@ -31,17 +31,19 @@
 //      every pixel of a tile and of the list routes a chip drop to the
 //      nearest chip edge instead of a hidden end-of-tile jump.
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
 import { buildInfo, makeCheck, sleep } from "./lib/e2e-common.mjs";
+import { cleanupBrowser } from "./lib/process-ownership.mjs";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
-const DEBUG_PORT = 29223;
+const DEBUG_PORT = 0; // Discovered only from this run's disposable profile.
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
@@ -189,6 +191,9 @@ const opened = []; // every url the panel asked the app to open
 /** The source is down: getSensorTree answers the unavailable tree. Set by
  * seeding "down", cleared by any other seed and by /tree/up. */
 let treeDown = false;
+let treeRequests = 0;
+let deferConfigReplies = false;
+const configReplies = [];
 let piWs = null;
 const toPi = (obj) => piWs?.send(JSON.stringify(obj));
 
@@ -321,7 +326,11 @@ wss.on("connection", (ws) => {
 				// AND device, and a missing field hangs that promise. The
 				// action is the one the open page registered as (the dial
 				// page registers the encoder action), for the same reason.
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } }));
+				{
+					const reply = JSON.stringify({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
+					if (deferConfigReplies) configReplies.push(() => ws.send(reply));
+					else ws.send(reply);
+				}
 				break;
 			case "setSettings":
 				writes.push(structuredClone(msg.payload ?? {}));
@@ -330,7 +339,11 @@ wss.on("connection", (ws) => {
 			case "getGlobalSettings":
 				// The linked seed's deck document carries the confirmed pairs the
 				// plugin applied to give LINKED_TREE its aliases.
-				ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: mode === "linked" ? { theme: "void", readingLinks: LINKED_LINKS } : { theme: "void" } } }));
+				{
+					const reply = JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: mode === "linked" ? { theme: "void", readingLinks: LINKED_LINKS } : { theme: "void" } } });
+					if (deferConfigReplies) configReplies.push(() => ws.send(reply));
+					else ws.send(reply);
+				}
 				break;
 			case "setGlobalSettings":
 				globalWrites.push(structuredClone(msg.payload ?? {}));
@@ -343,6 +356,7 @@ wss.on("connection", (ws) => {
 			case "sendToPlugin": {
 				const event = msg.payload?.event;
 				if (event === "getSensorTree") {
+					treeRequests++;
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: treeDown ? DOWN_TREE : mode === "gadget" ? GADGET_TREE : mode === "linked" ? LINKED_TREE : TREE });
 				} else if (event === "getThemes") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
@@ -421,25 +435,20 @@ const server = createServer((req, res) => {
 server.listen(HTTP_PORT, "127.0.0.1");
 
 // --- headless Chrome over CDP (the capture-pi pattern) --------------------
+const chromeProfile = mkdtempSync(path.join(os.tmpdir(), "pi-persist-profile-"));
+const chromeStartedAt = new Date().toISOString();
 const chrome = spawn(
 	CHROME,
-	["--headless=new", "--disable-gpu", `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${path.join(process.env.TEMP ?? ".", "pi-persist-profile")}`, "--hide-scrollbars", "about:blank"],
-	{ stdio: "ignore" }
+	["--headless=new", "--disable-gpu", `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${chromeProfile}`, "--hide-scrollbars", "about:blank"],
+	{ stdio: "ignore", windowsHide: true }
 );
+let chromeError;
+chrome.once("error", (err) => { chromeError = err; });
 function killChromeTree() {
 	try {
-		spawnSync("taskkill", ["/PID", String(chrome.pid), "/T", "/F"], { stdio: "ignore" });
+		cleanupBrowser(chromeProfile, chromeStartedAt);
 	} catch {
-		chrome.kill();
-	}
-	try {
-		spawnSync(
-			"powershell.exe",
-			["-NoProfile", "-Command", "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'pi-persist-profile' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"],
-			{ stdio: "ignore", timeout: 15000 }
-		);
-	} catch {
-		/* best effort */
+		console.error(`[pi-persistence] browser cleanup could not verify ownership; profile ${chromeProfile} left for inspection`);
 	}
 }
 const watchdog = setTimeout(() => {
@@ -454,8 +463,11 @@ try {
 	let target = null;
 	for (let i = 0; i < 30 && target === null; i++) {
 		await sleep(500);
+		if (chromeError) throw chromeError;
 		try {
-			const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+			const debugPort = Number(readFileSync(path.join(chromeProfile, "DevToolsActivePort"), "utf8").split(/\r?\n/)[0]);
+			if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) throw new Error("invalid browser debugger port");
+			const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
 			target = list.find((t) => t.type === "page") ?? null;
 		} catch {
 			/* debugger not up yet */
@@ -2800,6 +2812,43 @@ try {
 	const gadgetRecovered = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
 	check("stale Gadget: a recovered tree restores only the genuine missing cue", gadgetRecovered.placeholder === "⚠ Sensor not present. Pick again" && gadgetRecovered.missing === true && deepEqual(gadgetRecovered.chips, [false, false, true]), JSON.stringify(gadgetRecovered));
 	check("stale Gadget: source states never rewrite saved settings", writes.length === 0 && globalWrites.length === staleGlobalMark && deepEqual(store.settings, staleGadgetSeed), `${writes.length} key writes, ${globalWrites.length - staleGlobalMark} global writes`);
+
+	// Production ticks emit previews, not unsolicited tree replies. Recovery
+	// must initiate its own request after a tree had already succeeded.
+	const recoveryRequests = treeRequests;
+	sendGadgetPayload({ event: "preview", state: "stale", source: "gadget", hint: staleHint, missing: true });
+	sendGadgetPayload({ event: "preview", state: "unavailable", hint: DOWN_TREE.hint, missing: false });
+	sendGadgetPayload({ event: "preview", state: "ok", source: "gadget", hint: GADGET_TREE.hint, missing: true });
+	await sleep(350);
+	check("preview-only recovery refreshes its tree", treeRequests === recoveryRequests + 1, `${treeRequests - recoveryRequests} requests`);
+
+	// Settings loaded through the real sdpi store must not select inherited
+	// dictionary entries as palettes or leave the custom color seed broken.
+	store.settings = { ...store.settings, theme: "__proto__", textMode: "custom" };
+	toPi({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
+	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });
+	await sleep(500);
+	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Deck default · Void"`)).result?.value === true);
+
+	// Hold the real socket reply while the user edits each config textarea.
+	// This races the production async fill path, with no helper extraction.
+	await evaluate(`document.querySelector('details[data-fold="advanced"]').open = true`);
+	await sleep(350);
+	const configWriteMark = writes.length;
+	const configGlobalMark = globalWrites.length;
+	for (const scope of ["key", "deck"]) {
+		deferConfigReplies = true;
+		await evaluate(`document.getElementById("config-${scope}-copy").click()`);
+		for (let attempt = 0; configReplies.length === 0 && attempt < 20; attempt++) await sleep(50);
+		check(`delayed ${scope} config requested a socket reply`, configReplies.length > 0);
+		const draft = JSON.stringify({ draft: scope, readingLinks: [{ keep: "typing" }] });
+		await evaluate(`(() => { const el = document.getElementById("config-${scope}"); el.value = ${JSON.stringify(draft)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+		deferConfigReplies = false;
+		for (const reply of configReplies.splice(0)) reply();
+		await sleep(200);
+		check(`delayed ${scope} config preserves the typed draft`, (await evaluate(`document.getElementById("config-${scope}").value`)).result?.value === draft);
+	}
+	check("delayed config reads write no settings", writes.length === configWriteMark && globalWrites.length === configGlobalMark);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

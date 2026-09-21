@@ -3,26 +3,23 @@
 // shots, pi-harness + capture-pi), snapshots again, and FAILS if any process
 // spawned during the run is still alive — fake-hwinfo, plugin instances,
 // headless chrome, anything. Run with `npm run suite:full`.
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyNewProcesses, ownedDescendants, processIdentity, processSnapshot, terminateProcesses } from "./lib/process-ownership.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outRoot = process.argv[2] ?? fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-suite-"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** pid → command line for every node.exe / chrome.exe on the box. */
-function processSnapshot() {
-	const ps =
-		"$procs = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' or Name='chrome.exe'\" | Select-Object ProcessId,CommandLine); ConvertTo-Json -InputObject $procs -Depth 2";
-	const out = execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", timeout: 30_000 });
-	const map = new Map();
-	for (const row of JSON.parse(out.trim() || "[]")) {
-		map.set(row.ProcessId, row.CommandLine ?? "");
-	}
-	return map;
+/** Snapshots only at launch/step boundaries, never a busy background poll.
+ * Retain full identities so exited parents and recycled PIDs stay distinct. */
+function observeOwned() {
+	const rows = processSnapshot();
+	for (const row of ownedDescendants(rows, new Set(recorded.keys()))) recorded.set(processIdentity(row), row);
+	return rows;
 }
 
 function run(name, args, opts = {}) {
@@ -31,6 +28,7 @@ function run(name, args, opts = {}) {
 		const child = spawn(process.execPath, args, { cwd: repoRoot, stdio: ["ignore", "inherit", "inherit"], ...opts });
 		child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${name} exited with code ${code}`))));
 		child.on("error", reject);
+		observeOwned();
 	});
 }
 
@@ -52,6 +50,7 @@ async function runPiCapture() {
 	const harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: repoRoot, stdio: ["pipe", "inherit", "inherit"] });
 	const exited = new Promise((resolve) => harness.once("exit", resolve));
 	try {
+		observeOwned();
 		let up = false;
 		for (let i = 0; i < 40 && !up; i++) {
 			await sleep(500);
@@ -77,6 +76,9 @@ async function runPiCapture() {
 }
 
 const before = processSnapshot();
+const root = before.find((row) => row.pid === process.pid);
+if (!root) throw new Error("Cannot establish suite process creation identity; refusing to run cleanup-capable suites");
+const recorded = new Map([[processIdentity(root), root]]);
 const failures = [];
 for (const dir of ["pi", "contact", "shots"]) {
 	fs.mkdirSync(path.join(outRoot, dir), { recursive: true });
@@ -86,6 +88,7 @@ const steps = [
 	["e2e", () => run("e2e", ["scripts/e2e-harness.mjs"])],
 	["e2e:resilience", () => run("e2e:resilience", ["scripts/e2e-resilience.mjs"])],
 	["e2e:gadget", () => run("e2e:gadget", ["scripts/e2e-gadget.mjs"])],
+	["e2e:gadget-raw", () => run("e2e:gadget-raw", ["scripts/e2e-gadget-raw.mjs", path.join(outRoot, "gadget-raw")])],
 	["e2e:reading-links", () => run("e2e:reading-links", ["scripts/e2e-reading-links.mjs", path.join(outRoot, "reading-links")])],
 	["e2e:dead-fallback", () => run("e2e:dead-fallback", ["scripts/e2e-dead-fallback.mjs"])],
 	["e2e:native-edge", () => run("e2e:native-edge", ["scripts/e2e-native-edge.mjs"])],
@@ -111,34 +114,23 @@ for (const [name, step] of steps) {
 		failures.push(`${name}: ${err.message}`);
 		console.error(String(err));
 	}
+	observeOwned();
 }
 
 await sleep(1500); // give just-killed trees a moment to reap
-const after = processSnapshot();
-// Only processes WE could have spawned count as orphans — an unrelated
-// desktop-Chrome renderer appearing during the window must not fail the run.
-const OURS = /hwinfo-streamdeck|com\.lawrensen\.hwinfo|fake-hwinfo|pi-capture-profile|--headless/i;
-const orphans = [];
-const bystanders = [];
-for (const [pid, cmd] of after) {
-	if (!before.has(pid)) {
-		(OURS.test(cmd) ? orphans : bystanders).push({ pid, cmd });
-	}
-}
+const after = observeOwned();
+const { owned: orphans, ambiguous, unrelated: bystanders } = classifyNewProcesses(before, after, [...recorded.values()]);
 
 console.log(`\n=== hygiene ===`);
-console.log(`processes before: ${before.size}, after: ${after.size}, new: ${orphans.length + bystanders.length} (${orphans.length} ours, ${bystanders.length} unrelated)`);
+console.log(`processes before: ${before.length}, after: ${after.length}, new: ${orphans.length + ambiguous.length + bystanders.length} (${orphans.length} ours, ${ambiguous.length} ambiguous, ${bystanders.length} unrelated)`);
 for (const o of orphans) {
-	console.error(`ORPHAN pid ${o.pid}: ${o.cmd}`);
-	try {
-		execFileSync("taskkill", ["/PID", String(o.pid), "/T", "/F"], { stdio: "ignore" });
-	} catch {
-		/* already gone */
-	}
+	console.error(`ORPHAN pid ${o.pid}: ${o.commandLine}`);
 }
+terminateProcesses(orphans);
+for (const o of ambiguous) console.error(`POSSIBLE ORPHAN pid ${o.pid}, ownership unproved; left running: ${o.commandLine}`);
 
-if (failures.length > 0 || orphans.length > 0) {
-	console.error(`\nSUITE: FAILED — ${failures.length} step failure(s), ${orphans.length} orphan(s)`);
+if (failures.length > 0 || orphans.length > 0 || ambiguous.length > 0) {
+	console.error(`\nSUITE: FAILED — ${failures.length} step failure(s), ${orphans.length} orphan(s), ${ambiguous.length} possible orphan(s)`);
 	for (const f of failures) {
 		console.error(`  ${f}`);
 	}

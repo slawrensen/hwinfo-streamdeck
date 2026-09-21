@@ -22,48 +22,40 @@
 // same harness starts from the first run's end state and fails on the steps
 // that expect a clean panel (the rotation set is already split, so "Split
 // into groups" is gone).
-import { spawn, spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
+import { cleanupBrowser } from "./lib/process-ownership.mjs";
 
 const outDir = process.argv[2] ?? ".";
 const BASE = "http://127.0.0.1:28997/ui";
-const DEBUG_PORT = 29222;
+const DEBUG_PORT = 0; // Chrome writes its assigned port into our unique profile.
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(`[capture] ${m}`);
+const chromeProfile = mkdtempSync(path.join(os.tmpdir(), "pi-capture-profile-"));
+const chromeStartedAt = new Date().toISOString();
 
 const chrome = spawn(CHROME, [
 	"--headless=new",
 	"--disable-gpu",
 	`--remote-debugging-port=${DEBUG_PORT}`,
-	`--user-data-dir=${path.join(process.env.TEMP ?? ".", "pi-capture-profile")}`,
+	`--user-data-dir=${chromeProfile}`,
 	"--hide-scrollbars",
 	"about:blank"
-], { stdio: "ignore" });
+], { stdio: "ignore", windowsHide: true });
+let chromeError;
+chrome.once("error", (err) => { chromeError = err; });
 
-/** chrome.kill() alone can strand renderer children — take down the tree,
- * then sweep any stragglers that re-parented past /T by our profile dir. */
+/** Only this run's disposable profile can authorize browser cleanup. */
 function killChromeTree() {
 	try {
-		spawnSync("taskkill", ["/PID", String(chrome.pid), "/T", "/F"], { stdio: "ignore" });
+		cleanupBrowser(chromeProfile, chromeStartedAt);
 	} catch {
-		chrome.kill();
-	}
-	try {
-		spawnSync(
-			"powershell.exe",
-			[
-				"-NoProfile",
-				"-Command",
-				"Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'pi-capture-profile' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
-			],
-			{ stdio: "ignore", timeout: 15000 }
-		);
-	} catch {
-		/* best effort */
+		console.error(`[capture] browser cleanup could not verify ownership; profile ${chromeProfile} left for inspection`);
 	}
 }
 
@@ -82,8 +74,11 @@ try {
 	let target = null;
 	for (let i = 0; i < 30 && target === null; i++) {
 		await sleep(500);
+		if (chromeError) throw chromeError;
 		try {
-			const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+			const debugPort = Number(readFileSync(path.join(chromeProfile, "DevToolsActivePort"), "utf8").split(/\r?\n/)[0]);
+			if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) throw new Error("invalid browser debugger port");
+			const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
 			target = list.find((t) => t.type === "page") ?? null;
 		} catch {
 			/* debugger not up yet */

@@ -83,6 +83,36 @@ async function phase(name, source, start) {
 		check(details.includes("MY TILE") && expected.slice(1).every((value) => details.includes(value)), `${name}: custom detail values and personalization survive`);
 		check(!details.includes("Sensor missing"), `${name}: no detail identity substitution`);
 	}
+	// Real bundled PI payloads must agree with actual rendered row colors,
+	// including a saved selection whose row uses the other linked spelling.
+	const config = JSON.parse(fs.readFileSync(path.join(pluginDir, "themes.json"), "utf8"));
+	for (const dialView of ["tworow", "overview"]) {
+		const context = `gadget-dial-${dialView}`;
+		const action = actions.get(context);
+		send({ event: "propertyInspectorDidAppear", action: action.action, context, device: action.device });
+		const cases = [
+			{ name: "individual alias", individual: true, expectedColor: "#123abc" },
+			{ name: "automatic unclassified", individual: false, expectedColor: config.themes.void.value },
+			...(source === "shared-memory" ? [{ name: "automatic temperature", individual: false, expectedColor: config.typeAccents.temperature, readingKey: "f0001234:0:1000001" }] : [])
+		];
+		for (const testCase of cases) {
+			const before = traffic.length;
+			const settings = { ...action.settings, theme: "void", textMode: "theme", rotationKeys: links.map((link) => link.sharedMemory), sensorValueColors: true,
+				...(testCase.individual ? { readingColors: { [links[0].sharedMemory]: "#123abc", [links[0].gadget]: "#FF7E8E" } } : {}),
+				...(testCase.readingKey ? { readingKey: testCase.readingKey, rotationKeys: [testCase.readingKey] } : {}) };
+			event("didReceiveSettings", context, { ...action, settings });
+			const expectedColor = testCase.expectedColor;
+			await waitUntil(() => traffic.slice(before).some((msg) => msg.context === context && msg.event === "sendToPropertyInspector" && msg.payload?.display?.valueColor === expectedColor)
+				&& [...(framesSince(before, context).at(-1) ?? "").matchAll(/font-weight="700" fill="([^"]+)">/g)][0]?.[1] === expectedColor, 6000);
+			const preview = traffic.slice(before).findLast((msg) => msg.context === context && msg.event === "sendToPropertyInspector" && msg.payload?.display)?.payload;
+			const frame = framesSince(before, context).at(-1) ?? "";
+			const rowColor = [...frame.matchAll(/font-weight="700" fill="([^"]+)">/g)][0]?.[1];
+			check(preview?.source === source && preview?.display?.valueColor === expectedColor && rowColor === expectedColor, `${name}: ${dialView} ${testCase.name} preview matches built row`);
+			check(preview.display.bg === (dialView === "tworow" ? config.themes.void.track : config.themes.void.bg), `${name}: ${dialView} preview uses selected row surface`);
+		}
+		event("didReceiveSettings", context, action);
+	}
+	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "sharedMemory-single", device: "keys" });
 }
 try {
 	for (let i = 0; i < 4; i++) for (const [field, value] of Object.entries({ Sensor: "Test Source", Label: `Core ${i} VID`, Value: `${gadgetValues[i]} V`, ValueRaw: gadgetValues[i] })) regSet(regPath, `${field}${i}`, value);

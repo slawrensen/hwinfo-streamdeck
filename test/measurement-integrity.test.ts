@@ -15,6 +15,88 @@ import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-stor
 import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
 
+describe("dial press replay through the production action", () => {
+	type Down = Parameters<SensorDialAction["onDialDown"]>[0];
+	type Up = Parameters<SensorDialAction["onDialUp"]>[0];
+	type ActionBoundary = {
+		instances: Map<string, InstanceState>;
+		hidden: Map<string, { at: number; state: InstanceState }>;
+		traceGesture(): void;
+		renderAll(): void;
+		onDialDown(event: Down): Promise<void>;
+		onDialUp(event: Up): Promise<void>;
+	};
+	function fixture() {
+		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		// Call the real handlers and reset command; replace only the SDK render
+		// sink, tracing, acquisition and clock boundaries. No native source is
+		// opened, and host scheduling cannot turn a short press into a hold.
+		const action = Object.create(SensorDialAction.prototype) as ActionBoundary;
+		action.instances = new Map([["ctx", state]]);
+		action.hidden = new Map();
+		action.traceGesture = () => {};
+		action.renderAll = () => {};
+		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+		let eventAt = 1000;
+		const now = mock.method(performance, "now", () => eventAt);
+		const down = { action: { id: "ctx" } } as unknown as Down;
+		const up = { action: { id: "ctx" } } as unknown as Up;
+		return {
+			state,
+			down: (afterMs = 0) => { eventAt += afterMs; return action.onDialDown(down); },
+			up: (afterMs = 0) => { eventAt += afterMs; return action.onDialUp(up); },
+			close: () => { if (state.overlayTimer !== null) clearTimeout(state.overlayTimer); getStatus.mock.restore(); now.mock.restore(); }
+		};
+	}
+	it("a replayed legacy down does not erase samples collected since the first down", async () => {
+		const f = fixture();
+		try {
+			f.state.stats.sample("fixture:0:1", 40);
+			await f.down();
+			assert.equal(f.state.stats.get("fixture:0:1"), undefined, "the initial down still resets immediately");
+			f.state.stats.sample("fixture:0:1", 50);
+			f.state.stats.sample("fixture:0:1", 60);
+			const pressStart = f.state.gesture.downAt;
+			await f.down(200);
+			assert.deepEqual(f.state.stats.get("fixture:0:1"), { min: 50, max: 60, sum: 110, count: 2 }, "a duplicate down must not reset again");
+			assert.equal(f.state.gesture.downAt, pressStart);
+			await f.up(100);
+			assert.equal(f.state.stats.get("fixture:0:1")?.count, 2, "release does not reset a legacy press");
+			await f.down();
+			assert.equal(f.state.stats.get("fixture:0:1"), undefined, "a new press after release still resets");
+		} finally { f.close(); }
+	});
+	it("a consumed legacy press cannot fire again after switching to Elite before release", async () => {
+		const f = fixture();
+		try {
+			await f.down();
+			f.state.stats.sample("fixture:0:1", 50);
+			f.state.settings = { ...f.state.settings, controlPreset: "elite" };
+			await f.down(100);
+			await f.up(100);
+			assert.equal(f.state.cyclePaused, false);
+			assert.equal(f.state.stats.get("fixture:0:1")?.count, 1);
+			await f.down(100);
+			await f.down(100);
+			await f.up(100);
+			assert.equal(f.state.cyclePaused, true, "a new Elite press, including a duplicate down, toggles once on release");
+		} finally { f.close(); }
+	});
+	it("a repeated Elite down retains the original long-press boundary", async () => {
+		const f = fixture();
+		try {
+			f.state.settings = { ...f.state.settings, controlPreset: "elite" };
+			f.state.stats.sample("fixture:0:1", 40);
+			await f.down();
+			await f.down(400);
+			assert.equal(f.state.gesture.downAt, 1000);
+			await f.up(100);
+			assert.equal(f.state.stats.get("fixture:0:1"), undefined, "500 ms from the first down resets statistics");
+			assert.equal(f.state.cyclePaused, false, "the repeated down cannot turn the hold into a short press");
+		} finally { f.close(); }
+	});
+});
+
 const link = { sharedMemory: "f0001234:0:1000001", gadget: "g:GPU:Temperature", unit: "°C", sensorType: 1 };
 const reading: Reading = { key: link.sharedMemory, sensorIndex: 0, id: 1, label: "Temperature", type: 1, unit: "°C", value: 40, valueMin: 30, valueMax: 60, valueAvg: 42 };
 const snapshot = (r: Reading = reading, pollTime = 1): SensorSnapshot => ({ pollTime, valueRevision: pollTime, version: 1, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "GPU" }], readings: [r], byKey: new Map([[r.key, r]]) });

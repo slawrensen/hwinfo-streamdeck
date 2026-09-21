@@ -7,6 +7,7 @@ import { dialGalleryFixture, renderGalleryDial } from "../scripts/lib/dial-galle
 import { composeDialSvg, type DialSettings } from "../src/actions/sensor-dial";
 import { SensorType, type Reading } from "../src/hwinfo/types";
 import { applyReadingLinks } from "../src/hwinfo/reading-links";
+import { buildPreview } from "../src/pi-protocol";
 import { stepReading } from "../src/rotation";
 import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
@@ -18,6 +19,12 @@ type Fixture = ReturnType<typeof dialGalleryFixture>;
 const compose = ({ state, snapshot, historyOf }: Fixture): string => composeDialSvg(state, { state: "ok", snapshot, source: "shared-memory" }, historyOf);
 const values = (svg: string): string[] => [...svg.matchAll(/font-weight="700" fill="([^"]+)">[^<]+<\/text>/g)].map((m) => m[1]!);
 const withoutValues = (svg: string): string => svg.replace(/(font-weight="700" fill=")[^"]+/g, "$1VALUE");
+
+function previewOf(fixture: Fixture): NonNullable<ReturnType<typeof buildPreview>["display"]> {
+	const payload = buildPreview({ state: "ok", snapshot: fixture.snapshot, source: "shared-memory" }, fixture.state.settings, false);
+	assert.ok(payload.display);
+	return payload.display;
+}
 
 it("contrast primitive keeps passing colors exact and quantized corrections above 4.5 on either polarity", () => {
 	for (const bg of ["#000000", "#FFFFFF", "#777777", "#2A2F3A", "#CDC9BD"]) {
@@ -428,4 +435,121 @@ it("individual colors work with accents off and Paper, follow Dim and inherited 
 	const missing = compose(fixture);
 	delete fixture.state.settings.readingColors;
 	assert.equal(compose(fixture), missing);
+});
+
+it("Live value matches the selected overview numeric color and actual backdrop across themes and Text modes", () => {
+	for (const theme of Object.keys(config.themes)) {
+		for (const view of ["tworow", "overview"] as const) {
+			for (const mode of ["theme", "dim", "inherited-custom", "invalid-custom"] as const) {
+				applyGlobalThemeSettings({ theme, typeAccents: "on", textMode: "custom", textColor: "#123abc" });
+				const fixture = dialGalleryFixture("overview", true);
+				Object.assign(fixture.state.settings, { theme, dialView: view, readingColors: { "31:0:1": "#012aBc" } });
+				if (mode === "inherited-custom") delete fixture.state.settings.textMode;
+				else Object.assign(fixture.state.settings, { textMode: mode === "invalid-custom" ? "custom" : mode, textColor: "invalid" });
+				const saved = structuredClone(fixture.state.settings);
+				const bg = view === "tworow" ? config.themes[theme]!.track : config.themes[theme]!.bg;
+				const expected = mode === "inherited-custom" ? "#123abc" : mode === "dim" ? mixToward("#012aBc", bg, DIM_VALUE_BLEND) : "#012aBc";
+				assert.equal(previewOf(fixture).valueColor, expected, `${theme}/${view}/${mode}`);
+				assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+				assert.equal(previewOf(fixture).bg, bg);
+				delete fixture.state.settings.readingColors;
+				assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0], "automatic type color uses the same readable lift");
+				fixture.state.settings.readingColors = saved.readingColors;
+				assert.deepEqual(fixture.state.settings, saved, "preview never rewrites settings");
+			}
+		}
+	}
+});
+
+it("Live value uses the actual row spelling when a selection and its rotation rows use competing aliases", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		for (const curated of ["live", "alias", "none", "group"] as const) {
+			const fixture = dialGalleryFixture("overview");
+			const live = "31:0:1";
+			const alias = "g:Sample:CPU";
+			fixture.snapshot = applyReadingLinks(fixture.snapshot, [{ sharedMemory: live, gadget: alias, unit: "°C", sensorType: SensorType.Temperature }], 1);
+			Object.assign(fixture.state.settings, { dialView: view, readingKey: alias, readingColors: { [live]: "#4CC2FF", [alias]: "#FF7E8E" } });
+			if (curated === "none") delete fixture.state.settings.rotationKeys;
+			if (curated === "alias") fixture.state.settings.rotationKeys = [alias, "31:0:2"];
+			if (curated === "group") Object.assign(fixture.state.settings, { controlPreset: "elite", rotationGroups: [{ keys: [live] }, { keys: ["31:0:2", "31:0:3"] }] });
+			const expected = curated === "alias" ? "#FF7E8E" : "#4CC2FF";
+			assert.equal(previewOf(fixture).valueColor, expected, `${view}/${curated}`);
+			assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+			assert.equal(fixture.state.settings.readingKey, alias);
+		}
+	}
+});
+
+it("Live value keeps live alert precedence, native-unit scoping and Fahrenheit while the dial shows a session statistic", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture("overview", true);
+		fixture.state.statMode = "max";
+		Object.assign(fixture.state.settings, { dialView: view, textMode: "custom", textColor: "#123abc", readingColors: { "31:0:1": "#FF7E8E" }, warnValue: "70", critValue: "75", alertUnit: "°C" });
+		const bg = view === "tworow" ? config.themes.void!.track : config.themes.void!.bg;
+		assert.equal(previewOf(fixture).valueColor, alertValueColor(config, "warn", bg), "live71.4 warns; the displayed session max79 must not turn the preview critical");
+		assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+		Object.assign(fixture.state.settings, { fahrenheit: true, warnValue: "160", critValue: "168" });
+		assert.equal(previewOf(fixture).valueColor, alertValueColor(config, "warn", bg));
+		fixture.state.settings.alertUnit = "RPM";
+		assert.equal(previewOf(fixture).valueColor, "#123abc", "a threshold for a different native unit does not color this row");
+		assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+		fixture.state.settings.alertUnit = "°C";
+		fixture.state.settings.critValue = "160";
+		assert.equal(previewOf(fixture).valueColor, alertValueColor(config, "crit", bg));
+		Object.assign(fixture.state.settings, { fahrenheit: false, warnValue: "72", critValue: "70", alertBelow: true });
+		assert.equal(previewOf(fixture).valueColor, alertValueColor(config, "warn", bg), "below-threshold alerts still use the live value");
+		assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+	}
+});
+
+it("Live value salvages malformed colors and respects type-accent opt-outs without recoloring a nonfinite reading", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture("overview", true);
+		fixture.state.settings.dialView = view;
+		for (const raw of [null, true, [], "#123456", { "31:0:1": "bad" }, Object.create({ "31:0:1": "#123456" })]) {
+			Object.assign(fixture.state.settings, { readingColors: raw });
+			assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+		}
+		applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
+		fixture.state.settings.readingColors = { "31:0:1": "#012aBc" };
+		assert.equal(previewOf(fixture).valueColor, "#012aBc", "individual colors do not depend on automatic type accents");
+		const readings = fixture.snapshot.readings.map((reading) => ({ ...reading, value: NaN }));
+		fixture.snapshot = { ...fixture.snapshot, readings, byKey: new Map(readings.map((reading) => [reading.key, reading])) };
+		assert.notEqual(previewOf(fixture).valueColor, "#012aBc");
+		assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
+	}
+});
+
+it("single, malformed-view and key previews retain their existing color and alert policy", () => {
+	const fixture = dialGalleryFixture("overview", true);
+	for (const dialView of [undefined, "single", "future-view"]) {
+		Object.assign(fixture.state.settings, { dialView, textMode: "custom", textColor: "#123abc", warnValue: "70", critValue: "75", readingColors: { "31:0:1": "#FF7E8E" } });
+		assert.equal(previewOf(fixture).valueColor, "#123abc", "single dial alerts color the bar, not numeric text");
+		assert.equal(previewOf(fixture).bg, config.themes.void!.bg);
+	}
+	fixture.state.settings.dialView = "tworow";
+	const key = buildPreview({ state: "ok", source: "shared-memory", snapshot: fixture.snapshot }, fixture.state.settings, true);
+	assert.equal(key.display?.valueColor, config.alerts.warn.value);
+	assert.equal(key.display?.bg, config.alerts.warn.bg, "stray dial-only fields cannot change key presentation");
+});
+
+it("a selection outside the rotation list does not invent a selected two-row backdrop", () => {
+	const fixture = dialGalleryFixture("overview");
+	Object.assign(fixture.state.settings, { dialView: "tworow", rotationKeys: ["31:0:2", "31:0:3"], textMode: "dim", readingColors: { "31:0:1": "#FF7E8E" } });
+	assert.equal(previewOf(fixture).bg, config.themes.void!.bg);
+	assert.equal(previewOf(fixture).valueColor, mixToward("#FF7E8E", config.themes.void!.bg, DIM_VALUE_BLEND));
+	fixture.state.settings.rotationKeys = ["missing"];
+	assert.equal(previewOf(fixture).bg, config.themes.void!.track, "an empty resolved set uses the selected-reading fallback row");
+});
+
+it("Live value follows a selected row after the first visible row", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture("overview");
+		Object.assign(fixture.state.settings, { dialView: view, readingKey: "31:0:3", readingColors: { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" } });
+		const rendered = values(compose(fixture));
+		assert.notEqual(rendered[0], "#38CD89");
+		assert.equal(previewOf(fixture).valueColor, "#38CD89");
+		assert.equal(previewOf(fixture).valueColor, rendered.at(-1));
+		assert.equal(previewOf(fixture).bg, view === "tworow" ? config.themes.void!.track : config.themes.void!.bg);
+	}
 });

@@ -457,6 +457,19 @@ async function openPanel(shape: "dial" | "reading", seed: Record<string, unknown
 	return m;
 }
 
+it("the production Live value consumer paints the selected overview row color from the real preview payload", async () => {
+	applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "theme" });
+	const status = linkedStatus();
+	for (const dialView of ["overview", "tworow"]) {
+		const seed = { readingKey: SM[0], rotationKeys: [...G], dialView, theme: "void", textMode: "theme", readingColors: { [SM[0]]: "#4CC2FF", [G[0]]: "#FF7E8E" } };
+		const m = await openPanel("dial", seed, status);
+		assert.equal(m.el("preview-value").style.color, "#FF7E8E", "the row's exact color wins over the selection alias");
+		assert.equal(m.el("preview-value").style.color, paint(m.store, status)[0]);
+		assert.equal(m.el("preview-value").textContent, "71.4 °C");
+		assert.deepEqual(plain(m.store), seed);
+	}
+});
+
 const chips = (m: Mounted, list = "rotation-set"): FakeElement[] => m.el(list).querySelectorAll(".hw-set-chip");
 const chipNames = (m: Mounted, list = "rotation-set"): string[] => chips(m, list).map((c) => c.querySelector(".hw-set-name")!.textContent);
 const pickerRows = (m: Mounted, list = "picker-list"): FakeElement[] => m.el(list).querySelectorAll(".hw-row");

@@ -2454,7 +2454,7 @@ try {
 	);
 	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
-	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
+	check("dial: overview alert placeholders describe the row value and unit guidance", dialTruth.warnPlaceholder === "row value turns amber (see units below)", String(dialTruth.warnPlaceholder));
 	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
 	const colorToggle = `document.getElementById('sensor-value-colors-toggle').shadowRoot.querySelector('input[type=checkbox]')`;
 	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);

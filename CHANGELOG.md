@@ -8,6 +8,16 @@ listing is a separate track.
 
 Per-reading dial colors and reliability fixes in one release candidate.
 
+- Malformed Gadget raw numbers remain unavailable instead of displaying a
+  numeric prefix or adding it to freshness, history and session statistics.
+  Healthy neighboring readings keep serving. Detail faces also refresh when
+  a legacy Gadget alias becomes ambiguous or recovers.
+- A newly accepted source keeps its own sample age. Switching from recent
+  Gadget values to an old Shared Memory sample no longer makes that sample
+  appear live.
+- Invalid theme names fall back safely. The settings panel refreshes its
+  picker after source recovery or a provider change, preserves Config drafts
+  while settings replies are pending, and retains unknown Config fields.
 - Two-row and three-row dials can color each reading's number separately.
   Appearance adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading

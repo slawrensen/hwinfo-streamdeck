@@ -226,12 +226,19 @@ describe("dense reading tiles (composeChunkFace)", () => {
 	});
 
 	it("the tile's type accent follows its FIRST reading", () => {
-		const config = loadThemes();
-		const powerFirst = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
-		const tempFirst = composeChunkFace(stateOf(), ["cpu:0:2", "cpu:0:1"], "current", ok, ctxOf());
-		assert.notEqual(powerFirst, tempFirst);
-		const powerAccentBg = resolvePalette(config, config.defaultTheme, "power", "normal").bg;
-		assert.ok(powerFirst.includes(powerAccentBg), "power accent expected from the first reading");
+		// MIN exposes the resolved accent on the shared badge. Backgrounds
+		// are identical across type accents, and reordering rows changes an
+		// SVG even if accent selection is broken, so neither proves this.
+		for (const tail of [[], ["gpu:0:1"], ["gpu:0:1", "gpu:0:2"]]) {
+			for (const [keys, accent] of [
+				[["cpu:0:1", "cpu:0:2", ...tail], config.typeAccents.power],
+				[["cpu:0:2", "cpu:0:1", ...tail], config.typeAccents.temperature]
+			] as const) {
+				const svg = composeChunkFace(stateOf(), keys, "min", ok, ctxOf());
+				const badgeFills = [...svg.matchAll(/<text\b[^>]*fill="([^"]+)"[^>]*>MIN<\/text>/g)].map((match) => match[1]);
+				assert.deepEqual(badgeFills, [accent], `${keys.length} readings, first ${keys[0]}`);
+			}
+		}
 	});
 
 	it("never inherits the opener's thresholds at any density", () => {

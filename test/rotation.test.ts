@@ -72,6 +72,42 @@ describe("rotationReadings", () => {
 		assert.equal(stepReading([live, other, alias], "g:X:1", 1)?.key, "a:0:1", "stepping from the alias entry itself wraps to the first");
 	});
 
+	it("a group jump skips the current measurement's alias to reach the target group's distinct member", () => {
+		const raw = [
+			{ name: "One", keys: ["a:0:1"] },
+			{ name: "Two", keys: ["g:X:1", "b:0:1"] }
+		];
+		const groups = rotationGroupsOf(raw);
+		assert.ok(groups);
+		for (const liveKey of ["a:0:1", "g:X:1"]) {
+			const linked = applyReadingLinks(snapshot([reading(liveKey, 0), reading("b:0:1", 1)]), [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+			const landed = stepGroup(groups, "a:0:1", 1, linked);
+			assert.equal(landed?.key, "b:0:1", `target group must be reachable with ${liveKey} live`);
+			assert.equal(activeGroupIndex(groups, landed?.key, linked), 1);
+			assert.equal(stepGroup(groups, "b:0:1", -1, linked)?.key, "a:0:1", "the reverse jump keeps the first group's saved spelling");
+		}
+		assert.deepEqual(raw, [{ name: "One", keys: ["a:0:1"] }, { name: "Two", keys: ["g:X:1", "b:0:1"] }], "resolving aliases never rewrites the settings");
+	});
+
+	it("alias-only target groups are skipped in either direction and multi-tick jumps count reachable groups", () => {
+		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
+		const groups = rotationGroupsOf([
+			{ name: "One", keys: ["a:0:1"] },
+			{ name: "Alias only", keys: ["g:X:1"] },
+			{ name: "Two", keys: ["b:0:1"] },
+			{ name: "Three", keys: ["b:0:2"] }
+		]);
+		assert.ok(groups);
+		assert.equal(stepGroup(groups, "a:0:1", 1, linked)?.key, "b:0:1");
+		assert.equal(stepGroup(groups, "a:0:1", -1, linked)?.key, "b:0:2");
+		assert.equal(stepGroup(groups, "a:0:1", 2, linked)?.key, "b:0:2");
+		assert.equal(stepGroup(groups, "g:X:1", 1, linked)?.key, "b:0:1", "an exact alias-spelled current group keeps its place");
+		assert.equal(stepGroup(groups, "g:X:1", -1, linked)?.key, "b:0:2");
+		const onlyAliases = rotationGroupsOf([{ keys: ["a:0:1"] }, { keys: ["g:X:1"] }]);
+		assert.ok(onlyAliases);
+		assert.equal(stepGroup(onlyAliases, "a:0:1", 1, linked), undefined, "one measurement gives no group jump");
+	});
+
 	it("a group owns a selection saved under its other confirmed spelling", () => {
 		const linked = applyReadingLinks(snap, [{ sharedMemory: "a:0:1", gadget: "g:X:1", unit: "°C", sensorType: 1 }], 1);
 		const groups = rotationGroupsOf([{ name: "one", keys: ["b:0:1"] }, { name: "two", keys: ["a:0:1", "a:0:2"] }]);

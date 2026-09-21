@@ -169,15 +169,20 @@ export function groupReadings(groups: readonly RotationGroup[], currentKey: stri
  * Steps `ticks` whole groups: lands on the first snapshot-present member of
  * the target group, wrapping at both ends. The user-defined analog of
  * stepSensorSource, behind pressed rotation once groups exist. Groups whose
- * members the snapshot does not publish (sensor asleep, dropout) cannot be
+ * members the snapshot does not publish (sensor asleep, dropout), or which
+ * only repeat the current measurement under a confirmed alias, cannot be
  * landed in and are skipped; with fewer than two groups present there is
  * nowhere to jump and it returns undefined. A current reading outside every
  * present group enters at the first one.
  */
 export function stepGroup(groups: readonly RotationGroup[], currentKey: string | undefined, ticks: number, snapshot: SensorSnapshot): Reading | undefined {
+	const currentGroup = activeGroupIndex(groups, currentKey, snapshot);
 	const present: { index: number; first: Reading }[] = [];
 	for (const [index, group] of groups.entries()) {
-		const first = group.keys.map((key) => snapshot.byKey.get(key)).find((r): r is Reading => r !== undefined);
+		// The two saved spellings may belong to different groups. A target
+		// must offer a different measurement or advance() would reject the
+		// alias as a no-op and strand all later members of that group.
+		const first = group.keys.map((key) => snapshot.byKey.get(key)).find((r): r is Reading => r !== undefined && (index === currentGroup || !readingMatchesKey(r, currentKey)));
 		if (first !== undefined) {
 			present.push({ index, first });
 		}
@@ -185,7 +190,7 @@ export function stepGroup(groups: readonly RotationGroup[], currentKey: string |
 	if (present.length === 0) {
 		return undefined;
 	}
-	const position = present.findIndex((p) => p.index === activeGroupIndex(groups, currentKey, snapshot));
+	const position = present.findIndex((p) => p.index === currentGroup);
 	if (position === -1) {
 		return present[0]?.first;
 	}

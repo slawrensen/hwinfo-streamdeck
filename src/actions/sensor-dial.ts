@@ -33,17 +33,17 @@ import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
-import { activeGroupIndex, autoCycleTarget, groupDisplayName, groupReadings, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource, type RotationGroup } from "../rotation";
+import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
 import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
 import { FOOTER_PX, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
+import { dialViewOf, overviewRowColors, rotationKeysOf, stepListOf } from "../ui/dial-overview";
 import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
 import { statusDialText } from "../ui/state-screens";
-import { sensorValueColor } from "../ui/sensor-value-color";
 import { resolveTextColors, type TextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
-import { alertValueColor, classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
+import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig } from "../ui/themes";
 
 /** Persisted per-dial settings (written by the PI; all optional). */
 export type DialSettings = {
@@ -978,40 +978,8 @@ function readingKeyOf(settings: DialSettings): string | undefined {
 	return typeof settings.readingKey === "string" && settings.readingKey !== "" ? settings.readingKey : undefined;
 }
 
-/** Settings are untyped JSON at runtime: anything but a non-empty string
- *  array (a hand-edited profile, an import) degrades to "no set". */
-function rotationKeysOf(settings: DialSettings): string[] | undefined {
-	if (!Array.isArray(settings.rotationKeys)) {
-		return undefined;
-	}
-	const keys = settings.rotationKeys.filter((k): k is string => typeof k === "string");
-	return keys.length > 0 ? keys : undefined;
-}
-
 function matchesTarget(target: string, settings: DialSettings): boolean {
 	return target === "" || (typeof settings.linkId === "string" && settings.linkId.trim() === target);
-}
-
-/** Only the exact markers activate a multi-row view; anything else (absent,
- *  junk, a newer version's future value after a rollback) stays single. */
-function dialViewOf(settings: DialSettings): "single" | "overview" | "tworow" {
-	return settings.dialView === "overview" ? "overview" : settings.dialView === "tworow" ? "tworow" : "single";
-}
-
-/**
- * The list plain stepping and the auto cycle move through, and exactly what
- * the overview lists. Groups scope it to the active group only while the
- * scheme itself can jump groups (schemeCanSwitchGroups); otherwise the union
- * mirrored in rotationKeys keeps the pre-groups behavior, so defined groups
- * can never strand a dial inside one of them, and Legacy stays exact.
- * Module-level so composeDialSvg renders the same list rotation steps
- * through; the two can never disagree.
- */
-function stepListOf(settings: DialSettings, key: string | undefined, groups: readonly RotationGroup[] | undefined, snapshot: SensorSnapshot): readonly Reading[] {
-	if (groups !== undefined && schemeCanSwitchGroups(resolveControls(settings))) {
-		return groupReadings(groups, key, snapshot);
-	}
-	return rotationReadings(rotationKeysOf(settings), key, snapshot);
 }
 
 /** The PI writes "off" or a millisecond count; anything else means off too. */
@@ -1165,7 +1133,6 @@ function rotationNamesOf(settings: DialSettings): Record<string, string> | undef
  */
 function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, reading: Reading, config: ThemesConfig, themeId: string, rowCount: 2 | 3, historyOf: (key: string) => readonly number[] | undefined): string {
 	const settings = state.settings;
-	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
 	const stepList = stepListOf(settings, reading.key, rotationGroupsOf(settings.rotationGroups), snapshot);
 	// A set whose members are all absent from the snapshot (sensor asleep)
@@ -1199,18 +1166,12 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 	const palette = resolvePalette(config, themeId, accent, "normal");
 	const textSettings = effectiveTextFor(settings);
 	const text = resolveTextColors(palette, textSettings, "normal");
-	const warn = parseThreshold(settings.warnValue);
-	const crit = parseThreshold(settings.critValue);
-
 	const overviewRows: (OverviewRow & { history?: readonly number[] })[] = rows.map((member, index) => {
 		const selected = index === selectedIndex;
 		const nativeShown = rowStatValue(member.value, state.stats.get(member.key), state.statMode);
 		const shown = formatMeasurement(nativeShown, member.unit, measureOpts);
-		const scoped = thresholdsApplyTo(settings.alertUnit, member.unit);
-		const live = convertUnit(member.value, member.unit, fahrenheit).value;
-		const level = scoped ? alertLevel(live, warn, crit, settings.alertBelow === true) : "normal";
-		const rowBg = rowCount === 2 && selected ? palette.track : palette.bg;
-		const rowText = resolveTextColors({ ...palette, bg: rowBg }, effectiveTextFor(settings), "normal");
+		const colors = overviewRowColors({ settings, reading: member, shownValue: nativeShown, selected, rowCount,
+			palette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
 		return {
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,
@@ -1218,14 +1179,10 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 			selected,
 			// An alerting row's value is the alert indicator and stays fixed;
 			// custom text never recolors it.
-			valueColor: level !== "normal" ? alertValueColor(config, level, rowBg) : sensorValueColor({
-				enabled: settings.sensorValueColors, readingColors: settings.readingColors, reading: member, value: nativeShown,
-				config, themeId, typeAccents: typeAccentsEnabled(), textSettings,
-				normalColor: rowText.value, background: rowBg
-			}),
+			valueColor: colors.value,
 			// The selected two-row band resolves its label on the track like its unit.
-			selectedLabelColor: rowText.label,
-			unitColor: rowText.unit,
+			selectedLabelColor: colors.text.label,
+			unitColor: colors.text.unit,
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.
 			...(rowCount === 2 ? { history: historyOf(member.key) } : {})

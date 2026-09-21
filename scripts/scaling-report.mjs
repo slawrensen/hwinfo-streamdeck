@@ -61,6 +61,7 @@ export function report(summary, other) {
 	const lines = ["# Scaling measurements", "", `Run: ${summary.ok === true ? "PASS" : "FAIL or incomplete"}; mode: ${clean(summary.mode)}; machine: ${clean(summary.machine?.label)}; Node: ${clean(summary.machine?.node)}.`,
 		`Per case: ${clean(summary.seconds)} s measured, ${clean(summary.warmup)} s warmup, ${summary.repeats} repeat(s).`,
 		`Source: ${clean(summary.source)}; plugin SHA256: ${clean(summary.pluginSha256)}; native SHA256: ${clean(summary.nativeSha256)}.`, "",
+		`Measurement mode: ${clean(summary.measurementMode)}; working tree: ${typeof summary.dirty !== "string" ? "unknown" : summary.dirty.length ? "dirty (see summary.json)" : "clean"}.`, "",
 		"Values are medians across repeats. A p95 column is the median of repeat-level p95s, not a pooled percentile. Unknown values are not zero.", "",
 		`| Case | ${metrics.map(([name]) => name).join(" | ")} | Budget |`, `|${Array(metrics.length + 2).fill(" --- ").join("|")}|`,
 		...current.rows.map((row) => `| ${clean(row.name)} | ${row.values.map(formatted).join(" | ")} | ${row.budget} |`), "",
@@ -88,7 +89,10 @@ export function report(summary, other) {
 		for (const field of ["seconds", "warmup", "repeats"]) if (!finite(summary[field]) || !finite(other[field]) || summary[field] !== other[field]) reasons.push(`incompatible ${field}`);
 		const nodeMajor = (value) => /^v?(\d+)\./.exec(value ?? "")?.[1];
 		if (!nodeMajor(summary.machine?.node) || nodeMajor(summary.machine?.node) !== nodeMajor(other.machine?.node)) reasons.push("incompatible Node major");
-		for (const field of ["mode", "measurementMode"]) if ((field === "mode" && typeof summary[field] !== "string") || summary[field] !== other[field]) reasons.push(`incompatible ${field}`);
+		for (const field of ["mode", "measurementMode"]) if (typeof summary[field] !== "string" || !summary[field] || summary[field] !== other[field]) reasons.push(`missing or incompatible ${field}`);
+		for (const key of ["harnessSha256", "preloadSha256", "producerSha256", "metricsSha256"]) {
+			if (typeof summary[key] !== "string" || !/^[a-f\d]{64}$/i.test(summary[key]) || typeof other[key] !== "string" || !/^[a-f\d]{64}$/i.test(other[key]) || summary[key].toLowerCase() !== other[key].toLowerCase()) reasons.push(`missing or incompatible ${key}`);
+		}
 		const configs = (rows) => rows.map((row) => row.config).sort((a, b) => a.name.localeCompare(b.name));
 		if (stable(configs(current.rows)) !== stable(configs(compared.rows))) reasons.push("incompatible case configurations");
 		lines.push("", "## Second-run comparison", "", `Right-hand run: ${clean(other.machine?.label)}; Node: ${clean(other.machine?.node)}; source: ${clean(other.source)}.`,
@@ -96,7 +100,9 @@ export function report(summary, other) {
 		const hashes = ["pluginSha256", "nativeSha256"];
 		if (hashes.some((key) => typeof summary[key] !== "string" || !/^[a-f\d]{64}$/i.test(summary[key]) || typeof other[key] !== "string" || !/^[a-f\d]{64}$/i.test(other[key]))) reasons.push("missing or invalid byte hashes");
 		if (typeof summary.source !== "string" || !summary.source || typeof other.source !== "string" || !other.source) reasons.push("missing source identity");
+		if (typeof summary.dirty !== "string" || typeof other.dirty !== "string") reasons.push("missing working-tree provenance");
 		lines.push(hashes.some((key) => summary[key] !== other[key]) || summary.source !== other.source ? "Different bytes or source: this is also a code comparison; hardware effects are not isolated." : "Matching source and shipping bytes; machine/environment differences remain uncontrolled.");
+		if ((typeof summary.dirty === "string" && summary.dirty.length) || (typeof other.dirty === "string" && other.dirty.length)) lines.push("A working tree was dirty: recorded commit identity does not describe every source file; this is not a pure machine comparison.");
 		if (reasons.length) lines.push(`Ratios refused: ${[...new Set(reasons)].join("; ")}.`);
 		else lines.push("", ratioHeader, separator, ...current.rows.map((row) => `| ${clean(row.name)} (second / first) | ${ratios(row, compared.rows.find((entry) => entry.name === row.name))} |`));
 	}

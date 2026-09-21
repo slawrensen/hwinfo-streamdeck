@@ -33,6 +33,8 @@ SDK serialization and socket transport, with the production native addon.
 Only the publisher and Stream Deck host are simulated. The JavaScript and
 native hashes are recorded. Timer instrumentation is a separate Node preload;
 it never modifies the bundle or the installed plugin.
+Synthetic readings use integer fan/RPM values as recognizable generation
+witnesses; this does not benchmark every unit formatter or real sensor mix.
 
 | Case | Inventory | Keys / dials | Poll / producer ms | Question |
 | --- | ---: | ---: | ---: | --- |
@@ -46,7 +48,7 @@ it never modifies the bundle or the installed plugin.
 | control-250 | 512 | 36 / 6 | 250 / 250 | Timer instrumentation overhead control |
 
 All keys enable sparklines. Mixed mode cycles single/dual/triple/quad key
-layouts and single/two-row/overview dials, uses 64-member rotation sets with
+layouts and single/two-row/overview dials, uses 64-member (full matrix) or 16-member (smoke) rotation sets with
 two named groups, Elite controls, automatic cycling, alerts, sensor colors,
 16 reading links and an open property inspector. It checks every expected
 numeric value in each face, so one fresh cell cannot conceal stale siblings.

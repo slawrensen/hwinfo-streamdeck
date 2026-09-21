@@ -20,6 +20,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const clock = () => performance.timeOrigin + performance.now();
 const hash = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const args = process.argv.slice(2);
+const valueOptions = new Set(["--seconds", "--warmup", "--repeat", "--out", "--config", "--label"]);
+const switches = new Set(["--smoke", "--strict"]);
+const seenOptions = new Set();
+for (let index = 0; index < args.length; index++) {
+	const name = args[index];
+	assert.ok(valueOptions.has(name) || switches.has(name), `Unknown option: ${name}`);
+	assert.ok(!seenOptions.has(name), `Duplicate option: ${name}`);
+	seenOptions.add(name);
+	if (valueOptions.has(name)) assert.ok(args[++index] && !args[index].startsWith("--"), `${name} needs a value`);
+}
 const option = (name, fallback) => {
 	const index = args.indexOf(name);
 	if (index < 0) return fallback;
@@ -60,6 +70,7 @@ if (configFile !== null) {
 	cases.splice(0, cases.length, ...configured.map((entry) => ({ ...base, ...entry })));
 }
 for (const config of cases) {
+	assert.ok(Object.keys(config).every((key) => key === "name" || Object.hasOwn(base, key)), "Unknown workload field");
 	assert.match(config.name, /^[a-z0-9-]{1,60}$/);
 	for (const [field, min, max] of [["inventory", 16, 8192], ["keys", 1, 288], ["dials", 1, 48], ["rotation", 1, 256]]) {
 		assert.ok(Number.isInteger(config[field]) && config[field] >= min && config[field] <= max, `Invalid ${field}`);
@@ -71,13 +82,21 @@ for (const config of cases) {
 assert.equal(new Set(cases.map((c) => c.name)).size, cases.length, "Unique workload names required");
 assert.equal(process.platform, "win32", "The real production native boundary requires Windows");
 const original = path.join(root, "com.lawrensen.hwinfo.sdPlugin");
+function bundleInventory(directory, relative = "") {
+	return fs.readdirSync(path.join(directory, relative), { withFileTypes: true }).filter((entry) => entry.name !== "logs").sort((a, b) => a.name.localeCompare(b.name)).flatMap((entry) => {
+		const name = path.join(relative, entry.name);
+		return entry.isDirectory() ? bundleInventory(directory, name) : [{ path: name.replaceAll("\\", "/"), sha256: hash(path.join(directory, name)) }];
+	});
+}
 const metadata = {
 	schema: 1, startedAt: new Date().toISOString(), mode: smoke ? "smoke" : "benchmark", seconds, warmup, repeats, strict,
+	measurementMode: "synthetic-shared-memory-v1",
 	machine: { label: option("--label", os.hostname()), cpu: os.cpus().map(({ model, speed }) => ({ model, speed })), logicalCpus: os.cpus().length, totalMemory: os.totalmem(), freeMemory: os.freemem(), platform: os.platform(), release: os.release(), arch: os.arch(), node: process.version, execPath: process.execPath },
 	source: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
 	dirty: execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim(),
 	pluginSha256: hash(path.join(original, "bin/plugin.js")), nativeSha256: hash(path.join(original, "bin/hwsm.node")),
-	harnessSha256: hash(fileURLToPath(import.meta.url)), cases,
+	bundleInventory: bundleInventory(original),
+	harnessSha256: hash(fileURLToPath(import.meta.url)), preloadSha256: hash(path.join(root, "scripts/lib/scaling-preload.mjs")), producerSha256: hash(path.join(root, "scripts/lib/scaling-producer.mjs")), metricsSha256: hash(path.join(root, "scripts/lib/scaling-metrics.mjs")), cases,
 	limits: "Synthetic shared-memory producer and mock host. Callback and loop-drain timings are diagnostic, not physical display or full input-to-display latency. CPU is percent of one logical core. No low-spec extrapolation. Gadget is a separate backend."
 };
 try { metadata.machine.powerPlan = execFileSync("powercfg.exe", ["/getactivescheme"], { encoding: "utf8", windowsHide: true }).trim(); }
@@ -114,6 +133,9 @@ async function runCase(config, repeat) {
 	const record = (name, value) => fs.writeFileSync(path.join(directory, name), `${JSON.stringify(value, null, 2)}\n`);
 	const bundle = path.join(directory, "plugin");
 	fs.cpSync(original, bundle, { recursive: true, filter: (source) => path.basename(source) !== "logs" });
+	const copiedInventory = bundleInventory(bundle);
+	record("bundle-inventory.json", copiedInventory);
+	assert.deepEqual(copiedInventory, metadata.bundleInventory, "Bundle changed between workload copies");
 	const mapping = `Local\\HwinfoScaling_${randomUUID().replaceAll("-", "")}`;
 	const env = { ...process.env, HWINFO_SM2_NAME: mapping, HWINFO_SM2_MUTEX_NAME: `${mapping}_MUTEX`, HWINFO_VSB_KEY: `Software\\${mapping.slice(6)}`, HWSM_SCALING_POLL_MS: String(config.pollMs), HWSM_SCALING_TIMING: config.timing ? "1" : "0" };
 	// Do not inherit live tracing, altered freshness deadlines, alternate
@@ -121,7 +143,7 @@ async function runCase(config, repeat) {
 	for (const key of Object.keys(env)) if ((key.startsWith("HWINFO_") || key === "NODE_OPTIONS") && !["HWINFO_SM2_NAME", "HWINFO_SM2_MUTEX_NAME", "HWINFO_VSB_KEY"].includes(key)) delete env[key];
 	const publications = [], frames = [], errors = [], children = [], messages = [], commands = [];
 	let measuring = false, socket, bytes = 0, piMessages = 0;
-	let measurement, startedAt, stoppedAt, collectorError;
+	let measurement, startedAt, stoppedAt, collectorError, result, caseFailure;
 	const expected = new Set(), initialized = new Set(), valueCounts = new Map(), sampleFrames = new Map();
 	const actions = new Map();
 	const devices = Array.from({ length: Math.max(Math.ceil(config.keys / 36), Math.ceil(config.dials / 6)) }, (_, i) => ({ id: `deck${i}`, name: `Synthetic + XL ${i}`, size: { columns: 9, rows: 4 }, type: 13 }));
@@ -254,23 +276,31 @@ async function runCase(config, repeat) {
 			updateCoverage: updates.coverageRatio >= 0.95
 		};
 		if (strict && Object.values(budget).includes(false)) errors.push("Performance budget exceeded (see budget and raw measurements)");
-		const logs = path.join(bundle, "logs");
-		const stockWarnings = fs.existsSync(logs) ? fs.readdirSync(logs).filter((name) => name.endsWith(".log")).flatMap((name) => fs.readFileSync(path.join(logs, name), "utf8").split(/\r?\n/).filter((line) => /\b(?:WARN|ERROR)\b/.test(line))) : [];
-		if (stockWarnings.length) errors.push("Stock plugin logged WARN/ERROR; review preserved logs");
-		const result = { name: config.name, repeat: repeat + 1, config, ok: errors.length === 0, errors, budget, startedAt, stoppedAt, cpuPercentOneCore, callbackMs, drainMs, lateMs, callbackBudgetMisses: measurement.ticks.filter((t) => t.callbackMs > config.pollMs).length, loopDrainBudgetMisses: measurement.ticks.filter((t) => t.drainMs > config.pollMs).length, eventLoop: measurement.eventLoop, rssFirst: first.rss, rssLast: last.rss, rssPeak: Math.max(...resources.map((r) => r.rss)), piMessages, bytes, stockWarnings, updates, producerWriteMs: distribution(publications.map((p) => p.writeMs)), producerLateMs };
-		record("result.json", result);
-		return result;
+		result = { name: config.name, repeat: repeat + 1, config, errors, budget, startedAt, stoppedAt, cpuPercentOneCore, callbackMs, drainMs, lateMs, callbackBudgetMisses: measurement.ticks.filter((t) => t.callbackMs > config.pollMs).length, loopDrainBudgetMisses: measurement.ticks.filter((t) => t.drainMs > config.pollMs).length, eventLoop: measurement.eventLoop, rssFirst: first.rss, rssLast: last.rss, rssPeak: Math.max(...resources.map((r) => r.rss)), piMessages, bytes, updates, producerWriteMs: distribution(publications.map((p) => p.writeMs)), producerLateMs };
+	} catch (error) {
+		caseFailure = String(error.stack ?? error);
+		errors.push(caseFailure);
 	} finally {
 		measuring = false;
 		if (socket) socket.close();
-		if (producer?.connected) producer.send({ type: "stop" });
+		if (producer?.connected) producer.send({ type: "stop" }, (error) => { if (error) errors.push(`Publisher stop: ${error}`); });
 		await waitUntil(() => children.every((entry) => entry.exit !== null), 5000);
 		for (const client of server.clients) client.terminate();
 		await new Promise((resolve) => server.close(resolve));
+		if (collectorError && !errors.includes(collectorError)) errors.push(collectorError);
+		if (!children.every((entry) => entry.exit?.code === 0)) errors.push("Children did not both exit normally with code 0");
+		const logs = path.join(bundle, "logs");
+		const stockWarnings = fs.existsSync(logs) ? fs.readdirSync(logs).filter((name) => name.endsWith(".log")).flatMap((name) => fs.readFileSync(path.join(logs, name), "utf8").split(/\r?\n/).filter((line) => /\b(?:WARN|ERROR)\b/.test(line))) : [];
+		if (stockWarnings.length) errors.push("Stock plugin logged WARN/ERROR; review preserved logs");
+		try { assert.deepEqual(bundleInventory(bundle), copiedInventory, "Copied bundle changed during workload"); }
+		catch (error) { errors.push(String(error)); }
+		result = { ...result, name: config.name, repeat: repeat + 1, config, ok: errors.length === 0, errors, stockWarnings };
+		record("result.json", result);
 		record("raw.json", { config, publications, commands, frames, messages, measurement, startedAt, stoppedAt, collectorError, exits: children.map(({ name, exit }) => ({ name, exit })) });
 		for (const [context, svg] of sampleFrames) fs.writeFileSync(path.join(directory, `${context}.svg`), svg);
-		// Cleanup helper rechecks owned creation identities if graceful exit
-		// fails. A forced cleanup is a failure, never a successful benchmark.
-		assert.ok(children.every((entry) => entry.exit?.code === 0), "Children did not both exit normally with code 0");
 	}
+	// Outer cleanup rechecks creation identities if normal shutdown failed.
+	// Keep the original exception alongside any teardown failures.
+	if (caseFailure) throw new Error(errors.join("\n"));
+	return result;
 }

@@ -7,6 +7,8 @@ function fixture() {
 	const cases = [{ ...base, name: "changing-250" }, { ...base, name: "inventory-2048", inventory: 2048 }];
 	return {
 		schema: 1, ok: true, mode: "benchmark", seconds: 120, warmup: 30, repeats: 3,
+		measurementMode: "synthetic-shared-memory-v1", dirty: "",
+		harnessSha256: "c".repeat(64), preloadSha256: "d".repeat(64), producerSha256: "e".repeat(64), metricsSha256: "f".repeat(64),
 		machine: { label: "fixture", node: "v20.20.0" }, source: "revision", pluginSha256: "a".repeat(64), nativeSha256: "b".repeat(64), cases,
 		results: cases.flatMap((config, index) => [10, 30, 20].map((cpu, repeat) => ({
 			name: config.name, repeat: repeat + 1, config, ok: true, budget: { cpu: true, callback: true },
@@ -76,6 +78,30 @@ describe("scaling report", () => {
 		assert.match(comparison, /also a code comparison; hardware effects are not isolated/);
 		assert.match(comparison, /changing-250 \(second \/ first\) \| 2\.00x/);
 		assert.doesNotMatch(comparison, /Ratios refused/);
+	});
+
+	it("refuses absent measurement modes and missing or different measurement code", () => {
+		const first = fixture(), second = fixture();
+		delete first.measurementMode; delete second.measurementMode;
+		assert.match(report(first, second).split("## Second-run comparison")[1], /Ratios refused: missing or incompatible measurementMode/);
+		for (const key of ["harnessSha256", "preloadSha256", "producerSha256", "metricsSha256"]) {
+			for (const value of [undefined, "invalid", "0".repeat(64)]) {
+				const other = fixture(); other[key] = value;
+				const comparison = report(fixture(), other).split("## Second-run comparison")[1];
+				assert.ok(comparison.includes(`Ratios refused: missing or incompatible ${key}`));
+				assert.doesNotMatch(comparison, /\(second \/ first\) \|/);
+			}
+		}
+	});
+
+	it("qualifies dirty worktrees without representing them as pure hardware comparisons", () => {
+		const other = fixture(); other.dirty = " M src/plugin.ts";
+		const comparison = report(fixture(), other).split("## Second-run comparison")[1];
+		assert.match(comparison, /A working tree was dirty/);
+		assert.match(comparison, /not a pure machine comparison/);
+		assert.match(comparison, /changing-250 \(second \/ first\) \| 1\.00x/);
+		delete other.dirty;
+		assert.match(report(fixture(), other), /Ratios refused: missing working-tree provenance/);
 	});
 
 	it("distinguishes a budget review from failed or absent evidence", () => {

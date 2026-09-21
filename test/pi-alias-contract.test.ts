@@ -332,13 +332,17 @@ const DIAL_IDS = ["rotation-set", "rotation-help", "reading-color-list", "overvi
 const READING_IDS = ["detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
 
 /** Loads the production panel over a fresh DOM, store and socket. */
-function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}): Mounted {
+function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}, replies?: { settings?: () => Promise<Record<string, unknown>>; globals?: () => Promise<Record<string, unknown>>; textControls?: boolean }): Mounted {
 	const doc = new FakeDocument(shape === "dial" ? "Sensor Dial settings" : "Sensor Reading settings");
 	for (const id of [...SHARED_IDS, ...(shape === "dial" ? DIAL_IDS : READING_IDS)]) doc.make(id, id.endsWith("-copy") || id.endsWith("-apply") ? "button" : id.startsWith("config-") && !id.endsWith("-note") ? "textarea" : "div");
 	const pickerWrap = doc.createElement("div");
 	pickerWrap.className = "hw-picker";
 	doc.body.appendChild(pickerWrap);
 	doc.make("picker-search", "input", pickerWrap);
+	if (replies?.textControls) {
+		doc.make("text-custom", "div");
+		doc.make("text-color", "input");
+	}
 	if (shape === "dial") {
 		doc.make("reading-color-preset", "select").value = "automatic";
 	} else {
@@ -376,8 +380,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 					piSubscriber = cb;
 				}
 			},
-			getSettings: async () => ({ settings: store }),
-			getGlobalSettings: async () => globalStore,
+			getSettings: async () => ({ settings: replies?.settings === undefined ? store : await replies.settings() }),
+			getGlobalSettings: async () => replies?.globals === undefined ? globalStore : await replies.globals(),
 			setSettings: (docValue: unknown) => {
 				applied.push(plain(docValue));
 			},
@@ -501,6 +505,89 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
 
 describe("remaining PI review regressions", () => {
+	it("prototype-named theme settings keep the gallery and custom color seed usable", async () => {
+		const m = mountPanel("dial", { readingKey: SM[0] }, {}, { textControls: true });
+		await m.flush();
+		m.echo("theme", "__proto__");
+		m.feed({ event: "themes", ...loadThemes(), effectiveDeckTheme: "constructor" });
+		await m.flush();
+		assert.equal(m.el("text-color").value, loadThemes().themes.void!.value.toLowerCase());
+		assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Void");
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("real preview-only loss and recovery request a fresh sensor tree", async () => {
+		const status = linkedStatus();
+		const m = await openPanel("dial", { readingKey: SM[0] }, status);
+		const before = m.sent.length;
+		m.feed(buildPreview({ ...status, state: "stale", staleForMs: 16_000 }, { readingKey: SM[0] }, false));
+		m.feed(buildPreview({ state: "unavailable", reason: "not-running", message: "Stopped" }, { readingKey: SM[0] }, false));
+		m.feed(buildPreview(status, { readingKey: SM[0] }, false));
+		assert.equal(m.sent.length, before + 1, "production tick sends previews, not unsolicited sensor trees");
+		m.feed(buildPreview(status, { readingKey: SM[0] }, false));
+		assert.equal(m.sent.length, before + 1, "one request stays in flight until its reply");
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("an ok preview from a changed provider refreshes the tree once", async () => {
+		const status = linkedStatus();
+		const m = await openPanel("dial", { readingKey: SM[0] }, status);
+		const before = m.sent.length;
+		const recovered = { ...status, source: "shared-memory" as const };
+		m.feed(buildPreview(recovered, { readingKey: SM[0] }, false));
+		m.feed(buildPreview(recovered, { readingKey: SM[0] }, false));
+		assert.equal(m.sent.length, before + 1);
+		m.feed(buildSensorTree(recovered));
+		m.feed(buildPreview(recovered, { readingKey: SM[0] }, false));
+		assert.equal(m.sent.length, before + 1);
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("the config document preserves an unknown own __proto__ field", async () => {
+		const seed = JSON.parse('{"readingKey":"cpu:0:0","__proto__":{"future":"value"}}') as Record<string, unknown>;
+		const m = mountPanel("dial", seed);
+		await m.flush();
+		const copied = await copiedDocument(m);
+		assert.deepEqual(copied, seed);
+		assert.deepEqual(await applyDocument(m, copied), seed);
+	});
+
+	for (const scope of ["key", "deck"] as const) {
+		it(`a delayed ${scope} config read cannot overwrite a draft typed while waiting`, async () => {
+			let answer: (value: Record<string, unknown>) => void = () => {};
+			const reply = new Promise<Record<string, unknown>>((resolve) => { answer = resolve; });
+			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: () => reply } : { globals: () => reply });
+			await m.flush();
+			m.el(`config-${scope}-copy`).fire("click");
+			const well = m.el(`config-${scope}`);
+			const draft = '{"readingLinks": [{"draft": true}]}';
+			well.value = draft;
+			well.fire("input");
+			answer({ old: "saved" });
+			await m.flush();
+			assert.equal(well.value, draft);
+			assert.equal(m.clipboard.text, draft);
+			assert.equal(m.writes.length, 0);
+		});
+
+		it(`out-of-order ${scope} config reads keep the newest reply`, async () => {
+			const answers: ((value: Record<string, unknown>) => void)[] = [];
+			const read = (): Promise<Record<string, unknown>> => new Promise((resolve) => { answers.push(resolve); });
+			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: read } : { globals: read });
+			await m.flush();
+			m.el(`config-${scope}-copy`).fire("click");
+			m.el(`config-${scope}-copy`).fire("click");
+			assert.equal(answers.length, 2);
+			answers[1]!({ newest: true });
+			await m.flush();
+			answers[0]!({ old: true });
+			await m.flush();
+			assert.deepEqual(JSON.parse(m.el(`config-${scope}`).value), { newest: true });
+			assert.deepEqual(JSON.parse(m.clipboard.text), { newest: true });
+			assert.equal(m.writes.length, 0);
+		});
+	}
+
 	it("a stale snapshot retains missing cues, unavailable clears them, and recovery requests a fresh tree", async () => {
 		const status = linkedStatus();
 		const m = await openPanel("dial", { readingKey: "gone:0:1", rotationKeys: ["gone:0:1"] }, status);

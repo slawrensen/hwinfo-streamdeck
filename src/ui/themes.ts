@@ -69,19 +69,16 @@ export function validateThemesConfig(raw: unknown): ThemesConfig {
 	if (typeof root.themes !== "object" || root.themes === null) {
 		fail("themes", "expected an object");
 	}
-	const themes: Record<string, Palette> = {};
-	for (const [name, palette] of Object.entries(root.themes as Record<string, unknown>)) {
-		themes[name] = validatePalette(palette, `themes.${name}`);
-	}
+	const themes = Object.fromEntries(Object.entries(root.themes as Record<string, unknown>).map(([name, palette]) => [name, validatePalette(palette, `themes.${name}`)]));
 	if (Object.keys(themes).length === 0) {
 		fail("themes", "no themes defined");
 	}
 	for (const field of ["defaultTheme", "legacyDefaultTheme"] as const) {
-		if (typeof root[field] !== "string" || themes[root[field] as string] === undefined) {
+		if (typeof root[field] !== "string" || !Object.hasOwn(themes, root[field] as string)) {
 			fail(field, "must name a defined theme");
 		}
 	}
-	if (!Array.isArray(root.typeAccentsDisabledOn) || root.typeAccentsDisabledOn.some((t) => typeof t !== "string" || themes[t] === undefined)) {
+	if (!Array.isArray(root.typeAccentsDisabledOn) || root.typeAccentsDisabledOn.some((t) => typeof t !== "string" || !Object.hasOwn(themes, t))) {
 		fail("typeAccentsDisabledOn", "must list defined themes");
 	}
 	const alertsRaw = root.alerts;
@@ -171,7 +168,7 @@ export function resolvePalette(config: ThemesConfig, themeId: string | undefined
 	if (level !== "normal") {
 		return config.alerts[level];
 	}
-	const id = themeId !== undefined && config.themes[themeId] !== undefined ? themeId : config.defaultTheme;
+	const id = themeId !== undefined && Object.hasOwn(config.themes, themeId) ? themeId : config.defaultTheme;
 	const base = config.themes[id] as Palette;
 	if (typeAccent === null || config.typeAccentsDisabledOn.includes(id)) {
 		return base;

@@ -22,6 +22,7 @@ import { describe, it } from "node:test";
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey } from "../src/ui/key-renderer";
 import { resolveTextColors, themeTextColors } from "../src/ui/text-colors";
+import { applyGlobalThemeSettings, effectiveThemeFor, getDeckTheme } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 
 const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
@@ -136,5 +137,31 @@ describe("theme text mode is byte-identical to the palette path", () => {
 	it("an empty zones array leaves the dial bar untouched", () => {
 		const base = { title: "CPU", valueText: "56.3", unitText: "°C", statsText: "", fraction: 0.4, palette: VOID, barColor: VOID.accent };
 		assert.equal(renderDial({ ...base, zones: [] }), renderDial(base));
+	});
+});
+
+describe("malformed theme settings salvage without rewriting", () => {
+	it("prototype-named local themes render the default face", () => {
+		const base = { label: "CPU", valueText: "40.0", unitText: "°C", statBadge: "", palette: VOID };
+		for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+			const settings = { theme };
+			const palette = resolvePalette(config, effectiveThemeFor(settings), null, "normal");
+			assert.equal(renderReadingKey({ ...base, palette }), renderReadingKey(base), theme);
+			assert.deepEqual(settings, { theme });
+		}
+	});
+
+	it("prototype-named global themes retain the last valid deck theme", () => {
+		try {
+			applyGlobalThemeSettings({ theme: "paper" });
+			for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+				const settings = { theme };
+				applyGlobalThemeSettings(settings);
+				assert.equal(getDeckTheme(), "paper", theme);
+				assert.deepEqual(settings, { theme });
+			}
+		} finally {
+			applyGlobalThemeSettings({ theme: "void" });
+		}
 	});
 });

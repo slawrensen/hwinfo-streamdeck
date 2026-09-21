@@ -79,7 +79,7 @@ function notify(): void {
 /** Ingests the global settings (startup read and every later change). */
 export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccents?: unknown; textMode?: unknown; textColor?: unknown; textDimSecondary?: unknown; dataUnits?: unknown }): void {
 	const config = loadThemes();
-	const themeValid = typeof settings.theme === "string" && config.themes[settings.theme] !== undefined;
+	const themeValid = typeof settings.theme === "string" && Object.hasOwn(config.themes, settings.theme);
 	const nextTheme = themeValid ? (settings.theme as string) : deckTheme;
 	const nextAccents = settings.typeAccents !== "off";
 	const nextText = parseTextSettings(settings);

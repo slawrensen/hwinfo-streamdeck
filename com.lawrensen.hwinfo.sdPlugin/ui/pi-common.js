@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-5";
+	const PI_BUILD = "1.7.0.0-6";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -49,6 +49,7 @@
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
 	let treeHasSnapshot = false; // ok or stale, unlike an unavailable empty tree
 	let treeRequestPending = false;
+	let treeSource;
 
 	function requestTree() {
 		treeRequestPending = true;
@@ -2738,7 +2739,7 @@
 	// The plugin resolves the effective deck default (theme store, incl.
 	// legacy migration); never guess it from raw global settings here.
 	function resolvedDeckId() {
-		return themesConfig.themes[themesConfig.effectiveDeckTheme] ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
+		return Object.hasOwn(themesConfig.themes, themesConfig.effectiveDeckTheme) ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
 	}
 
 	function renderGallery() {
@@ -2781,7 +2782,7 @@
 	// color: the truthful "custom starts from what you see" seed.
 	function themeValueSeed() {
 		if (themesConfig === null) return "#ffffff";
-		const palette = themesConfig.themes[themeOverride] ?? themesConfig.themes[resolvedDeckId()];
+		const palette = themesConfig.themes[Object.hasOwn(themesConfig.themes, themeOverride) ? themeOverride : resolvedDeckId()];
 		return palette ? palette.value.toLowerCase() : "#ffffff";
 	}
 
@@ -2828,6 +2829,7 @@
 		}
 		if (p.event === "sensorTree") {
 			setTree(p.groups);
+			treeSource = p.source;
 			treeFetchedOk = p.state === "ok";
 			treeHasSnapshot = p.state === "ok" || p.state === "stale";
 			projectDetailState();
@@ -2840,8 +2842,11 @@
 		} else if (p.event === "preview") {
 			renderPreview(p);
 			setHint(p.hint);
-			// The tree was fetched while HWiNFO was down; refresh it now that
-			// data is flowing, so the picker isn't stuck on "No sensors reported".
+			// Ticks push previews only. A source outage or switch invalidates
+			// the old tree even when no new tree reply arrived in between.
+			if (p.state !== "ok" || (p.source !== undefined && p.source !== treeSource)) treeFetchedOk = false;
+			// Refresh after recovery so keys, aliases and available readings
+			// describe the provider that now supplies the face.
 			if (p.state === "ok" && !treeFetchedOk && !treeRequestPending) {
 				requestTree();
 			}
@@ -3208,10 +3213,7 @@
 		const configDeckEl = document.getElementById("config-deck");
 		const configNote = document.getElementById("config-note");
 		const canonical = (doc) => {
-			const out = {};
-			for (const field of Object.keys(doc ?? {}).sort()) {
-				out[field] = doc[field];
-			}
+			const out = Object.fromEntries(Object.keys(doc ?? {}).sort().map((field) => [field, doc[field]]));
 			return JSON.stringify(out, null, "\t");
 		};
 		const say = (text) => {
@@ -3223,20 +3225,21 @@
 		// settings of the moment the button is pressed, not of fold-open.
 		// A dirty well copies the draft exactly as typed.
 		const dirty = new WeakSet();
+		const fills = new WeakMap();
 		for (const well of [configKeyEl, configDeckEl]) {
 			well.addEventListener("input", () => dirty.add(well));
 		}
 		const fillWell = async (el) => {
+			const request = {};
+			fills.set(el, request);
 			// Asymmetric client shapes: getSettings resolves the payload
 			// envelope, getGlobalSettings resolves the bare settings object.
 			// Every reading key goes out wearing its friendly name; apply
 			// takes the names back off, so nothing stale is ever stored.
-			if (el === configKeyEl) {
-				const own = await streamDeckClient.getSettings();
-				el.value = canonical(mapReadingKeys(own?.settings, namedKey));
-			} else {
-				el.value = canonical(await streamDeckClient.getGlobalSettings());
-			}
+			const doc = el === configKeyEl ? (await streamDeckClient.getSettings())?.settings : await streamDeckClient.getGlobalSettings();
+			// A late reply cannot replace a draft or a newer read of this well.
+			if (dirty.has(el) || fills.get(el) !== request) return;
+			el.value = canonical(el === configKeyEl ? mapReadingKeys(doc, namedKey) : doc);
 			dirty.delete(el);
 		};
 		// A well the user has typed into keeps its draft: reopening the fold is

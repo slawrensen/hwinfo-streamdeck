@@ -188,6 +188,12 @@ describe("resolvePalette", () => {
 		assert.deepEqual(resolvePalette(config, "no-such-theme", null, "normal"), config.themes.void);
 		assert.deepEqual(resolvePalette(config, undefined, null, "normal"), config.themes.void);
 	});
+
+	it("prototype property names are unknown themes", () => {
+		for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+			assert.deepEqual(resolvePalette(config, theme, null, "normal"), config.themes.void, theme);
+		}
+	});
 });
 
 describe("classifyTypeAccent", () => {
@@ -245,6 +251,22 @@ describe("schema validation", () => {
 		const broken = valid();
 		broken.defaultTheme = "carbon";
 		assert.throws(() => validateThemesConfig(broken), /defaultTheme/);
+	});
+
+	it("rejects inherited names in theme references", () => {
+		for (const field of ["defaultTheme", "legacyDefaultTheme", "typeAccentsDisabledOn"]) {
+			const broken = valid();
+			broken[field] = field === "typeAccentsDisabledOn" ? ["constructor"] : "__proto__";
+			assert.throws(() => validateThemesConfig(broken), new RegExp(field));
+		}
+	});
+
+	it("keeps an explicitly defined prototype-named theme as an own entry", () => {
+		const raw = valid();
+		raw.themes = { ...config.themes, ["__proto__"]: config.themes.paper };
+		const parsed = validateThemesConfig(raw);
+		assert.ok(Object.hasOwn(parsed.themes, "__proto__"));
+		assert.deepEqual(resolvePalette(parsed, "__proto__", null, "normal"), config.themes.paper);
 	});
 
 	it("rejects missing alert palettes", () => {

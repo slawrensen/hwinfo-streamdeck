@@ -48,30 +48,43 @@ function nativeTestArgs() {
 /** pi-harness (long-running server) + capture-pi, with graceful stdin exit. */
 async function runPiCapture() {
 	console.log("\n=== pi-harness + capture-pi ===");
-	const harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: repoRoot, stdio: ["pipe", "inherit", "inherit"] });
-	const exited = new Promise((resolve) => harness.once("exit", resolve));
+	const harness = spawn(process.execPath, ["scripts/pi-harness.mjs"], { cwd: repoRoot, stdio: ["pipe", "pipe", "inherit"] });
+	let harnessOutput = "";
+	let harnessError;
+	let harnessExited = false;
+	harness.stdout.on("data", (chunk) => {
+		harnessOutput = (harnessOutput + chunk.toString()).slice(-4096);
+		process.stdout.write(chunk);
+	});
+	harness.once("error", (error) => { harnessError = error; });
+	const exited = new Promise((resolve) => harness.once("exit", (code) => { harnessExited = true; resolve(code); }));
 	try {
 		observeOwned();
 		let up = false;
 		for (let i = 0; i < 40 && !up; i++) {
 			await sleep(500);
-			try {
-				up = (await fetch("http://127.0.0.1:28997/ui/sensor-reading.html")).ok;
-			} catch {
-				/* not up yet */
-			}
+			if (harnessError) throw harnessError;
+			if (harnessExited || harness.exitCode !== null || harness.signalCode !== null) throw new Error(`pi-harness exited before capture: ${harness.exitCode}`);
+			// Only our child's successful listen callback establishes ownership.
+			// A HTTP response could come from an unrelated harness on this port.
+			up = harnessOutput.includes("PI at http://127.0.0.1:28997/");
 		}
 		if (!up) {
 			throw new Error("pi-harness never came up on :28997");
 		}
 		await run("capture-pi", ["scripts/capture-pi.mjs", path.join(outRoot, "pi")]);
 	} finally {
-		harness.stdin.write("exit\n");
-		const code = await Promise.race([exited, sleep(5000).then(() => "timeout")]);
-		if (code === "timeout") {
-			console.error("pi-harness ignored stdin exit — killing (will show as orphan if children leak)");
-			harness.kill();
-			await Promise.race([exited, sleep(2000)]);
+		if (!harnessError && !harnessExited) {
+			// Exit can race the shutdown write. The exit deadline still applies
+			// if stdin closes without the owned child actually stopping.
+			harness.stdin.once("error", () => {});
+			harness.stdin.write("exit\n");
+			const code = await Promise.race([exited, sleep(5000).then(() => "timeout")]);
+			if (code === "timeout") {
+				console.error("pi-harness ignored stdin exit; killing (will show as orphan if children leak)");
+				harness.kill();
+				await Promise.race([exited, sleep(2000)]);
+			}
 		}
 	}
 }

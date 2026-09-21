@@ -33,13 +33,12 @@
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync } from "node:fs";
-import os from "node:os";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
 import { buildInfo, makeCheck, sleep } from "./lib/e2e-common.mjs";
-import { cleanupBrowser } from "./lib/process-ownership.mjs";
+import { cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
@@ -435,7 +434,7 @@ const server = createServer((req, res) => {
 server.listen(HTTP_PORT, "127.0.0.1");
 
 // --- headless Chrome over CDP (the capture-pi pattern) --------------------
-const chromeProfile = mkdtempSync(path.join(os.tmpdir(), "pi-persist-profile-"));
+const chromeProfile = createBrowserProfile("pi-persist-profile-");
 const chromeStartedAt = new Date().toISOString();
 const chrome = spawn(
 	CHROME,
@@ -447,8 +446,10 @@ chrome.once("error", (err) => { chromeError = err; });
 function killChromeTree() {
 	try {
 		cleanupBrowser(chromeProfile, chromeStartedAt);
-	} catch {
-		console.error(`[pi-persistence] browser cleanup could not verify ownership; profile ${chromeProfile} left for inspection`);
+	} catch (err) {
+		const message = `[pi-persistence] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`;
+		console.error(message);
+		results.errors.push(message);
 	}
 }
 const watchdog = setTimeout(() => {

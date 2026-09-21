@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { browserProcesses, classifyNewProcesses, hasBrowserProfile, ownedDescendants, processIdentity } from "../scripts/lib/process-ownership.mjs";
+import { browserProcesses, classifyNewProcesses, cleanupBrowser, hasBrowserProfile, ownedDescendants, processIdentity } from "../scripts/lib/process-ownership.mjs";
 
 const row = (pid, parentPid, createdAt, commandLine = "node harness.mjs", name = "node.exe") => ({ pid, parentPid, createdAt, commandLine, name });
 const startedAt = "2026-09-21T01:00:00.000Z";
@@ -20,6 +20,15 @@ test("unobserved descendants of exited processes are possible leaks, never kill 
 	const step = row(11, 10, later);
 	const unseen = row(12, 11, later);
 	assert.deepEqual(classifyNewProcesses([root], [root, unseen], [root, step]), { owned: [], ambiguous: [unseen], unrelated: [] });
+});
+
+test("missing intermediate ancestors cannot hide processes in this run's directories", () => {
+	const root = row(10, 1, startedAt);
+	const step = row(11, 10, later);
+	const scope = "C:\\Temp\\hwinfo-suite-browser-owned";
+	const unseen = row(13, 12, later, `chrome --type=renderer --user-data-dir=${scope}\\pi-capture-profile-child`, "chrome.exe");
+	const other = row(14, 99, later, `chrome --user-data-dir=${scope}-other\\pi-capture-profile-child`, "chrome.exe");
+	assert.deepEqual(classifyNewProcesses([root], [root, unseen, other], [root, step], [scope]), { owned: [], ambiguous: [unseen], unrelated: [other] });
 });
 
 test("recorded identities retain descendants but reject PID reuse and missing ancestors", () => {
@@ -44,4 +53,24 @@ test("browser cleanup matches the exact unique profile and its descendants", () 
 	const unrelated = row(52, 999, later, `chrome "--user-data-dir=${profile}-other"`, "chrome.exe");
 	const previous = row(53, 999, "2026-09-20T00:00:00.000Z", `chrome "--user-data-dir=${profile}"`, "chrome.exe");
 	assert.deepEqual(browserProcesses([browser, renderer, unrelated, previous], profile, startedAt).map((p) => p.pid), [50, 51]);
+});
+
+test("browser cleanup reports survivors even after their observed parent exits", () => {
+	const profile = "C:\\Temp\\owned-profile";
+	const browser = row(50, 10, later, `chrome --user-data-dir=${profile}`, "chrome.exe");
+	const renderer = row(51, 50, later, "chrome --type=renderer", "chrome.exe");
+	const snapshots = [[browser, renderer], [renderer], [renderer]];
+	const terminated = [];
+	assert.throws(() => cleanupBrowser(profile, startedAt, { snapshot: () => snapshots.shift(), terminate: (rows) => terminated.push(rows.map((p) => p.pid)) }), /left 1 owned process/);
+	assert.deepEqual(terminated, [[50, 51], [51]]);
+});
+
+test("browser cleanup succeeds only after the final snapshot proves exit", () => {
+	const profile = "C:\\Temp\\owned-profile";
+	const browser = row(50, 10, later, `chrome --user-data-dir=${profile}`, "chrome.exe");
+	const unrelated = row(90, 99, later, "chrome --headless", "chrome.exe");
+	const snapshots = [[browser, unrelated], [unrelated], [unrelated]];
+	const terminated = [];
+	cleanupBrowser(profile, startedAt, { snapshot: () => snapshots.shift(), terminate: (rows) => terminated.push(rows.map((p) => p.pid)) });
+	assert.deepEqual(terminated, [[50], []]);
 });

@@ -12,6 +12,7 @@ import { classifyNewProcesses, ownedDescendants, processIdentity, processSnapsho
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outRoot = process.argv[2] ?? fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-suite-"));
+const browserRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-suite-browser-"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Snapshots only at launch/step boundaries, never a busy background poll.
@@ -25,7 +26,7 @@ function observeOwned() {
 function run(name, args, opts = {}) {
 	console.log(`\n=== ${name} ===`);
 	return new Promise((resolve, reject) => {
-		const child = spawn(process.execPath, args, { cwd: repoRoot, stdio: ["ignore", "inherit", "inherit"], ...opts });
+		const child = spawn(process.execPath, args, { cwd: repoRoot, stdio: ["ignore", "inherit", "inherit"], ...opts, env: { ...process.env, ...opts.env, HWSM_TEST_BROWSER_ROOT: browserRoot } });
 		child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${name} exited with code ${code}`))));
 		child.on("error", reject);
 		observeOwned();
@@ -119,7 +120,7 @@ for (const [name, step] of steps) {
 
 await sleep(1500); // give just-killed trees a moment to reap
 const after = observeOwned();
-const { owned: orphans, ambiguous, unrelated: bystanders } = classifyNewProcesses(before, after, [...recorded.values()]);
+const { owned: orphans, ambiguous, unrelated: bystanders } = classifyNewProcesses(before, after, [...recorded.values()], [repoRoot, browserRoot]);
 
 console.log(`\n=== hygiene ===`);
 console.log(`processes before: ${before.length}, after: ${after.length}, new: ${orphans.length + ambiguous.length + bystanders.length} (${orphans.length} ours, ${ambiguous.length} ambiguous, ${bystanders.length} unrelated)`);

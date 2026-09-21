@@ -23,11 +23,10 @@
 // that expect a clean panel (the rotation set is already split, so "Split
 // into groups" is gone).
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import os from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
-import { cleanupBrowser } from "./lib/process-ownership.mjs";
+import { cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const outDir = process.argv[2] ?? ".";
 const BASE = "http://127.0.0.1:28997/ui";
@@ -36,7 +35,7 @@ const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(`[capture] ${m}`);
-const chromeProfile = mkdtempSync(path.join(os.tmpdir(), "pi-capture-profile-"));
+const chromeProfile = createBrowserProfile("pi-capture-profile-");
 const chromeStartedAt = new Date().toISOString();
 
 const chrome = spawn(CHROME, [
@@ -54,8 +53,9 @@ chrome.once("error", (err) => { chromeError = err; });
 function killChromeTree() {
 	try {
 		cleanupBrowser(chromeProfile, chromeStartedAt);
-	} catch {
-		console.error(`[capture] browser cleanup could not verify ownership; profile ${chromeProfile} left for inspection`);
+	} catch (err) {
+		console.error(`[capture] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`);
+		process.exitCode = 1;
 	}
 }
 

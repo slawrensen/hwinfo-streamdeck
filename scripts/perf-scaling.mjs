@@ -14,6 +14,7 @@ import { buildInfo, decodeSvg, pluginArgv, sleep, waitUntil } from "./lib/e2e-co
 import { createChildCleanup } from "./lib/process-ownership.mjs";
 import { analyzeGenerations, distribution, frameGeneration } from "./lib/scaling-metrics.mjs";
 import { readingKey } from "./lib/scaling-producer.mjs";
+import { report } from "./scaling-report.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const clock = () => performance.timeOrigin + performance.now();
@@ -100,7 +101,9 @@ try {
 	failure = String(error?.stack ?? error);
 } finally {
 	try { cleanup.cleanup(); } catch (error) { failure = `${failure ?? ""}\n${error.stack}`; }
-	save("summary.json", { ...metadata, completedAt: new Date().toISOString(), ok: !failure, failure: failure ?? null, results });
+	const summary = { ...metadata, completedAt: new Date().toISOString(), ok: !failure, failure: failure ?? null, results };
+	save("summary.json", summary);
+	fs.writeFileSync(path.join(output, "summary.md"), report(summary));
 }
 if (failure) { console.error(failure); process.exitCode = 1; }
 else console.log(`Scaling evidence: ${output}`);

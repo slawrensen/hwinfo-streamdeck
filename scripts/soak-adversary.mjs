@@ -43,6 +43,7 @@ import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { assertSameStack, assertSharedMemoryReady, makeEventLogTail, restartEvent, sameLifetime, selectInstalledStack, startHostCommand, stopIdentityCommand } from "./lib/soak-adversary-safety.mjs";
+import { candidateNativeContract, createInstalledProducerCheck, runWithAdvancingProducer } from "./lib/soak-producer-freshness.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -67,6 +68,7 @@ const MUTEX_NAME = "Global\\HWiNFO_SM2_MUTEX";
 const SD_EXE = path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Elgato", "StreamDeck", "StreamDeck.exe");
 const installedRoot = path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "Plugins", "com.lawrensen.hwinfo.sdPlugin");
 const installedScript = path.join(installedRoot, "bin", "plugin.js");
+const installedAddon = path.join(installedRoot, "bin", "hwsm.node");
 const nodeRoot = path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "NodeJS");
 let observerSession;
 
@@ -287,15 +289,25 @@ if (baseline.hwinfoCount === 0) {
 	console.error(`soak-adversary: baseline incomplete (plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo ${baseline.hwinfoCount}); refusing to start`);
 	process.exit(1);
 }
-const hashes = () => Object.fromEntries([installedScript, path.join(installedRoot, "bin", "hwsm.node")]
+const hashes = () => Object.fromEntries([installedScript, installedAddon]
 	.map((file) => [file, createHash("sha256").update(fs.readFileSync(file)).digest("hex")]));
 const installedHashes = hashes();
+const checkProducer = createInstalledProducerCheck({ addonPath: installedAddon,
+	expectedSha256: installedHashes[installedAddon], expectedBuild: candidateNativeContract(repoRoot) });
 pollLogs(); // prime before even the brief mutex preflight
+let producerBaseline;
+try {
+	producerBaseline = await checkProducer();
+	assertSameStack(baseline, await snapshot());
+} catch (err) {
+	emit({ tsIso: nowIso(), name: "program-end", verdict: "FAIL", detail: `Producer preflight failed: ${err.message}`, evidence: err.freshnessEvidence });
+	throw err;
+}
 if (program.some((event) => event.name.startsWith("mutex-"))) {
 	const preflight = await preflightMutex().catch((err) => `open-failed: ${err?.message ?? err}`);
 	if (preflight !== "ok") throw new Error(`Mutex preflight failed (${preflight}); refusing to start`);
 }
-emit({ tsIso: nowIso(), name: "program-start", verdict: "INFO", baseline, installedHashes, detail: `baseline plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo x${baseline.hwinfoCount}; lead ${leadSec} s; events: ${program.map((e) => e.name).join(", ")}` });
+emit({ tsIso: nowIso(), name: "program-start", verdict: "INFO", baseline, installedHashes, producerBaseline, detail: `baseline plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo x${baseline.hwinfoCount}; lead ${leadSec} s; events: ${program.map((e) => e.name).join(", ")}` });
 console.log(`soak-adversary: baseline ok (plugin ${baseline.pluginPid}, app ${baseline.sdPid}); ${program.length} events after a ${leadSec} s lead`);
 console.log(`soak-adversary: events ${outPath}`);
 
@@ -315,8 +327,10 @@ for (const ev of program) {
 		} else {
 			if (JSON.stringify(hashes()) !== JSON.stringify(installedHashes)) throw new Error("Installed candidate bytes changed; refusing fault");
 			assertReady(await snapshot());
-			result = await ev.run(pollLogs);
+			result = await runWithAdvancingProducer(() => ev.run(pollLogs), checkProducer);
+			result.lines.push(...pollLogs());
 			if (result.verdict === "PASS") {
+				if (JSON.stringify(hashes()) !== JSON.stringify(installedHashes)) throw new Error("Installed candidate bytes changed during the event");
 				const settled = await snapshot();
 				assertSameStack(result.after, settled);
 				result.lines.push(...pollLogs());
@@ -325,7 +339,7 @@ for (const ev of program) {
 			}
 		}
 	} catch (err) {
-		result = { ...result, verdict: "FAIL", detail: `event failed: ${String(err?.message ?? err).slice(0, 200)}`, lines: result?.lines ?? [] };
+		result = { ...result, verdict: "FAIL", detail: `event failed: ${String(err?.message ?? err).slice(0, 200)}`, lines: result?.lines ?? [], freshnessFailure: err?.freshnessEvidence };
 	}
 	if (result.verdict !== "PASS") {
 		failures++;

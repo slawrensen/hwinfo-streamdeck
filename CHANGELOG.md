@@ -15,6 +15,11 @@ Per-reading dial colors and reliability fixes in one release candidate.
 - A newly accepted source keeps its own sample age. Switching from recent
   Gadget values to an old Shared Memory sample no longer makes that sample
   appear live.
+- Shared Memory readings with a duplicated stable identity or a missing
+  sensor owner are withheld instead of receiving keys based on list order.
+  Healthy readings keep serving, and a unique identity recovers on its own
+  with a fresh history segment. Saved selections are never rewritten;
+  old duplicate-suffixed or ownerless keys need reselection after repair.
 - Invalid theme names fall back safely. The settings panel refreshes its
   picker after source recovery or a provider change, preserves Config drafts
   while settings replies are pending, and retains unknown Config fields.

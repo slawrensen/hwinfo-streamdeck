@@ -26,6 +26,10 @@ Shared Memory provides hardware identities, a producer timestamp and HWiNFO's st
 
 In HWiNFO → **Settings** → tick **Shared Memory Support**. This is the recommended setup and gives you full stats. See [Getting started](getting-started.md) for the full first-run checklist.
 
+A Shared Memory selection uses HWiNFO's `sensor-id : instance : reading-id` identity. If two published rows have the same identity, both are withheld. A row whose sensor owner is missing is also withheld. Labels, units and list order cannot distinguish those rows safely. Healthy neighboring readings keep serving; a saved unique identity recovers automatically when HWiNFO publishes it unambiguously again, starting a fresh local history and statistics segment after the gap.
+
+Saved settings are not rewritten. A selection saved by an older version with a duplicate suffix (`~n`) or an ownerless positional key (`?:...`) remains missing. Once the producer's identity is valid and unique, select the reading again and update any explicit source link that used the old key.
+
 ### Enabling Gadget reporting
 
 In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab, tick **Enable reporting to Gadget**, then tick **Report value in Gadget** for each reading you want. Shift-click selects a whole range at once. Tick the readings you put on the deck: every poll reads the whole ticked list on the plugin's one thread, and with all 554 readings on my bench ticked one scan took about 150 ms, against about 5 ms for a 39-reading test key (measured in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md)). Only ticked readings appear to the plugin. HWiNFO 8.48 creates the registry key only once a reading is ticked: with reporting enabled and nothing ticked, the keys show **Start HWiNFO / not detected** while HWiNFO is running. A key that is there but holds no rows, which unticking everything can leave, shows **Tick sensors / in Gadget**.

@@ -126,6 +126,7 @@ async function startFake(name) {
 
 let plugin;
 let scenarioError = null;
+let runError = null;
 
 // --- scenario ----------------------------------------------------------------
 try {
@@ -261,8 +262,9 @@ try {
 	if (scenarioError) errors.unshift(scenarioError);
 	if (collectorError) errors.push(collectorError);
 	if (serverError) errors.push(serverError);
-	if (errors.length) throw new AggregateError(errors, "Resilience scenario or owned cleanup failed");
+	if (errors.length) runError = new AggregateError(errors, "Resilience scenario or owned cleanup failed");
 }
 
+if (runError) throw runError;
 console.log(failures === 0 ? "\nRESILIENCE E2E: ALL STATES FIRED" : `\nRESILIENCE E2E: ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

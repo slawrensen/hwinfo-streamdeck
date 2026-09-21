@@ -1,0 +1,13 @@
+{
+	"name": "legacy duplicate down is ignored, and a new press still resets",
+	"description": "Synthetic duplicate delivery, not a claim that the physical host emitted one. The action-level regression separately proves that acquired session samples are retained between the original and repeated down.",
+	"contexts": { "ctx1": { "settings": { "readingKey": "a:0:1" }, "device": "devA" } },
+	"events": [
+		{ "context": "ctx1", "event": "dialDown", "mono": 1000 },
+		{ "context": "ctx1", "event": "dialDown", "mono": 1100 },
+		{ "context": "ctx1", "event": "dialUp", "mono": 1200 },
+		{ "context": "ctx1", "event": "dialDown", "mono": 1300 },
+		{ "context": "ctx1", "event": "dialUp", "mono": 1400 }
+	],
+	"expect": { "ctx1": { "commands": ["resetStats", "resetStats"], "selection": "a:0:1" } }
+}

@@ -360,10 +360,13 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			return;
 		}
 		const scheme = resolveControls(state.settings);
+		const firstDown = state.gesture.downAt === null;
 		const routed = routeGesture(state.gesture, { kind: "dialDown", at: performance.now() }, scheme.touchZones);
 		this.traceGesture("dialDown", ev.action.id, state, routed.state, {});
 		state.gesture = routed.state;
-		if (scheme.pushTiming === "down") {
+		// The router retains a replayed down as the same press. Legacy's
+		// immediate command must also run only once, or it erases new stats.
+		if (scheme.pushTiming === "down" && firstDown) {
 			// Mark the press consumed so a preset switch mid-press can never
 			// fire a second command on release.
 			state.gesture = { downAt: state.gesture.downAt, rotatedWhileDown: true };

@@ -29,6 +29,8 @@ Per-reading dial colors and reliability fixes in one release candidate.
 - Invalid theme names fall back safely. The settings panel refreshes its
   picker after source recovery or a provider change, preserves Config drafts
   while settings replies are pending, and retains unknown Config fields.
+- Group jumps skip a confirmed alias of the current reading so the next
+  distinct reading in the target group remains reachable.
 - Two-row and three-row dials can color each reading's number separately.
   Appearance adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading
@@ -179,7 +181,9 @@ Per-reading dial colors and reliability fixes in one release candidate.
   native source change.
 - The bundle ships `@elgato/streamdeck` 2.1.2 with `@elgato/utils` 0.6.0,
   and the release and CI workflows run on the Node 24 generation of their
-  pinned actions. The native addon source is unchanged.
+  pinned actions. Native C behavior and the API are unchanged; the build
+  now enforces warning level 4 and treats warnings as errors after
+  node-gyp defaults are applied, which changes the recorded build source ID.
 
 ## 1.6.0.0 - 2026-09-04
 

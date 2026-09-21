@@ -541,3 +541,15 @@ it("a selection outside the rotation list does not invent a selected two-row bac
 	fixture.state.settings.rotationKeys = ["missing"];
 	assert.equal(previewOf(fixture).bg, config.themes.void!.track, "an empty resolved set uses the selected-reading fallback row");
 });
+
+it("Live value follows a selected row after the first visible row", () => {
+	for (const view of ["tworow", "overview"] as const) {
+		const fixture = dialGalleryFixture("overview");
+		Object.assign(fixture.state.settings, { dialView: view, readingKey: "31:0:3", readingColors: { "31:0:1": "#4CC2FF", "31:0:2": "#FF7E8E", "31:0:3": "#38CD89" } });
+		const rendered = values(compose(fixture));
+		assert.notEqual(rendered[0], "#38CD89");
+		assert.equal(previewOf(fixture).valueColor, "#38CD89");
+		assert.equal(previewOf(fixture).valueColor, rendered.at(-1));
+		assert.equal(previewOf(fixture).bg, view === "tworow" ? config.themes.void!.track : config.themes.void!.bg);
+	}
+});

@@ -50,13 +50,14 @@ export function createInstalledProducerCheck({ addonPath, expectedSha256, expect
 
 /** Native open/read validate the mapped header under the real producer's
  * consistency mutex. Keep only timestamp evidence, never sensor contents.
- * A busy/partial/error read fails this attempt rather than reusing a buffer. */
+ * Busy attempts skip a sample within the same deadline; partial/error reads
+ * fail this proof. A busy read never contributes bytes or freshness. */
 export async function sampleAdvancingProducer(open, { monotonicNow = () => performance.now(), wallNow = Date.now,
 	wait = sleep, timeoutMs = 10_000, intervalMs = 500, maxAgeMs = 15_000 } = {}) {
 	if (![timeoutMs, intervalMs, maxAgeMs].every((n) => Number.isFinite(n) && n > 0) || intervalMs > timeoutMs) throw new Error("Invalid freshness timing bounds");
 	const began = monotonicNow();
 	const deadline = began + timeoutMs;
-	const proof = { startedUtc: new Date(wallNow()).toISOString(), samples: [] };
+	const proof = { startedUtc: new Date(wallNow()).toISOString(), samples: [], busySkips: [] };
 	let session;
 	let failure;
 	let failed = false;
@@ -64,8 +65,22 @@ export async function sampleAdvancingProducer(open, { monotonicNow = () => perfo
 	const bounded = () => {
 		if (monotonicNow() >= deadline) throw new Error("Producer did not advance before the monotonic freshness deadline");
 	};
+	const recordBusy = (attempt) => proof.busySkips.push({ ...attempt, observedUtc: new Date(wallNow()).toISOString(), elapsedMs: monotonicNow() - began });
+	const waitNext = async () => {
+		bounded();
+		await wait(Math.min(intervalMs, deadline - monotonicNow()));
+	};
 	try {
-		session = open();
+		for (;;) {
+			bounded();
+			try { session = open(); break; }
+			catch (err) {
+				bounded();
+				if (err?.code !== "HWSM_MUTEX_BUSY") throw err;
+				recordBusy({ stage: "open", code: err.code });
+				await waitNext();
+			}
+		}
 		bounded();
 		if (!session || typeof session.readInto !== "function" || typeof session.close !== "function" ||
 			!Number.isSafeInteger(session.byteLength) || session.byteLength < 44 || session.byteLength > 64 * 1024 * 1024) throw new Error("Invalid native shared-memory session");
@@ -75,7 +90,12 @@ export async function sampleAdvancingProducer(open, { monotonicNow = () => perfo
 			bounded();
 			const copied = session.readInto(bytes);
 			bounded();
-			if (copied !== bytes.length) throw new Error(`Shared-memory read busy or incomplete: ${copied}/${bytes.length}`);
+			if (copied === 0) {
+				recordBusy({ stage: "read", copied });
+				await waitNext();
+				continue;
+			}
+			if (copied !== bytes.length) throw new Error(`Shared-memory read incomplete: ${copied}/${bytes.length}`);
 			const rawTime = bytes.readBigInt64LE(12);
 			if (rawTime <= 0n || rawTime > BigInt(Math.floor(Number.MAX_SAFE_INTEGER / 1000))) throw new Error("Invalid producer poll timestamp");
 			const pollTime = Number(rawTime);
@@ -90,7 +110,7 @@ export async function sampleAdvancingProducer(open, { monotonicNow = () => perfo
 				break;
 			}
 			first = pollTime;
-			await wait(Math.min(intervalMs, deadline - monotonicNow()));
+			await waitNext();
 		}
 	} catch (err) {
 		failure = err;

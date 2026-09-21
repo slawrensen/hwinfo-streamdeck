@@ -198,11 +198,11 @@ function producerFixture(stamps, { copied, readError, closeError, lateRead = fal
 			if (lateRead && index === 1) elapsed += 3000;
 			const stamp = stamps[Math.min(index, stamps.length - 1)];
 			if (stamp !== undefined) bytes.writeBigInt64LE(BigInt(stamp), 12);
-			return copied?.[index] ?? 44;
+			return copied?.[Math.min(index, copied.length - 1)] ?? 44;
 		},
 		close() { closes++; if (closeError) throw closeError; }
 	});
-	return { open, counts: () => ({ reads, closes }), sampling: {
+	return { open, counts: () => ({ reads, closes }), elapsed: () => elapsed, sampling: {
 		monotonicNow: () => elapsed, wallNow: () => epochMs + elapsed,
 		wait: async (ms) => { elapsed += lateSleep ? 3000 : ms; }, timeoutMs: 2000, intervalMs: 500
 	} };
@@ -220,10 +220,76 @@ test("producer proof requires two advancing fresh full reads and closes its sess
 	assert.deepEqual(frozen.counts(), { reads: 4, closes: 1 });
 });
 
-test("busy, partial, invalid, stale, future, backwards and error samples fail closed", async () => {
+test("producer proof records transient busy reads without crediting buffer contents", async () => {
+	for (const [stamps, copied, busyAt] of [
+		[[undefined, 1_799_999_998, 1_799_999_999], [0, 44, 44], 0],
+		[[1_799_999_998, undefined, 1_799_999_999], [44, 0, 44], 500]
+	]) {
+		const fixture = producerFixture(stamps, { copied });
+		const proof = await sampleAdvancingProducer(fixture.open, fixture.sampling);
+		assert.equal(proof.verdict, "advancing-shared-memory");
+		assert.deepEqual(proof.samples.map((sample) => sample.pollTime), [1_799_999_998, 1_799_999_999]);
+		assert.deepEqual(proof.busySkips, [{ stage: "read", copied: 0, observedUtc: new Date(1_800_000_000_000 + busyAt).toISOString(), elapsedMs: busyAt }]);
+		assert.equal(proof.elapsedMs, 1000);
+		assert.deepEqual(fixture.counts(), { reads: 3, closes: 1 });
+	}
+});
+
+test("producer continuous busy and frozen-after-busy exhaust the existing ten-second deadline", async () => {
+	for (const [stamps, copied, busyCount, sampleCount] of [
+		[[undefined], [0], 20, 0],
+		[[1_799_999_998], [44, 0, 44], 1, 19]
+	]) {
+		const fixture = producerFixture(stamps, { copied });
+		await assert.rejects(sampleAdvancingProducer(fixture.open, { ...fixture.sampling, timeoutMs: 10_000 }), (err) => {
+			assert.match(err.message, /monotonic freshness deadline/);
+			assert.equal(err.freshnessEvidence.busySkips.length, busyCount);
+			assert.equal(err.freshnessEvidence.samples.length, sampleCount);
+			return true;
+		});
+		assert.equal(fixture.elapsed(), 10_000);
+		assert.deepEqual(fixture.counts(), { reads: 20, closes: 1 });
+	}
+});
+
+test("producer open-time mutex contention retries only its exact native code within the shared deadline", async () => {
+	const busy = () => Object.assign(new Error("native mutex busy"), { code: "HWSM_MUTEX_BUSY" });
+	const transient = producerFixture([1_799_999_998, 1_799_999_999]);
+	let opens = 0;
+	const proof = await sampleAdvancingProducer(() => { if (++opens <= 2) throw busy(); return transient.open(); }, transient.sampling);
+	assert.equal(opens, 3);
+	assert.equal(proof.elapsedMs, 1500);
+	assert.deepEqual(proof.busySkips.map(({ stage, code, elapsedMs }) => ({ stage, code, elapsedMs })), [
+		{ stage: "open", code: "HWSM_MUTEX_BUSY", elapsedMs: 0 }, { stage: "open", code: "HWSM_MUTEX_BUSY", elapsedMs: 500 }
+	]);
+	assert.deepEqual(transient.counts(), { reads: 2, closes: 1 });
+	for (const busyOpens of [20, 19]) {
+		const fixture = producerFixture([1_799_999_998, 1_799_999_999]);
+		opens = 0;
+		await assert.rejects(sampleAdvancingProducer(() => { if (++opens <= busyOpens) throw busy(); return fixture.open(); },
+			{ ...fixture.sampling, timeoutMs: 10_000 }), (err) => {
+			assert.match(err.message, /monotonic freshness deadline/);
+			assert.equal(err.freshnessEvidence.busySkips.length, busyOpens);
+			return true;
+		});
+		assert.equal(opens, 20);
+		assert.equal(fixture.elapsed(), 10_000);
+		assert.deepEqual(fixture.counts(), { reads: busyOpens === 19 ? 1 : 0, closes: busyOpens === 19 ? 1 : 0 });
+	}
+	for (const code of ["HWSM_WAIT_FAILED", "HWSM_ABANDONED", "HWSM_MUTEX_BUSY_OTHER", undefined]) {
+		const fixture = producerFixture([1_799_999_998]);
+		opens = 0;
+		await assert.rejects(sampleAdvancingProducer(() => { opens++; throw Object.assign(new Error("terminal native open"), { code }); }, fixture.sampling), /terminal native open/);
+		assert.equal(opens, 1);
+		assert.equal(fixture.elapsed(), 0);
+		assert.deepEqual(fixture.counts(), { reads: 0, closes: 0 });
+	}
+});
+
+test("partial, invalid, stale, future, backwards and error samples fail closed", async () => {
 	const cases = [
-		[[1_799_999_998], { copied: [0] }, /busy or incomplete/],
-		[[1_799_999_998, undefined], { copied: [44, 43] }, /busy or incomplete/],
+		[[1_799_999_998, undefined], { copied: [44, 43] }, /incomplete/],
+		[[1_799_999_998, undefined, undefined], { copied: [44, 0, 43] }, /incomplete/],
 		[[0], {}, /Invalid producer/], [[-1], {}, /Invalid producer/],
 		[[9007199254740992n], {}, /Invalid producer/],
 		[[1_799_999_800], {}, /stale/], [[1_800_000_001], {}, /future/],
@@ -245,6 +311,16 @@ test("an advancing read after the monotonic deadline never rescues an expired pr
 	for (const option of [{ lateRead: true }, { lateSleep: true }]) {
 		const fixture = producerFixture([1_799_999_998, 1_799_999_999], option);
 		await assert.rejects(sampleAdvancingProducer(fixture.open, fixture.sampling), /monotonic freshness deadline/);
+		assert.equal(fixture.counts().closes, 1);
+	}
+	for (const option of [{ lateRead: true }, { lateSleep: true }]) {
+		const fixture = producerFixture([undefined, 1_799_999_999], { copied: [0, 44], ...option });
+		await assert.rejects(sampleAdvancingProducer(fixture.open, fixture.sampling), (err) => {
+			assert.match(err.message, /monotonic freshness deadline/);
+			assert.equal(err.freshnessEvidence.samples.length, 0);
+			assert.equal(err.freshnessEvidence.busySkips.length, 1);
+			return true;
+		});
 		assert.equal(fixture.counts().closes, 1);
 	}
 });

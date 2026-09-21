@@ -72,7 +72,9 @@ try {
 	for (let attempt = 0; attempt < 40 && !target; attempt++) {
 		await sleep(100);
 		if (chromeError) throw chromeError;
-		if (chrome.exitCode !== null) throw new Error("Chrome exited before its debugger started");
+		// The Windows launcher can exit zero after handing off to its browser.
+		// Readiness still requires the debugger from this run's unique profile.
+		if ((chrome.exitCode !== null && chrome.exitCode !== 0) || chrome.signalCode !== null) throw new Error(`Chrome exited before its debugger started (exit ${chrome.exitCode}, signal ${chrome.signalCode})`);
 		try {
 			const debugPort = browserDebuggerPort(profile);
 			target = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`, { signal: AbortSignal.timeout(700) })).json()).find((tab) => tab.type === "page");

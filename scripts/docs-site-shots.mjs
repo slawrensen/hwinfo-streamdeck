@@ -59,7 +59,9 @@ try {
 	for (let i = 0; i < 30 && target === null; i++) {
 		await sleep(500);
 		if (chromeError) throw chromeError;
-		if (chrome.exitCode !== null || chrome.signalCode !== null) throw new Error("Chrome exited before its debugger became ready");
+		// The Windows launcher can exit zero after handing off to its browser.
+		// Readiness still requires the debugger from this run's unique profile.
+		if ((chrome.exitCode !== null && chrome.exitCode !== 0) || chrome.signalCode !== null) throw new Error(`Chrome exited before its debugger became ready (exit ${chrome.exitCode}, signal ${chrome.signalCode})`);
 		try {
 			const debugPort = browserDebuggerPort(chromeProfile);
 			const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();

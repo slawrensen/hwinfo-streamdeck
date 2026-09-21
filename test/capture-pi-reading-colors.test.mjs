@@ -11,13 +11,14 @@ import { browserDebuggerPort } from "../scripts/lib/process-ownership.mjs";
 const scriptPath = fileURLToPath(new URL("../scripts/capture-pi-reading-colors.mjs", import.meta.url));
 const source = readFileSync(scriptPath, "utf8").replace(/^import .*;\r?\n/gm, "").replace("fileURLToPath(import.meta.url)", JSON.stringify(scriptPath));
 
-async function inspectLaunch({ port, spawnError = false, cleanupError = false } = {}) {
+async function inspectLaunch({ port, exitCode = null, signalCode = null, pageReady = false, spawnError = false, cleanupError = false } = {}) {
 	const profile = mkdtempSync(path.join(os.tmpdir(), "capture-pi-owned-test-"));
 	if (port !== undefined) writeFileSync(path.join(profile, "DevToolsActivePort"), `${port}\n/devtools/browser/fixture`);
 	const fetches = [];
 	const cleanups = [];
 	const launches = [];
 	const observations = [];
+	const connections = [];
 	let failure;
 	try {
 		await vm.runInNewContext(`(async () => { ${source}\n })()`, {
@@ -34,7 +35,7 @@ async function inspectLaunch({ port, spawnError = false, cleanupError = false } 
 			}),
 			spawn: (...args) => {
 				launches.push(args);
-				const child = Object.assign(new EventEmitter(), { pid: 100 + launches.length, exitCode: null, stdout: new EventEmitter(), stderr: new EventEmitter() });
+				const child = Object.assign(new EventEmitter(), { pid: 100 + launches.length, exitCode: launches.length === 1 ? null : exitCode, signalCode: launches.length === 1 ? null : signalCode, stdout: new EventEmitter(), stderr: new EventEmitter() });
 				queueMicrotask(() => {
 					if (launches.length === 1) child.stdout.emit("data", "PI at http://127.0.0.1:28997");
 					else if (spawnError) child.emit("error", new Error("synthetic Chrome spawn failure"));
@@ -44,8 +45,9 @@ async function inspectLaunch({ port, spawnError = false, cleanupError = false } 
 			fetch: async (url) => {
 				if (url === "http://127.0.0.1:28997") throw new Error("no pre-existing harness");
 				fetches.push(url);
-				return { json: async () => [] };
+				return { json: async () => pageReady ? [{ type: "page", webSocketDebuggerUrl: `ws://127.0.0.1:${port}/fixture` }] : [] };
 			},
+			WebSocket: class { constructor(url) { connections.push(url); throw new Error("owned debugger accepted; fixture stops before CDP"); } },
 			AbortSignal: { timeout: () => undefined },
 			setTimeout: (callback, ms) => { if (ms < 90_000) queueMicrotask(callback); return { unref() {} }; },
 			clearTimeout() {}
@@ -55,7 +57,7 @@ async function inspectLaunch({ port, spawnError = false, cleanupError = false } 
 	} finally {
 		rmSync(profile, { recursive: true, force: true });
 	}
-	return { profile, failure, fetches, cleanups, launches, observations };
+	return { profile, failure, fetches, cleanups, launches, observations, connections };
 }
 
 test("focused PI capture never probes a fixed debugger when its profile has no port", async () => {
@@ -87,4 +89,30 @@ test("focused PI capture rejects spawn failure and still attempts both cleanup p
 	const survivor = await inspectLaunch({ cleanupError: true });
 	assert.match(String(survivor.failure), /PI capture cleanup failed/);
 	assert.deepEqual(survivor.cleanups[1], ["children"]);
+});
+
+test("focused PI capture accepts a zero-exit launcher handoff through its owned debugger", async () => {
+	const result = await inspectLaunch({ port: 49124, exitCode: 0, pageReady: true });
+	assert.match(String(result.failure), /owned debugger accepted/);
+	assert.deepEqual(result.fetches, ["http://127.0.0.1:49124/json/list"]);
+	assert.deepEqual(result.connections, ["ws://127.0.0.1:49124/fixture"]);
+	assert.equal(result.cleanups.length, 2);
+});
+
+test("focused PI capture still needs its own debugger after a zero-exit launcher handoff", async () => {
+	const result = await inspectLaunch({ exitCode: 0, pageReady: true });
+	assert.match(String(result.failure), /Chrome debugger did not start/);
+	assert.deepEqual(result.fetches, []);
+	assert.deepEqual(result.connections, []);
+	assert.equal(result.cleanups.length, 2);
+});
+
+test("focused PI capture rejects a failed or signalled launcher before endpoint access", async () => {
+	for (const options of [{ exitCode: 1 }, { signalCode: "SIGTERM" }]) {
+		const result = await inspectLaunch({ port: 49124, pageReady: true, ...options });
+		assert.match(String(result.failure), /Chrome exited before its debugger/);
+		assert.deepEqual(result.fetches, []);
+		assert.deepEqual(result.connections, []);
+		assert.equal(result.cleanups.length, 2);
+	}
 });

@@ -135,7 +135,7 @@ function main() {
 			api.RtlMoveMemory(view, bytes, bytes.length);
 			// Stamp after the copy while ownership still prevents any reader
 			// observing it. writeMs also includes the subsequent mutex release.
-			const publishedAt = performance.timeOrigin + performance.now();
+			const publishedAt = Number(process.hrtime.bigint()) / 1e6;
 			if (!api.ReleaseMutex(mutex)) throw new Error(`ReleaseMutex failed: Win32 ${api.GetLastError()}`);
 			held = false;
 			const finished = performance.now();

@@ -64,6 +64,8 @@ cost is different and may already exceed a 250 ms interval at large inventories.
 
 `summary.json` and `results.json` contain results; each case has `raw.json`,
 process identities, actual exit records, stock logs and sample production SVGs.
+Cross-process timing uses the host-monotonic `hrtime` clock in milliseconds,
+not separately calibrated per-process wall-clock origins.
 Machine CPU model/count, memory, OS, Node, active power plan, source revision,
 dirty state, workload, bundle and addon hashes travel with the measurements.
 

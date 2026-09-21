@@ -1,6 +1,6 @@
 // Diagnostic --import preload for an unchanged built plugin. The parent owns
 // workload setup, shipping-byte verification, and the child's normal socket exit.
-import { monitorEventLoopDelay, performance } from "node:perf_hooks";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 
 const originalSetInterval = globalThis.setInterval;
 const originalClearInterval = globalThis.clearInterval;
@@ -19,8 +19,9 @@ let nextTimerId = 1;
 let registrationOverflow = false;
 let measurement = null;
 
-const epochAt = (monotonic) => performance.timeOrigin + monotonic;
-const now = () => epochAt(performance.now());
+// hrtime has one host-monotonic origin across Node processes. Adding each
+// process's performance.timeOrigin can introduce wall-clock calibration skew.
+const now = () => Number(process.hrtime.bigint()) / 1e6;
 
 function fail(state, message) {
 	if (state && !state.error) state.error = message;
@@ -58,7 +59,7 @@ function resourceSample(state) {
 function recordCallback(registration, callback, receiver, args) {
 	const state = measurement;
 	if (!state?.capturing) return Reflect.apply(callback, receiver, args);
-	const started = performance.now();
+	const started = now();
 	verifyTimerCount(state, "interval callback");
 	if (!activeTimers.has(registration.handle)) fail(state, "A cleared matching interval executed during measurement");
 	const lateMs = Math.max(0, started - registration.previousAt - pollMs);
@@ -67,20 +68,20 @@ function recordCallback(registration, callback, receiver, args) {
 		fail(state, `Tick buffer exceeded ${cap} samples`);
 		return Reflect.apply(callback, receiver, args);
 	}
-	const tick = { at: epochAt(started), callbackMs: null, drainMs: null,
+	const tick = { at: started, callbackMs: null, drainMs: null,
 		lateMs, timerId: registration.timerId };
 	state.ticks.push(tick);
-	const callbackStarted = performance.now();
+	const callbackStarted = now();
 	try {
 		// Do not await a returned Promise or alter the timer callback's receiver.
 		return Reflect.apply(callback, receiver, args);
 	} finally {
-		tick.callbackMs = performance.now() - callbackStarted;
+		tick.callbackMs = now() - callbackStarted;
 		state.pendingDrains++;
 		originalSetImmediate(() => {
 			// This includes microtasks and loop scheduling after the synchronous
 			// callback. It is NOT full tick, physical rendering, or send-ACK time.
-			tick.drainMs = performance.now() - started;
+			tick.drainMs = now() - started;
 			state.pendingDrains--;
 		}).unref();
 	}
@@ -117,7 +118,7 @@ if (timingEnabled && pollMs !== null) {
 		}
 		const registration = { timerId: nextTimerId++, requestedMs: delay,
 			registeredAt: now(), clearedAt: null, stack: new Error("Matching interval registration").stack,
-			previousAt: performance.now(), handle: null, nativeId: null };
+			previousAt: now(), handle: null, nativeId: null };
 		const handle = Reflect.apply(originalSetInterval, this, [function (...callbackArgs) {
 			return recordCallback(registration, callback, this, callbackArgs);
 		}, delay, ...args]);
@@ -146,8 +147,8 @@ function startMeasurement() {
 		send({ type: "measure-started", at: measurement.startedAt, error: measurement.error });
 		return;
 	}
-	const started = performance.now();
-	const state = { capturing: true, stopping: false, startedAt: epochAt(started), endedAt: null,
+	const started = now();
+	const state = { capturing: true, stopping: false, startedAt: started, endedAt: null,
 		ticks: [], resources: [], cpuStart: process.cpuUsage(), pendingDrains: 0,
 		histogram: monitorEventLoopDelay({ resolution: 10 }), resourceTimer: null,
 		error: configurationError || (registrationOverflow ? `Timer registration buffer exceeded ${cap} entries` : null) };

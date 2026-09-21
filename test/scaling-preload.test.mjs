@@ -60,6 +60,7 @@ function runFixture(mode, timing = true) {
 		});
 		let stopTimer;
 		let failure;
+		let startSentAt, startReceivedAt;
 		let stderr = "";
 		const messages = [];
 		const fail = (error) => {
@@ -86,15 +87,15 @@ function runFixture(mode, timing = true) {
 		child.on("message", (message) => {
 			messages.push(message);
 			if (messages.length > 12) return fail(new Error("Unexpected per-tick IPC or repeated measurement messages"));
-			if (message.type === "fixture-ready") send({ type: "measure-start" });
-			else if (message.type === "measure-started") stopTimer = setTimeout(() => send({ type: "measure-stop" }), 650);
+			if (message.type === "fixture-ready") { startSentAt = Number(process.hrtime.bigint()) / 1e6; send({ type: "measure-start" }); }
+			else if (message.type === "measure-started") { startReceivedAt = Number(process.hrtime.bigint()) / 1e6; stopTimer = setTimeout(() => send({ type: "measure-stop" }), 650); }
 			else if (message.type === "measurement") send({ type: "fixture-finish" });
 		});
 		child.on("close", (code, signal) => {
 			clearTimeout(deadline);
 			clearTimeout(stopTimer);
 			if (failure) reject(failure);
-			else resolve({ code, signal, stderr, messages,
+			else resolve({ code, signal, stderr, messages, startSentAt, startReceivedAt,
 				ack: messages.find((message) => message.type === "measure-started"),
 				measurement: messages.find((message) => message.type === "measurement"),
 				stats: messages.find((message) => message.type === "fixture-stats")?.stats });
@@ -132,6 +133,7 @@ test("scaling preload measures one live interval and preserves callback argument
 	assert.equal(result.ack.error, null);
 	assert.equal(measured.error, null);
 	assert.equal(measured.startedAt, result.ack.at);
+	assert.ok(result.ack.at >= result.startSentAt && result.ack.at <= result.startReceivedAt, "Child timestamp must be in the parent's host-monotonic send/receive interval");
 	assert.ok(measured.endedAt - measured.startedAt >= 600);
 	assert.equal(measured.timingEnabled, true);
 	assert.equal(measured.pollMs, 250);

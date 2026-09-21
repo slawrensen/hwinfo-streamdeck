@@ -8,7 +8,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { performance } from "node:perf_hooks";
 import { WebSocketServer } from "ws";
 import { buildInfo, decodeSvg, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 import { createChildCleanup } from "./lib/process-ownership.mjs";
@@ -17,7 +16,7 @@ import { readingKey } from "./lib/scaling-producer.mjs";
 import { report } from "./scaling-report.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const clock = () => performance.timeOrigin + performance.now();
+const clock = () => Number(process.hrtime.bigint()) / 1e6;
 const hash = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const args = process.argv.slice(2);
 const valueOptions = new Set(["--seconds", "--warmup", "--repeat", "--out", "--config", "--label"]);
@@ -88,14 +87,15 @@ function bundleInventory(directory, relative = "") {
 		return entry.isDirectory() ? bundleInventory(directory, name) : [{ path: name.replaceAll("\\", "/"), sha256: hash(path.join(directory, name)) }];
 	});
 }
+const initialInventory = bundleInventory(original);
 const metadata = {
 	schema: 1, startedAt: new Date().toISOString(), mode: smoke ? "smoke" : "benchmark", seconds, warmup, repeats, strict,
-	measurementMode: "synthetic-shared-memory-v1",
+	measurementMode: "synthetic-shared-memory-hrtime-v2",
 	machine: { label: option("--label", os.hostname()), cpu: os.cpus().map(({ model, speed }) => ({ model, speed })), logicalCpus: os.cpus().length, totalMemory: os.totalmem(), freeMemory: os.freemem(), platform: os.platform(), release: os.release(), arch: os.arch(), node: process.version, execPath: process.execPath },
 	source: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
 	dirty: execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim(),
-	pluginSha256: hash(path.join(original, "bin/plugin.js")), nativeSha256: hash(path.join(original, "bin/hwsm.node")),
-	bundleInventory: bundleInventory(original),
+	pluginSha256: initialInventory.find((entry) => entry.path === "bin/plugin.js")?.sha256, nativeSha256: initialInventory.find((entry) => entry.path === "bin/hwsm.node")?.sha256,
+	bundleInventory: initialInventory,
 	harnessSha256: hash(fileURLToPath(import.meta.url)), preloadSha256: hash(path.join(root, "scripts/lib/scaling-preload.mjs")), producerSha256: hash(path.join(root, "scripts/lib/scaling-producer.mjs")), metricsSha256: hash(path.join(root, "scripts/lib/scaling-metrics.mjs")), cases,
 	limits: "Synthetic shared-memory producer and mock host. Callback and loop-drain timings are diagnostic, not physical display or full input-to-display latency. CPU is percent of one logical core. No low-spec extrapolation. Gadget is a separate backend."
 };
@@ -281,6 +281,7 @@ async function runCase(config, repeat) {
 		caseFailure = String(error.stack ?? error);
 		errors.push(caseFailure);
 	} finally {
+		try {
 		measuring = false;
 		if (socket) socket.close();
 		if (producer?.connected) producer.send({ type: "stop" }, (error) => { if (error) errors.push(`Publisher stop: ${error}`); });
@@ -298,6 +299,14 @@ async function runCase(config, repeat) {
 		record("result.json", result);
 		record("raw.json", { config, publications, commands, frames, messages, measurement, startedAt, stoppedAt, collectorError, exits: children.map(({ name, exit }) => ({ name, exit })) });
 		for (const [context, svg] of sampleFrames) fs.writeFileSync(path.join(directory, `${context}.svg`), svg);
+		} catch (error) {
+			errors.push(`Teardown/evidence failure: ${error.stack ?? error}`);
+			caseFailure ??= String(error);
+			for (const client of server.clients) client.terminate();
+			server.close();
+			try { record("failure.json", { caseFailure, errors }); }
+			catch (writeError) { errors.push(`Could not preserve failure.json: ${writeError}`); }
+		}
 	}
 	// Outer cleanup rechecks creation identities if normal shutdown failed.
 	// Keep the original exception alongside any teardown failures.

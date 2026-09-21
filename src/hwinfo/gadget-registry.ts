@@ -378,11 +378,6 @@ export class GadgetRegistryProvider {
 			this.pendingNotices.set(key, `Gadget slots ${slots.slice(0, -1).join(", ")} and ${slots.at(-1)} withheld while they report one name (${named.sensor} / ${named.label}). ${remedy}`);
 		}
 
-		const digest = digestParts.join("|");
-		if (digest !== this.lastDigest) {
-			this.lastDigest = digest;
-			this.valueRevision++;
-		}
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
 		let valueChanged = false;
 		const safeValues = new Map<string, number>();
@@ -423,7 +418,18 @@ export class GadgetRegistryProvider {
 			byKey.set(legacy, { ...reading, key: legacy, linkedKeys, aliasOf: reading.key });
 			return live;
 		});
-		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: published, byKey, blockedReadingCount: incompleteIdentityCount + readings.length - safeReadings.length, ...(contradictoryCount > 0 ? { contradictoryReadingCount: contradictoryCount } : {}) };
+		const blockedReadingCount = incompleteIdentityCount + readings.length - safeReadings.length;
+		// Render invalidation follows the published identities and aliases too.
+		// A contradictory row contributes no value digest but can remove a
+		// healthy row's legacy alias, even with an unchanged reading count.
+		// This is topology only; the measurement evidence above stays separate.
+		digestParts.push(JSON.stringify([published.map((reading) => [reading.key, reading.linkedKeys]), blockedReadingCount, contradictoryCount]));
+		const digest = digestParts.join("|");
+		if (digest !== this.lastDigest) {
+			this.lastDigest = digest;
+			this.valueRevision++;
+		}
+		return { pollTime: this.lastChangeSec, valueRevision: this.valueRevision, freshnessRevision: this.freshnessRevision, version: 0, revision: 0, sensors, readings: published, byKey, blockedReadingCount, ...(contradictoryCount > 0 ? { contradictoryReadingCount: contradictoryCount } : {}) };
 	}
 
 	close(): void {

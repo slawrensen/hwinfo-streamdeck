@@ -15,6 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,13 +25,16 @@ import type { HwsmGadgetKey } from "../src/hwinfo/hwsm-loader";
 import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { HwinfoError } from "../src/hwinfo/types";
 import { statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
+import { SessionStatsStore } from "../src/stats";
+import { tickSignature } from "../src/detail/tick-signature";
 
 import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
 import type { PollerStatus } from "../src/poller";
 
 const onWindows = process.platform === "win32" && process.arch === "x64";
-const VSB_SUBKEY = `Software\\HwinfoGadgetNT_${process.pid}`;
+const VSB_SUBKEY = `Software\\HwinfoGadgetNT_${process.pid}_${randomUUID()}`;
 const REG_PATH = `HKCU\\${VSB_SUBKEY}`;
+assert.match(VSB_SUBKEY, /^Software\\HwinfoGadgetNT_\d+_[a-f0-9-]{36}$/);
 
 // Dynamic, because the module snapshots HWINFO_VSB_KEY at load time.
 process.env.HWINFO_VSB_KEY = VSB_SUBKEY;
@@ -1248,6 +1252,39 @@ describe("upgrade: legacy Gadget spellings resolve as checked aliases", { skip: 
 		assert.ok(snap.readings.every((r) => r.linkedKeys === undefined));
 	});
 
+	test("a contradictory legacy-alias owner invalidates detail rendering on arrival and removal", () => {
+		shape([0], () => ({ sensor: "A:B", label: "C", value: "40.0 °C", raw: "40" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			putValue("Value0", "41.0 °C");
+			putValue("ValueRaw0", "41");
+			const before = readVerified(provider);
+			assert.equal(before.byKey.get("g:A:B:C")?.value, 41);
+			assert.equal(before.freshnessRevision, 1, "the baseline has actual producer evidence");
+			const signature = (snapshot: SensorSnapshot): string => tickSignature({ state: "ok", snapshot, source: "gadget" });
+			putValue("Sensor1", "A");
+			putValue("Label1", "B:C");
+			putValue("Value1", "99.0 °C");
+			putValue("ValueRaw1", "80");
+			assert.equal(provider.read(), null, "the first contradiction skips the scan");
+			const ambiguous = readVerified(provider);
+			assert.equal(ambiguous.byKey.get("g:A:B:C"), undefined);
+			assert.equal(ambiguous.readings.length, before.readings.length, "withholding the new row leaves the live count unchanged");
+			assert.notEqual(signature(ambiguous), signature(before), "removing an alias must repaint its old numeric detail face");
+			assert.equal(ambiguous.freshnessRevision, before.freshnessRevision, "alias topology is not a measurement");
+			assert.equal(ambiguous.pollTime, before.pollTime);
+			assert.equal(readVerified(provider).valueRevision, ambiguous.valueRevision, "a standing contradiction does not churn renders");
+			dropValue("Sensor1");
+			const restored = readVerified(provider);
+			assert.equal(restored.byKey.get("g:A:B:C")?.value, 41);
+			assert.notEqual(signature(restored), signature(ambiguous), "restoring an alias must repaint its missing detail face");
+			assert.equal(restored.freshnessRevision, before.freshnessRevision);
+			assert.equal(restored.pollTime, before.pollTime);
+		} finally {
+			provider.close();
+		}
+	});
+
 	test("a literal fallback label gets no legacy alias", () => {
 		shape([0], () => ({ sensor: source, label: "Reading 3", value: "3.0 V", raw: "3" }));
 		const snap = readShape();
@@ -1388,6 +1425,93 @@ describe("integrity: one reading link resolves on both providers", { skip: !onWi
 		} finally {
 			provider.close();
 		}
+	});
+});
+
+describe("integrity: malformed raw tokens through the native registry boundary", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	test("malformed raw values earn no freshness or linked session samples and recover without continuity", () => {
+		const source = "CPU [#0]: Raw integrity";
+		const key = gadgetReadingKey(source, "Temperature");
+		const shared = "f0001234:0:1000001";
+		const links = [{ sharedMemory: shared, gadget: key, unit: "°C", sensorType: 1 }];
+		shape([0, 900], (i) => i === 0 ? { sensor: source, label: "Temperature", value: "40 °C", raw: "40" } : { sensor: "Board", label: "Power", value: "50 W", raw: "50" });
+		const provider = GadgetRegistryProvider.open();
+		const stats = new SessionStatsStore();
+		const observe = (): SensorSnapshot => {
+			const snapshot = applyReadingLinks(readVerified(provider), links, 1);
+			const reading = snapshot.byKey.get(shared);
+			assert.ok(reading);
+			stats.observe(reading, snapshot, "gadget");
+			return snapshot;
+		};
+		try {
+			assert.equal(observe().freshnessRevision, 0);
+			assert.equal(stats.get(shared)?.count, 1);
+			// REG_SZ written through reg.exe, read through production hwsm.node.
+			// Embedded NUL is intentionally helper-only: Win32 truncates it.
+			putValue("Value0", "41 °C");
+			for (const raw of ["41junk", "41 °C", "41e+", "41,0.2"]) {
+				putValue("ValueRaw0", raw);
+				const bad = observe();
+				assert.equal(Number.isFinite(bad.byKey.get(shared)?.value), false, raw);
+				assert.equal(bad.byKey.get(shared)?.aliasOf, key);
+				assert.equal(bad.byKey.get(legacyGadgetKey(source, "Temperature") as string)?.aliasOf, key);
+				assert.equal(bad.freshnessRevision, 0, "malformed data is not producer evidence");
+				assert.equal(bad.pollTime, 0);
+				assert.equal(stats.get(shared), undefined, "the affected segment ends");
+				assert.equal(bad.byKey.get("g:Board:Power")?.value, 50, "healthy neighbors keep serving");
+			}
+			putValue("Value0", "42 °C");
+			putValue("ValueRaw0", "42");
+			assert.equal(observe().freshnessRevision, 0, "first finite recovery is a baseline");
+			assert.deepEqual(stats.get(shared), { min: 42, max: 42, sum: 42, count: 1 });
+			putValue("Value0", "43 °C");
+			putValue("ValueRaw0", "43");
+			assert.equal(observe().freshnessRevision, 1);
+			assert.deepEqual(stats.get(shared), { min: 42, max: 43, sum: 85, count: 2 });
+		} finally { provider.close(); }
+	});
+
+	test("the production poller clears linked history on malformed raw and retains healthy history", () => {
+		type Subject = Pick<typeof poller, "setSourceMode" | "setReadingLinks" | "retain" | "release" | "getStatus" | "subscribeSeries" | "getSeries"> & { tick(): void };
+		const subject = new (poller.constructor as unknown as { new (): Subject })();
+		const shared = "f0001234:0:1000001";
+		shape([0, 900], (i) => i === 0 ? { sensor: "Raw poller", label: "Temperature", value: "39 °C", raw: "39" } : { sensor: "Board", label: "Power", value: "50 W", raw: "50" });
+		subject.setSourceMode("gadget");
+		subject.setReadingLinks([{ sharedMemory: shared, gadget: "g:Raw poller:Temperature", unit: "°C", sensorType: 1 }]);
+		subject.subscribeSeries(shared);
+		subject.subscribeSeries("g:Board:Power");
+		subject.retain();
+		const snapshot = (): SensorSnapshot => {
+			const state = subject.getStatus();
+			assert.equal(state.state, "ok");
+			assert.notEqual(state.state, "unavailable");
+			return state.snapshot;
+		};
+		try {
+			putValue("Value0", "40 °C");
+			putValue("ValueRaw0", "40");
+			subject.tick();
+			assert.equal(snapshot().freshnessRevision, 1);
+			assert.deepEqual(subject.getSeries(shared), [40]);
+			putValue("Value0", "41 °C");
+			putValue("ValueRaw0", "41junk");
+			subject.tick();
+			assert.equal(Number.isFinite(snapshot().byKey.get(shared)?.value), false);
+			assert.equal(snapshot().freshnessRevision, 1);
+			assert.deepEqual(subject.getSeries(shared), []);
+			assert.ok((subject.getSeries("g:Board:Power")?.length ?? 0) > 0);
+			putValue("Value0", "42 °C");
+			putValue("ValueRaw0", "42");
+			subject.tick();
+			assert.deepEqual(subject.getSeries(shared), [], "a recovery baseline alone does not earn a history point");
+			assert.equal(snapshot().freshnessRevision, 1);
+			putValue("Value0", "43 °C");
+			putValue("ValueRaw0", "43");
+			subject.tick();
+			assert.deepEqual(subject.getSeries(shared), [43]);
+			assert.equal(snapshot().freshnessRevision, 2);
+		} finally { subject.release(); }
 	});
 });
 

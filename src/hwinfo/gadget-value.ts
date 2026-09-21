@@ -26,7 +26,12 @@ export function gadgetUnitOf(formatted: string): string {
 export function gadgetRawValue(raw: string): number {
 	if (raw === "Yes") return 1;
 	if (raw === "No") return 0;
-	return Number.parseFloat(raw.replace(",", "."));
+	// ValueRaw is an ungrouped number, not display text. parseFloat would
+	// accept a truncated exponent, extra separators or a unit/text suffix
+	// and could publish that prefix as a live measurement.
+	const numeric = raw.trim();
+	if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)(?:[eE][+-]?\d+)?$/.test(numeric)) return Number.NaN;
+	return Number(numeric.replace(",", "."));
 }
 
 /** Whether the formatted numeric precision can describe the authoritative

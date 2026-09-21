@@ -222,6 +222,63 @@ describe("Shared Memory parser evidence reaches the poller with its real age", (
 });
 
 describe("provenance: a provider swap whose first reads are skipped", () => {
+	for (const transition of ["explicit switch", "automatic upgrade"] as const) {
+		it(`${transition} ages an accepted Shared Memory observation independently of recent Gadget evidence`, () => {
+			const subject = isolated();
+			now = 100_000;
+			if (transition === "explicit switch") subject.setSourceMode("gadget");
+			subject.lastUpgradeProbeAt = now;
+			subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+			subject.openProvider = () => provider("gadget", () => gadgetSnap);
+			subject.tick();
+			expectHeld(subject, "ok", "gadget", gadgetSnap, 0);
+			now += 1_000;
+			wall += 1_000;
+			let current = snap("f0001234:0:1000001", 40, (wall - 60_000) / 1000, { freshnessRevision: 0 });
+			const open = (): Provider => provider("shared-memory", () => current);
+			if (transition === "explicit switch") {
+				subject.openProvider = open;
+				subject.setSourceMode("shared-memory");
+			} else {
+				smOpen = open;
+				subject.lastUpgradeProbeAt = now - 15_000;
+			}
+			subject.tick();
+			expectHeld(subject, "stale", "shared-memory", current, 60_000, 60_000);
+			// A current producer stamp recovers normally after the source swap.
+			now += 1_000;
+			wall += 1_000;
+			current = snap("f0001234:0:1000001", 41, wall / 1000, { freshnessRevision: 0 });
+			subject.tick();
+			expectHeld(subject, "ok", "shared-memory", current, 0);
+		});
+	}
+
+	it("an accepted cold Gadget observation starts its own unknown age and transient hold", () => {
+		const subject = isolated();
+		now = 100_000;
+		subject.openProvider = () => provider("shared-memory", () => smSnap);
+		subject.tick();
+		expectHeld(subject, "ok", "shared-memory", smSnap, 0);
+		// The old observation is already older than the hold window when a
+		// new Gadget observation is accepted without any producer evidence.
+		now += STALE + 1_000;
+		const cold = snap("g:GPU:Temperature", 50, 0, { freshnessRevision: 0 });
+		let read: () => SensorSnapshot | null = () => cold;
+		subject.openProvider = () => provider("gadget", () => read());
+		subject.setSourceMode("gadget");
+		subject.tick();
+		expectHeld(subject, "stale", "gadget", cold, null);
+		assert.equal(subject.lastAdvanceAt, 0, "unknown-age Gadget must not inherit evidence from Shared Memory");
+		read = () => { throw new HwinfoError("busy", "synthetic scan collision"); };
+		now += 1_000;
+		subject.tick();
+		expectHeld(subject, "stale", "gadget", cold, null);
+		now += STALE;
+		subject.tick();
+		assert.equal(subject.getStatus().state, "unavailable", "the hold is bounded by the accepted Gadget read");
+	});
+
 	it("automatic upgrade to shared memory keeps the Gadget observation, its source and its age", () => {
 		const subject = isolated();
 		now = 100_000;

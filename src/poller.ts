@@ -440,6 +440,11 @@ class HwinfoPoller extends EventEmitter {
 				if (sourceChanged) {
 					for (const ring of this.series.values()) ring.length = 0;
 					this.seriesSource = this.provider.source;
+					// An accepted observation owns its source's evidence clock.
+					// A recent Gadget change cannot make an old Shared Memory
+					// stamp live, nor give a cold Gadget key a known sample age.
+					// Skipped reads never enter here, so held values keep theirs.
+					this.lastAdvanceAt = 0;
 					this.lastValueRevision = undefined;
 					this.lastFreshnessRevision = undefined;
 				}

@@ -34,11 +34,16 @@ export function gadgetRawValue(raw: string): number {
 	return Number(numeric.replace(",", "."));
 }
 
-/** Whether the formatted numeric precision can describe the authoritative
- * raw value. Agreement is a contradiction check, never an atomicity claim.
- * Nonnumeric/boolean displays and unavailable raw values remain unchanged. */
+/** Whether the formatted number or recognized boolean can describe the
+ * authoritative raw value. Agreement is a contradiction check, never an
+ * atomicity claim. Unknown words and unavailable raw values stay unchanged. */
 export function gadgetValueAgrees(formatted: string, raw: number): boolean {
 	if (!Number.isFinite(raw)) return true;
+	// A writer paused between the Yes/No fields is just as contradictory as
+	// a numeric pair. Match the same exact words gadgetUnitOf recognizes;
+	// do not invent boolean meanings for other display text.
+	const word = formatted.trim();
+	if (word === "Yes" || word === "No") return raw === (word === "Yes" ? 1 : 0);
 	const match = NUMERIC_PREFIX.exec(formatted);
 	if (!match) return true;
 	const token = (match[1] as string).trim().replace("−", "-").replace(/[\u00a0\u202f]/gu, " ").replace(/’/gu, "'");

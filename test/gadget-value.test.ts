@@ -25,8 +25,24 @@ describe("Gadget formatted/raw numeric consistency", () => {
 		assert.equal(gadgetValueAgrees("-1.2 A", -1.251), false);
 		assert.equal(gadgetValueAgrees("1.23e4 Hz", 12400), false);
 	});
-	it("keeps boolean/nonnumeric and unavailable raw readings explicit", () => {
-		for (const text of ["Yes", "No", "On", "Off", "Unavailable", ""]) assert.equal(gadgetValueAgrees(text, 1), true);
+	it("rejects contradictory recognized boolean fields without guessing other words", () => {
+		for (const [word, expected] of [["Yes", 1], ["No", 0]] as const) {
+			for (const formatted of [word, ` ${word} `, `\t${word}\r\n`]) {
+				assert.equal(gadgetUnitOf(formatted), "Yes/No");
+				assert.equal(gadgetValueAgrees(formatted, gadgetRawValue(word)), true);
+				assert.equal(gadgetValueAgrees(formatted, gadgetRawValue(String(expected))), true);
+				for (const raw of [1 - expected, -1, 0.5, 2]) {
+					assert.equal(gadgetValueAgrees(formatted, raw), false, `${JSON.stringify(formatted)} contradicts ${raw}`);
+				}
+			}
+		}
+		for (const text of ["On", "Off", "yes", "no", "Yes/No", "Yes please", "Unavailable", ""]) assert.equal(gadgetValueAgrees(text, 1), true);
+	});
+	it("keeps unavailable raw readings unavailable instead of repairing them from display words", () => {
+		for (const text of ["Yes", "No", "On", "Off", "Unavailable", ""]) {
+			assert.equal(gadgetValueAgrees(text, gadgetRawValue("unavailable")), true);
+			assert.equal(gadgetValueAgrees(text, gadgetRawValue("1junk")), true);
+		}
 		assert.equal(gadgetValueAgrees("40 °C", Number.NaN), true, "a nonfinite raw value remains unavailable, never repaired from display text");
 	});
 	it("reads a boolean reading's raw field as HWiNFO writes it", () => {

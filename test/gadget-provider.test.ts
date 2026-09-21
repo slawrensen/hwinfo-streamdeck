@@ -1428,6 +1428,66 @@ describe("integrity: one reading link resolves on both providers", { skip: !onWi
 	});
 });
 
+describe("integrity: boolean contradictions through the native registry boundary", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	for (const nextWord of ["Yes", "No"] as const) {
+		for (const rawForm of ["word", "number"] as const) {
+			test(`withholds a stable ${nextWord} display with the opposite ${rawForm} raw field and recovers`, () => {
+				const previousWord = nextWord === "Yes" ? "No" : "Yes";
+				const numberOf = (word: string): number => word === "Yes" ? 1 : 0;
+				const rawOf = (word: string): string => rawForm === "word" ? word : String(numberOf(word));
+				const source = "CPU [#0]: Boolean consistency";
+				const label = "Thermal Throttling";
+				const key = gadgetReadingKey(source, label);
+				const shared = "f0001234:0:8000001";
+				const links = [{ sharedMemory: shared, gadget: key, unit: "Yes/No", sensorType: 8 }];
+				shape([0, 900], (i) => i === 0
+					? { sensor: source, label, value: previousWord, raw: rawOf(previousWord) }
+					: { sensor: "Board", label: "Power", value: "50 W", raw: "50" });
+				const provider = GadgetRegistryProvider.open();
+				try {
+					const before = readVerified(provider);
+					assert.equal(before.byKey.get(key)?.value, numberOf(previousWord));
+					putValue("Value0", nextWord);
+					putValue("Value900", "51 W");
+					putValue("ValueRaw900", "51");
+					assert.equal(provider.read(), null, "a paused boolean rewrite skips its first contradictory scan");
+					assert.equal(Reflect.get(provider, "freshnessRevision"), before.freshnessRevision, "a rejected scan commits no evidence");
+					const partial = applyReadingLinks(readVerified(provider), links, 1);
+					assert.deepEqual(labels(partial), ["Power"], "the healthy sibling still serves");
+					assert.equal(partial.byKey.get("g:Board:Power")?.value, 51);
+					assert.equal(partial.contradictoryReadingCount, 1);
+					for (const spelling of [key, `g:${source}:${label}`, shared]) assert.equal(partial.byKey.has(spelling), false, "no alias republishes the contradictory row");
+					assert.equal(partial.freshnessRevision, (before.freshnessRevision ?? 0) + 1, "only the healthy sibling advances evidence");
+					assert.match(provider.notices().join("\n"), /formatted value.*does not agree with raw value.*Thermal Throttling/);
+					assert.equal(readVerified(provider).freshnessRevision, partial.freshnessRevision);
+					assert.deepEqual(provider.notices(), [], "a standing contradiction does not repeat its warning");
+					putValue("ValueRaw0", rawOf(nextWord));
+					const recovered = applyReadingLinks(readVerified(provider), links, 1);
+					assert.equal(recovered.byKey.get(shared)?.value, numberOf(nextWord));
+					assert.equal(recovered.byKey.get(shared)?.unit, "Yes/No");
+					assert.equal(recovered.contradictoryReadingCount, undefined);
+					assert.equal(recovered.freshnessRevision, partial.freshnessRevision, "reappearing after a withheld row starts a baseline, not an invented change");
+					putValue("Value0", previousWord);
+					putValue("ValueRaw0", rawOf(previousWord));
+					assert.equal(readVerified(provider).freshnessRevision, (recovered.freshnessRevision ?? 0) + 1, "a complete boolean flip remains measurement evidence");
+				} finally { provider.close(); }
+			});
+		}
+	}
+
+	test("a cold contradictory boolean row is withheld rather than published or treated as an empty key", () => {
+		shape([0], () => ({ sensor: "CPU", label: "Thermal Throttling", value: "Yes", raw: "No" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			const snapshot = readVerified(provider);
+			assert.deepEqual(snapshot.readings, []);
+			assert.equal(snapshot.contradictoryReadingCount, 1);
+			assert.equal(snapshot.freshnessRevision, 0);
+			assert.match(provider.notices().join("\n"), /Thermal Throttling/);
+		} finally { provider.close(); }
+	});
+});
+
 describe("integrity: malformed raw tokens through the native registry boundary", { skip: !onWindows ? "win32-x64 only" : false }, () => {
 	test("malformed raw values earn no freshness or linked session samples and recover without continuity", () => {
 		const source = "CPU [#0]: Raw integrity";

@@ -15,9 +15,13 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { WebSocketServer } from "ws";
 import { buildInfo, decodeSvg, makeCheck, pluginArgv, sleep } from "./lib/e2e-common.mjs";
+import { assessLoadMetrics, expectedRssSampleCount } from "./lib/load-metrics.mjs";
 
 const PORT = 28995;
 const SOAK_SEC = Number(process.env.LOAD_SOAK_SEC ?? "90");
+const SOAK_MS = SOAK_SEC * 1000;
+const SAMPLE_MS = 15_000;
+const EXPECTED_SAMPLES = expectedRssSampleCount(SOAK_MS, SAMPLE_MS);
 const POLL_MS = 250;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
@@ -160,18 +164,20 @@ try {
 	check("plugin survived churn (12 waves × ~260 contexts)", pluginExited === null, pluginExited === null ? `${totalFrames - framesBeforeChurn} frames during churn` : `exited code ${pluginExited}`);
 
 	// Phase 3 — soak with everything visible; RSS must stay bounded.
+	const soakStart = performance.now();
 	const samples = [rssMB()];
-	const soakEnd = Date.now() + SOAK_SEC * 1000;
-	while (Date.now() < soakEnd && pluginExited === null) {
-		await sleep(Math.min(15_000, Math.max(1000, soakEnd - Date.now())));
+	for (let sample = 1; sample < EXPECTED_SAMPLES && pluginExited === null; sample++) {
+		// Absolute deadlines include the exact requested end time without
+		// adding a sampler's own runtime to every interval.
+		const due = soakStart + Math.min(sample * SAMPLE_MS, SOAK_MS);
+		await sleep(Math.max(0, due - performance.now()));
 		samples.push(rssMB());
 	}
-	const valid = samples.filter((s) => s > 0);
-	const peak = Math.max(...valid);
-	const growth = valid[valid.length - 1] - valid[0];
-	console.log(`RSS samples (MB): start=${rssStart} ${valid.join(" → ")}`);
-	check(`soak ${SOAK_SEC}s: RSS peak < 300 MB`, peak < 300, `peak ${peak} MB`);
-	check("soak: RSS growth < 25 MB", growth < 25, `${growth >= 0 ? "+" : ""}${growth.toFixed(1)} MB over ${valid.length} samples`);
+	const metrics = assessLoadMetrics(samples, EXPECTED_SAMPLES, invalidFrames);
+	console.log(`RSS samples (MB): start=${rssStart} ${samples.map((sample) => sample > 0 ? sample : "FAILED").join(" → ")}`);
+	check("soak: every scheduled RSS observation succeeded", metrics.complete, `${metrics.validSamples}/${EXPECTED_SAMPLES} valid observations`);
+	check(`soak ${SOAK_SEC}s: RSS peak < 300 MB`, metrics.peak !== null && metrics.peak < 300, metrics.peak === null ? "unverified: incomplete RSS observations" : `peak ${metrics.peak} MB`);
+	check("soak: RSS growth < 25 MB", metrics.growth !== null && metrics.growth < 25, metrics.growth === null ? "unverified: incomplete RSS observations" : `${metrics.growth >= 0 ? "+" : ""}${metrics.growth.toFixed(1)} MB over ${metrics.validSamples} samples`);
 	check("plugin alive after soak", pluginExited === null);
 
 	// Phase 4 — all actions gone → poller idles → socket close → self-exit.
@@ -192,6 +198,7 @@ try {
 	wss.close();
 	const code = await Promise.race([exitPromise, sleep(5000).then(() => "timeout")]);
 	check("plugin self-exits on socket close", code === 0, `exit ${code}`);
+	check("no invalid frames during the full load run", assessLoadMetrics(samples, EXPECTED_SAMPLES, invalidFrames).framesValid, `${invalidFrames}`);
 } finally {
 	if (pluginExited === null) {
 		plugin.kill();

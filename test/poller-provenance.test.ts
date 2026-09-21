@@ -24,6 +24,7 @@ import { ENTRY, ENTRY_CLASSIC_SIZE, HEADER, HEADER_SIZE, MAGIC_ACTIVE, SENSOR, S
 import { SnapshotParser } from "../src/hwinfo/reader";
 import { HwinfoError, SensorType, type SensorSnapshot } from "../src/hwinfo/types";
 import type { PollerStatus } from "../src/poller";
+import { SessionStatsStore } from "../src/stats";
 import { statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
 
 const { poller } = await import("../src/poller");
@@ -44,6 +45,9 @@ type Subject = {
 	retain(): void;
 	release(): void;
 	setSourceMode(mode: "auto" | "shared-memory" | "gadget"): void;
+	setReadingLinks(raw: unknown): void;
+	subscribeSeries(key: string): void;
+	getSeries(key: string): readonly number[] | undefined;
 	getStatus(): PollerStatus;
 	diagnostics(): { state: string; source?: string; reason?: string; sampleAgeMs: number | null };
 };
@@ -125,6 +129,97 @@ function sharedMemoryFixture(): { bytes: Buffer; entry: number; open(): Provider
 		return provider("shared-memory", () => parser.parse(bytes));
 	} };
 }
+
+describe("withheld Shared Memory identities end consumer continuity", () => {
+	for (const boundary of ["duplicate tuple", "missing owner"] as const) {
+		it(`${boundary}: the real parser clears linked history and retained sessions before unique recovery`, () => {
+			const subject = isolated();
+			const fixture = sharedMemoryFixture();
+			const bytes = Buffer.alloc(fixture.entry + 3 * ENTRY_CLASSIC_SIZE);
+			fixture.bytes.copy(bytes);
+			bytes.writeUInt32LE(3, HEADER.entryElementCount);
+			for (const row of [1, 2]) {
+				fixture.bytes.copy(bytes, fixture.entry + row * ENTRY_CLASSIC_SIZE, fixture.entry);
+				bytes.writeUInt32LE(0x1000001 + row, fixture.entry + row * ENTRY_CLASSIC_SIZE + ENTRY.id);
+			}
+			const value = (row: number, number: number): void => {
+				for (const offset of [ENTRY.value, ENTRY.valueMin, ENTRY.valueMax, ENTRY.valueAvg]) bytes.writeDoubleLE(number, fixture.entry + row * ENTRY_CLASSIC_SIZE + offset);
+			};
+			const saved = "f0001234:0:1000001";
+			const alias = "g:GPU:Temperature";
+			const healthy = "f0001234:0:1000002";
+			const links = Object.freeze([Object.freeze({ sharedMemory: saved, gadget: alias, unit: "°C", sensorType: 1 })]);
+			const savedLinks = JSON.stringify(links);
+			const parser = new SnapshotParser();
+			subject.openProvider = () => provider("shared-memory", () => parser.parse(bytes));
+			subject.lastReopenProbeAt = Number.POSITIVE_INFINITY;
+			subject.setReadingLinks(links);
+			for (const key of [saved, alias, healthy]) subject.subscribeSeries(key);
+			const current = (): SensorSnapshot => {
+				const status = subject.getStatus();
+				assert.equal(status.state, "ok");
+				return status.snapshot;
+			};
+			const stats = new SessionStatsStore();
+			const observe = (): void => {
+				const snapshot = current();
+				for (const key of [saved, alias, healthy]) {
+					const reading = snapshot.byKey.get(key);
+					assert.ok(reading);
+					stats.observe(reading, snapshot, "shared-memory");
+				}
+			};
+			now = 100_000;
+			subject.tick();
+			observe();
+			value(0, 51);value(1, 60);
+			now += 500;
+			subject.tick();
+			observe();
+			assert.deepEqual(subject.getSeries(saved), [50, 51]);
+			assert.deepEqual(subject.getSeries(alias), [50, 51]);
+			const healthyStats = { ...stats.get(healthy) };
+			const evidence = current().freshnessRevision;
+			if (boundary === "duplicate tuple") bytes.writeUInt32LE(0x1000001, fixture.entry + 2 * ENTRY_CLASSIC_SIZE + ENTRY.id);
+			else bytes.writeUInt32LE(7, fixture.entry + ENTRY.sensorIndex);
+			value(0, 80);value(2, 900);
+			now += 500;
+			subject.tick();
+			const withheld = current();
+			assert.equal(withheld.byKey.has(saved), false);
+			assert.equal(withheld.byKey.has(alias), false, "an explicit link cannot republish an ambiguous or ownerless endpoint");
+			assert.equal(withheld.freshnessRevision, boundary === "duplicate tuple" ? evidence : (evidence ?? 0) + 1, "only the still-unique third row may supply evidence");
+			assert.deepEqual(subject.getSeries(saved), []);
+			assert.deepEqual(subject.getSeries(alias), []);
+			assert.deepEqual(subject.getSeries(healthy), [50, 60]);
+			stats.validateRetained(withheld, "shared-memory", new Set());
+			assert.equal(stats.get(saved), undefined);
+			assert.equal(stats.get(alias), undefined);
+			assert.deepEqual(stats.get(healthy), healthyStats);
+			const withheldEvidence = withheld.freshnessRevision;
+			if (boundary === "duplicate tuple") bytes.writeUInt32LE(0x1000003, fixture.entry + 2 * ENTRY_CLASSIC_SIZE + ENTRY.id);
+			else bytes.writeUInt32LE(0, fixture.entry + ENTRY.sensorIndex);
+			now += 500;
+			subject.tick();
+			assert.equal(current().byKey.get(saved)?.value, 80);
+			assert.equal(current().byKey.get(alias)?.value, 80);
+			assert.equal(current().freshnessRevision, withheldEvidence, "unique recovery establishes a new baseline");
+			assert.deepEqual(subject.getSeries(saved), []);
+			assert.deepEqual(subject.getSeries(alias), []);
+			observe();
+			assert.deepEqual(stats.get(saved), { min: 80, max: 80, sum: 80, count: 1 });
+			assert.deepEqual(stats.get(alias), { min: 80, max: 80, sum: 80, count: 1 });
+			assert.deepEqual(stats.get(healthy), healthyStats);
+			value(0, 81);
+			now += 500;
+			subject.tick();
+			assert.deepEqual(subject.getSeries(saved), [81]);
+			assert.deepEqual(subject.getSeries(alias), [81]);
+			assert.deepEqual(subject.getSeries(healthy), [50, 60]);
+			assert.equal(JSON.stringify(links), savedLinks, "saved pairing data is never migrated or rewritten");
+		});
+	}
+});
 
 describe("Shared Memory parser evidence reaches the poller with its real age", () => {
 	for (const rebuild of [false, true]) {

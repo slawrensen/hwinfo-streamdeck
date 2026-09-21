@@ -16,6 +16,8 @@
  * mid-session label rename is also possible and is knowingly NOT detected
  * (stale label until the next rebuild): a
  * stale name is cosmetic, a stale unit is a wrong number.
+ * A stable owner ID/instance/reading ID must identify exactly one raw row.
+ * Ambiguous and ownerless rows are withheld, never assigned positional keys.
  */
 import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
 import { HwinfoError, SensorType, type SensorSnapshot, type SensorSource } from "./types";
@@ -112,6 +114,9 @@ export class SnapshotParser {
 	 * the UTF-8 tail or zeros): a stale unit displays a wrong number, so the
 	 * fast path must notice a unit rewrite as cheaply as an id change. */
 	private unitWords = new Uint32Array(0);
+	/** Published readings may omit raw rows. Keep their physical offsets so
+	 * the fast path never assigns a withheld row's values to a survivor. */
+	private readingOffsets = new Uint32Array(0);
 	private snapshot: MutableSnapshot | null = null;
 	// DataView beats Buffer.read* in the hot loop: its accessors are TurboFan
 	// intrinsics, so reads stay unboxed (readDoubleLE allocates a HeapNumber
@@ -170,7 +175,7 @@ export class SnapshotParser {
 		const unitWords = this.unitWords;
 		let changed = false;
 		let evidenceChanged = false;
-		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
+		for (let i = 0, o = entrySectionOffset; i < identity.length / 3; i++, o += entryElementSize) {
 			if (
 				dv.getUint32(o + ENTRY.type, true) !== identity[i * 3] ||
 				dv.getUint32(o + ENTRY.sensorIndex, true) !== identity[i * 3 + 1] ||
@@ -194,7 +199,8 @@ export class SnapshotParser {
 		// Validate the entire identity skeleton before mutating cached values.
 		// Otherwise a late rebuild could lose an earlier value change when
 		// comparing its newly decoded readings with the previous snapshot.
-		for (let i = 0, o = entrySectionOffset; i < readings.length; i++, o += entryElementSize) {
+		for (let i = 0; i < readings.length; i++) {
+			const o = this.readingOffsets[i] as number;
 			// Object.is, not !==: a NaN entry would otherwise read as changed
 			// on every tick, re-boxing the double and bumping the revision on
 			// identical bytes (which would defeat the detail render gate).
@@ -271,7 +277,21 @@ export class SnapshotParser {
 			};
 		}
 
-		const readings: MutableReading[] = new Array<MutableReading>(entryElementCount);
+		// Count the complete stable tuple before publishing any row. Labels,
+		// types, units and encounter order cannot disambiguate one identity.
+		const keys: (string | undefined)[] = new Array<string | undefined>(entryElementCount);
+		const keyCounts = new Map<string, number>();
+		for (let i = 0; i < entryElementCount; i++) {
+			const o = entrySectionOffset + i * entryElementSize;
+			const source = sensors[buf.readUInt32LE(o + ENTRY.sensorIndex)];
+			if (source === undefined) continue;
+			const id = buf.readUInt32LE(o + ENTRY.id);
+			const key = `${source.id.toString(16)}:${source.instance}:${id.toString(16)}`;
+			keys[i] = key;
+			keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
+		}
+		const readings: MutableReading[] = [];
+		const readingOffsets: number[] = [];
 		const byKey = new Map<string, MutableReading>();
 		const identity = new Uint32Array(entryElementCount * 3);
 		const unitWords = new Uint32Array(entryElementCount * UNIT_WORDS_PER_ENTRY);
@@ -291,28 +311,20 @@ export class SnapshotParser {
 					unitWords[i * UNIT_WORDS_PER_ENTRY + UNIT_FIELD_WORDS + w] = buf.readUInt32LE(o + ENTRY.unitUtf8 + w * 4);
 				}
 			}
+			// Even withheld rows retain identity/unit guards above: a repaired
+			// or newly colliding row must invalidate the cached publication.
+			const key = keys[i];
+			if (key === undefined || keyCounts.get(key) !== 1) continue;
 			const orig = cstr(buf, o + ENTRY.labelOrig, 128, "latin1");
 			const user = cstr(buf, o + ENTRY.labelUser, 128, "latin1");
 			const utf8 = entryHasUtf8 ? cstr(buf, o + ENTRY.labelUtf8, 128, "utf8") : "";
 			const unitAnsi = cstr(buf, o + ENTRY.unit, 16, "latin1");
 			const unitUtf8 = entryHasUtf8 ? cstr(buf, o + ENTRY.unitUtf8, 16, "utf8") : "";
 
-			const source = sensors[sensorIndex];
-			// Identity that survives HWiNFO restarts: owning sensor id+instance plus
-			// the reading id, with a `~n` suffix for in-order duplicates.
-			const baseKey =
-				source !== undefined
-					? `${source.id.toString(16)}:${source.instance}:${id.toString(16)}`
-					: `?:${sensorIndex}:${id.toString(16)}`;
-			let key = baseKey;
-			for (let dup = 1; byKey.has(key); dup++) {
-				key = `${baseKey}~${dup}`;
-			}
-
 			const reading: MutableReading = {
 				key,
 				type: toSensorType(type),
-				sensorIndex: source !== undefined ? sensorIndex : -1,
+				sensorIndex,
 				id,
 				label: pickLabel(orig, user, utf8),
 				unit: unitUtf8.length > 0 ? unitUtf8 : unitAnsi,
@@ -321,7 +333,8 @@ export class SnapshotParser {
 				valueMax: buf.readDoubleLE(o + ENTRY.valueMax),
 				valueAvg: buf.readDoubleLE(o + ENTRY.valueAvg)
 			};
-			readings[i] = reading;
+			readings.push(reading);
+			readingOffsets.push(o);
 			byKey.set(key, reading);
 		}
 
@@ -330,6 +343,7 @@ export class SnapshotParser {
 		}
 		this.identity = identity;
 		this.unitWords = unitWords;
+		this.readingOffsets = Uint32Array.from(readingOffsets);
 		// A rebuild is a data change by definition (layout growth, unit flip),
 		// even when pollTime and the reading count happen to match: carry the
 		// revision line forward and bump it.

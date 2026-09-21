@@ -65,7 +65,11 @@ describe("release workflow privilege boundary", () => {
 		const stage = workflow.slice(workflow.indexOf("  stage:"));
 		assert.match(workflow, /permissions:\s*\n {2}contents: read/);
 		assert.match(build, /RELEASE_TAG: \$\{\{ github.ref_name \}\}/);
-		assert.ok(build.indexOf("node scripts/verify-release-tag.mjs") < build.indexOf("run: npm ci"));
+		const verifyIndex = build.indexOf("node scripts/verify-release-tag.mjs");
+		const installIndex = build.indexOf("run: npm ci");
+		assert.ok(verifyIndex >= 0, "release verifier command must exist");
+		assert.ok(installIndex >= 0, "dependency install command must exist");
+		assert.ok(verifyIndex < installIndex, "release verifier must run before dependency installation");
 		assert.doesNotMatch(build, /contents: write/);
 		assert.match(stage, /needs: build/);
 		assert.match(stage, /permissions:\s*\n {6}contents: write/);

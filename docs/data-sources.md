@@ -193,11 +193,12 @@ HWiNFO renumbers its Gadget rows after every tick or untick and rewrites
 them one at a time, so for a moment one reading can sit in two slots, or in
 none. A scan that sees a name on two rows for the first time is withheld
 and retried like any other torn read, and the keys hold their values for
-that poll. A name still on two rows at the next scan belongs to
+that poll. If the next scan shows the name on one row, that scan is
+retried the same way, because it can be the moment the other row is in no
+slot. A name still on two rows at the next scan belongs to
 [two ticked readings](#enabling-gadget-reporting): those rows are withheld
 on their own, and released once two scans in a row show the name on one
-row, because a single such scan can be the moment one of the two is in no
-slot.
+row, for the same reason.
 
 Sparklines collect changed values between producer timestamps as well as
 advancing timestamps. Repeated held frames do not add points. A skipped

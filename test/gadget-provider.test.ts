@@ -943,6 +943,7 @@ describe("integrity: a doubled Gadget name is withheld only while it stands", { 
 			assert.equal(readVerified(provider).readings.length, 12);
 			const torn = untick(provider, rows, 3);
 			const left = rows.filter((_, i) => i !== 3);
+			assert.equal(provider.read(), null, "the last frontier showed a name on two rows; the scan after shows it on one, which is also what a tick hiding a twin looks like, so it is skipped and the keys hold");
 			for (const scan of ["first", "second"]) {
 				const settled = readVerified(provider);
 				assert.deepEqual(labels(settled), left.map((row) => row.label), `the ${scan} scan after the rewrite publishes every remaining name`);
@@ -969,6 +970,51 @@ describe("integrity: a doubled Gadget name is withheld only while it stands", { 
 				assert.deepEqual(labels(settled), rows.map((row) => row.label), `the ${scan} scan after the rewrite publishes every name`);
 				assert.equal(settled.blockedReadingCount, 0);
 			}
+		} finally { provider.close(); }
+	});
+
+	test("a twin the rewrite hides for one scan cannot hand its name to the other twin", () => {
+		// The percent twin is ticked while the RPM twin is on a key: the first
+		// scan sees the name on two rows and skips. The tick is still rewriting
+		// on the next scan, and the RPM row is the one it is passing: its label
+		// is not written yet (variant a) or the row is in no slot at all
+		// (variant b), so the percent row is the only one carrying the name.
+		for (const hide of ["label", "slot"] as const) {
+			const healthy = probes("CPU [#0]: Hidden twin " + hide, 2);
+			shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row]);
+			const provider = GadgetRegistryProvider.open();
+			try {
+				assert.equal(readVerified(provider).byKey.get(shared)?.value, 1800);
+				putSlot(3, fanPct);
+				assert.equal(provider.read(), null, hide + ": a first sighting skips the scan");
+				if (hide === "label") dropValue("Label1");
+				else dropSlot(1);
+				assert.equal(provider.read(), null, hide + ": one row left with a name seen shared last scan is skipped too; the keys keep 1800 RPM instead of taking 35 %");
+				if (hide === "label") putValue("Label1", fanRpm.label);
+				else putSlot(1, fanRpm);
+				const standing = readVerified(provider);
+				assert.equal(standing.byKey.get(shared), undefined, hide + ": both twins back: withheld, no skip");
+				assert.equal(standing.byKey.get(sharedLegacy), undefined);
+				assert.equal(standing.blockedReadingCount, 2);
+				assert.match(provider.notices().join("; "), /slots 1 and 3 withheld/);
+			} finally { provider.close(); }
+		}
+		// The other way round: the RPM twin really was unticked. Two clean
+		// scans, the first skipped, and the percent row answers to the name.
+		const healthy = probes("CPU [#0]: Hidden twin gone", 2);
+		shapeRows([healthy[0] as Row, fanRpm, healthy[1] as Row]);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).byKey.get(shared)?.value, 1800);
+			putSlot(3, fanPct);
+			assert.equal(provider.read(), null);
+			dropSlot(1);
+			assert.equal(provider.read(), null, "the first clean scan is skipped");
+			const settled = readVerified(provider);
+			assert.equal(settled.byKey.get(shared)?.value, 35, "the second clean scan publishes the one row left");
+			assert.equal(settled.byKey.get(shared)?.unit, "%");
+			assert.equal(settled.blockedReadingCount, 0);
+			assert.deepEqual(provider.notices(), [], "a name never held is never named in the log");
 		} finally { provider.close(); }
 	});
 

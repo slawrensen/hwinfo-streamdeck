@@ -26,11 +26,15 @@ import { getHwsm, hwsmCode, hwsmWin32, type HwsmGadgetKey } from "./hwsm-loader"
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot, type SensorSource } from "./types";
 
 /** Where a name seen on more than one row stands. "suspect": one sighting,
- * and that scan was skipped as a possibly torn read. "held": on more than
- * one row on consecutive complete scans, so its rows are withheld.
- * "releasing": held, and the last complete scan no longer showed it on more
- * than one row; still withheld, forgotten when the next scan agrees. */
-type NameState = "suspect" | "held" | "releasing";
+ * and that scan was skipped as a possibly torn read. "settling": suspect,
+ * and the next complete scan showed it on one row; that scan was skipped
+ * too, because the row a tick is rewriting is in no slot for that same
+ * moment. Forgotten when the scan after agrees, held when the name is shared
+ * again. "held": on more than one row on consecutive complete scans, so its
+ * rows are withheld. "releasing": held, and the last complete scan no longer
+ * showed it on more than one row; still withheld, forgotten when the next
+ * scan agrees. */
+type NameState = "suspect" | "settling" | "held" | "releasing";
 
 /** Overridable so the gadget e2e can point at a synthetic key. */
 const VSB_SUBKEY = process.env.HWINFO_VSB_KEY || "Software\\HWiNFO64\\VSB";
@@ -316,9 +320,12 @@ export class GadgetRegistryProvider {
 		// (HWiNFO reports some readings twice under one name, a fan in RPM
 		// and in percent; a block it left behind can repeat a live row): its
 		// rows are withheld, and only they. Leaving takes two clean scans as
-		// well: a tick makes a reading ABSENT for that same moment, and a
-		// twin hidden that way must not hand the shared name to the other
-		// one for a tick.
+		// well, from a sighting as much as from a standing pair: a tick makes
+		// a reading ABSENT for that same moment, and a twin hidden that way
+		// must not hand the shared name to the other one for a tick. After a
+		// sighting the second of those scans is skipped like the first, so
+		// the keys hold their values instead of flashing the name missing
+		// for the ordinary case, a rewrite that has simply finished.
 		const rowsByName = new Map<string, typeof namedRows>();
 		for (const row of namedRows) {
 			const rows = rowsByName.get(row.key);
@@ -327,6 +334,7 @@ export class GadgetRegistryProvider {
 		}
 		const nameStates = new Map<string, NameState>();
 		let firstSighting = false;
+		let settling = false;
 		for (const [key, rows] of rowsByName) {
 			if (rows.length < 2) continue;
 			const known = this.nameStates.has(key);
@@ -334,7 +342,12 @@ export class GadgetRegistryProvider {
 			if (!known) firstSighting = true;
 		}
 		for (const [key, state] of this.nameStates) {
-			if (state === "held" && !nameStates.has(key)) nameStates.set(key, "releasing");
+			if (nameStates.has(key)) continue;
+			if (state === "held") nameStates.set(key, "releasing");
+			else if (state === "suspect" && rowsByName.has(key)) {
+				nameStates.set(key, "settling");
+				settling = true;
+			}
 		}
 		this.nameStates = nameStates;
 		for (const key of this.reportedNames) {
@@ -356,7 +369,7 @@ export class GadgetRegistryProvider {
 		// it. Skipping for one before the other advanced would take a key
 		// holding a standing pair AND a standing contradiction two skips to
 		// confirm, and open() reads only twice.
-		if (firstSighting || [...streak.values()].some((count) => count < 2)) return null;
+		if (firstSighting || settling || [...streak.values()].some((count) => count < 2)) return null;
 		for (const { slot, identity, notice } of contradictions) {
 			if (this.reportedSlots.get(slot) !== identity) {
 				this.reportedSlots.set(slot, identity);

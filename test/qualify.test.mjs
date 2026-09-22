@@ -6,7 +6,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -33,7 +32,10 @@ describe("qualification entrypoint", () => {
 		// the missing artifact is rejected there, with the remedy, and the
 		// ABI and recovery stages that would consume it are skipped, never
 		// run over an older extraction.
-		const out = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-qualify-"));
+		// The record directory sits INSIDE the checkout here, as CI keeps it:
+		// it is the run's own output, and the unchanged-tree stage must not
+		// count it as a changed input.
+		const out = fs.mkdtempSync(path.join(ROOT, "qualification-test-"));
 		t.after(() => fs.rmSync(out, { recursive: true, force: true }));
 		const archive = path.join(ROOT, "release", "com.lawrensen.hwinfo.streamDeckPlugin");
 		const packed = fs.existsSync(archive);

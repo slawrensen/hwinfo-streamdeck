@@ -189,8 +189,16 @@ const stages = {
 	"native-gate": () => exec(["scripts/validate-native.mjs"], { node: true }),
 	"cli-validate": () => (tools.streamdeck ? exec(`streamdeck${isWin ? ".cmd" : ""} validate "${stagingDir}"`) : { unavailable: "streamdeck CLI" }),
 	tree() {
+		// The record directory is this run's own output; when it sits inside
+		// the checkout (CI keeps it next to the sources) it is untracked and
+		// not an input, so it is the one new path the check ignores.
+		const relOut = path.relative(repoRoot, outDir).split(path.sep).join("/");
+		const ownRecord = (line) => {
+			const p = line.slice(3).trim().replace(/^"|"$/g, "").replace(/\/$/, "");
+			return relOut !== "" && !relOut.startsWith("..") && (relOut === p || relOut.startsWith(`${p}/`) || p.startsWith(`${relOut}/`));
+		};
 		const after = git("status", "--porcelain");
-		const changed = after.split("\n").filter((line) => line && !dirtyBefore.split("\n").includes(line));
+		const changed = after.split("\n").filter((line) => line && !dirtyBefore.split("\n").includes(line) && !ownRecord(line));
 		return { ok: changed.length === 0, output: changed.length === 0 ? "tracked inputs unchanged" : `the run changed tracked inputs:\n${changed.join("\n")}` };
 	}
 };

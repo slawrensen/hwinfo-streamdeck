@@ -181,7 +181,9 @@ Per-reading dial colors and reliability fixes in one release candidate.
   not a version, and it compares the built `hwsm.node` with the previous
   release's manifest and annotates the run when the bytes moved without a
   native source change. The packaging gate refuses a vendored `hwsm.node`
-  that was built from other native sources than the tree it sits in.
+  that was built from other native sources than the tree it sits in, and
+  the manifest step refuses a binary that lacks any of the hardening flags
+  the build asks for.
 - The bundle ships `@elgato/streamdeck` 2.1.2 with `@elgato/utils` 0.6.0,
   and the release and CI workflows run on the Node 24 generation of their
   pinned actions. Native C behavior and the API are unchanged; the build

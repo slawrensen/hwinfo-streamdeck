@@ -67,3 +67,30 @@ describe("native-manifest toolchain facts", { skip: !existsSync(addon) && "bin/h
 		assert.equal(manifest().compilerVersion, "unknown");
 	});
 });
+
+describe("native-manifest hardening record", { skip: !existsSync(addon) && "bin/hwsm.node not built" }, () => {
+	it("records every hardening flag binding.gyp asks for as present on the built addon", () => {
+		const r = run({});
+		assert.equal(r.status, 0, r.stderr);
+		const hardening = (JSON.parse(fs.readFileSync(out, "utf8")) as { hardening: Record<string, boolean> }).hardening;
+		assert.deepEqual(Object.keys(hardening).sort(), ["cetCompat", "controlFlowGuard", "dynamicBase", "highEntropyVa", "nxCompat", "reproducibleLink"]);
+		for (const [flag, on] of Object.entries(hardening)) assert.equal(on, true, flag);
+	});
+
+	it("refuses to record a binary that lacks one of them", () => {
+		// The same addon with Control Flow Guard cleared in its PE header:
+		// DllCharacteristics sits 70 bytes into the PE32+ optional header.
+		const bytes = fs.readFileSync(addon);
+		const optionalHeader = bytes.readUInt32LE(0x3c) + 4 + 20;
+		const characteristics = bytes.readUInt16LE(optionalHeader + 70);
+		assert.notEqual(characteristics & 0x4000, 0, "the built addon carries CFG, or this test proves nothing");
+		bytes.writeUInt16LE(characteristics & ~0x4000, optionalHeader + 70);
+		const weakened = join(outDir, "hwsm-no-cfg.node");
+		fs.writeFileSync(weakened, bytes);
+		fs.rmSync(out, { force: true });
+		const r = spawnSync(process.execPath, [script, weakened], { cwd: ROOT, encoding: "utf8", env: { ...process.env, GITHUB_RUN_ID: undefined, HWSM_CL_VERSION: undefined, HWSM_MANIFEST_OUT: out } });
+		assert.equal(r.status, 1);
+		assert.match(r.stderr, /lacks hardening controlFlowGuard/);
+		assert.equal(existsSync(out), false, "no manifest is written for a binary the gate refused");
+	});
+});

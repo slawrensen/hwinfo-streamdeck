@@ -122,6 +122,18 @@ function parsePe(buf) {
 
 const pe = parsePe(bytes);
 
+// binding.gyp asks for every one of these (/HIGHENTROPYVA, /DYNAMICBASE,
+// /NXCOMPAT, /guard:cf, /CETCOMPAT, /Brepro). The manifest is published as
+// the record of what shipped, so a binary that lacks one is refused here
+// rather than recorded with a false in it: a flag dropped from the build
+// would otherwise reproduce, pass the drift check (the source id covers
+// binding.gyp, so different bytes are expected) and ship.
+const missingHardening = Object.entries(pe.hardening).filter(([, on]) => !on).map(([name]) => name);
+if (missingHardening.length > 0) {
+	console.error(`native-manifest: ${path.basename(target)} lacks hardening ${missingHardening.join(", ")}; native/hwsm/binding.gyp asks for all of them, so this is a toolchain or flag regression.`);
+	process.exit(1);
+}
+
 // Load the exact file being described (win32-x64 only) for its own report.
 let buildInfo = null;
 if (process.platform === "win32" && process.arch === "x64") {

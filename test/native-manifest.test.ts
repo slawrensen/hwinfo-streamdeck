@@ -68,6 +68,25 @@ describe("native-manifest toolchain facts", { skip: !existsSync(addon) && "bin/h
 	});
 });
 
+describe("native-manifest refuses a file that is not a PE image", { skip: !existsSync(addon) && "bin/hwsm.node not built" }, () => {
+	it("reports one line and writes no manifest for a truncated, foreign or header-damaged file", () => {
+		const bytes = fs.readFileSync(addon);
+		const damaged = Buffer.from(bytes);
+		damaged.writeUInt32LE(bytes.length + 4096, 0x3c);
+		const cases: Array<[string, Buffer]> = [["truncated", bytes.subarray(0, 200)], ["text", Buffer.from("not a native module at all")], ["lfanew past the end", damaged], ["empty", Buffer.alloc(0)]];
+		for (const [name, content] of cases) {
+			const file = join(outDir, `not-a-pe-${name.replaceAll(" ", "-")}.node`);
+			fs.writeFileSync(file, content);
+			fs.rmSync(out, { force: true });
+			const r = spawnSync(process.execPath, [script, file], { cwd: ROOT, encoding: "utf8", env: { ...process.env, GITHUB_RUN_ID: undefined, HWSM_CL_VERSION: undefined, HWSM_MANIFEST_OUT: out } });
+			assert.equal(r.status, 1, name);
+			assert.match(r.stderr, /could not be parsed as a PE image/, name);
+			assert.doesNotMatch(r.stderr, /RangeError|ERR_OUT_OF_RANGE/, name);
+			assert.equal(existsSync(out), false, name);
+		}
+	});
+});
+
 describe("native-manifest hardening record", { skip: !existsSync(addon) && "bin/hwsm.node not built" }, () => {
 	it("records every hardening flag binding.gyp asks for as present on the built addon", () => {
 		const r = run({});

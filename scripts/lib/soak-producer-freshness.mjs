@@ -19,7 +19,7 @@ export function candidateNativeContract(repoRoot) {
 	const nativeProtocol = Number(/^#define HWSM_PROTOCOL_VERSION (\d+)$/m.exec(version)?.[1]);
 	const nativeVersion = /^#define HWSM_NATIVE_VERSION_STR "([^"]+)"$/m.exec(version)?.[1];
 	if (!Number.isSafeInteger(protocolVersion) || protocolVersion < 1 || nativeProtocol !== protocolVersion || !nativeVersion) {
-		throw new Error("Candidate native contract cannot be established");
+		throw new Error(`Candidate native contract cannot be established: src/hwinfo/hwsm-loader.ts HWSM_PROTOCOL_VERSION is ${String(protocolVersion)}, native/hwsm/hwsm-version.h HWSM_PROTOCOL_VERSION is ${String(nativeProtocol)} and HWSM_NATIVE_VERSION_STR is ${JSON.stringify(nativeVersion ?? null)}; the two protocol versions must be the same positive integer and the native version string must be present`);
 	}
 	const hash = createHash("sha256");
 	for (const name of ["hwsm.c", "hwsm.rc", "hwsm-version.h", "binding.gyp"]) {

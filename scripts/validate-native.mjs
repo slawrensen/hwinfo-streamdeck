@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { candidateNativeContract } from "./lib/soak-producer-freshness.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sd = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
@@ -42,6 +43,22 @@ if (!fs.existsSync(addonPath)) {
 			}
 			if (info.nativeSourceId === "unset") {
 				fail("bin/hwsm.node was built without scripts/native-source-id.mjs (nativeSourceId is 'unset') — rebuild with `npm run build:native`.");
+			}
+			// 2b. It was built from THIS tree's native sources. copy-hwsm.mjs
+			// vendors whatever build/Release holds, so an edit to hwsm.c
+			// followed by `npm run build` alone leaves a stale addon in the
+			// pack with a protocol that still matches; the source id is the
+			// only fact that tells the two apart.
+			try {
+				const expected = candidateNativeContract(repoRoot);
+				if (info.nativeSourceId !== expected.nativeSourceId) {
+					fail(`bin/hwsm.node was built from other native sources (its source id ${info.nativeSourceId}, this tree's ${expected.nativeSourceId}) — rebuild with \`npm run build:native\` and \`npm run build\`.`);
+				}
+				if (info.nativeVersion !== expected.nativeVersion) {
+					fail(`bin/hwsm.node reports native version ${info.nativeVersion}, native/hwsm/hwsm-version.h says ${expected.nativeVersion}.`);
+				}
+			} catch (err) {
+				fail(`the native contract in this tree could not be established: ${err?.message ?? err}`);
 			}
 		} catch (err) {
 			fail(`bin/hwsm.node failed to load: ${err?.message ?? err}`);

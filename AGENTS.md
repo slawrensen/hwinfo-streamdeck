@@ -70,8 +70,9 @@ Rules that keep it sound:
   session's exact mapped length (checked arithmetic, 64 MiB bound).
 - `hwsm_test.node` (fault-injection hooks) and `hwsm_protomm.node`
   (deliberate protocol mismatch) build alongside for tests and must never
-  ship; `scripts/validate-native.mjs` enforces that plus protocol/hash
-  consistency in the pack.
+  ship; `scripts/validate-native.mjs` enforces that, protocol/hash
+  consistency in the pack, and that the vendored addon was built from the
+  tree's native sources.
 - `node scripts/native-manifest.mjs` writes `release-native-manifest.json`
   (hash, size, PE hardening, imports, versions); the release workflow
   attaches it next to the pack and re-proves build reproducibility.

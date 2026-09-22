@@ -191,6 +191,13 @@ Per-reading dial colors and reliability fixes in one release candidate.
   than publishing one. The
   external soak monitor now distinguishes plugin and host resources,
   process restarts and failed observations.
+- One command, `npm run release:validate`, runs the whole software
+  qualification from a clean clone in a fixed order (static checks, native
+  build, bundle, unit and native suites, pack, archive contract, ABI check and
+  recovery suite on the extracted bytes, validators) and writes a record of
+  the bytes each stage exercised. CI packs the plugin on every push, holds
+  the archive to the shipping contract, and runs the ABI check and the
+  recovery suite on the extracted bytes.
 - `release-native-manifest.json` records the Windows SDK version the addon
   was built against, the release run refuses a compiler version that is
   not a version, and it compares the built `hwsm.node` with the previous

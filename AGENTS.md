@@ -31,15 +31,26 @@ This is the canonical guide for anyone, human or AI agent, working in the repo.
 | `npm run suite:full` | Every suite plus the screenshot pipeline; fails on any leftover process |
 | `npm run probe` | Standalone reader smoke test against live HWiNFO (`-- --gadget` forces the registry backend) |
 | `npm run changelog:page` | Regenerate the docs-site Changelog page from `CHANGELOG.md` (a committed derived file) |
-| `npm run release:validate` | lint + typecheck + unit + the release-copy validator; the validator needs internal release docs, so it passes only on the maintainer's full checkout |
-| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin`: the Elgato CLI packs a staged copy of the plugin directory (the CLI rewrites the manifest it packs, and the tracked one must not move), then `scripts/validate-pack.mjs` holds the archive to the shipping contract in `scripts/lib/pack-contract.mjs` and to the checkout. `npm run pack:validate` re-checks an existing archive. `npm test` holds the last packed archive to the checkout too, so pack again after a build or that case fails with the remedy in its message |
+| `npm run release:validate` | The canonical software qualification, `scripts/qualify.mjs`: prerequisites, lint, typecheck, native build, bundle, unit, native suite, pack, archive contract + extraction, ABI and producer recovery on the EXTRACTED bytes, copy validator, native packaging gate, `streamdeck validate`, and an unchanged-tree check, in that order from a clean clone. Every stage reports PASS, FAIL, SKIPPED or UNAVAILABLE; a stage that does not pass skips the rest and the exit is nonzero. Needs the MSVC toolset and `npm i -g @elgato/cli@1.7.4`; the copy validator needs the internal release docs, so the whole run passes only on the maintainer's full checkout. The record (stage table, artifact size and SHA-256, member inventory, which bytes the ABI and recovery stages exercised) lands under `release/qualification-<version>/` and is read by nothing |
+| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin`: the Elgato CLI packs a staged copy of the plugin directory (the CLI rewrites the manifest it packs, and the tracked one must not move), then `scripts/validate-pack.mjs` holds the archive to the shipping contract in `scripts/lib/pack-contract.mjs` and to the checkout. `npm run pack:validate` re-checks an existing archive; `npm test` never reads `release/` |
 
-The full UI/browser suite runs locally (`npm run suite:full`). CI (pinned
-windows-2025 runner) runs lint + typecheck + unit + build + the native
-integration suite and built-plugin producer recovery against isolated named
-objects and a mock Stream Deck socket. An ABI matrix loads the same
-Node-20-built `hwsm.node` under Node 20, 22, and 24 without rebuilding.
-The mock socket does not prove physical device behavior.
+Gate map (what runs where, and against which bytes):
+
+| Gate | Where | Bytes exercised | How it runs |
+|---|---|---|---|
+| lint, typecheck, unit (`npm test`) | CI `verify` and locally | source; unit tests never read `release/` | automatic on every push |
+| native build + `test:native` + `validate-native` | CI `verify` and locally | the addon built in that checkout | automatic |
+| `e2e:resilience` on the checkout | CI `verify` and locally | `bin/` of that checkout | automatic |
+| pack + archive contract + extraction, ABI and `e2e:resilience` on the extracted bytes | CI `verify` and locally | the archive that run packed | automatic (`qualify.mjs --stages pack,archive,abi,recovery,tree`); the CI pack and record are retained as the `ci-pack-qualification` artifact |
+| ABI matrix (Node 20, 22, 24) | CI `abi-matrix` | the CI-built addon, unchanged | automatic |
+| copy validator, `streamdeck validate`, the whole sequence with a record | local only (`npm run release:validate`) | the local build and its archive | explicit; ordinary CI does not attest to it |
+| `npm run suite:full` (browser and capture suites, process hygiene) | local only | `bin/` of the checkout | explicit; ordinary CI does not attest to it |
+| installation through the Stream Deck app, hardware soak | a physical deck | the installed package | by hand; the runbook and PERF.md record the result |
+
+The CI-built addon and a locally built one carry the same source identity
+and contract but are not byte-identical (different toolchain images); each
+is qualified where it is built. The mock socket does not prove physical
+device behavior.
 
 ## Native addon (hwsm)
 

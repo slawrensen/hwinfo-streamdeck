@@ -1,19 +1,16 @@
 // The packed-archive gate must refuse every way a .streamDeckPlugin can be
 // wrong while accepting the one shape the packer produces. Each case builds
 // an archive that is wrong in exactly one way over a fixture staging
-// directory, and the final case holds the real release archive (when one
-// has been packed) to the real staging directory.
+// directory. The real release archive is held to the real staging directory
+// by scripts/qualify.mjs (the archive stage), never by the unit run.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 import { PLUGIN_ROOT, SHIPPED_MEMBERS } from "../scripts/lib/pack-contract.mjs";
 import { validatePack } from "../scripts/lib/pack-validation.mjs";
 import { listZip, readZipEntry, writeZip } from "../scripts/lib/zip.mjs";
 import { archiveEntries, archiveFor, FIXTURE_VERSION, makeStaging } from "../scripts/lib/pack-fixture.mjs";
-
-const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 describe("packed-archive gate", () => {
 	let staging;
@@ -139,17 +136,5 @@ describe("packed-archive gate", () => {
 		}
 		const leaky = run(archiveFor(staging, (entries) => entries.map((entry) => entry.name === member("ui/pi-control.js") ? { ...entry, data: Buffer.from("const p = 'C:\\\\Users\\\\someone\\\\git';") } : entry))).failures;
 		assert.ok(leaky.some((line) => /pi-control\.js" contains a machine-specific user path/.test(line)), leaky.join("\n"));
-	});
-
-	const realArchive = path.join(ROOT, "release", "com.lawrensen.hwinfo.streamDeckPlugin");
-	const realStaging = path.join(ROOT, PLUGIN_ROOT);
-	const packed = fs.existsSync(realArchive) && fs.existsSync(path.join(realStaging, "bin", "plugin.js"));
-	it("holds the real release archive to the real staging directory", { skip: !packed && "no packed release (run npm run pack)" }, () => {
-		const packageVersion = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
-		const result = validatePack({ archiveBytes: fs.readFileSync(realArchive), stagingDir: realStaging, packageVersion });
-		// A payload drift here usually means the checkout was rebuilt after
-		// the last pack: the archive on disk is then not the candidate.
-		assert.deepEqual(result.failures, [], "release/com.lawrensen.hwinfo.streamDeckPlugin does not match the checkout; run `npm run pack` after `npm run build` so the archive is the bytes under test");
-		assert.equal(result.members, SHIPPED_MEMBERS.length);
 	});
 });

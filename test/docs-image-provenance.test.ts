@@ -59,3 +59,24 @@ describe("documentation renderer boards match their recorded provenance", () => 
 		}
 	});
 });
+
+describe("the dial color panel capture matches its recorded provenance", () => {
+	// The capture is a screenshot of the shipped panel files. The record
+	// holds the PNG's hash and the hashes of the panel sources it was taken
+	// from; bin/plugin.js is recorded too but not held here, because every
+	// bundle rebuild changes it while the panel it feeds does not.
+	type Capture = { file: string; sha256: string; sourceSha256: Record<string, string> };
+	const capture = JSON.parse(fs.readFileSync(path.join(IMG, "pi-dial-reading-colors-1.7.provenance.json"), "utf8")) as Capture;
+
+	it("the committed PNG is the recorded capture", () => {
+		assert.equal(sha256(fs.readFileSync(path.join(IMG, capture.file))), capture.sha256, capture.file);
+	});
+
+	it("the panel sources it was captured from are the shipped ones", () => {
+		const held = Object.entries(capture.sourceSha256).filter(([source]) => !source.endsWith("bin/plugin.js"));
+		assert.ok(held.length >= 3, "the record names the panel sources");
+		for (const [source, hash] of held) {
+			assert.equal(sha256(fs.readFileSync(path.join(ROOT, source))), hash, `${source} changed since the capture; regenerate it with node scripts/capture-pi-reading-colors.mjs`);
+		}
+	});
+});

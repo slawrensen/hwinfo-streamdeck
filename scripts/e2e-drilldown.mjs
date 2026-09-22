@@ -667,6 +667,10 @@ async function scenario(send) {
 	results.pageTitle2 = latestSvg(pageTitleCtx);
 	results.pageSlot0Second = latestSvg(pageSlot0Ctx);
 	results.pageSlot2Second = latestSvg(pageSlot2Ctx);
+	// Outlast one poll tick (1 s) before reading dev1: a key repaints only
+	// on a byte change, so a page shared across devices by mistake would
+	// show on dev1 at its next tick, not inside the 900 ms above.
+	await sleep(600);
 	results.w2Dev1Title2 = latestSvg(w2Dev1TitleCtx);
 	results.w2Dev1Slot0Second = latestSvg(w2Dev1Slot0Ctx);
 	const switchesBeforeW2Dev1Back = switches.length;

@@ -25,7 +25,7 @@ function newestMtime(dir, matches) {
 	return newest;
 }
 for (const [built, inputs, remedy] of [
-	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "plugin.js"), Math.max(newestMtime(path.join(repoRoot, "src"), (name) => name.endsWith(".ts")), fs.statSync(path.join(repoRoot, "rollup.config.mjs")).mtimeMs), "npm run build"],
+	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "plugin.js"), Math.max(newestMtime(path.join(repoRoot, "src"), (name) => name.endsWith(".ts")), fs.statSync(path.join(repoRoot, "rollup.config.mjs")).mtimeMs, fs.statSync(path.join(repoRoot, "package-lock.json")).mtimeMs), "npm run build"],
 	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"), newestMtime(path.join(repoRoot, "native", "hwsm"), (name) => ["hwsm.c", "hwsm.rc", "hwsm-version.h", "binding.gyp"].includes(name)), "npm run build:native && npm run build"]
 ]) {
 	if (!fs.existsSync(built) || fs.statSync(built).mtimeMs < inputs) {

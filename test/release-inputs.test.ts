@@ -18,10 +18,13 @@ describe("release input gate", () => {
 	});
 	after(() => rmSync(root, { recursive: true, force: true }));
 
-	function run(tag: string, versions: readonly string[] = ["1.6.1.0", "1.6.1", "1.6.1", "1.6.1"]): { status: number | null; stderr: string } {
+	const datedEntry = "# Changelog\n\n## 1.6.1.0 - 2026-08-11\n\n- entry\n\n## 1.6.0.0 - 2026-08-01\n";
+	function run(tag: string, versions: readonly string[] = ["1.6.1.0", "1.6.1", "1.6.1", "1.6.1"], changelog: string | null = datedEntry): { status: number | null; stderr: string } {
 		writeFileSync(join(root, "com.lawrensen.hwinfo.sdPlugin/manifest.json"), JSON.stringify({ Version: versions[0] }));
 		writeFileSync(join(root, "package.json"), JSON.stringify({ version: versions[1] }));
 		writeFileSync(join(root, "package-lock.json"), JSON.stringify({ version: versions[2], packages: { "": { version: versions[3] } } }));
+		if (changelog === null) rmSync(join(root, "CHANGELOG.md"), { force: true });
+		else writeFileSync(join(root, "CHANGELOG.md"), changelog);
 		return spawnSync(process.execPath, [join(root, "scripts/verify-release-tag.mjs")], {
 			encoding: "utf8",
 			env: { ...process.env, RELEASE_TAG: tag, GITHUB_OUTPUT: join(root, "output") }
@@ -47,6 +50,18 @@ describe("release input gate", () => {
 		for (const tag of ["", "1.6.1", "vv1.6.1", "v01.6.1", "v1.06.1", "v1.6.01", "v1.6", "v1.6.1.0", "v1.6.1-rc.1", "v1.6.1+build", " v1.6.1", "v1.6.1\n", "v1.6.1 "]) {
 			assert.equal(run(tag).status, 1, JSON.stringify(tag));
 		}
+	});
+
+	it("rejects a tag whose CHANGELOG entry is missing, undated or for another version", () => {
+		const outputBefore = readFileSync(join(root, "output"), "utf8");
+		const undated = ["# Changelog\n", "# Changelog\n\n## 1.6.1.0 - Unreleased\n", "# Changelog\n\n## 1.6.0.0 - 2026-08-01\n", "# Changelog\n\n## 1.6.1.0\n", "# Changelog\n\n### 1.6.1.0 - 2026-08-11\n", "# Changelog\n\n## 1.6.10.0 - 2026-08-11\n"];
+		for (const changelog of [null, ...undated]) {
+			const result = run("v1.6.1", undefined, changelog);
+			assert.equal(result.status, 1, JSON.stringify(changelog));
+			assert.match(result.stderr, /CHANGELOG.md must carry a dated/);
+		}
+		assert.equal(readFileSync(join(root, "output"), "utf8"), outputBefore);
+		assert.equal(run("v1.6.1").status, 0, "the dated entry restores acceptance");
 	});
 
 	it("rejects mismatched manifest, package, and either lockfile version", () => {

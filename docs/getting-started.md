@@ -30,9 +30,9 @@ Click the **Sensor** search box to open the picker. It lists every reading HWiNF
 
 ![The Sensor picker open with "gpu" typed in the search box, showing matching readings grouped under their sensors (a PSU's GPU/CPU rails, then the GPU itself), each row with its value, unit, and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
-Click a row to select it. **Live value** previews the reading, and the key shows it when data is available. HWiNFO's min/max/average require Shared Memory. In the **unreleased 1.7 candidate**, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changes from 1.6](whats-new-1.7.md).
+Click a row to select it. **Live value** previews the reading, and the key shows it when data is available. HWiNFO's min/max/average require Shared Memory. Since 1.7, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changed from 1.6](whats-new-1.7.md).
 
-The plugin reads once a second by default; HWiNFO updates at its own rate. Change the plugin interval under [Poll every](data-sources.md#poll-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection. Gadget uses source names and reading labels. Switching between providers requires explicit links in the 1.7 candidate; see [data sources](data-sources.md).
+The plugin reads once a second by default; HWiNFO updates at its own rate. Change the plugin interval under [Poll every](data-sources.md#poll-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection. Gadget uses source names and reading labels. Switching between providers requires explicit links (since 1.7); see [data sources](data-sources.md).
 
 ## Where to go next
 

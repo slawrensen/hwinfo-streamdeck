@@ -5,7 +5,7 @@ nav_order: 6
 
 Seven themes control the background, text, graphs and dividers. Set a theme per key or dial, or use the deck default. **Type accents** color graphs and indicators by sensor category. Alerts take priority over normal colors.
 
-> This page includes changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 ## The seven presets
 
@@ -31,7 +31,7 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 
 Each layout uses fixed positions across themes. A one-reading key puts its label on baseline 32, value on 94 and unit on 114. The multi-reading layouts use their own grids. Renderer tests check these positions.
 
-In the 1.7 candidate, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). Physical readability still needs device testing.
+Since 1.7, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). Physical readability still needs device testing.
 
 The illustrated boards use production renderers with sample scenarios, live inputs and generated histories. They are sample-data renders. Settings-panel captures and hardware photographs are identified separately.
 
@@ -76,7 +76,7 @@ Automatic quad identity colors adjust for their background when needed, includin
 
 The setting recolors **text only**. Backgrounds, theme and type accents, sparklines, bars, rings, range bars, tracks and separators keep their theme colors, status screens keep their fixed safety colors, and the [alert palettes](#alerts-override-everything) always override it: a warning key is amber with black text whatever Text says, and a dial's alert-colored bar or overview row value is never recolored.
 
-The unreleased 1.7 candidate adds [individual reading colors](sensor-dial.md#reading-colors) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls also appeared in the issue #31 preview and are absent from 1.6.0.
+1.7 adds [individual reading colors](sensor-dial.md#reading-colors) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls also appeared in the issue #31 preview and are absent from 1.6.0.
 
 ## Type accents
 

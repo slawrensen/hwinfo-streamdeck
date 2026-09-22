@@ -15,9 +15,8 @@ no ads, no telemetry.
 a layout comparison, not a hardware photograph. The board predates the 1.7
 contrast changes.*
 
-> **1.7 is a release candidate.** The current docs describe its reliability
-> changes and dial colors. [See what changes for you](whats-new-1.7.md).
-> Hardware qualification is still in progress.
+> **1.7** brings reliability changes and per-reading dial colors.
+> [See what changed for you](whats-new-1.7.md).
 
 ## What it does
 

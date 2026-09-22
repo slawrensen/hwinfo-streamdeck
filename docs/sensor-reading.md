@@ -7,7 +7,7 @@ The **Sensor Reading** action puts a live HWiNFO reading on a Stream Deck key: a
 
 Choose one to four readings per key. Each layout has fixed positions for its labels, values and units.
 
-> This page includes changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 This page documents every setting in the key's settings panel. For the Stream Deck + dial, see [Sensor Dial](sensor-dial.md).
 
@@ -169,7 +169,7 @@ The zones are **fixed landmarks**, drawn as muted shades so they read as markers
 
 Sparkline notes:
 
-- It holds the last **36 samples**. The 1.7 candidate accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO and the plugin's poll interval.
+- It holds the last **36 samples**. Since 1.7, the ring accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO and the plugin's poll interval.
 - Collection continues for subscribed readings while any Sensor Reading key or Sensor Dial is visible. With none visible, polling stops and samples stay in memory. Returning can append to them; the line is spaced by samples and does not measure that pause.
 - A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. A poll-interval change clears all segments; a pairing edit clears only a segment whose saved key now stands for a different measurement. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
 - It **survives a °C/°F toggle** unchanged (same data, just relabelled), and a frozen HWiNFO holds the line's last real shape instead of flattening it.

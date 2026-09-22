@@ -5,7 +5,7 @@ nav_order: 8
 
 The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory and can fall back to the Gadget registry. Switching sources does not automatically match saved readings.
 
-> This page describes the **unreleased 1.7 candidate**. Stable 1.6 has no explicit provider links, fills Gadget historical fields with the current value, and uses different freshness and identity handling. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7. 1.6 had no explicit provider links, filled Gadget historical fields with the current value, and used different freshness and identity handling. See [what changed from 1.6](whats-new-1.7.md).
 
 ## Shared Memory vs. Gadget registry
 

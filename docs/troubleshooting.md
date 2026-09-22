@@ -5,7 +5,7 @@ nav_order: 11
 
 Find the message or symptom below. For setup, see [Data sources](data-sources.md).
 
-> This page includes the **unreleased 1.7 candidate's** source and status behavior. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7's source and status behavior. See [what changed from 1.6](whats-new-1.7.md).
 
 > **First check, always:** is **HWiNFO** running, and is it publishing on at least one interface (**Shared Memory Support** *or* **Gadget reporting**)? Most status screens trace back to this. See [Data sources](data-sources.md).
 
@@ -51,7 +51,7 @@ HWiNFO's shared-memory mapping exists but its header is flagged **disabled** (in
 
 1. **Shared Memory Support was turned off** in HWiNFO Settings. Re-enable it.
 2. **Free version's 12-hour timer expired.** The free build auto-disables shared memory 12 hours after start and leaves the dead mapping behind. Toggle **Shared Memory Support** off and on to restart the timer, or restart HWiNFO. HWiNFO **Pro** removes the limit entirely.
-3. **Use Gadget reporting.** Under **Configure Sensors → HWiNFO Gadget**, tick **Enable reporting to Gadget**, then **Report value in Gadget** for the readings you need. Auto can switch to Gadget and back, but does not match saved readings by name. Select Gadget readings directly or use the 1.7 candidate's [explicit links](data-sources.md#link-readings-across-providers).
+3. **Use Gadget reporting.** Under **Configure Sensors → HWiNFO Gadget**, tick **Enable reporting to Gadget**, then **Report value in Gadget** for the readings you need. Auto can switch to Gadget and back, but does not match saved readings by name. Select Gadget readings directly or use 1.7's [explicit links](data-sources.md#link-readings-across-providers).
 
 > **Shared Memory only** never falls back. **Auto** can switch providers; reading identity, freshness and available statistics still depend on the selected source.
 

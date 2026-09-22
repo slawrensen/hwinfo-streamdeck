@@ -5,7 +5,7 @@ nav_order: 7
 
 Set **Warn at** and/or **Critical at** to change the display when the current value reaches a limit: amber for warning, red for critical.
 
-> This page includes the color changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page includes the color changes in 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 Both fields are optional and independent: set one, the other, or neither. A key with no thresholds just shows its themed value.
 

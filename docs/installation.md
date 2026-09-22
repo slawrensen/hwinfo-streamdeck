@@ -56,7 +56,7 @@ Shared Memory exposes **every** reading HWiNFO measures, with min / max / averag
    - (Combined with Sensors-only, HWiNFO runs quietly in the background.)
 5. Click **OK**.
 
-> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; HWiNFO Pro removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. The **unreleased 1.7 candidate** adds [explicit provider links](data-sources.md#link-readings-across-providers).
+> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; HWiNFO Pro removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
 
 ### Free path: Gadget reporting
 
@@ -68,13 +68,13 @@ Gadget reporting never expires on the free version, but it only exposes the sens
 
 The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. HWiNFO 8.48 creates that key only once a reading is ticked: with reporting enabled and nothing ticked, keys show **Start HWiNFO / not detected** while HWiNFO is running. **Tick sensors / in Gadget** appears when the key is there but holds no rows, which unticking everything can leave.
 
-You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, select **Advanced → Data source → Gadget registry only** before choosing them. The 1.7 candidate shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
+You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, select **Advanced → Data source → Gadget registry only** before choosing them. Since 1.7, Gadget shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
 
 ## Portable HWiNFO caveats
 
 The portable build of HWiNFO works identically, but there is no installer to wire things up for you:
 
-- **Keep HWiNFO running and publishing sensors.** Exiting it stops new data, and keys show **Start HWiNFO**. A killed or crashed HWiNFO can leave old Gadget values behind, which the 1.7 candidate shows as **Age unknown**.
+- **Keep HWiNFO running and publishing sensors.** Exiting it stops new data, and keys show **Start HWiNFO**. A killed or crashed HWiNFO can leave old Gadget values behind, which 1.7 shows as **Age unknown**.
 - **Add it to autostart yourself.** There's no installer to register Auto Start, so if you want it running at login you must add the executable to your own startup (e.g. a Startup-folder shortcut or Task Scheduler).
 - **Review access settings if needed.** **Access denied / open settings** means Windows refused access needed to read the sensor source. Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck; the error alone does not identify which access rule failed. See [Troubleshooting](troubleshooting.md#keys-show-access-denied).
 
@@ -82,7 +82,7 @@ The portable build of HWiNFO works identically, but there is no installer to wir
 
 1. Drag **HWiNFO Sensors → Sensor Reading** onto a key.
 2. In the settings panel (property inspector), open the **Sensor** picker and choose a reading. The list groups readings by source (CPU, GPU, drives, …) and shows live values; type to filter.
-3. With a readable source, the key shows the value. In the 1.7 candidate, Gadget can show **Age unknown** until a value change is observed; see [Status screens](status-screens.md).
+3. With a readable source, the key shows the value. Since 1.7, Gadget can show **Age unknown** until a value change is observed; see [Status screens](status-screens.md).
 
 If instead the key shows a status screen like **Start HWiNFO** or **Shared Memory off**, HWiNFO isn't publishing yet; recheck the setup above, or see [Troubleshooting](troubleshooting.md) for what each screen means and how to fix it.
 

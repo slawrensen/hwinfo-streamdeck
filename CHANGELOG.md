@@ -6,7 +6,7 @@ listing is a separate track.
 
 ## 1.7.0.0 - Unreleased
 
-Per-reading dial colors and reliability fixes in one release candidate.
+Per-reading dial colors and reliability fixes in one release.
 
 - Malformed Gadget raw numbers remain unavailable instead of displaying a
   numeric prefix or adding it to freshness, history and session statistics.

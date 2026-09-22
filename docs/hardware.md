@@ -4,8 +4,8 @@ nav_order: 9.5
 ---
 
 The matrix records device coverage and the dated tests behind it. Historical
-hardware results do not qualify the unreleased 1.7 candidate; its hardware
-checks are still in progress.
+hardware results predate 1.7 and do not stand in for its own checks; the
+dated rows below say what ran on which build.
 
 - **Physically verified**: ran on the real device in my hands, with a recorded result.
 - **SDK simulated**: exercised end to end against a mock Stream Deck WebSocket that replays the device's exact registration and events. Strong evidence, not hardware.
@@ -43,7 +43,7 @@ The Stream Deck app handles sideways swipes. Selection and labels are saved
 settings. Hidden dials can retain pause, pin and session state for up to
 30 minutes, subject to the [hidden-dial limit](controls.md#pause-pin-and-reset-reach).
 
-In the 1.7 candidate, missing or invalid readings, stale or unavailable data,
+Since 1.7, missing or invalid readings, stale or unavailable data,
 and source, unit or type changes reset affected sessions; a pairing edit
 resets only a session whose saved key now stands for a different
 measurement. Sparkline

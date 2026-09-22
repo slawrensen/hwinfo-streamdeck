@@ -5,7 +5,7 @@ nav_order: 10
 
 For setup and source errors, see [Data sources](data-sources.md) or [Troubleshooting](troubleshooting.md).
 
-> This page includes changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 ## Platform and requirements
 
@@ -31,7 +31,7 @@ No. It's an independent, MIT-licensed project, not affiliated with or endorsed b
 
 No. The free version works, with a time limit on Shared Memory:
 
-- **HWiNFO free**: Shared Memory Support switches off after **12 hours**. Auto can fall back to Gadget if reporting is enabled, then switch back when Shared Memory returns. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources; these links are new in the 1.7 candidate.
+- **HWiNFO free**: Shared Memory Support switches off after **12 hours**. Auto can fall back to Gadget if reporting is enabled, then switch back when Shared Memory returns. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources; these links are new in 1.7.
 - **HWiNFO Pro**: removes the 12-hour Shared Memory limit. HWiNFO still needs to be running and publishing sensors.
 
 Both editions provide Shared Memory readings while sharing is enabled. Pro removes its 12-hour limit. Gadget provides current values, and dials can collect local sessions while data is available.
@@ -40,7 +40,7 @@ Both editions provide Shared Memory readings while sharing is enabled. Pro remov
 
 That's the free version's Shared Memory timer expiring. HWiNFO stops publishing to shared memory after 12 hours of runtime and marks the mapping disabled. What you see depends on your data source:
 
-- **Auto mode** (default): the plugin detects the disabled mapping and tries the **Gadget registry**. Enable Gadget reporting and select its readings, or configure explicit reading links in the 1.7 candidate. Without links, a saved Shared Memory selection is missing on Gadget.
+- **Auto mode** (default): the plugin detects the disabled mapping and tries the **Gadget registry**. Enable Gadget reporting and select its readings, or configure explicit reading links (new in 1.7). Without links, a saved Shared Memory selection is missing on Gadget.
 - **Shared Memory only mode**: no fallback; keys show `Shared Memory / is off` until you re-enable Shared Memory Support in HWiNFO (Settings → Shared Memory Support) or restart HWiNFO.
 
 After the timer expires:
@@ -49,13 +49,13 @@ After the timer expires:
 2. Enable **Gadget reporting** on the sensors you use, then explicitly [link each reading](data-sources.md#link-readings-across-providers) so its selection survives a provider change.
 3. Buy HWiNFO Pro to remove the limit entirely.
 
-> In the 1.7 candidate, Shared Memory shows **Not updating / check sharing** after about 15 seconds without an advancing producer timestamp or observed value evidence. Gadget has no producer timestamp: before its first observed change, or after 15 seconds without another, it shows **Age unknown / check Gadget**. A steady registry value does not prove that HWiNFO stopped.
+> Since 1.7, Shared Memory shows **Not updating / check sharing** after about 15 seconds without an advancing producer timestamp or observed value evidence. Gadget has no producer timestamp: before its first observed change, or after 15 seconds without another, it shows **Age unknown / check Gadget**. A steady registry value does not prove that HWiNFO stopped.
 
 ## Data sources
 
 ### Which data source should I use?
 
-**Auto** prefers Shared Memory, tries Gadget when Shared Memory is unavailable, and switches back when it returns. Source availability and reading identity are separate: matching saved readings across sources requires an explicit link in the 1.7 candidate. Use **Shared Memory only** or **Gadget registry only** if you want to keep one source.
+**Auto** prefers Shared Memory, tries Gadget when Shared Memory is unavailable, and switches back when it returns. Source availability and reading identity are separate: matching saved readings across sources requires an explicit link since 1.7. Use **Shared Memory only** or **Gadget registry only** if you want to keep one source.
 
 | | Shared Memory (preferred) | Gadget registry (fallback) |
 | --- | --- | --- |
@@ -78,14 +78,14 @@ Because you're reading from the **Gadget registry**, which only exposes the curr
 
 This happens when Shared Memory isn't available, most commonly after the free version's 12-hour timeout in Auto mode, or if you've forced `Gadget registry only`. When it's active, the settings panel shows a note. To get real min/max/avg back, re-enable Shared Memory Support in HWiNFO (or use Pro).
 
-> Dials calculate local session statistics from accepted observations on either source. **Age unknown** or another unavailable state replaces the display and resets the session in the 1.7 candidate; the first live frame afterwards shows **stats reset: data gap** once.
+> Dials calculate local session statistics from accepted observations on either source. **Age unknown** or another unavailable state replaces the display and resets the session since 1.7; the first live frame afterwards shows **stats reset: data gap** once.
 
 ### What's the difference between the key's min/max/avg and the dial's?
 
 They're two different things:
 
 - **Key** (Sensor Reading): the `Show` setting and the key-press cycle display **HWiNFO's own** min/max/avg, measured since HWiNFO started (or since you last reset them *inside HWiNFO*). These come from the shared-memory data, so they're unavailable on the Gadget source.
-- **Dial** (Sensor Dial): min/max/avg are local, per-reading session statistics. The 1.7 candidate counts accepted observations once and calculates a sample-weighted average. Ordinary rotation preserves the session; data gaps and changes to the source or reading can reset it. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading).
+- **Dial** (Sensor Dial): min/max/avg are local, per-reading session statistics. Since 1.7, the dial counts accepted observations once and calculates a sample-weighted average. Ordinary rotation preserves the session; data gaps and changes to the source or reading can reset it. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading).
 
 ## Sparklines
 
@@ -93,7 +93,7 @@ They're two different things:
 
 The line holds 36 samples. Collection continues for subscribed readings while a Sensor Reading key or Sensor Dial is visible anywhere. HWiNFO Control keys do not keep polling alive. With no reading action visible, polling stops and the samples stay in memory; returning can append to them. The line is spaced by samples, so it does not measure the duration of that pause.
 
-The **1.7 candidate** collects subsecond value changes as well as advancing producer timestamps. It does not count repeated held frames. How quickly the line fills depends on HWiNFO, the plugin's poll interval and the observed changes. With one accepted point every two seconds, 36 samples take about 72 seconds.
+Since 1.7, the plugin collects subsecond value changes as well as advancing producer timestamps. It does not count repeated held frames. How quickly the line fills depends on HWiNFO, the plugin's poll interval and the observed changes. With one accepted point every two seconds, 36 samples take about 72 seconds.
 
 A skipped read, missing or non-finite reading, stale data (once the 15-second window opens), source transition or native-unit/type change clears the affected segment. A poll-interval change clears all segments; a pairing edit clears only a segment whose saved key now stands for a different measurement. A plugin restart also starts fresh. See [collection rules](data-sources.md#freshness-and-local-history).
 
@@ -148,7 +148,7 @@ To disable an alert, clear **Warn at** and **Critical at**. Key alert palettes s
 
 ### How do I reset a dial's session min/max?
 
-Under **Legacy**, push the dial. Under **Elite**, hold the push for half a second. **Reset reach** can widen the reset to the rotation set or every dial; an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can also send it. The next accepted sample starts the new session. Data or source changes can also reset sessions in the 1.7 candidate; see [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading). Reset a key's Shared Memory statistics inside HWiNFO.
+Under **Legacy**, push the dial. Under **Elite**, hold the push for half a second. **Reset reach** can widen the reset to the rotation set or every dial; an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can also send it. The next accepted sample starts the new session. Data or source changes can also reset sessions since 1.7; see [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading). Reset a key's Shared Memory statistics inside HWiNFO.
 
 ## Themes
 
@@ -206,7 +206,7 @@ Windows denied access needed to read the sensor source. The error can come from 
 
 ### What do the two-line screens on my keys mean?
 
-They name the observed state and a next step. These are the 1.7 candidate's messages:
+They name the observed state and a next step. These are the 1.7 messages:
 
 | Key shows | Meaning / fix |
 | --- | --- |

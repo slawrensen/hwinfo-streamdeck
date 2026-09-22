@@ -65,7 +65,7 @@ Every detail page has these controls:
 - **Title** (all decks except the Mini): the source or custom title over the visible range, like `CPU Enhanced` over `1-11 / 46`.
 - **Previous / Next**: page through long lists. The chevron dims at either end. Paging happens inside the one profile page; nothing stacks.
 - **Reading tiles**: live readings, themed like the opener. At the default one reading per tile, each tile carries the type accent of its own reading; a denser tile (**Tile shows**) carries its first reading's accent, the same rule the regular stacked, row and quad layouts follow for their first sensor. Pressing a tile cycles current / min / max / avg for everything on it, for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
-- **No sparklines on reading tiles.** Use a Sensor Reading key for recent history. In the **unreleased 1.7 candidate**, Gadget provides current values only; a detail tile set to MIN, MAX or AVG shows **N/A** with an empty value.
+- **No sparklines on reading tiles.** Use a Sensor Reading key for recent history. Since 1.7, Gadget provides current values only; a detail tile set to MIN, MAX or AVG shows **N/A** with an empty value.
 
 ![The same 15-key detail page at the default, with the second Back on: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
 

@@ -63,7 +63,7 @@ Pause and pin survive page switches and profile changes for up to 30 minutes off
 
 Each reading keeps local session min/max/average. Ordinary rotation preserves that session. The selected reading, rotation-set members and multi-row view readings accumulate while polling runs; hidden dials can keep collecting within the limits above. With no Sensor Reading key or Sensor Dial visible, polling stops.
 
-In the **unreleased 1.7 candidate**, repeated held frames do not count again, and averages are sample-weighted. Missing or non-finite readings, stale or unavailable data, and source, native-unit or type changes reset the affected sessions, and the first live frame after a data gap says so once; a pairing edit resets only a session whose saved key now stands for a different measurement. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading) for the full rules.
+Since 1.7, repeated held frames do not count again, and averages are sample-weighted. Missing or non-finite readings, stale or unavailable data, and source, native-unit or type changes reset the affected sessions, and the first live frame after a data gap says so once; a pairing edit resets only a session whose saved key now stands for a different measurement. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading) for the full rules.
 
 ## Thresholds and mixed units
 

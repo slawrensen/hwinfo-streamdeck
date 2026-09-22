@@ -1,11 +1,10 @@
 ---
-title: What's changing in 1.7
+title: What changed in 1.7
 nav_order: 1.5
 ---
 
-**1.7 is a release candidate, not a published release.** It combines the
-dial-color work with the reliability fixes. Hardware qualification is still
-in progress. The download links continue to point to the published release.
+**1.7 combines the dial-color work with the reliability fixes.** This page
+says what that changes on your deck and what, if anything, you need to do.
 
 ## What changes on your deck
 
@@ -76,6 +75,6 @@ source, unit or type changes, or a saved key that comes to stand for another mea
 Ordinary rotation still preserves the session and does not count unseen
 values as new samples.
 
-Regression tests cover those cases. They establish software behavior, not
-physical readability or long-run hardware stability. The release remains a
-candidate until its hardware checks are complete.
+Regression tests cover those cases. They establish software behavior;
+physical readability and long-run stability are checked on hardware before
+a release ships, and the [hardware page](hardware.md) records those results.

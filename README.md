@@ -19,9 +19,8 @@ Deck + and + XL dials show a single reading or a two- or three-row overview.
 a layout comparison, not a photograph of hardware. The board predates the
 1.7 contrast changes described below.*
 
-> **1.7 is a release candidate.** It combines per-reading dial colors with
-> source, identity and history fixes. [What changes for you](docs/whats-new-1.7.md).
-> Hardware qualification is still in progress.
+> **1.7** combines per-reading dial colors with source, identity and history
+> fixes. [What changed for you](docs/whats-new-1.7.md).
 
 ## Requirements
 
@@ -94,7 +93,7 @@ offer other gesture mappings. Local session averages count accepted
 observations, not elapsed time. Data gaps and source or unit changes start
 a new session.
 
-In the 1.7 candidate, **Appearance > Reading colors** assigns colors to
+Since 1.7, **Appearance > Reading colors** assigns colors to
 individual numbers on multi-row dials. Choose Signal, Pairs or Uniform,
 then adjust individual readings. Alerts and valid Custom Text colors take
 priority. Individual reading colors remain off until you enable them.

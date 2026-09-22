@@ -5,7 +5,7 @@ nav_order: 9
 
 When a key or dial cannot show a reading, it shows a **status screen** instead of a value. The first line names the observed state; the second gives a next step. Source recovery is automatic when readable data returns. A native bridge load failure can require an installation repair and plugin restart.
 
-> This page describes the **unreleased 1.7 candidate**. The image uses simulated source states rendered by production code. It is not a hardware photograph.
+> This page describes 1.7. The image uses simulated source states rendered by production code. It is not a hardware photograph.
 
 ## Key screens
 

@@ -5,7 +5,7 @@ nav_order: 5
 
 The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream Deck + XL touchscreen. Choose one reading with a range bar, two readings with sparklines, or three compact rows. Rotate to switch readings; push and touch to control the display.
 
-> This page includes changes in the **unreleased 1.7 candidate**. See [what changes from 1.6](whats-new-1.7.md).
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
 
@@ -72,7 +72,7 @@ rows and the saved key for the selection, so a measurement with two saved
 colors can change color when rotation selects it. Keep one color per
 measurement to avoid that.
 
-These controls are in the unreleased 1.7 candidate and the earlier issue #31 preview. Stable 1.6.0 does not include them.
+These controls arrived in 1.7 (and the earlier issue #31 preview); 1.6.0 does not have them.
 
 Choose a two-row or three-row **View**, then open **Appearance** and set **Text → Theme**. **Reading colors** uses the same presets and color wells as the [four-reading key](sensor-reading.md#layout-four-readings-the-quad-grid):
 
@@ -84,7 +84,7 @@ Colors follow each reading through rotation, reordering and groups. Switching vi
 
 ![The 1.7 settings panel's Appearance section with Text set to Theme, Color numbers by sensor type off, and individual color wells using the Signal preset.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*The 1.7 candidate's settings panel at panel build 1.7.0.0-7, captured through the local test host with live HWiNFO. This is a settings-panel capture of an unreleased build.*
+*The 1.7 settings panel at panel build 1.7.0.0-7, captured through the local test host with live HWiNFO.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -173,7 +173,7 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 
 Dials take the same **Warn at** / **Critical at** thresholds as keys, compared against the **live** value. But the alert shows differently, and differently per view: on the single view only the **range bar's fill** flips to the alert color (amber for warn, red for critical) while the label, value and rest of the face stay in your chosen theme; the two [overview](#overview-view) layouts have no range bar, so there the alerting row's **value text** carries the color instead.
 
-In the 1.7 candidate, overview alert values adjust for contrast against the row background. Alerts take priority over individual reading colors and Custom Text. See [Themes & alerts](themes.md).
+Since 1.7, overview alert values adjust for contrast against the row background. Alerts take priority over individual reading colors and Custom Text. See [Themes & alerts](themes.md).
 
 > **Note:** The single view has no sparkline; its range bar is the at-a-glance indicator there. The two-row [overview](#overview-view) draws real sparklines for its visible readings.
 

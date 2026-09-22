@@ -392,7 +392,9 @@ async function dials() {
 
 // ---------- shot 6: more than one reading per key ----------
 // The three multi-reading layouts at a size where the type is readable,
-// each drawn by its production renderer from live values.
+// each drawn by its production renderer. The pump speed is live; the
+// temperatures and the VRAM figure are chosen for the shot, and the caption
+// says so.
 async function multiKeys() {
 	const pal = (key, level = "normal") => {
 		const r = byKey(key);
@@ -435,7 +437,7 @@ async function multiKeys() {
 	const chrome = [
 		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">One key does not mean one reading.</text>`,
 		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">Stack two, list three, or split four across a single key. Every row keeps its own sensor, label and unit.</text>`,
-		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own key renderers · values chosen for the shot</text>`
 	];
 	captions.forEach((c, i) => {
 		const cx = startX + i * (KEY + GAP) + KEY / 2;
@@ -514,7 +516,7 @@ async function drilldown() {
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">any Sensor Reading key</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *4090*, paged</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">or one source, or a list you order by hand</text>`,
-		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D + RTX 4090</text>`
 	];
 	// The arrow between the two, on the shared centre line.
 	const arrowY = openerY + OPEN_KEY / 2;

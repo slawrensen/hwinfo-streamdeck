@@ -179,6 +179,14 @@ try {
 	const settingsHeight = await evaluate(`Math.ceil([...document.body.children].reduce((m, el) => Math.max(m, el.getBoundingClientRect().bottom), 0))`);
 	await viewport(Math.min(2400, Math.max(880, Number(settingsHeight.result?.value ?? 880) + 16)));
 	await sleep(300);
+	// The shot is a settings panel with the sensor tree in it: refuse to take
+	// it before the tree has rendered rows, or a blank list ships.
+	let treeRows = 0;
+	for (let attempt = 0; attempt < 50 && treeRows === 0; attempt++) {
+		treeRows = Number((await evaluate(`document.querySelectorAll("#picker-list .hw-row").length`)).result?.value ?? 0);
+		if (treeRows === 0) await sleep(200);
+	}
+	if (treeRows === 0) throw new Error("sensor tree never rendered rows in the key PI; refusing to capture a blank panel");
 	await capture("pi-settings.png");
 	// The Advanced fold on its own, from its summary to the Config help line:
 	// the deck-wide groups (Deck defaults, Connection, Support) and the
@@ -498,7 +506,8 @@ try {
 	// Two rows ticked so the capture shows checked and unchecked boxes side
 	// by side; unticked again after the shot (the chips shot below builds
 	// the real cross-sensor set).
-	await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#picker-list input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
+	const ticked = await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#picker-list input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
+	if (ticked.result?.value !== 2) throw new Error(`dial picker: expected to tick 2 rows, ticked ${JSON.stringify(ticked.result?.value ?? ticked.exceptionDetails?.text)}; refusing to capture`);
 	await sleep(500);
 	await capture("pi-dial-picker.png");
 	await evaluate(`(() => { for (const tick of document.querySelectorAll('#picker-list input.hw-tick:checked')) tick.click(); return "ok"; })()`);

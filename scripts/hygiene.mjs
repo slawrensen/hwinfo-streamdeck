@@ -11,6 +11,29 @@ import { fileURLToPath } from "node:url";
 import { classifyNewProcesses, ownedDescendants, processIdentity, processSnapshot, terminateProcesses } from "./lib/process-ownership.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// Every suite below drives bin/plugin.js and bin/hwsm.node, never src. A
+// bundle older than its inputs qualifies the previous build under the
+// current source tree's name, silently; refuse to start on one.
+function newestMtime(dir, matches) {
+	let newest = 0;
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const file = path.join(dir, entry.name);
+		if (entry.isDirectory()) newest = Math.max(newest, newestMtime(file, matches));
+		else if (matches(entry.name)) newest = Math.max(newest, fs.statSync(file).mtimeMs);
+	}
+	return newest;
+}
+for (const [built, inputs, remedy] of [
+	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "plugin.js"), Math.max(newestMtime(path.join(repoRoot, "src"), (name) => name.endsWith(".ts")), fs.statSync(path.join(repoRoot, "rollup.config.mjs")).mtimeMs), "npm run build"],
+	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"), newestMtime(path.join(repoRoot, "native", "hwsm"), (name) => ["hwsm.c", "hwsm.rc", "hwsm-version.h", "binding.gyp"].includes(name)), "npm run build:native && npm run build"]
+]) {
+	if (!fs.existsSync(built) || fs.statSync(built).mtimeMs < inputs) {
+		console.error(`suite:full: ${path.relative(repoRoot, built)} is ${fs.existsSync(built) ? "older than its sources" : "missing"}; run \`${remedy}\` first.`);
+		process.exit(1);
+	}
+}
+
 const outRoot = process.argv[2] ?? fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-suite-"));
 const browserRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-suite-browser-"));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

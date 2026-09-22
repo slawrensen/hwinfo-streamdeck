@@ -32,7 +32,7 @@ This is the canonical guide for anyone, human or AI agent, working in the repo.
 | `npm run probe` | Standalone reader smoke test against live HWiNFO (`-- --gadget` forces the registry backend) |
 | `npm run changelog:page` | Regenerate the docs-site Changelog page from `CHANGELOG.md` (a committed derived file) |
 | `npm run release:validate` | lint + typecheck + unit + the release-copy validator; the validator needs internal release docs, so it passes only on the maintainer's full checkout |
-| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin` (Elgato CLI) |
+| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin`: the Elgato CLI packs a staged copy of the plugin directory (the CLI rewrites the manifest it packs, and the tracked one must not move), then `scripts/validate-pack.mjs` holds the archive to the shipping contract in `scripts/lib/pack-contract.mjs` and to the checkout. `npm run pack:validate` re-checks an existing archive |
 
 The full UI/browser suite runs locally (`npm run suite:full`). CI (pinned
 windows-2025 runner) runs lint + typecheck + unit + build + the native

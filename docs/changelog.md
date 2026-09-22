@@ -194,7 +194,13 @@ Per-reading dial colors and reliability fixes in one release candidate.
   native source change. The packaging gate refuses a vendored `hwsm.node`
   that was built from other native sources than the tree it sits in, and
   the manifest step refuses a binary that lacks any of the hardening flags
-  the build asks for.
+  the build asks for. Packing now runs the Elgato CLI over a staged copy of
+  the plugin directory, so the tracked manifest is left untouched, and the
+  packed archive itself is held to a checked-in list of its members: a
+  missing or extra member, a member whose bytes differ from the built
+  files, a log, symbol or test-only addon, an unsafe path, a duplicate or
+  case-colliding name, a damaged entry, or a manifest that disagrees with
+  the checkout fails the pack and removes the archive.
 - The bundle ships `@elgato/streamdeck` 2.1.2 with `@elgato/utils` 0.6.0,
   and the release and CI workflows run on the Node 24 generation of their
   pinned actions. Native C behavior and the API are unchanged; the build

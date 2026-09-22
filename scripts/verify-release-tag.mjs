@@ -32,7 +32,7 @@ try {
 	// One version, one entry: the tag names a CHANGELOG heading that already
 	// carries its release date. "Unreleased" is the candidate placeholder,
 	// and a tag pushed over it would stage notes with no entry behind them.
-	const heading = new RegExp(`^## ${manifest.Version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}$`, "m");
+	const heading = new RegExp(`^## ${manifest.Version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}[ \\t]*$`, "m");
 	if (!heading.test(text("CHANGELOG.md"))) {
 		throw new Error(`CHANGELOG.md must carry a dated "## ${manifest.Version} - YYYY-MM-DD" entry for this release`);
 	}

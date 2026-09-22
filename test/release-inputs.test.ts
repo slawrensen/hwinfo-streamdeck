@@ -64,6 +64,12 @@ describe("release input gate", () => {
 		assert.equal(run("v1.6.1").status, 0, "the dated entry restores acceptance");
 	});
 
+	it("accepts a dated heading under CRLF line endings and with trailing whitespace", () => {
+		for (const changelog of [datedEntry.replaceAll("\n", "\r\n"), datedEntry.replace("2026-08-11", "2026-08-11  "), datedEntry.replace("2026-08-11", "2026-08-11\t")]) {
+			assert.equal(run("v1.6.1", undefined, changelog).status, 0, JSON.stringify(changelog));
+		}
+	});
+
 	it("rejects mismatched manifest, package, and either lockfile version", () => {
 		for (let index = 0; index < 4; index++) {
 			const versions = ["1.6.1.0", "1.6.1", "1.6.1", "1.6.1"];

@@ -61,8 +61,11 @@ wss.on("connection", (ws) => {
 				});
 			} else if (msg.event === "getGlobalSettings") {
 				send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
-			} else if (msg.event === "setSettings" && msg.context === "ctx-res") {
-				settingsWrites.push(msg.payload);
+			} else if (msg.event === "setSettings" || msg.event === "setGlobalSettings") {
+				// Every write the plugin makes, whichever context or store: the
+				// launch-time theme migration is allowed to write globals once,
+				// recovery is allowed to write nothing.
+				settingsWrites.push({ event: msg.event, context: msg.context, payload: msg.payload });
 			} else if (msg.event === "setImage" && msg.context === "ctx-res") {
 				const svg = decodeSvg(msg.payload?.image);
 				if (svg !== null) {
@@ -211,6 +214,7 @@ try {
 	// producer exited and the plugin released its own handles. Reusing alive
 	// on the original writer would not exercise this lifecycle boundary.
 	const beforeRecovery = frames.length;
+	const writesBeforeRecovery = settingsWrites.length;
 	const replacement = await startFake("replacement producer");
 	assert.notEqual(replacement.child, firstProducer.child, "recovery must use a separately spawned producer lifetime");
 	const recoveredValues = () => frames.slice(beforeRecovery).flatMap((svg) => {
@@ -222,14 +226,18 @@ try {
 	});
 	const advanced = () => {
 		const values = recoveredValues();
-		return values.length >= 2 && values.some((value) => value > values[0]);
+		// Increasing, not merely varied: no rendered value drops below the one
+		// before it and the last sits above the first, so a series that
+		// oscillates or replays an old frame cannot pass.
+		return values.length >= 2 && values.every((value, i) => i === 0 || value >= (values[i - 1] ?? value)) && (values.at(-1) ?? 0) > (values[0] ?? 0);
 	};
 	await waitUntil(advanced, 10000);
 	assert.ok(advanced(), `replacement producer must advance the rendered native-unit value, observed ${JSON.stringify(recoveredValues())}`);
 	assert.equal(plugin.exit, null, "the original plugin process must survive recovery");
 	assert.equal(replacement.exit, null, "the replacement producer must remain alive while proving recovery");
 	assert.equal(registrations, 1, "recovery must not reconnect or replace the plugin context");
-	assert.deepEqual(settingsWrites, [], "producer recovery must not rewrite the selected identity or any action setting");
+	assert.deepEqual(settingsWrites.filter((write) => write.event === "setSettings" && write.context === "ctx-res"), [], "the selected key's settings are never rewritten");
+	assert.deepEqual(settingsWrites.slice(writesBeforeRecovery), [], "producer recovery must not write any action or global setting");
 	check("new producer → advancing values on the unchanged selected key", true, JSON.stringify(recoveredValues()));
 	assert.equal(collectorError, null, "the mock socket collected all frames without error");
 } catch (error) {

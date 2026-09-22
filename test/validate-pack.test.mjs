@@ -147,7 +147,9 @@ describe("packed-archive gate", () => {
 	it("holds the real release archive to the real staging directory", { skip: !packed && "no packed release (run npm run pack)" }, () => {
 		const packageVersion = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 		const result = validatePack({ archiveBytes: fs.readFileSync(realArchive), stagingDir: realStaging, packageVersion });
-		assert.deepEqual(result.failures, []);
+		// A payload drift here usually means the checkout was rebuilt after
+		// the last pack: the archive on disk is then not the candidate.
+		assert.deepEqual(result.failures, [], "release/com.lawrensen.hwinfo.streamDeckPlugin does not match the checkout; run `npm run pack` after `npm run build` so the archive is the bytes under test");
 		assert.equal(result.members, SHIPPED_MEMBERS.length);
 	});
 });

@@ -195,7 +195,12 @@ none. A scan that sees a name on two rows for the first time is withheld
 and retried like any other torn read, and the keys hold their values for
 that poll. If the next scan shows the name on one row, that scan is
 retried the same way, because it can be the moment the other row is in no
-slot. A name still on two rows at the next scan belongs to
+slot. A name that appears alone under a different unit than it last
+showed is treated as a first sighting for the same reason (HWiNFO writes
+the rows in sensor order, so a twin that sorts ahead of the one on your
+key lands in its slot first), which means a unit you change in HWiNFO
+costs two retried scans before the new unit shows. A name still on two
+rows at the next scan belongs to
 [two ticked readings](#enabling-gadget-reporting): those rows are withheld
 on their own, and released once two scans in a row show the name on one
 row, for the same reason.

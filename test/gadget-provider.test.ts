@@ -631,8 +631,15 @@ describe("integrity: Gadget evidence and statistics", { skip: !onWindows ? "win3
 			putValue("Value0", "176 °F");
 			assert.equal(provider.read(), null, "a first contradictory sighting skips the scan like any interleave");
 			putValue("ValueRaw0", "176");
-			assert.equal(readVerified(provider).readings[0]?.value, 176);
-			assert.equal(readVerified(provider).readings[0]?.unit, "°F");
+			// The completed rewrite shows the name alone under a unit it was not
+			// published with: that is also what a twin arriving ahead of the
+			// on-key twin looks like, so it is a sighting and the scan after is
+			// skipped as well before the new unit is served.
+			assert.equal(provider.read(), null, "a name alone under a new unit is a sighting");
+			assert.equal(provider.read(), null, "the scan after is skipped too");
+			const flipped = readVerified(provider);
+			assert.equal(flipped.readings[0]?.value, 176);
+			assert.equal(flipped.readings[0]?.unit, "°F");
 		} finally { provider.close(); }
 	});
 	test("a detected field interleave discards the whole scan before publishing evidence", () => {
@@ -1016,6 +1023,71 @@ describe("integrity: a doubled Gadget name is withheld only while it stands", { 
 			assert.equal(settled.blockedReadingCount, 0);
 			assert.deepEqual(provider.notices(), [], "a name never held is never named in the log");
 		} finally { provider.close(); }
+	});
+
+	test("a twin that sorts ahead of the on-key twin is never published under its name", () => {
+		// HWiNFO writes the renumbered rows in sensor order. When the ticked
+		// twin sorts ahead of the one on the key it lands in that slot first,
+		// alone under the name, and the doubled sighting comes one scan later.
+		const unitOf = (row: Row): string => row.value.split(" ")[1] as string;
+		for (const [onKey, ticked] of [[fanRpm, fanPct], [fanPct, fanRpm]] as const) {
+			const healthy = probes(`CPU [#0]: Twin ahead of ${unitOf(onKey)}`, 2);
+			const rows = [healthy[0] as Row, onKey, healthy[1] as Row];
+			shapeRows(rows);
+			const provider = GadgetRegistryProvider.open();
+			try {
+				assert.equal(readVerified(provider).byKey.get(shared)?.unit, unitOf(onKey));
+				const torn = tick(provider, rows, 1, ticked);
+				assert.equal(torn[0], null, `${unitOf(ticked)} alone in the ${unitOf(onKey)} twin's slot is a sighting: the scan is skipped`);
+				for (const [step, snap] of torn.entries()) {
+					if (snap === null) continue;
+					const published = snap.byKey.get(shared);
+					assert.equal(published, undefined, `step ${step}: ${published?.value} ${published?.unit} was published under the shared name while a twin was arriving`);
+				}
+				const standing = readVerified(provider);
+				assert.equal(standing.byKey.get(shared), undefined);
+				assert.equal(standing.blockedReadingCount, 2);
+			} finally { provider.close(); }
+		}
+	});
+
+	test("a unit HWiNFO changes on a unique name costs two skipped scans, then publishes", () => {
+		const rows = probes("CPU [#0]: Unit flip", 2);
+		const key = gadgetReadingKey((rows[0] as Row).sensor, (rows[0] as Row).label);
+		shapeRows(rows);
+		const provider = GadgetRegistryProvider.open();
+		try {
+			assert.equal(readVerified(provider).byKey.get(key)?.unit, "°C");
+			putValue("Value0", "104.0 °F");
+			putValue("ValueRaw0", "104.0");
+			assert.equal(provider.read(), null, "a name alone in its slot under another unit is a sighting");
+			assert.equal(provider.read(), null, "and the scan after is skipped too, in case the other twin is in no slot");
+			const flipped = readVerified(provider);
+			assert.equal(flipped.byKey.get(key)?.unit, "°F");
+			assert.equal(flipped.byKey.get(key)?.value, 104);
+			assert.equal(flipped.blockedReadingCount, 0);
+			assert.deepEqual(provider.notices(), []);
+		} finally { provider.close(); }
+	});
+
+	test("a single torn sighting does not survive a reopen whose own reads were clean", () => {
+		shape([0, 8], (i) => ({ sensor: "CPU [#0]: Reopen streak", label: `Row ${i}`, raw: "40", value: "40 °C" }));
+		const first = GadgetRegistryProvider.open();
+		let second: Provider | undefined;
+		try {
+			readVerified(first);
+			putValue("Value0", "99 °C");
+			assert.equal(first.read(), null, "one torn sighting skips");
+			putValue("Value0", "40 °C");
+			second = GadgetRegistryProvider.open();
+			second.adoptFreshness(first);
+			putValue("Value0", "99 °C");
+			assert.equal(second.read(), null, "the reopened provider's first torn sighting is a skip, not a withheld row");
+			assert.deepEqual(second.notices(), []);
+		} finally {
+			first.close();
+			second?.close();
+		}
 	});
 
 	test("nothing about a torn rewrite is remembered by a fresh provider or another process", () => {

@@ -106,6 +106,10 @@ export class GadgetRegistryProvider {
 	private lastChangeSec = 0;
 	private freshnessRevision = 0;
 	private lastValues = new Map<string, number>();
+	/** Reading key -> the evidence key (name and unit) it was last published
+	 * under. A name back on one row under another unit is the other twin
+	 * sitting in the on-key twin's slot (see readEntries). */
+	private lastEvidenceKeys = new Map<string, string>();
 	/** The reading each slot's formatted/raw disagreement was reported for.
 	 * Slot numbers are reused: another reading contradicting in a reported
 	 * slot is news, the same one on a later scan or session is not. */
@@ -344,6 +348,28 @@ export class GadgetRegistryProvider {
 			nameStates.set(key, known ? "held" : "suspect");
 			if (!known) firstSighting = true;
 		}
+		// A name on ONE row under a unit other than the one this provider last
+		// published for it. HWiNFO writes the renumbered rows in sensor order,
+		// so a twin that sorts ahead of the twin on the key overwrites that
+		// slot first, and the doubled sighting only comes on the next scan
+		// when the on-key twin reappears one slot down. Taking the swap as
+		// the sighting keeps the other twin's value and unit off the key for
+		// that scan; a unit HWiNFO itself changed pays the same two skipped
+		// scans and then publishes, which is the same doubt resolved the same
+		// way. A name never published here (a fresh provider) has no unit to
+		// compare against and is served as it stands.
+		for (const [key, rows] of rowsByName) {
+			// A name already under watch from the previous scan is decided by
+			// the transitions below, not sighted again: the last published unit
+			// stands until a complete scan publishes the new one.
+			if (rows.length !== 1 || nameStates.has(key) || this.nameStates.has(key)) continue;
+			const previous = this.lastEvidenceKeys.get(key);
+			const current = evidenceKeys.get(key);
+			if (previous !== undefined && current !== undefined && previous !== current) {
+				nameStates.set(key, "suspect");
+				firstSighting = true;
+			}
+		}
 		for (const [key, state] of this.nameStates) {
 			if (nameStates.has(key)) continue;
 			if (state === "held") nameStates.set(key, "releasing");
@@ -400,14 +426,17 @@ export class GadgetRegistryProvider {
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));
 		let valueChanged = false;
 		const safeValues = new Map<string, number>();
+		const safeEvidenceKeys = new Map<string, string>();
 		for (const reading of safeReadings) {
 			const evidenceKey = evidenceKeys.get(reading.key) as string;
 			const value = values.get(evidenceKey) as number;
 			const previous = this.lastValues.get(evidenceKey);
 			if (previous !== undefined && Number.isFinite(previous) && Number.isFinite(value) && previous !== value) valueChanged = true;
 			safeValues.set(evidenceKey, value);
+			safeEvidenceKeys.set(reading.key, evidenceKey);
 		}
 		this.lastValues = safeValues;
+		this.lastEvidenceKeys = safeEvidenceKeys;
 		if (valueChanged) {
 			this.lastChangeSec = Math.floor(Date.now() / 1000);
 			this.freshnessRevision++;
@@ -470,6 +499,7 @@ export class GadgetRegistryProvider {
 			this.valueRevision = from.valueRevision;
 			this.freshnessRevision = from.freshnessRevision;
 			this.lastValues = from.lastValues;
+			this.lastEvidenceKeys = from.lastEvidenceKeys;
 		}
 		// The verification read inside open() ran before this adoption; a
 		// slot the previous provider already reported is not news.
@@ -477,10 +507,15 @@ export class GadgetRegistryProvider {
 			if (this.reportedSlots.get(slot) === identity) this.pendingNotices.delete(slot);
 			else if (!this.reportedSlots.has(slot)) this.reportedSlots.set(slot, identity);
 		}
+		// A contradiction the previous provider was counting carries over only
+		// when this provider's own verification reads saw the same reading
+		// contradict itself in that slot. Reads that found the row clean broke
+		// the streak: a single torn sighting must not outlive a reopen and
+		// turn the next torn read into a withheld row with a warning.
 		for (const [slot, record] of from.contradictionStreak) {
 			const own = this.contradictionStreak.get(slot);
-			if (own === undefined || own.identity === record.identity) {
-				this.contradictionStreak.set(slot, { identity: record.identity, count: Math.max(record.count, own?.count ?? 0) });
+			if (own !== undefined && own.identity === record.identity) {
+				this.contradictionStreak.set(slot, { identity: record.identity, count: Math.max(record.count, own.count) });
 			}
 		}
 		// A name the previous provider held stays held. A key HWiNFO is still

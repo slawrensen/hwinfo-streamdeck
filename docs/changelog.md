@@ -59,8 +59,12 @@ Per-reading dial colors and reliability fixes in one release candidate.
   first time skips that one poll like any torn read, and a poll that then
   shows it on one row is skipped as well, because that can be the moment
   the other row is being rewritten; only a name still on two rows at the
-  next poll is withheld, and the plugin log names the slots once. Sparse
-  slots and names containing spaces keep working.
+  next poll is withheld, and the plugin log names the slots once. A name
+  that comes back alone under a different unit than it last showed is
+  taken as such a first sighting too, because a twin that sorts ahead of
+  the one on the key lands in its slot first; a unit that HWiNFO itself
+  changes therefore costs two skipped polls before the new unit shows.
+  Sparse slots and names containing spaces keep working.
 - Most Gadget selections saved by 1.6.0 keep working after the upgrade.
   HWiNFO's standard source names ("CPU [#0]: <model>") carry a colon, and
   1.7 stores readings with a colon or tilde in the name under a new key

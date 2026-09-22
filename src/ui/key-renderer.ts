@@ -9,8 +9,8 @@
  * value and label glyph sizes flex with content.
  */
 import { HISTORY_LENGTH } from "../series";
-import { estimateKeyTextWidth, fitTextLadder, truncateLabel, type FittedText } from "./format";
-import { themeTextColors, type TextColors } from "./text-colors";
+import { cappedUnit, estimateKeyTextWidth, fitTextLadder, truncateLabel, type FittedText } from "./format";
+import { themeTextColors, type QuadIdentity, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
 export const FONT = "Segoe UI, Arial, sans-serif";
@@ -89,12 +89,20 @@ const LABEL_SIZES = [20, 18, 16] as const;
 const BADGE_GAP_Y = 38;
 const BADGE_TEXT_Y = 48;
 
+/** Every code unit XML 1.0 forbids in a document: the C0 controls except
+ * tab, newline and return (U+0000..U+0008, U+000B, U+000C, U+000E..U+001F),
+ * the two non-characters U+FFFE and U+FFFF, and any unpaired surrogate.
+ * A conforming SVG parser rejects the whole face over one of them. */
+// eslint-disable-next-line no-control-regex
+const XML_ILLEGAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
 export function escapeXml(text: string): string {
-	// Fold unpaired surrogates first: settings text arrives through JSON
-	// escapes and registry labels as raw UTF-16, so a lone unit can reach
-	// face text, and encodeURIComponent throws URIError on one mid-render.
-	// U+FFFD keeps the face rendering; real pairs pass through untouched.
-	return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "�").replace(/[<>&'"]/g, (c) => {
+	// Fold XML-illegal code units first: settings text arrives through JSON
+	// escapes and sensor labels as raw C strings or registry values, so a
+	// control character or a lone surrogate can reach face text, and
+	// encodeURIComponent throws URIError on a lone unit mid-render. U+FFFD
+	// keeps the face rendering; legal text and real pairs pass untouched.
+	return text.replace(XML_ILLEGAL, "�").replace(/[<>&'"]/g, (c) => {
 		switch (c) {
 			case "<":
 				return "&lt;";
@@ -552,7 +560,7 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 	const sharedBadge = opts.sharedBadge ?? "";
 	const rows = [0, 1, 2].map((i) => {
 		const row = opts.rows[i] ?? null;
-		return row === null ? null : { ...row, valueText: truncateLabel(row.valueText, TRIPLE_VALUE_MAX), unitText: truncateLabel(row.unitText, TRIPLE_UNIT_MAX) };
+		return row === null ? null : { ...row, valueText: truncateLabel(row.valueText, TRIPLE_VALUE_MAX), unitText: cappedUnit(row.unitText, TRIPLE_UNIT_MAX) };
 	});
 	const valueSize = tripleValueFontSize(rows);
 	// Fit every label first: the face-wide spread cap needs the smallest
@@ -634,10 +642,18 @@ const QUAD_LABEL_BUDGET = 50;
 const QUAD_VALUE_MAX = 7;
 
 /** Default per-slot identity colors (top-left, top-right, bottom-left,
- * bottom-right): four hues apart in both hue and lightness, picked to hold
- * against every theme background. The action salvages user overrides per
- * entry against these; the PI's preset list starts from the same four. */
+ * bottom-right): four identity hues. The action resolves their contrast
+ * against the actual background and salvages user overrides per entry;
+ * the PI's preset list starts from the same four. */
 export const QUAD_DEFAULT_COLORS = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"] as const;
+
+/** A slot's identity for quadIdentityColor: the chosen #RRGGBB when the
+ * settings carry a valid one for that slot, else the slot's automatic
+ * default. The flag is what lets a chosen hue render exact while a default
+ * keeps its readable lift; the settings themselves are never rewritten. */
+export function quadIdentityOf(chosen: string | null | undefined, slot: number): QuadIdentity {
+	return typeof chosen === "string" ? { color: chosen, chosen: true } : { color: QUAD_DEFAULT_COLORS[slot] as string, chosen: false };
+}
 
 /**
  * Quad-cell value size by character count. The quad formatter caps values

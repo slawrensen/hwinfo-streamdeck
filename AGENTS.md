@@ -31,14 +31,26 @@ This is the canonical guide for anyone, human or AI agent, working in the repo.
 | `npm run suite:full` | Every suite plus the screenshot pipeline; fails on any leftover process |
 | `npm run probe` | Standalone reader smoke test against live HWiNFO (`-- --gadget` forces the registry backend) |
 | `npm run changelog:page` | Regenerate the docs-site Changelog page from `CHANGELOG.md` (a committed derived file) |
-| `npm run release:validate` | lint + typecheck + unit + the release-copy validator; the validator needs internal release docs, so it passes only on the maintainer's full checkout |
-| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin` (Elgato CLI) |
+| `npm run release:validate` | The canonical software qualification, `scripts/qualify.mjs`: prerequisites, lint, typecheck, native build, bundle, unit, native suite, pack, archive contract + extraction, ABI and producer recovery on the EXTRACTED bytes, native packaging gate, `streamdeck validate`, copy validator, and an unchanged-tree check, in that order from a clean clone. Every stage reports PASS, FAIL, SKIPPED or UNAVAILABLE; a stage that does not pass skips the rest and the exit is nonzero. Needs the MSVC toolset and `npm i -g @elgato/cli@1.7.4`; the copy validator needs the internal release docs (`MARKETPLACE.md`, `docs/release/`), which the public repository does not carry, so on a checkout without them that stage is UNAVAILABLE and only the maintainer's checkout produces a release qualification. The record (stage table, artifact size and SHA-256, member inventory, which bytes the ABI and recovery stages exercised) lands under `release/qualification-<version>/` and is read by nothing |
+| `npm run pack` | Emit `release/com.lawrensen.hwinfo.streamDeckPlugin`: the Elgato CLI packs a staged copy of the plugin directory (the CLI rewrites the manifest it packs, and the tracked one must not move), then `scripts/validate-pack.mjs` holds the archive to the shipping contract in `scripts/lib/pack-contract.mjs` and to the checkout. `npm run pack:validate` re-checks an existing archive; `npm test` never reads `release/` |
 
-The UI e2e suites need a live plugin process against a mock Stream Deck
-socket, so they run locally (`npm run suite:full`). CI (pinned windows-2025
-runner) runs lint + typecheck + unit + build + the native integration suite,
-plus an ABI matrix that loads the same Node-20-built `hwsm.node` under Node
-20, 22, and 24 without rebuilding.
+Gate map (what runs where, and against which bytes):
+
+| Gate | Where | Bytes exercised | How it runs |
+|---|---|---|---|
+| lint, typecheck, unit (`npm test`) | CI `verify` and locally | source; unit tests never read `release/` | automatic on every push |
+| native build + `test:native` + `validate-native` | CI `verify` and locally | the addon built in that checkout | automatic |
+| `e2e:resilience` on the checkout | CI `verify` and locally | `bin/` of that checkout | automatic |
+| pack + archive contract + extraction, ABI and `e2e:resilience` on the extracted bytes | CI `verify` and locally | the archive that run packed | automatic (`qualify.mjs --stages pack,archive,abi,recovery,tree`); the CI pack and record are retained as the `ci-pack-qualification` artifact |
+| ABI matrix (Node 20, 22, 24) | CI `abi-matrix` | the CI-built addon, unchanged | automatic |
+| copy validator, `streamdeck validate`, the whole sequence with a record | local only (`npm run release:validate`) | the local build and its archive | explicit; ordinary CI does not attest to it |
+| `npm run suite:full` (browser and capture suites, process hygiene) | local only | `bin/` of the checkout | explicit; ordinary CI does not attest to it |
+| installation through the Stream Deck app, hardware soak | a physical deck | the installed package | by hand; the runbook and PERF.md record the result |
+
+The CI-built addon and a locally built one carry the same source identity
+and contract but are not byte-identical (different toolchain images); each
+is qualified where it is built. The mock socket does not prove physical
+device behavior.
 
 ## Native addon (hwsm)
 
@@ -58,15 +70,20 @@ Rules that keep it sound:
   The loader refuses a mismatched addon (fails closed as "bridge-failed").
   Bump BOTH on any API shape/meaning change.
 - The native version (`HWSM_NATIVE_VERSION_*`, also the version resource)
-  changes only when native source behavior changes, so TypeScript-only
-  releases ship byte-identical native bytes.
+  changes only when native source behavior changes. A TypeScript-only
+  release keeps the native version and source id; its bytes reproduce
+  within one runner image but can move when the image's MSVC toolset
+  moves (1.5.1 and 1.6.0 built different bytes from identical source), so
+  the release workflow compares each build with the previous release's
+  manifest and annotates the run when the bytes drift.
 - The consistency mutex is mandatory; there is no unguarded read path. The
   header is re-validated under the mutex on every read against the
   session's exact mapped length (checked arithmetic, 64 MiB bound).
 - `hwsm_test.node` (fault-injection hooks) and `hwsm_protomm.node`
   (deliberate protocol mismatch) build alongside for tests and must never
-  ship; `scripts/validate-native.mjs` enforces that plus protocol/hash
-  consistency in the pack.
+  ship; `scripts/validate-native.mjs` enforces that, protocol/hash
+  consistency in the pack, and that the vendored addon was built from the
+  tree's native sources.
 - `node scripts/native-manifest.mjs` writes `release-native-manifest.json`
   (hash, size, PE hardening, imports, versions); the release workflow
   attaches it next to the pack and re-proves build reproducibility.
@@ -96,6 +113,15 @@ Dev loop: `streamdeck link com.lawrensen.hwinfo.sdPlugin` once, then
 
 ## Conventions
 
+- **Public copy is plain and specific.** Lead with what changes for the user,
+  the condition under which it works, and any action they need to take. Use
+  exact UI labels. Write as Stephen, first person singular when needed, not
+  a fictional team. Cut sales language, filler, metaphors and repeated
+  explanations. Do not invent anecdotes or imitate another person's voice.
+  Mark candidate features as unreleased; distinguish renderer samples,
+  settings-panel captures and hardware photographs. Claims need code, tests
+  or measured evidence. The maintainer's full checkout has the detailed
+  rules in `docs/release/COPY_RULES.md`; run the release-copy validator there.
 - **Tabs** for indentation. TypeScript strict: no `any`, explicit boundary
   types, `console.error` only (the probe and build scripts are exempt).
 - **No em dashes** in prose or user-facing strings. The lone em dash on an empty
@@ -144,7 +170,9 @@ split so soak numbers stay honest.
 ## Distribution
 
 - **GitHub Releases** (un-DRM'd, direct download): push a `vX.Y.Z` tag and
-  `.github/workflows/release.yml` builds, packs, hashes, and publishes.
+  `.github/workflows/release.yml` builds, packs, hashes, and stages a draft
+  release that I publish by hand after checking the pack against the local
+  candidate.
 - **Elgato Marketplace** (DRM applied on Elgato's side): a separate submission.
 - `CHANGELOG.md` is the release history; `docs/changelog.md` mirrors it on the
   site (`npm run changelog:page` regenerates it).

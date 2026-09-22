@@ -76,6 +76,14 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	private readonly visible = new Set<string>();
 	/** Pending badge reverts by context id, so repeats re-arm cleanly. */
 	private readonly badgeTimers = new Map<string, NodeJS.Timeout>();
+	/** The key each pending badge is painted on. willDisappear carries only
+	 * an ActionContext (no setImage) and the SDK has already dropped the
+	 * action from its store by then, so the way-out restore needs the
+	 * press's own handle. */
+	private readonly badgedKeys = new Map<string, KeyAction<ControlActionSettings>>();
+	/** Contexts that left the screen with the badge still up; the next
+	 * willAppear repaints the manifest icon. */
+	private readonly restoreOwed = new Set<string>();
 
 	constructor() {
 		super();
@@ -85,14 +93,29 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	override onWillAppear(ev: WillAppearEvent<ControlActionSettings>): void {
 		this.visible.add(ev.action.id);
 		streamDeck.logger.debug(`Control key appeared on ${ev.action.device.name} (${ev.action.id})`);
+		if (this.restoreOwed.delete(ev.action.id)) {
+			// No argument restores the manifest image.
+			void ev.action.setImage();
+		}
 	}
 
+	/**
+	 * A key that leaves inside the badge window (a Multi Action whose next
+	 * step switches page or profile, or a swipe) must not leave the badge
+	 * behind: the app caches each key's last image per profile and replays
+	 * it, so an abandoned badge came back on every later visit. The restore
+	 * goes out now, and because the app can drop a frame sent across the
+	 * switch, the next willAppear sends it again.
+	 */
 	override onWillDisappear(ev: WillDisappearEvent<ControlActionSettings>): void {
 		this.visible.delete(ev.action.id);
 		const timer = this.badgeTimers.get(ev.action.id);
 		if (timer !== undefined) {
 			clearTimeout(timer);
 			this.badgeTimers.delete(ev.action.id);
+			void this.badgedKeys.get(ev.action.id)?.setImage();
+			this.badgedKeys.delete(ev.action.id);
+			this.restoreOwed.add(ev.action.id);
 		}
 	}
 
@@ -111,10 +134,12 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 			clearTimeout(previous);
 		}
 		void keyAction.setImage(SUCCESS_IMAGE);
+		this.badgedKeys.set(keyAction.id, keyAction);
 		this.badgeTimers.set(
 			keyAction.id,
 			setTimeout(() => {
 				this.badgeTimers.delete(keyAction.id);
+				this.badgedKeys.delete(keyAction.id);
 				// No argument restores the manifest image.
 				void keyAction.setImage();
 			}, SUCCESS_BADGE_MS).unref()

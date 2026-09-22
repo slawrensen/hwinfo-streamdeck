@@ -1,7 +1,9 @@
 /**
  * Compatibility proof: faces rendered from legacy-shaped inputs (no gauge, no
- * text overrides, no data-unit re-tiering in play) must stay byte-identical
- * to the captured renderer output in test/golden/legacy-faces.json. The dial
+ * text overrides, no data-unit re-tiering in play) must preserve captured
+ * geometry and content from test/golden/legacy-faces.json. The two explicit
+ * numeric-unit color replacements below are the readability correction.
+ * The dial
  * faces and the quad key are the untouched 1.2.0 capture; the single and
  * dual key entries were re-baselined for the adaptive label typography
  * (issue #3), and the three single-key entries again for the measured
@@ -20,14 +22,18 @@ import { describe, it } from "node:test";
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey } from "../src/ui/key-renderer";
 import { resolveTextColors, themeTextColors } from "../src/ui/text-colors";
+import { applyGlobalThemeSettings, effectiveThemeFor, getDeckTheme } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 
-const golden = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
+const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
+// Retain the historical artifacts. Authorize only these foreground changes;
+// all other bytes still compare exactly, including number and unit geometry.
+const golden = Object.fromEntries(Object.entries(legacy).map(([name, svg]) => [name, svg.replaceAll("#667082", "#6B7586").replaceAll("#8A6326", "#926E35")]));
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 const EMBER = resolvePalette(config, "ember", "temperature", "normal");
 
-describe("legacy faces stay byte-identical", () => {
+describe("legacy faces retain all bytes except the approved numeric colors", () => {
 	it("single key, plain (no sparkline field ever set)", () => {
 		assert.equal(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", palette: VOID }), golden.singlePlain);
 	});
@@ -131,5 +137,31 @@ describe("theme text mode is byte-identical to the palette path", () => {
 	it("an empty zones array leaves the dial bar untouched", () => {
 		const base = { title: "CPU", valueText: "56.3", unitText: "°C", statsText: "", fraction: 0.4, palette: VOID, barColor: VOID.accent };
 		assert.equal(renderDial({ ...base, zones: [] }), renderDial(base));
+	});
+});
+
+describe("malformed theme settings salvage without rewriting", () => {
+	it("prototype-named local themes render the default face", () => {
+		const base = { label: "CPU", valueText: "40.0", unitText: "°C", statBadge: "", palette: VOID };
+		for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+			const settings = { theme };
+			const palette = resolvePalette(config, effectiveThemeFor(settings), null, "normal");
+			assert.equal(renderReadingKey({ ...base, palette }), renderReadingKey(base), theme);
+			assert.deepEqual(settings, { theme });
+		}
+	});
+
+	it("prototype-named global themes retain the last valid deck theme", () => {
+		try {
+			applyGlobalThemeSettings({ theme: "paper" });
+			for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+				const settings = { theme };
+				applyGlobalThemeSettings(settings);
+				assert.equal(getDeckTheme(), "paper", theme);
+				assert.deepEqual(settings, { theme });
+			}
+		} finally {
+			applyGlobalThemeSettings({ theme: "void" });
+		}
 	});
 });

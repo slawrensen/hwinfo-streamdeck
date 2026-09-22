@@ -14,6 +14,9 @@
 //   fahrenheit / celsius   republish the temperature as °F / °C: unit string
 //           rewritten in place, values rescaled, layout unchanged (exactly
 //           what flipping HWiNFO's own unit setting does mid-session)
+//   identity-duplicate / identity-swapped / identity-orphan / identity-unique
+//           publish three fixed rows: two colliding or ownerless rows, then
+//           a healthy fan; swap/update them and finally restore unique IDs
 //   hold / release   acquire / release the consistency mutex and keep it,
 //           simulating HWiNFO holding it at the instant a consumer opens
 //           (publishing still works: same-thread acquisition is recursive)
@@ -74,6 +77,7 @@ let mode = "alive"; // alive | freeze | dead
 let entryCount = 2;
 let unitF = false; // temperature published as °F (values rescaled)
 let holding = false; // "hold" keeps the mutex acquired between commands
+let identityPhase = null;
 
 function cstr(offset, width, text) {
 	buf.fill(0, offset, offset + width);
@@ -99,6 +103,38 @@ function compose() {
 	buf.writeUInt32LE(0, s + 4);
 	cstr(s + 8, 128, "Test Source");
 	cstr(s + 136, 128, "Test Source");
+
+	if (identityPhase !== null) {
+		// Keep the header and all three physical offsets fixed across phases.
+		// Withheld rows must not shift the healthy row's cached numeric reads.
+		const swapped = identityPhase === "swapped";
+		const orphan = identityPhase === "orphan";
+		const rows = identityPhase === "unique" ? [
+			{ type: 1, owner: 0, id: 0x1000001, label: "Test Temp", unit: "°C", values: [45, 40, 90, 55] },
+			{ type: 2, owner: 0, id: 0x1000003, label: "Test Volt", unit: "V", values: [12.1, 11.9, 12.3, 12.1] }
+		] : [
+			{ type: 1, owner: orphan ? 7 : 0, id: 0x1000001, label: swapped ? "Temp Beta" : "Temp Alpha", unit: "°C", values: [swapped ? 80 : 40, 30, 95, 50] },
+			{ type: 1, owner: orphan ? 9 : 0, id: orphan ? 0x1000003 : 0x1000001, label: swapped ? "Temp Alpha" : "Temp Beta", unit: "°C", values: [swapped ? 40 : 80, 60, 99, 70] }
+		];
+		const fanValues = {
+			duplicate: [1210, 801, 2001, 1251],
+			swapped: [1300, 810, 2100, 1350],
+			orphan: [1400, 820, 2200, 1450],
+			unique: [1500, 830, 2300, 1550]
+		}[identityPhase];
+		rows.push({ type: 3, owner: 0, id: 0x1000002, label: "Test Fan", unit: "RPM", values: fanValues });
+		for (const [index, row] of rows.entries()) {
+			const offset = HEADER_SIZE + SENSOR_SIZE + index * ENTRY_SIZE;
+			buf.writeUInt32LE(row.type, offset);
+			buf.writeUInt32LE(row.owner, offset + 4);
+			buf.writeUInt32LE(row.id, offset + 8);
+			cstr(offset + 12, 128, row.label);
+			cstr(offset + 140, 128, row.label);
+			cstr(offset + 268, 16, row.unit);
+			row.values.forEach((number, field) => buf.writeDoubleLE(number, offset + 284 + field * 8));
+		}
+		return;
+	}
 
 	// entry[0]: temperature that advances ("fahrenheit" republishes the same
 	// entry with the unit string rewritten and the doubles rescaled in place)
@@ -212,6 +248,12 @@ rl.on("line", (line) => {
 		compose();
 		publish();
 		console.log(`UNIT ${unitF ? "F" : "C"}`);
+	} else if (["identity-duplicate", "identity-swapped", "identity-orphan", "identity-unique"].includes(cmd)) {
+		identityPhase = cmd.slice("identity-".length);
+		entryCount = 3;
+		compose();
+		publish();
+		console.log(`IDENTITY ${identityPhase}`);
 	} else if (cmd === "hold") {
 		if (hMutex !== null && !holding) {
 			WaitForSingleObject(hMutex, 2000);

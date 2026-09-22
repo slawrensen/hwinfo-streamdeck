@@ -38,9 +38,9 @@ Build them in the dial's settings panel. **Split into groups** under the rotatio
 
 Details worth knowing:
 
-- The active group is wherever the current reading lives. Jumping groups moves it, and so do the HWiNFO Control key and an alert interrupt; rotate after any of those and you are stepping inside the group you landed in. A group whose readings are all missing (sensor asleep, device gone) is skipped by the jump.
-- Auto cycle steps inside the active group. With **On alert** ticked it still watches every group: a critical reading anywhere in the set pulls the cycle to it, group boundary or not.
-- Plain rotate honors group boundaries only while the dial has a gesture that can cross them. Legacy has none, so Legacy rotates through all groups as one flat list, exactly as it always has. On Custom, assign "Switch sensor or group" to any gesture and the boundaries engage; assign it nowhere and the dial keeps one flat list, so no group can ever become unreachable.
+- The active group is wherever the current reading lives. Jumping groups moves it, and so do the HWiNFO Control key and an alert interrupt; on a preset that can switch groups (Elite, or Custom with "Switch sensor or group" on a gesture), rotate after any of those and you are stepping inside the group you landed in. A group whose readings are all missing (sensor asleep, device gone) is skipped by the jump.
+- On those presets, Auto cycle steps inside the active group and the overviews list it. With **On alert** ticked it still watches every group: a critical reading anywhere in the set pulls the cycle to it, group boundary or not.
+- Plain rotate honors group boundaries only while the dial has a gesture that can cross them. Legacy has none, so on Legacy plain rotate, Auto cycle and the overviews treat all groups as one flat list, exactly as they always have, and a group jump from the HWiNFO Control key lands but the next notch walks on through the boundary. On Custom, assign "Switch sensor or group" to any gesture and the boundaries engage; assign it nowhere and the dial keeps one flat list, so no group can ever become unreachable.
 - The [HWiNFO Control key](#the-hwinfo-control-key-action)'s "Next/Previous sensor or group" commands honor your groups on every preset.
 - A single group behaves like a plain rotation set. **Reset reach** "set" keeps meaning the whole set: every group.
 - Older plugin versions read the groups as one flat set (the set is stored alongside the groups), so downgrading loses nothing and the groups wake up again after re-updating.
@@ -53,7 +53,7 @@ Off by default. With **two zones**, the left half of the touchscreen steps to th
 
 - **Pause/resume auto cycle** stops the auto cycle until you resume it (resuming waits one full interval before the next step). The dial's bottom line shows "cycle paused".
 - **Pin** locks the selection completely: turns, taps and auto cycle cannot move the dial off its reading until you unpin. The bottom line shows "pinned".
-- **Reset reach** decides what a stats reset clears: the current reading (default), the whole rotation set, or every dial. "Every dial" never rides on a default gesture; you have to pick it on purpose.
+- **Reset reach** decides what a stats reset clears: the current reading (default), the whole rotation set, or every dial. "Every dial" includes dials parked on other pages and profiles, and it never rides on a default gesture; you have to pick it on purpose.
 
 Pause and pin survive page switches and profile changes for up to 30 minutes off screen (the plugin parks the state of the 64 most recently hidden dials; past either bound a returning dial starts fresh). They also reset when the Stream Deck app restarts.
 
@@ -61,7 +61,9 @@ Pause and pin survive page switches and profile changes for up to 30 minutes off
 
 ## Session stats are per reading
 
-Each reading keeps its own session min/max/average, keyed by HWiNFO's stable sensor identity. Rotate away and back and you find that reading's own session numbers again, not the neighbor's. Stats keep accumulating for every rotation-set member while other members are on screen, and while the dial is on another page (within the same 30-minute hidden window as pause and pin). One prerequisite: the plugin's poller only runs while a Sensor Reading key or Sensor Dial is on screen somewhere, so a page with none of them pauses the accumulation too.
+Each reading keeps local session min/max/average. Ordinary rotation preserves that session. The selected reading, rotation-set members and multi-row view readings accumulate while polling runs; hidden dials can keep collecting within the limits above. With no Sensor Reading key or Sensor Dial visible, polling stops.
+
+Since 1.7, repeated held frames do not count again, and averages are sample-weighted. Missing or non-finite readings, stale or unavailable data, and source, native-unit or type changes reset the affected sessions, and the first live frame after a data gap says so once; a pairing edit resets only a session whose saved key now stands for a different measurement. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading) for the full rules.
 
 ## Thresholds and mixed units
 
@@ -77,13 +79,13 @@ Alert-aware cycling is opt-in via the **On alert** setting. Ticked, the auto cyc
 
 **HWiNFO Control** is a key action that drives Sensor Dials remotely: from a pedal, a G-key, a Multi Action step, a Key Logic slot (Stream Deck 7.0+), or a plain key, on any connected device. Pick a command (next/previous reading or sensor, stat mode, pause/resume, pin/unpin, reset) and optionally a **Target**.
 
-Targeting is explicit. Give a dial a **Link ID** in its settings and put the same name in the control key's Target field; the key then drives only dials with that ID, wherever they live. An empty Target drives every dial. The key shows a tick when the command reached at least one matching dial (a pinned dial still counts as reached), and an alert icon when none matched. One reach limit: the target dial has to be on screen somewhere, on any connected deck. A dial hidden behind another page of its own deck is not reachable, which is why the sources listed above are other devices or automations, not a key that swaps the dial off screen as you press it. Pause/resume and pin/unpin have explicit one-way variants, so repeated presses in a Multi Action stay harmless.
+Targeting is explicit. Give a dial a **Link ID** in its settings and put the same name in the control key's Target field; the key then drives only dials with that ID, wherever they live. An empty Target drives every dial. The key shows a tick when the command reached at least one matching dial (a pinned dial still counts as reached), and an alert icon when none matched. One reach limit: the four selection commands (next/previous reading, next/previous sensor or group) need the target dial on screen somewhere, on any connected deck, which is why the sources listed above are other devices or automations, not a key that swaps the dial off screen as you press it. The stat, pause, pin and reset commands also reach a dial parked off screen inside the same 30-minute window that keeps its pause and pin, and the tick means the command matched a dial, not that anything changed on screen. Pause/resume and pin/unpin have explicit one-way variants, so repeated presses in a Multi Action stay harmless.
 
 ![The HWiNFO Control key's settings panel with every section open: the "What this key does" intro, the Command select on "Next reading", the Target field reading "cpu-dial", the Reset reach select with the help text explaining Link ID targeting, and the Copy support report button.]({{ '/assets/img/pi-control.png' | relative_url }})
 
 ## Page swipe
 
-Swiping sideways on the touch strip switches Stream Deck pages. That gesture belongs to the Stream Deck app itself; no plugin receives it, and this one does not pretend to. What the plugin does guarantee: selection and labels are persisted settings and always survive; session stats, pause and pin state survive the page switch within the 30-minute hidden window described above.
+Swiping sideways on the touch strip switches Stream Deck pages. The app handles that gesture. Selection and labels are saved settings. Pause, pin and session state can survive a page switch within the hidden-dial limits above; session statistics still follow the reset rules.
 
 ## Settings migration
 

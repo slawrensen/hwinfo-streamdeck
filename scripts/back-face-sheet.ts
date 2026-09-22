@@ -3,6 +3,7 @@
 // placement can be eyeballed at 144 px and at the 72 px physical scale.
 // Writes SVGs plus one HTML sheet. A manual review tool, not part of any
 // build or suite; run with: npx tsx scripts/back-face-sheet.ts <outDir>
+import "./lib/script-failures.mjs";
 import fs from "node:fs";
 import path from "node:path";
 

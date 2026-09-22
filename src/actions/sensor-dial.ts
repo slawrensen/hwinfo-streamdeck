@@ -28,13 +28,15 @@ import { parseResetScope, resolveControls, schemeCanSwitchGroups, triggerDescrip
 import { deviceCapabilities, tapCanvasWidth } from "../devices";
 import { registerDiagnostics } from "../diagnostics";
 import { IDLE_GESTURE, routeGesture, type GestureState } from "../gestures";
+import { liveKeyOf, readingMatchesKey } from "../hwinfo/reading-links";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
-import { activeGroupIndex, autoCycleTarget, groupDisplayName, groupReadings, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource, type RotationGroup } from "../rotation";
-import { SessionStatsStore, type SessionStats } from "../stats";
+import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
+import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
 import { FOOTER_PX, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
+import { dialViewOf, overviewRowColors, rotationKeysOf, stepListOf } from "../ui/dial-overview";
 import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
@@ -66,6 +68,10 @@ export type DialSettings = {
 	textColor?: string;
 	/** Custom mode: labels, units and stats at lower intensity. */
 	textDimSecondary?: boolean;
+	/** Multi-row normal numbers use sensor-type colors only on exact true. */
+	sensorValueColors?: boolean;
+	/** Optional numeric color overrides by stable reading key; multi-row only. */
+	readingColors?: Record<string, string>;
 	/** Rotation set: rotate/autocycle move only through these picked readings. */
 	rotationKeys?: string[];
 	/**
@@ -139,7 +145,7 @@ export type DialSettings = {
 	overviewSeparators?: string;
 };
 
-type InstanceState = {
+export type InstanceState = {
 	settings: DialSettings;
 	/** Session stats per reading identity; survives rotation and hiding. */
 	stats: SessionStatsStore;
@@ -158,6 +164,9 @@ type InstanceState = {
 	deviceId: string;
 	/** A threshold edit is waiting for a resolvable reading to stamp its unit. */
 	pendingAlertUnitStamp: boolean;
+	/** A stale or unavailable tick ended this dial's sessions; the first live
+	 * frame afterwards says so once, so a collapsed min/max is explained. */
+	gapReset?: boolean;
 	/** Readings this instance holds poller series subscriptions for (the
 	 * two-row view's sparklines); synced each tick, released on disappear.
 	 * Not restored across hiding: poller subscriptions are permanent for the
@@ -239,13 +248,26 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			overlayTimer: null,
 			deviceId: ev.action.device.id,
 			pendingAlertUnitStamp: restored?.pendingAlertUnitStamp ?? false,
+			// A gap that ended this dial's sessions while it was hidden, or
+			// before a replayed appear, is still owed its one explanation.
+			gapReset: restored?.gapReset ?? false,
 			rowSeries: new Set()
 		};
 		this.instances.set(ev.action.id, state);
 		if (ev.action.isDial()) {
 			this.pushTriggerDescriptions(ev.action, ev.payload.settings);
 		}
-		this.renderAll(poller.getStatus(), ev.action.id);
+		// retain() may synchronously read a different source or native unit
+		// before this instance is restored. Validate its session against that
+		// observation before drawing the first frame, just as each tick does.
+		const status = poller.getStatus();
+		if (status.state === "ok") {
+			this.sampleStats(state, status.snapshot, status.source);
+		} else {
+			if (state.stats.size > 0) state.gapReset = true;
+			state.stats.reset();
+		}
+		this.renderAll(status, ev.action.id);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<DialSettings>): void {
@@ -338,10 +360,13 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			return;
 		}
 		const scheme = resolveControls(state.settings);
+		const firstDown = state.gesture.downAt === null;
 		const routed = routeGesture(state.gesture, { kind: "dialDown", at: performance.now() }, scheme.touchZones);
 		this.traceGesture("dialDown", ev.action.id, state, routed.state, {});
 		state.gesture = routed.state;
-		if (scheme.pushTiming === "down") {
+		// The router retains a replayed down as the same press. Legacy's
+		// immediate command must also run only once, or it erases new stats.
+		if (scheme.pushTiming === "down" && firstDown) {
 			// Mark the press consumed so a preset switch mid-press can never
 			// fire a second command on release.
 			state.gesture = { downAt: state.gesture.downAt, rotatedWhileDown: true };
@@ -446,13 +471,21 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			return;
 		}
 		const key = readingKeyOf(state.settings);
+		// A reset aims at measurements: a reading sampled under two confirmed
+		// spellings (its saved key and its live row) resets under both.
+		const status = poller.getStatus();
+		const snapshot = status.state === "unavailable" ? undefined : status.snapshot;
+		const resetKeys = (keys: readonly string[]): void => {
+			state.stats.reset(keys);
+			state.stats.resetIdentities(new Set(keys.map((k) => { const reading = snapshot?.byKey.get(k); return reading === undefined ? k : liveKeyOf(reading); })));
+		};
 		if (scope === "set") {
-			state.stats.reset([...(rotationKeysOf(state.settings) ?? []), ...(key === undefined ? [] : [key])]);
+			resetKeys([...(rotationKeysOf(state.settings) ?? []), ...(key === undefined ? [] : [key])]);
 			this.showOverlay(state, "set stats reset");
 			return;
 		}
 		if (key !== undefined) {
-			state.stats.reset([key]);
+			resetKeys([key]);
 		}
 		this.showOverlay(state, "stats reset");
 	}
@@ -486,22 +519,24 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		} else {
 			next = stepReading(stepListOf(state.settings, key, groups, snapshot), key, ticks);
 		}
-		if (next === undefined || next.key === state.settings.readingKey) {
+		// Landing on the measurement already selected (its other confirmed
+		// spelling) is no move: never rewrite the saved key for nothing.
+		if (next === undefined || readingMatchesKey(next, state.settings.readingKey)) {
 			return;
 		}
 		// A group jump names its landing group; set before adopting so the
 		// adopt's own render already paints the overlay.
 		if (granularity === "group" && groups !== undefined) {
-			const landed = activeGroupIndex(groups, next.key);
+			const landed = activeGroupIndex(groups, next.key, snapshot);
 			if (landed !== -1) {
 				this.showOverlay(state, groupDisplayName(groups, landed));
 			}
 		}
-		await this.adoptReading(action, state, next.key, status);
+		await this.adoptReading(action, state, next.key);
 	}
 
 	/** Moves the selection and persists it; per-reading stats stay intact. */
-	private async adoptReading(action: DialAction<DialSettings>, state: InstanceState, nextKey: string, status: PollerStatus): Promise<void> {
+	private async adoptReading(action: DialAction<DialSettings>, state: InstanceState, nextKey: string): Promise<void> {
 		const before = readingKeyOf(state.settings);
 		// The custom label described the reading it was written for; in the
 		// default "auto" label mode, moving to a different reading drops it
@@ -513,7 +548,9 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		state.nextCycleAt = null; // any move defers the next automatic step by a full interval
 		trace({ event: "selection", context: action.id, selectionBefore: before === undefined ? undefined : hashId(before), selectionAfter: hashId(nextKey) });
 		await action.setSettings(state.settings);
-		this.renderAll(status);
+		// A source/unit transition can land while the host write is pending.
+		// Never redraw the older observation captured when selection began.
+		this.renderAll(poller.getStatus());
 	}
 
 	private onPollerTick(status: PollerStatus): void {
@@ -524,7 +561,14 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			// its true session, and hidden members keep alert coverage. The
 			// two-row view's sparkline subscriptions ride the same sweep.
 			for (const state of this.instances.values()) {
-				this.sampleStats(state, status.snapshot);
+				if (state.gapReset === true) {
+					// The status face hid the reset while the source was out;
+					// name it on the first live frame so the collapsed
+					// min/max is not read as a plugin fault.
+					state.gapReset = false;
+					this.showOverlay(state, sessionResetMessage("gap"));
+				}
+				this.sampleStats(state, status.snapshot, status.source);
 				this.syncRowSeries(state, status.snapshot);
 			}
 			// Completes a unit stamp whose threshold edit landed while the
@@ -542,15 +586,27 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 					this.hidden.delete(id);
 					continue;
 				}
-				this.sampleStats(entry.state, status.snapshot);
+				this.sampleStats(entry.state, status.snapshot, status.source);
 			}
 			this.autoCycle(status, now);
+		} else {
+			// A stale or unavailable source ends every session (a frozen or
+			// absent producer is not evidence). Remember which dials lost a
+			// session so the return to live data can say so.
+			for (const state of this.instances.values()) {
+				if (state.stats.size > 0) state.gapReset = true;
+				state.stats.reset();
+			}
+			for (const entry of this.hidden.values()) {
+				if (entry.state.stats.size > 0) entry.state.gapReset = true;
+				entry.state.stats.reset();
+			}
 		}
 		this.renderAll(status);
 		pushPreviewToPi(status, this.manifestId, this.instances, false);
 	}
 
-	private sampleStats(state: InstanceState, snapshot: SensorSnapshot): void {
+	private sampleStats(state: InstanceState, snapshot: SensorSnapshot, source: string): void {
 		const keys = new Set<string>(rotationKeysOf(state.settings) ?? []);
 		const current = readingKeyOf(state.settings);
 		if (current !== undefined) {
@@ -565,10 +621,14 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				keys.add(member.key);
 			}
 		}
+		state.stats.validateRetained(snapshot, source, keys);
 		for (const key of keys) {
 			const reading = snapshot.byKey.get(key);
 			if (reading !== undefined) {
-				state.stats.sample(key, reading.value);
+				const resetReason = state.stats.observe(reading, snapshot, source);
+				if (key === current && resetReason !== undefined) this.showOverlay(state, sessionResetMessage(resetReason));
+			} else {
+				state.stats.reset([key]);
 			}
 		}
 		// Bound by relevance: every actively sampled reading is kept whatever
@@ -639,7 +699,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				// version. Ungrouped and Legacy dials pass their own list.
 				const alertList = groups !== undefined && schemeCanSwitchGroups(resolveControls(state.settings)) ? rotationReadings(groups.flatMap((g) => g.keys), key, status.snapshot) : list;
 				const target = autoCycleTarget(list, alertList, key, this.criticalKeys(state, alertList), state.settings.alertInterrupt === true);
-				if (target === undefined || target.key === key) {
+				if (target === undefined || readingMatchesKey(target, key)) {
 					// Held (critical member on screen, or nowhere to go):
 					// wait a full interval before looking again.
 					state.nextCycleAt = now + interval;
@@ -647,7 +707,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 				}
 				// adoptReading leaves nextCycleAt null; the next tick re-arms
 				// a full interval out.
-				void this.adoptReading(act, state, target.key, status);
+				void this.adoptReading(act, state, target.key);
 			}
 		}
 	}
@@ -840,6 +900,12 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			if (state === undefined) {
 				continue;
 			}
+			// Settings, gestures, theme changes and overlay expiry can render
+			// before the next tick. Revalidate every displayed session here so
+			// a retained untracked reading never borrows its old unit/source.
+			// observe() deduplicates unchanged evidence, including tick renders.
+			if (status.state === "ok") this.sampleStats(state, status.snapshot, status.source);
+			else state.stats.reset();
 			const svg = composeDialSvg(state, status);
 			if (svg !== state.lastFeedback) {
 				state.lastFeedback = svg;
@@ -915,40 +981,8 @@ function readingKeyOf(settings: DialSettings): string | undefined {
 	return typeof settings.readingKey === "string" && settings.readingKey !== "" ? settings.readingKey : undefined;
 }
 
-/** Settings are untyped JSON at runtime: anything but a non-empty string
- *  array (a hand-edited profile, an import) degrades to "no set". */
-function rotationKeysOf(settings: DialSettings): string[] | undefined {
-	if (!Array.isArray(settings.rotationKeys)) {
-		return undefined;
-	}
-	const keys = settings.rotationKeys.filter((k): k is string => typeof k === "string");
-	return keys.length > 0 ? keys : undefined;
-}
-
 function matchesTarget(target: string, settings: DialSettings): boolean {
 	return target === "" || (typeof settings.linkId === "string" && settings.linkId.trim() === target);
-}
-
-/** Only the exact markers activate a multi-row view; anything else (absent,
- *  junk, a newer version's future value after a rollback) stays single. */
-function dialViewOf(settings: DialSettings): "single" | "overview" | "tworow" {
-	return settings.dialView === "overview" ? "overview" : settings.dialView === "tworow" ? "tworow" : "single";
-}
-
-/**
- * The list plain stepping and the auto cycle move through, and exactly what
- * the overview lists. Groups scope it to the active group only while the
- * scheme itself can jump groups (schemeCanSwitchGroups); otherwise the union
- * mirrored in rotationKeys keeps the pre-groups behavior, so defined groups
- * can never strand a dial inside one of them, and Legacy stays exact.
- * Module-level so composeDialSvg renders the same list rotation steps
- * through; the two can never disagree.
- */
-function stepListOf(settings: DialSettings, key: string | undefined, groups: readonly RotationGroup[] | undefined, snapshot: SensorSnapshot): readonly Reading[] {
-	if (groups !== undefined && schemeCanSwitchGroups(resolveControls(settings))) {
-		return groupReadings(groups, key, snapshot);
-	}
-	return rotationReadings(rotationKeysOf(settings), key, snapshot);
 }
 
 /** The PI writes "off" or a millisecond count; anything else means off too. */
@@ -957,7 +991,10 @@ function parseAutoCycleMs(raw: string | undefined): number | null {
 	return Number.isInteger(ms) && ms > 0 ? ms : null;
 }
 
-function composeDialSvg(state: InstanceState, status: PollerStatus): string {
+/** The render-only state, shared by runtime, regressions and sample galleries. */
+export type DialRenderState = Pick<InstanceState, "settings" | "stats" | "statMode" | "overlay" | "pinned" | "cyclePaused">;
+
+export function composeDialSvg(state: DialRenderState, status: PollerStatus, historyOf: (key: string) => readonly number[] | undefined = (key) => poller.getSeries(key)): string {
 	const settings = state.settings;
 	const config = loadThemes();
 	const themeId = effectiveThemeFor(settings);
@@ -989,7 +1026,7 @@ function composeDialSvg(state: InstanceState, status: PollerStatus): string {
 	// out.
 	const view = dialViewOf(settings);
 	if (view !== "single") {
-		return composeOverviewSvg(state, snapshot, reading, config, themeId, view === "tworow" ? 2 : 3);
+		return composeOverviewSvg(state, snapshot, reading, config, themeId, view === "tworow" ? 2 : 3, historyOf);
 	}
 
 	const fahrenheit = settings.fahrenheit === true;
@@ -1031,7 +1068,7 @@ function composeDialSvg(state: InstanceState, status: PollerStatus): string {
 
 	// Title precedence: the per-dial label (transient or fixed), then the
 	// reading's own per-member name, then HWiNFO's label.
-	const label = customLabelOf(settings) ?? rotationNamesOf(settings)?.[reading.key] ?? reading.label;
+	const label = customLabelOf(settings) ?? readingNameOf(rotationNamesOf(settings), reading) ?? reading.label;
 	// A transient hint owns the whole stats line for its moment (appending it
 	// to min/max would run past the 200 px canvas); persistent states replace
 	// only the trailing "session" tag. Belt and braces: the line is truncated
@@ -1060,6 +1097,17 @@ function customLabelOf(settings: DialSettings): string | undefined {
 	return typeof settings.label === "string" && settings.label.trim() !== "" ? settings.label.trim() : undefined;
 }
 
+/** A reading's per-member name: saved under the key it shows as, else under
+ *  a confirmed alias of it, the same walk the reading colors take, so a
+ *  renamed reading keeps its name on whichever provider is live. */
+function readingNameOf(names: Record<string, string> | undefined, reading: Pick<Reading, "key" | "linkedKeys">): string | undefined {
+	if (names === undefined) return undefined;
+	for (const key of [reading.key, ...(reading.linkedKeys ?? [])]) {
+		if (Object.hasOwn(names, key)) return names[key];
+	}
+	return undefined;
+}
+
 /** Settings are untyped JSON: keep non-empty string names under string keys
  *  (the PI's chip rename writes them); anything else degrades to no names. */
 function rotationNamesOf(settings: DialSettings): Record<string, string> | undefined {
@@ -1086,9 +1134,8 @@ function rotationNamesOf(settings: DialSettings): Record<string, string> | undef
  * displayed stat from each member's own session, and warn/critical tint a
  * row's value under the same alertUnit scoping as the single view's bar.
  */
-function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, reading: Reading, config: ThemesConfig, themeId: string, rowCount: 2 | 3): string {
+function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, reading: Reading, config: ThemesConfig, themeId: string, rowCount: 2 | 3, historyOf: (key: string) => readonly number[] | undefined): string {
 	const settings = state.settings;
-	const fahrenheit = settings.fahrenheit === true;
 	const measureOpts = measureOptionsFrom(settings);
 	const stepList = stepListOf(settings, reading.key, rotationGroupsOf(settings.rotationGroups), snapshot);
 	// A set whose members are all absent from the snapshot (sensor asleep)
@@ -1105,7 +1152,7 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 	const names = rotationNamesOf(settings);
 	const customLabel = customLabelOf(settings);
 	const candidates = rows.map((member, index) => {
-		const override = index === selectedIndex && customLabel !== undefined ? customLabel : names?.[member.key];
+		const override = index === selectedIndex && customLabel !== undefined ? customLabel : readingNameOf(names, member);
 		return { text: override ?? member.label, locked: override !== undefined };
 	});
 	const shorten = settings.overviewLabels !== "full";
@@ -1120,16 +1167,14 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 	// like the single view's accent follows it.
 	const accent = typeAccentsEnabled() ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = resolvePalette(config, themeId, accent, "normal");
-	const text = resolveTextColors(palette, effectiveTextFor(settings), "normal");
-	const warn = parseThreshold(settings.warnValue);
-	const crit = parseThreshold(settings.critValue);
-
+	const textSettings = effectiveTextFor(settings);
+	const text = resolveTextColors(palette, textSettings, "normal");
 	const overviewRows: (OverviewRow & { history?: readonly number[] })[] = rows.map((member, index) => {
 		const selected = index === selectedIndex;
-		const shown = formatMeasurement(rowStatValue(member.value, state.stats.get(member.key), state.statMode), member.unit, measureOpts);
-		const scoped = thresholdsApplyTo(settings.alertUnit, member.unit);
-		const live = convertUnit(member.value, member.unit, fahrenheit).value;
-		const level = scoped ? alertLevel(live, warn, crit, settings.alertBelow === true) : "normal";
+		const nativeShown = rowStatValue(member.value, state.stats.get(member.key), state.statMode);
+		const shown = formatMeasurement(nativeShown, member.unit, measureOpts);
+		const colors = overviewRowColors({ settings, reading: member, shownValue: nativeShown, selected, rowCount,
+			palette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
 		return {
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,
@@ -1137,10 +1182,13 @@ function composeOverviewSvg(state: InstanceState, snapshot: SensorSnapshot, read
 			selected,
 			// An alerting row's value is the alert indicator and stays fixed;
 			// custom text never recolors it.
-			valueColor: level !== "normal" ? config.alerts[level].bg : text.value,
+			valueColor: colors.value,
+			// The selected two-row band resolves its label on the track like its unit.
+			selectedLabelColor: colors.text.label,
+			unitColor: colors.text.unit,
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.
-			...(rowCount === 2 ? { history: poller.getSeries(member.key) } : {})
+			...(rowCount === 2 ? { history: historyOf(member.key) } : {})
 		};
 	});
 

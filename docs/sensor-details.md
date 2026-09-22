@@ -21,33 +21,51 @@ Practical consequences:
 
 ## Turning it on
 
-In the key's settings panel, under **Press**:
+Open **Press** in the key's settings:
 
-- **Press does** picks the behavior. The default stays exactly as before: cycle current / min / max / avg. **Open sensor details** switches to the detail view on press. **Tap cycles; hold opens details** keeps the cycle on a short tap and opens details after holding half a second.
-- **Detail contains** picks the list. **All readings from this sensor source** (the default) lists every other reading HWiNFO currently publishes for the pressed sensor's source, in HWiNFO's order; the pressed reading itself rides on the Back tile and is not repeated in the list or the title's count. **Custom sensor list** lists exactly the readings you add, in the order you set (the opener's own sensor stays on the Back tile). **Readings matching a filter** lists everything whose source name and label, taken together, match a glob pattern, deck-wide and live: `*4090*` gathers every reading of an RTX 4090, `*gpu*fan*` just its fans, and the list re-resolves each poll so readings that appear or vanish in HWiNFO follow along. The pattern doubles as the title unless you set one, the panel shows a live match count under the field, and the grammar gets [its own section](#filter-patterns) below.
-- **Tile shows** packs two, three or four readings onto each tile of the view, using the same stacked, row and quad faces regular keys have. One reading per tile stays the default and keeps the page exactly as it was. A dense tile shows one shared stat badge, a press cycles all of its readings together, and a page's last tile simply carries however many readings remain. In the four-per-tile grid each cell wears a short label built from its reading's name with the words all four share dropped, so four GPU readings read MEMO, HOT, THER and CORE instead of GPU four times over, and Core 0 to Core 3 VID read 0, 1, 2, 3.
-- **A Custom sensor list can group its tiles one by one.** Each entry in the list grows a small tile control: click the size to cycle a tile through one, two, three or four readings, give any cell its own label, and give a quad tile's cells their own colors or switch it to bare color-coded values, the same knobs a regular key of that size has. Mixed sizes sit together on one page, readings past your groups keep flowing at the Tile shows setting, and the grouping is positional: readings flow through the tile pattern in list order. The arrows, and a drag within one tile, reorder the readings through a pattern that stays put. Dragging a chip onto a different tile moves the reading there instead, so the tile it left loses a cell and the tile it landed on gains one. Wherever on a tile you let go, the chip lands where the blue caret sits, at the cell edge nearest your pointer; a tile already holding four readings cannot take a fifth, so the caret moves to that tile's own edge and the chip parks beside it as a tile of its own. A reading's dressing travels with it every one of those ways. That covers the colors a four-cell tile hands out by default as well as the ones you pick yourself, so moving a reading never repaints the ones it moves past. Two readings can end up the same color that way, since each keeps what it already wore; click either cell's color well to tell them apart again. Removing a reading shrinks the tile that held it instead of pulling the next reading up into it, whether you grouped that tile by hand or the Tile shows fill built it, so the tiles below keep their readings and the freed cell refills from the tile's plus; a fill tile shrunk this way joins your groups at its new size, the same freeze touching its size control applies. Source and filter lists re-resolve live against HWiNFO and cannot pin tiles positionally, so grouping is a custom-list feature by design.
-- **Detail title** names the view's title tile in any mode, replacing the default (the source name, the filter pattern, or Custom set).
-- **Repeat Back under this key's own cell** keeps the second Back tile described [below](#the-detail-page), on by default; untick it and the movable top-left Back is the one way out.
+- **Press does**: choose **Open sensor details**, or **Tap cycles; hold opens details** to keep stat cycling on a tap and open details after a half-second hold. The default cycles current / min / max / avg.
+- **Detail contains**: choose the source, a custom list, or a filter as described below.
+- **Tile shows**: one reading per tile by default, or two stacked readings, three rows or a four-cell grid. A press cycles all readings on that tile together. The last tile uses as many readings as remain. Quad labels shorten shared words, so Core 0 through Core 3 VID can read 0, 1, 2, 3.
+- **Detail title**: replace the default source name, filter pattern or Custom set title.
+- **Repeat Back under this key's own cell**: enabled by default. Untick it to keep only the movable Back tile.
 
-![The Press section of the settings panel: Press does set to Open sensor details, Detail contains on All readings from this sensor source, Tile shows on One reading (default), an empty Detail title field, and the Second Back checkbox ticked, reading Repeat Back under this key's own cell.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
+![The Press settings with Open sensor details, All readings from this sensor source, one reading per tile, and Repeat Back under this key's own cell enabled.]({{ '/assets/img/detail-press-panel.png' | relative_url }})
 
-![The Custom sensor list editor in the settings panel at its real width: the Add sensor search field, then three tiles built by hand, a two-cell tile holding GPU/CPU 1 Current and Temperature1, a four-cell tile with its Abc label toggle and a color well beside each of its four chips, and a one-cell tile holding PSU +3.3V, each tile with a grip and a size control, each chip with move arrows and a remove cross, a plus inside a tile with room and a dashed plus for a new tile, and the note reading 7 readings across 3 tiles.]({{ '/assets/img/detail-custom-tiles-panel.png' | relative_url }})
+### Choosing the list
 
-Existing keys are untouched: a key without a Press setting behaves exactly as it always has.
+**All readings from this sensor source** lists the source's other published readings in HWiNFO's order. The opener's reading appears on Back and is excluded from the list and its count.
+
+**Custom sensor list** uses the readings and order you choose. It also supports individual tile sizes, labels and colors. The list shows one tile per measurement: two saved keys that resolve to the same reading through a confirmed source link or a legacy Gadget alias share one tile, and a key that resolves to the opener's own reading is left to the Back tile.
+
+**Readings matching a filter** matches the combined source name and reading label across the current source. Matches update each poll. The panel shows a match count, and the pattern becomes the title unless you set one. See [Filter patterns](#filter-patterns) for examples.
+
+### Editing custom tiles
+
+The custom-list editor lets you mix tile sizes and formatting:
+
+- Click a tile's size to cycle through one to four readings. Set cell labels, quad colors or a quad's labels-on/off option. Ungrouped readings use **Tile shows**.
+- The arrows and drags within a tile reorder readings through the existing tile pattern. Dragging a reading to another tile shrinks the source tile and grows the destination. The blue caret marks the insertion point. A full four-reading tile cannot accept another cell; the reading becomes its own tile beside it.
+- Labels and colors move with the reading, including default quad colors. Automatic colors keep adjusting for the theme; moving a reading does not turn them into a chosen color. Other readings keep their colors. If two readings end up with the same color, change one using its color control.
+- Removing a reading shrinks its tile without pulling a reading from the next tile. Use the tile's plus to add another. Resizing or shrinking a tile created by **Tile shows** saves it as an explicit group.
+
+Source and filter lists update with HWiNFO and do not support these fixed tile groups.
+
+![The custom-list editor with three tiles containing two, four and one readings, plus size controls, labels, colors, move arrows, remove buttons and add controls.]({{ '/assets/img/detail-custom-tiles-panel.png' | relative_url }})
+
+Keys without a saved **Press does** choice continue to cycle statistics.
 
 ## The detail page
 
 ![A 15-key detail page rendered by the plugin from live HWiNFO data, with Repeat Back under this key's own cell unticked by hand so the page holds one Back only: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
 
-Every detail page has the same furniture:
+Every detail page has these controls:
 
 - **Back** (always top left, where the native folder back key lives): a real Sensor Reading key whose press is fixed to leaving the view; a small return arrow in the tile's lower-left corner marks it. Fresh from install it shows the sensor you drilled down from, live, with that key's theme, text, units, decimals and thresholds. It stays pressable when HWiNFO is down, when the sensor is missing, and even right after a plugin restart.
 - **A second Back under your finger, on by default.** When the opener key's cell maps onto a reading cell of the page, that cell becomes a second Back tile showing the same opener face with the return arrow: tap in, tap out, without moving your hand. The readings flow around it (none are hidden). Untick **Repeat Back under this key's own cell** on the opener to keep one movable Back only, the way the 1.5.0 releases shipped it after [issue #5](https://github.com/slawrensen/hwinfo-streamdeck/issues/5) testing; from 1.6.0 the same-finger exit is the default again, and the top-left Back always works regardless.
 - **Title** (all decks except the Mini): the source or custom title over the visible range, like `CPU Enhanced` over `1-11 / 46`.
 - **Previous / Next**: page through long lists. The chevron dims at either end. Paging happens inside the one profile page; nothing stacks.
 - **Reading tiles**: live readings, themed like the opener. At the default one reading per tile, each tile carries the type accent of its own reading; a denser tile (**Tile shows**) carries its first reading's accent, the same rule the regular stacked, row and quad layouts follow for their first sensor. Pressing a tile cycles current / min / max / avg for everything on it, for this visit; leaving the view resets those. Reading tiles deliberately do not inherit the opener's thresholds: an 80 °C warn level means nothing on a wattage or clock tile. The Back tile keeps its own.
-- **No sparklines on reading tiles, by design.** A sparkline needs a history buffer that fills over a minute or more, and a detail page shows dozens of arbitrary readings (up to 128 on a + XL at four per tile) that change with every page turn and every filter, so the lines would draw mostly empty while costing buffer churn on every visit. The tiles stay instant and scannable; your opener key keeps its own sparkline back on your page.
+- **No sparklines on reading tiles.** Use a Sensor Reading key for recent history. Since 1.7, Gadget provides current values only; a detail tile set to MIN, MAX or AVG shows **N/A** with an empty value.
 
 ![The same 15-key detail page at the default, with the second Back on: the CPU temperature opener appears twice with the return arrow in its corner, once on the top-left Back tile and once on the center cell where the key sits, the title range reads 1-10 of 71 instead of 1-11, and the readings flow around the second tile.]({{ '/assets/img/detail-second-back.png' | relative_url }})
 
@@ -92,9 +110,9 @@ Patterns I run on my own bench (512 readings across 21 sources), with their live
 | `*12v*` | 8 | every 12 V rail on the board and the PSU |
 | `*temperature*` | 18 | everything HWiNFO literally labels a temperature |
 | `?PU*` | 270 | sources whose name starts with any one character plus "PU" (anchored start) |
-| `*` | everything | the full deck-wide firehose, paginated |
+| `*` | everything | all readings, paginated |
 
-Two edges worth knowing: an empty pattern refuses entry with the alert cue (there is nothing to list), and a pattern that matches nothing opens an honest empty view reading `0 / 0`. Two more: leading and trailing spaces are trimmed (spaces only count inside the pattern), and everything past 128 characters is cut. The panel's live count reflects all of this before you press.
+Two edges worth knowing: an empty pattern refuses entry with the alert cue (there is nothing to list), and a pattern that matches nothing opens an empty view reading `0 / 0`. Two more: leading and trailing spaces are trimmed (spaces only count inside the pattern), and everything past 128 characters is cut. The panel's live count reflects all of this before you press.
 
 ## Supported decks
 

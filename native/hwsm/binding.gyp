@@ -5,8 +5,6 @@
 		"defines": ["NAPI_VERSION=8"],
 		"msvs_settings": {
 			"VCCLCompilerTool": {
-				"WarningLevel": "4",
-				"WarnAsError": "true",
 				"BufferSecurityCheck": "true",
 				"Optimization": 1,
 				"FavorSizeOrSpeed": 2,
@@ -22,15 +20,24 @@
 	},
 	"targets": [
 		{
-			"target_name": "hwsm"
+			"target_name": "hwsm",
+			"msvs_settings": {
+				"VCCLCompilerTool": { "WarningLevel": "4", "WarnAsError": "true" }
+			}
 		},
 		{
 			"target_name": "hwsm_test",
-			"defines": ["HWSM_TEST_HOOKS"]
+			"defines": ["HWSM_TEST_HOOKS"],
+			"msvs_settings": {
+				"VCCLCompilerTool": { "WarningLevel": "4", "WarnAsError": "true" }
+			}
 		},
 		{
 			"target_name": "hwsm_protomm",
-			"defines": ["HWSM_PROTOCOL_VERSION=999"]
+			"defines": ["HWSM_PROTOCOL_VERSION=999"],
+			"msvs_settings": {
+				"VCCLCompilerTool": { "WarningLevel": "4", "WarnAsError": "true" }
+			}
 		}
 	]
 }

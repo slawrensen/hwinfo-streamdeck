@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-8" />
 	</head>
 	<body>
 		<details class="hw-setup">
@@ -56,6 +56,7 @@
 			<div class="hw-set" id="rotation-set"></div>
 		</sdpi-item>
 		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them.</div>
+		<div class="hw-help hw-cond" id="groups-preset-help" hidden>Rotation groups need a gesture that can switch groups, and this dial's control map has none. Set Controls to Elite under "Dial gestures &amp; advanced", or map a gesture to "Switch sensor or group" in Custom.</div>
 
 		<sdpi-item label="Bump guard">
 			<sdpi-checkbox setting="rotationDisabled" label="Ignore turns (protects against accidental bumps)"></sdpi-checkbox>
@@ -152,6 +153,28 @@
 			</sdpi-item>
 		</div>
 
+		<div id="sensor-value-colors" class="hw-cond" hidden>
+			<sdpi-item label="Numbers">
+				<sdpi-checkbox id="sensor-value-colors-toggle" label="Color numbers by sensor type"></sdpi-checkbox>
+			</sdpi-item>
+			<div class="hw-help">Off by default. Use Text → Theme or Dim with Type accents enabled. Valid Custom Text overrides these colors, including a deck-wide Custom default. Alerts keep priority. Paper and unknown sensor types keep normal text.</div>
+			<sdpi-item label="Reading colors">
+				<div class="hw-quad-colors">
+					<select id="reading-color-preset" aria-label="Reading color preset">
+						<option value="automatic">Automatic</option>
+						<option value="signal">Signal (four hues)</option>
+						<option value="pairs">Pairs (two hues)</option>
+						<option value="uniform">Uniform</option>
+						<option value="custom" disabled>Custom</option>
+					</select>
+				</div>
+			</sdpi-item>
+			<sdpi-item label="Readings">
+				<div id="reading-color-list" class="hw-reading-colors"></div>
+			</sdpi-item>
+			<div class="hw-help">Pick a color for each reading, independent of Type accents. Colors follow readings through rotation. Automatic uses the option above. Text → Custom overrides these colors; Dim dims them. Alerts keep priority. Graphs stay unchanged.</div>
+		</div>
+
 		<div id="bar-range">
 			<div class="hw-section">Bar range</div>
 
@@ -167,17 +190,17 @@
 		<div class="hw-section">Alerts</div>
 
 		<sdpi-item label="Warn at">
-			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns amber (display units)"></sdpi-textfield>
+			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns amber (see units below)"></sdpi-textfield>
 		</sdpi-item>
 
 		<sdpi-item label="Critical at">
-			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns red (display units)"></sdpi-textfield>
+			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns red (see units below)"></sdpi-textfield>
 		</sdpi-item>
 
 		<sdpi-item label="Direction">
 			<sdpi-checkbox setting="alertBelow" label="Alert when value drops below thresholds"></sdpi-checkbox>
 		</sdpi-item>
-		<div class="hw-help">Warn at and Critical at use display units, the same numbers the dial shows, °F included when Unit is on.</div>
+		<div class="hw-help">Warn at and Critical at use the live reading, with temperatures in °F when Unit is on. For bytes and rates, use HWiNFO's original number and unit before Data units changes the display scale.</div>
 
 		<details data-fold="advanced">
 			<summary>Dial gestures &amp; advanced</summary>
@@ -322,6 +345,7 @@
 					<option value="gadget">Gadget registry only</option>
 				</sdpi-select>
 			</sdpi-item>
+			<div class="hw-help">Auto switches providers. To keep a selection working on both, explicitly link its Shared Memory and Gadget keys in the deck Config document. See <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</div>
 			<sdpi-item label="Poll every">
 				<sdpi-select setting="pollIntervalMs" global default="1000">
 					<option value="250">250 ms</option>
@@ -359,7 +383,7 @@
 			<div class="hw-help">The exact settings this dial runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another dial or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.6.0.0-3"></script>
-		<script src="pi-control.js?v=1.6.0.0-3"></script>
+		<script src="pi-common.js?v=1.7.0.0-8"></script>
+		<script src="pi-control.js?v=1.7.0.0-8"></script>
 	</body>
 </html>

@@ -123,6 +123,24 @@ function measureData(canonical: number, ladder: readonly string[], base: number,
 
 export type Measurement = { valueText: string; unitText: string };
 
+/** The unit both sources give HWiNFO's boolean readings. */
+const BOOLEAN_UNIT = "Yes/No";
+
+/**
+ * A boolean reading as the word HWiNFO's own windows show. Both sources
+ * publish these as 0 or 1 in the unit "Yes/No", so the face read "0.00
+ * Yes/No", which says nothing to the person looking at the key. The number
+ * itself is untouched: thresholds, gauges and evidence still see 0 and 1.
+ * Only exactly 0 and 1 are words; anything else stays a number, because a
+ * reading that is not one of the two is not a boolean this can name.
+ */
+function booleanMeasurement(value: number, unit: string): Measurement | null {
+	if (unit !== BOOLEAN_UNIT || (value !== 0 && value !== 1)) {
+		return null;
+	}
+	return { valueText: value === 1 ? "Yes" : "No", unitText: "" };
+}
+
 export type MeasureOptions = {
 	decimals: DecimalsSetting;
 	fahrenheit: boolean;
@@ -135,6 +153,10 @@ export type MeasureOptions = {
  * Non-finite values keep the placeholder glyph and the source unit.
  */
 export function formatMeasurement(value: number, unit: string, opts: MeasureOptions): Measurement {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word;
+	}
 	const converted = convertUnit(value, unit, opts.fahrenheit);
 	const data = parseDataUnit(converted.unit);
 	if (data === null || !Number.isFinite(converted.value)) {
@@ -148,6 +170,10 @@ export function formatMeasurement(value: number, unit: string, opts: MeasureOpti
  * budget. A value that only fits with its own magnitude suffix (a negative
  * near a binary tier edge, "-1010") promotes a tier instead. */
 export function formatQuadMeasurement(value: number, unit: string, opts: MeasureOptions): Measurement {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word;
+	}
 	const converted = convertUnit(value, unit, opts.fahrenheit);
 	const data = parseDataUnit(converted.unit);
 	if (data === null || !Number.isFinite(converted.value)) {
@@ -170,6 +196,10 @@ export function isDataUnit(unit: string): boolean {
  * picks its own tier and a bare number would read in the wrong unit.
  */
 export function formatStat(value: number, unit: string, opts: MeasureOptions): string {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word.valueText;
+	}
 	if (!isDataUnit(unit)) {
 		return formatValue(convertUnit(value, unit, opts.fahrenheit).value, opts.decimals);
 	}

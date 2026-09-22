@@ -37,10 +37,13 @@
 // to a JSONL events file and the exit code is non-zero if any event fails.
 import { execFile } from "node:child_process";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { assertSameStack, assertSharedMemoryReady, makeEventLogTail, restartEvent, sameLifetime, selectInstalledStack, startHostCommand, stopIdentityCommand } from "./lib/soak-adversary-safety.mjs";
+import { candidateNativeContract, createInstalledProducerCheck, runWithAdvancingProducer } from "./lib/soak-producer-freshness.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -62,11 +65,15 @@ if (args.help) {
 }
 
 const MUTEX_NAME = "Global\\HWiNFO_SM2_MUTEX";
-const SD_EXE = "C:\\Program Files\\Elgato\\StreamDeck\\StreamDeck.exe";
-const PLUGIN_RE = /com\.lawrensen\.hwinfo\.sdPlugin[\\/]bin[\\/]plugin\.js/i;
+const SD_EXE = path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Elgato", "StreamDeck", "StreamDeck.exe");
+const installedRoot = path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "Plugins", "com.lawrensen.hwinfo.sdPlugin");
+const installedScript = path.join(installedRoot, "bin", "plugin.js");
+const installedAddon = path.join(installedRoot, "bin", "hwsm.node");
+const nodeRoot = path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "NodeJS");
+let observerSession;
 
 const UNAVAILABLE_BUSY_RE = /WARN\s+HwinfoPoller: HWiNFO unavailable \[busy\]/;
-const REOPENED_RE = /INFO\s+HwinfoPoller: (Opened HWiNFO data source|Data source layout changed)/;
+const REOPENED_RE = /INFO\s+HwinfoPoller: Opened HWiNFO data source: shared-memory\b/;
 const STARTED_RE = /INFO\s+HwinfoPoller: Started \(/;
 const ERROR_RE = /\bERROR\b/;
 const WARN_RE = /\bWARN\b/;
@@ -79,64 +86,22 @@ const nowIso = () => new Date().toISOString();
 // ---------------------------------------------------------------------------
 
 async function runPs(command, timeoutMs = 30_000) {
-	const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 });
+	const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, windowsHide: true });
 	return stdout.trim();
 }
 
 async function snapshot() {
 	const ps =
-		"$procs = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
-		"Select-Object ProcessId,Name,CommandLine); ConvertTo-Json -InputObject $procs -Depth 2 -Compress";
-	const rows = JSON.parse((await runPs(ps)) || "[]");
-	return {
-		pluginPid: rows.find((r) => r.Name === "node.exe" && PLUGIN_RE.test(r.CommandLine ?? ""))?.ProcessId ?? null,
-		sdPid: rows.find((r) => r.Name === "StreamDeck.exe")?.ProcessId ?? null,
-		hwinfoCount: rows.filter((r) => /^HWiNFO/i.test(r.Name ?? "")).length
-	};
+		"$ErrorActionPreference = 'Stop'; $procs = @(Get-CimInstance Win32_Process -ErrorAction Stop -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
+		"Select-Object ProcessId,ParentProcessId,SessionId,Name,CommandLine,ExecutablePath,@{Name='CreatedTicks';Expression={$_.CreationDate.ToUniversalTime().Ticks.ToString()}}); ConvertTo-Json -InputObject $procs -Depth 2 -Compress";
+	const rows = JSON.parse(await runPs(ps));
+	const stack = selectInstalledStack(rows, { installedScript, nodeRoot, hostImage: SD_EXE, sessionId: observerSession });
+	return { ...stack, pluginPid: stack.plugin.ProcessId, sdPid: stack.host.ProcessId };
 }
 
 // ---------------------------------------------------------------------------
-// Plugin log tail (same NTFS-identity rotation handling as soak-monitor).
+// Plugin log tail: complete rotated tails and fail-closed missing evidence.
 // ---------------------------------------------------------------------------
-
-function makeLogTail(dir) {
-	let file = null;
-	let fileIno = null;
-	let offset = 0;
-	const newest = () => {
-		if (!fs.existsSync(dir)) {
-			return null;
-		}
-		const logs = fs
-			.readdirSync(dir)
-			.filter((f) => f.endsWith(".log"))
-			.map((f) => ({ p: path.join(dir, f), m: fs.statSync(path.join(dir, f)).mtimeMs }))
-			.sort((a, b) => b.m - a.m);
-		return logs[0]?.p ?? null;
-	};
-	return function poll() {
-		const current = newest();
-		if (current === null) {
-			return [];
-		}
-		const st = fs.statSync(current, { bigint: true });
-		const size = Number(st.size);
-		if (current !== file || st.ino !== fileIno || size < offset) {
-			file = current;
-			fileIno = st.ino;
-			offset = 0; // rotation: a fresh plugin instance, read it from the top
-		}
-		if (size === offset) {
-			return [];
-		}
-		const fd = fs.openSync(current, "r");
-		const buf = Buffer.alloc(size - offset);
-		fs.readSync(fd, buf, 0, buf.length, offset);
-		fs.closeSync(fd);
-		offset = size;
-		return buf.toString("utf8").split(/\r?\n/).filter((l) => l.length > 0);
-	};
-}
 
 /** Poll the log until every pattern matched or the deadline passed. */
 async function watchLog(pollLogs, patterns, deadlineMs, collected) {
@@ -168,16 +133,16 @@ async function watchLog(pollLogs, patterns, deadlineMs, collected) {
 /** Hold the real HWiNFO consistency mutex in a child for holdSec seconds. */
 async function holdMutex(holdSec) {
 	const ps =
-		`$m = [System.Threading.Mutex]::OpenExisting('${MUTEX_NAME}'); ` +
-		"if ($m.WaitOne(5000)) { Start-Sleep -Seconds " + holdSec + "; $m.ReleaseMutex(); 'held-released' } else { 'wait-timeout' }; $m.Dispose()";
+		`$ErrorActionPreference = 'Stop'; $m = [System.Threading.Mutex]::OpenExisting('${MUTEX_NAME}'); $held = $false; ` +
+		"try { $held = $m.WaitOne(5000); if ($held) { Start-Sleep -Seconds " + holdSec + "; 'held-released' } else { throw 'wait-timeout' } } finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() }";
 	return runPs(ps, (holdSec + 20) * 1000);
 }
 
 /** Acquire and immediately release, proving the vector works before use. */
 async function preflightMutex() {
 	const ps =
-		`$m = [System.Threading.Mutex]::OpenExisting('${MUTEX_NAME}'); ` +
-		"if ($m.WaitOne(2000)) { $m.ReleaseMutex(); 'ok' } else { 'wait-timeout' }; $m.Dispose()";
+		`$ErrorActionPreference = 'Stop'; $m = [System.Threading.Mutex]::OpenExisting('${MUTEX_NAME}'); $held = $false; ` +
+		"try { $held = $m.WaitOne(2000); if ($held) { 'ok' } else { throw 'wait-timeout' } } finally { if ($held) { $m.ReleaseMutex() }; $m.Dispose() }";
 	return runPs(ps);
 }
 
@@ -195,7 +160,7 @@ function classifyLines(lines) {
 async function eventMutexHoldSilent(pollLogs, holdSec) {
 	const before = await snapshot();
 	const lines = [];
-	const holder = holdMutex(holdSec);
+	const holder = holdMutex(holdSec).catch((err) => `holder-failed: ${err.message}`);
 	await sleep(holdSec * 1000 + 4000);
 	const holderOut = await holder;
 	for (const line of pollLogs()) {
@@ -206,19 +171,19 @@ async function eventMutexHoldSilent(pollLogs, holdSec) {
 	if (holderOut !== "held-released") {
 		return { verdict: "FAIL", detail: `mutex holder said ${holderOut}`, lines };
 	}
-	if (after.pluginPid !== before.pluginPid || after.pluginPid === null) {
+	if (!sameLifetime(before.plugin, after.plugin) || !sameLifetime(before.host, after.host)) {
 		return { verdict: "FAIL", detail: `plugin PID ${before.pluginPid} -> ${after.pluginPid} (restart during a silent hold)`, lines };
 	}
 	if (errors.length > 0 || warns.length > 0) {
 		return { verdict: "FAIL", detail: `expected silence under the ${holdSec} s grace window, saw ${warns.length} WARN / ${errors.length} ERROR`, lines };
 	}
-	return { verdict: "PASS", detail: `rode through a ${holdSec} s hold silently (holder: ${holderOut})`, lines };
+	return { verdict: "PASS", detail: `rode through a ${holdSec} s hold silently (holder: ${holderOut})`, lines, before, after };
 }
 
 async function eventMutexHoldBusy(pollLogs, holdSec) {
 	const before = await snapshot();
 	const lines = [];
-	const holder = holdMutex(holdSec);
+	const holder = holdMutex(holdSec).catch((err) => `holder-failed: ${err.message}`);
 	const missedDuring = await watchLog(pollLogs, [{ name: "warn-busy", re: UNAVAILABLE_BUSY_RE }], holdSec * 1000 + 2000, lines);
 	const holderOut = await holder;
 	const missedAfter = await watchLog(pollLogs, [{ name: "reopened", re: REOPENED_RE }], 12_000, lines);
@@ -227,7 +192,7 @@ async function eventMutexHoldBusy(pollLogs, holdSec) {
 	if (holderOut !== "held-released") {
 		return { verdict: "FAIL", detail: `mutex holder said ${holderOut}`, lines };
 	}
-	if (after.pluginPid !== before.pluginPid || after.pluginPid === null) {
+	if (!sameLifetime(before.plugin, after.plugin) || !sameLifetime(before.host, after.host)) {
 		return { verdict: "FAIL", detail: `plugin PID ${before.pluginPid} -> ${after.pluginPid} (restarted instead of degrading)`, lines };
 	}
 	const missed = [...missedDuring, ...missedAfter];
@@ -237,49 +202,39 @@ async function eventMutexHoldBusy(pollLogs, holdSec) {
 	if (errors.length > 0) {
 		return { verdict: "FAIL", detail: `unexpected ERROR lines: ${errors.length}`, lines };
 	}
-	return { verdict: "PASS", detail: `degraded to unavailable [busy] past the grace window and reopened after release, same PID ${after.pluginPid}`, lines };
+	return { verdict: "PASS", detail: `degraded to unavailable [busy] past the grace window and reopened after release, same PID ${after.pluginPid}`, lines, before, after };
 }
 
-async function eventPluginKill(pollLogs) {
-	const before = await snapshot();
-	if (before.pluginPid === null) {
-		return { verdict: "FAIL", detail: "plugin process not found before the kill", lines: [] };
-	}
-	await runPs(`Stop-Process -Id ${before.pluginPid} -Force`);
-	const lines = [];
-	const missed = await watchLog(pollLogs, [{ name: "started", re: STARTED_RE }, { name: "reopened", re: REOPENED_RE }], 25_000, lines);
-	const after = await snapshot();
-	if (missed.length > 0) {
-		return { verdict: "FAIL", detail: `missing startup markers after kill: ${missed.join(", ")}`, lines };
-	}
-	if (after.pluginPid === null || after.pluginPid === before.pluginPid) {
-		return { verdict: "FAIL", detail: `no fresh plugin PID after kill (${before.pluginPid} -> ${after.pluginPid})`, lines };
-	}
-	return { verdict: "PASS", detail: `app restarted the plugin, PID ${before.pluginPid} -> ${after.pluginPid}, source reopened`, lines };
+async function stopVerifiedStack(before, role) {
+	assertSameStack(before, await snapshot());
+	const result = await runPs(stopIdentityCommand(before[role]));
+	if (result !== "stopped-verified-identity") throw new Error("Fault did not confirm verified process exit");
 }
 
-async function eventAppRestart(pollLogs) {
-	const before = await snapshot();
-	await runPs("Stop-Process -Name StreamDeck -Force");
-	await sleep(4000);
-	await runPs(`Start-Process '${SD_EXE}'`);
-	const lines = [];
-	const missed = await watchLog(pollLogs, [{ name: "started", re: STARTED_RE }, { name: "reopened", re: REOPENED_RE }], 60_000, lines);
-	const after = await snapshot();
-	if (missed.length > 0) {
-		return { verdict: "FAIL", detail: `missing startup markers after app restart: ${missed.join(", ")}`, lines };
-	}
-	if (after.sdPid === null || after.sdPid === before.sdPid || after.pluginPid === null) {
-		return { verdict: "FAIL", detail: `stack did not come back (app ${before.sdPid} -> ${after.sdPid}, plugin ${after.pluginPid})`, lines };
-	}
-	return { verdict: "PASS", detail: `full stack back, app PID ${before.sdPid} -> ${after.sdPid}, plugin PID ${after.pluginPid}`, lines };
+async function eventRestart(role, pollLogs) {
+	return restartEvent(role, {
+		snapshot,
+		stop: stopVerifiedStack,
+		startHost: async () => {
+			await sleep(4000);
+			await runPs(startHostCommand(SD_EXE));
+		},
+		collectRecovery: async (deadlineMs) => {
+			const lines = [];
+			await watchLog(pollLogs, [{ name: "started", re: STARTED_RE }, { name: "reopened", re: REOPENED_RE }], deadlineMs, lines);
+			// Recovery must stay clean beyond its first successful open.
+			await sleep(4000);
+			lines.push(...pollLogs());
+			return lines;
+		}
+	});
 }
 
 const PROGRAM = [
 	{ name: "mutex-hold-6s", afterSec: 0, run: (tail) => eventMutexHoldSilent(tail, 6) },
 	{ name: "mutex-hold-25s", afterSec: 240, run: (tail) => eventMutexHoldBusy(tail, 25) },
-	{ name: "plugin-kill", afterSec: 300, run: (tail) => eventPluginKill(tail) },
-	{ name: "app-restart", afterSec: 360, run: (tail) => eventAppRestart(tail) },
+	{ name: "plugin-kill", afterSec: 300, run: (tail) => eventRestart("plugin", tail) },
+	{ name: "app-restart", afterSec: 360, run: (tail) => eventRestart("host", tail) },
 	{ name: "mutex-hold-8s", afterSec: 300, run: (tail) => eventMutexHoldSilent(tail, 8) }
 ];
 
@@ -317,48 +272,84 @@ const pad2 = (n) => String(n).padStart(2, "0");
 const defaultOut = path.join(repoRoot, "release", `soak-adversary-${stamp.getFullYear()}${pad2(stamp.getMonth() + 1)}${pad2(stamp.getDate())}-${pad2(stamp.getHours())}${pad2(stamp.getMinutes())}.jsonl`);
 const outPath = path.resolve(args.out ?? defaultOut);
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
+fs.writeFileSync(outPath, "", { flag: "wx" }); // A trial never appends to earlier evidence.
 
 const logDir = args.logs ?? path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "Plugins", "com.lawrensen.hwinfo.sdPlugin", "logs");
-const pollLogs = makeLogTail(logDir);
+const pollLogs = makeEventLogTail(logDir);
+const assertReady = (stack) => assertSharedMemoryReady(fs.readdirSync(logDir).filter((file) => file.endsWith(".log"))
+	.flatMap((file) => fs.readFileSync(path.join(logDir, file), "utf8").split(/\r?\n/)), stack.plugin);
 
 const emit = (obj) => fs.appendFileSync(outPath, JSON.stringify(obj) + os.EOL);
 
-const preflight = await preflightMutex().catch((err) => `open-failed: ${err?.message ?? err}`);
+observerSession = Number(await runPs("[Diagnostics.Process]::GetCurrentProcess().SessionId"));
+if (!Number.isSafeInteger(observerSession) || observerSession < 0) throw new Error("Observer session unavailable");
 const baseline = await snapshot();
-if (preflight !== "ok") {
-	console.error(`soak-adversary: mutex preflight failed (${preflight}); refusing to start`);
-	process.exit(1);
-}
-if (baseline.pluginPid === null || baseline.sdPid === null || baseline.hwinfoCount === 0) {
+assertReady(baseline);
+if (baseline.hwinfoCount === 0) {
 	console.error(`soak-adversary: baseline incomplete (plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo ${baseline.hwinfoCount}); refusing to start`);
 	process.exit(1);
 }
-emit({ tsIso: nowIso(), name: "program-start", verdict: "INFO", detail: `baseline plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo x${baseline.hwinfoCount}; lead ${leadSec} s; events: ${program.map((e) => e.name).join(", ")}` });
+const hashes = () => Object.fromEntries([installedScript, installedAddon]
+	.map((file) => [file, createHash("sha256").update(fs.readFileSync(file)).digest("hex")]));
+const installedHashes = hashes();
+const checkProducer = createInstalledProducerCheck({ addonPath: installedAddon,
+	expectedSha256: installedHashes[installedAddon], expectedBuild: candidateNativeContract(repoRoot) });
+pollLogs(); // prime before even the brief mutex preflight
+let producerBaseline;
+try {
+	producerBaseline = await checkProducer();
+	assertSameStack(baseline, await snapshot());
+} catch (err) {
+	emit({ tsIso: nowIso(), name: "program-end", verdict: "FAIL", detail: `Producer preflight failed: ${err.message}`, evidence: err.freshnessEvidence });
+	throw err;
+}
+if (program.some((event) => event.name.startsWith("mutex-"))) {
+	const preflight = await preflightMutex().catch((err) => `open-failed: ${err?.message ?? err}`);
+	if (preflight !== "ok") throw new Error(`Mutex preflight failed (${preflight}); refusing to start`);
+}
+emit({ tsIso: nowIso(), name: "program-start", verdict: "INFO", baseline, installedHashes, producerBaseline, detail: `baseline plugin ${baseline.pluginPid}, app ${baseline.sdPid}, hwinfo x${baseline.hwinfoCount}; lead ${leadSec} s; events: ${program.map((e) => e.name).join(", ")}` });
 console.log(`soak-adversary: baseline ok (plugin ${baseline.pluginPid}, app ${baseline.sdPid}); ${program.length} events after a ${leadSec} s lead`);
 console.log(`soak-adversary: events ${outPath}`);
 
-pollLogs(); // prime the tail so only lines after this point count
 await sleep(leadSec * 1000);
 
 let failures = 0;
+let completed = 0;
 for (const ev of program) {
 	await sleep(ev.afterSec * 1000);
-	pollLogs(); // drain quiet-period lines out of the event's window
 	const startedIso = nowIso();
 	console.log(`soak-adversary: ${startedIso} ${ev.name} firing`);
 	let result;
 	try {
-		result = await ev.run(pollLogs);
+		const quietLines = pollLogs();
+		if (quietLines.some((line) => /\b(?:WARN|ERROR)\b/.test(line))) {
+			result = { verdict: "FAIL", detail: "Unexpected WARN/ERROR before the next fault", lines: quietLines };
+		} else {
+			if (JSON.stringify(hashes()) !== JSON.stringify(installedHashes)) throw new Error("Installed candidate bytes changed; refusing fault");
+			assertReady(await snapshot());
+			result = await runWithAdvancingProducer(() => ev.run(pollLogs), checkProducer);
+			result.lines.push(...pollLogs());
+			if (result.verdict === "PASS") {
+				if (JSON.stringify(hashes()) !== JSON.stringify(installedHashes)) throw new Error("Installed candidate bytes changed during the event");
+				const settled = await snapshot();
+				assertSameStack(result.after, settled);
+				result.lines.push(...pollLogs());
+				if (result.lines.some((line) => ERROR_RE.test(line))) throw new Error("Unexpected ERROR before event completion");
+				assertReady(settled);
+			}
+		}
 	} catch (err) {
-		result = { verdict: "FAIL", detail: `event crashed: ${String(err?.message ?? err).slice(0, 200)}`, lines: [] };
+		result = { ...result, verdict: "FAIL", detail: `event failed: ${String(err?.message ?? err).slice(0, 200)}`, lines: result?.lines ?? [], freshnessFailure: err?.freshnessEvidence };
 	}
 	if (result.verdict !== "PASS") {
 		failures++;
 	}
-	emit({ tsIso: startedIso, name: ev.name, verdict: result.verdict, detail: result.detail, logLines: result.lines.length });
+	completed++;
+	emit({ tsIso: startedIso, finishedIso: nowIso(), name: ev.name, ...result, logLines: result.lines.length });
 	console.log(`soak-adversary: ${ev.name} ${result.verdict}: ${result.detail}`);
+	if (failures > 0) break; // Unverified recovery never authorizes the next fault.
 }
 
-emit({ tsIso: nowIso(), name: "program-end", verdict: failures === 0 ? "PASS" : "FAIL", detail: `${program.length - failures}/${program.length} events passed` });
-console.log(`soak-adversary: done, ${program.length - failures}/${program.length} passed`);
+emit({ tsIso: nowIso(), name: "program-end", verdict: failures === 0 ? "PASS" : "FAIL", detail: `${completed - failures}/${program.length} events passed` });
+console.log(`soak-adversary: done, ${completed - failures}/${program.length} passed`);
 process.exit(failures === 0 ? 0 : 1);

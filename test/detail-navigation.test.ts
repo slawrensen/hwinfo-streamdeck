@@ -674,8 +674,8 @@ describe("tickSignature — the detail render gate", () => {
 
 	it("a stale line names its source, so a mid-stale provider swap still repaints", () => {
 		// While stale in auto mode, probeReopen can swap shared-memory for
-		// the Gadget registry (the registry persists after HWiNFO exits, so
-		// the reopen succeeds on frozen values) and the stale screen's
+		// the Gadget registry (a killed or crashed HWiNFO leaves its registry
+		// behind, so the reopen succeeds on frozen values) and the stale screen's
 		// sub-line flips between "check sharing" and "check Gadget" under
 		// otherwise frozen data. The source member is what repaints it.
 		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);

@@ -1,6 +1,6 @@
 // Captures the property inspectors (served by scripts/pi-harness.mjs) in
 // headless Chrome over CDP with real-time waits, so live WebSocket data and
-// the theme gallery are present. Twenty-three states: the key PI's settings view,
+// the theme gallery are present. States include the key PI's settings view,
 // open picker (marketplace shot 4), Display selector on Bar, Text set to
 // Custom with the color well and dim checkbox, the Press section on Open
 // sensor details, the same block with the Second Back checkbox ticked, the
@@ -22,54 +22,46 @@
 // same harness starts from the first run's end state and fails on the steps
 // that expect a clean panel (the rotation set is already split, so "Split
 // into groups" is gone).
-import { spawn, spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
+import { cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const outDir = process.argv[2] ?? ".";
 const BASE = "http://127.0.0.1:28997/ui";
-const DEBUG_PORT = 29222;
+const DEBUG_PORT = 0; // Chrome writes its assigned port into our unique profile.
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(`[capture] ${m}`);
+const chromeProfile = createBrowserProfile("pi-capture-profile-");
+const chromeStartedAt = new Date().toISOString();
 
 const chrome = spawn(CHROME, [
 	"--headless=new",
 	"--disable-gpu",
 	`--remote-debugging-port=${DEBUG_PORT}`,
-	`--user-data-dir=${path.join(process.env.TEMP ?? ".", "pi-capture-profile")}`,
+	`--user-data-dir=${chromeProfile}`,
 	"--hide-scrollbars",
 	"about:blank"
-], { stdio: "ignore" });
+], { stdio: "ignore", windowsHide: true });
+let chromeError;
+chrome.once("error", (err) => { chromeError = err; });
 
-/** chrome.kill() alone can strand renderer children — take down the tree,
- * then sweep any stragglers that re-parented past /T by our profile dir. */
+/** Only this run's disposable profile can authorize browser cleanup. */
 function killChromeTree() {
 	try {
-		spawnSync("taskkill", ["/PID", String(chrome.pid), "/T", "/F"], { stdio: "ignore" });
-	} catch {
-		chrome.kill();
-	}
-	try {
-		spawnSync(
-			"powershell.exe",
-			[
-				"-NoProfile",
-				"-Command",
-				"Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'pi-capture-profile' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
-			],
-			{ stdio: "ignore", timeout: 15000 }
-		);
-	} catch {
-		/* best effort */
+		cleanupBrowser(chromeProfile, chromeStartedAt);
+	} catch (err) {
+		console.error(`[capture] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`);
+		process.exitCode = 1;
 	}
 }
 
 // Hard stop so a wedged CDP call can never hang the caller — but never at
-// the price of an orphaned chrome tree. Eleven captures with real-time
-// waits need more headroom than the old two.
+// the price of an orphaned chrome tree. The full capture sequence includes
+// real-time waits between panel states.
 const watchdog = setTimeout(() => {
 	console.error("[capture] watchdog: 240s elapsed — aborting");
 	killChromeTree();
@@ -82,8 +74,11 @@ try {
 	let target = null;
 	for (let i = 0; i < 30 && target === null; i++) {
 		await sleep(500);
+		if (chromeError) throw chromeError;
 		try {
-			const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+			const debugPort = Number(readFileSync(path.join(chromeProfile, "DevToolsActivePort"), "utf8").split(/\r?\n/)[0]);
+			if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) throw new Error("invalid browser debugger port");
+			const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
 			target = list.find((t) => t.type === "page") ?? null;
 		} catch {
 			/* debugger not up yet */
@@ -118,9 +113,11 @@ try {
 		});
 	const viewport = (height) => cdp("Emulation.setDeviceMetricsOverride", { width: 400, height, deviceScaleFactor: 2, mobile: false });
 	const evaluate = (expression) => cdp("Runtime.evaluate", { expression, returnByValue: true });
+	let captureCount = 0;
 	const capture = async (name) => {
 		const shot = await cdp("Page.captureScreenshot", { format: "png" });
 		writeFileSync(path.join(outDir, name), Buffer.from(shot.data, "base64"));
+		captureCount++;
 		log(`${name} captured`);
 	};
 	/** Clip-capture one region at the panel's full 400 px width. rectRes must
@@ -136,6 +133,7 @@ try {
 		}
 		const shot = await cdp("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: clip.y, width: 400, height: clip.h, scale: 1 } });
 		writeFileSync(path.join(outDir, name), Buffer.from(shot.data, "base64"));
+		captureCount++;
 		log(`${name} captured`);
 	};
 	/** Fail loudly when a driven element has been renamed away: a silent miss
@@ -181,6 +179,16 @@ try {
 	const settingsHeight = await evaluate(`Math.ceil([...document.body.children].reduce((m, el) => Math.max(m, el.getBoundingClientRect().bottom), 0))`);
 	await viewport(Math.min(2400, Math.max(880, Number(settingsHeight.result?.value ?? 880) + 16)));
 	await sleep(300);
+	// The shot is the settings panel with its picker closed (the list only
+	// renders rows once the search box opens it). What must be there is the
+	// live value of the selected reading: refuse to shoot a panel the plugin
+	// has not fed yet, or a "—" preview ships as the documented state.
+	let liveValue = "";
+	for (let attempt = 0; attempt < 50 && !/\d/.test(liveValue); attempt++) {
+		liveValue = String((await evaluate(`document.getElementById("preview-value")?.textContent ?? ""`)).result?.value ?? "");
+		if (!/\d/.test(liveValue)) await sleep(200);
+	}
+	if (!/\d/.test(liveValue)) throw new Error(`the key PI never showed a live value (preview reads ${JSON.stringify(liveValue)}); refusing to capture a panel the plugin has not fed`);
 	await capture("pi-settings.png");
 	// The Advanced fold on its own, from its summary to the Config help line:
 	// the deck-wide groups (Deck defaults, Connection, Support) and the
@@ -197,6 +205,10 @@ try {
 	// Open the picker with a query typed in, so the filtered list shows.
 	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = "gpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(1500);
+	// This shot IS the filtered tree: refuse it with no rows, or a blank list
+	// ships as the picker.
+	const treeRows = Number((await evaluate(`document.querySelectorAll("#picker-list .hw-row").length`)).result?.value ?? 0);
+	if (treeRows === 0) throw new Error("the key picker rendered no rows for \"gpu\"; refusing to capture a blank list");
 	await capture("pi-picker.png");
 	// The same state clipped to end at the Press section instead of at
 	// whatever row a consumer's height budget lands on: cutting mid-swatch
@@ -500,7 +512,8 @@ try {
 	// Two rows ticked so the capture shows checked and unchecked boxes side
 	// by side; unticked again after the shot (the chips shot below builds
 	// the real cross-sensor set).
-	await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#picker-list input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
+	const ticked = await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#picker-list input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
+	if (ticked.result?.value !== 2) throw new Error(`dial picker: expected to tick 2 rows, ticked ${JSON.stringify(ticked.result?.value ?? ticked.exceptionDetails?.text)}; refusing to capture`);
 	await sleep(500);
 	await capture("pi-dial-picker.png");
 	await evaluate(`(() => { for (const tick of document.querySelectorAll('#picker-list input.hw-tick:checked')) tick.click(); return "ok"; })()`);
@@ -766,7 +779,7 @@ try {
 	await sleep(300);
 	await capture("pi-control.png");
 
-	console.log(`captured 23 PI states to ${outDir}`);
+	console.log(`captured ${captureCount} PI states to ${outDir}`);
 } finally {
 	// The open CDP socket would otherwise hold the event loop until the
 	// watchdog fires — close it, then take the browser tree down.

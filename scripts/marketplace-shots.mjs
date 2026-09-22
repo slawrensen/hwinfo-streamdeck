@@ -1,17 +1,21 @@
 // Marketplace listing stills (1920×960 per Elgato's product guidelines:
 // thumbnail + gallery are 1920×960 PNG; 1920×1080 is the VIDEO spec), composed
-// from the plugin's own renderers with live HWiNFO values — the marketing art
-// IS the product output. Emits gallery shots 1/3/5 (+4 with a capture dir; shot 2 is the hardware photo board from scripts/shot2-hardware.mjs)
+// from the plugin's renderers with sample scenarios and live HWiNFO inputs.
+// Multi-row dials use the runtime action composer and fixed sample data.
+// Emits gallery boards; shot 2 is the photograph from shot2-hardware.mjs.
 // and a dedicated thumbnail.png.
 // Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir]
+import "./lib/script-failures.mjs";
 import path from "node:path";
 import sharp from "sharp";
+import { renderGalleryDial } from "./lib/dial-gallery";
 
 import { composeBackFace, composePagerFace, composeReadingFace, composeTitleFace } from "../src/detail/detail-faces";
 import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
 import { DETAIL_PROFILES } from "../src/detail/managed-profiles";
 import { effectiveTextSettings, parseTextSettings } from "../src/ui/text-colors";
-import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
+import { renderDial } from "../src/ui/dial-renderer";
+import { applyGlobalThemeSettings } from "../src/ui/theme-store";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
 import { formatValue } from "../src/ui/format";
 import { SharedMemoryProvider } from "../src/hwinfo/provider";
@@ -19,6 +23,11 @@ import { classifyTypeAccent, loadThemes, resolvePalette } from "../src/ui/themes
 
 const outDir = process.argv[2] ?? "marketing";
 const config = loadThemes();
+const sensorValueColors = process.argv.includes("--sensor-value-colors");
+applyGlobalThemeSettings({ theme: "void", textMode: "theme", typeAccents: "on" });
+const dialCaption = sensorValueColors
+	? "PREVIEW ONLY: Color numbers by sensor type ON; Text: Theme; Type accents: ON"
+	: "Sample-data renders; multi-row numbers use stable Theme text";
 
 // ---------- live data ----------
 const provider = SharedMemoryProvider.open();
@@ -140,43 +149,12 @@ const multiValue = (key, forced) => formatValue(forced ?? byKey(key).value, "aut
 /** The three-row rotation overview: the same "more than one reading"
  *  argument on the touchscreen, shared by the hero and the thumbnail. */
 function dialThreeRow() {
-	const mk = (key, label, forced) => {
-		const r = byKey(key);
-		return {
-			label,
-			valueText: formatValue(forced ?? r.value, "auto"),
-			unitText: r.unit,
-			selected: label === "CPU Temp",
-			valueColor: multiPalette(key).accent
-		};
-	};
-	return renderDialOverview({
-		rows: [mk(K.cpuTemp, "CPU Temp", 71.4), mk(K.gpuTemp, "GPU Temp", 76.2), mk(K.pump, "Pump")],
-		contextText: "Loop",
-		statsText: "▼ 51.0 ▲ 79.0",
-		palette: multiPalette(K.cpuTemp)
-	});
+	return renderGalleryDial("overview", sensorValueColors);
 }
 
 /** Two rows with a sparkline each: the middle density on the touchscreen. */
 function dialTwoRow() {
-	const mk = (key, label, forced) => {
-		const r = byKey(key);
-		const value = forced ?? r.value;
-		return {
-			label,
-			valueText: formatValue(value, "auto"),
-			unitText: r.unit,
-			selected: label === "GPU Power",
-			valueColor: multiPalette(key).accent,
-			history: walk(key + label, Math.min(r.valueMin, value), Math.max(r.valueMax, value), value)
-		};
-	};
-	return renderDialTwoRow({
-		rows: [mk(K.gpuPower, "GPU Power", 316.4), mk(K.gpuLoad, "GPU Load", 98)],
-		footerText: "▼ 64.5 ▲ 349 session",
-		palette: multiPalette(K.gpuPower)
-	});
+	return renderGalleryDial("tworow", sensorValueColors);
 }
 
 /** The single view, kept alongside so the range bar and session stats show. */
@@ -265,7 +243,7 @@ async function hero() {
 		`<text x="96" y="522" font-family="${MONO}" font-size="17" fill="${CYAN}">temperatures · clocks · fans · power · load · network</text>`,
 		`<text x="96" y="560" font-family="${MONO}" font-size="17" fill="${MUTED}">up to four readings per key · up to three per dial</text>`,
 		`<text x="96" y="598" font-family="${MONO}" font-size="17" fill="${MUTED}">7 themes · type accents · sparklines · aviation-style alerts</text>`,
-		`<text x="96" y="912" font-family="${MONO}" font-size="15" fill="${MUTED}">every key face above is real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="96" y="912" font-family="${MONO}" font-size="15" fill="${MUTED}">${dialCaption}</text>`
 	];
 
 	const composites = [];
@@ -414,7 +392,9 @@ async function dials() {
 
 // ---------- shot 6: more than one reading per key ----------
 // The three multi-reading layouts at a size where the type is readable,
-// each drawn by its production renderer from live values.
+// each drawn by its production renderer. The pump speed is live; the
+// temperatures and the VRAM figure are chosen for the shot, and the caption
+// says so.
 async function multiKeys() {
 	const pal = (key, level = "normal") => {
 		const r = byKey(key);
@@ -457,7 +437,7 @@ async function multiKeys() {
 	const chrome = [
 		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">One key does not mean one reading.</text>`,
 		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">Stack two, list three, or split four across a single key. Every row keeps its own sensor, label and unit.</text>`,
-		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own key renderers · values chosen for the shot</text>`
 	];
 	captions.forEach((c, i) => {
 		const cx = startX + i * (KEY + GAP) + KEY / 2;
@@ -536,7 +516,7 @@ async function drilldown() {
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">any Sensor Reading key</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *4090*, paged</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">or one source, or a list you order by hand</text>`,
-		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D + RTX 4090</text>`
 	];
 	// The arrow between the two, on the shared centre line.
 	const arrowY = openerY + OPEN_KEY / 2;
@@ -560,31 +540,10 @@ async function drilldown() {
 
 // ---------- shot 7: the dial touchscreen, two and three at a time ----------
 async function dialViews() {
-	const row = (key, label, forced, selected) => {
-		const r = byKey(key);
-		const palette = resolvePalette(config, "void", classifyTypeAccent(r.type, r.unit, r.label), "normal");
-		return {
-			label,
-			valueText: formatValue(forced ?? r.value, "auto"),
-			unitText: r.unit,
-			selected,
-			valueColor: palette.accent,
-			history: walk(key + label, Math.min(r.valueMin, forced ?? r.value), Math.max(r.valueMax, forced ?? r.value), forced ?? r.value)
-		};
-	};
 	const base = resolvePalette(config, "void", classifyTypeAccent(byKey(K.cpuTemp).type, "°C", "CPU"), "normal");
 
-	const three = renderDialOverview({
-		rows: [row(K.cpuTemp, "CPU Temp", 71.4, true), row(K.gpuTemp, "GPU Temp", 76.2, false), row(K.pump, "Pump", undefined, false)],
-		contextText: "Loop",
-		statsText: "▼ 51.0 ▲ 79.0",
-		palette: base
-	});
-	const two = renderDialTwoRow({
-		rows: [row(K.gpuPower, "GPU Power", 316.4, true), row(K.gpuLoad, "GPU Load", 98, false)],
-		footerText: "▼ 64.5 ▲ 349 session",
-		palette: base
-	});
+	const three = dialThreeRow();
+	const two = dialTwoRow();
 	const one = renderDial({
 		title: "GPU Hot Spot",
 		valueText: formatValue(106.2, "auto"),
@@ -607,7 +566,7 @@ async function dialViews() {
 	const chrome = [
 		`<text x="960" y="150" text-anchor="middle" font-family="${FONT}" font-size="58" font-weight="700" fill="${HEADLINE}">The dial screen holds a whole group.</text>`,
 		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">Stream Deck + and + XL: three views of the same rotation set, switched per dial. Rotate to move, push to reset.</text>`,
-		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">real plugin output: Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="820" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">${dialCaption}</text>`
 	];
 	captions.forEach((c, i) => {
 		const cx = startX + i * (SLOT_W + GAP) + SLOT_W / 2;
@@ -707,7 +666,8 @@ async function thumbnail() {
 		`<text x="960" y="180" text-anchor="middle" font-family="${FONT}" font-size="86" font-weight="700" fill="${HEADLINE}">HWiNFO Sensors</text>`,
 		`<text x="960" y="248" text-anchor="middle" font-family="${FONT}" font-size="32" fill="${BODY}">Live hardware readings on keys and dials</text>`,
 		`<text x="960" y="322" text-anchor="middle" font-family="${MONO}" font-size="22" fill="${CYAN}">temperatures · clocks · fans · power · load · network</text>`,
-		`<text x="960" y="878" text-anchor="middle" font-family="${MONO}" font-size="20" fill="${MUTED}">7 themes · sparklines · warn/critical alerts · Stream Deck + and + XL</text>`
+		`<text x="960" y="878" text-anchor="middle" font-family="${MONO}" font-size="20" fill="${MUTED}">7 themes · sparklines · warn/critical alerts · Stream Deck + and + XL</text>`,
+		`<text x="960" y="922" text-anchor="middle" font-family="${MONO}" font-size="15" fill="${MUTED}">${dialCaption}</text>`
 	];
 	const composites = [];
 	for (let i = 0; i < faces.length; i++) {
@@ -735,7 +695,7 @@ await multiKeys();
 await dialViews();
 await drilldown();
 await thumbnail();
-const piDir = process.argv[3];
+const piDir = process.argv[3]?.startsWith("--") ? undefined : process.argv[3];
 if (piDir !== undefined) {
 	await settings(piDir);
 	console.log(`Rendered thumbnail + shots 1, 3, 4, 5 (${W}x${H}) to ${outDir}/`);

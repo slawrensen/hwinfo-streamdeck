@@ -180,7 +180,11 @@ const plugin = spawn(
 );
 
 try {
-	// 1. Auto-fallback: SM absent, gadget populated → live value.
+	// 1. A populated registry alone is not producer evidence.
+	await expectFrame("initial registry has unknown freshness", (svg) => svg.includes("Age unknown"), 8000, { fromStart: true });
+	publish(47.6);
+	await sleep(1100);
+	publish(47.5);
 	await expectFrame("auto-fallback → live gadget 'Test Temp'", (svg) => svg.includes("Test Temp") && svg.includes("°C") && svg.includes("47.5"), 8000);
 
 	// 2. The reading at index 6, behind the hole at index 1, reaches both
@@ -297,9 +301,9 @@ try {
 	surface("willDisappear");
 	await sleep(300);
 
-	// 7. Freeze (HWiNFO exits — key remains, values stop changing) → stale.
+	// 7. Freeze (HWiNFO killed or hung: key remains, values stop changing) → stale.
 	clearInterval(updater);
-	await expectFrame("frozen registry → 'Not updating'", (svg) => svg.includes("Not updating"), 12000);
+	await expectFrame("frozen registry → unknown freshness", (svg) => svg.includes("Age unknown"), 12000);
 
 	// 8. Resume → live again.
 	const updater2 = setInterval(() => publish((51.1 + Math.random() * 0.05).toFixed(2)), 700);
@@ -310,8 +314,9 @@ try {
 	regDeleteKey();
 	await expectFrame("key deleted → 'Start HWiNFO'", (svg) => svg.includes("Start HWiNFO"), 10000);
 
-	// 10. Key present but EMPTY (gadget enabled, nothing ticked) — must NOT be
-	// diagnosed as "start HWiNFO"; the user needs to tick sensors instead.
+	// 10. Key present but EMPTY (unticking everything can leave that; reporting
+	// enabled with nothing ticked writes no key at all). It must NOT be
+	// diagnosed as "start HWiNFO": the user needs to tick sensors instead.
 	execSync(`reg add "${REG_PATH}" /f`, { stdio: "ignore" });
 	await expectFrame("empty key → 'Tick sensors' (gadget-empty)", (svg) => svg.includes("Tick sensors"), 10000);
 

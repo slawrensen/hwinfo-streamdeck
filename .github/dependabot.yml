@@ -12,3 +12,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Retained pins; the reasons live in .github/workflows/ci.yml under
+    # "Retained pins". Minor and patch updates still arrive by PR.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: node-gyp
+        update-types: ["version-update:semver-major"]

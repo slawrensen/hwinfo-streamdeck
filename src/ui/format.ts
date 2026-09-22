@@ -24,6 +24,7 @@ export function nextStatMode(mode: StatMode): StatMode {
 }
 
 export function statValue(reading: Reading, mode: StatMode): number {
+	if (mode !== "current" && reading.statistics === "unavailable") return Number.NaN;
 	switch (mode) {
 		case "min":
 			return reading.valueMin;
@@ -34,6 +35,11 @@ export function statValue(reading: Reading, mode: StatMode): number {
 		default:
 			return reading.value;
 	}
+}
+
+/** An unavailable historical field must never wear a numeric MIN/MAX/AVG. */
+export function readingStatBadge(reading: Reading | undefined, mode: StatMode): string {
+	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? "N/A" : STAT_BADGE[mode];
 }
 
 /** Converts a value for display; only °C→°F is meaningful in HWiNFO data. */
@@ -162,12 +168,25 @@ export function parseThreshold(raw: unknown): number | undefined {
  * `undefined` means unscoped: settings that predate unit scoping keep the
  * old apply-everywhere behavior until the user next edits a threshold
  * (which anchors it to the reading on screen). An empty string is a REAL
- * unit (HWiNFO's unitless yes/no readings) and scopes to unitless readings
- * only; conflating it with unscoped would both widen alerts and defeat the
+ * unit (a unitless reading) and scopes to unitless readings only; conflating it with unscoped would both widen alerts and defeat the
  * stamped-check.
  */
 export function thresholdsApplyTo(alertUnit: string | undefined, readingUnit: string): boolean {
-	return alertUnit === undefined || alertUnit === readingUnit;
+	if (alertUnit === undefined || alertUnit === readingUnit) return true;
+	// Through 1.6.0 a Gadget boolean reading published its display word as
+	// the unit, so a threshold edited there was stamped "Yes" or "No". The
+	// reading's unit is "Yes/No" now; that stamp still means this reading.
+	return readingUnit === "Yes/No" && (alertUnit === "Yes" || alertUnit === "No");
+}
+
+/**
+ * The unit as a width-capped dense row draws it. HWiNFO's boolean unit does
+ * not survive a cap ("Yes/…" beside a 0 says nothing), and the 0 or 1
+ * already carries the state, so those rows draw no unit and the label keeps
+ * the room.
+ */
+export function cappedUnit(unit: string, max: number): string {
+	return unit === "" || unit === "Yes/No" ? "" : truncateLabel(unit, max);
 }
 
 export type AlertLevel = "normal" | "warn" | "crit";
@@ -175,9 +194,13 @@ export type AlertLevel = "normal" | "warn" | "crit";
 /**
  * Evaluates warn/critical thresholds against the *live* (current) value in the
  * displayed unit. With `alertBelow`, lower is worse (e.g. fan RPM); otherwise
- * higher is worse (temperatures, power).
+ * higher is worse (temperatures, power). A value that is not a finite number
+ * never alerts: NaN compares false anyway, but an overflowed raw field
+ * ("1e400" in a Gadget row) parses to Infinity, which is beyond every limit
+ * in one direction while the face shows the value as unavailable.
  */
 export function alertLevel(current: number, warn: number | undefined, crit: number | undefined, alertBelow: boolean): AlertLevel {
+	if (!Number.isFinite(current)) return "normal";
 	const beyond = (limit: number): boolean => (alertBelow ? current <= limit : current >= limit);
 	if (crit !== undefined && beyond(crit)) {
 		return "crit";

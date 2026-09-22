@@ -3,7 +3,9 @@ title: Sensor Dial (Stream Deck +)
 nav_order: 5
 ---
 
-The **Sensor Dial** action puts an HWiNFO reading on a Stream Deck + or Stream Deck + XL encoder. The touchscreen shows a label, the live value with its unit, the session low/high, and a range bar; the dial and touch surface let you switch readings and stats without opening settings. A second view, the [overview](#overview-view), lists up to three readings of your rotation set at once. On the Stream Deck + XL, each of the six encoders can hold its own Sensor Dial.
+The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream Deck + XL touchscreen. Choose one reading with a range bar, two readings with sparklines, or three compact rows. Rotate to switch readings; push and touch to control the display.
+
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
 
@@ -26,22 +28,22 @@ The bar always tracks the live value, even while you're touching through MIN / M
 
 **View** offers two multi-row layouts besides the single readout, both listing what rotation moves through:
 
-- **Overview (two rows, big values + trend)**: two tall rows, each with its label on its own line and a large value in the shared right-aligned column, the reading on the dial marked by a full-width highlight band and an accent bar. The space left of the value earns its keep: a long label word-wraps onto it, and a label that fits one line frees it for a **sparkline** of that reading's recent values (the same recent-history line the keys draw, fed live for the two visible rows). The bottom line keeps the single view's stats slot.
-- **Overview (three rows)**: the wide tile, one line per reading. The reading on the dial is a small accent **thumb riding the left rail**, which also shows where the three-row window sits in the full list. One **context line** carries the shared name and the session `▼ low ▲ high`: the numbers always render in full, right-anchored, and only the name shortens, so a long name can never eat a stat. The context line sits above the rows by default or below them (**Context line** setting), and thin separator lines between rows can be turned off (**Separators** setting). The `pinned` / `cycle paused` tags and the stat badge share the context line's name region; a transient hint (a group name on a jump, "cycle paused", a reset confirmation) briefly takes the whole line, then the name and numbers return.
+- **Overview (two rows, big values + trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection. Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
+- **Overview (three rows)**: one line per reading. A marker on the left shows the selection and window position. The context line contains the shared name and session `▼ low ▲ high`; names shorten before statistics. Put it above or below the rows with **Context line**, and show or hide row dividers with **Separators**. Pause, pin and stat badges share the name area. Temporary messages briefly replace the context line.
 
 ![The dial's View setting in the settings panel set to the three-row overview, with the Row labels, Context line and Separators selects it reveals below it.]({{ '/assets/img/pi-dial-overview.png' | relative_url }})
 
 Three things keep the short labels readable:
 
-- **Shared prefixes move to the context line.** When the visible rows' labels start with the same words ("GPU Temperature / GPU Hot Spot / GPU Thermal Limit"), the shared part is lifted out and shown once beside the stats: the rows read "Temperature / Hot Spot / Thermal Limit" with `GPU` in the context line (the two-row face keeps it in its bottom line). You keep the context without paying for it three times. Names you type yourself are never altered, and a reading whose whole label IS the shared word (a plain "GPU" row) keeps it. Prefer the untouched names? Set **Row labels** to "Always full labels".
-- **Values share one right-aligned column.** Every value's ones digit lands on the same column edge, with units in their own column beside it. The three-row face fixes the column and steps the value size down a ladder until the widest visible value fits, so numbers never move, and each row's label runs right up to its own value before it shortens; the two-row face places its columns by the widest visible value, so a short value donates its slack to the labels.
+- **Shared prefixes move to the context line.** For "GPU Temperature / GPU Hot Spot / GPU Thermal Limit", the rows show "Temperature / Hot Spot / Thermal Limit" and the context line shows `GPU`. The two-row view uses its footer. Custom names and labels consisting only of the shared word stay intact. Set **Row labels** to **Always full labels** to disable this shortening.
+- **Values share a right-aligned column**, with units beside them. Three-row values use a fixed column and reduce their font size to fit. Two-row columns follow the widest visible value. Labels use the remaining width.
 - **You can rename any reading.** Click a chip's name under **Rotation set** and type a new one (Enter or click away to save; clear it to go back to the HWiNFO name). The name shows on that row and as the dial's title whenever that reading is selected, in both views. Unticking a reading keeps its name for later.
 
   ![The dial's Rotation set in the settings panel: two chips already renamed to "CPU" and "GPU" (the first highlighted because that reading is on the dial), and a third chip open in its inline rename box with the typed name selected, above the line reading "Rotation moves through these 3 readings only".]({{ '/assets/img/pi-dial-rename.png' | relative_url }})
 
-  This is the fix for readings HWiNFO gives the same name. Two DDR5 modules both report as `SPD Hub Temperature`, so name them `DIMM 1` and `DIMM 2` once and every row, title and overview line tells them apart from then on.
+  For example, rename two `SPD Hub Temperature` readings to `DIMM 1` and `DIMM 2` for display. This does not change HWiNFO's names, so it does not separate two Gadget readings that share a name.
 
-![Multi-readout key and dial faces rendered by the plugin, including the three-row overview with its rail thumb and context line shown before and after rotation moved the marked row.]({{ '/assets/img/multi-readouts.png' | relative_url }})
+See the [current rendered dial examples](#reading-colors) below. Older gallery images may show number colors that stable 1.6 could not produce through its settings.
 
 The overview does not get its own list to manage. It shows exactly what rotation already steps through, in the same order:
 
@@ -60,6 +62,37 @@ A few details specific to the view:
 - With fewer than three readings in reach, the overview lists what there is; the status faces (HWiNFO down, no selection, sensor missing) are the same as the single view's.
 
 Switching back to **One reading** restores the exact single-view face.
+
+## Reading colors
+
+Saved colors also follow explicitly confirmed Shared Memory/Gadget links.
+If both linked keys have their own color, the displayed key's choice wins.
+In an uncurated rotation the displayed key is the live key for unselected
+rows and the saved key for the selection, so a measurement with two saved
+colors can change color when rotation selects it. Keep one color per
+measurement to avoid that.
+
+These controls arrived in 1.7 (and the earlier issue #31 preview); 1.6.0 does not have them.
+
+Choose a two-row or three-row **View**, then open **Appearance** and set **Text → Theme**. **Reading colors** uses the same presets and color wells as the [four-reading key](sensor-reading.md#layout-four-readings-the-quad-grid):
+
+- **Signal**, **Pairs**, or **Uniform** applies a preset to the listed readings.
+- Click a reading's color well to choose its own number color. Two temperatures can have different colors, like DIMM 1 and DIMM 2 below.
+- **Auto** resets one reading; **Automatic** resets the listed readings. Readings without a chosen color follow the sensor-type option below, or normal text.
+
+Colors follow each reading through rotation, reordering and groups. Switching views or removing and re-adding a reading keeps its saved color. Individual colors work with **Type accents off**, including on Paper. Labels, units, footer, graphs and the selection indicator keep their existing styling.
+
+![The 1.7 settings panel's Appearance section with Text set to Theme, Color numbers by sensor type off, and individual color wells using the Signal preset.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+
+*The 1.7 settings panel at panel build 1.7.0.0-8, captured through the local test host with live HWiNFO.*
+
+![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
+
+*Production-rendered fixed sample data. Both sides use Void, Text → Theme and Type accents off; only the individual reading colors change. This is not a hardware photograph.*
+
+For automatic category colors, enable **Color numbers by sensor type** and leave **Type accents** enabled: temperature numbers share pink, fans cyan, power gold and load purple. The option is off by default. Paper, Type accents off and unknown categories keep normal text. Automatic colors adjust for readability on each row's background.
+
+**Text → Theme** keeps your chosen colors exact; **Dim** dims them. A valid **Text → Custom** color, including an inherited deck default, overrides reading colors. Warning and critical values keep priority and the existing unit scoping. Leave both number-color controls at their defaults to keep the released appearance.
 
 ## Gestures
 
@@ -90,11 +123,14 @@ Rotation also protects your selection when HWiNFO temporarily stops publishing t
 
 ### Session stats are the dial's own, per reading
 
-Unlike keys (which read HWiNFO's own min/max/average), the dial tracks its **session** stats itself, and it keeps a separate session per reading, keyed by HWiNFO's stable sensor identity:
+The dial calculates local min/max/average for each reading. These are separate from HWiNFO's own statistics. The average is the sum of accepted observations divided by their count; it is not time-weighted. Repeated held frames do not count again.
 
-- Rotate away and back, and you find that reading's own session numbers again; no reading ever shows another one's min/max. Stats for your rotation-set members keep accumulating while they are off screen (as long as a Sensor Reading key or Sensor Dial is on screen to keep the poller running), and the whole set survives page switches and profile changes for up to 30 minutes off screen (see [controls](controls.md#pause-pin-and-reset-reach)).
-- **Push** resets the current reading's stats (the **Reset reach** setting can widen that to the set or every dial).
-- On the **Gadget** data source there is no HWiNFO min/max/avg at all, but the dial's session stats still work because it computes them from the live stream. See [Data sources](data-sources.md).
+- The selected reading, rotation-set members and multi-row view readings accumulate while the poller runs. Ordinary rotation preserves a reading's session. Hidden dials can retain their state for up to 30 minutes, subject to the [hidden-dial limit](controls.md#pause-pin-and-reset-reach).
+- A missing or non-finite reading, a stale or unavailable source, or a source, native-unit or type change resets the affected session; the first live frame after a stale or unavailable source shows **stats reset: data gap** once. A pairing edit resets a session only when its saved key now stands for a different measurement. This also applies to retained readings while another reading is selected. The next accepted sample starts the new session.
+- **Push** resets the current reading under the Legacy preset. **Reset reach** can widen that to the set or every dial. Other presets can assign reset to a different gesture.
+- Gadget can supply observations for these local statistics, but has no HWiNFO history or producer timestamp. **Age unknown** replaces the display when freshness cannot be established. See [Data sources](data-sources.md#freshness-and-local-history).
+
+With no Sensor Reading key or Sensor Dial visible, polling stops. Retained state does not establish what happened during that unobserved period.
 
 ## Settings
 
@@ -113,14 +149,16 @@ Open the dial's Property Inspector to configure it. Most fields mirror the key a
 | **Label** | Custom label; blank falls back to the sensor's name. |
 | **Theme** | Preset gallery for this dial, or **Deck default** to follow the deck-wide theme. See [Themes](themes.md). |
 | **Text** | Text intensity for this dial: **Deck default**, **Theme**, **Dim**, or **Custom** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
+| **Color numbers by sensor type** | Multi-row views: opt into automatic category colors for normal numbers. Off by default. See [Reading colors](#reading-colors). |
+| **Reading colors** | Multi-row views: choose a preset or individual number colors, with **Auto** to reset a reading. See [Reading colors](#reading-colors). |
 | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the deck-wide **Data units** preference instead. |
 | **Unit** | Show temperatures in °F instead of °C. |
 | **Bar min** | Fixed low end of the range bar on the single view. Leave blank to auto-track the session low. |
 | **Bar max** | Fixed high end of the range bar on the single view. Leave blank to auto-track the session high. |
 | **On alert** | Makes the auto cycle alert-aware: it jumps to a critical member of the rotation set instead of waiting its turn, and holds there while the reading stays critical. Off by default. |
 | **Label mode** | Whether a custom label clears when rotation moves to another reading (default), or stays as a fixed title. |
-| **Warn at** | Value at which the bar fill turns amber (in the displayed unit). |
-| **Critical at** | Value at which the bar fill turns red (in the displayed unit). |
+| **Warn at** | Live value at which the bar fill turns amber. Use the displayed temperature unit; byte and rate values use HWiNFO's original unit before Data units changes the display scale. |
+| **Critical at** | Live value at which the bar fill turns red, using the same units as Warn at. |
 | **Direction** | "Alert when value drops below thresholds" flips the comparison: for fan RPM, free space, and other where-lower-is-worse readings. |
 
 Thresholds and the manual bar range are **unit-scoped**: they only apply to readings in the unit they were typed against, so a °C threshold can never misfire on an RPM reading you rotate to. Details on the [controls page](controls.md#thresholds-and-mixed-units).
@@ -135,7 +173,7 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 
 Dials take the same **Warn at** / **Critical at** thresholds as keys, compared against the **live** value. But the alert shows differently, and differently per view: on the single view only the **range bar's fill** flips to the alert color (amber for warn, red for critical) while the label, value and rest of the face stay in your chosen theme; the two [overview](#overview-view) layouts have no range bar, so there the alerting row's **value text** carries the color instead.
 
-This is by design. The touchscreen slot is too small for the full field-flip that keys use (whole key to amber/red), so the bar (or, in an overview, the row's own value) carries the alert while the readout stays legible. The two alert colors are global and never tinted per theme, so they stay unmistakable. For the full alert model, see [Themes & alerts](themes.md).
+Since 1.7, overview alert values adjust for contrast against the row background. Alerts take priority over individual reading colors and Custom Text. See [Themes & alerts](themes.md).
 
 > **Note:** The single view has no sparkline; its range bar is the at-a-glance indicator there. The two-row [overview](#overview-view) draws real sparklines for its visible readings.
 
@@ -146,13 +184,14 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 | Touchscreen | Meaning / fix |
 | --- | --- |
 | **Start HWiNFO** / not detected | HWiNFO isn't publishing on either interface. Start it (Shared Memory Support or Gadget reporting). |
-| **HWiNFO busy** / retrying | HWiNFO is running but its shared memory was momentarily locked. The plugin retries on the next poll. |
+| **Source busy** / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory off** / enable in HWiNFO | HWiNFO reports sharing disabled. Re-enable it, or rely on the Gadget fallback in Auto mode. |
-| **HWiNFO stalled** / check sharing | Values frozen (Sensors window closed or HWiNFO stopped polling). When the dial is on the Gadget source this reads **check Gadget** instead. |
-| **Gadget empty** / tick sensors | Gadget reporting is on but no values are ticked. In HWiNFO: **Configure Sensors** → **HWiNFO Gadget** tab → "Report value in Gadget". |
-| **Access denied** / un-elevate HWiNFO | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
-| **HWiNFO error** / restart HWiNFO | Shared memory didn't validate (mid-restart or an incompatible version). |
-| **Plugin damaged** / reinstall it | The plugin's native HWiNFO bridge (`bin/hwsm.node`) is missing, was blocked from loading (usually an antivirus quarantine), or doesn't match this plugin version. Reinstall the plugin; restarting HWiNFO won't clear this one. The file is unsigned, so check it against the release's published SHA-256 before allowing it ([how](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed)). |
+| **No new data** / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| **Age unknown** / check Gadget | Gadget has no producer timestamp. Before the first observed value change, or after 15 seconds without another, the plugin cannot tell whether the source is steady or stopped. Check HWiNFO and Gadget reporting. |
+| **Gadget empty** / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
+| **Access denied** / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
+| **Source error** / open settings | The sensor source could not be opened or validated. In Auto mode a Gadget failure shows this only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
+| **Bridge failed** / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load. Reinstall the plugin from its release package, then restart it. Keep any Windows or security-software report for support. |
 
 Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** with the hint *or use the settings panel*. If a saved sensor is no longer in HWiNFO's output, it shows **Sensor missing** / **waiting**, and turns are ignored so your saved pick survives the outage; reselect in settings if the sensor is gone for good.
 

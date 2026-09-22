@@ -15,13 +15,13 @@ import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
-import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, STAT_BADGE, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, readingStatBadge, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
-import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
+import { QUAD_DEFAULT_COLORS, quadIdentityOf, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
-import { HEX6, quadIdentityColor, resolveTextColors } from "../ui/text-colors";
+import { HEX6, quadIdentityColor, resolveTextColors, type QuadIdentity } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
 import { classifyTypeAccent, loadThemes, resolvePalette, type ThemesConfig, type TypeAccentKey } from "../ui/themes";
 
@@ -140,14 +140,16 @@ function nonEmptyStringOf(value: unknown): string | undefined {
 
 /** Per-entry salvage of the quad identity colors: each slot independently
  *  keeps a valid #RRGGBB override or falls back to that slot's default, so
- *  one hand-edited bad hex costs exactly one cell. */
-function quadColorsOf(settings: ReadingSettings): readonly [string, string, string, string] {
+ *  one hand-edited bad hex costs exactly one cell. Each entry says which it
+ *  was, because a chosen color renders exact and a default keeps its
+ *  readable lift; the settings are never rewritten either way. */
+function quadColorsOf(settings: ReadingSettings): readonly QuadIdentity[] {
 	const raw: unknown = settings.quadColors;
 	const entries: readonly unknown[] = Array.isArray(raw) ? raw : [];
-	return QUAD_DEFAULT_COLORS.map((fallback, i) => {
+	return QUAD_DEFAULT_COLORS.map((_, i) => {
 		const entry = entries[i];
-		return typeof entry === "string" && HEX6.test(entry) ? entry : fallback;
-	}) as unknown as readonly [string, string, string, string];
+		return quadIdentityOf(typeof entry === "string" && HEX6.test(entry) ? entry : null, i);
+	});
 }
 
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
@@ -521,7 +523,7 @@ export function compose(settings: ReadingSettings, status: PollerStatus, returnM
 	const palette = resolvePalette(config, themeId, accent, level);
 	const text = resolveTextColors(palette, effectiveTextFor(settings), level);
 	const display = displayModeOf(settings);
-	const badge = STAT_BADGE[mode];
+	const badge = readingStatBadge(reading, mode);
 	return renderReadingKey({
 		label: keyLabel(settings.label, reading.label),
 		valueText: measured.valueText,
@@ -552,7 +554,7 @@ function displayModeOf(settings: ReadingSettings): "sparkline" | "bar" | "ring" 
  * The Bar/Ring gauge for a single-reading key. Bounds are automatic: percent
  * and yes/no readings get their fixed domains; everything else derives from
  * values actually visited — HWiNFO's own session min/max where trustworthy
- * (the gadget source reports min = max = value, which the union neutralizes)
+ * (Gadget leaves these fields unavailable)
  * plus the poller's observed series — expanded to keep threshold zones
  * inside the visible domain. The fill follows the LIVE value even while the
  * text shows MIN/MAX/AVG, matching the dial bar and alert behavior.
@@ -621,9 +623,9 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	const bottomMode = isStatMode(settings.secondaryStatMode) ? settings.secondaryStatMode : topMode;
 	const shared = topMode === bottomMode;
 	return renderDualKey({
-		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : STAT_BADGE[topMode]),
-		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : STAT_BADGE[bottomMode]),
-		sharedBadge: shared ? STAT_BADGE[topMode] : "",
+		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : readingStatBadge(primary ?? secondary, topMode)),
+		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : readingStatBadge(secondary, bottomMode)),
+		sharedBadge: shared ? readingStatBadge(primary ?? secondary, topMode) : "",
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
@@ -656,7 +658,7 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3];
 	return renderTripleKey({
 		rows: slotKeys.map((key, i) => (key === undefined ? null : readingRow(readings[i], mode, measureOpts, customLabels[i]))),
-		sharedBadge: STAT_BADGE[mode],
+		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
@@ -696,9 +698,9 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	const colors = quadColorsOf(settings);
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3, settings.quadLabel4];
 	return renderQuadKey({
-		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as string, labeled, textSettings, text, palette)))),
+		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as QuadIdentity, labeled, textSettings, text, palette)))),
 		labels: labeled,
-		sharedBadge: STAT_BADGE[mode],
+		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
 		palette,
 		text,
 		returnMark

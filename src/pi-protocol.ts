@@ -9,15 +9,22 @@ import { detailProfileFor } from "./detail/managed-profiles";
 import { deviceCapabilities } from "./devices";
 import { buildSupportReport } from "./diagnostics";
 import { poller, type PollerStatus } from "./poller";
+import { overviewWindow, rotationGroupsOf } from "./rotation";
+import { dialViewOf, overviewRowColors, stepListOf } from "./ui/dial-overview";
 import { alertLevel, convertUnit, parseThreshold, type DecimalsSetting } from "./ui/format";
 import { formatMeasurement, formatStat, type MeasureOptions } from "./ui/measure";
 import { statusSentence } from "./ui/state-screens";
 import { resolveTextColors } from "./ui/text-colors";
-import { effectiveTextFor, effectiveThemeFor, getDataUnits, getDeckTheme, measureOptionsFrom } from "./ui/theme-store";
+import { effectiveTextFor, effectiveThemeFor, getDataUnits, getDeckTheme, measureOptionsFrom, typeAccentsEnabled } from "./ui/theme-store";
 import { loadThemes, resolvePalette } from "./ui/themes";
 
 type TreeReading = {
 	key: string;
+	/** Every key that resolves to this reading, its own key first, then
+	 * confirmed aliases (explicit cross-provider links, legacy Gadget keys)
+	 * in the runtime's lookup order. A saved key found here is present, so
+	 * the panel can name it, tick it and color it without name matching. */
+	keys: string[];
 	label: string;
 	unit: string;
 	value: number;
@@ -41,7 +48,12 @@ export type PreviewSettings = {
 	warnValue?: string;
 	critValue?: string;
 	alertBelow?: boolean;
-};
+	alertUnit?: string;
+	dialView?: string;
+	readingColors?: unknown;
+	sensorValueColors?: unknown;
+	rotationGroups?: unknown;
+} & Parameters<typeof stepListOf>[0];
 
 type TreeGroup = {
 	name: string;
@@ -144,6 +156,7 @@ export function buildSensorTree(status: PollerStatus): SensorTreePayload {
 			const m = formatMeasurement(reading.value, reading.unit, treeOpts);
 			group.readings.push({
 				key: reading.key,
+				keys: [reading.key, ...(reading.linkedKeys ?? []).filter((key) => key !== reading.key)],
 				label: reading.label,
 				unit: reading.unit,
 				value: reading.value,
@@ -190,15 +203,36 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 	// alert palettes outrank the theme and every text mode on the face, so
 	// they must outrank them in the panel too.
 	const level = alertsRecolor ? alertLevel(convertUnit(reading.value, reading.unit, opts.fahrenheit).value, parseThreshold(settings.warnValue), parseThreshold(settings.critValue), settings.alertBelow === true) : "normal";
+	// A dial's type palette changes only accent (selection graphics/badges),
+	// not the background/value/unit tokens used by this compact live preview.
 	const palette = resolvePalette(config, themeId, null, level);
-	const text = resolveTextColors(palette, effectiveTextFor(settings), level);
+	const textSettings = effectiveTextFor(settings);
+	const text = resolveTextColors(palette, textSettings, level);
+	let background = palette.bg;
+	let valueColor = text.value;
+	let statsColor = text.unit;
+	// Keys and the single dial keep their existing presentation. An overview
+	// preview follows the actual selected row, including its alias spelling:
+	// a curated row or the provider's own entry can outrank the saved key.
+	const view = alertsRecolor ? "single" : dialViewOf(settings);
+	if (view !== "single") {
+		const list = stepListOf(settings, reading.key, rotationGroupsOf(settings.rotationGroups), status.snapshot);
+		const rowCount = view === "tworow" ? 2 : 3;
+		const window = overviewWindow(list.length === 0 ? [reading] : list, reading.key, rowCount);
+		const selected = window.rows[window.selectedIndex];
+		const colors = overviewRowColors({ settings, reading: selected ?? reading, shownValue: reading.value,
+			selected: selected !== undefined, rowCount, palette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
+		background = colors.background;
+		valueColor = colors.value;
+		statsColor = colors.text.unit;
+	}
 	payload.display = {
 		value: m.valueText,
 		unit: m.unitText,
-		stats: `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
-		bg: palette.bg,
-		valueColor: text.value,
-		statsColor: text.unit
+		stats: status.source === "gadget" ? "Historical statistics unavailable in Gadget" : `min ${formatStat(reading.valueMin, reading.unit, opts)} · max ${formatStat(reading.valueMax, reading.unit, opts)} · avg ${formatStat(reading.valueAvg, reading.unit, opts)}`,
+		bg: background,
+		valueColor,
+		statsColor
 	};
 	return payload;
 }

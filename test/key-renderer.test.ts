@@ -11,6 +11,7 @@ import {
 	escapeXml,
 	KEY_TEXT_LADDERS,
 	QUAD_DEFAULT_COLORS,
+	quadIdentityOf,
 	quadValueFontSize,
 	renderDualKey,
 	renderQuadKey,
@@ -215,7 +216,7 @@ describe("alert pass recolors the whole key", () => {
 		assert.match(svg, /<rect width="144" height="144" fill="#E8940D"\/>/);
 		assert.match(svg, /y="94"[^>]*fill="#1C1200"/);
 		assert.match(svg, /y="32"[^>]*fill="#402C00"/); // label
-		assert.match(svg, /y="114"[^>]*fill="#553C00"/); // unit
+		assert.match(svg, /y="114"[^>]*fill="#503900"/); // unit
 		assert.match(svg, /<polyline [^>]*stroke="#402C00"/); // accent, not themed
 		assert.match(svg, /<path [^>]*fill="#C67A06"/); // track, not themed
 	});
@@ -1076,5 +1077,55 @@ describe("escapeXml folds lone surrogates", () => {
 		for (const hostile of ["CPU\uD800", "\uDC00x", "\uD800😀", "x\uDBFF"]) {
 			assert.doesNotThrow(() => encodeURIComponent(escapeXml(hostile)));
 		}
+	});
+});
+
+describe("escapeXml folds XML-illegal code units", () => {
+	// XML 1.0 Char: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] |
+	// [#x10000-#x10FFFF]. Anything else in a face aborts the whole image at
+	// the parser, so the chokepoint folds it to U+FFFD like a lone surrogate.
+	// Code points are spelled out so the payloads are readable and no editor
+	// can quietly normalize them.
+	const U = (...codes: number[]): string => String.fromCodePoint(...codes);
+	const FOLD = U(0xfffd);
+	const XML_ILLEGAL = new RegExp(`[^${U(9, 10, 13)}${U(0x20)}-${U(0xd7ff)}${U(0xe000)}-${U(0xfffd)}${U(0x10000)}-${U(0x10ffff)}]`, "u");
+
+	it("the C0 controls, U+FFFE and U+FFFF each become U+FFFD", () => {
+		assert.equal(escapeXml(`CPU${U(1)}Temp`), `CPU${FOLD}Temp`);
+		assert.equal(escapeXml(`GPU${U(0x0b)}Clock`), `GPU${FOLD}Clock`);
+		assert.equal(escapeXml(`${U(0x1f)}W`), `${FOLD}W`);
+		assert.equal(escapeXml(`Fan${U(0xfffe)}`), `Fan${FOLD}`);
+		assert.equal(escapeXml(U(0, 8, 0x0c, 0x0e, 0xffff)), FOLD.repeat(5));
+		const everyIllegal = [...Array.from({ length: 9 }, (_, i) => i), 0x0b, 0x0c, ...Array.from({ length: 18 }, (_, i) => 0x0e + i), 0xfffe, 0xffff];
+		assert.equal(escapeXml(U(...everyIllegal)), FOLD.repeat(everyIllegal.length));
+		assert.doesNotMatch(escapeXml(U(...everyIllegal)), XML_ILLEGAL);
+	});
+
+	it("tab, newline and return are legal XML and pass; ordinary text is byte-identical", () => {
+		const legal = `a${U(9)}b${U(10)}c${U(13)}d`;
+		assert.equal(escapeXml(legal), legal);
+		const plain = `CPU Package °C ▼ ▲ ${U(0x1f600)} ${U(0xa0)}${FOLD}`;
+		assert.equal(escapeXml(plain), plain);
+		assert.equal(escapeXml(`a<${U(1)}>b`), `a&lt;${FOLD}&gt;b`);
+	});
+
+	it("a face rendered from a control-character label, value and unit is well-formed XML", () => {
+		for (const svg of [
+			renderReadingKey({ label: `CPU${U(1)}Temp`, valueText: `56${U(0x0b)}.3`, unitText: `${U(0x1f)}C`, statBadge: "", palette: VOID }),
+			renderDualKey({ top: dualRow({ label: `Fan${U(0xfffe)}` }), bottom: dualRow({ unitText: U(0) }), palette: VOID }),
+			renderTripleKey({ rows: [{ label: `${U(0x0c)}A`, valueText: "1", unitText: "" }, null, null], palette: VOID }),
+			renderQuadKey({ cells: [quadCell({ label: `${U(7)}X`, valueText: U(8) }), null, null, null], labels: true, palette: VOID })
+		]) {
+			assert.doesNotMatch(svg, XML_ILLEGAL);
+			assert.ok(svg.includes(FOLD), "the illegal unit was folded, not dropped");
+		}
+	});
+});
+
+describe("quadIdentityOf", () => {
+	it("a chosen #RRGGBB is flagged chosen; null and undefined fall back to the slot's default", () => {
+		assert.deepEqual(quadIdentityOf("#123456", 0), { color: "#123456", chosen: true });
+		assert.deepEqual(quadIdentityOf(null, 1), { color: QUAD_DEFAULT_COLORS[1], chosen: false });
+		assert.deepEqual(quadIdentityOf(undefined, 3), { color: QUAD_DEFAULT_COLORS[3], chosen: false });
 	});
 });

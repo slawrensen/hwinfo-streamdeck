@@ -1,0 +1,351 @@
+{
+	"version": "1.7.0",
+	"command": "npx tsx scripts/docs-v17-images.mjs",
+	"note": "Boards use fixed sample data and the production renderers without any art or color overrides. They are not physical hardware captures.",
+	"assets": [
+		{
+			"file": "dial-reading-colors-1.7.png",
+			"width": 1340,
+			"height": 884,
+			"sha256": "b1bb0008ce622ea02e286e727de6ce7ed6a1185fac8407ff3fed3562e28445db",
+			"kind": "production-renderer board",
+			"source": "src/actions/sensor-dial.ts: composeDialSvg",
+			"sampleData": true,
+			"globals": {
+				"theme": "void",
+				"textMode": "theme",
+				"typeAccents": "off"
+			},
+			"scenarios": [
+				{
+					"view": "overview",
+					"individualColors": false,
+					"settings": {
+						"readingKey": "31:0:1",
+						"rotationKeys": [
+							"31:0:1",
+							"31:0:2",
+							"31:0:3"
+						],
+						"dialView": "overview",
+						"theme": "void",
+						"textMode": "theme",
+						"overviewLabels": "full",
+						"sensorValueColors": false
+					},
+					"readings": [
+						{
+							"key": "31:0:1",
+							"sensorIndex": 0,
+							"id": 1,
+							"label": "CPU Temp",
+							"type": 1,
+							"unit": "°C",
+							"value": 71.4,
+							"valueMin": 51,
+							"valueMax": 79,
+							"valueAvg": 71.4
+						},
+						{
+							"key": "31:0:2",
+							"sensorIndex": 0,
+							"id": 2,
+							"label": "GPU Temp",
+							"type": 1,
+							"unit": "°C",
+							"value": 76.2,
+							"valueMin": 48,
+							"valueMax": 82,
+							"valueAvg": 76.2
+						},
+						{
+							"key": "31:0:3",
+							"sensorIndex": 0,
+							"id": 3,
+							"label": "Pump",
+							"type": 3,
+							"unit": "RPM",
+							"value": 2850,
+							"valueMin": 2700,
+							"valueMax": 2900,
+							"valueAvg": 2850
+						}
+					],
+					"histories": {
+						"31:0:1": [
+							51,
+							79,
+							61.2,
+							64.26,
+							71.4
+						],
+						"31:0:2": [
+							48,
+							82,
+							62.1,
+							68.58,
+							76.2
+						],
+						"31:0:3": [
+							2700,
+							2900,
+							2775,
+							2565,
+							2850
+						]
+					},
+					"svgSha256": "ebb112659fbf93af8f33ce8c59e46e39b8d81808ec8bfb1a87c4045b6f6f8daf"
+				},
+				{
+					"view": "overview",
+					"individualColors": true,
+					"settings": {
+						"readingKey": "31:0:1",
+						"rotationKeys": [
+							"31:0:1",
+							"31:0:2",
+							"31:0:3"
+						],
+						"dialView": "overview",
+						"theme": "void",
+						"textMode": "theme",
+						"overviewLabels": "full",
+						"sensorValueColors": false,
+						"readingColors": {
+							"31:0:1": "#4CC2FF",
+							"31:0:2": "#FF7E8E",
+							"31:0:3": "#38CD89",
+							"31:0:4": "#D4AB33",
+							"31:0:5": "#4CC2FF"
+						}
+					},
+					"readings": [
+						{
+							"key": "31:0:1",
+							"sensorIndex": 0,
+							"id": 1,
+							"label": "CPU Temp",
+							"type": 1,
+							"unit": "°C",
+							"value": 71.4,
+							"valueMin": 51,
+							"valueMax": 79,
+							"valueAvg": 71.4
+						},
+						{
+							"key": "31:0:2",
+							"sensorIndex": 0,
+							"id": 2,
+							"label": "GPU Temp",
+							"type": 1,
+							"unit": "°C",
+							"value": 76.2,
+							"valueMin": 48,
+							"valueMax": 82,
+							"valueAvg": 76.2
+						},
+						{
+							"key": "31:0:3",
+							"sensorIndex": 0,
+							"id": 3,
+							"label": "Pump",
+							"type": 3,
+							"unit": "RPM",
+							"value": 2850,
+							"valueMin": 2700,
+							"valueMax": 2900,
+							"valueAvg": 2850
+						}
+					],
+					"histories": {
+						"31:0:1": [
+							51,
+							79,
+							61.2,
+							64.26,
+							71.4
+						],
+						"31:0:2": [
+							48,
+							82,
+							62.1,
+							68.58,
+							76.2
+						],
+						"31:0:3": [
+							2700,
+							2900,
+							2775,
+							2565,
+							2850
+						]
+					},
+					"svgSha256": "a7c0b81cebd32cce9a0f3bf8f556cd8ffa001dc116439abe2ff0659b9b963da5"
+				},
+				{
+					"view": "tworow",
+					"individualColors": false,
+					"settings": {
+						"readingKey": "31:0:4",
+						"rotationKeys": [
+							"31:0:4",
+							"31:0:5"
+						],
+						"dialView": "tworow",
+						"theme": "void",
+						"textMode": "theme",
+						"overviewLabels": "full",
+						"sensorValueColors": false
+					},
+					"readings": [
+						{
+							"key": "31:0:4",
+							"sensorIndex": 0,
+							"id": 4,
+							"label": "GPU Power",
+							"type": 5,
+							"unit": "W",
+							"value": 316.4,
+							"valueMin": 64.5,
+							"valueMax": 349,
+							"valueAvg": 316.4
+						},
+						{
+							"key": "31:0:5",
+							"sensorIndex": 0,
+							"id": 5,
+							"label": "GPU Load",
+							"type": 7,
+							"unit": "%",
+							"value": 98,
+							"valueMin": 12,
+							"valueMax": 100,
+							"valueAvg": 98
+						}
+					],
+					"histories": {
+						"31:0:4": [
+							64.5,
+							349,
+							190.45,
+							284.76,
+							316.4
+						],
+						"31:0:5": [
+							12,
+							100,
+							55,
+							88.2,
+							98
+						]
+					},
+					"svgSha256": "7489641c27403ba634ec47c20ed1d3f66a3c3ecbab07fe7c3751a6293d99ba7e"
+				},
+				{
+					"view": "tworow",
+					"individualColors": true,
+					"settings": {
+						"readingKey": "31:0:4",
+						"rotationKeys": [
+							"31:0:4",
+							"31:0:5"
+						],
+						"dialView": "tworow",
+						"theme": "void",
+						"textMode": "theme",
+						"overviewLabels": "full",
+						"sensorValueColors": false,
+						"readingColors": {
+							"31:0:1": "#4CC2FF",
+							"31:0:2": "#FF7E8E",
+							"31:0:3": "#38CD89",
+							"31:0:4": "#D4AB33",
+							"31:0:5": "#4CC2FF"
+						}
+					},
+					"readings": [
+						{
+							"key": "31:0:4",
+							"sensorIndex": 0,
+							"id": 4,
+							"label": "GPU Power",
+							"type": 5,
+							"unit": "W",
+							"value": 316.4,
+							"valueMin": 64.5,
+							"valueMax": 349,
+							"valueAvg": 316.4
+						},
+						{
+							"key": "31:0:5",
+							"sensorIndex": 0,
+							"id": 5,
+							"label": "GPU Load",
+							"type": 7,
+							"unit": "%",
+							"value": 98,
+							"valueMin": 12,
+							"valueMax": 100,
+							"valueAvg": 98
+						}
+					],
+					"histories": {
+						"31:0:4": [
+							64.5,
+							349,
+							190.45,
+							284.76,
+							316.4
+						],
+						"31:0:5": [
+							12,
+							100,
+							55,
+							88.2,
+							98
+						]
+					},
+					"svgSha256": "a82f67bda6fe8036f75636bae794ffca4757c55ea26d5eb8bcabc160fff8b7d1"
+				}
+			],
+			"validation": "SVGs match exactly after removing hexadecimal fill colors."
+		},
+		{
+			"file": "reading-status-1.7.png",
+			"width": 1360,
+			"height": 704,
+			"sha256": "5b53b534434e6bb043fad7836c3a21a29bf8486df96ce4d0bd3fabb6b399070b",
+			"kind": "production-renderer board",
+			"source": [
+				"src/ui/state-screens.ts: statusScreen",
+				"src/ui/key-renderer.ts: renderStatusKey",
+				"src/actions/sensor-dial.ts: composeDialSvg"
+			],
+			"sampleData": true,
+			"globals": {
+				"theme": "void",
+				"textMode": "theme",
+				"typeAccents": "off"
+			},
+			"scenarios": [
+				{
+					"title": "Source busy",
+					"state": "unavailable",
+					"reason": "busy"
+				},
+				{
+					"title": "No new Shared Memory data",
+					"state": "stale",
+					"source": "shared-memory",
+					"staleForMs": 20000
+				},
+				{
+					"title": "Gadget freshness unknown",
+					"state": "stale",
+					"source": "gadget",
+					"staleForMs": 20000
+				}
+			]
+		}
+	]
+}

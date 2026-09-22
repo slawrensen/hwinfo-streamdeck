@@ -3,7 +3,9 @@ title: Themes & colors
 nav_order: 6
 ---
 
-Themes control how every key and dial looks: background, label, value, unit, accent and track (the sparkline underfill, the bar, ring and range bar tracks, and the dividers in the multi-reading layouts). Seven presets ship with the plugin, and you can set one per key/dial or once for the whole deck. On top of that, **type accents** tint the accent color by sensor category, and **alerts** override everything when a value crosses a threshold.
+Seven themes control the background, text, graphs and dividers. Set a theme per key or dial, or use the deck default. **Type accents** color graphs and indicators by sensor category. Alerts take priority over normal colors.
+
+> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 
 ## The seven presets
 
@@ -11,36 +13,34 @@ Pick a theme from the live gallery in any key's or dial's settings (the **Theme*
 
 | Preset | Character |
 | --- | --- |
-| **Void** *(default)* | True black (`#000000`): pixels off on OLED, only the data glows. |
-| **Graphite** | Near-black slate (`#1A1C22`): the plugin's original look, retuned. Existing installs stay here after updating (see below). |
-| **Ultraviolet** | Deep violet cast with lavender signal. |
-| **Midnight** | Blue-black with ice-blue signal. |
-| **Forest** | Green-black with spring-green signal. |
-| **Ember** | Amber-on-black monochrome: VFD/nostalgia look, warm amber value on true black. |
-| **Paper** | High-contrast light theme (near-black ink on warm paper `#E9E6DE`) for bright rooms and low vision. |
+| **Void** *(default)* | Black background (`#000000`), white values. |
+| **Graphite** | Dark slate background (`#1A1C22`). The default for installs configured before themes were added. |
+| **Ultraviolet** | Dark violet background, lavender accent. |
+| **Midnight** | Dark blue background, light blue accent. |
+| **Forest** | Dark green background, green accent. |
+| **Ember** | Black background, amber text and accent. |
+| **Paper** | Light background (`#E9E6DE`), dark text. |
 
-![A contact sheet of the seven themes (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline, with the amber warn and red critical alert states below them, then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges), and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+![Earlier production-rendered examples of seven themes, alert palettes, key layouts and dial views, using sample scenarios and generated histories.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
-> **Note:** Void is the default for new installs. Graphite is the pre-theme legacy look. If you had the plugin configured before themes existed, the deck default stays on **Graphite** so nothing changes visually; a genuinely fresh install starts on **Void**. Either way, the moment you pick any theme yourself, that choice takes over.
+*This earlier board predates the 1.7 contrast adjustments. See the [1.7 reading-color examples](sensor-dial.md#reading-colors) for the new dial options.*
+
+> **Note:** New installs start on **Void**. Installs configured before themes were added keep **Graphite** as the deck default. Selecting a theme replaces that default.
 
 ## The display system
 
-All seven presets follow one written display system, and its rules are measured, not eyeballed:
+Each layout uses fixed positions across themes. A one-reading key puts its label on baseline 32, value on 94 and unit on 114. The multi-reading layouts use their own grids. Renderer tests check these positions.
 
-- **True black is the instrument.** Void's background is `#000000`: OLED pixels off, so the key face physically disappears and only the data glows. The tinted presets keep their backgrounds dark enough to read as black with a cast at arm's length, which preserves the same effect.
-- **One bright element per key.** On Void the value sits at 21:1 contrast against the background, the label at 5.5:1, the unit at 4.2:1. The unit is dimmest on purpose: its position and the number's magnitude already tell you °C from W, so it stays quiet and keeps the number's silhouette crisp.
-- **The physics sets the sizes.** At a normal desk distance a Stream Deck key is small enough that one canvas pixel covers roughly 0.6 of an arc minute of your vision. Value digits are sized to stay glanceable; the label is sized for identification, so it earns moderate contrast, never brightness.
-- **Anchors never move.** Within a layout the anchors are fixed: a one-reading key always puts its label on baseline 32, its value on 94 and its unit on 114, whether it shows a sparkline, a Bar, a Ring or nothing, and on every theme. The two-, three- and four-reading layouts each have their own fixed grid. That constancy is what makes a mixed wall of temperatures, clocks and fan speeds read as one instrument instead of a collage.
-- **Alerts break every rule on purpose.** Warn and critical recolor the whole face from two global palettes that no theme may tint, so an alert is unmistakable on any theme and with any color vision.
+Since 1.7, built-in value, unit and numeric session-statistic text colors are checked for at least 4.5:1 contrast against their authored backgrounds, and in Dim a label is kept at least as readable as its unit. The floor does not apply to badges, to a Custom Text color, or to individually chosen dial, quad cell and tile colors (a valid Custom Text color replaces those chosen colors while it is set). Physical readability still needs device testing.
 
-Every key and dial screenshot in these docs is real renderer output regenerated by scripts, never a mockup (the docs also carry real property-inspector captures and one photograph of live hardware), and the geometry above is locked by the test suite.
+The illustrated boards use production renderers with sample scenarios, live inputs and generated histories. They are sample-data renders. Settings-panel captures and hardware photographs are identified separately.
 
 ## Per-key vs. deck-wide
 
 Every key and dial has its own **Theme** setting. You can:
 
 - **Set a preset per key/dial**: that key uses exactly that theme, ignoring everything else.
-- **Follow the deck default**: the key uses whatever the deck-wide theme is, so changing one setting re-skins the whole wall at once.
+- **Follow the deck default**: the key uses the deck-wide theme.
 
 Set the deck-wide theme under **Advanced → Deck theme** in any key's settings, or under **Dial gestures & advanced → Deck theme** on a dial (it's a global setting; there's one value for the whole plugin).
 
@@ -52,13 +52,11 @@ Set the deck-wide theme under **Advanced → Deck theme** in any key's settings,
 
 The theme gallery leads with a **Deck default** chip, followed by the seven presets. Click it to make that key follow the deck-wide theme instead of pinning a preset.
 
-Because that chip previews the *resolved* deck theme, it could look identical to the preset it currently follows. To keep it unmistakable, the Deck default chip (as of 1.1.5):
+The Deck default chip previews the resolved theme and identifies itself with:
 
-- wears a **dashed frame** and a small **link/follow badge** (a drawn glyph, not an emoji, so it stays legible on any palette),
-- shows **"auto"** on its face instead of a sample value,
-- names the resolved theme in its tooltip and in the help line under the gallery, e.g. *Deck default · Void* / "currently Void".
-
-So even when the deck theme it follows renders an identical palette, the follow chip is never mistaken for the Void (or any) preset chip.
+- a **dashed frame** and a small **link/follow badge**,
+- **"auto"** on its face,
+- the resolved theme in its tooltip and the help line, e.g. *Deck default · Void* / "currently Void".
 
 ![The Theme gallery in the property inspector: the dashed "Deck default" chip with its link badge and "auto" face, followed by the seven preset chips, with the help line under the gallery naming the resolved theme.]({{ '/assets/img/settings-panel.png' | relative_url }})
 
@@ -66,19 +64,23 @@ So even when the deck theme it follows renders an identical palette, the follow 
 
 The dark themes use bright near-white values, and Ember uses amber. Both can be too much in a dark room or for light-sensitive eyes, so every key and dial has a **Text** setting directly under its theme gallery, with a deck-wide default under *Advanced → Deck text*:
 
-- **Theme** *(deck-wide default)*: the selected theme's own text colors, exactly as before.
-- **Dim**: a lower-intensity version of the theme's text. One fixed algorithm blends each text color toward the theme background, so it lands correctly on dark and light themes alike and keeps the value/label/unit hierarchy.
+- **Theme** *(deck-wide default)*: the selected theme's own text colors.
+- **Dim**: lower-intensity text. Built-in value, unit and numeric session-statistic colors retain a 4.5:1 authored contrast floor, including on the selected dial row, and labels stay at least as readable as units, so the selected row's name never reads dimmer than its neighbours; the accent bar marks the selection. Individually chosen dial, quad cell and tile colors are dimmed without that adjustment.
 - **Custom**: your own color. **Text color** sets it, and the main value uses it **exactly as picked**, never adjusted. **Dim labels, units and stats** decides the secondary text: ticked, labels, units, suffixes and MIN/MAX/AVG badges take the same hue at lower intensity; unticked, every textual element uses the exact color.
 
 Per-key and per-dial settings default to **Deck default**, which follows the deck-wide Text value; a local **Theme**, **Dim** or **Custom** wins over it, mirroring the theme precedence rule. An invalid custom color falls back to theme text.
+
+Automatic quad identity colors adjust for their background when needed, including after moving readings in a custom detail list. Individually chosen quad cell and detail tile colors render exactly in Theme mode and are only dimmed in Dim mode. **Custom** text retains your exact color and can fall below the contrast floor; choose a readable foreground for your theme. Authored contrast does not establish recognition speed on a physical key.
 
 ![The Text select under the theme gallery, set to Custom, with the Text color well and the "Dim labels, units and stats" checkbox revealed.]({{ '/assets/img/pi-key-text.png' | relative_url }})
 
 The setting recolors **text only**. Backgrounds, theme and type accents, sparklines, bars, rings, range bars, tracks and separators keep their theme colors, status screens keep their fixed safety colors, and the [alert palettes](#alerts-override-everything) always override it: a warning key is amber with black text whatever Text says, and a dial's alert-colored bar or overview row value is never recolored.
 
+1.7 adds [individual reading colors](sensor-dial.md#reading-colors) to two-row and three-row dials. Use **Text → Theme** for exact chosen hues, or **Dim** to dim them; valid **Custom** Text retains priority. Individual colors work with **Type accents off**, so you can color numbers while keeping your existing graph colors. These controls also appeared in the issue #31 preview and are absent from 1.6.0.
+
 ## Type accents
 
-**Type accents** (*Advanced → Type accents*, **on by default**) color the accent on each key and dial by the sensor's type: the sparkline's line and end dot, the Bar and Ring gauge fills, the MIN/MAX/AVG badge in its gap under the title, and on a dial the range bar fill or the overview's selection bar. Only the accent changes; label, value and unit keep the theme's own luminance rhythm.
+**Type accents** (*Advanced → Type accents*, **on by default**) color the accent on each key and dial by the sensor's type: the sparkline's line and end dot, the Bar and Ring gauge fills, the MIN/MAX/AVG badge in its gap under the title, and on a dial the range bar fill or the overview's selection bar. With default number-color settings, labels, values and units keep their Text styling.
 
 | Sensor type | Accent |
 | --- | --- |
@@ -105,9 +107,9 @@ When a value crosses a threshold (see [Alerts & thresholds](thresholds-alerts.md
 | **Warn** | Bright amber (`#E8940D`) | Black |
 | **Critical** | Red (`#CB2114`) | White |
 
-On **keys**, the whole face flips: background, label, value, accent and track all recolor from the alert palette. On **dials** (Stream Deck +) the rest of the touchscreen stays themed, because the slot is too small for a full field flip: in the single view the **range bar fill** flips to the alert color, and in the two-row and three-row overview views, which have no bar, an alerting row's **value** takes it instead.
+On **keys**, the whole face flips: background, label, value, accent and track all recolor from the alert palette. On **dials** (Stream Deck +) the rest of the touchscreen stays themed: in the single view the **range bar fill** changes, and in the two-row and three-row overview views an alerting row's **value** uses a separate foreground hue adjusted for readable contrast.
 
-The two alert palettes are **global, never tinted per theme**, and the warn/crit fields differ in luminance as well as hue. That aviation-style master-caution/master-warning treatment keeps warn and critical unmistakable on any theme and with any color-vision deficiency. Type accents don't apply while alerting.
+Whole-key alert palettes remain global; type accents do not replace them. Physical recognition across displays and color-vision differences still requires device testing.
 
 ---
 

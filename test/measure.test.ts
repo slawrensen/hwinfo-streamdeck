@@ -374,6 +374,20 @@ describe("fitTextLadder (largest safe size, ellipsis only at the floor)", () => 
 		assert.ok(tight.fontSize < loose.fontSize);
 	});
 
+	it("a Yes/No reading reads as the word HWiNFO shows, not as a number", () => {
+		// Both sources publish these as 0 or 1 in the unit "Yes/No", so a key
+		// read "0.00 Yes/No". HWiNFO's own windows say No.
+		assert.deepEqual(formatMeasurement(0, "Yes/No", DEC), { valueText: "No", unitText: "" });
+		assert.deepEqual(formatMeasurement(1, "Yes/No", DEC), { valueText: "Yes", unitText: "" });
+		assert.deepEqual(formatQuadMeasurement(0, "Yes/No", DEC), { valueText: "No", unitText: "" });
+		assert.equal(formatStat(1, "Yes/No", DEC), "Yes");
+		// A value that is neither stays a number: nothing is invented.
+		assert.deepEqual(formatMeasurement(0.5, "Yes/No", DEC), { valueText: "0.50", unitText: "Yes/No" });
+		assert.deepEqual(formatMeasurement(Number.NaN, "Yes/No", DEC), { valueText: "—", unitText: "Yes/No" });
+		// The 1.6.0 spelling of the same unit is not this unit.
+		assert.deepEqual(formatMeasurement(1, "Yes", DEC), { valueText: "1.00", unitText: "Yes" });
+	});
+
 	it("the ellipsis is budgeted at its real label advance, not the footer's", () => {
 		// The old class table priced "…" at 7px against a measured 9.8 advance:
 		// floor cuts could poke ~3px past their budget. Now 9.8 minus the 1.5

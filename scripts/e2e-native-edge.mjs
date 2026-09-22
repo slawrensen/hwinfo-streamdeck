@@ -4,7 +4,10 @@
 //   mapping present, mutex ABSENT  → "Start HWiNFO" (never an unguarded read)
 //   mutex appears                  → live value (recovery)
 //   published layout GROWS mid-run → session invalidates → reopen → live again
-//   protocol-mismatched hwsm.node  → "Plugin damaged" (loader fails closed)
+//   late timestamp-only update     → producer age retained → stale face
+//   duplicate IDs / missing owners → missing faces and withheld picker entries
+//   unique identity recovery       → saved base key and healthy offsets work
+//   protocol-mismatched hwsm.node  → "Bridge failed" (loader fails closed)
 //
 // The mismatch leg runs a second plugin instance from a scratch bundle whose
 // hwsm.node is the hwsm_protomm build (HWSM_PROTOCOL_VERSION=999).
@@ -15,7 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, sleep, waitUntil } from "./lib/e2e-common.mjs";
 
 const PORT = 28995;
 const MISMATCH_PORT = 28994;
@@ -32,13 +35,14 @@ const check = makeCheck(() => {
 	failures += 1;
 });
 
-function makeServer(port, context, frames) {
+function makeServer(port, context, frames, traffic = []) {
 	const wss = new WebSocketServer({ host: "127.0.0.1", port });
 	let ws = null;
 	wss.on("connection", (socket) => {
 		ws = socket;
 		socket.on("message", (data) => {
 			const msg = JSON.parse(data.toString());
+			traffic.push({ ...msg, svg: msg.event === "setImage" ? decodeSvg(msg.payload?.image) : null });
 			if (msg.event === "registerPlugin") {
 				socket.send(JSON.stringify({
 					event: "willAppear",
@@ -86,7 +90,8 @@ function spawnPlugin(entry, cwd, port, uuid) {
 
 // --- leg 1: mutex-absent, recovery, layout growth ---------------------------
 const frames = [];
-const { wss } = makeServer(PORT, "ctx-edge", frames);
+const traffic = [];
+const { wss, send } = makeServer(PORT, "ctx-edge", frames, traffic);
 
 const fake = spawn(process.execPath, [path.join(repoRoot, "scripts", "fake-hwinfo.mjs"), "--no-mutex"], {
 	env: { ...process.env, HWINFO_SM2_NAME: MAPPING_NAME, HWINFO_SM2_MUTEX_NAME: MUTEX_NAME },
@@ -98,6 +103,69 @@ await new Promise((resolve, reject) => {
 	});
 	setTimeout(() => reject(new Error("fake provider did not become ready")), 5000);
 });
+
+/** Wait for the producer to acknowledge a command before timing its effect. */
+function producerCommand(command, acknowledgment) {
+	return new Promise((resolve, reject) => {
+		let output = "";
+		const onData = (data) => {
+			output += data.toString();
+			if (!output.split(/\r?\n/).includes(acknowledgment)) return;
+			clearTimeout(deadline);
+			fake.stdout.off("data", onData);
+			resolve();
+		};
+		const deadline = setTimeout(() => {
+			fake.stdout.off("data", onData);
+			reject(new Error(`fake provider did not acknowledge ${command}`));
+		}, 3000);
+		fake.stdout.on("data", onData);
+		fake.stdin.write(`${command}\n`);
+	});
+}
+const freezeProducer = () => producerCommand("freeze", "MODE freeze");
+
+async function identityRegression() {
+	const fanKey = "f0001234:0:1000002";
+	const invalidKeys = new Map([["ctx-edge", READING_KEY], ["ctx-edge-suffix", `${READING_KEY}~1`], ["ctx-edge-orphan", "?:7:1000001"]]);
+	const statModes = ["current", "min", "max", "avg"];
+	const savedKeys = new Map([...invalidKeys, ...statModes.map((stat) => [`ctx-edge-fan-${stat}`, fanKey])]);
+	const latest = (context) => traffic.filter((message) => message.context === context && message.svg !== null).at(-1)?.svg ?? "";
+	const hasValue = (svg, value) => svg.includes(`>${value}</text>`) || svg.includes(`>${value}<tspan`);
+	let position = 1;
+	for (const [context, readingKey] of savedKeys) {
+		if (context === "ctx-edge") continue;
+		send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context, device: "dev1", payload: { settings: { readingKey, decimals: "0", statMode: context.startsWith("ctx-edge-fan-") ? context.slice("ctx-edge-fan-".length) : "current" }, coordinates: { column: position % 5, row: Math.floor(position / 5) }, controller: "Keypad", isInMultiAction: false } });
+		position++;
+	}
+	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge", device: "dev1", payload: { settings: { readingKey: READING_KEY, decimals: "0" }, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
+	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge", device: "dev1" });
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { source: "shared-memory", pollIntervalMs: "250" } } });
+	for (const [phase, expectedFan] of [["duplicate", [1210, 801, 2001, 1251]], ["swapped", [1300, 810, 2100, 1350]], ["orphan", [1400, 820, 2200, 1450]], ["unique", [1500, 830, 2300, 1550]]]) {
+		const phaseStart = traffic.length;
+		await producerCommand(`identity-${phase}`, `IDENTITY ${phase}`);
+		const fanMatches = () => statModes.every((stat, index) => hasValue(latest(`ctx-edge-fan-${stat}`), expectedFan[index]));
+		check(`${phase}: healthy physical row 2 retains all four statistic values`, await waitUntil(fanMatches, 5000));
+		// Numeric witness frames prove the plugin accepted this fixture phase.
+		// The swapped phase changes only doubles/labels under the same header,
+		// owner/type/ID/unit words, exercising the parser's cached offsets.
+		if (phase === "swapped") await sleep(1100);
+		for (const context of invalidKeys.keys()) {
+			const recovered = phase === "unique" && context === "ctx-edge";
+			check(`${phase}: ${context} ${recovered ? "recovers the unique base value" : "remains Sensor missing"}`, recovered ? hasValue(latest(context), 45) && latest(context).includes("Test Temp") : latest(context).includes("Sensor missing"));
+		}
+		check(`${phase}: healthy statistics stay on their own physical row`, fanMatches());
+		const treeStart = traffic.length;
+		send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge", device: "dev1", payload: { event: "getSensorTree" } });
+		await waitUntil(() => traffic.slice(treeStart).some((message) => message.event === "sendToPropertyInspector" && message.payload?.event === "sensorTree"), 3000);
+		const tree = traffic.slice(treeStart).find((message) => message.event === "sendToPropertyInspector" && message.payload?.event === "sensorTree")?.payload;
+		const keys = tree?.groups?.flatMap((group) => group.readings.map((reading) => reading.key)).sort();
+		const expectedKeys = phase === "unique" ? [READING_KEY, fanKey, "f0001234:0:1000003"].sort() : [fanKey];
+		check(`${phase}: inspector offers exactly the unambiguous owned readings`, tree?.source === "shared-memory" && tree.state === "ok" && JSON.stringify(keys) === JSON.stringify(expectedKeys));
+		check(`${phase}: phase produced healthy witness frames`, traffic.slice(phaseStart).some((message) => message.context === "ctx-edge-fan-current" && message.svg !== null && hasValue(message.svg, expectedFan[0])));
+	}
+	check("identity withholding and recovery never migrate saved selections", traffic.filter((message) => message.event === "setSettings" && savedKeys.has(message.context)).every((message) => message.payload?.readingKey === savedKeys.get(message.context)));
+}
 
 const plugin = spawnPlugin("bin/plugin.js", pluginDir, PORT, "e2e-native-edge");
 
@@ -130,11 +198,35 @@ try {
 	fake.stdin.write("grow\n");
 	await sleep(300);
 	await expectFrame(frames, "layout grows → live values continue (reopened in place)", (svg) => svg.includes("Test Temp"), 10000);
-	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("HWiNFO error") || svg.includes("HWiNFO stalled") || svg.includes("Start HWiNFO"));
+	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("Source error") || svg.includes("No new data") || svg.includes("Start HWiNFO"));
 	check("no status frame during the growth transition", flashed.length === 0, flashed.length > 0 ? `${flashed.length} status frame(s) reached the deck` : "");
+	// "Test Temp" is entry 0 and unchanged by the growth, so its frames alone
+	// cannot tell a reopened session from one still reading the old layout.
+	// The reading the growth ADDED can: a key on it renders a value only when
+	// the new layout was actually read.
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge-grown", device: "dev1", payload: { settings: { readingKey: "f0001234:0:1000003", decimals: "1" }, coordinates: { column: 4, row: 0 }, controller: "Keypad", isInMultiAction: false } });
+	const grownRendered = await waitUntil(() => traffic.some((message) => message.context === "ctx-edge-grown" && message.svg !== null && message.svg.includes("Test Volt") && /<text x="72" y="94"[^>]*>-?\d/.test(message.svg)), 8000);
+	check("the reading the growth added renders its value (the new layout was read, not the stale session)", grownRendered, grownRendered ? "" : `last frame: ${traffic.findLast((message) => message.context === "ctx-edge-grown" && message.svg !== null)?.svg?.slice(0, 160) ?? "none"}`);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge-grown", device: "dev1", payload: { settings: { readingKey: "f0001234:0:1000003", decimals: "1" }, coordinates: { column: 4, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
-	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Plugin damaged'", (svg) => svg.includes("Plugin damaged"), 10000, { fromStart: true });
+	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });
+
+	// Keep the same provider/parser and establish a frozen-value baseline.
+	// The next freeze command republishes only the producer timestamp. Its
+	// age exceeds this harness's 2500 ms grace before the next 5000 ms poll:
+	// a parser revision must not turn that old heartbeat into fresh values.
+	await freezeProducer();
+	await sleep(1200);
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "5000" } } });
+	await sleep(1100);
+	await freezeProducer();
+	await expectFrame(frames, "late timestamp-only update retains producer age and shows stale", (svg) => svg.includes("Not updating"), 6000);
+
+	fake.stdin.write("alive\n");
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "1000" } } });
+	await expectFrame(frames, "new producer values recover the stale key", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 5000);
+	await identityRegression();
 } finally {
 	const gone = Promise.all([plugin, mismatchPlugin].map((p) => new Promise((r) => { p.once("exit", r); p.kill(); })));
 	fake.kill();

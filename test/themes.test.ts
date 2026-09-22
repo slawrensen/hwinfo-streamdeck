@@ -6,26 +6,38 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { SensorType } from "../src/hwinfo/types";
-import { classifyTypeAccent, loadThemes, resolvePalette, validateThemesConfig } from "../src/ui/themes";
+import { alertValueColor, classifyTypeAccent, loadThemes, resolvePalette, validateThemesConfig } from "../src/ui/themes";
 import { contrast, luminance } from "./wcag";
 
 const config = loadThemes();
 
+describe("dial numeric alert contrast on actual row surfaces", () => {
+	for (const [name, palette] of Object.entries(config.themes)) {
+		for (const level of ["warn", "crit"] as const) {
+			it(`${name} ${level}: normal and selected row value text meets 4.5:1`, () => {
+				for (const background of [palette.bg, palette.track]) {
+					assert.ok(contrast(alertValueColor(config, level, background), background) >= 4.5);
+				}
+			});
+		}
+	}
+});
+
 /** The spec's token table, verbatim — order bg,label,value,unit,accent,track. */
 const SPEC_THEMES: Record<string, [string, string, string, string, string, string]> = {
-	void: ["#000000", "#7A8393", "#FFFFFF", "#667082", "#4CC2FF", "#161A21"],
-	graphite: ["#1A1C22", "#8B93A3", "#F4F6FA", "#757F91", "#55C7FF", "#2A2F3A"],
-	ultraviolet: ["#10061F", "#8F80AE", "#F3EDFF", "#7C6C9F", "#C08BFF", "#261544"],
-	midnight: ["#071120", "#788CA9", "#EFF6FF", "#627896", "#6FCFFF", "#152238"],
-	forest: ["#05130C", "#739181", "#ECFBF2", "#5D7D6F", "#3FE09A", "#12271B"],
-	ember: ["#000000", "#A47632", "#FFB84D", "#8A6326", "#E0912F", "#1E1305"],
+	void: ["#000000", "#7A8393", "#FFFFFF", "#6B7586", "#4CC2FF", "#161A21"],
+	graphite: ["#1A1C22", "#8B93A3", "#F4F6FA", "#7A8495", "#55C7FF", "#2A2F3A"],
+	ultraviolet: ["#10061F", "#8F80AE", "#F3EDFF", "#8171A2", "#C08BFF", "#261544"],
+	midnight: ["#071120", "#788CA9", "#EFF6FF", "#687E9A", "#6FCFFF", "#152238"],
+	forest: ["#05130C", "#739181", "#ECFBF2", "#638274", "#3FE09A", "#12271B"],
+	ember: ["#000000", "#A47632", "#FFB84D", "#926E35", "#E0912F", "#1E1305"],
 	paper: ["#E9E6DE", "#4A4740", "#14120D", "#615D4F", "#3B382E", "#CDC9BD"]
 };
 
 /** Alert rows are spec-ordered bg,value,label,unit,accent,track. */
 const SPEC_ALERTS: Record<"warn" | "crit", [string, string, string, string, string, string]> = {
-	warn: ["#E8940D", "#1C1200", "#402C00", "#553C00", "#402C00", "#C67A06"],
-	crit: ["#CB2114", "#FFFFFF", "#FFDCD6", "#F8C2B9", "#FFDCD6", "#A81A0C"]
+	warn: ["#E8940D", "#1C1200", "#402C00", "#503900", "#402C00", "#C67A06"],
+	crit: ["#CB2114", "#FFFFFF", "#FFE1DB", "#FCE1DD", "#FFDCD6", "#A81A0C"]
 };
 
 const SPEC_TYPE_ACCENTS: Record<string, string> = {
@@ -70,40 +82,38 @@ describe("themes.json tokens are verbatim per spec", () => {
 });
 
 describe("WCAG contrast invariants", () => {
-	// The spec's label/unit bands (5.2–5.5, 3.9–4.3) pin the muted-text
-	// hierarchy on the dark themes; light "paper" can only exceed them, so the
-	// ceilings apply to dark backgrounds only. ε absorbs the spec's 1-decimal
-	// rounding (e.g. ember unit computes 3.885).
+	// Labels keep their established hierarchy. Units also carry numeric
+	// statistics, so their authored colors now have an unrounded 4.5 floor.
 	const EPS = 0.05;
 	for (const [name, palette] of Object.entries(config.themes)) {
 		const dark = luminance(palette.bg) < 0.5;
-		it(`${name}: value ≥12, label 5.2–5.5, unit 3.9–4.3, accent ≥4`, () => {
+		it(`${name}: value ≥12, label 5.2–5.5, unit ≥4.5, accent ≥4`, () => {
 			assert.ok(contrast(palette.value, palette.bg) >= 12, `value ${contrast(palette.value, palette.bg)}`);
 			const label = contrast(palette.label, palette.bg);
 			assert.ok(label >= 5.2 - EPS, `label ${label}`);
 			const unit = contrast(palette.unit, palette.bg);
-			assert.ok(unit >= 3.9 - EPS, `unit ${unit}`);
+			assert.ok(unit >= 4.5, `unit ${unit}`);
 			if (dark) {
 				assert.ok(label <= 5.5 + EPS, `label ceiling ${label}`);
-				assert.ok(unit <= 4.3 + EPS, `unit ceiling ${unit}`);
+				assert.ok(unit <= 4.6, `unit ceiling ${unit}`);
 			}
 			assert.ok(contrast(palette.accent, palette.bg) >= 4, `accent ${contrast(palette.accent, palette.bg)}`);
 		});
 	}
 
-	it("warn text hits 7.6 / 5.5 / 4.3", () => {
+	it("warn text keeps its hierarchy with numeric units at 4.5", () => {
 		const { bg, value, label, unit, accent } = config.alerts.warn;
 		assert.ok(contrast(value, bg) >= 7.6 - EPS);
 		assert.ok(contrast(label, bg) >= 5.5 - EPS);
-		assert.ok(contrast(unit, bg) >= 4.3 - EPS);
+		assert.ok(contrast(unit, bg) >= 4.5);
 		assert.ok(contrast(accent, bg) >= 4);
 	});
 
-	it("crit text hits 5.6 / 4.4 / 3.6", () => {
+	it("crit text keeps its hierarchy with numeric units at 4.5", () => {
 		const { bg, value, label, unit, accent } = config.alerts.crit;
 		assert.ok(contrast(value, bg) >= 5.6 - EPS);
 		assert.ok(contrast(label, bg) >= 4.4 - EPS);
-		assert.ok(contrast(unit, bg) >= 3.6 - EPS);
+		assert.ok(contrast(unit, bg) >= 4.5);
 		assert.ok(contrast(accent, bg) >= 4);
 	});
 
@@ -112,7 +122,7 @@ describe("WCAG contrast invariants", () => {
 		assert.ok(luminance(config.alerts.crit.value) > luminance(config.alerts.crit.bg));
 	});
 
-	it("warn/crit field-luminance gap is ~2.8× (the CVD guarantee)", () => {
+	it("warn/crit field-luminance gap remains ~2.8×", () => {
 		const gap = luminance(config.alerts.warn.bg) / luminance(config.alerts.crit.bg);
 		assert.ok(gap >= 2.5 && gap <= 3.1, `gap ${gap}`);
 	});
@@ -178,6 +188,12 @@ describe("resolvePalette", () => {
 		assert.deepEqual(resolvePalette(config, "no-such-theme", null, "normal"), config.themes.void);
 		assert.deepEqual(resolvePalette(config, undefined, null, "normal"), config.themes.void);
 	});
+
+	it("prototype property names are unknown themes", () => {
+		for (const theme of Object.getOwnPropertyNames(Object.prototype)) {
+			assert.deepEqual(resolvePalette(config, theme, null, "normal"), config.themes.void, theme);
+		}
+	});
 });
 
 describe("classifyTypeAccent", () => {
@@ -235,6 +251,22 @@ describe("schema validation", () => {
 		const broken = valid();
 		broken.defaultTheme = "carbon";
 		assert.throws(() => validateThemesConfig(broken), /defaultTheme/);
+	});
+
+	it("rejects inherited names in theme references", () => {
+		for (const field of ["defaultTheme", "legacyDefaultTheme", "typeAccentsDisabledOn"]) {
+			const broken = valid();
+			broken[field] = field === "typeAccentsDisabledOn" ? ["constructor"] : "__proto__";
+			assert.throws(() => validateThemesConfig(broken), new RegExp(field));
+		}
+	});
+
+	it("keeps an explicitly defined prototype-named theme as an own entry", () => {
+		const raw = valid();
+		raw.themes = { ...config.themes, ["__proto__"]: config.themes.paper };
+		const parsed = validateThemesConfig(raw);
+		assert.ok(Object.hasOwn(parsed.themes, "__proto__"));
+		assert.deepEqual(resolvePalette(parsed, "__proto__", null, "normal"), config.themes.paper);
 	});
 
 	it("rejects missing alert palettes", () => {

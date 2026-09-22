@@ -21,8 +21,9 @@
 # - koffi 3.1.2: test-only producer script; 3.2 rewrote the call machinery.
 #   Bump on its own with test:native green.
 # - sharp 0.35.4: current.
-# - @elgato/cli 1.7.4 (release.yml): the packer must match the locally
-#   validated candidate for this release; bump both sides together after 1.7.
+# - @elgato/cli 1.7.4 (here and release.yml): the packer must match the
+#   locally validated candidate for this release; bump all three together
+#   after 1.7.
 # - @types/node 20.x: see the node-version comment below.
 name: ci
 
@@ -87,6 +88,26 @@ jobs:
           retention-days: 14
       - name: Native packaging gate
         run: node scripts/validate-native.mjs
+      # The same packer version release.yml pins, so the archive contract is
+      # held on every push, not only at a tag: pack through the staged copy,
+      # validate the archive, extract it, and run the ABI check and the
+      # producer recovery suite on the EXTRACTED bytes. The record and the
+      # pack are retained so a reviewer can hold a candidate to them.
+      - name: Install Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.7.4
+      - name: Pack, archive contract, ABI and recovery on the extracted bytes
+        timeout-minutes: 6
+        run: node scripts/qualify.mjs --stages pack,archive,abi,recovery,tree --out qualification-ci
+      - name: Retain the CI pack and its qualification record
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-pack-qualification
+          path: |
+            qualification-ci/
+            release/com.lawrensen.hwinfo.streamDeckPlugin
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload built addon for the ABI matrix
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

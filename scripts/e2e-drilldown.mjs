@@ -667,7 +667,7 @@ async function scenario(send) {
 	results.pageTitle2 = latestSvg(pageTitleCtx);
 	results.pageSlot0Second = latestSvg(pageSlot0Ctx);
 	results.pageSlot2Second = latestSvg(pageSlot2Ctx);
-	// Outlast one poll tick (1 s) before reading dev1: a key repaints only
+	// Outlast one read (1 s at most) before reading dev1: a key repaints only
 	// on a byte change, so a page shared across devices by mistake would
 	// show on dev1 at its next tick, not inside the 900 ms above.
 	await sleep(600);

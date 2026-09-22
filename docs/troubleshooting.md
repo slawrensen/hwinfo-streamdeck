@@ -63,7 +63,7 @@ No Shared Memory producer timestamp or value revision advanced for more than ~15
 2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
 3. **HWiNFO itself crashed or hung.** Restart it. On Shared Memory the plugin checks a fresh connection about every 5 seconds while stale; on Gadget the next value change brings the keys back. Both recover on their own.
 4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
-5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.
+5. **Confusing a slow refresh for a freeze.** HWiNFO updates once per polling period (2 s by default). A number that holds between HWiNFO updates is normal, not a freeze. The plugin only calls it stale after 15 s of no change.
 
 ## Keys freeze, and only closing the Stream Deck app brings them back
 
@@ -178,7 +178,7 @@ Dial gesture reference (Legacy preset, the default): **rotate** cycles your rota
 
 The plugin runs one poller regardless of how many keys are visible, and is designed to idle when no keys are shown.
 
-1. **Perceived high CPU.** There is no plugin poll rate to lower: a Shared Memory read takes microseconds, and the Gadget registry is read once a second (see [update rate](data-sources.md#update-rate)). If the plugin process itself holds CPU, note how many keys and dials are live and attach the log.
+1. **Perceived high CPU.** There is no plugin poll rate to lower: a Shared Memory read takes about 10 µs, and reading stays within about a tenth of the plugin's time (see [update rate](data-sources.md#update-rate)). On Gadget the cost grows with the ticked list, so tick only the readings you put on the deck. If the plugin process still holds CPU, note how many keys and dials are live and attach the log.
 2. **Process lingering after Stream Deck quits.** The plugin watches its parent and exits when Stream Deck dies; if you ever find an orphaned `plugin.js`/Node process, ending it is safe and Stream Deck respawns it on next launch. If it recurs, capture the log (below) and file an issue.
 3. **Memory climbing.** The plugin is memory-stable under long soaks in testing. If you observe real growth, note how many keys/dials are live and attach the log.
 
@@ -201,7 +201,7 @@ On a normal install that folder lives under your Stream Deck plugins directory, 
 Files rotate as `com.lawrensen.hwinfo.0.log` (newest) through `.9.log`. Each line is `TIMESTAMP LEVEL Scope: message`, for example:
 
 ```
-2026-07-05T19:22:50.649Z INFO  HwinfoPoller: Started (1000 ms interval)
+2026-07-05T19:22:50.649Z INFO  HwinfoPoller: Started (Shared Memory every 250 ms, otherwise every 1000 ms)
 2026-07-05T19:22:50.650Z INFO  HwinfoPoller: Opened HWiNFO data source: gadget
 2026-07-05T19:29:12.294Z INFO  HwinfoPoller: Stopped (no visible actions)
 ```

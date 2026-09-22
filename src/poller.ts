@@ -58,12 +58,13 @@ type SourceMode = "auto" | "shared-memory" | "gadget";
  * Read cadence, per source. HWiNFO's own polling period (2 s by default,
  * published in the Shared Memory header) sets how often the data changes,
  * and no read rate can make it change faster, so this is not a setting.
- * A Shared Memory read is one guarded copy of a few microseconds (PERF.md),
- * read often enough that no HWiNFO write waits more than a quarter second
- * and a period down to 500 ms is never under-sampled. A Gadget read walks
- * the whole registry bound (about 2.6 ms), and with no source open a tick
- * is only an open attempt: both run once a second. HWINFO_TICK_MS pins
- * every cadence for the e2e harnesses.
+ * A Shared Memory read is one guarded copy of about 10 µs (PERF.md), read
+ * often enough that a write waits about a quarter second at most and a
+ * period down to 500 ms is not under-sampled. A Gadget read scans the
+ * ticked list (about 5 ms for 39 readings, about 150 ms for 554), and with
+ * no source open a tick is only an open attempt: both run once a second,
+ * slower when a read is slow (see tickMs). HWINFO_TICK_MS pins every
+ * cadence for the e2e harnesses.
  */
 const PINNED_TICK_MS = Number(process.env.HWINFO_TICK_MS ?? "") || 0;
 const SHARED_MEMORY_TICK_MS = PINNED_TICK_MS || 250;
@@ -97,6 +98,8 @@ class HwinfoPoller extends EventEmitter {
 	private provider: SnapshotProvider | null = null;
 	private timer: NodeJS.Timeout | null = null;
 	private refs = 0;
+	/** How long the open provider's last read took; feeds tickMs. */
+	private readCostMs = 0;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
 	private lastValueRevision: number | undefined;
@@ -264,37 +267,44 @@ class HwinfoPoller extends EventEmitter {
 			return;
 		}
 		this.logger.info(`Started (Shared Memory every ${SHARED_MEMORY_TICK_MS} ms, otherwise every ${DEFAULT_TICK_MS} ms)`);
-		this.tick();
-		// Armed after the first read, at the cadence of the source it opened.
-		// A listener that stopped or restarted the poller inside that tick
-		// has already settled the chain.
-		if (this.refs > 0 && this.timer === null) this.schedule();
-	}
-
-	/** The cadence of the source that is open right now (see SHARED_MEMORY_TICK_MS). */
-	private tickMs(): number {
-		return this.provider?.source === "shared-memory" ? SHARED_MEMORY_TICK_MS : DEFAULT_TICK_MS;
+		this.step();
 	}
 
 	/**
-	 * Arms the next tick at the open source's cadence, so a fallback or an
-	 * upgrade changes the rate on the following tick. Only the chain that is
-	 * still current re-arms: a stop and start inside a tick listener must
-	 * not leave two chains reading.
+	 * The cadence of the source that is open right now (see
+	 * SHARED_MEMORY_TICK_MS), stretched when a read is slow so reading stays
+	 * within about a tenth of the plugin's one thread (a Gadget key with
+	 * every reading ticked scans for about 150 ms).
 	 */
-	private schedule(): void {
-		// unref'd: the Stream Deck socket is what keeps this process alive, and
-		// it should be the ONLY thing. The SDK has no close handler and never
-		// reconnects, and ws drops sends after a close without raising, so a
-		// socket that dies while keys are visible would otherwise leave a
-		// plugin polling HWiNFO forever, painting into nothing, with no log
-		// line. With the timer unref'd the loop drains and the process exits,
-		// which is exactly what the e2e already asserts for the idle case.
-		const timer: NodeJS.Timeout = setTimeout(() => {
+	private tickMs(): number {
+		if (PINNED_TICK_MS > 0) return PINNED_TICK_MS;
+		const base = this.provider?.source === "shared-memory" ? SHARED_MEMORY_TICK_MS : DEFAULT_TICK_MS;
+		return Math.max(base, 10 * this.readCostMs);
+	}
+
+	/**
+	 * One tick, then the next one armed at the cadence of whatever source is
+	 * open by then, so a fallback or an upgrade changes the rate at once.
+	 * The re-arm survives a throw, as setInterval did, and is skipped when a
+	 * listener stopped the poller or already restarted it inside the tick.
+	 */
+	private step(): void {
+		this.timer = null;
+		try {
 			this.tick();
-			if (this.timer === timer) this.schedule();
-		}, this.tickMs()).unref();
-		this.timer = timer;
+		} finally {
+			if (this.refs > 0 && this.timer === null) {
+				// unref'd: the Stream Deck socket is what keeps this process
+				// alive, and it should be the ONLY thing. The SDK has no close
+				// handler and never reconnects, and ws drops sends after a close
+				// without raising, so a socket that dies while keys are visible
+				// would otherwise leave a plugin polling HWiNFO forever, painting
+				// into nothing, with no log line. With the timer unref'd the loop
+				// drains and the process exits, which is exactly what the e2e
+				// already asserts for the idle case.
+				this.timer = setTimeout(() => this.step(), this.tickMs()).unref();
+			}
+		}
 	}
 
 	private stop(): void {
@@ -317,6 +327,7 @@ class HwinfoPoller extends EventEmitter {
 	private dropProvider(): void {
 		this.provider?.close();
 		this.provider = null;
+		this.readCostMs = 0;
 		this.lastPollTime = -1;
 	}
 
@@ -410,7 +421,9 @@ class HwinfoPoller extends EventEmitter {
 
 			let snapshot: SensorSnapshot | null;
 			try {
+				const readStart = monotonicNow();
 				snapshot = this.provider.read();
+				this.readCostMs = monotonicNow() - readStart;
 			} catch (err) {
 				if (!(err instanceof HwinfoError) || err.reason !== "invalid") {
 					throw err;
@@ -492,7 +505,16 @@ class HwinfoPoller extends EventEmitter {
 				this.revisionProvider = this.provider;
 				this.lastFreshnessRevision = snapshot.freshnessRevision;
 			} else {
-				for (const ring of this.series.values()) ring.length = 0;
+				// A skipped read (busy mutex, Gadget interleave) ends the
+				// segments only when it could have hidden a producer write.
+				// Shared Memory publishes its polling period, and a write can
+				// be lost only if two land between accepted reads; half the
+				// period keeps a margin for HWiNFO's timing jitter. Without a
+				// published period, every skip ends them.
+				const period = this.lastRaw?.source === this.provider.source ? this.lastRaw.snapshot.pollingPeriodMs : undefined;
+				if (period === undefined || monotonicNow() - this.lastAcceptedAt + this.tickMs() >= period / 2) {
+					for (const ring of this.series.values()) ring.length = 0;
+				}
 			}
 			// Freshness is judged even when the read was skipped (mutex busy) —
 			// a consumer wedged on the mutex must not freeze us at "ok" forever.

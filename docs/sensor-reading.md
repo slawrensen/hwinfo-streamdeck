@@ -11,7 +11,7 @@ Choose one to four readings per key. Each layout has fixed positions for its lab
 
 This page documents every setting in the key's settings panel. For the Stream Deck + dial, see [Sensor Dial](sensor-dial.md).
 
-![The full Sensor Reading settings panel in the Stream Deck property inspector, its rows grouped under flat Sensor, Format, Press, Appearance, Layout and Alerts headers: the sensor picker with a live value and the label field, the stat, decimals and unit rows, the Press does select, the theme gallery with the Text select under it, the layout and Display selects, the threshold controls, and the expanded Advanced section headed Deck defaults (deck theme, Deck text, type accents, data units), Connection (data source, poll rate), Support (the Copy support report button) and Config (the This key and Deck JSON wells with their Copy and Apply buttons).]({{ '/assets/img/settings-panel.png' | relative_url }})
+![The full Sensor Reading settings panel in the Stream Deck property inspector, its rows grouped under flat Sensor, Format, Press, Appearance, Layout and Alerts headers: the sensor picker with a live value and the label field, the stat, decimals and unit rows, the Press does select, the theme gallery with the Text select under it, the layout and Display selects, the threshold controls, and the expanded Advanced section headed Deck defaults (deck theme, Deck text, type accents, data units), Connection (data source), Support (the Copy support report button) and Config (the This key and Deck JSON wells with their Copy and Apply buttons).]({{ '/assets/img/settings-panel.png' | relative_url }})
 
 ## Settings
 
@@ -171,7 +171,7 @@ Sparkline notes:
 
 - It holds the last **36 samples**. Since 1.7, the ring accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO's polling period.
 - Collection continues for subscribed readings while any Sensor Reading key or Sensor Dial is visible. With none visible, polling stops and samples stay in memory. Returning can append to them; the line is spaced by samples and does not measure that pause.
-- A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. A pairing edit clears only a segment whose saved key now stands for a different measurement. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
+- A skipped read that could have hidden an update, a missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. A pairing edit clears only a segment whose saved key now stands for a different measurement. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
 - It **survives a °C/°F toggle** unchanged (same data, just relabelled), and a frozen HWiNFO holds the line's last real shape instead of flattening it.
 - The sparkline self-scales to its own visible min/max, so the shape reflects recent variation, not absolute magnitude.
 

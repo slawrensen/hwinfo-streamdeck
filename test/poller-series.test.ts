@@ -24,8 +24,8 @@ function snapshotAt(pollTime: number, value: number): SensorSnapshot {
 }
 
 describe("the read cadence follows the open source", () => {
-	type CadenceSeam = Seam & { tickMs(): number };
-	type Subject = Pick<typeof poller, "setSourceMode" | "diagnostics" | "retain" | "release" | "onTick"> & CadenceSeam;
+	type CadenceSeam = Seam & { tickMs(): number; lastAcceptedAt: number };
+	type Subject = Pick<typeof poller, "setSourceMode" | "diagnostics" | "retain" | "release" | "onTick" | "subscribeSeries" | "getSeries"> & CadenceSeam;
 	const isolated = (): Subject => new (poller.constructor as unknown as { new(): Subject })();
 
 	it("Shared Memory reads every 250 ms; Gadget and a closed source once a second", () => {
@@ -40,6 +40,34 @@ describe("the read cadence follows the open source", () => {
 		subject.tick();
 		assert.equal(subject.tickMs(), 1000, "a Gadget read walks the whole registry bound");
 		assert.deepEqual([subject.diagnostics().intervalMs, subject.diagnostics().hwinfoPollingPeriodMs], [1000, null], "Gadget publishes no period");
+	});
+
+	it("a slow read stretches the interval so reading stays within a tenth of the thread", () => {
+		const subject = isolated();
+		subject.openProvider = () => ({ source: "shared-memory", close() {}, read: () => {
+			const until = performance.now() + 40;
+			while (performance.now() < until) { /* a 40 ms read */ }
+			return snapshotAt(700, 40);
+		} });
+		subject.tick();
+		assert.ok(subject.tickMs() >= 400, `${subject.tickMs()} ms after a 40 ms read`);
+	});
+
+	it("a busy Shared Memory read keeps the sparkline unless the skip could hide an HWiNFO write", () => {
+		const subject = isolated();
+		const key = "cpu:0:0";
+		let current: SensorSnapshot | null = { ...snapshotAt(500, 40), pollingPeriodMs: 2000 };
+		subject.openProvider = () => ({ source: "shared-memory", close() {}, read: () => current });
+		subject.subscribeSeries(key);
+		subject.tick();
+		current = { ...snapshotAt(501, 41), pollingPeriodMs: 2000 };
+		subject.tick();
+		current = null;
+		subject.tick();
+		assert.deepEqual([...(subject.getSeries(key) ?? [])], [40, 41], "one skipped quarter second cannot lose a 2 s write");
+		subject.lastAcceptedAt -= 1000;
+		subject.tick();
+		assert.deepEqual(subject.getSeries(key), [], "skips spanning half the period end the segment");
 	});
 
 	// Real timers: the chain itself is the subject. Late timers only lower
@@ -60,6 +88,31 @@ describe("the read cadence follows the open source", () => {
 		subject.release();
 		// Arming before the first read would take the closed-source second.
 		assert.ok(ticks >= 2, `${ticks} tick(s) in 700 ms`);
+	});
+
+	it("a Gadget source is read once a second through the timer", async () => {
+		const subject = isolated();
+		subject.setSourceMode("gadget");
+		let value = 40;
+		subject.openProvider = () => ({ source: "gadget", close() {}, read: () => ({ ...snapshotAt(700, ++value), freshnessRevision: value }) });
+		let ticks = 0;
+		subject.onTick(() => ticks++);
+		subject.retain();
+		await sleep(1200);
+		subject.release();
+		assert.ok(ticks >= 1 && ticks <= 2, `${ticks} tick(s) in 1.2 s`);
+	});
+
+	it("a throwing tick listener cannot end the reads", async () => {
+		const subject = sharedMemory();
+		let ticks = 0;
+		subject.onTick(() => {
+			if (++ticks === 1) throw new Error("synthetic listener failure");
+		});
+		assert.throws(() => subject.retain(), /synthetic listener failure/);
+		await sleep(700);
+		subject.release();
+		assert.ok(ticks >= 2, `${ticks} tick(s) in 700 ms after the throw`);
 	});
 
 	it("a stop and restart inside a timer-driven tick leaves exactly one read chain", async () => {

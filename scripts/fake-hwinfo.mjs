@@ -3,9 +3,9 @@
 // covers the extended UTF-8 layout) and mutates it on stdin commands:
 //   alive   valid magic, pollTime + values advancing every 400 ms
 //   freeze  stop advancing (pollTime frozen)
-//   backdate   freeze, and republish the same values under a stamp 10 s
-//           old: a timestamp-only update whose age is already past any
-//           freshness window, however soon the reader sees it
+//   backdate   freeze, and republish the same values under a stamp 3 s
+//           old: sent 5 s after a freeze it is newer than the frozen
+//           stamp, yet already older than a 2.5 s freshness window
 //   dead    write the "DEAD" magic (shared-memory support disabled)
 //   mutex   create the consistency mutex now (pairs with --no-mutex)
 //   grow    append a third reading (the published layout grows mid-run)
@@ -235,7 +235,7 @@ rl.on("line", (line) => {
 		console.log(`MODE ${mode}`);
 	} else if (cmd === "backdate") {
 		mode = "freeze";
-		stampLagSec = 10;
+		stampLagSec = 3;
 		compose();
 		publish();
 		console.log("BACKDATED");

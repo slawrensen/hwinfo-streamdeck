@@ -685,7 +685,7 @@ async function scenario(send) {
 	});
 	await sleep(1200); // drain any in-flight tick
 	const framesAtIdle = results.images.length + results.feedbacks.length;
-	await sleep(3000); // three poll intervals of required silence
+	await sleep(3000); // 3 s of required silence (a dozen 250 ms reads)
 	results.idleDelta = results.images.length + results.feedbacks.length - framesAtIdle;
 	await finish();
 }
@@ -1110,7 +1110,7 @@ async function finish() {
 	check("poller idles when no actions visible", results.idleDelta === 0, `frames in 3 s after willDisappear: ${results.idleDelta}`);
 	// The cadence follows the open source, not a setting: the start line
 	// names both rates, and Shared Memory is the source this run reads.
-	check("poller reads at the per-source cadence", loggedThisRun("Started (Shared Memory every 250 ms, otherwise every 1000 ms)") && loggedThisRun("Opened HWiNFO data source: shared-memory"));
+	check("poller logs its per-source cadence", loggedThisRun("Started (Shared Memory every 250 ms, otherwise every 1000 ms)") && loggedThisRun("Opened HWiNFO data source: shared-memory"));
 	check("poller logged idle stop", loggedThisRun("Stopped (no visible actions)"));
 	const shutdown = await shutdownPlugin();
 	check("plugin exits when the app socket closes", shutdown.clean, shutdown.detail);
@@ -1118,7 +1118,7 @@ async function finish() {
 	// A deleted gate runs zero checks and everything left still passes:
 	// name the legs a merge must never lose and fail when one never ran.
 	for (const req of [
-		"poller reads at the per-source cadence",
+		"poller logs its per-source cadence",
 		"PI got live preview for selected reading",
 		"a replayed willAppear repaints the key despite unchanged bytes",
 		"a replayed willAppear repaints the dial despite unchanged bytes",

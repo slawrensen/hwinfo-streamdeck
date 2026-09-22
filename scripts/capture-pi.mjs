@@ -167,7 +167,7 @@ try {
 	log("navigating: sensor-reading");
 	await cdp("Page.navigate", { url: `${BASE}/sensor-reading.html` });
 	await sleep(8000); // real time: plugin ticks + sensor tree + themes payload
-	// Advanced open (deck theme, accents, source, poll rate, support report)
+	// Advanced open (deck theme, accents, source, support report)
 	// and the viewport fitted, so the capture shows the whole panel.
 	expectOk("Advanced details", await evaluate(`(() => {
 		const adv = document.querySelector('details[data-fold="advanced"]');

@@ -212,21 +212,28 @@ try {
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
 	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });
 
-	// A timestamp-only update is aged by its own stamp, never by when it is
-	// read: a parser revision must not turn an old heartbeat into fresh
-	// values. Freeze until the key is stale, then republish the frozen values
-	// under a stamp already older than this harness's 2500 ms grace. The key
-	// must stay stale across a dozen Shared Memory reads; a fresh stamp after
-	// it is the control that such an update is read at all.
+	// Stamp aging end to end: a timestamp-only update is as old as its stamp
+	// says, however soon it is read. Freeze until the key is stale, then, 5 s
+	// after the freeze, republish the frozen values under a stamp 3 s old:
+	// newer than the frozen stamp, older than this harness's 2500 ms grace.
+	// The key must stay stale across a dozen reads, and a fresh stamp after
+	// it must bring the key back (the control that such an update is read at
+	// all). Whether a revision bump in the SAME parser can pose as fresh
+	// evidence is proven deterministically in poller-provenance.test.ts: the
+	// reopen probe replaces a stale key's parser every second, so this leg
+	// cannot pin which parser decodes the stamp.
 	const live = (svg) => svg.includes("Test Temp") && svg.includes("°C") && !svg.includes("Not updating");
+	const frozenAt = Date.now();
 	await freezeProducer();
 	await expectFrame(frames, "a frozen producer goes stale", (svg) => svg.includes("Not updating"), 6000);
+	await sleep(Math.max(0, frozenAt + 5000 - Date.now()));
 	const backdatedFrom = frames.length;
 	await producerCommand("backdate", "BACKDATED");
 	await sleep(3000);
 	check("an old timestamp-only update keeps its producer age (the key stays stale)", !frames.slice(backdatedFrom).some(live), `${frames.length - backdatedFrom} frame(s) since the backdated stamp`);
+	const controlFrom = frames.length;
 	await freezeProducer();
-	await expectFrame(frames, "a fresh timestamp-only update is read and shows live", live, 3000);
+	check("a fresh timestamp-only update is read and shows live", await waitUntil(() => frames.slice(controlFrom).some(live), 3000));
 
 	fake.stdin.write("alive\n");
 	await expectFrame(frames, "new producer values recover the stale key", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 5000);

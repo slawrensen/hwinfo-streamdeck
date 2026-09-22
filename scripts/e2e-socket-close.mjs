@@ -14,7 +14,7 @@
 // close the socket, so they exercise the idle case only, where the poll timer
 // is already cleared. This one keeps a key visible on purpose.
 //
-// The fix under test is the poll interval being unref'd, so the socket is the
+// The fix under test is the poll timer being unref'd, so the socket is the
 // only thing keeping the process alive.
 //
 //   phase 1: key visible, frames flowing, plugin ALIVE while the socket is up

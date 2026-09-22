@@ -84,7 +84,7 @@ Colors follow each reading through rotation, reordering and groups. Switching vi
 
 ![The 1.7 settings panel's Appearance section with Text set to Theme, Color numbers by sensor type off, and individual color wells using the Signal preset.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*The 1.7 candidate's settings panel (captured at panel build 1.7.0.0-1; the Reading colors section is unchanged since), captured through the local test host with live HWiNFO. This is a settings-panel capture of an unreleased build.*
+*The 1.7 candidate's settings panel at panel build 1.7.0.0-7, captured through the local test host with live HWiNFO. This is a settings-panel capture of an unreleased build.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 

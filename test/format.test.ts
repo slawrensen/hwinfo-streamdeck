@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { gadgetRawValue } from "../src/hwinfo/gadget-value";
 import { alertLevel, cappedUnit, convertUnit, fitTextLadder, type DecimalsSetting } from "../src/ui/format";
 import { formatMeasurement } from "../src/ui/measure";
 import { measureOptionsFrom } from "../src/ui/theme-store";
@@ -75,6 +76,15 @@ describe("alertLevel, degenerate inputs stay safe", () => {
 	it("a non-finite current value never alerts", () => {
 		assert.equal(alertLevel(Number.NaN, 70, 90, false), "normal");
 		assert.equal(alertLevel(Number.NaN, 600, 300, true), "normal");
+		// An overflowed Gadget raw field parses to Infinity, which is beyond
+		// every limit in one direction; the face shows it as unavailable, so
+		// it must not paint the key critical or hold an alert-aware cycle.
+		const overflow = gadgetRawValue("1e400");
+		assert.ok(!Number.isFinite(overflow) && !Number.isNaN(overflow), "the overflow token parses to an infinity, not NaN");
+		assert.equal(alertLevel(overflow, 70, 90, false), "normal");
+		assert.equal(alertLevel(Number.POSITIVE_INFINITY, 70, undefined, false), "normal");
+		assert.equal(alertLevel(Number.NEGATIVE_INFINITY, 600, 300, true), "normal");
+		assert.equal(alertLevel(Number.NEGATIVE_INFINITY, undefined, 300, true), "normal");
 	});
 
 	it("crit wins when the user sets crit below warn", () => {

@@ -12,6 +12,10 @@ Per-reading dial colors and reliability fixes in one release candidate.
   numeric prefix or adding it to freshness, history and session statistics.
   Healthy neighboring readings keep serving. Detail faces also refresh when
   a legacy Gadget alias becomes ambiguous or recovers.
+- A raw value that overflows to infinity is unavailable everywhere it is
+  compared, not only where it is drawn: it no longer paints a key critical,
+  colors a dial row with the alert color, or holds an alert-aware auto
+  cycle on the reading, while the face shows no value.
 - A newly accepted source keeps its own sample age. Switching from recent
   Gadget values to an old Shared Memory sample no longer makes that sample
   appear live.

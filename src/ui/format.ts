@@ -194,9 +194,13 @@ export type AlertLevel = "normal" | "warn" | "crit";
 /**
  * Evaluates warn/critical thresholds against the *live* (current) value in the
  * displayed unit. With `alertBelow`, lower is worse (e.g. fan RPM); otherwise
- * higher is worse (temperatures, power).
+ * higher is worse (temperatures, power). A value that is not a finite number
+ * never alerts: NaN compares false anyway, but an overflowed raw field
+ * ("1e400" in a Gadget row) parses to Infinity, which is beyond every limit
+ * in one direction while the face shows the value as unavailable.
  */
 export function alertLevel(current: number, warn: number | undefined, crit: number | undefined, alertBelow: boolean): AlertLevel {
+	if (!Number.isFinite(current)) return "normal";
 	const beyond = (limit: number): boolean => (alertBelow ? current <= limit : current >= limit);
 	if (crit !== undefined && beyond(crit)) {
 		return "crit";

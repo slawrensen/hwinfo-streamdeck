@@ -40,7 +40,7 @@ server.on("connection", (ws) => {
 		const svg = decodeSvg(message.event === "setImage" ? message.payload?.image : message.payload?.canvas);
 		traffic.push({ ...message, svg });
 		fs.appendFileSync(path.join(output, "traffic.jsonl"), JSON.stringify(message) + "\n");
-		if (message.event === "getGlobalSettings") send({ event: "didReceiveGlobalSettings", payload: { settings: { source: "gadget", pollIntervalMs: "250", readingLinks: [
+		if (message.event === "getGlobalSettings") send({ event: "didReceiveGlobalSettings", payload: { settings: { source: "gadget", readingLinks: [
 			{ sharedMemory: reading, gadget: "g:Raw fixture:Temperature", unit: "°C", sensorType: 1 },
 			{ sharedMemory: booleanReading, gadget: "g:Boolean fixture:Thermal Throttling", unit: "Yes/No", sensorType: 8 }
 		] } } });
@@ -61,7 +61,7 @@ try {
 	}
 	plugin = spawn(process.execPath, pluginArgv(port, "raw-integrity-test", buildInfo({ devices: [{ id: "keys", name: "Fixture", type: 0, size: { columns: 5, rows: 3 } }, { id: "plus", name: "Fixture Plus", type: 7, size: { columns: 4, rows: 2 } }] })), {
 		cwd: path.join(root, "com.lawrensen.hwinfo.sdPlugin"),
-		env: { ...process.env, HWINFO_VSB_KEY: registry, HWINFO_SM2_NAME: `Local\\HwinfoRawAbsent_${process.pid}_${randomUUID()}`, HWINFO_STALE_AFTER_MS: "15000" },
+		env: { ...process.env, HWINFO_VSB_KEY: registry, HWINFO_SM2_NAME: `Local\\HwinfoRawAbsent_${process.pid}_${randomUUID()}`, HWINFO_STALE_AFTER_MS: "15000", HWINFO_TICK_MS: "250" },
 		stdio: ["ignore", "pipe", "pipe"], windowsHide: true
 	});
 	exit = once(plugin, "exit");

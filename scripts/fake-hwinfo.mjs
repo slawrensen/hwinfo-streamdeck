@@ -3,6 +3,9 @@
 // covers the extended UTF-8 layout) and mutates it on stdin commands:
 //   alive   valid magic, pollTime + values advancing every 400 ms
 //   freeze  stop advancing (pollTime frozen)
+//   backdate   freeze, and republish the same values under a stamp 3 s
+//           old: sent 5 s after a freeze it is newer than the frozen
+//           stamp, yet already older than a 2.5 s freshness window
 //   dead    write the "DEAD" magic (shared-memory support disabled)
 //   mutex   create the consistency mutex now (pairs with --no-mutex)
 //   grow    append a third reading (the published layout grows mid-run)
@@ -74,6 +77,7 @@ if (view === null) {
 const buf = Buffer.alloc(SIZE);
 let value = 50;
 let mode = "alive"; // alive | freeze | dead
+let stampLagSec = 0; // "backdate" publishes under an already old stamp
 let entryCount = 2;
 let unitF = false; // temperature published as °F (values rescaled)
 let holding = false; // "hold" keeps the mutex acquired between commands
@@ -89,7 +93,7 @@ function compose() {
 	buf.writeUInt32LE(magic, 0);
 	buf.writeUInt32LE(1, 4); // version
 	buf.writeUInt32LE(0, 8); // revision
-	buf.writeBigInt64LE(BigInt(Math.floor(Date.now() / 1000)), 12);
+	buf.writeBigInt64LE(BigInt(Math.floor(Date.now() / 1000) - stampLagSec), 12);
 	buf.writeUInt32LE(HEADER_SIZE, 20); // sensor section offset
 	buf.writeUInt32LE(SENSOR_SIZE, 24);
 	buf.writeUInt32LE(1, 28);
@@ -225,9 +229,16 @@ rl.on("line", (line) => {
 	const cmd = line.trim();
 	if (cmd === "alive" || cmd === "freeze" || cmd === "dead") {
 		mode = cmd;
+		stampLagSec = 0;
 		compose();
 		publish();
 		console.log(`MODE ${mode}`);
+	} else if (cmd === "backdate") {
+		mode = "freeze";
+		stampLagSec = 3;
+		compose();
+		publish();
+		console.log("BACKDATED");
 	} else if (cmd === "mutex") {
 		if (hMutex === null) {
 			hMutex = CreateMutexW(null, 0, MUTEX_NAME);

@@ -11,12 +11,15 @@ import { deviceCapabilities } from "./devices";
 import { registerDiagnostics } from "./diagnostics";
 import { initHwsm } from "./hwinfo/hwsm-loader";
 import { classifyProbeError, ParentLiveness, type ParentProbe, probeErrorCode } from "./parent-liveness";
-import { parsePollInterval, parseSourceMode, poller } from "./poller";
+import { parseSourceMode, poller } from "./poller";
 import { hashId, traceEnabled } from "./recorder";
 import { applyGlobalThemeSettings, decideLegacyDefault, onThemeChange } from "./ui/theme-store";
 
 /** Plugin-wide settings (written by the PI's "Advanced" and theme sections). */
 type GlobalSettings = {
+	/** Retired: the read cadence follows the open source (see poller.ts).
+	 * A saved value is ignored and left in place: settings are append-only,
+	 * and its presence still marks a pre-theme install below. */
 	pollIntervalMs?: string;
 	source?: string;
 	/** Explicit cross-provider reading pairs, editable through Config. */
@@ -222,7 +225,6 @@ if (traceEnabled()) {
 
 streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
 	poller.setReadingLinks(ev.settings.readingLinks);
-	poller.setIntervalMs(parsePollInterval(ev.settings.pollIntervalMs));
 	poller.setSourceMode(parseSourceMode(ev.settings.source));
 	applyGlobalThemeSettings(ev.settings);
 });
@@ -236,7 +238,6 @@ for (const device of streamDeck.devices) {
 
 const globals = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
 poller.setReadingLinks(globals.readingLinks);
-poller.setIntervalMs(parsePollInterval(globals.pollIntervalMs));
 poller.setSourceMode(parseSourceMode(globals.source));
 applyGlobalThemeSettings(globals);
 // Pre-theme installs that already tweaked plugin-wide settings keep the old

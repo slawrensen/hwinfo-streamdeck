@@ -174,7 +174,7 @@ export class DetailController {
 
 	/** Poller tick: re-resolve live sessions, then repaint every surface.
 	 * Gated on the DATA actually changing: HWiNFO publishes about every
-	 * two seconds while the poll option goes down to 250 ms, so most ticks
+	 * two seconds while Shared Memory is read every 250 ms, so most ticks
 	 * carry the identical snapshot and every face would compose to the
 	 * identical bytes the dedupe then drops. Skipping those passes outright
 	 * removes the compose cost too (tick-signature.ts owns what "changed"

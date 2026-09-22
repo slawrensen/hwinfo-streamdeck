@@ -22,6 +22,8 @@ const SOAK_SEC = Number(process.env.LOAD_SOAK_SEC ?? "90");
 const SOAK_MS = SOAK_SEC * 1000;
 const SAMPLE_MS = 15_000;
 const EXPECTED_SAMPLES = expectedRssSampleCount(SOAK_MS, SAMPLE_MS);
+// The poller reads Shared Memory every 250 ms (poller.ts); live HWiNFO is
+// the source here, so every tick is the production read path.
 const POLL_MS = 250;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
@@ -57,7 +59,7 @@ wss.on("connection", (ws) => {
 	ws.on("message", (data) => {
 		const msg = JSON.parse(data.toString());
 		if (msg.event === "getGlobalSettings") {
-			send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: String(POLL_MS) } } });
+			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
 		} else if (msg.event === "setImage") {
 			const image = msg.payload?.image ?? "";
 			const svg = decodeSvg(image);

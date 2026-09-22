@@ -36,6 +36,25 @@ function runElgatoPacker(stagedDir, outputDir) {
 	if (result.status !== 0) throw new Error(`streamdeck pack exited with ${result.status ?? `signal ${result.signal}`}`);
 }
 
+/** Copies the plugin directory minus the staging-only entries, one walk of
+ * its own: a directory is tested with its trailing slash so the log
+ * directory itself stays behind, not only the files in it, and the copy
+ * does not depend on how a given Node release applies a cpSync filter to
+ * directories (Node 20 and 24 differ). */
+function copyStaged(fromDir, toDir, rel) {
+	fs.mkdirSync(toDir, { recursive: true });
+	for (const entry of fs.readdirSync(fromDir, { withFileTypes: true })) {
+		const relPath = rel === "" ? entry.name : `${rel}/${entry.name}`;
+		if (entry.isDirectory()) {
+			if (STAGING_ONLY.some((pattern) => pattern.test(`${relPath}/`))) continue;
+			copyStaged(path.join(fromDir, entry.name), path.join(toDir, entry.name), relPath);
+		} else if (entry.isFile()) {
+			if (STAGING_ONLY.some((pattern) => pattern.test(relPath))) continue;
+			fs.copyFileSync(path.join(fromDir, entry.name), path.join(toDir, entry.name));
+		}
+	}
+}
+
 /**
  * Stages, packs, validates. `runPacker(stagedDir, outputDir)` must leave
  * `<outputDir>/<uuid>.streamDeckPlugin` behind; tests inject one. Returns
@@ -47,15 +66,7 @@ export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacke
 	const stagedDir = path.join(stagingRoot, PLUGIN_ROOT);
 	const archivePath = path.join(outputDir, `${PLUGIN_UUID}.streamDeckPlugin`);
 	try {
-		fs.cpSync(sourceDir, stagedDir, {
-			recursive: true,
-			filter: (source) => {
-				// A directory is tested with its trailing slash, so the log
-				// directory itself stays behind, not only the files in it.
-				const rel = path.relative(sourceDir, source).split(path.sep).join("/") + (fs.statSync(source).isDirectory() ? "/" : "");
-				return rel === "/" || !STAGING_ONLY.some((pattern) => pattern.test(rel));
-			}
-		});
+		copyStaged(sourceDir, stagedDir, "");
 		fs.mkdirSync(outputDir, { recursive: true });
 		runPacker(stagedDir, outputDir);
 		if (!fs.existsSync(archivePath)) throw new Error(`the packer left no ${path.basename(archivePath)} in ${outputDir}`);

@@ -19,7 +19,7 @@ describe("qualification entrypoint", () => {
 	it("lists the stages in the clean-clone order", () => {
 		const r = run("--list");
 		assert.equal(r.status, 0);
-		assert.deepEqual(r.stdout.trim().split(/\r?\n/), ["prerequisites", "lint", "typecheck", "build:native", "build", "unit", "native", "pack", "archive", "abi", "recovery", "copy", "native-gate", "cli-validate", "tree"]);
+		assert.deepEqual(r.stdout.trim().split(/\r?\n/), ["prerequisites", "lint", "typecheck", "build:native", "build", "unit", "native", "pack", "archive", "abi", "recovery", "native-gate", "cli-validate", "copy", "tree"]);
 	});
 
 	it("refuses an unknown stage before running anything", () => {

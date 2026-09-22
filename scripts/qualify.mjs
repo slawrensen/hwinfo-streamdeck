@@ -47,7 +47,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf
 const archivePath = path.join(repoRoot, "release", "com.lawrensen.hwinfo.streamDeckPlugin");
 const stagingDir = path.join(repoRoot, PLUGIN_ROOT);
 
-const STAGE_IDS = ["prerequisites", "lint", "typecheck", "build:native", "build", "unit", "native", "pack", "archive", "abi", "recovery", "copy", "native-gate", "cli-validate", "tree"];
+const STAGE_IDS = ["prerequisites", "lint", "typecheck", "build:native", "build", "unit", "native", "pack", "archive", "abi", "recovery", "native-gate", "cli-validate", "copy", "tree"];
 if (args.includes("--list")) {
 	console.log(STAGE_IDS.join("\n"));
 	process.exit(0);
@@ -77,9 +77,15 @@ function tool(name) {
 	const r = spawnSync(isWin ? "where.exe" : "which", [name], { encoding: "utf8" });
 	return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : undefined;
 }
+// The release-copy validator needs the private release docs, which the
+// public repository does not carry (they are mirrored separately and
+// restored into the maintainer's checkout); without them that stage is
+// UNAVAILABLE, not PASS, and the run is not a release qualification.
+const PRIVATE_DOCS = ["MARKETPLACE.md", "docs/release/RELEASE_RUNBOOK.md", "docs/release/STREAM_DECK_MARKETPLACE.md", "docs/release/COPY_RULES.md"];
 const tools = {
 	streamdeck: tool(isWin ? "streamdeck.cmd" : "streamdeck"),
-	nodeGyp: fs.existsSync(path.join(repoRoot, "node_modules", ".bin", isWin ? "node-gyp.cmd" : "node-gyp")) ? "node_modules/.bin/node-gyp" : undefined
+	nodeGyp: fs.existsSync(path.join(repoRoot, "node_modules", ".bin", isWin ? "node-gyp.cmd" : "node-gyp")) ? "node_modules/.bin/node-gyp" : undefined,
+	privateDocs: PRIVATE_DOCS.every((rel) => fs.existsSync(path.join(repoRoot, rel))) ? "present" : undefined
 };
 
 /** Runs a command line through the shell (npm and the CLI are .cmd shims on
@@ -121,7 +127,7 @@ const stages = {
 		if (Number(process.versions.node.split(".")[0]) < 20) problems.push(`Node ${process.version} is below the Node 20 host contract`);
 		if (!fs.existsSync(path.join(repoRoot, "node_modules", ".package-lock.json"))) problems.push("node_modules is not an `npm ci` install (node_modules/.package-lock.json missing)");
 		if (!sourceSha) problems.push("not a git checkout");
-		const lines = [`node ${process.version}`, `streamdeck CLI: ${tools.streamdeck ?? "NOT FOUND (npm i -g @elgato/cli@1.7.4)"}`, `node-gyp: ${tools.nodeGyp ?? "NOT FOUND (npm ci)"}`, `source ${sourceSha}${record.attributable ? "" : ` DIRTY (${record.dirtyBefore.length} paths): this run is not attributable to the SHA alone`}`];
+		const lines = [`node ${process.version}`, `streamdeck CLI: ${tools.streamdeck ?? "NOT FOUND (npm i -g @elgato/cli@1.7.4)"}`, `node-gyp: ${tools.nodeGyp ?? "NOT FOUND (npm ci)"}`, `private release docs: ${tools.privateDocs ?? "NOT PRESENT (restore MARKETPLACE.md and docs/release/ from the private mirror; the copy stage will be UNAVAILABLE)"}`, `source ${sourceSha}${record.attributable ? "" : ` DIRTY (${record.dirtyBefore.length} paths): this run is not attributable to the SHA alone`}`];
 		return { ok: problems.length === 0, output: [...lines, ...problems].join("\n") };
 	},
 	lint: () => exec("npm run -s lint"),
@@ -179,7 +185,7 @@ const stages = {
 		record.recovery = [...r.output.matchAll(/^PLUGIN BYTES .*$/gm)].map((m) => m[0]);
 		return r;
 	},
-	copy: () => exec(["scripts/validate-release-copy.mjs"], { node: true }),
+	copy: () => (tools.privateDocs ? exec(["scripts/validate-release-copy.mjs"], { node: true }) : { unavailable: "private release docs" }),
 	"native-gate": () => exec(["scripts/validate-native.mjs"], { node: true }),
 	"cli-validate": () => (tools.streamdeck ? exec(`streamdeck${isWin ? ".cmd" : ""} validate "${stagingDir}"`) : { unavailable: "streamdeck CLI" }),
 	tree() {

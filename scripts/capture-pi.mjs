@@ -179,14 +179,16 @@ try {
 	const settingsHeight = await evaluate(`Math.ceil([...document.body.children].reduce((m, el) => Math.max(m, el.getBoundingClientRect().bottom), 0))`);
 	await viewport(Math.min(2400, Math.max(880, Number(settingsHeight.result?.value ?? 880) + 16)));
 	await sleep(300);
-	// The shot is a settings panel with the sensor tree in it: refuse to take
-	// it before the tree has rendered rows, or a blank list ships.
-	let treeRows = 0;
-	for (let attempt = 0; attempt < 50 && treeRows === 0; attempt++) {
-		treeRows = Number((await evaluate(`document.querySelectorAll("#picker-list .hw-row").length`)).result?.value ?? 0);
-		if (treeRows === 0) await sleep(200);
+	// The shot is the settings panel with its picker closed (the list only
+	// renders rows once the search box opens it). What must be there is the
+	// live value of the selected reading: refuse to shoot a panel the plugin
+	// has not fed yet, or a "—" preview ships as the documented state.
+	let liveValue = "";
+	for (let attempt = 0; attempt < 50 && !/\d/.test(liveValue); attempt++) {
+		liveValue = String((await evaluate(`document.getElementById("preview-value")?.textContent ?? ""`)).result?.value ?? "");
+		if (!/\d/.test(liveValue)) await sleep(200);
 	}
-	if (treeRows === 0) throw new Error("sensor tree never rendered rows in the key PI; refusing to capture a blank panel");
+	if (!/\d/.test(liveValue)) throw new Error(`the key PI never showed a live value (preview reads ${JSON.stringify(liveValue)}); refusing to capture a panel the plugin has not fed`);
 	await capture("pi-settings.png");
 	// The Advanced fold on its own, from its summary to the Config help line:
 	// the deck-wide groups (Deck defaults, Connection, Support) and the
@@ -203,6 +205,10 @@ try {
 	// Open the picker with a query typed in, so the filtered list shows.
 	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = "gpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(1500);
+	// This shot IS the filtered tree: refuse it with no rows, or a blank list
+	// ships as the picker.
+	const treeRows = Number((await evaluate(`document.querySelectorAll("#picker-list .hw-row").length`)).result?.value ?? 0);
+	if (treeRows === 0) throw new Error("the key picker rendered no rows for \"gpu\"; refusing to capture a blank list");
 	await capture("pi-picker.png");
 	// The same state clipped to end at the Press section instead of at
 	// whatever row a consumer's height budget lands on: cutting mid-swatch

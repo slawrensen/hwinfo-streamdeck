@@ -958,6 +958,45 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 	});
 });
 
+describe("the picker lists every reading however long the tree", () => {
+	// The bench tree that exposed the old 150-row budget held 549 readings,
+	// and System plus the CPU alone filled the budget: the GPU readings a
+	// dial rotated through were never drawn, so the list could neither show
+	// their ticks nor untick them.
+	const CPU = Array.from({ length: 400 }, (_, i) => sample(`cpu:0:${i}`, i, `Core ${i} Clock`, SensorType.Clock, "MHz", 4800));
+	const [HOT, RAIL] = ["gpu:0:0", "gpu:0:1"];
+	const GPU = [sample(HOT, 400, "GPU Hot Spot Temperature", SensorType.Temperature, "°C", 60, 1), sample(RAIL, 401, "GPU 12VHPWR Voltage", SensorType.Voltage, "V", 12, 1), sample("gpu:0:2", 402, "GPU Core Load", SensorType.Usage, "%", 20, 1)];
+	const readings = [...CPU, ...GPU];
+	const status: OkStatus = { state: "ok", source: "shared-memory", snapshot: { pollTime: 1, valueRevision: 1, version: 2, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "CPU [#0]" }, { index: 1, id: 2, instance: 0, name: "dGPU [#0]" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) } };
+	const ticked = (m: Mounted, list: string): string[] => pickerRows(m, list).filter((r) => tickOf(r).checked).map((r) => r.dataset.key!);
+
+	it("the dial's rotation list draws every row, ticks the members deep in the tree, and unticks and reticks them in place", async () => {
+		const m = await openPanel("dial", { readingKey: HOT, rotationKeys: [HOT, RAIL] }, status);
+		m.el("picker-search").fire("focus");
+		assert.equal(pickerRows(m).length, readings.length, "no row budget");
+		assert.equal(m.el("picker-list").querySelector(".hw-more"), null, "nothing is held back behind a refine note");
+		assert.deepEqual(ticked(m, "picker-list"), [HOT, RAIL]);
+		assert.deepEqual(pickerRows(m).filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [HOT]);
+		clickTick(m, RAIL, false);
+		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT]);
+		assert.deepEqual(ticked(m, "picker-list"), [HOT], "the unticked row stays listed to be ticked again");
+		clickTick(m, RAIL, true);
+		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT, RAIL]);
+	});
+
+	it("the detail collector draws every row and a deep listed reading unticks without leaving the list", async () => {
+		const m = await openPanel("reading", { readingKey: "cpu:0:0", pressBehavior: "open-details", detailMode: "custom", detailKeys: [RAIL] }, status);
+		m.el("pickerd-search").fire("focus");
+		assert.equal(pickerRows(m, "pickerd-list").length, readings.length, "no row budget");
+		assert.deepEqual(ticked(m, "pickerd-list"), ["cpu:0:0", RAIL], "the opener's own row and the listed one");
+		clickTick(m, RAIL, false, "pickerd-list");
+		assert.deepEqual(m.lastWrite("detailKeys"), []);
+		assert.deepEqual(ticked(m, "pickerd-list"), ["cpu:0:0"], "the collector repaints and the unticked row is still there");
+		clickTick(m, RAIL, true, "pickerd-list");
+		assert.deepEqual(m.lastWrite("detailKeys"), [RAIL]);
+	});
+});
+
 describe("a color saved under the dormant endpoint while the rows are keyed by the live provider", () => {
 	const status = linkedStatus();
 	const colors = { [SM[1]]: "#FF7E8E", dormant: "#ABCDEF", future: { keep: "unknown" } };

@@ -96,6 +96,10 @@ Per-reading dial colors and reliability fixes in one release.
   names and colors follow a
   confirmed alias, and the settings panel shows a linked saved key as
   present, with its label, tick and color.
+- The settings panel's sensor list shows every reading. It used to stop
+  after 150 rows, so on a system with many CPU readings a later source
+  such as the GPU only appeared when searched for, and a reading ticked
+  or selected there could not be seen or unticked in the list.
 - A stale sensor snapshot keeps the picker's missing-reading cue, matching
   Live value; an unavailable source still leaves the picker neutral. Bar
   and Ring help now distinguishes Shared Memory session min/max from

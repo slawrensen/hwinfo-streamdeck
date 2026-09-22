@@ -11,7 +11,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-7";
+	const PI_BUILD = "1.7.0.0-8";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -26,7 +26,6 @@
 	const controlsZonesEl = document.getElementById("controls-zones"); // dial PI only
 	const dualRowsEl = document.getElementById("dual-rows"); // reading PI only
 
-	const MAX_ROWS = 150;
 	const SENSOR_TYPE_NAMES = ["", "Temp", "Voltage", "Fan", "Current", "Power", "Clock", "Usage"];
 	// One hex gate for every color field, mirroring the plugin's shared
 	// HEX6 in src/ui/text-colors.ts (unsharable across the webview boundary).
@@ -1879,8 +1878,10 @@
 			// The selection's row, resolved once: a saved key the tree lists
 			// under an alias highlights the live row it names.
 			const selected = findSelected()?.reading ?? null;
+			// Every match renders, however long the tree: a ticked or selected
+			// row has to be in the list to be seen and unticked, and a row
+			// budget hid whole sources (a GPU behind a many-core CPU) from it.
 			let shown = 0;
-			let hidden = 0;
 			for (let gi = 0; gi < tree.length; gi++) {
 				const group = tree[gi];
 				const groupLower = group.name.toLowerCase();
@@ -1888,10 +1889,6 @@
 				for (const reading of group.readings) {
 					const hay = `${groupLower} ${reading.label.toLowerCase()}`;
 					if (tokens.length > 0 && !tokens.every((t) => hay.includes(t))) continue;
-					if (shown >= MAX_ROWS) {
-						hidden++;
-						continue;
-					}
 					if (header === null) {
 						header = document.createElement("div");
 						header.className = "hw-group";
@@ -1946,12 +1943,6 @@
 				none.className = "hw-more";
 				none.textContent = tokens.length > 0 ? "No sensors match." : "No sensors reported. Check HWiNFO's sensor window.";
 				frag.appendChild(none);
-			}
-			if (hidden > 0) {
-				const more = document.createElement("div");
-				more.className = "hw-more";
-				more.textContent = `…${hidden} more. Refine the search.`;
-				frag.appendChild(more);
 			}
 			listEl.replaceChildren(frag);
 		}

@@ -123,7 +123,7 @@ With no Sensor Reading key or Sensor Dial visible, source polling stops. The plu
 
 ### How many sensors / keys can I use?
 
-There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them (the list shows up to 150 rows at once and asks you to refine the search past that). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Layout** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
+There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker lists all of them, and typing narrows the list. You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Layout** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
 
 ### Can multiple keys show the same sensor?
 

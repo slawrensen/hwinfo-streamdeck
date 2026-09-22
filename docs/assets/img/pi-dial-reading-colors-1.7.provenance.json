@@ -2,14 +2,14 @@
 	"command": "node scripts/capture-pi-reading-colors.mjs",
 	"kind": "Real property-inspector screenshot",
 	"note": "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to Appearance. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.",
-	"captureTime": "2026-09-22T01:45:40.995Z",
+	"captureTime": "2026-09-22T04:55:37.473Z",
 	"panelSha256": "250369dafa06439e925d698fbe9ce1680eff8de884b764738877d5931acc5193",
 	"file": "pi-dial-reading-colors-1.7.png",
-	"sha256": "19cda5af2eee4b81149e138f648cee8711baac779da28b36ef127dcd99a86e75",
+	"sha256": "5744d264807e1e3e73f59d8ab3a6bbfd473aac62363895e7bf73ef8743fc3c06",
 	"width": 800,
 	"height": 1220,
 	"evidence": {
-		"build": "1.7.0.0-7",
+		"build": "1.7.0.0-8",
 		"rows": [
 			{
 				"key": "f0000501:0:1000000",
@@ -38,7 +38,7 @@
 			}
 		],
 		"preset": "signal",
-		"liveValue": "57.3 °C",
+		"liveValue": "62.1 °C",
 		"statusHint": "",
 		"appliedSettings": {
 			"readingKey": "f0000501:0:1000000",
@@ -75,11 +75,11 @@
 			"textMode": "theme",
 			"source": "shared-memory"
 		},
-		"liveDialSha256": "6a3dff5656196cb6c8a937d283632f97fdd4b4ea931aefe8297df22a928b46b7"
+		"liveDialSha256": "918960a1087c3c129eb90b910ee8bd643d0d8cad7e5cebf7a8ba05fd049e61cb"
 	},
 	"sourceSha256": {
-		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "08ef25449371e2a92deb6015f688bd5d6575e22e0352c16bbee2c3b5a2cd598c",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "c7908b97b0c826405398343954b101c76558e11b82f0fca09dc679d23376f52d",
+		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "f2246f7d237bb6205ffc036a240683811c680fbcd7849d1e5f2d7e99ba08ea65",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "8f4773c565474b28f78645fb1b5924d8f2e54abc339c4d47fe3d8b99ca0315ec",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "a23f757c7dab577dfeef96b330b56999e601f47dc5e2c402ad936bf58861050c",
 		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "3de4d2586f3b65216035de97bfbc7810dc4bae6e8c4302c732b1e280534a52e7"
 	}

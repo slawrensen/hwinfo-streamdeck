@@ -168,8 +168,20 @@ try {
 
 		// 2. Keep updating and outlast the 1.5 s upgrade probe: the probe opens the
 		//    dead mapping and must throw (not clobber the working gadget provider).
-		const updater = setInterval(() => publish((49.0 + Math.random() * 0.05).toFixed(2)), 600);
-		await expectFrame("gadget survives upgrade probes → value keeps updating (no clobber)", (svg) => svg.includes("49.0"), 9000);
+		//    The published value climbs a visible tenth per write: a key only
+		//    repaints when its face changes, so jitter inside one displayed
+		//    decimal would leave a live key silent and look like a clobber.
+		let step = 0;
+		const updater = setInterval(() => publish((49 + ++step * 0.1).toFixed(1)), 600);
+		const valueOf = (svg) => Number(/y="94"[^>]*>(-?\d+(?:\.\d+)?)</.exec(svg ?? "")?.[1] ?? Number.NaN);
+		await expectFrame("gadget survives upgrade probes → value keeps updating (no clobber)", (svg) => valueOf(svg) >= 49.1, 9000);
+		// The first live frame can land before an upgrade probe has fired since
+		// the fallback took hold. Outlast the 1.5 s probe interval, then
+		// demand a frame that moved on: a probe that clobbered the source
+		// would leave the key on a status screen or a frozen value from here on.
+		const valueBeforeProbeWait = Math.max(...frames.map(valueOf).filter(Number.isFinite));
+		await sleep(2200);
+		await expectFrame(`gadget still updates after an upgrade probe interval (no clobber; was ${valueBeforeProbeWait.toFixed(1)})`, (svg) => valueOf(svg) > valueBeforeProbeWait, 4000);
 		clearInterval(updater);
 	} finally {
 		plugin.kill();

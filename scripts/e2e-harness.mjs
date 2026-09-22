@@ -470,7 +470,11 @@ async function scenario(send) {
 			await sleep(500);
 			results.displayNoneFrame = dispLatest();
 			dispSet({ readingKey: k1, sparkline: true, displayMode: "histogram-from-the-future" });
-			await sleep(500);
+			// A sparkline segment ends on a skipped read and restarts with one
+			// point, which draws no line yet; a fixed 500 ms read of the latest
+			// frame missed the line once in three runs. Bounded wait for the
+			// observable the check names, then the same assertion.
+			await waitUntil(() => (dispLatest() ?? "").includes("<polyline"), 2500, 100);
 			results.displayJunkFrame = dispLatest();
 			// Custom text: the main value must be the exact selected color.
 			dispSet({ readingKey: k1, textMode: "custom", textColor: "#660000" });
@@ -491,6 +495,9 @@ async function scenario(send) {
 			// local Text setting, so it must follow and re-render.
 			dispSet({ readingKey: k1 });
 			await sleep(400);
+			// The frame under the deck default, from the same settings, so the
+			// dimmed frame is compared with what it actually replaced.
+			results.deckDimPlainFrame = dispLatest();
 			send({ event: "didReceiveGlobalSettings", payload: { settings: { textMode: "dim" } } });
 			await sleep(500);
 			results.deckDimFrame = dispLatest();
@@ -648,8 +655,17 @@ async function scenario(send) {
 	const intervalFramesBefore = results.images.filter((i) => i.context === "ctx-key").length;
 	const keyFramesSince = () => results.images.filter((i) => i.context === "ctx-key").slice(intervalFramesBefore);
 	const rebuildStart = Date.now();
+	// The key must carry a line before the change, the change must empty the
+	// ring (a frame without the line), and a line drawn AFTER that frame is
+	// the rebuild. A line that was already there when the change landed, or
+	// a byte-changing tick in flight at the marker, proves nothing.
+	results.sparklineBeforeIntervalChange = decodeSvg(results.images.filter((i) => i.context === "ctx-key").at(-1)?.image ?? "")?.includes("<polyline") === true;
 	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: 250 } } });
-	results.sparklineAfterIntervalChange = await waitUntil(() => keyFramesSince().some((i) => decodeSvg(i.image).includes("<polyline")), SPARKLINE_REBUILD_MS, 100);
+	const rebuilt = () => {
+		const cleared = keyFramesSince().findIndex((i) => !decodeSvg(i.image).includes("<polyline"));
+		return cleared >= 0 && keyFramesSince().slice(cleared + 1).some((i) => decodeSvg(i.image).includes("<polyline"));
+	};
+	results.sparklineAfterIntervalChange = await waitUntil(rebuilt, SPARKLINE_REBUILD_MS, 100);
 	// On failure, say which half broke. The frame count alone cannot: the key
 	// repaints only when its composed bytes change, so a steady sensor legitimately
 	// yields a single frame even while the poller is healthy (reintroducing the
@@ -740,7 +756,9 @@ function shutdownPlugin() {
 			if (!settled) {
 				settled = true;
 				clearTimeout(timer);
-				resolve({ clean: true, detail: `self-exited (code ${code})` });
+				// An exit is clean only when it is code 0: a plugin that throws
+				// in its close path leaves the same way, one code higher.
+				resolve({ clean: code === 0, detail: `self-exited (code ${code})` });
 			}
 		});
 		for (const client of wss.clients) {
@@ -788,8 +806,8 @@ async function finish() {
 	check("key SVG includes sparkline polyline", keyImages.some((s) => s.includes("<polyline")));
 	check(
 		"sparkline rebuilds after a poll-interval change (subscriptions survive the cadence reset)",
-		results.sparklineAfterIntervalChange === true,
-		results.sparklineRebuildDetail ?? "leg did not run"
+		results.sparklineBeforeIntervalChange === true && results.sparklineAfterIntervalChange === true,
+		`${results.sparklineBeforeIntervalChange === true ? "line present before the change; " : "NO line before the change; "}${results.sparklineRebuildDetail ?? "leg did not run"}`
 	);
 	check(
 		"sparkline survives nav away + back (history persisted in poller)",
@@ -1016,10 +1034,16 @@ async function finish() {
 		results.alertPreview !== undefined && results.alertPreview.bg === "#E8940D" && results.alertPreview.valueColor === "#1C1200",
 		`preview=${JSON.stringify(results.alertPreview ?? null)}`
 	);
+	// The value text sits at y="94". Dim blends it toward the face, so the
+	// dimmed frame must carry a different value fill from the plain frame
+	// taken under the same settings a moment earlier. Neither fill is
+	// hard-coded: the deck theme owns the plain color, and an earlier form
+	// that named it could pass on a frame from other settings.
+	const valueFillOf = (svg) => /y="94"[^>]*fill="(#[0-9A-Fa-f]{6})"/.exec(svg ?? "")?.[1];
 	check(
 		"deck-wide dim reaches a key with no local Text setting",
-		typeof results.deckDimFrame === "string" && results.deckDimFrame !== results.displayNoneFrame && !/y="94"[^>]*fill="#F4F6FA"/.test(results.deckDimFrame),
-		(results.deckDimFrame ?? "no frame").slice(0, 200)
+		typeof results.deckDimFrame === "string" && typeof results.deckDimPlainFrame === "string" && valueFillOf(results.deckDimPlainFrame) !== undefined && valueFillOf(results.deckDimFrame) !== undefined && valueFillOf(results.deckDimFrame) !== valueFillOf(results.deckDimPlainFrame),
+		`plain value fill ${valueFillOf(results.deckDimPlainFrame)}, dimmed ${valueFillOf(results.deckDimFrame)}`
 	);
 
 	// Data units: decimal vs binary re-tiering, PI preview via the same authority.
@@ -1044,7 +1068,9 @@ async function finish() {
 	check("the landing group's name shows on the dial", results.groupOverlaySeen === true);
 	check(
 		"stat mode survives page navigation (hidden-state cache)",
-		Array.isArray(results.dialReturnFrames) && results.dialReturnFrames.some((s) => s.includes("MIN")),
+		// The badge rides in the footer text ("▼ 40.0  ▲ 90.0  MIN"), so a
+		// whole-word match, not a bare substring or an element boundary.
+		Array.isArray(results.dialReturnFrames) && results.dialReturnFrames.some((s) => /\bMIN\b/.test(s)),
 		`${results.dialReturnFrames?.length ?? 0} frames after return`
 	);
 

@@ -200,6 +200,14 @@ try {
 	await expectFrame(frames, "layout grows → live values continue (reopened in place)", (svg) => svg.includes("Test Temp"), 10000);
 	const flashed = frames.slice(beforeGrow).filter((svg) => svg.includes("Source error") || svg.includes("No new data") || svg.includes("Start HWiNFO"));
 	check("no status frame during the growth transition", flashed.length === 0, flashed.length > 0 ? `${flashed.length} status frame(s) reached the deck` : "");
+	// "Test Temp" is entry 0 and unchanged by the growth, so its frames alone
+	// cannot tell a reopened session from one still reading the old layout.
+	// The reading the growth ADDED can: a key on it renders a value only when
+	// the new layout was actually read.
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge-grown", device: "dev1", payload: { settings: { readingKey: "f0001234:0:1000003", decimals: "1" }, coordinates: { column: 4, row: 0 }, controller: "Keypad", isInMultiAction: false } });
+	const grownRendered = await waitUntil(() => traffic.some((message) => message.context === "ctx-edge-grown" && message.svg !== null && message.svg.includes("Test Volt") && /<text x="72" y="94"[^>]*>-?\d/.test(message.svg)), 8000);
+	check("the reading the growth added renders its value (the new layout was read, not the stale session)", grownRendered, grownRendered ? "" : `last frame: ${traffic.findLast((message) => message.context === "ctx-edge-grown" && message.svg !== null)?.svg?.slice(0, 160) ?? "none"}`);
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge-grown", device: "dev1", payload: { settings: { readingKey: "f0001234:0:1000003", decimals: "1" }, coordinates: { column: 4, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
 	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });

@@ -43,7 +43,8 @@ const readings = snapshot.readings;
 console.log(`live inventory: ${readings.length} readings / ${snapshot.sensors.length} sensors`);
 
 // --- mock Stream Deck -----------------------------------------------------------
-const framesByCtx = new Map(); // ctx → frame count
+const framesByCtx = new Map();
+const statusByCtx = new Map(); // ctx → frame count
 const feedbacksByCtx = new Map();
 let totalFrames = 0;
 let totalFeedbacks = 0;
@@ -59,9 +60,15 @@ wss.on("connection", (ws) => {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: String(POLL_MS) } } });
 		} else if (msg.event === "setImage") {
 			const image = msg.payload?.image ?? "";
-			if (decodeSvg(image)?.includes('viewBox="0 0 144 144"') === true) {
+			const svg = decodeSvg(image);
+			if (svg?.includes('viewBox="0 0 144 144"') === true) {
 				framesByCtx.set(msg.context, (framesByCtx.get(msg.context) ?? 0) + 1);
 				totalFrames++;
+				// A status screen is a frame too, and the sweep must not count
+				// "Sensor missing" on every key as every reading rendered.
+				if (/Sensor missing|Pick a sensor|Start HWiNFO|Source busy|Source error|Bridge failed|Tick sensors/.test(svg)) {
+					statusByCtx.set(msg.context, (statusByCtx.get(msg.context) ?? 0) + 1);
+				}
 			} else {
 				invalidFrames++;
 			}
@@ -141,6 +148,10 @@ try {
 		await sleep(500);
 	}
 	check(`every reading rendered (${readings.length} contexts)`, missing === 0, missing === 0 ? `${totalFrames} frames` : `${missing} contexts frameless`);
+	// Every context came from the live probe, so a status face on any of
+	// them means the bundle did not resolve a reading the probe published.
+	const statusContexts = [...statusByCtx.keys()].filter((context) => context.startsWith("k")).length;
+	check("no key sat on a status screen during the sweep", statusContexts === 0, `${statusContexts} context(s) drew a status face`);
 	const dialsSeen = Array.from({ length: DIALS }, (_, d) => feedbacksByCtx.get(`dial${d}`) ?? 0).filter((n) => n > 0).length;
 	check(`all ${DIALS} dials rendered feedback`, dialsSeen === DIALS, `${dialsSeen}/${DIALS}, ${totalFeedbacks} feedbacks`);
 	check("no invalid frames", invalidFrames === 0, `${invalidFrames}`);

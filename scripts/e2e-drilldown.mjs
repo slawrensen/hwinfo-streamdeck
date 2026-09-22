@@ -33,6 +33,8 @@ const setSettings = []; // { context, payload }
 const showAlerts = []; // context
 
 const latestSvg = (context) => latestSvgIn(images, context);
+/** The first text node of a face: a reading tile's label. */
+const firstText = (svg) => /<text[^>]*>([^<]*)</.exec(svg ?? "")?.[1];
 
 let fake = null;
 let finished = false;
@@ -247,15 +249,17 @@ async function scenario(send) {
 	// G. A stateless surface (the plugin-restart shape): honest idle tiles,
 	// Back still gets you out. The pause clears Back's double-press
 	// debounce from leg F, as a real restart-later press would.
-	installDetailSurface(send, "dev1", standardCells);
+	// Its own id space ("-g"): leg F's Back frame already reads ">Back<", so
+	// a read of the unsuffixed slot could pass on that stale frame.
+	installDetailSurface(send, "dev1", standardCells, "-g");
 	await sleep(1700);
-	results.idleSlotFace = latestSvg(slot0Ctx);
-	results.idleBackFace = latestSvg(backCtx);
+	results.idleSlotFace = latestSvg(slotCtx("dev1", cellOfIndex(standardCells, 0).coord, "-g"));
+	results.idleBackFace = latestSvg(slotCtx("dev1", cellOfRole(standardCells, "back").coord, "-g"));
 	const switchesBeforeIdleBack = switches.length;
-	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings);
+	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings, "-g");
 	await waitUntil(() => switches.length > switchesBeforeIdleBack, 500);
 	results.idleBackSwitch = switches.length > switchesBeforeIdleBack ? switches.at(-1) : undefined;
-	removeDetailSurface(send, "dev1", standardCells);
+	removeDetailSurface(send, "dev1", standardCells, "-g");
 	await sleep(300);
 
 	// H. Honest refusals: an unsupported device (Pedal) and an unresolvable
@@ -308,10 +312,12 @@ async function scenario(send) {
 	await sleep(1400);
 	const xlTitleCtx = slotCtx("devxl", cellOfRole(xlCells, "title").coord);
 	results.xlTitle = latestSvg(xlTitleCtx);
-	const dev1FramesBeforeXlPaging = images.filter((i) => i.context.startsWith("slot-dev1-")).length;
+	// The XL page holds this whole list, so Next moves nothing here; the
+	// cross-device paging check lives in W2, on a list that pages. (An
+	// earlier "no dev1 slot repainted" count here ran over no dev1 surface
+	// at all, and a poll tick repaints every device anyway.)
 	slotPress(send, "devxl", cellOfRole(xlCells, "next").coord, cellOfRole(xlCells, "next").settings);
 	await sleep(700);
-	results.dev1FramesDuringXl = images.filter((i) => i.context.startsWith("slot-dev1-")).length - dev1FramesBeforeXlPaging;
 	slotPress(send, "devxl", cellOfRole(xlCells, "back").coord, cellOfRole(xlCells, "back").settings);
 	await sleep(400);
 	removeDetailSurface(send, "devxl", xlCells);
@@ -409,15 +415,18 @@ async function scenario(send) {
 	// generated Back renders the idle face and still gets the user out.
 	// The pause clears devr2's leave debounce from leg N first.
 	await sleep(1400);
-	installDetailSurface(send, "devr2", r2Cells);
+	// Its own id space ("-q"): leg N's frames on the unsuffixed Back context
+	// already read ">Back<" and would satisfy the idle-face read below.
+	installDetailSurface(send, "devr2", r2Cells, "-q");
 	await sleep(1700);
-	results.r2IdleBack = latestSvg(r2BackCtx);
+	const r2IdleBackCtx = slotCtx("devr2", r2Back.coord, "-q");
+	results.r2IdleBack = latestSvg(r2IdleBackCtx);
 	const switchesBeforeIdle = switches.length;
-	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
-	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2BackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: r2IdleBackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: r2IdleBackCtx, device: "devr2", payload: { settings: { detailRole: "back" }, coordinates: { column: 0, row: 0 } } });
 	await waitUntil(() => switches.length > switchesBeforeIdle, 500);
 	results.r2IdleBackSwitch = switches.length > switchesBeforeIdle ? switches.at(-1) : undefined;
-	removeDetailSurface(send, "devr2", r2Cells);
+	removeDetailSurface(send, "devr2", r2Cells, "-q");
 	await sleep(300);
 
 	// R. Two devices on revision 2: devr2 and dev1 hold independent
@@ -632,6 +641,25 @@ async function scenario(send) {
 	const pageSlot2Ctx = slotCtx("devpage", cellOfIndex(pageCells, 2).coord);
 	results.pageTitle1 = latestSvg(pageTitleCtx);
 	results.pageSlot0First = latestSvg(pageSlot0Ctx);
+	// A second device on the SAME list, in its own bundle: dev1's eleven
+	// slots hold all six readings (1-6 / 6), and paging the + must leave
+	// dev1's page and its first reading exactly where they were. Navigation
+	// state is per device, and this is the leg that proves it.
+	const w2Dev1At = { column: 4, row: 2 };
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-w2-dev1", device: "dev1", payload: { settings: pageOpener, coordinates: w2Dev1At, controller: "Keypad", isInMultiAction: false } });
+	await sleep(300);
+	const switchesBeforeW2Dev1 = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-w2-dev1", device: "dev1", payload: { settings: pageOpener, coordinates: w2Dev1At } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-w2-dev1", device: "dev1", payload: { settings: pageOpener, coordinates: w2Dev1At } });
+	await waitUntil(() => switches.length > switchesBeforeW2Dev1, 500);
+	results.w2Dev1Switch = switches.length > switchesBeforeW2Dev1 ? switches.at(-1) : undefined;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-w2-dev1", device: "dev1", payload: { settings: pageOpener, coordinates: w2Dev1At, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "dev1", standardCells, "-w");
+	await sleep(1600);
+	const w2Dev1TitleCtx = slotCtx("dev1", cellOfRole(standardCells, "title").coord, "-w");
+	const w2Dev1Slot0Ctx = slotCtx("dev1", cellOfIndex(standardCells, 0).coord, "-w");
+	results.w2Dev1Title1 = latestSvg(w2Dev1TitleCtx);
+	results.w2Dev1Slot0First = latestSvg(w2Dev1Slot0Ctx);
 	const pageNext = cellOfRole(pageCells, "next");
 	const pagePrevious = cellOfRole(pageCells, "previous");
 	slotPress(send, "devpage", pageNext.coord, pageNext.settings);
@@ -639,6 +667,14 @@ async function scenario(send) {
 	results.pageTitle2 = latestSvg(pageTitleCtx);
 	results.pageSlot0Second = latestSvg(pageSlot0Ctx);
 	results.pageSlot2Second = latestSvg(pageSlot2Ctx);
+	results.w2Dev1Title2 = latestSvg(w2Dev1TitleCtx);
+	results.w2Dev1Slot0Second = latestSvg(w2Dev1Slot0Ctx);
+	const switchesBeforeW2Dev1Back = switches.length;
+	slotPress(send, "dev1", cellOfRole(standardCells, "back").coord, cellOfRole(standardCells, "back").settings, "-w");
+	await waitUntil(() => switches.length > switchesBeforeW2Dev1Back, 500);
+	results.w2Dev1BackSwitch = switches.length > switchesBeforeW2Dev1Back ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "dev1", standardCells, "-w");
+	await sleep(300);
 	slotPress(send, "devpage", pagePrevious.coord, pagePrevious.settings);
 	await sleep(900);
 	results.pageTitle3 = latestSvg(pageTitleCtx);
@@ -770,7 +806,9 @@ async function finish() {
 	check("the release after a hold writes nothing (no ghost cycle)", results.holdGhostWrites === 0, `${results.holdGhostWrites} writes`);
 	check("the + XL entered its own bundle", results.xlSwitch?.device === "devxl" && results.xlSwitch?.profile === "profiles/detail-r3-plus-xl", JSON.stringify(results.xlSwitch));
 	check("the + XL title tile rendered", typeof results.xlTitle === "string" && results.xlTitle.includes("<text"));
-	check("paging devxl repainted no dev1 slot", results.dev1FramesDuringXl === 0, `${results.dev1FramesDuringXl} frames`);
+	check("two devices page independently: dev1 entered the same list on its own bundle", results.w2Dev1Switch?.device === "dev1" && typeof results.w2Dev1Title1 === "string" && results.w2Dev1Title1.includes(">1-6 / 6<"), `${JSON.stringify(results.w2Dev1Switch)} ${(results.w2Dev1Title1 ?? "no frame").slice(0, 120)}`);
+	check("two devices page independently: the + moved to 5-6 / 6 and dev1 stayed on 1-6 / 6 with its first reading", typeof results.pageTitle2 === "string" && results.pageTitle2.includes(">5-6 / 6<") && typeof results.w2Dev1Title2 === "string" && results.w2Dev1Title2.includes(">1-6 / 6<") && firstText(results.w2Dev1Slot0Second) !== undefined && firstText(results.w2Dev1Slot0Second) === firstText(results.w2Dev1Slot0First) && firstText(results.w2Dev1Slot0Second) !== firstText(results.pageSlot0Second), `dev1 title ${(results.w2Dev1Title2 ?? "no frame").slice(0, 100)}; dev1 slot 0 ${firstText(results.w2Dev1Slot0First)} -> ${firstText(results.w2Dev1Slot0Second)}; + slot 0 ${firstText(results.pageSlot0Second)}`);
+	check("two devices page independently: dev1's own Back left with its device id", results.w2Dev1BackSwitch?.device === "dev1" && results.w2Dev1BackSwitch?.profile === undefined, JSON.stringify(results.w2Dev1BackSwitch));
 	check("a 10x10 Virtual Stream Deck enters as a guest of the + XL keypad", results.vsdSwitch?.device === "devvsd" && results.vsdSwitch?.profile === "profiles/detail-r3-plus-xl", JSON.stringify(results.vsdSwitch));
 
 	// Revision-2 configurable Back (the generated Sensor Reading cell)
@@ -910,7 +948,9 @@ async function finish() {
 			if (!settled) {
 				settled = true;
 				clearTimeout(timer);
-				resolve({ clean: true, detail: `self-exited (code ${code})` });
+				// An exit is clean only when it is code 0: a plugin that throws
+				// in its close path leaves the same way, one code higher.
+				resolve({ clean: code === 0, detail: `self-exited (code ${code})` });
 			}
 		});
 		for (const client of wss.clients) {

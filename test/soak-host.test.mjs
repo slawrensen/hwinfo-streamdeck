@@ -189,6 +189,17 @@ describe("soak log tail across a rotation", () => {
 		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
 	});
 
+	it("a primed tail whose log directory vanished says logs-missing, never a clean sample", (t) => {
+		const { dir, append } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
+		fs.rmSync(dir, { recursive: true, force: true });
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "logs-missing" });
+		assert.deepEqual(poll(), { warn: 0, error: 0, note: "logs-missing" });
+		fs.mkdirSync(dir);
+	});
+
 	it("a poll between the SDK's rename and its first new line re-counts nothing", (t) => {
 		const { dir, log, append } = logDir(t);
 		append(0, WARN + WARN + ERROR); // history from before the soak

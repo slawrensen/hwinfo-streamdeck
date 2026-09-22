@@ -84,7 +84,10 @@ export function makeLogTail(dir) {
 	return function poll() {
 		const current = newest();
 		if (current === null) {
-			return { warn: 0, error: 0, note: primed ? "" : "logs-missing" };
+			// Before priming, nothing to baseline yet. After it, the tailed log
+			// is gone: a sample with no log behind it is not a clean one, and
+			// the summary says so instead of reading "0 / 0" over the gap.
+			return { warn: 0, error: 0, note: "logs-missing" };
 		}
 		const st = fs.statSync(current, { bigint: true });
 		const size = Number(st.size);

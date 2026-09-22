@@ -171,8 +171,9 @@ Per-reading dial colors and reliability fixes in one release candidate.
   the key or dial image.
 - Release builds validate exact tag and package versions, and a dated
   CHANGELOG entry for the tag, before installing dependencies, and only
-  the separate release-staging job receives write permission; it stages a
-  draft release rather than publishing one. The
+  the separate release-staging job receives write permission, and the CI
+  workflow runs under a read-only token; the release stages a draft rather
+  than publishing one. The
   external soak monitor now distinguishes plugin and host resources,
   process restarts and failed observations.
 - `release-native-manifest.json` records the Windows SDK version the addon

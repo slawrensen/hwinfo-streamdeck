@@ -73,6 +73,16 @@ describe("release input gate", () => {
 	});
 });
 
+describe("ci workflow privilege boundary", () => {
+	it("runs dependency installs and native builds under a read-only token", () => {
+		const workflow = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+		const permissions = workflow.match(/^permissions:\n((?: {2}.*\n)+)/m);
+		assert.ok(permissions, "ci.yml must declare workflow-level permissions");
+		assert.equal(permissions[1], "  contents: read\n");
+		assert.doesNotMatch(workflow, /^ {4}permissions:/m, "no job widens the workflow token");
+	});
+});
+
 describe("release workflow privilege boundary", () => {
 	it("validates a data-only tag before npm and restricts write access to staging", () => {
 		const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8");

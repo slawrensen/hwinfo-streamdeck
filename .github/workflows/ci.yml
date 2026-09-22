@@ -31,6 +31,12 @@ on:
     branches: [main]
   pull_request:
 
+# Nothing here writes to the repository: npm ci runs third-party install
+# scripts and build:native runs the native toolchain, so the token they can
+# reach stays read-only, as it already does in release.yml.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: windows-2025

@@ -1373,6 +1373,27 @@ describe("integrity: one contradictory row does not take the source down", { ski
 		}
 	});
 
+	test("a contradiction streak follows the reading, not the slot it was seen in", () => {
+		shape([0, 8], (i) => ({ sensor: "CPU [#0]: Reused slot", label: i === 0 ? "Package" : "Core 0", raw: "40", value: "40 °C" }));
+		const provider = GadgetRegistryProvider.open();
+		try {
+			readVerified(provider);
+			putValue("Value0", "99 °C");
+			assert.equal(provider.read(), null, "the first contradictory sighting of Package skips the scan");
+			// A renumber puts another reading in slot 0, itself torn on this
+			// very scan: its first sighting is a skip, not a withheld row.
+			putValue("Label0", "Core 1");
+			putValue("Value0", "12 V");
+			putValue("ValueRaw0", "3");
+			assert.equal(provider.read(), null, "another reading landing in a torn slot starts its own count");
+			assert.deepEqual(provider.notices(), [], "nothing is reported on a first sighting");
+			const standing = readVerified(provider);
+			assert.deepEqual(labels(standing), ["Core 0"], "the third scan withholds the row that contradicted itself twice running");
+			assert.equal(standing.contradictoryReadingCount, 1);
+			assert.match(provider.notices().join("; "), /slot 0 withheld.*Core 1/);
+		} finally { provider.close(); }
+	});
+
 	test("an old baseline is not adopted, but what was reported stays reported", () => {
 		shape([0, 1], (i) => (i === 0 ? { sensor: "Alpha Source", label: "Package", value: "55.0 °C", raw: "55" } : { sensor: "Alpha Source", label: "Hot Spot", value: "104.0 °F", raw: "40" }));
 		const first = GadgetRegistryProvider.open();

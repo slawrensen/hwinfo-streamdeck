@@ -114,10 +114,13 @@ export class GadgetRegistryProvider {
 	 * a shared name, so a reopen that adopts the previous provider's report
 	 * lists can take back what it re-raised. */
 	private readonly pendingNotices = new Map<number | string, string>();
-	/** Consecutive scans each slot has contradicted itself. One sighting is
-	 * indistinguishable from reading between HWiNFO's two stores for a row,
-	 * so it skips the scan like any interleave; the second withholds the row. */
-	private contradictionStreak = new Map<number, number>();
+	/** Consecutive scans each slot has contradicted itself, and which reading
+	 * was doing so. One sighting is indistinguishable from reading between
+	 * HWiNFO's two stores for a row, so it skips the scan like any
+	 * interleave; the second withholds the row. Slot numbers are reused by
+	 * every renumber, so another reading landing in a torn slot starts its
+	 * own count: its first sighting is a skip too, not a withheld row. */
+	private contradictionStreak = new Map<number, { identity: string; count: number }>();
 	/** Names seen on more than one row, by reading key (see readEntries).
 	 * Rebuilt by every complete scan, so an entry lives while its name is
 	 * shared plus one scan. In memory only: nothing here reaches the disk or
@@ -362,14 +365,17 @@ export class GadgetRegistryProvider {
 		// it is withheld on its own, counted and logged once, and every
 		// healthy row keeps serving. A whole-scan refusal there would take
 		// the source down forever under a "retrying" screen.
-		const streak = new Map<number, number>();
-		for (const { slot } of contradictions) streak.set(slot, (this.contradictionStreak.get(slot) ?? 0) + 1);
+		const streak = new Map<number, { identity: string; count: number }>();
+		for (const { slot, identity } of contradictions) {
+			const previous = this.contradictionStreak.get(slot);
+			streak.set(slot, { identity, count: previous !== undefined && previous.identity === identity ? previous.count + 1 : 1 });
+		}
 		this.contradictionStreak = streak;
 		// Both records advance on every complete scan before either may skip
 		// it. Skipping for one before the other advanced would take a key
 		// holding a standing pair AND a standing contradiction two skips to
 		// confirm, and open() reads only twice.
-		if (firstSighting || settling || [...streak.values()].some((count) => count < 2)) return null;
+		if (firstSighting || settling || [...streak.values()].some(({ count }) => count < 2)) return null;
 		for (const { slot, identity, notice } of contradictions) {
 			if (this.reportedSlots.get(slot) !== identity) {
 				this.reportedSlots.set(slot, identity);
@@ -471,8 +477,11 @@ export class GadgetRegistryProvider {
 			if (this.reportedSlots.get(slot) === identity) this.pendingNotices.delete(slot);
 			else if (!this.reportedSlots.has(slot)) this.reportedSlots.set(slot, identity);
 		}
-		for (const [slot, count] of from.contradictionStreak) {
-			this.contradictionStreak.set(slot, Math.max(count, this.contradictionStreak.get(slot) ?? 0));
+		for (const [slot, record] of from.contradictionStreak) {
+			const own = this.contradictionStreak.get(slot);
+			if (own === undefined || own.identity === record.identity) {
+				this.contradictionStreak.set(slot, { identity: record.identity, count: Math.max(record.count, own?.count ?? 0) });
+			}
 		}
 		// A name the previous provider held stays held. A key HWiNFO is still
 		// refilling after a restart can show one twin alone, and this

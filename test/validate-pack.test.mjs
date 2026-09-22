@@ -104,6 +104,19 @@ describe("packed-archive gate", () => {
 	});
 
 	it("reads ZIP64 per-entry sizes the packer writes and refuses a marked size it does not carry", () => {
+		// Sizes marked 0xFFFFFFFF and carried in the 0x0001 field, as the CLI
+		// writes them: the field is parsed, the sizes come out right, every
+		// member inflates, and the archive passes whole.
+		const zip64 = archiveFor(staging, (entries) => entries.map((entry) => ({ ...entry, zip64: true })));
+		assert.ok(zip64.includes(Buffer.from([0x01, 0x00, 0x10, 0x00])), "the fixture carries a ZIP64 extended information field");
+		const wide = listZip(zip64);
+		assert.deepEqual(wide.problems, []);
+		assert.equal(wide.entries.length, SHIPPED_MEMBERS.length);
+		for (const entry of wide.entries) {
+			assert.ok(entry.uncompressedSize < 0xffffffff && entry.compressedSize < 0xffffffff, `${entry.name}: sizes read from the field`);
+			assert.equal(readZipEntry(zip64, entry).length, entry.uncompressedSize);
+		}
+		assert.deepEqual(run(zip64).failures, []);
 		const good = archiveFor(staging);
 		const { entries } = listZip(good);
 		assert.equal(entries.length, SHIPPED_MEMBERS.length);

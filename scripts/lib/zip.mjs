@@ -5,7 +5,9 @@
 // reported instead of guessed at. Sizes and CRCs come from the central
 // directory too, because the Elgato CLI writes local headers with the
 // data-descriptor flag (bit 3), where those fields are zero. Every member
-// read is inflated in full and checked against its CRC-32 and both sizes.
+// read is inflated in full and checked against its CRC-32 and uncompressed
+// size; the compressed size is the bound the inflater may not run past (an
+// overstated one is not detected, an understated one is).
 // ZIP64, multi-disk and encrypted archives are refused: a 300 KB plugin
 // never needs them, and refusing keeps the parser honest about what it
 // understood. The writer exists for tests (fixtures that must be wrong in
@@ -196,16 +198,28 @@ export function writeZip(entries, { corrupt } = {}) {
 		dir.writeUInt16LE(0, 12);
 		dir.writeUInt16LE(((2026 - 1980) << 9) | (1 << 5) | 1, 14);
 		dir.writeUInt32LE(record.crc, 16);
-		dir.writeUInt32LE(record.compressedSize, 20);
-		dir.writeUInt32LE(record.uncompressedSize, 24);
+		// `zip64: true` writes the sizes the way the Elgato CLI does: marked
+		// 0xFFFFFFFF in the directory and carried in a ZIP64 extended
+		// information field (uncompressed, then compressed), so a fixture can
+		// exercise the reader's field parsing without a 4 GB archive.
+		const zip64 = entry.zip64 === true;
+		const extra = zip64 ? Buffer.alloc(20) : Buffer.alloc(0);
+		if (zip64) {
+			extra.writeUInt16LE(0x0001, 0);
+			extra.writeUInt16LE(16, 2);
+			extra.writeBigUInt64LE(BigInt(record.uncompressedSize), 4);
+			extra.writeBigUInt64LE(BigInt(record.compressedSize), 12);
+		}
+		dir.writeUInt32LE(zip64 ? 0xffffffff : record.compressedSize, 20);
+		dir.writeUInt32LE(zip64 ? 0xffffffff : record.uncompressedSize, 24);
 		dir.writeUInt16LE(name.length, 28);
-		dir.writeUInt16LE(0, 30);
+		dir.writeUInt16LE(extra.length, 30);
 		dir.writeUInt16LE(0, 32);
 		dir.writeUInt16LE(0, 34);
 		dir.writeUInt16LE(0, 36);
 		dir.writeUInt32LE(0, 38);
 		dir.writeUInt32LE(offset, 42);
-		central.push(dir, name);
+		central.push(dir, name, extra);
 		offset += size;
 	}
 	const directory = Buffer.concat(central);

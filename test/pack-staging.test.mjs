@@ -63,8 +63,11 @@ describe("pack through a staged copy", () => {
 		assert.deepEqual(payload(first), payload(second));
 	});
 
-	it("a failing packer leaves no archive, no staged copy and no change", () => {
-		fs.rmSync(path.join(outputDir, archiveName), { force: true });
+	it("a failing packer leaves no archive, not even a stale one, no staged copy and no change", () => {
+		// An archive from an earlier pack sits in the output directory; a
+		// packer failure must not leave it there to be validated later.
+		fs.mkdirSync(outputDir, { recursive: true });
+		fs.writeFileSync(path.join(outputDir, archiveName), "stale archive from an earlier pack");
 		assert.throws(() => packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: (stagedDir) => { stagedSeen.push(stagedDir); throw new Error("streamdeck pack exited with 1"); }, log: () => {} }), /exited with 1/);
 		assert.equal(fs.existsSync(path.join(outputDir, archiveName)), false);
 		assert.equal(fs.existsSync(stagedSeen.at(-1)), false);

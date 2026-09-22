@@ -68,6 +68,10 @@ export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacke
 	try {
 		copyStaged(sourceDir, stagedDir, "");
 		fs.mkdirSync(outputDir, { recursive: true });
+		// The previous archive goes before the packer runs: a packer that
+		// fails must not leave yesterday's file where a later stage would
+		// validate it as today's.
+		fs.rmSync(archivePath, { force: true });
 		runPacker(stagedDir, outputDir);
 		if (!fs.existsSync(archivePath)) throw new Error(`the packer left no ${path.basename(archivePath)} in ${outputDir}`);
 		const { failures, members, payload } = validatePack({ archiveBytes: fs.readFileSync(archivePath), stagingDir: sourceDir, packageVersion });

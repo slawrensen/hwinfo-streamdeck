@@ -26,6 +26,12 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 // HWINFO_E2E_PLUGIN_DIR points the run at another plugin directory (bytes
 // extracted from a packed archive, for instance); the default is the checkout.
 const pluginDir = process.env.HWINFO_E2E_PLUGIN_DIR ? path.resolve(process.env.HWINFO_E2E_PLUGIN_DIR) : path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+// A directory with no bundle cannot be driven: refuse up front instead of
+// failing every bounded step against a plugin that never spawned.
+if (!fs.existsSync(path.join(pluginDir, "bin", "plugin.js"))) {
+	console.error(`e2e-resilience: no bin/plugin.js under ${pluginDir}; build the checkout or point HWINFO_E2E_PLUGIN_DIR at an extracted plugin directory.`);
+	process.exit(2);
+}
 
 // The bytes this run drives, named up front so a log line ties the verdict
 // to one plugin.js and one hwsm.node, whichever directory they came from.

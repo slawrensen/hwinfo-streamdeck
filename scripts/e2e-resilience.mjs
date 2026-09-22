@@ -15,13 +15,24 @@
 // Run with `npm run e2e:resilience` (after `npm run build`).
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { buildInfo, decodeSvg, makeCheck, makeExpectFrame, pluginArgv, sleep, waitUntil } from "./lib/e2e-common.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+// HWINFO_E2E_PLUGIN_DIR points the run at another plugin directory (bytes
+// extracted from a packed archive, for instance); the default is the checkout.
+const pluginDir = process.env.HWINFO_E2E_PLUGIN_DIR ? path.resolve(process.env.HWINFO_E2E_PLUGIN_DIR) : path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+
+// The bytes this run drives, named up front so a log line ties the verdict
+// to one plugin.js and one hwsm.node, whichever directory they came from.
+for (const member of ["bin/plugin.js", "bin/hwsm.node"]) {
+	const file = path.join(pluginDir, ...member.split("/"));
+	console.log(`PLUGIN BYTES ${JSON.stringify({ dir: pluginDir, member, sha256: fs.existsSync(file) ? createHash("sha256").update(fs.readFileSync(file)).digest("hex") : null })}`);
+}
 
 const MAPPING_NAME = `Local\\HwinfoE2E_SM2_${process.pid}`;
 const MUTEX_NAME = `${MAPPING_NAME}_MUTEX`;

@@ -151,8 +151,9 @@ physical readability. See the [display reference](docs/themes.md#the-display-sys
 
 One reader serves all keys and dials. HWiNFO's own polling period (2 s by
 default, set in HWiNFO) decides how often values change. The plugin reads
-Shared Memory four times a second and the Gadget registry once a second;
-reading faster than HWiNFO does not create extra sensor samples.
+Shared Memory four times a second and the Gadget registry once a second
+(less often when a scan is slow); reading faster than HWiNFO does not
+create extra sensor samples.
 
 ## Building from source
 

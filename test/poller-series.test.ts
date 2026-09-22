@@ -42,15 +42,34 @@ describe("the read cadence follows the open source", () => {
 		assert.deepEqual([subject.diagnostics().intervalMs, subject.diagnostics().hwinfoPollingPeriodMs], [1000, null], "Gadget publishes no period");
 	});
 
-	it("a slow read stretches the interval so reading stays within a tenth of the thread", () => {
-		const subject = isolated();
-		subject.openProvider = () => ({ source: "shared-memory", close() {}, read: () => {
-			const until = performance.now() + 40;
-			while (performance.now() < until) { /* a 40 ms read */ }
+	it("a slow Gadget attempt stretches its interval; a Shared Memory stall does not", () => {
+		const spin = (ms: number): void => {
+			const until = performance.now() + ms;
+			while (performance.now() < until) { /* a slow scan */ }
+		};
+		const slowScan = isolated();
+		slowScan.setSourceMode("gadget");
+		slowScan.openProvider = () => ({ source: "gadget", close() {}, read: () => {
+			spin(150);
+			return { ...snapshotAt(700, 40), freshnessRevision: 1 };
+		} });
+		slowScan.tick();
+		assert.ok(slowScan.tickMs() >= 1500, `${slowScan.tickMs()} ms after a 150 ms scan`);
+		const refused = isolated();
+		refused.setSourceMode("gadget");
+		refused.openProvider = () => {
+			spin(150);
+			throw new HwinfoError("invalid", "synthetic refused scan");
+		};
+		refused.tick();
+		assert.ok(refused.tickMs() >= 1500, `${refused.tickMs()} ms after a refused 150 ms scan`);
+		const stalled = isolated();
+		stalled.openProvider = () => ({ source: "shared-memory", close() {}, read: () => {
+			spin(40);
 			return snapshotAt(700, 40);
 		} });
-		subject.tick();
-		assert.ok(subject.tickMs() >= 400, `${subject.tickMs()} ms after a 40 ms read`);
+		stalled.tick();
+		assert.equal(stalled.tickMs(), 250, "stretching after a stall would skip HWiNFO writes");
 	});
 
 	it("a busy Shared Memory read keeps the sparkline unless the skip could hide an HWiNFO write", () => {
@@ -98,9 +117,10 @@ describe("the read cadence follows the open source", () => {
 		let ticks = 0;
 		subject.onTick(() => ticks++);
 		subject.retain();
-		await sleep(1200);
+		await sleep(2300);
 		subject.release();
-		assert.ok(ticks >= 1 && ticks <= 2, `${ticks} tick(s) in 1.2 s`);
+		// Start, 1 s, 2 s: late timers can cost the last one, never add one.
+		assert.ok(ticks >= 2 && ticks <= 3, `${ticks} tick(s) in 2.3 s`);
 	});
 
 	it("a throwing tick listener cannot end the reads", async () => {

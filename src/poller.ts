@@ -63,7 +63,7 @@ type SourceMode = "auto" | "shared-memory" | "gadget";
  * period down to 500 ms is not under-sampled. A Gadget read scans the
  * ticked list (about 5 ms for 39 readings, about 150 ms for 554), and with
  * no source open a tick is only an open attempt: both run once a second,
- * slower when a read is slow (see tickMs). HWINFO_TICK_MS pins every
+ * slower when an attempt is slow (see tickMs). HWINFO_TICK_MS pins every
  * cadence for the e2e harnesses.
  */
 const PINNED_TICK_MS = Number(process.env.HWINFO_TICK_MS ?? "") || 0;
@@ -98,8 +98,9 @@ class HwinfoPoller extends EventEmitter {
 	private provider: SnapshotProvider | null = null;
 	private timer: NodeJS.Timeout | null = null;
 	private refs = 0;
-	/** How long the open provider's last read took; feeds tickMs. */
-	private readCostMs = 0;
+	/** How long the last attempt took to open (when it had to) and read,
+	 * failed or not; feeds tickMs. */
+	private attemptCostMs = 0;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
 	private lastValueRevision: number | undefined;
@@ -272,14 +273,16 @@ class HwinfoPoller extends EventEmitter {
 
 	/**
 	 * The cadence of the source that is open right now (see
-	 * SHARED_MEMORY_TICK_MS), stretched when a read is slow so reading stays
-	 * within about a tenth of the plugin's one thread (a Gadget key with
-	 * every reading ticked scans for about 150 ms).
+	 * SHARED_MEMORY_TICK_MS). Anything but Shared Memory is stretched when
+	 * an attempt is slow, so reading stays within about a tenth of the
+	 * plugin's one thread (a Gadget key with every reading ticked scans for
+	 * about 150 ms). A slow Shared Memory read is a stall, not a cost:
+	 * stretching after one would skip HWiNFO writes.
 	 */
 	private tickMs(): number {
 		if (PINNED_TICK_MS > 0) return PINNED_TICK_MS;
-		const base = this.provider?.source === "shared-memory" ? SHARED_MEMORY_TICK_MS : DEFAULT_TICK_MS;
-		return Math.max(base, 10 * this.readCostMs);
+		if (this.provider?.source === "shared-memory") return SHARED_MEMORY_TICK_MS;
+		return Math.max(DEFAULT_TICK_MS, 10 * this.attemptCostMs);
 	}
 
 	/**
@@ -327,7 +330,6 @@ class HwinfoPoller extends EventEmitter {
 	private dropProvider(): void {
 		this.provider?.close();
 		this.provider = null;
-		this.readCostMs = 0;
 		this.lastPollTime = -1;
 	}
 
@@ -411,6 +413,7 @@ class HwinfoPoller extends EventEmitter {
 	}
 
 	private tick(): void {
+		const attemptStart = monotonicNow();
 		try {
 			if (this.provider === null) {
 				this.provider = this.openProvider();
@@ -421,9 +424,7 @@ class HwinfoPoller extends EventEmitter {
 
 			let snapshot: SensorSnapshot | null;
 			try {
-				const readStart = monotonicNow();
 				snapshot = this.provider.read();
-				this.readCostMs = monotonicNow() - readStart;
 			} catch (err) {
 				if (!(err instanceof HwinfoError) || err.reason !== "invalid") {
 					throw err;
@@ -444,6 +445,7 @@ class HwinfoPoller extends EventEmitter {
 					? `Data source layout changed; reopened in place (${this.provider.source})`
 					: `Opened HWiNFO data source: ${this.provider.source} (${poisoned} became unreadable)`);
 			}
+			this.attemptCostMs = monotonicNow() - attemptStart;
 			for (const line of this.provider.notices?.() ?? []) this.logger.warn(line);
 			this.holdingSince = 0;
 			if (snapshot !== null) {
@@ -546,6 +548,9 @@ class HwinfoPoller extends EventEmitter {
 			}
 			// Otherwise (skipped read, still fresh): keep the previous status.
 		} catch (err) {
+			// A failing attempt still paid for its open and scan (a Gadget key
+			// refused on every tick scans it every tick).
+			this.attemptCostMs = monotonicNow() - attemptStart;
 			for (const ring of this.series.values()) ring.length = 0;
 			this.preserveFreshness();
 			this.dropProvider();

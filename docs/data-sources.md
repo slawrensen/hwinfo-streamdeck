@@ -86,7 +86,7 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 
 HWiNFO decides how often values change: it polls its sensors once per polling period, **2 seconds** by default, set in HWiNFO's own settings. No plugin setting can make values change faster. For faster updates, shorten HWiNFO's polling period.
 
-The plugin reads Shared Memory four times a second, so a new HWiNFO value waits about a quarter second at most, and while every read succeeds none is missed at a polling period of 500 ms or longer. It reads the Gadget registry once a second, so a polling period under a second shows at most once a second there. A slow read stretches either interval so reading stays within about a tenth of the plugin's time: on my bench a Gadget scan takes about 5 ms with 39 readings ticked and about 150 ms with all 554, against about 10 µs for a Shared Memory read. One reader serves every visible key and dial.
+The plugin reads Shared Memory four times a second, so a new HWiNFO value waits about a quarter second at most, and while every read succeeds none is missed at a polling period of 500 ms or longer. It reads the Gadget registry once a second, so a polling period under a second shows at most once a second there. A slow Gadget scan stretches its interval so reading stays within about a tenth of the plugin's time: on my bench a Gadget scan takes about 5 ms with 39 readings ticked and about 150 ms with all 554, against about 10 µs for a Shared Memory read. One reader serves every visible key and dial.
 
 Earlier versions had a **Poll every** setting. A value saved there is ignored. The support report shows both rates: `intervalMs` is the plugin's current read interval and `hwinfoPollingPeriodMs` is HWiNFO's polling period as Shared Memory reports it.
 
@@ -209,8 +209,9 @@ row, for the same reason.
 
 Sparklines collect changed values between producer timestamps as well as
 advancing timestamps. Repeated held frames do not add points. A skipped
-read that could have hidden an update (always on Gadget; on Shared Memory
-once the skipped reads span half of HWiNFO's polling period), a missing or
+read that could have hidden an update (always when HWiNFO's polling period
+is unknown, as on Gadget; otherwise once the gap between successful reads
+reaches half of that period), a missing or
 non-finite reading, stale data, a reading-type or native-unit change, or a
 provider transition clears the segment while retaining the subscription.
 A pairing edit

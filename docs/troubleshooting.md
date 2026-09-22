@@ -178,7 +178,7 @@ Dial gesture reference (Legacy preset, the default): **rotate** cycles your rota
 
 The plugin runs one poller regardless of how many keys are visible, and is designed to idle when no keys are shown.
 
-1. **Perceived high CPU.** There is no plugin poll rate to lower: a Shared Memory read takes about 10 µs, and reading stays within about a tenth of the plugin's time (see [update rate](data-sources.md#update-rate)). On Gadget the cost grows with the ticked list, so tick only the readings you put on the deck. If the plugin process still holds CPU, note how many keys and dials are live and attach the log.
+1. **Perceived high CPU.** There is no plugin poll rate to lower: a Shared Memory read takes about 10 µs, and a slow Gadget scan is read less often, so reading stays within about a tenth of the plugin's time (see [update rate](data-sources.md#update-rate)). On Gadget the cost grows with the ticked list, so tick only the readings you put on the deck. If the plugin process still holds CPU, note how many keys and dials are live and attach the log.
 2. **Process lingering after Stream Deck quits.** The plugin watches its parent and exits when Stream Deck dies; if you ever find an orphaned `plugin.js`/Node process, ending it is safe and Stream Deck respawns it on next launch. If it recurs, capture the log (below) and file an issue.
 3. **Memory climbing.** The plugin is memory-stable under long soaks in testing. If you observe real growth, note how many keys/dials are live and attach the log.
 

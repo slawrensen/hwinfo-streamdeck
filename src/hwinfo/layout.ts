@@ -33,7 +33,11 @@ export const HEADER = {
 	sensorElementCount: 28,
 	entrySectionOffset: 32,
 	entryElementSize: 36,
-	entryElementCount: 40
+	entryElementCount: 40,
+	// u32, HWiNFO's current sensor polling period in ms (2000 by default).
+	// Header revision 1 and later only, and only when both sections start
+	// past it: the revision-0 header ends at HEADER_SIZE.
+	pollingPeriod: 44
 } as const;
 
 /**

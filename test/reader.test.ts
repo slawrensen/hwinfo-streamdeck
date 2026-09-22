@@ -39,6 +39,8 @@ interface ComposeOptions {
 	utf8?: boolean;
 	revision?: number;
 	pollTime?: number;
+	/** Writes the revision-1 header: 48 bytes, this period at offset 44. */
+	pollingPeriodMs?: number;
 }
 
 /** Builds a complete synthetic mapping in either stride layout. */
@@ -46,7 +48,7 @@ function compose(sensors: FakeSensor[], entries: FakeEntry[], opts: ComposeOptio
 	const utf8 = opts.utf8 === true;
 	const sensorSize = utf8 ? SENSOR_UTF8_SIZE : SENSOR_CLASSIC_SIZE;
 	const entrySize = utf8 ? ENTRY_UTF8_SIZE : ENTRY_CLASSIC_SIZE;
-	const sensorOff = HEADER_SIZE;
+	const sensorOff = opts.pollingPeriodMs === undefined ? HEADER_SIZE : HEADER.pollingPeriod + 4;
 	const entryOff = sensorOff + sensors.length * sensorSize;
 	const buf = Buffer.alloc(entryOff + entries.length * entrySize);
 
@@ -60,6 +62,7 @@ function compose(sensors: FakeSensor[], entries: FakeEntry[], opts: ComposeOptio
 	buf.writeUInt32LE(entryOff, HEADER.entrySectionOffset);
 	buf.writeUInt32LE(entrySize, HEADER.entryElementSize);
 	buf.writeUInt32LE(entries.length, HEADER.entryElementCount);
+	if (opts.pollingPeriodMs !== undefined) buf.writeUInt32LE(opts.pollingPeriodMs, HEADER.pollingPeriod);
 
 	const cstr = (text: string, offset: number, width: number, enc: "latin1" | "utf8"): void => {
 		buf.fill(0, offset, offset + width);
@@ -299,6 +302,28 @@ describe("Shared Memory identity fails closed", () => {
 			assert.equal(lost.byKey.size, 0, "an empty owner table has no positional fallback identity");
 		});
 	}
+});
+
+describe("HWiNFO's declared polling period", () => {
+	it("is read from a revision-1 header on the rebuild and the fast path, and is not a value", () => {
+		const parser = new SnapshotParser();
+		const first = parser.parse(compose([CPU], [TEMP], { revision: 1, pollingPeriodMs: 2000 }));
+		assert.equal(first.pollingPeriodMs, 2000);
+		const rev = first.valueRevision;
+		// Changing it in HWiNFO rewrites the field in place under the same layout.
+		const next = parser.parse(compose([CPU], [TEMP], { revision: 1, pollingPeriodMs: 500 }));
+		assert.equal(next, first, "still the fast path");
+		assert.equal(next.pollingPeriodMs, 500);
+		assert.equal(next.valueRevision, rev, "a period change moves no value");
+	});
+
+	it("is absent where the header does not carry one", () => {
+		assert.equal(parseSnapshot(compose([CPU], [TEMP], { revision: 0, pollingPeriodMs: 2000 })).pollingPeriodMs, undefined, "revision 0 predates the field");
+		// A revision-2 claim over a 44-byte header: offset 44 is the first
+		// sensor's id (0xf0000501), which must never read as a period.
+		assert.equal(parseSnapshot(compose([CPU], [TEMP], { revision: 2 })).pollingPeriodMs, undefined, "a section starting at 44 leaves no field");
+		assert.equal(parseSnapshot(compose([CPU], [TEMP], { revision: 1, pollingPeriodMs: 0 })).pollingPeriodMs, undefined, "zero is no period");
+	});
 });
 
 describe("SnapshotParser — incremental fast path", () => {

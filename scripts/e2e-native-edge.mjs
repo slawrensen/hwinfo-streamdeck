@@ -140,7 +140,7 @@ async function identityRegression() {
 	}
 	send({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge", device: "dev1", payload: { settings: { readingKey: READING_KEY, decimals: "0" }, coordinates: { column: 0, row: 0 }, controller: "Keypad", isInMultiAction: false } });
 	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-edge", device: "dev1" });
-	send({ event: "didReceiveGlobalSettings", payload: { settings: { source: "shared-memory", pollIntervalMs: "250" } } });
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { source: "shared-memory" } } });
 	for (const [phase, expectedFan] of [["duplicate", [1210, 801, 2001, 1251]], ["swapped", [1300, 810, 2100, 1350]], ["orphan", [1400, 820, 2200, 1450]], ["unique", [1500, 830, 2300, 1550]]]) {
 		const phaseStart = traffic.length;
 		await producerCommand(`identity-${phase}`, `IDENTITY ${phase}`);
@@ -212,19 +212,23 @@ try {
 	// A plugin.js next to a wrong-protocol hwsm.node must fail closed.
 	await expectFrame(mismatchFrames, "protocol-mismatched addon → 'Bridge failed'", (svg) => svg.includes("Bridge failed"), 10000, { fromStart: true });
 
-	// Keep the same provider/parser and establish a frozen-value baseline.
-	// The next freeze command republishes only the producer timestamp. Its
-	// age exceeds this harness's 2500 ms grace before the next 5000 ms poll:
-	// a parser revision must not turn that old heartbeat into fresh values.
+	// A timestamp-only update is aged by its own stamp, never by when it is
+	// read: a parser revision must not turn an old heartbeat into fresh
+	// values. Freeze until the key is stale, then republish the frozen values
+	// under a stamp already older than this harness's 2500 ms grace. The key
+	// must stay stale across a dozen Shared Memory reads; a fresh stamp after
+	// it is the control that such an update is read at all.
+	const live = (svg) => svg.includes("Test Temp") && svg.includes("°C") && !svg.includes("Not updating");
 	await freezeProducer();
-	await sleep(1200);
-	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "5000" } } });
-	await sleep(1100);
+	await expectFrame(frames, "a frozen producer goes stale", (svg) => svg.includes("Not updating"), 6000);
+	const backdatedFrom = frames.length;
+	await producerCommand("backdate", "BACKDATED");
+	await sleep(3000);
+	check("an old timestamp-only update keeps its producer age (the key stays stale)", !frames.slice(backdatedFrom).some(live), `${frames.length - backdatedFrom} frame(s) since the backdated stamp`);
 	await freezeProducer();
-	await expectFrame(frames, "late timestamp-only update retains producer age and shows stale", (svg) => svg.includes("Not updating"), 6000);
+	await expectFrame(frames, "a fresh timestamp-only update is read and shows live", live, 3000);
 
 	fake.stdin.write("alive\n");
-	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "1000" } } });
 	await expectFrame(frames, "new producer values recover the stale key", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 5000);
 	await identityRegression();
 } finally {

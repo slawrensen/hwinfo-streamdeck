@@ -169,13 +169,13 @@ The zones are **fixed landmarks**, drawn as muted shades so they read as markers
 
 Sparkline notes:
 
-- It holds the last **36 samples**. Since 1.7, the ring accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO and the plugin's poll interval.
+- It holds the last **36 samples**. Since 1.7, the ring accepts subsecond value changes and advancing producer timestamps. Repeated held frames do not add points. The collection rate depends on HWiNFO's polling period.
 - Collection continues for subscribed readings while any Sensor Reading key or Sensor Dial is visible. With none visible, polling stops and samples stay in memory. Returning can append to them; the line is spaced by samples and does not measure that pause.
-- A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. A poll-interval change clears all segments; a pairing edit clears only a segment whose saved key now stands for a different measurement. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
+- A skipped read, missing or non-finite reading, stale data, source transition or native-unit/type change clears the affected segment. A pairing edit clears only a segment whose saved key now stands for a different measurement. Restarting the plugin also clears history. See [collection rules](data-sources.md#freshness-and-local-history).
 - It **survives a °C/°F toggle** unchanged (same data, just relabelled), and a frozen HWiNFO holds the line's last real shape instead of flattening it.
 - The sparkline self-scales to its own visible min/max, so the shape reflects recent variation, not absolute magnitude.
 
-> **Note:** Changing the poll interval (*Advanced → Poll every*) resets sparkline history, because the ring is spaced by sample index and does not preserve elapsed time across a cadence change. Keys configured before 1.2.x keep their old Sparkline checkbox behavior until you touch the Display select.
+> **Note:** Keys configured before 1.2.x keep their old Sparkline checkbox behavior until you touch the Display select.
 
 ### Warn at / Critical at
 
@@ -226,9 +226,9 @@ The settings panel shows the matching plain-language explanation and fix while t
 
 ## Advanced (deck-wide)
 
-The **Advanced** section in this panel holds plugin-wide settings shared by every key and dial, in four headed groups: **Deck defaults (every key and dial)** with **Deck theme**, **Deck text**, **Type accents** and **Data units**; **Connection** with **Data source** and **Poll every**; **Support**; and **Config**. Themes and Deck text are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
+The **Advanced** section in this panel holds plugin-wide settings shared by every key and dial, in four headed groups: **Deck defaults (every key and dial)** with **Deck theme**, **Deck text**, **Type accents** and **Data units**; **Connection** with **Data source**; **Support**; and **Config**. Themes and Deck text are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
 
-![The expanded Advanced section of the settings panel at its real width: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source and Poll every, Support with the Copy support report button, and Config with the This key and Deck JSON wells, each with its Copy and Apply buttons, over the help line that explains them.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
+![The expanded Advanced section of the settings panel at its real width: the Deck defaults header over Deck theme, Deck text, Type accents and Data units rows, then Connection with Data source, Support with the Copy support report button, and Config with the This key and Deck JSON wells, each with its Copy and Apply buttons, over the help line that explains them.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
 
 **Config** has two JSON text boxes: **This key** for the action's settings and **Deck** for plugin-wide settings. **Copy** fills an untouched box with the current settings and copies the document to the clipboard. Save it to a file for backup. Paste a document and press **Apply** to replace the settings and reload the panel. Unknown fields are preserved.
 

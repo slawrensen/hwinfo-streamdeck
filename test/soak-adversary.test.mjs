@@ -165,12 +165,65 @@ test("host launch is hidden and stop commands refuse identities with missing cre
 	assert.throws(() => stopIdentityCommand({ ...plugin, CreatedTicks: null }), /unverified/);
 });
 
-test("native stop guard rejects reused identity and preserves an owned same-image bystander", { skip: process.platform !== "win32", timeout: 30_000 }, async () => {
+test("a failed or timed-out identity query never authorizes a stop", async () => {
+	// What the driver's runPs rejects with when PowerShell overruns its budget,
+	// cannot start, or returns something that is not the JSON it asked for.
+	const timedOut = Object.assign(new Error("spawn powershell.exe ETIMEDOUT"), { code: "ETIMEDOUT", killed: true, signal: "SIGTERM" });
+	for (const failure of [timedOut, Object.assign(new Error("spawn powershell.exe ENOENT"), { code: "ENOENT" }), new SyntaxError("Unexpected end of JSON input")]) {
+		const calls = [];
+		await assert.rejects(restartEvent("host", {
+			snapshot: async () => { throw failure; },
+			stop: async () => calls.push("stop"),
+			startHost: async () => calls.push("start"),
+			collectRecovery: async () => goodLogs
+		}), (err) => err === failure);
+		assert.deepEqual(calls, [], "nothing is stopped or started without a verified snapshot");
+	}
+	// A snapshot that fails after the stop confirmed leaves no verdict either:
+	// the event rejects instead of reporting a recovery it could not verify.
+	let sample = 0;
+	const calls = [];
+	await assert.rejects(restartEvent("plugin", {
+		snapshot: async () => { if (sample++ === 0) return stack(); throw timedOut; },
+		stop: async () => calls.push("stop"),
+		collectRecovery: async () => { calls.push("collect"); return goodLogs; }
+	}), /ETIMEDOUT/);
+	assert.deepEqual(calls, ["stop", "collect"]);
+	// Identity rows the query returned malformed cannot be stopped at all.
+	for (const broken of [{ CreatedTicks: undefined }, { CreatedTicks: "63894000001" }, { CreatedTicks: 638940000010000000 }, { ProcessId: "20" }, { SessionId: -1 }, { ExecutablePath: "node.exe" }]) {
+		assert.throws(() => stopIdentityCommand({ ...plugin, ...broken }), /unverified/, JSON.stringify(broken));
+	}
+});
+
+test("a stop that fails or times out is the event's failure, never a recovered restart", async () => {
+	const timedOut = Object.assign(new Error("spawn powershell.exe ETIMEDOUT"), { code: "ETIMEDOUT", killed: true, signal: "SIGTERM" });
+	for (const role of ["plugin", "host"]) {
+		let snapshots = 0;
+		const calls = [];
+		await assert.rejects(restartEvent(role, {
+			snapshot: async () => { snapshots++; return stack(); },
+			stop: async (before, target) => { calls.push(`stop:${target}`); throw timedOut; },
+			startHost: async () => calls.push("start"),
+			collectRecovery: async () => { calls.push("collect"); return goodLogs; }
+		}), /ETIMEDOUT/);
+		assert.deepEqual(calls, [`stop:${role}`], `${role}: no host start and no recovery collection after a stop that did not confirm`);
+		assert.equal(snapshots, 1, `${role}: no after-snapshot for an unconfirmed stop`);
+	}
+});
+
+test("native stop guard rejects reused identity and preserves an owned same-image bystander", { skip: process.platform !== "win32", timeout: 90_000 }, async () => {
 	const owned = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { windowsHide: true, stdio: "ignore" });
 	const bystander = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { windowsHide: true, stdio: "ignore" });
 	try {
 		await Promise.all([once(owned, "spawn"), once(bystander, "spawn")]);
-		const run = (command) => execFileSync("powershell.exe", ["-NoProfile", "-Command", command], { encoding: "utf8", windowsHide: true, timeout: 15_000, stdio: ["ignore", "pipe", "pipe"] });
+		// The identity query below is the driver's own snapshot query (a
+		// Get-CimInstance under runPs's 30 s budget in scripts/soak-adversary.mjs).
+		// On one hosted runner (CI run 35671500778) the first CIM call of the
+		// job ran past the 15 s this fixture used to allow, while the same
+		// test took 2 to 4 s on every run around it; the cause on that runner
+		// was not established. The fixture now grants the budget the
+		// production seam grants, no more: an overrun still fails here.
+		const run = (command) => execFileSync("powershell.exe", ["-NoProfile", "-Command", command], { encoding: "utf8", windowsHide: true, timeout: 30_000, stdio: ["ignore", "pipe", "pipe"] });
 		const target = JSON.parse(run(`Get-CimInstance Win32_Process -Filter 'ProcessId=${owned.pid}' | Select-Object ProcessId,SessionId,ExecutablePath,@{Name='CreatedTicks';Expression={$_.CreationDate.ToUniversalTime().Ticks.ToString()}} | ConvertTo-Json -Compress`));
 		assert.throws(() => run(stopIdentityCommand({ ...target, CreatedTicks: (BigInt(target.CreatedTicks) + 10_000_000n).toString() })));
 		assert.equal(owned.exitCode, null);

@@ -35,13 +35,16 @@ export interface Reading {
 	 * saved key; sessions and history follow this identity. */
 	readonly aliasOf?: string;
 	/**
-	 * Stable identity of this reading across HWiNFO restarts:
-	 * `sensorId:sensorInstance:readingId` (hex), with `~n` appended for
-	 * duplicates. Persist this in action settings — never the array index.
+	 * Stable identity of this reading across HWiNFO restarts. Shared Memory:
+	 * `sensorId:sensorInstance:readingId` (sensor id and reading id in hex,
+	 * the instance in decimal); a tuple that occurs twice, or whose owner is
+	 * missing, is withheld rather than numbered. Gadget: the source name and
+	 * label (see gadget-identity.ts). Persist this in action settings, never
+	 * the array index.
 	 */
 	readonly key: string;
 	readonly type: SensorType;
-	/** Index of the owning sensor in {@link SensorSnapshot.sensors}, or -1. */
+	/** Index of the owning sensor in {@link SensorSnapshot.sensors}. */
 	readonly sensorIndex: number;
 	readonly id: number;
 	/** Effective display label (user rename respected, UTF-8 preferred). */

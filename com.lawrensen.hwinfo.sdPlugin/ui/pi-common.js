@@ -1711,7 +1711,7 @@
 					? "Empty: add readings above, in the order the detail view should list them."
 					: detailKeys.length >= DETAIL_KEYS_MAX
 						? `${listed.length} readings across ${walk.length} tiles. That is the cap; remove one to add another.`
-						: `${listed.length} reading${listed.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow the Tile shows setting.`
+						: `${listed.length} reading${listed.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow Readings per tile.`
 			)
 		);
 		detailListEl.replaceChildren(frag);

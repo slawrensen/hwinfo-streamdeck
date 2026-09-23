@@ -217,7 +217,10 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		try {
 			let body = readFileSync(file);
 			if (file.endsWith(".html")) {
-				const fx = url.searchParams.get("fx");
+				// No fixture named (the capture script's live-harness URLs): a
+				// page switch picks that page's configured fixture.
+				const DEFAULTS = { "sensor-reading.html": "key-configured", "sensor-dial.html": "dial-configured", "control.html": "control-reset", "detail-slot.html": "slot-reading" };
+				const fx = url.searchParams.get("fx") ?? (sim.page !== path.basename(file) ? (DEFAULTS[path.basename(file)] ?? null) : null);
 				if (fx !== null && sim.fixture !== fx) sim.setFixture(fx);
 				const inject = [bootstrap(), ...(url.searchParams.getAll("inject").map((src) => (src.split("?")[0].endsWith(".css") ? `<link rel="stylesheet" href="${src}">` : `<script defer src="${src}"></script>`)))].join("");
 				body = Buffer.from(body.toString("utf8").replace("</head>", `${inject}</head>`));

@@ -263,6 +263,25 @@ try {
 	await sleep(450);
 	check("IME: the committed text saves once composed", lastWrite()?.label === "日本", JSON.stringify(lastWrite()?.label));
 
+	// The theme gallery is one radio group: one Tab stop, arrows pick.
+	await open("key-configured");
+	const chipIds = await b.evaluate(`[...document.querySelectorAll("#theme-gallery .hw-theme")].map((c) => c.dataset.theme)`);
+	const stops = await b.evaluate(`[...document.querySelectorAll("#theme-gallery .hw-theme")].filter((c) => c.tabIndex === 0).map((c) => c.dataset.theme + ":" + c.getAttribute("aria-checked"))`);
+	check("theme gallery: a radio group with one Tab stop, on the checked chip", (await b.evaluate(`document.getElementById("theme-gallery").getAttribute("role")`)) === "radiogroup" && same(stops, [`${sim.settings.theme ?? ""}:true`]), JSON.stringify(stops));
+	await b.evaluate(`document.querySelector('#theme-gallery .hw-theme[tabindex="0"]').focus()`);
+	const startAt = chipIds.indexOf(sim.settings.theme ?? "");
+	await b.key("ArrowRight");
+	await sleep(200);
+	const afterArrow = await b.evaluate(`({ focused: document.activeElement.dataset.theme, checked: document.querySelector('#theme-gallery [aria-checked="true"]')?.dataset.theme })`);
+	const expectedNext = chipIds[(startAt + 1) % chipIds.length];
+	check("theme gallery: ArrowRight moves focus and picks the next theme, one write", lastWrite()?.theme === expectedNext && sim.writes.length === 1 && afterArrow.focused === expectedNext && afterArrow.checked === expectedNext, JSON.stringify({ afterArrow, wrote: lastWrite()?.theme, n: sim.writes.length }));
+	await b.key("Home");
+	await sleep(200);
+	check("theme gallery: Home returns to Default (follow the shared theme)", lastWrite()?.theme === "" && sim.writes.length === 2 && (await b.evaluate(`document.activeElement.dataset.theme`)) === "", JSON.stringify({ wrote: lastWrite()?.theme, n: sim.writes.length }));
+	await open("key-configured", { settings: { ...sim.settings, theme: "neon-future" } });
+	const unknownStops = await b.evaluate(`[...document.querySelectorAll("#theme-gallery .hw-theme")].filter((c) => c.tabIndex === 0).map((c) => c.dataset.theme)`);
+	check("theme gallery: an unknown stored theme checks no chip, Default holds the Tab stop, nothing is written", same(unknownStops, [""]) && (await b.evaluate(`document.querySelectorAll('#theme-gallery [aria-checked="true"]').length`)) === 0 && sim.writes.length === 0, JSON.stringify(unknownStops));
+
 	// ---- truth: data states --------------------------------------------------
 	await open("key-unavailable");
 	const down = await b.evaluate(`({ ph: document.getElementById("picker-search").placeholder, missing: document.getElementById("picker-search").classList.contains("missing"), tone: document.getElementById("reading-status").dataset.tone, state: document.getElementById("head-state").textContent })`);

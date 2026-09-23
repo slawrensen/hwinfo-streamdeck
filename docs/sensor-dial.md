@@ -98,7 +98,7 @@ Unlike keys (which read HWiNFO's own min/max/average), the dial tracks its **ses
 
 ## Settings
 
-Open the dial's Property Inspector to configure it. The panel follows the same order as the key panel: a header with the dial's current touchscreen face (the exact image the plugin last drew) and its live state, then **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**. Reading starts open; each folded section's title line summarizes what it holds, so you can check a dial without opening anything.
+Open the dial's Property Inspector to configure it. The panel follows the same order as the key panel: a header with the dial's current touchscreen face (the exact image the plugin last drew) and its live state, then **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**. Reading and Display start open; each folded section's title line summarizes what it holds, so you can check a dial without opening anything.
 
 | Section | Setting | What it does |
 | --- | --- | --- |

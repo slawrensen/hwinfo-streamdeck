@@ -26,7 +26,7 @@
 	--hw-focus: #7cc4ff;
 	--hw-select-bg: #2660aa;
 	--hw-select-text: #ffffff;
-	--hw-active-bg: #44505e;
+	--hw-active-bg: #3a4350;
 	--hw-ok: #7fdca0;
 	--hw-warn-text: #ffcf70;
 	--hw-warn-bg: #44381f;
@@ -876,13 +876,13 @@ body {
 	border-radius: var(--hw-radius);
 }
 
-.hw-theme[aria-pressed="true"] .hw-theme-face,
+.hw-theme[aria-checked="true"] .hw-theme-face,
 .hw-theme.selected .hw-theme-face {
 	outline: 2px solid var(--hw-focus);
 	outline-offset: 1px;
 }
 
-.hw-theme[aria-pressed="true"] .hw-theme-name {
+.hw-theme[aria-checked="true"] .hw-theme-name {
 	color: var(--hw-text);
 	font-weight: 600;
 }

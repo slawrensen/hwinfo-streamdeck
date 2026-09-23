@@ -2573,9 +2573,10 @@
 	// --- theme preset gallery -------------------------------------------------
 	// Tokens come from the plugin (parsed themes.json) over the message channel;
 	// the shared default renders as the leading "Default" chip and the seven
-	// presets follow, each a toggle button (aria-pressed). Clicking writes the
-	// per-action "theme" setting ("" = follow the shared theme); the key or
-	// dial re-renders at once and the header shows its new face.
+	// presets follow. The gallery is one radio group (APG): a single Tab stop
+	// on the checked chip, arrow keys, Home and End move and pick. Picking
+	// writes the per-action "theme" setting ("" = follow the shared theme);
+	// the key or dial re-renders at once and the header shows its new face.
 
 	let themesConfig = null; // { defaultTheme, effectiveDeckTheme, themes: { id: { bg, ... } } }
 	let themeOverride = "";
@@ -2608,7 +2609,9 @@
 		chip.className = "hw-theme" + (selected ? " selected" : "") + (isDeck ? " hw-theme-deck" : "");
 		chip.dataset.theme = id;
 		chip.title = name;
-		chip.setAttribute("aria-pressed", selected ? "true" : "false");
+		chip.setAttribute("role", "radio");
+		chip.setAttribute("aria-checked", selected ? "true" : "false");
+		chip.tabIndex = selected ? 0 : -1;
 		const face = document.createElement("span");
 		face.className = "hw-theme-face";
 		face.style.background = palette.bg;
@@ -2678,7 +2681,10 @@
 			chip.setAttribute("aria-label", `${model.themeName(id)} theme for this ${hw.kind === "dial" ? "dial" : "key"}`);
 			frag.appendChild(chip);
 		}
-		// Rebuilding under focus would drop it; keep the pressed chip focused.
+		// An unknown stored theme checks no chip; the group still needs its
+		// one Tab stop, so the Default chip takes it.
+		if (unknown) deckChip.tabIndex = 0;
+		// Rebuilding under focus would drop it; keep the focused chip focused.
 		const focusedTheme = galleryEl.contains(document.activeElement) ? document.activeElement.dataset.theme : undefined;
 		galleryEl.replaceChildren(frag);
 		if (focusedTheme !== undefined) galleryEl.querySelector(`.hw-theme[data-theme="${CSS.escape(focusedTheme)}"]`)?.focus({ preventScroll: true });
@@ -2698,12 +2704,28 @@
 	}
 	hw.on("globals", labelSharedOptions);
 
+	function pickTheme(id) {
+		if (id === themeOverride) return;
+		themeOverride = id;
+		setThemeOverride(themeOverride);
+		renderGallery();
+	}
 	galleryEl.addEventListener("click", (ev) => {
 		const chip = ev.target.closest(".hw-theme");
 		if (!chip) return;
-		themeOverride = chip.dataset.theme;
-		setThemeOverride(themeOverride);
-		renderGallery();
+		pickTheme(chip.dataset.theme);
+	});
+	galleryEl.addEventListener("keydown", (ev) => {
+		const chips = [...galleryEl.querySelectorAll(".hw-theme")];
+		const at = chips.indexOf(document.activeElement);
+		if (at < 0 || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+		const next = { ArrowRight: at + 1, ArrowDown: at + 1, ArrowLeft: at - 1, ArrowUp: at - 1, Home: 0, End: chips.length - 1 }[ev.key];
+		if (next === undefined) return;
+		ev.preventDefault();
+		const target = chips[(next + chips.length) % chips.length];
+		// Focus first: the rebuild keeps focus on whatever chip holds it.
+		target.focus();
+		pickTheme(target.dataset.theme);
 	});
 	// The plugin pushes a fresh themes payload (with effectiveDeckTheme)
 	// whenever the deck theme changes; no global-settings guessing here.

@@ -20,11 +20,12 @@ Elgato Marketplace listing is a separate track.
   Control keys and detail tiles share one essentials-first layout: a
   header with the exact face the plugin last drew and its live state,
   then Reading, Display, Alerts, Press (Controls on a dial) and
-  Advanced. Reading starts open, and every folded section's title line
-  says what it holds in the runtime's own terms: inherited choices are
-  marked "shared", thresholds read as at or beyond (≥, ≤) with their
-  unit and a dial's unit scope, and a dial's gesture line follows the
-  resolved preset, so a tap made dead by touch zones is not listed.
+  Advanced. Reading and Display start open, and every folded
+  section's title line says what it holds in the runtime's own terms:
+  inherited choices are marked "shared", thresholds read as at or
+  beyond (≥, ≤) with their unit and a dial's unit scope, and a dial's
+  gesture line follows the resolved preset, so a tap made dead by
+  touch zones is not listed.
 - The panel tells its states apart: connecting, plugin not answering,
   no reading selected, HWiNFO unavailable (the saved reading is kept
   and never called missing), HWiNFO stalled, saved reading not found,

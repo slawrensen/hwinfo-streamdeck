@@ -348,7 +348,7 @@ async function a11y() {
 			let axe = null;
 			if (axeSource !== null) {
 				await browser.evaluate(`${axeSource}; 0`);
-				axe = await browser.evaluate(`axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } }).then((r) => ({ violations: r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => n.target.join(" ")).slice(0, 8) })), passes: r.passes.length, incomplete: r.incomplete.map((v) => v.id) }))`);
+				axe = await browser.evaluate(`axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } }).then((r) => ({ violations: r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => n.target.join(" ")).slice(0, 8) })), passes: r.passes.length, incomplete: r.incomplete.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(" ") + " (" + (n.any?.[0]?.data?.messageKey ?? n.any?.[0]?.message ?? "needs review") + ")").slice(0, 8) })) }))`);
 			}
 			report.push({ fixture, state: label, own, axe });
 			console.log(`${fixture} ${label}: own ${own.length} issue(s)${axe ? `, axe ${axe.violations.length} violation(s)` : ", axe NOT RUN (set AXE_CORE)"}`);

@@ -47,7 +47,7 @@ To verify a device and have it listed as community verified:
 2. Quit the Stream Deck app, then start it with the recorder armed so the plugin process inherits it: set the user environment variable `HWINFO_TRACE_EVENTS=1` and restart the app.
 3. Perform, in order: two slow turns each way, one fast spin, a short press, a half-second press, press+turn, a tap, a long touch, a page swipe away and back.
 4. Note what the dial did for each step (the [controls page](controls.md) says what it should do for your preset).
-5. Collect `logs/trace-<pid>.jsonl` from the plugin folder (`%APPDATA%\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\logs`) and the "Copy support report" output from the settings panel.
+5. Collect `logs/trace-<pid>.jsonl` from the plugin folder (`%APPDATA%\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\logs`) and the "Copy support report" output from the settings panel (*Advanced → Support*).
 6. Open a GitHub issue titled "Hardware report: <device>" with the notes, the trace and the report.
 
 The trace is redacted at the source: device identifiers are hashed, and no sensor values, sensor names, computer names or file paths are recorded. It exists so a capture from your hardware can be replayed, event for event, through the same state machine the test suite uses (`test/traces/` holds the synthetic versions a real capture can replace).
@@ -58,4 +58,4 @@ For development: `HWINFO_TRACE_EVENTS=1` makes the plugin append one JSON line p
 
 ## Support report
 
-Every settings panel has **Copy support report**: under **Advanced** on a key, under **Dial gestures & advanced** on a dial, and under **Support** on an HWiNFO Control key. It builds a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, sample age, Sensor Dial and HWiNFO Control action state, recent input events) and copies it to the clipboard. Nothing is uploaded anywhere: the plugin makes no network requests, and its only connection is the local WebSocket to the Stream Deck app.
+Every settings panel has **Copy support report**: under **Advanced → Support** on a key or dial, and under **Advanced** on an HWiNFO Control key. It builds a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, sample age, Sensor Dial and HWiNFO Control action state, recent input events) and copies it to the clipboard. Nothing is uploaded anywhere: the plugin makes no network requests, and its only connection is the local WebSocket to the Stream Deck app.

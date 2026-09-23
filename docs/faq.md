@@ -64,7 +64,7 @@ Leave it on **Auto** (the default) unless you have a specific reason not to. Aut
 | Free-version limit | disables after 12 h | none |
 | Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
 
-Set it under **Advanced → Data source** in any key's settings, or under **Dial gestures & advanced → Data source** on a dial (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
+Set it under **Advanced → Connection → Data source** in any key's or dial's settings (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
 
 See [Data sources](data-sources.md) for the full breakdown.
 
@@ -93,14 +93,14 @@ They're two different things:
 
 Sparkline history lives with the poller and keeps **collecting while a key is off screen** (as of 1.4; between 1.1.6 and 1.3 a page unviewed for over a minute rebuilt from empty), as long as a Sensor Reading key or Sensor Dial is visible somewhere; HWiNFO Control keys do not keep polling alive. If none of them are visible, or the machine is asleep, the poller stops entirely (see the CPU answer below), so collection pauses and picks up from the same samples when a key comes back. The ring is spaced by sample, not by clock, so after a long pause the old points sit next to the new ones until the line refills; nothing marks the gap. A graph only builds from empty the first time a reading is shown, after a plugin or Stream Deck restart (history is plugin memory), or after a poll-interval change.
 
-When it does build from empty: **a new point lands at the slower of HWiNFO's update rate and the plugin's poll interval, never faster than one per second.** The sparkline only gains a point when HWiNFO produces a genuinely fresh reading; a frozen source never pushes duplicate points (that would flatten the line). At the defaults (HWiNFO polling every 2 seconds, 36 samples) a full graph takes ~72 seconds to build from scratch. Lowering HWiNFO's polling period (**HWiNFO → Settings → Polling period**) fills it faster, down to the 1-second floor, and only if the plugin's own **Poll every** interval isn't the slower side.
+When it does build from empty: **a new point lands at the slower of HWiNFO's update rate and the plugin's poll interval, never faster than one per second.** The sparkline only gains a point when HWiNFO produces a genuinely fresh reading; a frozen source never pushes duplicate points (that would flatten the line). At the defaults (HWiNFO polling every 2 seconds, 36 samples) a full graph takes ~72 seconds to build from scratch. Lowering HWiNFO's polling period (**HWiNFO → Settings → Polling period**) fills it faster, down to the 1-second floor, and only if the plugin's own **Read every** interval isn't the slower side.
 
 Two more sparkline behaviors:
 
 - Toggling **°C/°F** no longer resets the graph: it stores native values and just relabels.
 - A **frozen** HWiNFO holds the line's last real shape instead of flattening it.
 
-Changing the plugin's **Poll every** interval (Advanced) *does* clear the ring: the history is index-spaced, not time-stamped, so it can't honestly span a cadence change.
+Changing the plugin's **Read every** interval (Advanced) *does* clear the ring: the history is index-spaced, not time-stamped, so it can't honestly span a cadence change.
 
 ## Performance and resource use
 
@@ -121,7 +121,7 @@ And when no Sensor Reading key or Sensor Dial is on screen (you switched to anot
 
 ### How many sensors / keys can I use?
 
-There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them (the list shows up to 150 rows at once and asks you to refine the search past that). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Layout** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
+There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them and lists every match, with no row cap (a 5,000-reading test tree stays responsive). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Readings on this key** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
 
 ### Can multiple keys show the same sensor?
 
@@ -150,20 +150,20 @@ If a key is amber/red and you didn't mean to set a threshold, clear the **Warn a
 
 ## Themes
 
-### Why isn't "Deck default" the same as Void?
+### Why isn't "Default" the same as Void?
 
-"Deck default" isn't a theme; it's a **link**. It means "this key follows whatever the deck-wide theme is set to," which you set under **Advanced → Deck theme**. It happens to *resolve* to Void on a fresh install because Void is the default deck theme, but they're not the same choice:
+"Default" (called *Deck default* before this release) isn't a theme; it's a **link**. It means "this key follows whatever the shared theme is set to," which you set under **Advanced → Shared defaults → Theme**. It happens to *resolve* to Void on a fresh install because Void is the default shared theme, but they're not the same choice:
 
-- Pick the **Void** chip → this key is pinned to Void forever, even if you later change the deck theme.
-- Pick the **Deck default** chip → this key changes whenever you change the deck-wide theme.
+- Pick the **Void** chip → this key is pinned to Void forever, even if you later change the shared theme.
+- Pick the **Default** chip → this key changes whenever you change the shared theme.
 
-In the gallery the Deck default chip is drawn with a dashed border and a small link badge so it's structurally distinct from the preset it currently resolves to; the resolved theme is named in its tooltip and in the help line under the gallery (e.g. "currently Void").
+In the gallery the Default chip is drawn with a dashed border and a small link badge so it's structurally distinct from the preset it currently resolves to; the resolved theme is named in its tooltip and in the help line under the gallery (e.g. "currently Void").
 
-Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the deck default you inherit may be Graphite, not the fresh-install Void. That's deliberate, so an update never changes how your deck already looks. See [Themes](themes.md).
+Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the shared default you inherit may be Graphite, not the fresh-install Void. That's deliberate, so an update never changes how your deck already looks. See [Themes](themes.md).
 
-### A per-key theme won't follow my deck theme: why?
+### A per-key theme won't follow my shared theme: why?
 
-Because a per-key pick always wins. The **Deck theme** (Advanced) only affects keys set to **Deck default**. If a key has its own theme selected, changing the deck theme won't touch it; pick the **Deck default** chip on that key to make it follow again.
+Because a per-key pick always wins. The shared **Theme** (Advanced → Shared defaults) only affects keys set to **Default**. If a key has its own theme selected, changing the shared theme won't touch it; pick the **Default** chip on that key to make it follow again. The folded Display section tells the two apart at a glance: *Void (shared)* follows the shared theme, *Void* alone is the key's own pick.
 
 ## Privacy
 

@@ -113,16 +113,24 @@ async function capture() {
 				await settle(browser);
 				sim.pushPreview();
 				await sleep(300);
-				if (typeof step === "string") await browser.evaluate(step);
-				else if (typeof step === "function") await step(browser);
+				// A step can fail on a panel that lacks its target (the baseline
+				// build has no Alerts section): the state is captured as it
+				// stands and the failure is recorded, never silently dropped.
+				let stepError = null;
+				try {
+					if (typeof step === "string") await browser.evaluate(step);
+					else if (typeof step === "function") await step(browser);
+				} catch (e) {
+					stepError = String(e?.message ?? e);
+				}
 				await sleep(400);
 				const png = await browser.screenshot(shot);
 				const name = `${fixture}--${label}--${width}.png`;
 				writeFileSync(path.join(out, name), png);
 				const metrics = await browser.evaluate(`({ height: document.documentElement.scrollHeight, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth, build: window.__hwPiVersion ?? null })`);
 				const errors = pageErrors.splice(0);
-				manifest.push({ file: name, fixture, state: label, width, ...metrics, writes: sim.writes.length, globalWrites: sim.globalWrites.length, errors });
-				console.log(`captured ${name} (${metrics.height}px, overflowX ${metrics.overflowX}, writes ${sim.writes.length}/${sim.globalWrites.length}${errors.length > 0 ? `, ERRORS: ${errors.join(" | ")}` : ""})`);
+				manifest.push({ file: name, fixture, state: label, width, ...metrics, writes: sim.writes.length, globalWrites: sim.globalWrites.length, errors, stepError });
+				console.log(`captured ${name} (${metrics.height}px, overflowX ${metrics.overflowX}, writes ${sim.writes.length}/${sim.globalWrites.length}${errors.length > 0 ? `, ERRORS: ${errors.join(" | ")}` : ""}${stepError === null ? "" : `, STEP FAILED: ${stepError}`})`);
 			}
 		}
 	} finally {

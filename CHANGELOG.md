@@ -3,6 +3,48 @@
 One entry per version. Tagged versions are published as GitHub releases; the
 Elgato Marketplace listing is a separate track.
 
+## Unreleased
+
+- The settings panels for Sensor Reading keys, Sensor Dials, HWiNFO
+  Control keys and detail tiles share one essentials-first layout: a
+  header with the exact face the plugin last drew and its live state,
+  then Reading, Display, Alerts, Press (Controls on a dial) and
+  Advanced. Reading starts open, and every folded section's title line
+  says what it holds in the runtime's own terms: inherited choices are
+  marked "shared", thresholds read as at or beyond (≥, ≤) with their
+  unit and a dial's unit scope, and a dial's gesture line follows the
+  resolved preset, so a tap made dead by touch zones is not listed.
+- The panel tells its states apart: connecting, plugin not answering,
+  no reading selected, HWiNFO unavailable (the saved reading is kept
+  and never called missing), HWiNFO stalled, saved reading not found,
+  and no search matches. Each comes with its local fix: Retry now,
+  HWiNFO setup steps, or picking another reading.
+- Opening a panel writes nothing, and an edit changes only the field it
+  touched. Rotation groups, detail tiles, per-reading names, quad cell
+  colors and list entries keep fields and entries this version does not
+  know instead of being normalized away, and a stored choice this
+  version does not know shows as kept rather than silently replaced.
+  Replacing the shared settings document asks for a second click.
+- The reading picker lists every match (the 150-row cap is gone) and
+  stays responsive on a 5,000-reading tree (PERF.md). It follows the
+  combobox pattern: arrow keys browse, Enter picks, Escape closes
+  without changing anything. Rotation membership and custom detail
+  lists are checklists instead, so ticking a reading never changes the
+  reading on the dial, and rotation chips gain up and down buttons.
+- Every control has a programmatic name and a visible focus ring, text
+  contrast and small targets were raised, and the panels reflow at
+  320 px wide without horizontal scrolling.
+- Labels follow the new vocabulary; stored settings are unchanged.
+  "Deck default" is now Default; the deck theme, deck text and type
+  accents are Theme, Text color and Accent colors under Advanced,
+  Shared defaults (marked "All keys and dials"); Poll every is Read
+  every; Label mode is Title after a turn; Reset reach is A stats reset
+  clears; Press does is A press; Detail contains is Details list; Tile
+  shows is Readings per tile; and "Repeat Back under this key's own
+  cell" is "Also go back from this key's own position". The Text
+  color help explains that type accents color graphs and badges, never
+  the numbers (issue #31).
+
 ## 1.6.0.0 - 2026-09-04
 
 - A detail tile can carry one to four readings. The new Tile shows

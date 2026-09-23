@@ -1,32 +1,34 @@
-/* Shared property-inspector logic: the searchable sensor picker(s), the live
-   preview line, and the status hint. Persists selections through
-   SDPIComponents.useSettings so sdpi-managed fields are never clobbered.
-   The DOM contract lives in the panels that load this file
-   (sensor-reading.html, sensor-dial.html): every element is looked up by
-   id here, and a panel without a section simply leaves it inert. */
-/* global SDPIComponents */
+/* Shared property-inspector logic: the reading pickers (an accessible
+   combobox for one reading, native checklists for membership), the rotation
+   set and custom detail list editors, the theme gallery and color wells,
+   the configuration documents, and each panel's section summaries.
+   Persists through SDPIComponents.useSettings so a write merges one field
+   into the whole stored document and never clobbers another. The DOM
+   contract lives in the panels that load this file (sensor-reading.html,
+   sensor-dial.html): every element is looked up by id here, and a panel
+   without a section simply leaves it inert. pi-shell.js (loaded first)
+   owns the header, the status line and the native control bindings. */
+/* global SDPIComponents, hwShell */
 (() => {
 	"use strict";
 
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.6.0.0-3";
+	const PI_BUILD = "1.6.0.0-f01";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
 	const { streamDeckClient, useSettings, useGlobalSettings } = SDPIComponents;
+	const hw = hwShell;
+	const model = hw.model;
 
-	const previewValueEl = document.getElementById("preview-value");
-	const previewStatsEl = document.getElementById("preview-stats");
-	const hintEl = document.getElementById("status-hint");
 	const galleryEl = document.getElementById("theme-gallery");
 	const rotationSetEl = document.getElementById("rotation-set"); // dial PI only
 	const controlsCustomEl = document.getElementById("controls-custom"); // dial PI only
 	const controlsZonesEl = document.getElementById("controls-zones"); // dial PI only
 	const dualRowsEl = document.getElementById("dual-rows"); // reading PI only
 
-	const MAX_ROWS = 150;
 	const SENSOR_TYPE_NAMES = ["", "Temp", "Voltage", "Fan", "Current", "Power", "Clock", "Usage"];
 	// One hex gate for every color field, mirroring the plugin's shared
 	// HEX6 in src/ui/text-colors.ts (unsharable across the webview boundary).
@@ -118,34 +120,47 @@
 	}
 
 	// --- rotation set (dial PI only) -----------------------------------------
-	// The readings dial rotation is limited to, ticked in the primary picker's
-	// rows. Shown under the picker as one flat chips row, or split into named
-	// groups (plain rotate stays inside a group, a gesture set to "Switch
-	// sensor or group" jumps between them). rotationKeys is kept mirrored to
-	// the union of all group keys, so set-wide consumers (stats, reset reach)
-	// and older plugin versions after a rollback keep reading the flat set
-	// unchanged. The plugin ignores anything under two non-empty groups; the
-	// PI still renders those editing states. Declared before the pickers so
-	// every reference below is initialized by the time async callbacks fire.
+	// The readings dial rotation is limited to, ticked in the rotation
+	// checklist (its own list: the Reading combobox above picks what is on
+	// the dial NOW, the checklist picks what rotation moves THROUGH). Shown as
+	// one flat chips row, or split into named groups (plain rotate stays
+	// inside a group, a gesture set to "Switch sensor or group" jumps between
+	// them). rotationKeys is kept mirrored to the union of all group keys, so
+	// set-wide consumers (stats, reset reach) and older plugin versions after
+	// a rollback keep reading the flat set unchanged. The plugin ignores
+	// anything under two non-empty groups; the PI still renders those editing
+	// states. Every write is lossless: a group's unknown fields, list entries
+	// this build cannot read, and names the parser skipped ride along as
+	// stored. Declared before the pickers so every reference below is
+	// initialized by the time async callbacks fire.
+	let rotationPicker = null; // the dial's membership checklist, created with the pickers
 	let rotationKeys = [];
-	let rotationGroups = null; // null = flat set; else [{ name, keys }]
+	let rotationKeysKept = []; // raw entries this build does not edit (non-strings)
+	let rotationGroups = null; // null = flat set; else [{ name, keys, raw, base, keysKept }]
+	let rotationGroupsKept = []; // raw group entries that are not objects
+	let rotationNamesRaw = {}; // the stored map, junk entries included
 	let rotationNames = {}; // per-reading display names, keyed by reading key
 	let collectorIndex = 0; // which group new ticks land in (PI-local, not persisted)
 
 	function adoptRotationKeys(value) {
-		rotationKeys = Array.isArray(value) ? value.filter((k) => typeof k === "string") : [];
+		const split = model.splitKeyList(value);
+		rotationKeys = split.known;
+		rotationKeysKept = split.kept;
 		renderRotationSet();
-		primaryPicker.renderList();
+		rotationPicker?.renderList();
 	}
 
 	function adoptRotationGroups(value) {
-		rotationGroups = parseGroupsSetting(value);
+		const parsed = parseGroupsSetting(value);
+		rotationGroups = parsed.groups;
+		rotationGroupsKept = parsed.kept;
 		clampCollector();
 		renderRotationSet();
-		primaryPicker.renderList();
+		rotationPicker?.renderList();
 	}
 
 	function adoptRotationNames(value) {
+		rotationNamesRaw = typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
 		rotationNames = parseNamesSetting(value);
 		renderRotationSet();
 	}
@@ -167,17 +182,24 @@
 		return names;
 	}
 
-	// Settings are untyped JSON: keep what renders (name string, string keys)
-	// and treat an empty or non-array value as "no groups" (the flat set).
+	// Settings are untyped JSON: groups render from their name string and
+	// string keys; an empty or non-array value is "no groups" (the flat
+	// set). Each group keeps its raw entry so a write re-emits the fields
+	// and key entries this build does not know exactly as stored.
 	function parseGroupsSetting(value) {
-		if (!Array.isArray(value) || value.length === 0) return null;
+		if (!Array.isArray(value) || value.length === 0) return { groups: null, kept: [] };
 		const groups = [];
+		const kept = [];
 		for (const entry of value) {
-			if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
-			const keys = Array.isArray(entry.keys) ? entry.keys.filter((k) => typeof k === "string" && k !== "") : [];
-			groups.push({ name: typeof entry.name === "string" ? entry.name : "", keys });
+			if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+				kept.push(entry);
+				continue;
+			}
+			const split = model.splitKeyList(entry.keys);
+			const name = typeof entry.name === "string" ? entry.name : "";
+			groups.push({ name, keys: split.known, keysKept: split.kept, raw: entry, base: { name, keys: [...split.known, ...split.kept] } });
 		}
-		return groups.length > 0 ? groups : null;
+		return { groups: groups.length > 0 ? groups : null, kept };
 	}
 
 	function unionKeys(groups) {
@@ -199,6 +221,11 @@
 		return rotationGroups !== null ? rotationGroups.some((g) => g.keys.includes(key)) : rotationKeys.includes(key);
 	}
 
+	/** A group's stored form: only the fields the edit changed are rewritten. */
+	function serializeGroup(group) {
+		return model.patchEntry(group.raw, group.base, { name: group.name, keys: [...group.keys, ...group.keysKept] }, ["name", "keys"]);
+	}
+
 	/**
 	 * One write path for every set/group edit: persists the groups (when
 	 * `writeGroups`; flat-set edits skip it so dials that never used groups
@@ -212,13 +239,14 @@
 		if (writeGroups) {
 			// [] persists "no groups": the field is only ever written, never
 			// removed, and the plugin ignores anything under two groups.
-			groupsBinding[1](rotationGroups === null ? [] : rotationGroups.map((g) => ({ name: g.name, keys: [...g.keys] })));
+			groupsBinding[1](rotationGroups === null ? [...rotationGroupsKept] : [...rotationGroups.map(serializeGroup), ...rotationGroupsKept]);
 		}
-		rotationBinding[1](rotationKeys);
+		rotationBinding[1]([...rotationKeys, ...rotationKeysKept]);
 		renderRotationSet();
-		for (const row of primaryPicker.list.querySelectorAll(".hw-row")) {
-			const tick = row.querySelector(".hw-tick");
-			if (tick !== null) tick.checked = memberOfRotation(row.dataset.key);
+		if (rotationPicker !== null) {
+			for (const tick of rotationPicker.list.querySelectorAll(".hw-row .hw-tick")) {
+				tick.checked = memberOfRotation(tick.closest(".hw-row").dataset.key);
+			}
 		}
 	}
 
@@ -240,25 +268,69 @@
 		writeRotation(rotationGroups !== null);
 	}
 
-	function setChip(key, groupIndex) {
+	/** Moves `key` one place earlier (-1) or later (+1) in its own list: the
+	 * flat set, or the group `groupIndex`. The order is the order rotation
+	 * steps through, so this is the keyboard reorder. */
+	function moveRotationKey(key, groupIndex, delta) {
+		const list = groupIndex === null ? rotationKeys : rotationGroups?.[groupIndex]?.keys;
+		if (list === undefined) return false;
+		const from = list.indexOf(key);
+		const to = from + delta;
+		if (from < 0 || to < 0 || to >= list.length) return false;
+		list.splice(to, 0, list.splice(from, 1)[0]);
+		writeRotation(groupIndex !== null);
+		return true;
+	}
+
+	function setChip(key, groupIndex, index, count) {
 		const label = readingLabelOf(key);
+		const missing = tree !== null && label === null;
+		const current = key === primaryPicker.selectedKey();
 		const chip = document.createElement("span");
-		// "current" paints the chip of the reading on the dial right now, so
-		// the open panel shows where rotation (and a group jump) landed.
-		chip.className = "hw-set-chip" + (tree !== null && label === null ? " missing" : "") + (key === primaryPicker.selectedKey() ? " current" : "");
+		// "current" paints the chip of the reading on the dial right now (a
+		// fill AND an "on dial" badge, never color alone), so the open panel
+		// shows where rotation (and a group jump) landed.
+		chip.className = "hw-set-chip" + (missing ? " missing" : "") + (current ? " current" : "");
 		chip.dataset.key = key;
+		if (groupIndex !== null) chip.dataset.group = String(groupIndex);
+		const shown = rotationNames[key] ?? label ?? key;
+		const spoken = `${shown}${missing ? " (not in HWiNFO's current list)" : ""}`;
 		const name = document.createElement("span");
-		name.className = "hw-set-name";
-		name.textContent = rotationNames[key] ?? label ?? key;
-		name.title = "Click to rename how this reading shows on the dial";
+		name.className = "hw-set-name" + (rotationNames[key] !== undefined ? " renamed" : "");
+		name.textContent = shown;
+		name.title = missing ? "Not in the current HWiNFO layout; keeps its place and shows as missing" : "Rename how this reading shows on the dial";
+		name.tabIndex = 0;
+		name.setAttribute("role", "button");
+		name.setAttribute("aria-label", `Rename ${spoken}`);
+		chip.append(name);
+		if (current) {
+			const badge = document.createElement("span");
+			badge.className = "hw-chip-badge";
+			badge.textContent = "on dial";
+			chip.append(badge);
+		}
+		const move = (delta, glyph, word) => {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "hw-chip-move";
+			button.dataset.move = String(delta);
+			button.dataset.key = key;
+			if (groupIndex !== null) button.dataset.group = String(groupIndex);
+			button.textContent = glyph;
+			button.title = `Move ${word}`;
+			button.setAttribute("aria-label", `Move ${spoken} ${word}`);
+			button.disabled = delta < 0 ? index === 0 : index === count - 1;
+			return button;
+		};
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "hw-set-remove";
 		remove.dataset.key = key;
 		if (groupIndex !== null) remove.dataset.group = String(groupIndex);
 		remove.title = groupIndex !== null ? "Remove from this group" : "Remove from the rotation set";
+		remove.setAttribute("aria-label", `Remove ${spoken} from ${groupIndex !== null ? `group ${groupIndex + 1}` : "the rotation set"}`);
 		remove.textContent = "×";
-		chip.append(name, remove);
+		chip.append(move(-1, "↑", "earlier"), move(1, "↓", "later"), remove);
 		return chip;
 	}
 
@@ -295,6 +367,7 @@
 		collector.checked = index === collectorIndex;
 		collector.dataset.group = String(index);
 		collector.title = "New ticks land in this group";
+		collector.setAttribute("aria-label", `New ticks go to group ${index + 1}${group.name !== "" ? ` (${group.name})` : ""}`);
 		const name = document.createElement("input");
 		name.type = "text";
 		name.className = "hw-group-name";
@@ -302,12 +375,14 @@
 		name.placeholder = `Group ${index + 1}`;
 		name.dataset.group = String(index);
 		name.title = "Group name; the dial shows it when a jump lands here";
+		name.setAttribute("aria-label", `Name of group ${index + 1}`);
 		name.spellcheck = false;
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "hw-group-remove";
 		remove.dataset.group = String(index);
 		remove.title = "Remove this group (its readings leave the rotation)";
+		remove.setAttribute("aria-label", `Remove group ${index + 1}; its readings leave the rotation`);
 		remove.textContent = "×";
 		head.append(collector, name, remove);
 		return head;
@@ -320,8 +395,34 @@
 		// in sensor-dial.html (empty-set default leads).
 		help.textContent =
 			rotationGroups === null
-				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them."
+				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the list above to limit rotation to just those; the arrows set their order."
 				: "Ticks land in the group marked by the radio. “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name and keeps plain rotate inside one; any control map without that gesture (Legacy always, Custom until you map it) rotates through all groups as one flat list.";
+	}
+
+	/** Focus memory across a list rebuild: which control of which chip. */
+	function focusMemo(container) {
+		const active = document.activeElement;
+		if (active === null || !container.contains(active)) return null;
+		const chip = active.closest("[data-key]");
+		return {
+			key: active.dataset.key ?? chip?.dataset.key ?? null,
+			group: active.dataset.group ?? null,
+			cls: [...active.classList].find((c) => c.startsWith("hw-")) ?? null,
+			move: active.dataset.move ?? null,
+			setAction: active.dataset.setAction ?? null
+		};
+	}
+
+	function focusRestore(container, memo) {
+		if (memo === null || container.contains(document.activeElement)) return;
+		const candidates = Array.from(container.querySelectorAll(memo.cls === null ? "*" : `.${memo.cls}`));
+		const match =
+			candidates.find((el) => (el.dataset.key ?? el.closest("[data-key]")?.dataset.key ?? null) === memo.key && (el.dataset.move ?? null) === memo.move && (el.dataset.setAction ?? null) === memo.setAction && (memo.key !== null || (el.dataset.group ?? null) === memo.group)) ??
+			(memo.move !== null ? candidates.find((el) => (el.dataset.key ?? el.closest("[data-key]")?.dataset.key) === memo.key) : undefined);
+		if (match === undefined) return;
+		// A disabled twin (the chip reached the end) hands focus to its sibling.
+		const target = match.disabled ? match.closest(".hw-set-chip")?.querySelector(".hw-chip-move:not(:disabled), .hw-set-remove") : match;
+		target?.focus({ preventScroll: true });
 	}
 
 	function renderRotationSet() {
@@ -329,18 +430,17 @@
 		// Never rebuild under a focused name field: a settings echo (rotation
 		// moved, autocycle stepped) would clobber the typing mid-word.
 		if (rotationSetEl.contains(document.activeElement) && document.activeElement.classList.contains("hw-group-name")) return;
+		const memo = focusMemo(rotationSetEl);
 		const frag = document.createDocumentFragment();
 		if (rotationGroups === null) {
-			for (const key of rotationKeys) {
-				frag.appendChild(setChip(key, null));
-			}
+			rotationKeys.forEach((key, i) => frag.appendChild(setChip(key, null, i, rotationKeys.length)));
 			frag.appendChild(
 				setNote(
 					rotationKeys.length === 0
 						? "Empty: rotation moves through all readings of the picked sensor."
 						: rotationKeys.length === 1
 							? "Only one reading picked. Rotation needs two or more to move."
-							: `Rotation moves through these ${rotationKeys.length} readings only.`
+							: `Rotation moves through these ${rotationKeys.length} readings only, in this order.`
 				)
 			);
 			frag.appendChild(setActions([["split", "Split into groups"]]));
@@ -349,9 +449,7 @@
 				frag.appendChild(groupHeader(group, index));
 				const chips = document.createElement("div");
 				chips.className = "hw-set-chips";
-				for (const key of group.keys) {
-					chips.appendChild(setChip(key, index));
-				}
+				group.keys.forEach((key, i) => chips.appendChild(setChip(key, index, i, group.keys.length)));
 				if (group.keys.length === 0) {
 					chips.appendChild(setNote("Empty: tick readings above to fill this group."));
 				}
@@ -370,7 +468,9 @@
 			frag.appendChild(setActions([["add", "Add group"], ["merge", "Merge back into one set"]]));
 		}
 		rotationSetEl.replaceChildren(frag);
+		focusRestore(rotationSetEl, memo);
 		updateRotationHelp();
+		hw.scheduleRender();
 	}
 
 	// --- custom detail list (reading PI only) --------------------------------
@@ -408,9 +508,17 @@
 	// list edit survives (a torn pair is exactly the restaffed-quad bug).
 	const detailTilesStage = detailListEl === null ? null : useSettings("detailTiles", undefined, null, false);
 
+	// Entries past the parser's cap, kept exactly as stored behind every write.
+	let detailTilesKept = [];
+
 	function adoptDetailTiles(value) {
 		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
 		// salvage, so the panel always shows what the runtime would build.
+		// Each tile also keeps its raw entry and the values parsed from it:
+		// a write rewrites only the fields an edit changed, so a tile's
+		// unknown fields and its untouched (even junk) fields stay stored
+		// exactly as they were. Salvage is for display, never for storage.
+		detailTilesKept = Array.isArray(value) ? value.slice(DETAIL_TILES_MAX) : [];
 		detailTiles = !Array.isArray(value)
 			? []
 			: value.slice(0, DETAIL_TILES_MAX).map((entry) => {
@@ -426,10 +534,18 @@
 						labels.push(typeof rawLabels[i] === "string" ? rawLabels[i].trim() : "");
 						colors.push(typeof rawColors[i] === "string" && HEX_COLOR.test(rawColors[i]) ? rawColors[i] : null);
 					}
-					return { size, labels, colors, cellLabels: raw.cellLabels !== false };
+					const tile = { size, labels, colors, cellLabels: raw.cellLabels !== false };
+					return { ...tile, raw: entry, base: { size, labels: [...labels], colors: [...colors], cellLabels: tile.cellLabels } };
 				});
 		revalidateDetailAim();
 		renderDetailList();
+	}
+
+	/** A tile's stored form: a tile from storage rewrites only the fields
+	 * that changed; a tile the editor created writes all four. */
+	function serializeTile(tile) {
+		const current = { size: tile.size, labels: [...tile.labels], colors: [...tile.colors], cellLabels: tile.cellLabels };
+		return tile.raw === undefined || tile.raw === null ? current : model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels"]);
 	}
 
 	function adoptDetailUniform(value) {
@@ -486,7 +602,7 @@
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
-		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels }));
+		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, raw: t.raw, base: t.base }));
 	}
 
 	/** A walk tile's spec at exactly the cells it fills, always a fresh
@@ -496,7 +612,7 @@
 	function occupancySpec(tile, occupied) {
 		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
 		const size = Math.min(spec.size, occupied);
-		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels };
+		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, raw: spec.raw, base: spec.base };
 	}
 
 	/** Extends the plan with default entries (at the uniform fill size,
@@ -527,8 +643,8 @@
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
-		detailTilesStage[1](cloneTiles(detailTiles));
-		detailBinding[1]([...detailKeys]);
+		detailTilesStage[1]([...detailTiles.map(serializeTile), ...detailTilesKept]);
+		detailBinding[1]([...detailKeys, ...detailKeysKept]);
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow the edit
 	}
@@ -539,7 +655,11 @@
 		// A quad wearing exactly the default identity colors renders the same
 		// as one storing none, so a shuffle that lands every cell back on its
 		// own default prunes away instead of freezing a tile into the plan.
-		const isDefault = (t) => t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
+		// A stored tile carrying fields this build does not know is never
+		// "only restating the fill": pruning it would drop those fields.
+		const KNOWN = ["size", "labels", "colors", "cellLabels"];
+		const carriesUnknown = (t) => typeof t.raw === "object" && t.raw !== null && Object.keys(t.raw).some((k) => !KNOWN.includes(k));
+		const isDefault = (t) => !carriesUnknown(t) && t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
 		while (next.length > 0 && isDefault(next[next.length - 1])) {
 			next.pop();
 		}
@@ -547,20 +667,34 @@
 		writeDetailState();
 	}
 
+	// Stored entries the editor does not show: non-strings and strings past
+	// the cap. A write appends them after the edited list, unchanged, so a
+	// newer version's entries (or a hand-built tail) are never dropped.
+	let detailKeysKept = [];
+
 	function adoptDetailKeys(value) {
 		// Mirror the plugin parser: a key sheds any friendly name pasted after
 		// it (the config document writes one), duplicates drop at their first
 		// occurrence (hand-edited settings could hold them, and indexOf-based
-		// move and remove need one chip per key), and the same cap applies, so
-		// the panel never shows chips past what the runtime lists.
+		// move and remove need one chip per key; the runtime ignores the
+		// repeats too), and the same cap applies, so the panel never shows
+		// chips past what the runtime lists.
 		const seen = new Set();
-		detailKeys = Array.isArray(value)
-			? value
-					.filter((k) => typeof k === "string")
-					.map((k) => bareKey(k))
-					.filter((k) => k !== "" && !seen.has(k) && seen.add(k))
-					.slice(0, DETAIL_KEYS_MAX)
-			: [];
+		const known = [];
+		const kept = [];
+		for (const entry of Array.isArray(value) ? value : []) {
+			if (typeof entry !== "string") {
+				kept.push(entry);
+				continue;
+			}
+			const key = bareKey(entry);
+			if (key === "" || seen.has(key)) continue;
+			seen.add(key);
+			if (known.length < DETAIL_KEYS_MAX) known.push(key);
+			else kept.push(entry);
+		}
+		detailKeys = known;
+		detailKeysKept = kept;
 		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
@@ -1588,47 +1722,51 @@
 	}
 
 	// --- sensor pickers -------------------------------------------------------
-	// One factory, one instance per search box. The tree is shared; membership
-	// ticks render wherever a config supplies tick/onTick (the dial's rotation
-	// list, the reading PI's collector). Each picker owns its open/typed state
-	// so the reading PI's pickers never fight.
+	// One factory, two widgets. A picker bound to a setting is an editable
+	// combobox over a listbox (W3C APG, list autocomplete, manual selection):
+	// typing filters, arrow keys move the highlight (aria-activedescendant)
+	// without committing, Enter or a click commits, Escape closes and puts
+	// the box back to the saved choice, Tab leaves without committing. A
+	// picker with membership (the detail collector, the dial's rotation list)
+	// is a search box over a native checklist: every row is a real checkbox
+	// with its label, so nothing interactive hides inside a listbox option.
+	// Every matching reading renders: no row budget, so a deep selection is
+	// always reachable and visible when the list opens.
 	const pickers = [];
+	let optionSeq = 0;
 
 	function createPicker(config) {
 		const searchEl = config.search;
 		const listEl = config.list;
+		const combobox = config.setting !== undefined;
 		let selectedKey = "";
 		let listOpen = false;
 		// True only after a real keystroke in the search box; cleared whenever
-		// the box is programmatically rewritten. The old proxy (box text
-		// differs from the selection display) misfired when rotation moved the
-		// selection under a focused box: the stale display text filtered the
-		// list to nothing.
+		// the box is programmatically rewritten, so a stale display text can
+		// never filter the list.
 		let searchTyped = false;
+		let activeKey = ""; // the highlighted option (combobox only)
+		const pickerId = `p${++optionSeq}`;
+		const optionId = (key) => `${pickerId}-${encodeURIComponent(key).replace(/%/g, "_")}`;
 
 		// Immediate (non-debounced) persistence; third arg null disables debounce.
-		// A picker without a `setting` (the detail-list collector) binds nothing:
-		// its rows feed `onPick` instead of a persisted selection.
-		const [getKey, setKey] =
-			config.setting === undefined
-				? [() => Promise.resolve(""), () => {}]
-				: useSettings(
-						config.setting,
-						(value) => {
-							selectedKey = typeof value === "string" ? value : "";
-							showSelection();
-							renderList();
-							config.onSelectionEcho?.(); // chip highlight follows the move
-							// Rotating the dial (or autocycle) moves the selection while the
-							// list is open: keep the highlighted row in view so the movement
-							// is visible. "nearest" only scrolls when it left the viewport,
-							// and a hand-typed filter is never yanked around.
-							if (listOpen && !searchTyped) {
-								listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "nearest" });
-							}
-						},
-						null
-					);
+		// A picker without a `setting` binds nothing: its rows feed `onTick`.
+		const [getKey, setKey] = !combobox
+			? [() => Promise.resolve(""), () => {}]
+			: useSettings(
+					config.setting,
+					(value) => {
+						selectedKey = typeof value === "string" ? value : "";
+						showSelection();
+						renderList();
+						config.onSelectionEcho?.(); // chip highlight follows the move
+						// Rotating the dial (or autocycle) moves the selection while the
+						// list is open: keep the selected row in view so the movement is
+						// visible, never while the person is typing a filter.
+						if (listOpen && !searchTyped) listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "nearest" });
+					},
+					null
+				);
 
 		function findSelected() {
 			if (tree === null || selectedKey === "") return null;
@@ -1643,23 +1781,30 @@
 		function showSelection() {
 			if (document.activeElement === searchEl && listOpen && searchTyped) return; // don't fight the user mid-search
 			searchTyped = false;
+			if (!combobox) {
+				searchEl.value = "";
+				return;
+			}
 			const found = findSelected();
 			if (found !== null) {
 				searchEl.value = `${found.reading.label}  ·  ${found.group.name}`;
-				searchEl.placeholder = "Search sensors…";
+				searchEl.placeholder = "Search readings";
 				searchEl.classList.remove("missing");
-			} else if (selectedKey !== "") {
+			} else if (selectedKey !== "" && tree !== null && treeFetchedOk) {
+				// Missing only when HWiNFO answered with a list that lacks it.
 				// Never put the warning into .value; it would act as a search filter.
 				searchEl.value = "";
-				searchEl.placeholder = "⚠ selected sensor not present. Pick again";
+				searchEl.placeholder = "Saved reading not found. Search to pick another";
 				searchEl.classList.add("missing");
+			} else if (selectedKey !== "" && tree !== null) {
+				// No usable list (HWiNFO down): the saved reading is unknown,
+				// not missing, and stays exactly as it is.
+				searchEl.value = "";
+				searchEl.placeholder = "Saved reading kept (no HWiNFO data to show it)";
+				searchEl.classList.remove("missing");
 			} else {
 				searchEl.value = "";
-				// The collector never holds a selection (no bound setting), and
-				// its placeholder is owned by the HTML resting text and
-				// armDetailAdd's aim line: the generic reset here would wipe a
-				// standing aim's receipt on every close and tree echo.
-				if (config.setting !== undefined) searchEl.placeholder = "Search sensors…";
+				searchEl.placeholder = selectedKey !== "" ? "Loading readings" : "Search readings";
 				searchEl.classList.remove("missing");
 			}
 		}
@@ -1668,59 +1813,92 @@
 			return text.toLowerCase().split(/\s+/).filter((t) => t.length > 0);
 		}
 
+		function options() {
+			return Array.from(listEl.querySelectorAll(".hw-row"));
+		}
+
+		function setActive(key, scroll = true) {
+			activeKey = key;
+			let found = null;
+			for (const row of options()) {
+				const on = row.dataset.key === key;
+				row.classList.toggle("active", on);
+				if (on) found = row;
+			}
+			if (combobox) {
+				if (found !== null) searchEl.setAttribute("aria-activedescendant", found.id);
+				else searchEl.removeAttribute("aria-activedescendant");
+			}
+			if (found !== null && scroll) found.scrollIntoView({ block: "nearest" });
+		}
+
 		function renderList() {
 			if (!listOpen) return;
 			if (tree === null) {
-				listEl.innerHTML = `<div class="hw-more">Loading sensors…</div>`;
+				const loading = document.createElement("div");
+				loading.className = "hw-more";
+				loading.textContent = "Loading readings…";
+				listEl.replaceChildren(loading);
 				return;
 			}
-			const raw = searchEl.value;
+			const keepScroll = listEl.scrollTop;
 			// Only a filter the user actually typed filters the list.
-			const filtering = searchTyped && raw !== "";
-			const tokens = filtering ? tokensOf(raw) : [];
-
+			const raw = searchEl.value;
+			const tokens = searchTyped && raw !== "" ? tokensOf(raw) : [];
 			const frag = document.createDocumentFragment();
 			let shown = 0;
-			let hidden = 0;
 			for (let gi = 0; gi < tree.length; gi++) {
 				const group = tree[gi];
 				const groupLower = group.name.toLowerCase();
-				let header = null;
+				let box = null;
 				for (const reading of group.readings) {
-					const hay = `${groupLower} ${reading.label.toLowerCase()}`;
-					if (tokens.length > 0 && !tokens.every((t) => hay.includes(t))) continue;
-					if (shown >= MAX_ROWS) {
-						hidden++;
-						continue;
+					if (tokens.length > 0) {
+						const hay = `${groupLower} ${reading.label.toLowerCase()}`;
+						if (!tokens.every((t) => hay.includes(t))) continue;
 					}
-					if (header === null) {
-						header = document.createElement("div");
+					if (box === null) {
+						box = document.createElement("div");
+						const header = document.createElement("div");
 						header.className = "hw-group";
-						header.textContent = group.name;
+						header.id = `${pickerId}-g${gi}`;
+						const title = document.createElement("span");
+						title.textContent = group.name;
+						header.appendChild(title);
+						if (combobox) {
+							box.setAttribute("role", "group");
+							box.setAttribute("aria-labelledby", header.id);
+							header.setAttribute("role", "presentation");
+						}
 						if (config.onGroupAdd !== undefined) {
-							// "Add this whole source" in one press, straight from the
-							// same tree data the pickers already share.
+							// "Add this whole source" in one press. Bound by position in
+							// the rendered tree, not by name: source names are not unique
+							// (identical hardware, user renames, the orphan fallback).
 							const addAll = document.createElement("button");
 							addAll.type = "button";
 							addAll.className = "hw-group-add";
-							// Bound by position in the rendered tree, not by name:
-							// source names are not unique (identical hardware, user
-							// renames, the "Unknown sensor" orphan fallback), and a
-							// name lookup would always resolve to the first twin.
 							addAll.dataset.groupIndex = String(gi);
-							addAll.title = "Add every reading of this source";
 							addAll.textContent = "+ all";
+							addAll.setAttribute("aria-label", `Add every reading of ${group.name}`);
 							header.appendChild(addAll);
 						}
-						frag.appendChild(header);
+						box.appendChild(header);
+						frag.appendChild(box);
 					}
-					const row = document.createElement("div");
-					row.className = "hw-row" + (reading.key === selectedKey ? " selected" : "");
-					row.dataset.key = reading.key;
-					if (config.tick !== undefined) {
-						// One membership pattern wherever a list HAS membership
-						// (the rotation set and the drill-down list): a checkbox
-						// at the row head. The old ✓ glyph is gone with it.
+					const typeName = SENSOR_TYPE_NAMES[reading.type] || "";
+					const valueText = `${reading.display ?? ""}${typeName ? " · " + typeName : ""}`;
+					let row;
+					if (combobox) {
+						row = document.createElement("div");
+						row.setAttribute("role", "option");
+						row.id = optionId(reading.key);
+						const selected = reading.key === selectedKey;
+						row.setAttribute("aria-selected", selected ? "true" : "false");
+						row.className = "hw-row" + (selected ? " selected" : "") + (reading.key === activeKey ? " active" : "");
+					} else {
+						// A native checklist row: the label IS the hit area, the box
+						// its state, the name everything a screen reader needs.
+						row = document.createElement("label");
+						row.className = "hw-row";
 						const state = config.tick(reading.key);
 						const tick = document.createElement("input");
 						tick.type = "checkbox";
@@ -1730,37 +1908,47 @@
 						tick.title = state.title;
 						row.appendChild(tick);
 					}
+					row.dataset.key = reading.key;
 					const label = document.createElement("span");
 					label.className = "hw-label";
 					label.textContent = reading.label;
 					const val = document.createElement("span");
 					val.className = "hw-val";
-					const typeName = SENSOR_TYPE_NAMES[reading.type] || "";
-					val.textContent = `${reading.display ?? ""}${typeName ? " · " + typeName : ""}`;
+					val.textContent = valueText;
 					row.append(label, val);
-					frag.appendChild(row);
+					const marker = config.marker?.(reading.key);
+					if (marker) {
+						const badge = document.createElement("span");
+						badge.className = "hw-now";
+						badge.textContent = marker;
+						row.appendChild(badge);
+					}
+					box.appendChild(row);
 					shown++;
 				}
 			}
 			if (shown === 0) {
 				const none = document.createElement("div");
 				none.className = "hw-more";
-				none.textContent = tokens.length > 0 ? "No sensors match." : "No sensors reported. Check HWiNFO's sensor window.";
+				none.textContent = tokens.length > 0 ? `No readings match "${raw.trim()}".` : "HWiNFO publishes no readings right now.";
 				frag.appendChild(none);
 			}
-			if (hidden > 0) {
-				const more = document.createElement("div");
-				more.className = "hw-more";
-				more.textContent = `…${hidden} more. Refine the search.`;
-				frag.appendChild(more);
-			}
 			listEl.replaceChildren(frag);
+			listEl.scrollTop = keepScroll;
+			if (combobox) {
+				// The highlight survives a re-render while its row still matches.
+				if (activeKey !== "" && listEl.querySelector(`[data-key="${CSS.escape(activeKey)}"]`) === null) activeKey = "";
+				setActive(activeKey, false);
+			}
+			listEl.setAttribute("aria-busy", "false");
 		}
 
 		function openList() {
 			if (listOpen) return;
 			listOpen = true;
 			listEl.hidden = false;
+			searchEl.setAttribute("aria-expanded", "true");
+			activeKey = combobox ? selectedKey : "";
 			renderList();
 			const sel = listEl.querySelector(".hw-row.selected");
 			if (sel) sel.scrollIntoView({ block: "center" });
@@ -1771,21 +1959,16 @@
 			const was = listOpen;
 			listOpen = false;
 			listEl.hidden = true;
+			searchEl.setAttribute("aria-expanded", "false");
+			searchEl.removeAttribute("aria-activedescendant");
+			activeKey = "";
 			showSelection();
 			if (was) config.onOpenChange?.(false);
 		}
 
-		function selectRow(row) {
-			if (!row || !row.dataset.key) return;
-			if (config.onPick !== undefined) {
-				// Collector mode: a row click toggles membership and keeps the
-				// list open, so building a custom detail list is one click per
-				// reading instead of reopen-search-click cycles.
-				config.onPick(row.dataset.key);
-				renderList();
-				return;
-			}
-			selectedKey = row.dataset.key;
+		function commit(key) {
+			if (!combobox || !key) return;
+			selectedKey = key;
 			setKey(selectedKey);
 			closeList();
 			config.onSelectionEcho?.(); // own writes are not echoed back
@@ -1796,7 +1979,7 @@
 			openList();
 		});
 
-		// After a selection the input keeps focus (the row's mousedown is
+		// After a selection the input keeps focus (the option's mousedown is
 		// preventDefault-ed), so no focus event fires; reopen on click too.
 		searchEl.addEventListener("mousedown", () => {
 			if (!listOpen && document.activeElement === searchEl) {
@@ -1808,54 +1991,110 @@
 		searchEl.addEventListener("input", () => {
 			searchTyped = true;
 			openList();
+			if (combobox) activeKey = "";
 			renderList();
 		});
 
 		searchEl.addEventListener("keydown", (ev) => {
+			if (ev.isComposing) return; // an IME owns these keys mid-composition
 			if (ev.key === "Escape") {
-				closeList();
-				searchEl.blur();
-			} else if (ev.key === "Enter" && listOpen) {
-				// Only treat Enter as "pick the top row" when the user actually typed
-				// a filter (same condition renderList uses). With the box still showing
-				// the current selection (or the ⚠ missing-sensor placeholder), the list
-				// is the full unfiltered tree, whose top row is unrelated; picking it
-				// would silently swap the user's saved sensor. Just close instead.
-				if (searchTyped && searchEl.value !== "") {
-					selectRow(listEl.querySelector(".hw-row"));
-				} else {
-					closeList();
-				}
-			}
-		});
-
-		// mousedown fires before the input's blur, keeping selection handling simple.
-		listEl.addEventListener("mousedown", (ev) => {
-			const groupAdd = ev.target.closest(".hw-group-add");
-			if (groupAdd !== null && config.onGroupAdd !== undefined) {
-				ev.preventDefault();
-				const group = (tree ?? [])[Number(groupAdd.dataset.groupIndex)];
-				if (group !== undefined) {
-					config.onGroupAdd(group);
-					renderList();
+				if (listOpen) {
+					ev.preventDefault();
+					ev.stopPropagation();
+					closeList(); // restores the saved choice; commits nothing
 				}
 				return;
 			}
-			const row = ev.target.closest(".hw-row");
-			if (!row) return;
-			// Membership ticks toggle natively on the CLICK that follows; fighting
-			// that from mousedown left the box visually inverted. Let it be.
-			if (ev.target.classList.contains("hw-tick")) return;
-			ev.preventDefault();
-			selectRow(row);
+			if (!combobox) {
+				if (ev.key === "ArrowDown") {
+					// Into the checklist: the first box takes focus.
+					openList();
+					const first = listEl.querySelector(".hw-tick:not(:disabled), .hw-group-add");
+					if (first !== null) {
+						ev.preventDefault();
+						first.focus();
+					}
+				}
+				return;
+			}
+			if (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "PageDown" || ev.key === "PageUp") {
+				ev.preventDefault();
+				openList();
+				const rows = options();
+				if (rows.length === 0) return;
+				const at = rows.findIndex((r) => r.dataset.key === activeKey);
+				const step = ev.key === "ArrowDown" ? 1 : ev.key === "ArrowUp" ? -1 : ev.key === "PageDown" ? 10 : -10;
+				const next = at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, at + step));
+				setActive(rows[next].dataset.key);
+			} else if (ev.key === "Enter" && listOpen) {
+				ev.preventDefault();
+				// Enter commits the highlighted option. With no highlight, it
+				// commits the top match only when the person typed a filter;
+				// otherwise the list is the whole unfiltered tree, whose top row
+				// is unrelated, and picking it would silently swap the saved
+				// reading. Just close instead.
+				if (activeKey !== "") commit(activeKey);
+				else if (searchTyped && searchEl.value !== "") commit(options()[0]?.dataset.key);
+				else closeList();
+			} else if (ev.key === "Tab" && listOpen) {
+				closeList(); // leaving commits nothing
+			}
 		});
 
-		if (config.onTick !== undefined) {
-			// The checkbox's own activation already flipped it; adopt its new state.
-			listEl.addEventListener("click", (ev) => {
-				if (!ev.target.classList.contains("hw-tick") || ev.target.disabled) return;
-				const row = ev.target.closest(".hw-row");
-				if (row?.dataset.key) config.onTick(row.dataset.key, ev.target.checked);
+		searchEl.addEventListener("blur", () => {
+			// Focus left the widget (not into its own checklist): close quietly.
+			setTimeout(() => {
+				const inside = listEl.contains(document.activeElement) || document.activeElement === searchEl || (config.alsoWithin !== undefined && config.alsoWithin !== null && config.alsoWithin.contains(document.activeElement));
+				if (listOpen && !inside && combobox) closeList();
+			}, 0);
+		});
+
+		// Group "+ all": acts on mousedown (keeping the search focused, the
+		// list open and the press from blurring) and on click for keyboards,
+		// never twice for one mouse press.
+		let groupAddAt = 0;
+		const groupAdd = (button) => {
+			const group = (tree ?? [])[Number(button.dataset.groupIndex)];
+			if (group !== undefined && config.onGroupAdd !== undefined) {
+				config.onGroupAdd(group);
+				renderList();
+			}
+		};
+		listEl.addEventListener("mousedown", (ev) => {
+			const add = ev.target.closest(".hw-group-add");
+			if (add !== null) {
+				ev.preventDefault();
+				groupAddAt = performance.now();
+				groupAdd(add);
+				return;
+			}
+			if (!combobox) return; // checklist rows are native labels
+			const row = ev.target.closest(".hw-row");
+			if (!row) return;
+			ev.preventDefault(); // keep focus in the box
+			commit(row.dataset.key);
+		});
+		listEl.addEventListener("click", (ev) => {
+			const add = ev.target.closest(".hw-group-add");
+			if (add !== null) {
+				if (performance.now() - groupAddAt > 400) groupAdd(add);
+				return;
+			}
+		});
+		if (!combobox) {
+			// The box's own activation already flipped it; adopt its new state.
+			listEl.addEventListener("change", (ev) => {
+				const tick = ev.target;
+				if (!(tick instanceof HTMLInputElement) || !tick.classList.contains("hw-tick") || tick.disabled) return;
+				const row = tick.closest(".hw-row");
+				if (row?.dataset.key) config.onTick(row.dataset.key, tick.checked);
+			});
+			listEl.addEventListener("keydown", (ev) => {
+				if (ev.key === "Escape") {
+					ev.preventDefault();
+					closeList();
+					searchEl.focus({ preventScroll: true });
+				}
 			});
 		}
 
@@ -1895,21 +2134,33 @@
 		return picker;
 	}
 
-	const primaryConfig = {
+	const primaryPicker = createPicker({
 		search: document.getElementById("picker-search"),
 		refresh: document.getElementById("picker-refresh"),
 		list: document.getElementById("picker-list"),
 		setting: "readingKey",
-		onSelectionEcho: renderRotationSet
-	};
-	if (rotationSetEl !== null) {
-		primaryConfig.tick = (key) => ({
-			on: memberOfRotation(key),
-			title: rotationGroups === null ? "Include in the rotation set" : "Include in the marked rotation group"
+		onSelectionEcho: () => {
+			renderRotationSet();
+			rotationPicker?.renderList();
+			hw.scheduleRender();
+		}
+	});
+
+	// The dial's rotation membership: its own checklist, so ticking what
+	// rotation moves through never changes what is on the dial now.
+	if (rotationSetEl !== null && document.getElementById("pickerr-search") !== null) {
+		rotationPicker = createPicker({
+			search: document.getElementById("pickerr-search"),
+			list: document.getElementById("pickerr-list"),
+			tick: (key) => ({
+				on: memberOfRotation(key),
+				title: rotationGroups === null ? "In the rotation set" : "In a rotation group (new ticks go to the marked group)"
+			}),
+			onTick: setRotationMembership,
+			marker: (key) => (key === primaryPicker.selectedKey() ? "on dial" : ""),
+			alsoWithin: rotationSetEl
 		});
-		primaryConfig.onTick = setRotationMembership;
 	}
-	const primaryPicker = createPicker(primaryConfig);
 
 	// The extra-slot pickers (reading PI only in the markup): slot 2 serves
 	// the dual AND quad layouts, slots 3 and 4 are quad-only.
@@ -1921,7 +2172,8 @@
 					search: searchEl,
 					refresh: document.getElementById(`picker${n}-refresh`),
 					list: document.getElementById(`picker${n}-list`),
-					setting
+					setting,
+					onSelectionEcho: () => hw.scheduleRender()
 				});
 	};
 	const secondaryPicker = extraPicker(2, "secondaryReadingKey");
@@ -1936,17 +2188,9 @@
 			: createPicker({
 					search: document.getElementById("pickerd-search"),
 					list: document.getElementById("pickerd-list"),
-					// The row body is the same toggle as its checkbox: one
-					// affordance, two hit areas. Adds respect the armed tile;
-					// removals shrink the tile that held the reading.
-					onPick: (key) => {
-						if (key === detailPrimaryKey) return;
-						if (detailKeys.includes(key)) removeDetailKey(key);
-						else addDetailKey(key);
-					},
 					tick: (key) =>
 						key === detailPrimaryKey
-							? { on: true, disabled: true, title: "This key's own sensor: the Back tile already shows it." }
+							? { on: true, disabled: true, title: "This key's own reading: the Back tile already shows it." }
 							: { on: detailKeys.includes(key), title: "Ticked readings are in the view. Untick to remove; the tile that held it shrinks." },
 					onTick: (key, next) => {
 						if (next) {
@@ -1963,7 +2207,7 @@
 					// close the results: the list below the dock counts as
 					// inside the picker.
 					alsoWithin: detailListEl,
-					// While picking, the Add sensor row pins to the top and the
+					// While picking, the Add readings row pins to the top and the
 					// landing marker is brought on screen, so results and the
 					// slot they fill stay co-visible.
 					onOpenChange: (open) => {
@@ -1973,76 +2217,43 @@
 				});
 
 	document.addEventListener("mousedown", (ev) => {
-		// composedPath, not target.closest: toggling a rotation tick re-renders
-		// the rows mid-bubble, detaching ev.target; closest() on a detached node
-		// would misread the click as outside the picker and close the list.
+		// composedPath, not target.closest: toggling a tick re-renders rows
+		// mid-bubble, detaching ev.target; closest() on a detached node would
+		// misread the click as outside the picker and close the list.
 		// Checked per picker so opening one never strands the other open.
 		const path = ev.composedPath();
 		for (const picker of pickers) {
 			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) picker.close();
 		}
 	});
-
-	function setHint(text) {
-		hintEl.hidden = !text;
-		hintEl.textContent = text || "";
-	}
-
-	function renderPreview(p) {
-		const live = previewValueEl.closest(".hw-preview-live");
-		if (p.display) {
-			// Plugin-formatted and plugin-colored: the same measurement text and
-			// resolved theme/Text colors the face itself renders with.
-			previewValueEl.textContent = `${p.display.value} ${p.display.unit}`.trim();
-			previewStatsEl.textContent = p.display.stats;
-			previewValueEl.style.color = p.display.valueColor;
-			previewStatsEl.style.color = p.display.statsColor;
-			if (live !== null) {
-				live.classList.add("themed");
-				live.style.background = p.display.bg;
-			}
-		} else {
-			previewValueEl.style.color = "";
-			previewStatsEl.style.color = "";
-			if (live !== null) {
-				live.classList.remove("themed");
-				live.style.background = "";
-			}
-			if (p.missing) {
-				previewValueEl.textContent = "sensor missing";
-				previewStatsEl.textContent = "";
-			} else if (p.state !== "ok") {
-				previewValueEl.textContent = "—";
-				previewStatsEl.textContent = "";
-			} else {
-				previewValueEl.textContent = "pick a sensor";
-				previewStatsEl.textContent = "";
-			}
+	// Focus leaving a checklist (Tab past its last box) closes it too.
+	document.addEventListener("focusin", (ev) => {
+		const target = ev.target;
+		for (const picker of pickers) {
+			if (!picker.isOpen()) continue;
+			const inside = picker.root.contains(target) || (picker.alsoWithin !== null && picker.alsoWithin.contains(target));
+			if (!inside) picker.close();
 		}
-		// The stats line clips to one line (pi.css); the title carries the full text.
-		previewStatsEl.title = previewStatsEl.textContent;
-	}
+	});
 
-	// The sdpi store notifies subscribers on didReceiveSettings only, and the
-	// app does NOT echo a PI's own setSettings back to it, so picking a value
-	// in this very panel never fires the subscription. Poll the LOCAL settings
-	// cache (no round trip) so dependent rows follow while the panel is open.
+	// The app never echoes a panel's own write, and several controls here
+	// follow what another control writes (the tile editor follows Tile
+	// shows, the layout rows follow Readings on this key). The shell sees
+	// every save the store makes and every echo, so a follower re-reads its
+	// setting on each: no timers, and nothing runs while nothing changes.
 	const followSetting = (setting, apply) => {
 		const [get] = useSettings(setting, apply, null);
 		get().then(apply);
-		setInterval(() => get().then(apply), 400);
+		hw.on("settings", () => get().then(apply));
+	};
+	const followGlobal = (setting, apply) => {
+		const [get] = useGlobalSettings(setting, apply, null);
+		get().then(apply);
+		hw.on("globals", () => get().then(apply));
 	};
 
-	// Drive an sdpi textfield's placeholder: attribute so the markup stays
-	// truthful, rendered input for the repaint (the component's placeholder
-	// property wants a localized-message object and throws on plain strings,
-	// and its attribute observer never repaints a changed value). Callers'
-	// 400 ms polls re-assert it if the component re-renders over it.
 	const setPlaceholder = (el, hint) => {
-		if (el === null) return;
-		if (el.getAttribute("placeholder") !== hint) el.setAttribute("placeholder", hint);
-		const input = (el.shadowRoot ?? el).querySelector("input");
-		if (input !== null && input.placeholder !== hint) input.placeholder = hint;
+		if (el !== null && el.placeholder !== hint) el.placeholder = hint;
 	};
 
 	// Control preset (dial PI only): the custom gesture rows only exist for
@@ -2068,10 +2279,9 @@
 				getGesture().then((value) => {
 					if (typeof value === "string" && value !== "") return; // user-set: keep
 					setGesture(command);
-					// The sdpi store does not notify components of the PI's own
-					// writes; poke the select so it displays the seeded command.
-					const el = document.querySelector(`sdpi-select[setting="${setting}"]`);
-					if (el) el.value = command;
+					// The store does not echo the panel's own writes; the shell
+					// re-reads every bound control after each save, so the
+					// select shows the seeded command at once.
 				});
 			});
 		};
@@ -2100,17 +2310,18 @@
 		const tripleHelpEl = document.getElementById("triple-help");
 		const thirdLabelEl = document.getElementById("third-label");
 		const quadRowsEl = document.getElementById("quad-rows");
+		const quadDisplayEl = document.getElementById("quad-display");
 		const displayItemEl = document.getElementById("display-item");
 		const layoutHintEl = document.getElementById("layout-hint");
 		// quadLabel3 doubles as the triple's third-row label, and in the quad
 		// grid the Label and Second label fields feed the top two cells: all
 		// of them hard-cut to 4 characters there, so every field's promise
 		// swaps with the mode (the static placeholders stay the non-quad
-		// truth; setPlaceholder carries the sdpi drive).
-		const mainLabelEl = document.querySelector('sdpi-textfield[setting="label"]');
-		const secondLabelEl = document.querySelector('sdpi-textfield[setting="secondaryLabel"]');
+		// truth).
+		const mainLabelEl = document.getElementById("f-label");
+		const secondLabelEl = document.getElementById("f-label2");
 		const labelHints = (quad) => {
-			const hint = quad ? "Short name; 4 characters show" : "Custom label (default: sensor name)";
+			const hint = quad ? "Short name; 4 characters show" : "The reading's own name";
 			for (const el of [thirdLabelEl, mainLabelEl, secondLabelEl]) setPlaceholder(el, hint);
 		};
 		const applyLayout = (value) => {
@@ -2122,6 +2333,7 @@
 			if (thirdSlotEl !== null) thirdSlotEl.hidden = !triple && !quad;
 			if (tripleHelpEl !== null) tripleHelpEl.hidden = !triple;
 			if (quadRowsEl !== null) quadRowsEl.hidden = !quad;
+			if (quadDisplayEl !== null) quadDisplayEl.hidden = !quad;
 			if (displayItemEl !== null) displayItemEl.hidden = dual || triple || quad;
 			labelHints(quad);
 			// The face silently keeps its single layout until the extra slots
@@ -2130,6 +2342,8 @@
 			const picked = (p) => p !== null && p.selectedKey() !== "";
 			if (layoutHintEl !== null) layoutHintEl.hidden = !((dual && !picked(secondaryPicker)) || (triple && !picked(secondaryPicker) && !picked(quadPicker3)) || (quad && !picked(secondaryPicker) && !picked(quadPicker3) && !picked(quadPicker4)));
 		};
+		// followSetting re-reads on every save and echo, so a pick in another
+		// slot that ends the degrade re-evaluates the hint too.
 		followSetting("keyLayout", applyLayout);
 	}
 
@@ -2147,6 +2361,8 @@
 		const showHelpEl = document.getElementById("show-help");
 		const pressBlockEl = document.getElementById("press-block");
 		const roleNoteEl = document.getElementById("role-note");
+		const roleHelpEl = document.getElementById("press-role-help");
+		const headKindEl = document.getElementById("head-kind");
 		let pressValue;
 		let backRole = false;
 		// One renderer over both polled facts, so whichever poll answers
@@ -2156,15 +2372,18 @@
 			detailConfigEl.hidden = !details;
 			if (pressBlockEl !== null) pressBlockEl.hidden = backRole;
 			if (roleNoteEl !== null) roleNoteEl.hidden = !backRole;
+			if (roleHelpEl !== null) roleHelpEl.hidden = !backRole;
+			if (headKindEl !== null) headKindEl.textContent = backRole ? "Back tile · sensor detail view" : "Sensor Reading key";
 			if (showHelpEl !== null) {
 				showHelpEl.textContent = backRole
-					? "Show picks the stat this tile displays. Pressing it always returns to the previous profile."
+					? "Value shown picks the stat this tile displays. Pressing it always returns to the previous profile."
 					: pressValue === "open-details"
-						? "Pressing the key opens the sensor details view; Show picks the stat on this key's own face."
+						? "Pressing the key opens the sensor details view; Value shown picks the stat on this key's own face."
 						: pressValue === "tap-cycle-hold-details"
 							? "A short tap cycles current → min → max → avg; holding half a second opens sensor details."
-							: "Pressing the key cycles current → min → max → avg.";
+							: "Pressing the key cycles current → min → max → avg. Minimum, maximum and average are HWiNFO's own, since HWiNFO started.";
 			}
+			hw.scheduleRender();
 		};
 		followSetting("pressBehavior", (value) => {
 			pressValue = value;
@@ -2222,7 +2441,7 @@
 			setDisplayMode(displayModeEl.value);
 		});
 		showDisplayMode();
-		setInterval(showDisplayMode, 400);
+		hw.on("settings", showDisplayMode);
 	}
 
 	// Dial view (dial PI only): the overview rows serve both multi-row
@@ -2234,8 +2453,8 @@
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
 		const barRangeEl = document.getElementById("bar-range");
-		const warnEl = document.querySelector('sdpi-textfield[setting="warnValue"]');
-		const critEl = document.querySelector('sdpi-textfield[setting="critValue"]');
+		const warnEl = document.getElementById("f-warn");
+		const critEl = document.getElementById("f-crit");
 		const applyView = (value) => {
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
@@ -2244,8 +2463,8 @@
 			// there (the dial renderer's alert indicator), so the threshold
 			// placeholders must promise the mechanism the view really has.
 			const single = value !== "tworow" && value !== "overview";
-			setPlaceholder(warnEl, single ? "bar turns amber (display units)" : "row value turns amber (display units)");
-			setPlaceholder(critEl, single ? "bar turns red (display units)" : "row value turns red (display units)");
+			setPlaceholder(warnEl, single ? "Off (bar turns amber)" : "Off (row value turns amber)");
+			setPlaceholder(critEl, single ? "Off (bar turns red)" : "Off (row value turns red)");
 		};
 		followSetting("dialView", applyView);
 	}
@@ -2263,7 +2482,9 @@
 		};
 		const cellInputs = [1, 2, 3, 4].map((n) => document.getElementById(`quad-color-${n}`));
 		let quadColors = [...QUAD_DEFAULT_COLORS];
+		let quadColorsRaw = undefined; // the stored list, entries past four and junk included
 		const adoptQuadColors = (value) => {
+			quadColorsRaw = value;
 			const raw = Array.isArray(value) ? value : [];
 			quadColors = QUAD_DEFAULT_COLORS.map((fallback, i) => (typeof raw[i] === "string" && HEX_COLOR.test(raw[i]) ? raw[i] : fallback));
 		};
@@ -2283,7 +2504,9 @@
 			const preset = QUAD_PRESETS[quadPresetEl.value];
 			if (preset === undefined) return; // "Custom" is a display state, not a preset
 			quadColors = [...preset];
-			writeQuadColors([...quadColors]);
+			// A preset sets the four cells; anything stored past them stays.
+			quadColorsRaw = model.patchColors(quadColorsRaw, { 0: preset[0], 1: preset[1], 2: preset[2], 3: preset[3] }, QUAD_DEFAULT_COLORS);
+			writeQuadColors(quadColorsRaw);
 			showQuadColors();
 		});
 		cellInputs.forEach((input, i) => {
@@ -2291,7 +2514,9 @@
 			// change (picker closed), not input: no write per drag frame.
 			input.addEventListener("change", () => {
 				quadColors[i] = input.value;
-				writeQuadColors([...quadColors]);
+				// One cell changed: only that entry is rewritten.
+				quadColorsRaw = model.patchColors(quadColorsRaw, { [i]: input.value }, QUAD_DEFAULT_COLORS);
+				writeQuadColors(quadColorsRaw);
 				showQuadColors();
 			});
 		});
@@ -2300,9 +2525,10 @@
 
 	// --- theme preset gallery -------------------------------------------------
 	// Tokens come from the plugin (parsed themes.json) over the message channel;
-	// the deck-wide default renders as the leading "Deck default" chip and the
-	// seven presets follow. Clicking writes the per-key "theme" setting ("" =
-	// follow deck default); the key/dial re-renders immediately: live preview.
+	// the shared default renders as the leading "Default" chip and the seven
+	// presets follow, each a toggle button (aria-pressed). Clicking writes the
+	// per-action "theme" setting ("" = follow the shared theme); the key or
+	// dial re-renders at once and the header shows its new face.
 
 	let themesConfig = null; // { defaultTheme, effectiveDeckTheme, themes: { id: { bg, ... } } }
 	let themeOverride = "";
@@ -2335,9 +2561,11 @@
 		chip.className = "hw-theme" + (selected ? " selected" : "") + (isDeck ? " hw-theme-deck" : "");
 		chip.dataset.theme = id;
 		chip.title = name;
+		chip.setAttribute("aria-pressed", selected ? "true" : "false");
 		const face = document.createElement("span");
 		face.className = "hw-theme-face";
 		face.style.background = palette.bg;
+		face.setAttribute("aria-hidden", "true");
 		const value = document.createElement("span");
 		value.className = "hw-theme-value";
 		value.style.color = palette.value;
@@ -2371,22 +2599,57 @@
 		if (themesConfig === null) return;
 		const frag = document.createDocumentFragment();
 		const deckId = resolvedDeckId();
-		const deckDisplay = deckId.charAt(0).toUpperCase() + deckId.slice(1);
-		const deckChip = themeChip("", themesConfig.themes[deckId], "Deck default", themeOverride === "");
-		deckChip.title = "Deck default · " + deckDisplay;
+		const deckDisplay = model.themeName(deckId);
+		const deckChip = themeChip("", themesConfig.themes[deckId], "Default", themeOverride === "");
+		deckChip.title = `Default: follows the shared theme (${deckDisplay})`;
+		deckChip.setAttribute("aria-label", `Default: follow the shared theme, currently ${deckDisplay}`);
 		frag.appendChild(deckChip);
+		// A stored theme this version does not know draws the spec default;
+		// say so instead of showing no chip pressed.
+		const unknown = themeOverride !== "" && themesConfig.themes[themeOverride] === undefined;
 		const help = document.getElementById("theme-help");
 		if (help !== null) {
-			// The deck row lives under a different fold per PI; keep the static
-			// HTML fallbacks in both PIs in sync with these two strings.
-			const isDial = document.title.includes("Dial");
-			help.textContent = "Pick a preset for this " + (isDial ? "dial" : "key") + " only, or the dashed “Deck default” chip (currently " + deckDisplay + ") to follow the deck-wide theme set under " + (isDial ? "Dial gestures & advanced" : "Advanced") + ".";
+			const scope = hw.kind === "dial" ? "dial" : "key";
+			const text = unknown
+				? `This ${scope} stores the theme "${themeOverride}", which this version does not know; it draws ${model.themeName(themesConfig.defaultTheme)}. The stored value is kept until you pick a theme. `
+				: themeOverride === ""
+					? `This ${scope} follows the shared theme, currently ${deckDisplay}. `
+					: `This ${scope} uses ${model.themeName(themeOverride)}. Default follows the shared theme (${deckDisplay}). `;
+			if (help.dataset.text !== text) {
+				help.dataset.text = text;
+				help.textContent = text;
+				const link = document.createElement("button");
+				link.type = "button";
+				link.className = "hw-link";
+				link.dataset.reveal = "shared-theme";
+				link.textContent = "Change the shared theme";
+				help.appendChild(link);
+			}
 		}
 		for (const [id, palette] of Object.entries(themesConfig.themes)) {
-			frag.appendChild(themeChip(id, palette, id.charAt(0).toUpperCase() + id.slice(1), themeOverride === id));
+			const chip = themeChip(id, palette, model.themeName(id), themeOverride === id);
+			chip.setAttribute("aria-label", `${model.themeName(id)} theme for this ${hw.kind === "dial" ? "dial" : "key"}`);
+			frag.appendChild(chip);
 		}
+		// Rebuilding under focus would drop it; keep the pressed chip focused.
+		const focusedTheme = galleryEl.contains(document.activeElement) ? document.activeElement.dataset.theme : undefined;
 		galleryEl.replaceChildren(frag);
+		if (focusedTheme !== undefined) galleryEl.querySelector(`.hw-theme[data-theme="${CSS.escape(focusedTheme)}"]`)?.focus({ preventScroll: true });
+		labelSharedOptions();
 	}
+
+	/** The Default choices name what they currently resolve to. */
+	const [getSharedText] = useGlobalSettings("textMode", undefined, null, false);
+	function labelSharedOptions() {
+		const option = document.querySelector('#f-text option[value=""]');
+		if (option === null) return;
+		getSharedText().then((mode) => {
+			const name = mode === "dim" ? "Dimmed" : mode === "custom" ? "Custom color" : "Theme text";
+			const text = `Default (shared: ${name})`;
+			if (option.textContent !== text) option.textContent = text;
+		});
+	}
+	hw.on("globals", labelSharedOptions);
 
 	galleryEl.addEventListener("click", (ev) => {
 		const chip = ev.target.closest(".hw-theme");
@@ -2411,28 +2674,33 @@
 		return palette ? palette.value.toLowerCase() : "#ffffff";
 	}
 
-	function bindTextControls(customEl, colorEl, useStore) {
+	function bindTextControls(customEl, colorEl, useStore, event) {
 		if (customEl === null || colorEl === null) return;
 		const [getMode] = useStore("textMode", () => {}, null);
 		const [getColor, setColor] = useStore("textColor", () => {}, null);
+		const codeEl = document.getElementById(`${colorEl.id}-code`);
 		const refresh = () => {
 			getMode().then((mode) => {
 				customEl.hidden = mode !== "custom";
 			});
 			getColor().then((color) => {
+				const stored = typeof color === "string" && HEX_COLOR.test(color);
+				if (codeEl !== null) codeEl.textContent = stored ? color.toUpperCase() : "not set: theme text until picked";
+				colorEl.setAttribute("aria-label", stored ? `Custom text color, ${color.toUpperCase()}` : "Custom text color, not set (theme text until picked)");
 				if (document.activeElement === colorEl) return; // picker open: don't fight it
-				const shown = typeof color === "string" && HEX_COLOR.test(color) ? color.toLowerCase() : themeValueSeed();
+				const shown = stored ? color.toLowerCase() : themeValueSeed();
 				if (colorEl.value !== shown) colorEl.value = shown;
 			});
 		};
-		// change (picker closed), not input: no write per drag frame.
+		// change (picker closed), not input: no write per drag frame. The
+		// exact color is stored as picked; nothing here ever adjusts it.
 		colorEl.addEventListener("change", () => setColor(colorEl.value));
 		refresh();
-		setInterval(refresh, 400);
+		hw.on(event, refresh);
 	}
 
-	bindTextControls(document.getElementById("text-custom"), document.getElementById("text-color"), useSettings);
-	bindTextControls(document.getElementById("deck-text-custom"), document.getElementById("deck-text-color"), useGlobalSettings);
+	bindTextControls(document.getElementById("text-custom"), document.getElementById("text-color"), useSettings, "settings");
+	bindTextControls(document.getElementById("deck-text-custom"), document.getElementById("deck-text-color"), useGlobalSettings, "globals");
 
 	streamDeckClient.sendToPropertyInspector.subscribe((ev) => {
 		const p = ev && ev.payload;
@@ -2453,19 +2721,17 @@
 			return;
 		}
 		if (p.event === "sensorTree") {
-			tree = p.groups;
+			tree = Array.isArray(p.groups) ? p.groups : [];
 			treeFetchedOk = p.state === "ok";
 			treeRequestPending = false;
-			setHint(p.hint);
 			for (const picker of pickers) picker.onTree();
 			renderRotationSet(); // chip labels resolve once the tree is here
 			renderDetailList(); // detail chip labels too
 			updateFilterCount(); // and the live filter match count
 		} else if (p.event === "preview") {
-			renderPreview(p);
-			setHint(p.hint);
-			// The tree was fetched while HWiNFO was down; refresh it now that
-			// data is flowing, so the picker isn't stuck on "No sensors reported".
+			// The header, status line and summaries are the shell's. Here: the
+			// tree was fetched while HWiNFO was down; refresh it now that data
+			// is flowing, so the picker isn't stuck on "no readings".
 			if (p.state === "ok" && !treeFetchedOk && !treeRequestPending) {
 				requestTree();
 			}
@@ -2473,6 +2739,11 @@
 	});
 
 	primaryPicker.init();
+	hw.on("retry", () => {
+		tree = null;
+		for (const picker of pickers) picker.renderList();
+		treeRequestPending = true;
+	});
 	if (secondaryPicker !== null) secondaryPicker.init();
 	if (quadPicker3 !== null) quadPicker3.init();
 	if (quadPicker4 !== null) quadPicker4.init();
@@ -2700,6 +2971,16 @@
 	}
 	if (rotationBinding !== null) {
 		rotationSetEl.addEventListener("click", (ev) => {
+			// Keyboard reorder: the arrows move a chip one place in its own
+			// list (the order rotation steps through); focus stays on the
+			// same arrow of the moved chip, or its twin at a list edge.
+			const moveEl = ev.target.closest(".hw-chip-move");
+			if (moveEl !== null) {
+				if (moveEl.disabled) return;
+				const groupIndex = moveEl.dataset.group === undefined ? null : Number(moveEl.dataset.group);
+				moveRotationKey(moveEl.dataset.key, groupIndex, Number(moveEl.dataset.move));
+				return;
+			}
 			// Chip rename: the name swaps to an inline input; commit on
 			// change (Enter blurs, like group names), empty restores the
 			// HWiNFO label.
@@ -2714,6 +2995,7 @@
 				input.placeholder = readingLabelOf(key) ?? key;
 				input.dataset.key = key;
 				input.spellcheck = false;
+				input.setAttribute("aria-label", `Name on the dial for ${readingLabelOf(key) ?? key}; empty uses HWiNFO's name`);
 				nameEl.replaceWith(input);
 				input.focus();
 				input.select();
@@ -2760,14 +3042,14 @@
 			if (action.dataset.setAction === "split") {
 				// Group 1 inherits the current set; new ticks land in group 2.
 				rotationGroups = [
-					{ name: "", keys: [...rotationKeys] },
-					{ name: "", keys: [] }
+					{ name: "", keys: [...rotationKeys], keysKept: [], raw: null, base: null },
+					{ name: "", keys: [], keysKept: [], raw: null, base: null }
 				];
 				collectorIndex = 1;
 				writeRotation(true);
 			} else if (action.dataset.setAction === "add") {
-				rotationGroups = rotationGroups ?? [{ name: "", keys: [...rotationKeys] }];
-				rotationGroups.push({ name: "", keys: [] });
+				rotationGroups = rotationGroups ?? [{ name: "", keys: [...rotationKeys], keysKept: [], raw: null, base: null }];
+				rotationGroups.push({ name: "", keys: [], keysKept: [], raw: null, base: null });
 				collectorIndex = rotationGroups.length - 1;
 				writeRotation(true);
 			} else if (action.dataset.setAction === "merge") {
@@ -2785,7 +3067,10 @@
 				const name = ev.target.value.trim();
 				if (name === "") delete rotationNames[key];
 				else rotationNames[key] = name;
-				namesBinding[1]({ ...rotationNames });
+				// Only this reading's entry changes; entries the parser skipped
+				// (junk, a newer version's shape) stay stored as they were.
+				rotationNamesRaw = model.patchNames(rotationNamesRaw, key, name);
+				namesBinding[1](rotationNamesRaw);
 				renderRotationSet();
 				return;
 			}
@@ -2806,11 +3091,27 @@
 			if (ev.key === "Enter" && ev.target instanceof HTMLInputElement && ev.target.classList.contains("hw-group-name")) {
 				ev.target.blur();
 				renderRotationSet();
+				return;
+			}
+			if (ev.key === "Escape" && ev.target instanceof HTMLInputElement && ev.target.classList.contains("hw-chip-rename")) {
+				// Abandon the rename: nothing is written, the name returns.
+				ev.preventDefault();
+				const key = ev.target.dataset.key;
+				ev.target.value = rotationNames[key] ?? "";
+				renderRotationSet();
+				rotationSetEl.querySelector(`.hw-set-chip[data-key="${CSS.escape(key)}"] .hw-set-name`)?.focus();
+				return;
+			}
+			// The rename affordance is a span; Enter/Space reach the same swap.
+			if ((ev.key === "Enter" || ev.key === " ") && ev.target instanceof Element && ev.target.classList.contains("hw-set-name")) {
+				ev.preventDefault();
+				ev.target.click();
 			}
 		});
 		rotationBinding[0]().then(adoptRotationKeys);
 		groupsBinding[0]().then(adoptRotationGroups);
 		namesBinding[0]().then(adoptRotationNames);
+		rotationPicker?.init();
 	}
 
 	// --- config export and apply (any panel with #config-key) ------------
@@ -2878,29 +3179,69 @@
 			}
 			say(ok ? "Copied." : "Copy failed; select the text and copy by hand.");
 		};
-		const apply = (el, write, what) => () => {
-			let doc;
-			try {
-				doc = JSON.parse(el.value);
-			} catch (err) {
-				say(`Refused: not JSON (${err.message}).`);
-				return;
-			}
-			if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
-				say("Refused: the document must be one JSON object.");
-				return;
-			}
-			// Names come off here, whether this build wrote them or a person
-			// typed them: what lands in settings is keys alone. A document
-			// that never carried a name passes through unchanged.
-			write(mapReadingKeys(doc, bareKey));
-			say(`Applied the ${what} document; reloading the panel.`);
-			setTimeout(() => window.location.reload(), 350);
+		const apply = (el, write, what, confirmFirst) => {
+			let armedUntil = 0;
+			const button = el === configKeyEl ? document.getElementById("config-key-apply") : document.getElementById("config-deck-apply");
+			const label = button?.textContent ?? "";
+			return () => {
+				let doc;
+				try {
+					doc = JSON.parse(el.value);
+				} catch (err) {
+					say(`Refused: not JSON (${err.message}). Nothing was changed.`);
+					return;
+				}
+				if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
+					say("Refused: the document must be one JSON object. Nothing was changed.");
+					return;
+				}
+				// The shared document reaches every key and dial: the first
+				// click only arms, and says so; a second click within five
+				// seconds replaces it.
+				if (confirmFirst && Date.now() > armedUntil) {
+					armedUntil = Date.now() + 5000;
+					if (button !== null) {
+						button.dataset.armed = "true";
+						button.textContent = "Click again to replace for all keys and dials";
+						setTimeout(() => {
+							if (Date.now() >= armedUntil && button !== null) {
+								button.dataset.armed = "false";
+								button.textContent = label;
+							}
+						}, 5100);
+					}
+					say("This replaces the shared settings every HWiNFO key and dial uses. Click again to confirm.");
+					return;
+				}
+				armedUntil = 0;
+				// Names come off here, whether this build wrote them or a person
+				// typed them: what lands in settings is keys alone. A document
+				// that never carried a name passes through unchanged.
+				write(mapReadingKeys(doc, bareKey));
+				say(`Replaced the ${what} settings; reloading the panel.`);
+				setTimeout(() => window.location.reload(), 350);
+			};
 		};
 		document.getElementById("config-key-copy")?.addEventListener("click", copy(configKeyEl));
 		document.getElementById("config-deck-copy")?.addEventListener("click", copy(configDeckEl));
-		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), document.title.includes("Dial") ? "dial" : "key"));
-		document.getElementById("config-deck-apply")?.addEventListener("click", apply(configDeckEl, (doc) => streamDeckClient.setGlobalSettings(doc), "deck"));
+		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), hw.kind === "dial" ? "dial" : "key", false));
+		document.getElementById("config-deck-apply")?.addEventListener("click", apply(configDeckEl, (doc) => streamDeckClient.setGlobalSettings(doc), "shared", true));
 	}
+
+	// --- section summaries --------------------------------------------------
+	// Each summary names the EFFECTIVE result, from the plugin's resolved
+	// `effective` block where the runtime decides (theme drawn, text
+	// precedence, parsed thresholds and scope, controls), from exact stored
+	// markers otherwise. Rendered by the shell on settings, echoes, previews
+	// and tree changes; a tick that changes nothing rewrites nothing.
+	const labelFor = (key) => readingLabelOf(key);
+	if (hw.kind === "key" || hw.kind === "dial") {
+		hw.summary("reading", (st) => model.readingSummary(hw.kind, st.settings, st.preview, labelFor));
+		hw.summary("display", (st) => model.displaySummary(hw.kind, st.settings, st.globals, st.preview));
+		hw.summary("alerts", (st) => model.alertsSummary(hw.kind, st.settings, st.preview));
+		hw.summary("interaction", (st) => (hw.kind === "key" ? model.keyInteractionSummary(st.settings) : model.dialInteractionSummary(st.settings, st.preview)));
+		hw.summary("advanced", (st) => model.advancedSummary(st.globals));
+	}
+
 	requestTree();
 })();

@@ -5,15 +5,18 @@
 import streamDeck from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { detailDensityOf, detailModeOf, detailRoleOf, pressBehaviorOf } from "./detail/detail-settings";
 import { detailProfileFor } from "./detail/managed-profiles";
 import { deviceCapabilities } from "./devices";
 import { buildSupportReport } from "./diagnostics";
 import { poller, type PollerStatus } from "./poller";
-import { alertLevel, convertUnit, parseThreshold, type DecimalsSetting } from "./ui/format";
+import { resolveControls, schemeCanSwitchGroups } from "./controls";
+import { alertLevel, convertUnit, parseThreshold, thresholdsApplyTo, type DecimalsSetting } from "./ui/format";
+import { drawnKeyLayout } from "./ui/key-layout";
 import { formatMeasurement, formatStat, type MeasureOptions } from "./ui/measure";
 import { statusSentence } from "./ui/state-screens";
-import { resolveTextColors } from "./ui/text-colors";
-import { effectiveTextFor, effectiveThemeFor, getDataUnits, getDeckTheme, measureOptionsFrom } from "./ui/theme-store";
+import { appliedTextMode, parseTextSettings, resolveTextColors } from "./ui/text-colors";
+import { effectiveTextFor, effectiveThemeFor, getDataUnits, getDeckTheme, measureOptionsFrom, typeAccentsEnabled } from "./ui/theme-store";
 import { loadThemes, resolvePalette } from "./ui/themes";
 
 type TreeReading = {
@@ -41,6 +44,8 @@ export type PreviewSettings = {
 	warnValue?: string;
 	critValue?: string;
 	alertBelow?: boolean;
+	/** Dial only: the unit the thresholds are scoped to (plugin-stamped). */
+	alertUnit?: string;
 };
 
 type TreeGroup = {
@@ -83,6 +88,44 @@ type PreviewPayload = {
 	};
 	/** True when a reading is selected but absent from the current snapshot. */
 	missing: boolean;
+	/** The action context this preview describes. The panel drops a payload
+	 * naming another context, so a late reply can never paint action A's
+	 * face into action B's panel after a quick switch. */
+	context?: string;
+	kind?: "key" | "dial";
+	/** The exact SVG this action last sent to the device (setImage or the
+	 * dial canvas), carried only when it changed since the last push to
+	 * this panel or when the panel asked for it. Never re-rendered here. */
+	face?: string;
+	/** The primary reading as the face shows it: label, source, display unit. */
+	reading?: { label: string; source: string; unit: string };
+	/** What the runtime resolves, from the functions the faces use, so the
+	 * panel's summaries report effective behavior instead of guessing. */
+	effective?: PreviewEffective;
+};
+
+type PreviewEffective = {
+	/** drawn: the palette actually used (an unknown id draws the spec default). */
+	theme: { id: string; drawn: string; own: boolean; unknown: boolean };
+	/** applied: Custom without a valid color draws theme text. */
+	text: { mode: string; applied: string; own: boolean; color: string | null; dimSecondary: boolean };
+	/** Type accents on AND not suppressed by the drawn theme. */
+	typeAccents: boolean;
+	dataUnits: string;
+	/** Parsed thresholds in display units; scopeUnit is the dial's stamp. */
+	alert: { level: string; warn: number | null; crit: number | null; below: boolean; unit: string | null; applies: boolean; scopeUnit: string | null };
+	layout?: { chosen: string; drawn: string };
+	press?: { behavior: string; role: string | null; detailMode: string; density: number };
+	controls?: { preset: string; rotate: string; pressedRotate: string; shortPress: string; longPress: string; tap: string; touchHold: string; touchZones: string; switchesGroups: boolean };
+};
+
+/** Faces past this size are never carried to the panel (bounded messages). */
+const MAX_FACE_BYTES = 64 * 1024;
+
+export type PreviewExtras = {
+	context?: string;
+	kind?: "key" | "dial";
+	face?: string;
 };
 
 /**
@@ -162,16 +205,30 @@ export function buildSensorTree(status: PollerStatus): SensorTreePayload {
 /** Live preview of the selected reading — pushed to the open PI every tick,
  * formatted and colored with the open action's effective settings so the
  * panel can never contradict the face. `alertsRecolor` mirrors the face:
- * key faces flip their whole palette on warn/crit, dial faces stay themed. */
-export function buildPreview(status: PollerStatus, settings: PreviewSettings | undefined, alertsRecolor: boolean): PreviewPayload {
+ * key faces flip their whole palette on warn/crit, dial faces stay themed.
+ * `extras` carries the panel context, the action kind and the device face
+ * the caller already rendered (never composed here). */
+export function buildPreview(status: PollerStatus, settings: PreviewSettings | undefined, alertsRecolor: boolean, extras: PreviewExtras = {}): PreviewPayload {
 	const payload: PreviewPayload = {
 		event: "preview",
 		state: status.state,
 		hint: statusSentence(status),
 		missing: false
 	};
+	if (extras.context !== undefined) {
+		payload.context = extras.context;
+	}
+	if (extras.kind !== undefined) {
+		payload.kind = extras.kind;
+	}
+	if (extras.face !== undefined && extras.face !== "" && extras.face.length <= MAX_FACE_BYTES) {
+		payload.face = extras.face;
+	}
 	if (status.state !== "unavailable") {
 		payload.source = status.source;
+	}
+	if (settings !== undefined) {
+		payload.effective = effectiveOf(settings, extras.kind, undefined);
 	}
 	const readingKey = settings?.readingKey;
 	if (status.state === "unavailable" || settings === undefined || readingKey === undefined || readingKey === "") {
@@ -200,7 +257,57 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 		valueColor: text.value,
 		statsColor: text.unit
 	};
+	const displayUnit = convertUnit(reading.value, reading.unit, opts.fahrenheit).unit;
+	payload.reading = { label: reading.label, source: status.snapshot.sensors[reading.sensorIndex]?.name ?? "", unit: displayUnit };
+	payload.effective = effectiveOf(settings, extras.kind, { unit: reading.unit, displayUnit, value: convertUnit(reading.value, reading.unit, opts.fahrenheit).value });
 	return payload;
+}
+
+/**
+ * The effective presentation of one action, resolved by the same authorities
+ * the faces use: effectiveThemeFor + the palette table (an unknown stored id
+ * draws the spec default), parseTextSettings/effectiveTextFor/appliedTextMode
+ * for the Text precedence, parseThreshold/alertLevel/thresholdsApplyTo for
+ * alerts, drawnKeyLayout, the detail parsers, and resolveControls.
+ */
+function effectiveOf(settings: PreviewSettings, kind: "key" | "dial" | undefined, live: { unit: string; displayUnit: string; value: number } | undefined): PreviewEffective {
+	const config = loadThemes();
+	const id = effectiveThemeFor(settings);
+	const drawn = config.themes[id] !== undefined ? id : config.defaultTheme;
+	const own = typeof settings.theme === "string" && settings.theme !== "";
+	const text = effectiveTextFor(settings);
+	const warn = parseThreshold(settings.warnValue) ?? null;
+	const crit = parseThreshold(settings.critValue) ?? null;
+	const below = settings.alertBelow === true;
+	const scopeUnit = kind === "dial" && typeof settings.alertUnit === "string" ? settings.alertUnit : null;
+	const applies = live === undefined ? false : kind === "dial" ? thresholdsApplyTo(scopeUnit ?? undefined, live.unit) : true;
+	const level = live !== undefined && applies ? alertLevel(live.value, warn ?? undefined, crit ?? undefined, below) : "normal";
+	const effective: PreviewEffective = {
+		theme: { id, drawn, own, unknown: own && config.themes[id] === undefined },
+		text: { mode: text.mode, applied: appliedTextMode(text), own: parseTextSettings(settings) !== null, color: text.color ?? null, dimSecondary: text.dimSecondary },
+		typeAccents: typeAccentsEnabled() && !config.typeAccentsDisabledOn.includes(drawn),
+		dataUnits: getDataUnits(),
+		alert: { level, warn, crit, below, unit: live?.displayUnit ?? null, applies, scopeUnit }
+	};
+	const raw = settings as Record<string, unknown>;
+	if (kind === "key") {
+		effective.layout = { chosen: typeof raw.keyLayout === "string" ? raw.keyLayout : "single", drawn: drawnKeyLayout(raw) };
+		effective.press = { behavior: pressBehaviorOf(raw), role: detailRoleOf(raw) ?? null, detailMode: detailModeOf(raw), density: detailDensityOf(raw) };
+	} else if (kind === "dial") {
+		const scheme = resolveControls(raw as Parameters<typeof resolveControls>[0]);
+		effective.controls = {
+			preset: scheme.preset,
+			rotate: scheme.rotate,
+			pressedRotate: scheme.pressedRotate,
+			shortPress: scheme.shortPress,
+			longPress: scheme.longPress,
+			tap: scheme.tap,
+			touchHold: scheme.touchHold,
+			touchZones: scheme.touchZones,
+			switchesGroups: schemeCanSwitchGroups(scheme)
+		};
+	}
+	return effective;
 }
 
 /**
@@ -222,13 +329,31 @@ export function handlePiRequest(payload: JsonValue): void {
 	}
 }
 
+/** The last face pushed to the open panel, per panel context: a face rides
+ * a preview only when it changed or the panel asked (getPreview), so an
+ * unchanged face costs nothing per tick. Reset when another panel opens. */
+let lastPanelFace = { context: "", face: "" };
+
+/** Makes the next push carry the face even when unchanged (panel request). */
+export function forgetPanelFace(): void {
+	lastPanelFace = { context: "", face: "" };
+}
+
 /** Live numbers for the PI while it is open on one of the caller's instances
- *  (the manifestId check keeps each action class feeding only its own PI). */
-export function pushPreviewToPi(status: PollerStatus, manifestId: string | undefined, instances: { get(id: string): { settings: PreviewSettings } | undefined }, alertsRecolor: boolean): void {
+ *  (the manifestId check keeps each action class feeding only its own PI).
+ *  `faceOf` reads the frame the action last sent to the device; nothing is
+ *  rendered for the panel, so a closed panel costs no work at all. */
+export function pushPreviewToPi(status: PollerStatus, manifestId: string | undefined, instances: { get(id: string): { settings: PreviewSettings } | undefined }, alertsRecolor: boolean, faceOf?: (id: string) => string | undefined): void {
 	const piAction = streamDeck.ui.action;
 	if (piAction === undefined || piAction.manifestId !== manifestId) {
 		return;
 	}
 	const state = instances.get(piAction.id);
-	void streamDeck.ui.sendToPropertyInspector(buildPreview(status, state?.settings, alertsRecolor));
+	const current = faceOf?.(piAction.id) ?? "";
+	const changed = lastPanelFace.context !== piAction.id || lastPanelFace.face !== current;
+	if (changed) {
+		lastPanelFace = { context: piAction.id, face: current };
+	}
+	const kind = alertsRecolor ? "key" : "dial";
+	void streamDeck.ui.sendToPropertyInspector(buildPreview(status, state?.settings, alertsRecolor, { context: piAction.id, kind, face: changed ? current : undefined }));
 }

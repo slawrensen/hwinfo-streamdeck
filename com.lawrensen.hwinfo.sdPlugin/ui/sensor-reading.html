@@ -1,360 +1,407 @@
 <!doctype html>
-<html>
+<html lang="en" data-pin="key">
 	<head>
 		<meta charset="utf-8" />
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.6.0.0-f01" />
 	</head>
-	<body>
-		<details class="hw-setup">
-			<summary>First time? HWiNFO setup</summary>
-			<p>
-				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
-				2. In HWiNFO Settings, enable <b>Shared Memory Support</b>. On the free
-				version you can instead click <b>Configure Sensors</b> in the sensor
-				window, open the <b>HWiNFO Gadget</b> tab, tick <b>Enable reporting to
-				Gadget</b>, then tick <b>“Report value in Gadget”</b> on the readings
-				you want (no 12-hour limit).<br />
-				3. Pick a sensor below. That's it.
-			</p>
-		</details>
-
-		<div class="hw-hint" id="role-note" hidden>Back tile: configure its sensor and layout normally. Pressing it always returns to the previous profile.</div>
-
-		<div class="hw-section">Sensor</div>
-
-		<sdpi-item label="Sensor">
-			<div class="hw-picker">
-				<input id="picker-search" type="text" placeholder="Search sensors…" autocomplete="off" spellcheck="false" />
-				<button id="picker-refresh" type="button" title="Reload sensor list">⟳</button>
-				<div class="hw-picker-list" id="picker-list" hidden></div>
+	<body data-kind="key">
+		<header class="hw-head" id="hw-head" data-kind="key" data-pin>
+			<figure class="hw-face" id="face" hidden>
+				<img id="face-img" alt="" width="72" height="72" />
+				<figcaption>On the key now</figcaption>
+			</figure>
+			<div class="hw-head-text">
+				<p class="hw-head-kind" id="head-kind">Sensor Reading key</p>
+				<p class="hw-head-reading" id="head-reading">No reading selected</p>
+				<p class="hw-head-source" id="head-source"></p>
+				<p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p>
 			</div>
-		</sdpi-item>
+		</header>
 
-		<sdpi-item label="Live value">
-			<div class="hw-preview hw-preview-live">
-				<span id="preview-value">—</span>
-				<span id="preview-stats"></span>
-			</div>
-		</sdpi-item>
+		<div class="hw-hint hw-lede" id="role-note" hidden>
+			This is the <b>Back tile</b> of the sensor detail view. Set its reading, layout and look like any key; pressing it always returns to the profile you came from, so press settings do not apply here.
+		</div>
 
-		<div class="hw-hint" id="status-hint" hidden></div>
-
-		<sdpi-item label="Label">
-			<sdpi-textfield setting="label" placeholder="Custom label (default: sensor name)"></sdpi-textfield>
-		</sdpi-item>
-
-		<div class="hw-section">Format</div>
-
-		<sdpi-item label="Show">
-			<sdpi-select setting="statMode" default="current">
-				<option value="current">Current value</option>
-				<option value="min">Minimum (since HWiNFO start)</option>
-				<option value="max">Maximum (since HWiNFO start)</option>
-				<option value="avg">Average (since HWiNFO start)</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div class="hw-help" id="show-help">Pressing the key cycles current → min → max → avg.</div>
-
-		<sdpi-item label="Decimals">
-			<sdpi-select setting="decimals" default="auto">
-				<option value="auto">Auto</option>
-				<option value="0">0</option>
-				<option value="1">1</option>
-				<option value="2">2</option>
-				<option value="3">3</option>
-			</sdpi-select>
-		</sdpi-item>
-
-		<sdpi-item label="Unit">
-			<sdpi-checkbox setting="fahrenheit" label="Show temperatures in °F"></sdpi-checkbox>
-		</sdpi-item>
-
-		<div id="press-block">
-		<div class="hw-section">Press</div>
-
-		<sdpi-item label="Press does">
-			<sdpi-select setting="pressBehavior" default="">
-				<option value="">Cycle current / min / max / avg</option>
-				<option value="open-details">Open sensor details</option>
-				<option value="tap-cycle-hold-details">Tap cycles; hold opens details</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div id="detail-config" class="hw-cond" hidden>
-			<sdpi-item label="Detail contains">
-				<sdpi-select setting="detailMode" default="source">
-					<option value="source">All readings from this sensor source</option>
-					<option value="custom">Custom sensor list</option>
-					<option value="filter">Readings matching a filter</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div id="detail-custom" class="hw-cond" hidden>
-				<div id="detail-add-dock">
-					<sdpi-item label="Add sensor">
-						<div class="hw-picker">
-							<input id="pickerd-search" type="text" placeholder="Search sensors to add…" autocomplete="off" spellcheck="false" />
-							<!-- Inline, not an overlay: results push the tile list down
-							     instead of covering it, and the whole row pins to the
-							     top while the list is open, so what you are adding TO
-							     stays visible while you pick. -->
-							<div class="hw-picker-list hw-inline" id="pickerd-list" hidden></div>
-						</div>
-					</sdpi-item>
+		<details class="hw-sec" id="sec-reading" open>
+			<summary><span class="hw-sec-title">Reading</span><span class="hw-sec-sum" data-summary="reading"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-field">
+					<label id="picker-label" for="picker-search">Reading</label>
+					<div class="hw-picker" data-hw-picker="primary">
+						<input id="picker-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+						<button id="picker-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+						<div class="hw-picker-list" id="picker-list" role="listbox" aria-labelledby="picker-label" hidden></div>
+					</div>
+					<p class="hw-help" id="picker-help">Type part of a reading or source name. Arrow keys browse, Enter picks, Escape closes without changing anything.</p>
 				</div>
-				<div id="detail-list" class="hw-set"></div>
-			</div>
-			<div id="detail-filter" class="hw-cond" hidden>
-				<sdpi-item label="Filter">
-					<sdpi-textfield setting="detailFilter" placeholder="*4090*   (* spans anything, ? one character)"></sdpi-textfield>
-				</sdpi-item>
-				<div class="hw-hint" id="detail-filter-count" aria-live="polite" hidden></div>
-				<div class="hw-help">Lists every reading whose source name and label, taken together, match the pattern, deck-wide and live against HWiNFO's current layout. Plain text matches anywhere; * spans anything and ? matches one character (*gpu*fan* style).</div>
-			</div>
-			<sdpi-item label="Tile shows">
-				<sdpi-select setting="detailDensity" default="1">
-					<option value="1">One reading (default)</option>
-					<option value="2">Two readings, stacked</option>
-					<option value="3">Three readings, rows</option>
-					<option value="4">Four readings, quad grid</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Packs that many readings onto each tile of the detail view, using the same stacked, row and quad faces regular keys have. Pressing a dense tile cycles the stat for all of its readings together; a Custom sensor list can also group and dress its tiles one by one in the list above.</div>
-			<sdpi-item label="Detail title">
-				<sdpi-textfield setting="detailTitle" placeholder="Title tile text (optional)"></sdpi-textfield>
-			</sdpi-item>
-			<sdpi-item label="Second Back">
-				<sdpi-checkbox setting="detailMirrorBack" default="true" label="Repeat Back under this key's own cell"></sdpi-checkbox>
-			</sdpi-item>
-			<div class="hw-hint" id="detail-unsupported" hidden></div>
-			<div class="hw-help">Details open as a plugin-managed profile, not a native folder: the deck switches to a bundled one-page view with this key's sensor as the live Back tile (top left), and Stream Deck asks to install it once per deck type on first use. Previous and Next page through long lists; pressing a listed reading cycles its stat for that visit.</div>
-		</div>
-		</div>
+				<div class="hw-status" id="reading-status" hidden></div>
 
-		<div class="hw-section">Appearance</div>
-
-		<sdpi-item label="Theme">
-			<div class="hw-themes" id="theme-gallery"></div>
-		</sdpi-item>
-		<div class="hw-help" id="theme-help">Pick a preset for this key only, or “Deck default” to follow the deck-wide theme (set under Advanced).</div>
-
-		<sdpi-item label="Text">
-			<sdpi-select setting="textMode" default="">
-				<option value="">Deck default</option>
-				<option value="theme">Theme</option>
-				<option value="dim">Dim</option>
-				<option value="custom">Custom</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div id="text-custom" class="hw-cond" hidden>
-			<sdpi-item label="Text color">
-				<div class="hw-quad-colors">
-					<input type="color" id="text-color" title="Main value color; exact as picked" />
+				<div class="hw-field">
+					<label for="f-label">Label on the key</label>
+					<input id="f-label" type="text" data-setting="label" placeholder="The reading's own name" autocomplete="off" spellcheck="false" />
 				</div>
-			</sdpi-item>
-			<sdpi-item label="Other text">
-				<sdpi-checkbox setting="textDimSecondary" label="Dim labels, units and stats"></sdpi-checkbox>
-			</sdpi-item>
-		</div>
 
-		<div class="hw-section">Layout</div>
-
-		<sdpi-item label="Layout">
-			<sdpi-select setting="keyLayout" default="single">
-				<option value="single">One reading (default)</option>
-				<option value="dual">Two readings, stacked</option>
-				<option value="triple">Three readings, rows</option>
-				<option value="quad">Four readings, quad grid</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div class="hw-hint" id="layout-hint" hidden>This layout shows once a second sensor is picked below.</div>
-		<div id="second-slot" class="hw-cond" hidden>
-			<sdpi-item label="Second sensor">
-				<div class="hw-picker">
-					<input id="picker2-search" type="text" placeholder="Search sensors…" autocomplete="off" spellcheck="false" />
-					<button id="picker2-refresh" type="button" title="Reload sensor list">⟳</button>
-					<div class="hw-picker-list" id="picker2-list" hidden></div>
-				</div>
-			</sdpi-item>
-			<sdpi-item label="Second label">
-				<sdpi-textfield setting="secondaryLabel" placeholder="Custom label (default: sensor name)"></sdpi-textfield>
-			</sdpi-item>
-		</div>
-		<div id="dual-rows" class="hw-cond" hidden>
-			<sdpi-item label="Second shows">
-				<sdpi-select setting="secondaryStatMode" default="follow">
-					<option value="follow">Follows the first reading (default)</option>
-					<option value="current">Always current value</option>
-					<option value="min">Always minimum (since HWiNFO start)</option>
-					<option value="max">Always maximum (since HWiNFO start)</option>
-					<option value="avg">Always average (since HWiNFO start)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Two rows on one key, cycling together on a press unless this row pins a fixed stat (pairs like minimum and maximum). Thresholds and the theme accent follow the first reading; the sparkline is a single-layout feature.</div>
-		</div>
-		<div id="third-slot" class="hw-cond" hidden>
-			<sdpi-item label="Third sensor">
-				<div class="hw-picker">
-					<input id="picker3-search" type="text" placeholder="Search sensors…" autocomplete="off" spellcheck="false" />
-					<button id="picker3-refresh" type="button" title="Reload sensor list">⟳</button>
-					<div class="hw-picker-list" id="picker3-list" hidden></div>
-				</div>
-			</sdpi-item>
-			<sdpi-item label="Third label">
-				<sdpi-textfield id="third-label" setting="quadLabel3" placeholder="Short name; 4 characters show"></sdpi-textfield>
-			</sdpi-item>
-			<div id="triple-help" class="hw-help hw-cond" hidden>A long name shortens so its number stays whole; a short custom label keeps a row readable. Every row shows the same stat (the press cycles all three together), and thresholds follow the first sensor, recoloring the whole key on alert.</div>
-		</div>
-		<div id="quad-rows" class="hw-cond" hidden>
-			<sdpi-item label="Fourth sensor">
-				<div class="hw-picker">
-					<input id="picker4-search" type="text" placeholder="Search sensors…" autocomplete="off" spellcheck="false" />
-					<button id="picker4-refresh" type="button" title="Reload sensor list">⟳</button>
-					<div class="hw-picker-list" id="picker4-list" hidden></div>
-				</div>
-			</sdpi-item>
-			<sdpi-item label="Fourth label">
-				<sdpi-textfield setting="quadLabel4" placeholder="Short name; 4 characters show"></sdpi-textfield>
-			</sdpi-item>
-			<sdpi-item label="Cell colors">
-				<div class="hw-quad-colors">
-					<select id="quad-color-preset" title="Color preset for the four cells">
-						<option value="signal">Signal (four hues)</option>
-						<option value="pairs">Pairs (top row, bottom row)</option>
-						<option value="uniform">Uniform (accent blue)</option>
-						<option value="custom" hidden>Custom</option>
+				<div class="hw-field">
+					<label for="f-layout">Readings on this key</label>
+					<select id="f-layout" data-setting="keyLayout" data-default="single">
+						<option value="single">One reading</option>
+						<option value="dual">Two readings, stacked</option>
+						<option value="triple">Three readings, rows</option>
+						<option value="quad">Four readings, quad grid</option>
 					</select>
-					<input type="color" id="quad-color-1" title="Top left cell color" />
-					<input type="color" id="quad-color-2" title="Top right cell color" />
-					<input type="color" id="quad-color-3" title="Bottom left cell color" />
-					<input type="color" id="quad-color-4" title="Bottom right cell color" />
 				</div>
-			</sdpi-item>
-			<sdpi-item label="Cell labels">
-				<sdpi-checkbox setting="quadLabels" label="Show a small label in each cell"></sdpi-checkbox>
-			</sdpi-item>
-			<div class="hw-help">Cells fill in reading order: the sensor above top left, then second, third and fourth. Every cell shows the same stat (the press cycles all four together), and thresholds follow the first sensor, recoloring the whole key on alert.</div>
-		</div>
+				<div class="hw-hint" id="layout-hint" hidden>This layout draws once another reading is picked below. Until then the key shows one reading.</div>
 
-		<div id="display-item">
-			<sdpi-item label="Display">
-				<select id="display-mode" class="hw-select" title="Extra display under the value">
-					<option value="none">None (value only)</option>
-					<option value="sparkline">Sparkline (recent history)</option>
-					<option value="bar">Bar (value in its range)</option>
-					<option value="ring">Ring (value in its range)</option>
-				</select>
-			</sdpi-item>
-			<div class="hw-help">Bar and Ring show where the value sits in its range: 0 to 100 for percentages, otherwise the values seen this session. Warn and critical thresholds mark amber and red zones toward the alarmed end: the high side normally, the low side when Direction alerts below.</div>
-		</div>
-
-		<div class="hw-section">Alerts</div>
-
-		<sdpi-item label="Warn at">
-			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="key turns amber (display units)"></sdpi-textfield>
-		</sdpi-item>
-
-		<sdpi-item label="Critical at">
-			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="key turns red (display units)"></sdpi-textfield>
-		</sdpi-item>
-
-		<sdpi-item label="Direction">
-			<sdpi-checkbox setting="alertBelow" label="Alert when value drops below thresholds"></sdpi-checkbox>
-		</sdpi-item>
-		<div class="hw-help">Warn at and Critical at use display units, the same numbers the key shows, °F included when Unit is on.</div>
-
-		<details data-fold="advanced">
-			<summary>Advanced</summary>
-			<div class="hw-section">Deck defaults (every key and dial)</div>
-			<sdpi-item label="Deck theme">
-				<sdpi-select setting="theme" global default="void">
-					<option value="void">Void</option>
-					<option value="graphite">Graphite</option>
-					<option value="ultraviolet">Ultraviolet</option>
-					<option value="midnight">Midnight</option>
-					<option value="forest">Forest</option>
-					<option value="ember">Ember</option>
-					<option value="paper">Paper</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Fallback for keys set to “Deck default”. Keys with their own theme keep it.</div>
-			<sdpi-item label="Deck text">
-				<sdpi-select setting="textMode" global default="theme">
-					<option value="theme">Theme</option>
-					<option value="dim">Dim</option>
-					<option value="custom">Custom</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div id="deck-text-custom" class="hw-cond" hidden>
-				<sdpi-item label="Text color">
-					<div class="hw-quad-colors">
-						<input type="color" id="deck-text-color" title="Deck-wide main value color; exact as picked" />
+				<div id="second-slot" hidden>
+					<div class="hw-field">
+						<label id="picker2-label" for="picker2-search">Reading 2</label>
+						<div class="hw-picker">
+							<input id="picker2-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker2-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<button id="picker2-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+							<div class="hw-picker-list" id="picker2-list" role="listbox" aria-labelledby="picker2-label" hidden></div>
+						</div>
 					</div>
-				</sdpi-item>
-				<sdpi-item label="Other text">
-					<sdpi-checkbox setting="textDimSecondary" global label="Dim labels, units and stats"></sdpi-checkbox>
-				</sdpi-item>
+					<div class="hw-field">
+						<label for="f-label2">Label 2</label>
+						<input id="f-label2" type="text" data-setting="secondaryLabel" placeholder="The reading's own name" autocomplete="off" spellcheck="false" />
+					</div>
+				</div>
+				<div id="dual-rows" hidden>
+					<div class="hw-field">
+						<label for="f-second-stat">Row 2 shows</label>
+						<select id="f-second-stat" data-setting="secondaryStatMode" data-default="follow" aria-describedby="dual-help">
+							<option value="follow">The same stat as row 1</option>
+							<option value="current">Always the current value</option>
+							<option value="min">Always the minimum</option>
+							<option value="max">Always the maximum</option>
+							<option value="avg">Always the average</option>
+						</select>
+						<p class="hw-help" id="dual-help">A press cycles both rows together unless row 2 is pinned to one stat (for a minimum and maximum pair). Alerts and the accent follow reading 1.</p>
+					</div>
+				</div>
+				<div id="third-slot" hidden>
+					<div class="hw-field">
+						<label id="picker3-label" for="picker3-search">Reading 3</label>
+						<div class="hw-picker">
+							<input id="picker3-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker3-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<button id="picker3-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+							<div class="hw-picker-list" id="picker3-list" role="listbox" aria-labelledby="picker3-label" hidden></div>
+						</div>
+					</div>
+					<div class="hw-field">
+						<label for="third-label">Label 3</label>
+						<input id="third-label" type="text" data-setting="quadLabel3" placeholder="Short name; 4 characters show" autocomplete="off" spellcheck="false" />
+					</div>
+					<p id="triple-help" class="hw-help" hidden>A long name shortens so its number stays whole. Every row shows the same stat, and alerts follow reading 1, recoloring the whole key.</p>
+				</div>
+				<div id="quad-rows" hidden>
+					<div class="hw-field">
+						<label id="picker4-label" for="picker4-search">Reading 4</label>
+						<div class="hw-picker">
+							<input id="picker4-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker4-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<button id="picker4-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+							<div class="hw-picker-list" id="picker4-list" role="listbox" aria-labelledby="picker4-label" hidden></div>
+						</div>
+					</div>
+					<div class="hw-field">
+						<label for="f-label4">Label 4</label>
+						<input id="f-label4" type="text" data-setting="quadLabel4" placeholder="Short name; 4 characters show" autocomplete="off" spellcheck="false" />
+					</div>
+					<p class="hw-help">Cells fill in reading order: 1 top left, 2 top right, 3 bottom left, 4 bottom right. Every cell shows the same stat, and alerts follow reading 1, recoloring the whole key.</p>
+				</div>
 			</div>
-			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color, and keys or dials with their own Text setting keep it. Warn and critical colors always win.</div>
-			<sdpi-item label="Type accents">
-				<sdpi-select setting="typeAccents" global default="on">
-					<option value="on">On (accent color by sensor type)</option>
-					<option value="off">Off (theme accent everywhere)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<sdpi-item label="Data units">
-				<sdpi-select setting="dataUnits" global default="decimal">
-					<option value="decimal">Decimal (KB, MB, GB · rates in Mbps)</option>
-					<option value="binary">Binary (KiB, MiB, GiB · rates in MiB/s)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-section">Connection</div>
-			<sdpi-item label="Data source">
-				<sdpi-select setting="source" global default="auto">
-					<option value="auto">Auto (Shared Memory, else Gadget)</option>
-					<option value="shared-memory">Shared Memory only</option>
-					<option value="gadget">Gadget registry only</option>
-				</sdpi-select>
-			</sdpi-item>
-			<sdpi-item label="Poll every">
-				<sdpi-select setting="pollIntervalMs" global default="1000">
-					<option value="250">250 ms</option>
-					<option value="500">500 ms</option>
-					<option value="1000">1 second</option>
-					<option value="2000">2 seconds</option>
-					<option value="5000">5 seconds</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-section">Support</div>
-			<sdpi-item label="Support">
-				<button class="hw-support" id="support-report" type="button">Copy support report</button>
-			</sdpi-item>
-			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
-			<div class="hw-section">Config</div>
-			<sdpi-item label="This key">
-				<div class="hw-config">
-					<textarea id="config-key" spellcheck="false" autocomplete="off" aria-label="This key's configuration as JSON"></textarea>
-					<div class="hw-config-row">
-						<button id="config-key-copy" type="button">Copy</button>
-						<button id="config-key-apply" type="button">Apply</button>
-					</div>
-				</div>
-			</sdpi-item>
-			<sdpi-item label="Deck">
-				<div class="hw-config">
-					<textarea id="config-deck" spellcheck="false" autocomplete="off" aria-label="Deck-wide configuration as JSON"></textarea>
-					<div class="hw-config-row">
-						<button id="config-deck-copy" type="button">Copy</button>
-						<button id="config-deck-apply" type="button">Apply</button>
-					</div>
-				</div>
-			</sdpi-item>
-			<div class="hw-hint" id="config-note" aria-live="polite" hidden></div>
-			<div class="hw-help">The exact settings this key runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another key or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
 		</details>
 
-		<script src="pi-common.js?v=1.6.0.0-3"></script>
-		<script src="pi-control.js?v=1.6.0.0-3"></script>
+		<details class="hw-sec" id="sec-display" open>
+			<summary><span class="hw-sec-title">Display</span><span class="hw-sec-sum" data-summary="display"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-stat">Value shown</label>
+						<select id="f-stat" data-setting="statMode" data-default="current" aria-describedby="show-help">
+							<option value="current">Current value</option>
+							<option value="min">Minimum</option>
+							<option value="max">Maximum</option>
+							<option value="avg">Average</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="f-decimals">Decimals</label>
+						<select id="f-decimals" data-setting="decimals" data-default="auto">
+							<option value="auto">Auto</option>
+							<option value="0">0</option>
+							<option value="1">1</option>
+							<option value="2">2</option>
+							<option value="3">3</option>
+						</select>
+					</div>
+				</div>
+				<p class="hw-help" id="show-help">Pressing the key cycles current → min → max → avg. Minimum, maximum and average are HWiNFO's own, since HWiNFO started.</p>
+				<label class="hw-check"><input type="checkbox" data-setting="fahrenheit" /><span>Show temperatures in °F</span></label>
+
+				<div class="hw-field" id="display-item">
+					<label for="display-mode">Graph under the value</label>
+					<select id="display-mode" aria-describedby="display-help">
+						<option value="none">None</option>
+						<option value="sparkline">Sparkline (recent history)</option>
+						<option value="bar">Bar (value in its range)</option>
+						<option value="ring">Ring (value in its range)</option>
+					</select>
+					<p class="hw-help" id="display-help">One-reading layout only. Bar and Ring span 0 to 100 for percentages, otherwise the values seen this session, with amber and red zones at your alert thresholds.</p>
+				</div>
+
+				<div class="hw-field">
+					<span class="hw-label" id="theme-label">Theme</span>
+					<div class="hw-themes" id="theme-gallery" role="group" aria-labelledby="theme-label"></div>
+					<p class="hw-help" id="theme-help">Pick a theme for this key, or Default to follow the shared theme.</p>
+				</div>
+
+				<div class="hw-field">
+					<label for="f-text">Text color</label>
+					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
+						<option value="">Default</option>
+						<option value="theme">Theme text</option>
+						<option value="dim">Dimmed</option>
+						<option value="custom">Custom color</option>
+					</select>
+					<p class="hw-help" id="text-help">Colors the numbers and labels. Warn and critical colors always win. Graphs, bars and stat badges take the accent color instead.</p>
+				</div>
+				<div id="text-custom" hidden>
+					<div class="hw-field">
+						<label for="text-color">Custom text color</label>
+						<div class="hw-swatch-row">
+							<input type="color" class="hw-color" id="text-color" />
+							<code id="text-color-code" aria-hidden="true"></code>
+						</div>
+					</div>
+					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
+				</div>
+
+				<div id="quad-display" hidden>
+					<div class="hw-field">
+						<label for="quad-color-preset">Cell colors</label>
+						<div class="hw-quad-colors">
+							<select id="quad-color-preset">
+								<option value="signal">Signal (four hues)</option>
+								<option value="pairs">Pairs (top row, bottom row)</option>
+								<option value="uniform">Uniform (accent blue)</option>
+								<option value="custom" hidden>Custom</option>
+							</select>
+							<input type="color" id="quad-color-1" aria-label="Top left cell color" title="Top left cell color" />
+							<input type="color" id="quad-color-2" aria-label="Top right cell color" title="Top right cell color" />
+							<input type="color" id="quad-color-3" aria-label="Bottom left cell color" title="Bottom left cell color" />
+							<input type="color" id="quad-color-4" aria-label="Bottom right cell color" title="Bottom right cell color" />
+						</div>
+					</div>
+					<label class="hw-check"><input type="checkbox" data-setting="quadLabels" /><span>Show a small label in each cell (values then use the text color)</span></label>
+				</div>
+			</div>
+		</details>
+
+		<details class="hw-sec" id="sec-alerts">
+			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum" data-summary="alerts"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-warn">Warn at</label>
+						<input id="f-warn" type="text" inputmode="decimal" data-setting="warnValue" data-validate="number" placeholder="Off" aria-describedby="alerts-help f-warn-error" autocomplete="off" />
+						<p class="hw-error" id="f-warn-error" hidden></p>
+					</div>
+					<div class="hw-field">
+						<label for="f-crit">Critical at</label>
+						<input id="f-crit" type="text" inputmode="decimal" data-setting="critValue" data-validate="number" placeholder="Off" aria-describedby="alerts-help f-crit-error" autocomplete="off" />
+						<p class="hw-error" id="f-crit-error" hidden></p>
+					</div>
+				</div>
+				<label class="hw-check"><input type="checkbox" data-setting="alertBelow" /><span>Alert when the value drops to or below these numbers (for fans and clocks)</span></label>
+				<p class="hw-help" id="alerts-help">Use the numbers the key shows, in °F when °F is on. At or past Warn the key turns amber, at or past Critical red. On layouts with several readings, alerts follow reading 1.</p>
+			</div>
+		</details>
+
+		<details class="hw-sec" id="sec-interaction">
+			<summary><span class="hw-sec-title">Press</span><span class="hw-sec-sum" data-summary="interaction"></span></summary>
+			<div class="hw-sec-body">
+				<p class="hw-help" id="press-role-help" hidden>This Back tile always returns to the previous profile when pressed. Press settings stored on it are kept, unused.</p>
+				<div id="press-block">
+					<div class="hw-field">
+						<label for="f-press">A press</label>
+						<select id="f-press" data-setting="pressBehavior" data-default="">
+							<option value="">Cycles current, min, max, avg</option>
+							<option value="open-details">Opens sensor details</option>
+							<option value="tap-cycle-hold-details">Tap cycles; hold opens details</option>
+						</select>
+					</div>
+					<div id="detail-config" hidden>
+						<div class="hw-field">
+							<label for="f-detail-mode">Details list</label>
+							<select id="f-detail-mode" data-setting="detailMode" data-default="source">
+								<option value="source">Every reading from this reading's source</option>
+								<option value="custom">A custom list</option>
+								<option value="filter">Readings matching a filter</option>
+							</select>
+						</div>
+						<div id="detail-custom" hidden>
+							<div id="detail-add-dock">
+								<div class="hw-field">
+									<label id="pickerd-label" for="pickerd-search">Add readings</label>
+									<div class="hw-picker">
+										<input id="pickerd-search" type="text" aria-controls="pickerd-list" aria-expanded="false" aria-describedby="pickerd-help" placeholder="Search readings to add" autocomplete="off" spellcheck="false" />
+										<div class="hw-picker-list hw-inline" id="pickerd-list" role="group" aria-labelledby="pickerd-label" hidden></div>
+									</div>
+									<p class="hw-help" id="pickerd-help">Tick readings to add or remove them. The tile list below keeps their order; arrow buttons move them.</p>
+								</div>
+							</div>
+							<div id="detail-list" class="hw-set"></div>
+						</div>
+						<div id="detail-filter" hidden>
+							<div class="hw-field">
+								<label for="f-filter">Filter</label>
+								<input id="f-filter" type="text" data-setting="detailFilter" placeholder="*4090*" aria-describedby="detail-filter-count filter-help" autocomplete="off" spellcheck="false" />
+							</div>
+							<div class="hw-status" id="detail-filter-count" aria-live="polite" hidden></div>
+							<p class="hw-help" id="filter-help">Matches source name and label together, across every source. Plain text matches anywhere; * spans anything and ? one character (*gpu*fan*).</p>
+						</div>
+						<div class="hw-field">
+							<label for="f-density">Readings per tile</label>
+							<select id="f-density" data-setting="detailDensity" data-default="1" aria-describedby="density-help">
+								<option value="1">One</option>
+								<option value="2">Two, stacked</option>
+								<option value="3">Three, rows</option>
+								<option value="4">Four, quad grid</option>
+							</select>
+							<p class="hw-help" id="density-help">Tiles use the same faces as keys. Pressing a tile cycles the stat for all its readings. A custom list can group its tiles one by one above.</p>
+						</div>
+						<div class="hw-field">
+							<label for="f-detail-title">Title tile text</label>
+							<input id="f-detail-title" type="text" data-setting="detailTitle" placeholder="Optional" autocomplete="off" spellcheck="false" />
+						</div>
+						<label class="hw-check"><input type="checkbox" data-setting="detailMirrorBack" data-default="true" /><span>Also go back from this key's own position</span></label>
+						<div class="hw-hint" id="detail-unsupported" hidden></div>
+						<p class="hw-help">Details open as a plugin-managed profile: the deck switches to a bundled one-page view whose top-left Back tile returns you here. Stream Deck asks to install it once per deck type. Previous and Next page through long lists.</p>
+					</div>
+				</div>
+			</div>
+		</details>
+
+		<details class="hw-sec" id="sec-advanced" data-fold="advanced">
+			<summary><span class="hw-sec-title">Advanced</span><span class="hw-sec-sum" data-summary="advanced"></span></summary>
+			<div class="hw-sec-body">
+				<fieldset class="hw-group-box" id="shared-defaults">
+					<legend>Shared defaults <span class="hw-scope">All keys and dials</span></legend>
+					<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. Keys and dials with their own choice keep it.</p>
+					<div class="hw-field">
+						<label for="shared-theme">Theme</label>
+						<select id="shared-theme" data-setting="theme" data-global data-default="void">
+							<option value="void">Void</option>
+							<option value="graphite">Graphite</option>
+							<option value="ultraviolet">Ultraviolet</option>
+							<option value="midnight">Midnight</option>
+							<option value="forest">Forest</option>
+							<option value="ember">Ember</option>
+							<option value="paper">Paper</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="shared-text">Text color</label>
+						<select id="shared-text" data-setting="textMode" data-global data-default="theme">
+							<option value="theme">Theme text</option>
+							<option value="dim">Dimmed</option>
+							<option value="custom">Custom color</option>
+						</select>
+					</div>
+					<div id="deck-text-custom" hidden>
+						<div class="hw-field">
+							<label for="deck-text-color">Shared custom text color</label>
+							<div class="hw-swatch-row">
+								<input type="color" class="hw-color" id="deck-text-color" />
+								<code id="deck-text-color-code" aria-hidden="true"></code>
+							</div>
+						</div>
+						<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
+					</div>
+					<div class="hw-field">
+						<label for="shared-accents">Accent colors</label>
+						<select id="shared-accents" data-setting="typeAccents" data-global data-default="on" aria-describedby="accents-help">
+							<option value="on">By sensor type</option>
+							<option value="off">Theme accent everywhere</option>
+						</select>
+						<p class="hw-help" id="accents-help">Accents color graphs, bars and stat badges, never the numbers (Text color does that). Paper keeps its own accent.</p>
+					</div>
+					<div class="hw-field">
+						<label for="shared-units">Data units</label>
+						<select id="shared-units" data-setting="dataUnits" data-global data-default="decimal">
+							<option value="decimal">Decimal (KB, MB, GB; rates in Mbps)</option>
+							<option value="binary">Binary (KiB, MiB, GiB; rates in MiB/s)</option>
+						</select>
+					</div>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Connection <span class="hw-scope">All keys and dials</span></legend>
+					<div class="hw-field">
+						<label for="shared-source">Data source</label>
+						<select id="shared-source" data-setting="source" data-global data-default="auto">
+							<option value="auto">Auto (Shared Memory, else Gadget)</option>
+							<option value="shared-memory">Shared Memory only</option>
+							<option value="gadget">Gadget registry only</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="shared-poll">Read every</label>
+						<select id="shared-poll" data-setting="pollIntervalMs" data-global data-default="1000">
+							<option value="250">250 ms</option>
+							<option value="500">500 ms</option>
+							<option value="1000">1 second</option>
+							<option value="2000">2 seconds</option>
+							<option value="5000">5 seconds</option>
+						</select>
+					</div>
+					<details class="hw-inline-help" id="setup-help">
+						<summary>HWiNFO setup steps</summary>
+						<ol class="hw-help">
+							<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
+							<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
+							<li>Pick a reading under Reading.</li>
+						</ol>
+					</details>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Support</legend>
+					<div class="hw-actions"><button class="hw-support" id="support-report" type="button" aria-describedby="support-help">Copy support report</button></div>
+					<p class="hw-help" id="support-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard. Nothing is uploaded.</p>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Configuration documents</legend>
+					<div class="hw-field hw-config">
+						<label for="config-key">This key's settings</label>
+						<textarea id="config-key" spellcheck="false" autocomplete="off"></textarea>
+						<div class="hw-config-row">
+							<button id="config-key-copy" type="button">Copy</button>
+							<button id="config-key-apply" type="button">Replace this key's settings</button>
+						</div>
+					</div>
+					<div class="hw-field hw-config">
+						<label for="config-deck">Shared settings <span class="hw-scope">All keys and dials</span></label>
+						<textarea id="config-deck" spellcheck="false" autocomplete="off"></textarea>
+						<div class="hw-config-row">
+							<button id="config-deck-copy" type="button">Copy</button>
+							<button id="config-deck-apply" type="button">Replace shared settings</button>
+						</div>
+					</div>
+					<div class="hw-status" id="config-note" aria-live="polite" hidden></div>
+					<p class="hw-help">The exact settings as JSON. Copy one to back a layout up; paste a saved document and Replace to restore or clone it. Replace swaps the whole document, reloads this panel, and keeps fields this version does not know. Replacing shared settings changes every HWiNFO key and dial and asks for a second click.</p>
+				</fieldset>
+			</div>
+		</details>
+
+		<script src="pi-model.js?v=1.6.0.0-f01"></script>
+		<script src="pi-shell.js?v=1.6.0.0-f01"></script>
+		<script src="pi-common.js?v=1.6.0.0-f01"></script>
+		<script src="pi-control.js?v=1.6.0.0-f01"></script>
 	</body>
 </html>

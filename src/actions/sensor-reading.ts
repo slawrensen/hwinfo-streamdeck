@@ -12,7 +12,7 @@ import { PressEngine } from "../detail/press-engine";
 import { tickSignature } from "../detail/tick-signature";
 import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
 import { deviceCapabilities } from "../devices";
-import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
+import { buildThemesPayload, forgetPanelFace, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, STAT_BADGE, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
@@ -20,6 +20,7 @@ import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { QUAD_DEFAULT_COLORS, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
 import { renderDetailIdleBackKey } from "../ui/detail-renderer";
+import { drawnKeyLayout } from "../ui/key-layout";
 import { keyLabel, missingReadingScreen, noSelectionScreen, statusScreen } from "../ui/state-screens";
 import { HEX6, quadIdentityColor, resolveTextColors } from "../ui/text-colors";
 import { decideLegacyDefault, effectiveTextFor, effectiveThemeFor, measureOptionsFrom, onThemeChange, typeAccentsEnabled } from "../ui/theme-store";
@@ -175,7 +176,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			// in real time (theme, Text and Data units are all deck-wide).
 			if (streamDeck.ui.action?.manifestId === this.manifestId) {
 				void streamDeck.ui.sendToPropertyInspector(buildThemesPayload());
-				pushPreviewToPi(poller.getStatus(), this.manifestId, this.instances, true);
+				this.pushPanelPreview(poller.getStatus());
 			}
 		});
 	}
@@ -259,6 +260,8 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			this.presses.cancel(ev.action.id);
 		}
 		this.renderAll(poller.getStatus(), ev.action.id);
+		// The panel sees an edit's result at once, not on the next tick.
+		this.pushPanelPreview(poller.getStatus());
 	}
 
 	/**
@@ -370,7 +373,25 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	}
 
 	override onSendToPlugin(ev: SendToPluginEvent<JsonValue, ReadingSettings>): void {
-		handlePiRequest(ev.payload);
+		const payload = ev.payload;
+		if (typeof payload === "object" && payload !== null && !Array.isArray(payload) && payload.event === "getPreview") {
+			// A freshly loaded panel asks once: resend the face even when it
+			// has not changed since the previous panel on this context.
+			forgetPanelFace();
+			this.pushPanelPreview(poller.getStatus());
+			return;
+		}
+		handlePiRequest(payload);
+	}
+
+	override onPropertyInspectorDidAppear(): void {
+		forgetPanelFace();
+	}
+
+	/** The open panel's preview, carrying the frame this action last sent
+	 * to the device (never a separate render). No-op with no panel open. */
+	private pushPanelPreview(status: PollerStatus): void {
+		pushPreviewToPi(status, this.manifestId, this.instances, true, (id) => this.instances.get(id)?.lastSvg);
 	}
 
 	private lastTickSignature = "";
@@ -389,7 +410,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			this.lastTickSignature = signature;
 			this.renderAll(status);
 		}
-		pushPreviewToPi(status, this.manifestId, this.instances, true);
+		this.pushPanelPreview(status);
 	}
 
 	/** Repaint hook for detail-state changes (enter, leave, cleanup): a
@@ -481,29 +502,22 @@ export function compose(settings: ReadingSettings, status: PollerStatus, returnM
 	if (primaryKey === undefined) {
 		return renderStatusKey({ ...noSelectionScreen(), returnMark });
 	}
-	// The dual layout needs BOTH the exact "dual" marker and a usable second
-	// reading; every other combination (absent, junk, rolled-back settings)
-	// falls through to the unchanged single path below.
+	// The layout gate lives in drawnKeyLayout (shared with the settings
+	// panel's summary): the dual layout needs BOTH the exact "dual" marker
+	// and a usable second reading; the quad grid and the triple rows need
+	// their exact marker plus at least two resolvable slots among theirs
+	// (the primary above is slot 1). Junk slots simply don't render, and
+	// every other combination (absent, junk, rolled-back settings) falls
+	// through to the unchanged single path below.
 	const secondaryKey = nonEmptyStringOf(settings.secondaryReadingKey);
-	// The quad grid needs the exact "quad" marker plus at least two
-	// resolvable slots; the primary above is slot 1, so one more of slots
-	// 2-4 must parse. Junk slots simply don't render. With only the primary
-	// left, the marker degrades along the dual rules (not "dual", and no
-	// second reading either way) onto the unchanged single path below.
-	if (settings.keyLayout === "quad") {
-		const slotKeys = [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3), nonEmptyStringOf(settings.quadReadingKey4)];
-		if (slotKeys.filter((k) => k !== undefined).length >= 2) {
-			return composeQuad(settings, snapshot, slotKeys, returnMark);
-		}
+	const layout = drawnKeyLayout(settings);
+	if (layout === "quad") {
+		return composeQuad(settings, snapshot, [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3), nonEmptyStringOf(settings.quadReadingKey4)], returnMark);
 	}
-	// Same gate as the quad above, over its first three slots.
-	if (settings.keyLayout === "triple") {
-		const slotKeys = [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3)];
-		if (slotKeys.filter((k) => k !== undefined).length >= 2) {
-			return composeTriple(settings, snapshot, slotKeys, returnMark);
-		}
+	if (layout === "triple") {
+		return composeTriple(settings, snapshot, [primaryKey, secondaryKey, nonEmptyStringOf(settings.quadReadingKey3)], returnMark);
 	}
-	if (settings.keyLayout === "dual" && secondaryKey !== undefined) {
+	if (layout === "dual" && secondaryKey !== undefined) {
 		return composeDual(settings, snapshot, primaryKey, secondaryKey, returnMark);
 	}
 	const reading = snapshot.byKey.get(primaryKey);

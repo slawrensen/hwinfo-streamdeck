@@ -10,8 +10,8 @@
 			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 173,
-			"pageHeight": 1120,
+			"top": 50,
+			"pageHeight": 998,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -20,11 +20,11 @@
 			"what": "Change decimals",
 			"width": 320,
 			"found": true,
-			"tabStop": 8,
+			"tabStop": 6,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 454,
-			"pageHeight": 1120,
+			"top": 269,
+			"pageHeight": 998,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -33,11 +33,11 @@
 			"what": "Theme gallery",
 			"width": 320,
 			"found": true,
-			"tabStop": 11,
+			"tabStop": 8,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 709,
-			"pageHeight": 1120,
+			"top": 420,
+			"pageHeight": 998,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -46,12 +46,12 @@
 			"what": "Text color (this key)",
 			"width": 320,
 			"found": true,
-			"tabStop": 13,
+			"tabStop": 16,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 891,
-			"pageHeight": 1120,
-			"visibleWithoutScroll": false
+			"top": 591,
+			"pageHeight": 998,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T3",
@@ -59,11 +59,11 @@
 			"what": "Layout select",
 			"width": 320,
 			"found": true,
-			"tabStop": 5,
+			"tabStop": 17,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 336,
-			"pageHeight": 1120,
+			"top": 651,
+			"pageHeight": 998,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -72,13 +72,11 @@
 			"what": "Warn threshold",
 			"width": 320,
 			"found": true,
-			"tabStop": 14,
-			"tabStopIsDisclosure": true,
-			"closedDisclosures": [
-				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
-			],
-			"top": 1045,
-			"pageHeight": 1120,
+			"tabStop": 19,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 829,
+			"pageHeight": 998,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -87,11 +85,11 @@
 			"what": "Rotation membership list",
 			"width": 320,
 			"found": true,
-			"tabStop": 6,
+			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 492,
-			"pageHeight": 1837,
+			"top": 50,
+			"pageHeight": 1505,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -100,11 +98,11 @@
 			"what": "Rotation order (first move button)",
 			"width": 320,
 			"found": true,
-			"tabStop": 11,
+			"tabStop": 9,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 625,
-			"pageHeight": 1837,
+			"top": 270,
+			"pageHeight": 1505,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -113,14 +111,12 @@
 			"what": "Press behavior",
 			"width": 320,
 			"found": true,
-			"tabStop": 15,
-			"tabStopIsDisclosure": true,
-			"closedDisclosures": [
-				"PressPress cycles current, min, max, avg"
-			],
-			"top": 1080,
-			"pageHeight": 1120,
-			"visibleWithoutScroll": false
+			"tabStop": 7,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 367,
+			"pageHeight": 998,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T6",
@@ -128,13 +124,13 @@
 			"what": "Dial controls preset",
 			"width": 320,
 			"found": true,
-			"tabStop": 28,
+			"tabStop": 26,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
+				"Dial gestures & advanced"
 			],
-			"top": 1558,
-			"pageHeight": 1597,
+			"top": 1324,
+			"pageHeight": 1297,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -143,11 +139,11 @@
 			"what": "Missing-reading status",
 			"width": 320,
 			"found": true,
-			"tabStop": 4,
+			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 260,
-			"pageHeight": 1294,
+			"top": 50,
+			"pageHeight": 998,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -156,13 +152,13 @@
 			"what": "Shared theme default",
 			"width": 320,
 			"found": true,
-			"tabStop": 16,
+			"tabStop": 21,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"AdvancedAuto source · poll 1 s · decimal data units"
+				"Advanced"
 			],
-			"top": 1231,
-			"pageHeight": 1136,
+			"top": 1025,
+			"pageHeight": 998,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -171,13 +167,13 @@
 			"what": "Config document",
 			"width": 320,
 			"found": true,
-			"tabStop": 16,
+			"tabStop": 21,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"AdvancedAuto source · poll 1 s · decimal data units"
+				"Advanced"
 			],
-			"top": 1820,
-			"pageHeight": 1120,
+			"top": 1474,
+			"pageHeight": 998,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -189,8 +185,8 @@
 			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 173,
-			"pageHeight": 1024,
+			"top": 50,
+			"pageHeight": 955,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -199,11 +195,11 @@
 			"what": "Change decimals",
 			"width": 480,
 			"found": true,
-			"tabStop": 8,
+			"tabStop": 6,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 438,
-			"pageHeight": 1024,
+			"top": 269,
+			"pageHeight": 955,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -212,11 +208,11 @@
 			"what": "Theme gallery",
 			"width": 480,
 			"found": true,
-			"tabStop": 11,
+			"tabStop": 8,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 661,
-			"pageHeight": 1024,
+			"top": 420,
+			"pageHeight": 955,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -225,12 +221,12 @@
 			"what": "Text color (this key)",
 			"width": 480,
 			"found": true,
-			"tabStop": 13,
+			"tabStop": 16,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 827,
-			"pageHeight": 1024,
-			"visibleWithoutScroll": false
+			"top": 576,
+			"pageHeight": 955,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T3",
@@ -238,11 +234,11 @@
 			"what": "Layout select",
 			"width": 480,
 			"found": true,
-			"tabStop": 5,
+			"tabStop": 17,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 320,
-			"pageHeight": 1024,
+			"top": 636,
+			"pageHeight": 955,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -251,14 +247,12 @@
 			"what": "Warn threshold",
 			"width": 480,
 			"found": true,
-			"tabStop": 14,
-			"tabStopIsDisclosure": true,
-			"closedDisclosures": [
-				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
-			],
-			"top": 965,
-			"pageHeight": 1024,
-			"visibleWithoutScroll": false
+			"tabStop": 19,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 785,
+			"pageHeight": 955,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T5",
@@ -266,11 +260,11 @@
 			"what": "Rotation membership list",
 			"width": 480,
 			"found": true,
-			"tabStop": 6,
+			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 380,
-			"pageHeight": 1488,
+			"top": 50,
+			"pageHeight": 1418,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -279,11 +273,11 @@
 			"what": "Rotation order (first move button)",
 			"width": 480,
 			"found": true,
-			"tabStop": 11,
+			"tabStop": 9,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 497,
-			"pageHeight": 1488,
+			"top": 270,
+			"pageHeight": 1418,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -292,14 +286,12 @@
 			"what": "Press behavior",
 			"width": 480,
 			"found": true,
-			"tabStop": 15,
-			"tabStopIsDisclosure": true,
-			"closedDisclosures": [
-				"PressPress cycles current, min, max, avg"
-			],
-			"top": 1000,
-			"pageHeight": 1024,
-			"visibleWithoutScroll": false
+			"tabStop": 7,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 367,
+			"pageHeight": 955,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T6",
@@ -307,13 +299,13 @@
 			"what": "Dial controls preset",
 			"width": 480,
 			"found": true,
-			"tabStop": 28,
+			"tabStop": 26,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
+				"Dial gestures & advanced"
 			],
-			"top": 1273,
-			"pageHeight": 1297,
+			"top": 1281,
+			"pageHeight": 1254,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -322,11 +314,11 @@
 			"what": "Missing-reading status",
 			"width": 480,
 			"found": true,
-			"tabStop": 4,
+			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 244,
-			"pageHeight": 1152,
+			"top": 50,
+			"pageHeight": 955,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -335,13 +327,13 @@
 			"what": "Shared theme default",
 			"width": 480,
 			"found": true,
-			"tabStop": 16,
+			"tabStop": 21,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"AdvancedAuto source · poll 1 s · decimal data units"
+				"Advanced"
 			],
-			"top": 1120,
-			"pageHeight": 1040,
+			"top": 982,
+			"pageHeight": 955,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -350,13 +342,13 @@
 			"what": "Config document",
 			"width": 480,
 			"found": true,
-			"tabStop": 16,
+			"tabStop": 21,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"AdvancedAuto source · poll 1 s · decimal data units"
+				"Advanced"
 			],
-			"top": 1676,
-			"pageHeight": 1024,
+			"top": 1387,
+			"pageHeight": 955,
 			"visibleWithoutScroll": false
 		}
 	]

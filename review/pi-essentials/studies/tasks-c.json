@@ -10,7 +10,7 @@
 			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 288,
+			"top": 284,
 			"pageHeight": 800,
 			"visibleWithoutScroll": true
 		},
@@ -19,7 +19,15 @@
 			"fixture": "key-configured",
 			"what": "Change decimals",
 			"width": 320,
-			"found": false
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 602,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T2",
@@ -32,42 +40,77 @@
 			"closedDisclosures": [
 				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
 			],
-			"top": 866,
+			"top": 858,
 			"pageHeight": 800,
 			"visibleWithoutScroll": false
 		},
 		{
 			"task": "T2",
 			"fixture": "key-configured",
-			"what": "Text intensity (this key)",
+			"what": "Text color (this key)",
 			"width": 320,
-			"found": false
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 1039,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
 		},
 		{
 			"task": "T3",
 			"fixture": "key-configured",
 			"what": "Layout select",
 			"width": 320,
-			"found": false
+			"found": true,
+			"tabStop": 5,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 463,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T4",
 			"fixture": "key-configured",
 			"what": "Warn threshold",
 			"width": 320,
-			"found": false
+			"found": true,
+			"tabStop": 7,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
+			],
+			"top": 642,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T5",
 			"fixture": "dial-groups",
-			"what": "Rotation set editor",
+			"what": "Rotation membership list",
 			"width": 320,
 			"found": true,
-			"tabStop": null,
+			"tabStop": 6,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 202,
-			"pageHeight": 1114,
+			"top": 518,
+			"pageHeight": 1265,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation order (first move button)",
+			"width": 320,
+			"found": true,
+			"tabStop": 11,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 651,
+			"pageHeight": 1265,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -75,7 +118,15 @@
 			"fixture": "key-configured",
 			"what": "Press behavior",
 			"width": 320,
-			"found": false
+			"found": true,
+			"tabStop": 8,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"PressPress cycles current, min, max, avg"
+			],
+			"top": 683,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T6",
@@ -83,12 +134,12 @@
 			"what": "Dial controls preset",
 			"width": 320,
 			"found": true,
-			"tabStop": 14,
+			"tabStop": 20,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"Dial gestures & advanced"
+				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
 			],
-			"top": 1122,
+			"top": 1070,
 			"pageHeight": 1114,
 			"visibleWithoutScroll": false
 		},
@@ -101,8 +152,8 @@
 			"tabStop": 4,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 407,
-			"pageHeight": 920,
+			"top": 403,
+			"pageHeight": 900,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -116,7 +167,7 @@
 			"closedDisclosures": [
 				"AdvancedAuto source · poll 1 s · decimal data units"
 			],
-			"top": 842,
+			"top": 822,
 			"pageHeight": 800,
 			"visibleWithoutScroll": false
 		},
@@ -131,7 +182,7 @@
 			"closedDisclosures": [
 				"AdvancedAuto source · poll 1 s · decimal data units"
 			],
-			"top": 1432,
+			"top": 1427,
 			"pageHeight": 800,
 			"visibleWithoutScroll": false
 		},
@@ -144,7 +195,7 @@
 			"tabStop": 2,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 288,
+			"top": 284,
 			"pageHeight": 800,
 			"visibleWithoutScroll": true
 		},
@@ -153,7 +204,15 @@
 			"fixture": "key-configured",
 			"what": "Change decimals",
 			"width": 480,
-			"found": false
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 570,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T2",
@@ -166,42 +225,77 @@
 			"closedDisclosures": [
 				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
 			],
-			"top": 801,
+			"top": 793,
 			"pageHeight": 800,
-			"visibleWithoutScroll": false
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T2",
 			"fixture": "key-configured",
-			"what": "Text intensity (this key)",
+			"what": "Text color (this key)",
 			"width": 480,
-			"found": false
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 959,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
 		},
 		{
 			"task": "T3",
 			"fixture": "key-configured",
 			"what": "Layout select",
 			"width": 480,
-			"found": false
+			"found": true,
+			"tabStop": 5,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 447,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T4",
 			"fixture": "key-configured",
 			"what": "Warn threshold",
 			"width": 480,
-			"found": false
+			"found": true,
+			"tabStop": 7,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
+			],
+			"top": 610,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T5",
 			"fixture": "dial-groups",
-			"what": "Rotation set editor",
+			"what": "Rotation membership list",
 			"width": 480,
 			"found": true,
-			"tabStop": null,
+			"tabStop": 6,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 202,
-			"pageHeight": 1050,
+			"top": 487,
+			"pageHeight": 1046,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation order (first move button)",
+			"width": 480,
+			"found": true,
+			"tabStop": 11,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 604,
+			"pageHeight": 1046,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -209,7 +303,15 @@
 			"fixture": "key-configured",
 			"what": "Press behavior",
 			"width": 480,
-			"found": false
+			"found": true,
+			"tabStop": 8,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"PressPress cycles current, min, max, avg"
+			],
+			"top": 650,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
 		},
 		{
 			"task": "T6",
@@ -217,13 +319,13 @@
 			"what": "Dial controls preset",
 			"width": 480,
 			"found": true,
-			"tabStop": 14,
+			"tabStop": 20,
 			"tabStopIsDisclosure": true,
 			"closedDisclosures": [
-				"Dial gestures & advanced"
+				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
 			],
-			"top": 1058,
-			"pageHeight": 1050,
+			"top": 930,
+			"pageHeight": 958,
 			"visibleWithoutScroll": false
 		},
 		{
@@ -235,8 +337,8 @@
 			"tabStop": 4,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 375,
-			"pageHeight": 810,
+			"top": 371,
+			"pageHeight": 800,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -250,7 +352,7 @@
 			"closedDisclosures": [
 				"AdvancedAuto source · poll 1 s · decimal data units"
 			],
-			"top": 779,
+			"top": 759,
 			"pageHeight": 800,
 			"visibleWithoutScroll": true
 		},
@@ -265,7 +367,7 @@
 			"closedDisclosures": [
 				"AdvancedAuto source · poll 1 s · decimal data units"
 			],
-			"top": 1337,
+			"top": 1332,
 			"pageHeight": 800,
 			"visibleWithoutScroll": false
 		}

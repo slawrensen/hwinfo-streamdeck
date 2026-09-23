@@ -7,6 +7,7 @@
 //   npx tsx scripts/pi-lab.mjs tasks <out.json>
 //   npx tsx scripts/pi-lab.mjs perf <out.json> [--runs 3]
 //   npx tsx scripts/pi-lab.mjs a11y <out.json>        (AXE_CORE=<path to axe.min.js> adds axe-core)
+//   npx tsx scripts/pi-lab.mjs faces <out.png>        (device-face contact sheet)
 //
 // Owned processes only: the Chromium this script launches and its own
 // servers on fixed lab ports; nothing else is ever stopped.
@@ -390,7 +391,44 @@ async function sheet() {
 	console.log(`sheet ${out} (${width}x${height})`);
 }
 
-const commands = { capture, tasks, perf, a11y, sheet };
+// --- device-face contact sheet ---------------------------------------------
+//   pi-lab.mjs faces <out.png>
+// Every key and dial fixture's device face, rendered by the production
+// compose()/composeDialSvg() exactly as the header receives it, rasterized
+// at 2x under its fixture name. Sample data; no Stream Deck involved.
+async function faces() {
+	const sharp = (await import("sharp")).default;
+	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
+	const tiles = [];
+	try {
+		for (const name of sim.fixtureNames()) {
+			sim.setFixture(name);
+			const svg = sim.face();
+			if (typeof svg !== "string" || svg === "") continue;
+			const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
+			tiles.push({ name, png, meta: await sharp(png).metadata() });
+		}
+	} finally {
+		await sim.stop();
+	}
+	const gap = 20;
+	const head = 22;
+	const cols = 4;
+	const cellW = Math.max(...tiles.map((t) => t.meta.width)) + gap;
+	const rows = Math.ceil(tiles.length / cols);
+	const rowH = Math.max(...tiles.map((t) => t.meta.height)) + head + gap;
+	const composites = [];
+	tiles.forEach((t, i) => {
+		const x = gap + (i % cols) * cellW;
+		const y = gap + Math.floor(i / cols) * rowH;
+		composites.push({ input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${cellW - gap}" height="${head}"><text x="0" y="15" font-family="DejaVu Sans, Arial" font-size="13" fill="#e0e0e0">${t.name}</text></svg>`), left: x, top: y });
+		composites.push({ input: t.png, left: x, top: y + head });
+	});
+	await sharp({ create: { width: gap + cols * cellW, height: gap + rows * rowH, channels: 3, background: "#171717" } }).composite(composites).png({ compressionLevel: 9, palette: true }).toFile(out);
+	console.log(`faces ${out} (${tiles.length} faces)`);
+}
+
+const commands = { capture, tasks, perf, a11y, sheet, faces };
 if (commands[cmd] === undefined || out === undefined) {
 	console.error("usage: tsx scripts/pi-lab.mjs capture|tasks|perf|a11y <out> [options]");
 	process.exit(2);

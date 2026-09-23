@@ -114,6 +114,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	sim.face = face;
 	sim.status = status;
 
+	sim.fixtureNames = () => Object.keys(all.list);
 	sim.setFixture = (name, overrides = {}) => {
 		const fx = all.list[name];
 		if (fx === undefined) throw new Error(`unknown fixture ${name}`);

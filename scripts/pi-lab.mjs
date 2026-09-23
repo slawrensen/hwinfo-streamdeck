@@ -303,11 +303,40 @@ async function a11y() {
 					const name = nameOf(el);
 					if (name === "" || name.startsWith("(placeholder only)")) issues.push({ rule: "no-accessible-name", el: el.outerHTML.slice(0, 160), name });
 				}
-				for (const el of document.querySelectorAll("[hidden] *, details:not([open]) > :not(summary) *")) {
-					if (el.tabIndex >= 0 && el.getClientRects().length > 0) issues.push({ rule: "focusable-in-hidden", el: el.outerHTML.slice(0, 120) });
-				}
 				return issues;
 			})()`);
+			// Real sequential navigation: Tab through the page and flag any stop
+			// inside a hidden subtree or a closed disclosure (other than its own
+			// summary), and any stop without a visible focus indicator.
+			await browser.evaluate(`document.activeElement?.blur(); window.scrollTo(0, 0)`);
+			const stops = [];
+			for (let i = 0; i < 80; i++) {
+				await browser.key("Tab");
+				const stop = await browser.evaluate(`(() => {
+					let a = document.activeElement;
+					while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+					if (!a || a === document.body) return null;
+					let hiddenBy = null;
+					for (let n = a; n; n = n.parentElement) {
+						if (n.hidden) { hiddenBy = "hidden"; break; }
+						if (n.tagName === "DETAILS" && !n.open && !(a.tagName === "SUMMARY" && a.parentElement === n)) { hiddenBy = "closed details"; break; }
+					}
+					const cs = getComputedStyle(a);
+					const ring = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) >= 2;
+					const r = a.getBoundingClientRect();
+					const head = document.querySelector(".hw-head[data-pin]");
+					const hr = head && getComputedStyle(head).position === "sticky" ? head.getBoundingClientRect() : null;
+					const obscured = hr !== null && !head.contains(a) && r.bottom <= hr.bottom + 1;
+					return { tag: a.tagName + (a.id ? "#" + a.id : ""), hiddenBy, ring, obscured };
+				})()`);
+				if (stop === null) break;
+				stops.push(stop);
+			}
+			for (const stop of stops) {
+				if (stop.hiddenBy !== null) own.push({ rule: "focus-in-hidden", el: `${stop.tag} (${stop.hiddenBy})` });
+				if (!stop.ring) own.push({ rule: "no-visible-focus", el: stop.tag });
+				if (stop.obscured) own.push({ rule: "focus-obscured-by-pinned-header", el: stop.tag });
+			}
 			let axe = null;
 			if (axeSource !== null) {
 				await browser.evaluate(`${axeSource}; 0`);

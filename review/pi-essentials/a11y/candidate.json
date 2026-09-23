@@ -1,0 +1,352 @@
+{
+	"method": "Simulated host, headless Chromium. Own name/tabindex/hidden-focus checks plus axe-core when AXE_CORE is set. Not a full WCAG audit and not the embedded host.",
+	"axe": true,
+	"report": [
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "alerts-editing",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-custom-dim",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-inherited",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-alert",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "key-zero-negative",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-empty",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-alert",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 24,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					"color-contrast"
+				]
+			}
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 18,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "control-reset",
+			"state": "expanded",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 19,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-back",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		}
+	]
+}

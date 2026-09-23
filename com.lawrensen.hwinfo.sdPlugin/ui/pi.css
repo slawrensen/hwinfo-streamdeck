@@ -822,6 +822,24 @@ body {
 	padding: 2px 0 2px 20px;
 }
 
+/* A small disclosure inside a section (the HWiNFO setup steps). */
+.hw-inline-help {
+	margin-top: var(--hw-s2);
+}
+
+.hw-inline-help > summary {
+	display: inline-flex;
+	align-items: center;
+	min-height: 24px;
+	color: var(--hw-link);
+	cursor: pointer;
+}
+
+.hw-inline-help ol {
+	margin: var(--hw-s1) 0 0;
+	padding-left: 20px;
+}
+
 /* --- theme gallery ------------------------------------------------------ */
 
 .hw-themes {
@@ -1106,7 +1124,13 @@ body {
 }
 
 .hw-tile-grip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
 	padding: 0 3px;
+	box-sizing: border-box;
 	color: #9aa3ae;
 	font-size: 12px;
 	line-height: 1;

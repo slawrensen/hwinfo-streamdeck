@@ -1989,7 +1989,7 @@
 			if (listOpen) return;
 			listOpen = true;
 			listEl.hidden = false;
-			searchEl.setAttribute("aria-expanded", "true");
+			if (combobox) searchEl.setAttribute("aria-expanded", "true");
 			activeKey = combobox ? selectedKey : "";
 			renderList();
 			const toSelected = () => listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "center" });
@@ -2006,7 +2006,7 @@
 			const was = listOpen;
 			listOpen = false;
 			listEl.hidden = true;
-			searchEl.setAttribute("aria-expanded", "false");
+			if (combobox) searchEl.setAttribute("aria-expanded", "false");
 			searchEl.removeAttribute("aria-activedescendant");
 			activeKey = "";
 			showSelection();

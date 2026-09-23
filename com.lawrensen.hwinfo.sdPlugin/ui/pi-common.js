@@ -1814,17 +1814,16 @@
 		}
 
 		function options() {
-			return Array.from(listEl.querySelectorAll(".hw-row"));
+			return Array.from(listEl.querySelectorAll(".hw-row:not([hidden])"));
 		}
 
 		function setActive(key, scroll = true) {
+			const previous = activeKey;
 			activeKey = key;
-			let found = null;
-			for (const row of options()) {
-				const on = row.dataset.key === key;
-				row.classList.toggle("active", on);
-				if (on) found = row;
-			}
+			const prevRow = built?.byKey.get(previous);
+			if (prevRow !== undefined) prevRow.el.classList.remove("active");
+			const found = built?.byKey.get(key)?.el ?? null;
+			if (found !== null) found.classList.add("active");
 			if (combobox) {
 				if (found !== null) searchEl.setAttribute("aria-activedescendant", found.id);
 				else searchEl.removeAttribute("aria-activedescendant");
@@ -1832,80 +1831,67 @@
 			if (found !== null && scroll) found.scrollIntoView({ block: "nearest" });
 		}
 
-		function renderList() {
-			if (!listOpen) return;
-			if (tree === null) {
-				const loading = document.createElement("div");
-				loading.className = "hw-more";
-				loading.textContent = "Loading readings…";
-				listEl.replaceChildren(loading);
-				return;
-			}
-			const keepScroll = listEl.scrollTop;
-			// Only a filter the user actually typed filters the list.
-			const raw = searchEl.value;
-			const tokens = searchTyped && raw !== "" ? tokensOf(raw) : [];
+		// The list is built once per tree and then filtered in place: a
+		// keystroke toggles `hidden` on the rows whose match changed and
+		// repaints nothing else, so typing stays fast with thousands of
+		// readings and never loses the list's scroll position.
+		let built = null; // { tree, rows: [{ key, el, box, hay, tick, badge }], byKey, boxes: [{ box, rows }], none }
+		const ROW_PX = 24; // .hw-row min-height
+		const GROUP_HEAD_PX = 27; // .hw-group line plus padding
+
+		function build() {
 			const frag = document.createDocumentFragment();
-			let shown = 0;
+			const rows = [];
+			const byKey = new Map();
+			const boxes = [];
 			for (let gi = 0; gi < tree.length; gi++) {
 				const group = tree[gi];
+				const box = document.createElement("div");
+				box.className = "hw-optgroup";
+				const header = document.createElement("div");
+				header.className = "hw-group";
+				header.id = `${pickerId}-g${gi}`;
+				const title = document.createElement("span");
+				title.textContent = group.name;
+				header.appendChild(title);
+				if (combobox) {
+					box.setAttribute("role", "group");
+					box.setAttribute("aria-labelledby", header.id);
+					header.setAttribute("role", "presentation");
+				}
+				if (config.onGroupAdd !== undefined) {
+					// "Add this whole source" in one press. Bound by position in
+					// the rendered tree, not by name: source names are not unique
+					// (identical hardware, user renames, the orphan fallback).
+					const addAll = document.createElement("button");
+					addAll.type = "button";
+					addAll.className = "hw-group-add";
+					addAll.dataset.groupIndex = String(gi);
+					addAll.textContent = "+ all";
+					addAll.setAttribute("aria-label", `Add every reading of ${group.name}`);
+					header.appendChild(addAll);
+				}
+				box.appendChild(header);
 				const groupLower = group.name.toLowerCase();
-				let box = null;
+				const members = [];
 				for (const reading of group.readings) {
-					if (tokens.length > 0) {
-						const hay = `${groupLower} ${reading.label.toLowerCase()}`;
-						if (!tokens.every((t) => hay.includes(t))) continue;
-					}
-					if (box === null) {
-						box = document.createElement("div");
-						const header = document.createElement("div");
-						header.className = "hw-group";
-						header.id = `${pickerId}-g${gi}`;
-						const title = document.createElement("span");
-						title.textContent = group.name;
-						header.appendChild(title);
-						if (combobox) {
-							box.setAttribute("role", "group");
-							box.setAttribute("aria-labelledby", header.id);
-							header.setAttribute("role", "presentation");
-						}
-						if (config.onGroupAdd !== undefined) {
-							// "Add this whole source" in one press. Bound by position in
-							// the rendered tree, not by name: source names are not unique
-							// (identical hardware, user renames, the orphan fallback).
-							const addAll = document.createElement("button");
-							addAll.type = "button";
-							addAll.className = "hw-group-add";
-							addAll.dataset.groupIndex = String(gi);
-							addAll.textContent = "+ all";
-							addAll.setAttribute("aria-label", `Add every reading of ${group.name}`);
-							header.appendChild(addAll);
-						}
-						box.appendChild(header);
-						frag.appendChild(box);
-					}
 					const typeName = SENSOR_TYPE_NAMES[reading.type] || "";
-					const valueText = `${reading.display ?? ""}${typeName ? " · " + typeName : ""}`;
 					let row;
+					let tick = null;
 					if (combobox) {
 						row = document.createElement("div");
 						row.setAttribute("role", "option");
 						row.id = optionId(reading.key);
-						const selected = reading.key === selectedKey;
-						row.setAttribute("aria-selected", selected ? "true" : "false");
-						row.className = "hw-row" + (selected ? " selected" : "") + (reading.key === activeKey ? " active" : "");
+						row.setAttribute("aria-selected", "false");
+						row.className = "hw-row";
 					} else {
 						// A native checklist row: the label IS the hit area, the box
 						// its state, the name everything a screen reader needs.
 						row = document.createElement("label");
 						row.className = "hw-row";
-						const state = config.tick(reading.key);
-						const tick = document.createElement("input");
+						tick = document.createElement("input");
 						tick.type = "checkbox";
 						tick.className = "hw-tick";
-						tick.checked = state.on;
-						tick.disabled = state.disabled === true;
-						tick.title = state.title;
 						row.appendChild(tick);
 					}
 					row.dataset.key = reading.key;
@@ -1914,33 +1900,89 @@
 					label.textContent = reading.label;
 					const val = document.createElement("span");
 					val.className = "hw-val";
-					val.textContent = valueText;
+					val.textContent = `${reading.display ?? ""}${typeName ? " · " + typeName : ""}`;
 					row.append(label, val);
-					const marker = config.marker?.(reading.key);
-					if (marker) {
-						const badge = document.createElement("span");
-						badge.className = "hw-now";
-						badge.textContent = marker;
-						row.appendChild(badge);
-					}
 					box.appendChild(row);
-					shown++;
+					const entry = { key: reading.key, el: row, hay: `${groupLower} ${reading.label.toLowerCase()}`, tick, badge: null, selected: false, marker: "" };
+					rows.push(entry);
+					members.push(entry);
+					byKey.set(reading.key, entry);
 				}
+				// Off-screen groups skip rendering (content-visibility in
+				// pi.css); their placeholder height is estimated from the real
+				// row geometry so a scroll to a deep row lands on it.
+				box.style.containIntrinsicSize = `auto ${GROUP_HEAD_PX + members.length * ROW_PX}px`;
+				boxes.push({ box, rows: members });
+				frag.appendChild(box);
 			}
-			if (shown === 0) {
-				const none = document.createElement("div");
-				none.className = "hw-more";
-				none.textContent = tokens.length > 0 ? `No readings match "${raw.trim()}".` : "HWiNFO publishes no readings right now.";
-				frag.appendChild(none);
-			}
+			const none = document.createElement("div");
+			none.className = "hw-more";
+			none.hidden = true;
+			frag.appendChild(none);
 			listEl.replaceChildren(frag);
-			listEl.scrollTop = keepScroll;
-			if (combobox) {
-				// The highlight survives a re-render while its row still matches.
-				if (activeKey !== "" && listEl.querySelector(`[data-key="${CSS.escape(activeKey)}"]`) === null) activeKey = "";
-				setActive(activeKey, false);
+			built = { tree, rows, byKey, boxes, none };
+		}
+
+		function renderList() {
+			if (!listOpen) return;
+			if (tree === null) {
+				built = null;
+				const loading = document.createElement("div");
+				loading.className = "hw-more";
+				loading.textContent = "Loading readings…";
+				listEl.replaceChildren(loading);
+				return;
 			}
-			listEl.setAttribute("aria-busy", "false");
+			if (built === null || built.tree !== tree) build();
+			// Only a filter the user actually typed filters the list.
+			const raw = searchEl.value;
+			const tokens = searchTyped && raw !== "" ? tokensOf(raw) : [];
+			let shown = 0;
+			for (const { box, rows } of built.boxes) {
+				let inBox = 0;
+				for (const row of rows) {
+					const visible = tokens.length === 0 || tokens.every((t) => row.hay.includes(t));
+					if (row.el.hidden === visible) row.el.hidden = !visible;
+					if (visible) inBox++;
+					if (combobox) {
+						const selected = row.key === selectedKey;
+						if (row.selected !== selected) {
+							row.selected = selected;
+							row.el.classList.toggle("selected", selected);
+							row.el.setAttribute("aria-selected", selected ? "true" : "false");
+						}
+					} else {
+						const state = config.tick(row.key);
+						if (row.tick.checked !== state.on) row.tick.checked = state.on;
+						const disabled = state.disabled === true;
+						if (row.tick.disabled !== disabled) row.tick.disabled = disabled;
+						if (row.tick.title !== state.title) row.tick.title = state.title;
+					}
+					const marker = config.marker?.(row.key) ?? "";
+					if (row.marker !== marker) {
+						row.marker = marker;
+						if (row.badge === null) {
+							row.badge = document.createElement("span");
+							row.badge.className = "hw-now";
+							row.el.appendChild(row.badge);
+						}
+						row.badge.textContent = marker;
+						row.badge.hidden = marker === "";
+					}
+				}
+				const boxHidden = inBox === 0;
+				if (box.hidden !== boxHidden) box.hidden = boxHidden;
+				shown += inBox;
+			}
+			const noneText = shown > 0 ? "" : tokens.length > 0 ? `No readings match "${raw.trim()}".` : "HWiNFO publishes no readings right now.";
+			if (built.none.textContent !== noneText) built.none.textContent = noneText;
+			built.none.hidden = shown > 0;
+			if (combobox) {
+				// The highlight survives filtering while its row still shows.
+				const activeRow = built.byKey.get(activeKey);
+				if (activeKey !== "" && (activeRow === undefined || activeRow.el.hidden)) setActive("", false);
+				else setActive(activeKey, false);
+			}
 		}
 
 		function openList() {
@@ -1950,8 +1992,13 @@
 			searchEl.setAttribute("aria-expanded", "true");
 			activeKey = combobox ? selectedKey : "";
 			renderList();
-			const sel = listEl.querySelector(".hw-row.selected");
-			if (sel) sel.scrollIntoView({ block: "center" });
+			const toSelected = () => listEl.querySelector(".hw-row.selected")?.scrollIntoView({ block: "center" });
+			toSelected();
+			// Groups above the saved row render on the way and may settle to a
+			// slightly different height; one follow-up frame keeps it in view.
+			requestAnimationFrame(() => {
+				if (listOpen && !searchTyped) toSelected();
+			});
 			config.onOpenChange?.(true);
 		}
 

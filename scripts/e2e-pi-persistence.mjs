@@ -573,7 +573,9 @@ try {
 	check("second picker searched", pick.result?.value === "ok", String(pick.result?.value));
 	await sleep(600);
 	const row = await evaluate(`(() => {
-		const r = document.querySelector("#picker2-list .hw-row");
+		// The first row the filter left visible (non-matching rows stay in
+		// the list, hidden, so typing never rebuilds it).
+		const r = document.querySelector("#picker2-list .hw-row:not([hidden])");
 		if (!r) return "missing";
 		r.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 		return "ok";

@@ -30,7 +30,9 @@ import { applyGlobalThemeSettings } from "../../src/ui/theme-store.ts";
 import { frozenHistory, sampleSnapshot, scenarios } from "./pi-fixtures.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+// PI_SIM_PLUGIN_DIR serves another checkout's panels (a baseline worktree)
+// against this build's plugin side, for before/after measurements.
+const pluginDir = process.env.PI_SIM_PLUGIN_DIR ?? path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
 export const PAGES = {
 	"sensor-reading.html": { action: "com.lawrensen.hwinfo.reading", controller: "Keypad", kind: "key" },

@@ -217,11 +217,14 @@ async function perf() {
 				const r = await browser.evaluate(`(async () => {
 					const input = document.getElementById("picker-search");
 					const frame = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
+					// Open: focus to the first frame after the rows exist (bounded).
+					const rows = () => document.querySelectorAll("#picker-list .hw-row, #picker-list [role=option]").length;
 					const t0 = performance.now();
 					input.focus();
+					input.dispatchEvent(new Event("focus"));
 					await frame();
+					for (let i = 0; i < 100 && rows() === 0 && ${size} > 0; i++) await frame();
 					const open = performance.now() - t0;
-					const rows = () => document.querySelectorAll("#picker-list .hw-row, #picker-list [role=option]").length;
 					const openRows = rows();
 					const selectedVisible = (() => { const s = document.querySelector("#picker-list .selected, #picker-list [aria-selected=true]"); if (!s) return false; const a = s.getBoundingClientRect(), b = document.getElementById("picker-list").getBoundingClientRect(); return a.bottom > b.top && a.top < b.bottom; })();
 					const samples = [];
@@ -237,7 +240,7 @@ async function perf() {
 					input.value = "";
 					input.dispatchEvent(new Event("input"));
 					await frame();
-					const allRows = rows();
+					const allRows = document.querySelectorAll("#picker-list .hw-row:not([hidden]), #picker-list [role=option]:not([hidden])").length;
 					return { open, openRows, allRows, selectedVisible, samples, heap: performance.memory ? performance.memory.usedJSHeapSize : null };
 				})()`);
 				results.push({ size, run, ...r });

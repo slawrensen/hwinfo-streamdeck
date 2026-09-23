@@ -218,7 +218,7 @@ try {
 	await sleep(100);
 	await b.type("drive temp");
 	await sleep(150);
-	const drives = await b.evaluate(`Array.from(document.querySelectorAll("#picker-list [role=option]")).map((o) => o.closest("[role=group]")?.querySelector(".hw-group")?.textContent + " / " + o.querySelector(".hw-label").textContent)`);
+	const drives = await b.evaluate(`Array.from(document.querySelectorAll("#picker-list [role=option]:not([hidden])")).map((o) => o.closest("[role=group]")?.querySelector(".hw-group")?.textContent + " / " + o.querySelector(".hw-label").textContent)`);
 	check("T1: two same-named readings are told apart by source", drives.length >= 2 && new Set(drives).size === drives.length && drives.every((d) => d.includes("Drive")), JSON.stringify(drives));
 	await b.key("ArrowDown");
 	await b.key("ArrowDown");
@@ -312,6 +312,11 @@ try {
 		return { options: options.length, selected: sel?.dataset.key ?? null, visible: !!sel && a.bottom > r.top && a.top < r.bottom };
 	})()`);
 	check("scale: all 5,000 readings are options", reach.options === 5000, String(reach.options));
+	await b.type("reading 4999");
+	await sleep(200);
+	const narrowed = await b.evaluate(`Array.from(document.querySelectorAll("#picker-list [role=option]:not([hidden])")).map((o) => o.dataset.key)`);
+	check("scale: typing narrows to the matching rows and keeps the last one reachable", narrowed.length === 1, JSON.stringify(narrowed));
+	await b.key("Escape");
 	check("scale: the deep saved reading is selected and in view on open", reach.selected === deep && reach.visible, JSON.stringify(reach));
 	await b.key("End");
 	for (let i = 0; i < 3; i++) await b.key("PageDown");

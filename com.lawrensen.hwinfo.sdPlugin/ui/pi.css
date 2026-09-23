@@ -539,6 +539,13 @@ body {
 	box-shadow: none;
 }
 
+/* Off-screen sources skip layout and paint until scrolled near, which
+   keeps a list of thousands of readings quick to open and to filter. */
+.hw-optgroup {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 240px;
+}
+
 .hw-group {
 	position: sticky;
 	top: 0;

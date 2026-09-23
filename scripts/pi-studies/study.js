@@ -1,3 +1,4 @@
+/* global document */
 /* Study switcher: tags the body and sets the study's initial disclosure
    state. UI state only; the study never writes a setting. */
 (() => {

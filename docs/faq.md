@@ -146,7 +146,7 @@ If a key is amber/red and you didn't mean to set a threshold, clear the **Warn a
 
 ### How do I reset a dial's session min/max?
 
-**Push** the dial (press it in). That resets the current reading's session min/max/avg to the current value (on the Elite preset it's the half-second long press; the **Reset reach** setting can widen a reset to the whole rotation set or every dial, and an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can fire it remotely). Since 1.1.10, rotating away no longer wipes a reading's session: stats are kept per reading and survive rotation, page switches and profile changes for up to 30 minutes off screen. There's no reset for the *key's* stats; those are HWiNFO's own, reset inside HWiNFO.
+**Push** the dial (press it in). That resets the current reading's session min/max/avg to the current value (on the Elite preset it's the half-second long press; the **A stats reset clears** setting can widen a reset to the whole rotation set or every dial, and an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can fire it remotely). Since 1.1.10, rotating away no longer wipes a reading's session: stats are kept per reading and survive rotation, page switches and profile changes for up to 30 minutes off screen. There's no reset for the *key's* stats; those are HWiNFO's own, reset inside HWiNFO.
 
 ## Themes
 

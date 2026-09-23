@@ -39,7 +39,7 @@ New to the plugin? Follow these two pages in order:
 From there:
 
 - **[Sensor Reading (keys)](sensor-reading.md)**: every key setting and the press-to-cycle behavior.
-- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, Tile shows, grouped custom tiles, filter patterns and the Back tile.
+- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, readings per tile, grouped custom tiles, filter patterns and the Back tile.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**: the dial's rotate / push / touch controls, rotation sets, auto cycle and range bar.
 - **[Dial controls & presets](controls.md)**: the Legacy, Elite and Custom presets, touch zones, pause/pin, reset reach, and the HWiNFO Control key action.
 - **[Themes and alerts](themes.md)**: the seven presets, type accents, and how alerts override everything.

@@ -93,7 +93,7 @@ Rotation also protects your selection when HWiNFO temporarily stops publishing t
 Unlike keys (which read HWiNFO's own min/max/average), the dial tracks its **session** stats itself, and it keeps a separate session per reading, keyed by HWiNFO's stable sensor identity:
 
 - Rotate away and back, and you find that reading's own session numbers again; no reading ever shows another one's min/max. Stats for your rotation-set members keep accumulating while they are off screen (as long as a Sensor Reading key or Sensor Dial is on screen to keep the poller running), and the whole set survives page switches and profile changes for up to 30 minutes off screen (see [controls](controls.md#pause-pin-and-reset-reach)).
-- **Push** resets the current reading's stats (the **Reset reach** setting can widen that to the set or every dial).
+- **Push** resets the current reading's stats (the **A stats reset clears** setting can widen that to the set or every dial).
 - On the **Gadget** data source there is no HWiNFO min/max/avg at all, but the dial's session stats still work because it computes them from the live stream. See [Data sources](data-sources.md).
 
 ## Settings

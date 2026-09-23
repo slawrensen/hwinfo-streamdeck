@@ -200,7 +200,7 @@ On a dual key with **Row 2 shows** at its default (the same stat as row 1), the 
 
 On a quad key every cell shows the same stat, so the press cycles **all four together**, with the one badge at the cross center updating.
 
-### Press does (drill-down)
+### A press can open details (drill-down)
 
 The **Press** section's **A press** select can repurpose the press instead. **Opens sensor details** switches the deck to a bundled detail view listing every reading of this sensor's HWiNFO source, a custom list, or everything matching a glob filter (`*4090*` style, with a live match count in the panel). **Tap cycles; hold opens details** keeps the stat cycle on a short tap and opens the view after holding half a second. Keys that never touch the Press section behave exactly as before. The whole feature has [its own page](sensor-details.md): what the view shows, the one-time install prompt per deck type, and which decks are supported.
 

@@ -337,7 +337,7 @@ self.hwShell = (() => {
 			actions = [["retry", "Reload sensor list"]];
 		} else if (p !== null && p.state === "stale") {
 			tone = "warn";
-			lines = [p.hint || "HWiNFO stopped updating.", "The face keeps its last values and marks them; nothing is reset."];
+			lines = [p.hint || "HWiNFO stopped updating.", `The ${kind === "dial" ? 'dial shows "HWiNFO stalled"' : 'key shows "Not updating"'} until HWiNFO resumes. Your reading and settings are unchanged.`];
 			actions = [["retry", "Retry now"]];
 		} else if (tree !== null && tree.state === "ok" && Array.isArray(tree.groups) && tree.groups.length === 0) {
 			tone = "warn";

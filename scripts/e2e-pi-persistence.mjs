@@ -37,12 +37,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
+import { chromePath } from "./lib/cdp.mjs";
 import { buildInfo, makeCheck, sleep } from "./lib/e2e-common.mjs";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
 const DEBUG_PORT = 29223;
-const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+// Windows Chrome by default; CHROME (or the Linux container's Chromium)
+// elsewhere, so the suite runs wherever a Chromium does.
+const CHROME = chromePath();
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
@@ -282,6 +285,13 @@ wss.on("connection", (ws) => {
 });
 
 const info = buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] });
+// The panel collapses the Press section by default; every leg here works in
+// it (the detail list, its drags and focus), so the suite opens it first,
+// the way a person does. A closed <details> renders nothing: its controls
+// neither take focus nor report geometry. Advanced stays closed, because
+// the config legs open it themselves and read the fill that opening does.
+const OPEN_PRESS = `<script>document.addEventListener("DOMContentLoaded",()=>{const s=document.getElementById("sec-interaction");if(s)s.open=true;});</script>`;
+
 function bootstrap() {
 	const actionInfo = {
 		action: "com.lawrensen.hwinfo.reading",
@@ -289,7 +299,7 @@ function bootstrap() {
 		device: "dev1",
 		payload: { settings: store.settings, coordinates: { column: 0, row: 0 }, controller: "Keypad" }
 	};
-	return `<style>body{background:#2d2d2d;margin:0;padding:8px 0;}</style>
+	return `<style>body{background:#2d2d2d;margin:0;padding:8px 0;}</style>${OPEN_PRESS}
 <script>window.addEventListener("load",()=>{connectElgatoStreamDeckSocket(String(${WS_PORT}),"pi-ctx","registerPropertyInspector",${JSON.stringify(JSON.stringify(info))},${JSON.stringify(JSON.stringify(actionInfo))});});</script>`;
 }
 
@@ -338,10 +348,23 @@ server.listen(HTTP_PORT, "127.0.0.1");
 // --- headless Chrome over CDP (the capture-pi pattern) --------------------
 const chrome = spawn(
 	CHROME,
-	["--headless=new", "--disable-gpu", `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${path.join(process.env.TEMP ?? ".", "pi-persist-profile")}`, "--hide-scrollbars", "about:blank"],
+	[
+		...(process.platform === "linux" && process.getuid?.() === 0 ? ["--no-sandbox"] : []),
+		"--headless=new",
+		"--disable-gpu",
+		`--remote-debugging-port=${DEBUG_PORT}`,
+		`--user-data-dir=${path.join(process.env.TEMP ?? process.env.TMPDIR ?? "/tmp", "pi-persist-profile")}`,
+		"--hide-scrollbars",
+		"about:blank"
+	],
 	{ stdio: "ignore" }
 );
 function killChromeTree() {
+	if (process.platform !== "win32") {
+		// Only the browser this suite spawned; its renderers exit with it.
+		chrome.kill("SIGKILL");
+		return;
+	}
 	try {
 		spawnSync("taskkill", ["/PID", String(chrome.pid), "/T", "/F"], { stdio: "ignore" });
 	} catch {
@@ -419,24 +442,20 @@ try {
 	};
 	const setSelect = async (setting, value) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-select[setting="${setting}"]');
+			const el = document.querySelector('select[data-setting="${setting}"]:not([data-global])');
 			if (!el) return "missing";
-			el.value = ${JSON.stringify(value)};
-			const inner = (el.shadowRoot ?? el).querySelector("select");
-			if (inner && inner.value !== ${JSON.stringify(value)}) {
-				inner.value = ${JSON.stringify(value)};
-				inner.dispatchEvent(new Event("change", { bubbles: true }));
+			if (el.value !== ${JSON.stringify(value)}) {
+				el.value = ${JSON.stringify(value)};
+				el.dispatchEvent(new Event("change", { bubbles: true }));
 			}
 			return "ok";
 		})()`);
-		check(`sdpi-select ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
+		check(`select ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
 	};
 	const setTextfield = async (setting, value) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-textfield[setting="${setting}"]');
-			if (!el) return "missing";
-			const input = (el.shadowRoot ?? el).querySelector("input");
-			if (!input) return "no input";
+			const input = document.querySelector('input[data-setting="${setting}"]:not([data-global])');
+			if (!input) return "missing";
 			input.focus();
 			input.value = ${JSON.stringify(value)};
 			input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
@@ -444,18 +463,16 @@ try {
 			input.blur();
 			return "ok";
 		})()`);
-		check(`sdpi-textfield ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
+		check(`text field ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
 	};
 	const clickCheckbox = async (setting) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-checkbox[setting="${setting}"]');
-			if (!el) return "missing";
-			const input = (el.shadowRoot ?? el).querySelector("input[type=checkbox]");
-			if (!input) return "no input";
+			const input = document.querySelector('input[type=checkbox][data-setting="${setting}"]:not([data-global])');
+			if (!input) return "missing";
 			input.click();
 			return "ok";
 		})()`);
-		check(`sdpi-checkbox ${setting} clicked`, res.result?.value === "ok", String(res.result?.value));
+		check(`checkbox ${setting} clicked`, res.result?.value === "ok", String(res.result?.value));
 	};
 	/** Bounded DOM poll over CDP (the waitUntil idiom with an async
 	 * predicate): passes the check as soon as `expr` evaluates true, and a
@@ -722,7 +739,7 @@ try {
 	// The boot sensorTree echo runs every picker's showSelection; the
 	// collector's HTML resting text must survive it (placeholder ownership).
 	const restingPh = (await evaluate(`document.getElementById("pickerd-search")?.placeholder ?? "gone"`)).result?.value;
-	check("grouped: the boot tree echo kept the collector's resting placeholder", restingPh === "Search sensors to add…", String(restingPh));
+	check("grouped: the boot tree echo kept the collector's resting placeholder", restingPh === "Search readings to add", String(restingPh));
 
 	const clickChipRemove = async (key) =>
 		(await evaluate(`(() => {
@@ -847,7 +864,7 @@ try {
 	check("leg B: the tile grew to a quad keeping its dressing", deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF00AA", null, null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
 	check("leg B: the neighbor tile is untouched", frame.detailTiles?.[1]?.size === 2, JSON.stringify(frame.detailTiles?.[1]));
 	check("leg B: full quad auto-disarmed", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg B: placeholder reset", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg B: placeholder reset", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg C: aiming at the under-occupied fill tail materializes it on the
 	// pick and keeps the aim until toggled off by hand.
@@ -865,7 +882,7 @@ try {
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(400);
 	check("leg C: manual toggle-off wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
-	check("leg C: toggle-off reset the placeholder", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg C: toggle-off reset the placeholder", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg D: + all under a standing aim appends in ONE frame and disarms,
 	// so the lit marker never claims a landing that did not happen.
@@ -886,7 +903,7 @@ try {
 	check("leg D: the block appended at the end", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0", "twin:1:1"]), JSON.stringify(frame.detailKeys));
 	check("leg D: the plan rode through unchanged", frame.detailTiles?.length === 3 && frame.detailTiles?.[0]?.size === 4 && frame.detailTiles?.[1]?.size === 2 && frame.detailTiles?.[2]?.size === 4, JSON.stringify(frame.detailTiles?.map((t) => t.size)));
 	check("leg D: + all disarmed the stale aim", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg D: placeholder no longer claims the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg D: placeholder no longer claims the aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg E: the cell rename commit touches exactly one label; the dressed
 	// quad beside it is the index-slip tripwire. The commit also prunes the
@@ -1044,7 +1061,7 @@ try {
 	check("leg H: none of it wrote", writes.length === mark, `${writes.length - mark} frames`);
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(400);
-	check("leg H: manual disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg H: manual disarm restored the resting text", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg I: an edit that consumes the aimed tile disarms the aim, so the
 	// placeholder never claims a tile the walk no longer has (the shrink
@@ -1063,7 +1080,7 @@ try {
 	await sleep(700);
 	frame = atomic("leg I aimed-tile removal", writes.slice(mark));
 	check("leg I: no armed marker outlives the vanished tile", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg I: the placeholder dropped the stale claim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg I: the placeholder dropped the stale claim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	mark = writes.length;
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
 	await sleep(700);
@@ -1135,6 +1152,13 @@ try {
 		JSON.stringify(frame.detailTiles)
 	);
 
+	// The drag legs below aim at pixel positions that assume a tile's chips
+	// share one row. At the panel's own width a four-cell tile wraps (its
+	// move and remove buttons are sized as touch-and-pointer targets), so
+	// these legs run wide, where the premise holds; the routing math they
+	// prove is width-independent, and the arrow-key legs cover narrow.
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// L4: tile chrome is a reorder surface, not a teleport. Dropping a
 	// chip beside its own cell writes nothing (the honest no-op), and a
 	// drop on the chrome left of the first chip lands BEFORE it, exactly
@@ -1333,6 +1357,8 @@ try {
 	);
 	check("leg L9: painting a caret wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
 
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// ---- run 3c: the bench case, exactly as reported (leg M) -------------
 	// Stephen's tile on the real deck: a bare-values quad whose ONLY
 	// stored dressing is one cell label ("Solo" on cell 0) and no colors
@@ -1505,7 +1531,7 @@ try {
 		tileSizesNow
 	);
 	await sleep(700);
-	check("leg J2: the reshape disarmed the dangling aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J2: the reshape disarmed the dangling aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	check("leg J2: no armed marker after the reshape", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
 	check("leg J2: the disarm itself wrote only the density edit", writes.slice(mark).every((w) => w.detailDensity === "4"), JSON.stringify(writes.slice(mark).length));
 
@@ -1534,7 +1560,7 @@ try {
 		(await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value === "×4",
 		String((await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value)
 	);
-	check("leg J3: the full-quad growth disarmed the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J3: the full-quad growth disarmed the aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	mark = writes.length;
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
 	await sleep(700);
@@ -1587,6 +1613,9 @@ try {
 	await sleep(400);
 	const noteLive = (await evaluate(`document.querySelector('#detail-list .hw-set-note')?.getAttribute("aria-live") ?? "none"`)).result?.value;
 	check("leg J5: the list note is a live region", noteLive === "polite", String(noteLive));
+	// Wide for the same reason as the L legs: short tiles share a row there.
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// Leg J6: a whole tile drags (and arrow-keys) as one unit: its members
 	// travel as a run, its dressing travels with them, a partial spec
 	// shrinks to what it fills instead of swallowing a neighbor's head,
@@ -1658,7 +1687,7 @@ try {
 		tiles[1]?.querySelector(".hw-tile-grip")?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
 	})()`);
 	await sleep(700);
-	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg J7: dropping an existing chip ON a tile joins that tile: the
 	// target grows a cell and the chip's old tile shrinks by the cell it
@@ -1742,6 +1771,8 @@ try {
 	await evaluate(`document.querySelector('#detail-list input.hw-cell-rename')?.blur()`);
 	await sleep(400);
 
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// ---- run 4: the 128-reading cap refuses loudly -----------------------
 	// At the cap the tick's native flip must not survive as a lying
 	// checkbox (the add was refused and nothing re-rendered), and the
@@ -1807,7 +1838,7 @@ try {
 	check("run 4b: focus followed the remove through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-set-remove")`)).result?.value === true);
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(300);
-	check("run 4b: disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("run 4b: disarm restored the resting text", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	await evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="0"]')?.click()`);
 	await sleep(500);
 	check("run 4b: focus followed the size cycler through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-tile-size") && document.activeElement.dataset.tile === "0"`)).result?.value === true);
@@ -1898,8 +1929,11 @@ try {
 	})()`);
 	await sleep(700);
 	frame = atomic("adopted rename", writes.slice(mark));
-	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
-	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[1]));
+	// Lossless tile writes (F01): a stored tile rewrites only the field an
+	// edit changed. The seed's tiles carry no colors and no cellLabels, and
+	// they gain none: absent stays absent, which the runtime reads the same.
+	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"] }), JSON.stringify(frame.detailTiles?.[0]));
+	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"] }), JSON.stringify(frame.detailTiles?.[1]));
 	check("adopted: the parked key stays in the stored list", frame.detailKeys?.length === 4 && frame.detailKeys?.[0] === "bench:0:0", JSON.stringify(frame.detailKeys));
 
 	// Removing the PARKED chip edits the list only: no tile held it, so
@@ -1916,7 +1950,7 @@ try {
 	check("adopted: removed the parked chip", parkedRemove.result?.value === "ok", String(parkedRemove.result?.value));
 	await sleep(700);
 	frame = atomic("adopted parked removal", writes.slice(mark));
-	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }, { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
+	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"] }, { size: 2, labels: ["L3", "L4"] }]), JSON.stringify(frame.detailTiles));
 	check("adopted: only the parked key left the list", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
 
 	// ---- run 6b: dressing travels PAST a parked primary (leg O) ----------
@@ -1939,7 +1973,9 @@ try {
 	check("leg O: the listed order changed and the parked primary kept its slot", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:3", "bench:0:1", "bench:0:2"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg O: every label rode its own reading and the emptied tile left the plan",
-		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null], cellLabels: true }]),
+		// The grown tile rewrites the fields that changed (size, labels,
+		// colors); its untouched, absent cellLabels stays absent.
+		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null] }]),
 		JSON.stringify(frame.detailTiles)
 	);
 	check(
@@ -2144,10 +2180,16 @@ try {
 	check("leg S: everything that is not a key rode through untouched", frame.label === "Named" && deepEqual(frame.futureBlob, FUTURE_BLOB) && frame.detailTiles?.[0]?.labels?.[0] === "A", JSON.stringify(frame).slice(0, 140));
 	await sleep(1400); // the panel reloads itself after an apply
 	check("leg S: the reloaded panel shows the chips in the pasted order", (await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value === JSON.stringify(["bench:0:2", "bench:0:0", "bench:0:5"]), String((await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value));
+	// The shared document reaches every key and dial: its first click only
+	// arms and says so; the second, within five seconds, replaces it.
+	const globalsBeforeArm = globalWrites.length;
 	await evaluate(`(() => {
 		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper" });
 		document.getElementById("config-deck-apply").click();
 	})()`);
+	await sleep(400);
+	check("config: the shared document's first click only arms (no write)", globalWrites.length === globalsBeforeArm, `${globalWrites.length - globalsBeforeArm} writes`);
+	await evaluate(`document.getElementById("config-deck-apply").click()`);
 	await sleep(700);
 	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper" }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
@@ -2292,14 +2334,14 @@ try {
 		(await evaluate(`JSON.stringify({
 		zonesHelp: document.querySelector("#controls-zones .hw-help")?.textContent ?? null,
 		zonesShown: document.getElementById("controls-zones")?.hidden === false,
-		warnPlaceholder: document.querySelector('sdpi-textfield[setting="warnValue"]')?.getAttribute("placeholder") ?? "gone",
+		warnPlaceholder: document.getElementById("f-warn")?.getAttribute("placeholder") ?? "gone",
 		rotationHelp: document.getElementById("rotation-help")?.textContent ?? "gone"
 	})`)).result?.value ?? "{}"
 	);
 	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
-	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "row value turns amber (display units)", String(dialTruth.warnPlaceholder));
-	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
+	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "Off (row value turns amber)", String(dialTruth.warnPlaceholder));
+	check("dial: the rotation help states how the order is set", String(dialTruth.rotationHelp).includes("the arrows set their order"), String(dialTruth.rotationHelp));
 
 	// ---- run 9: Gadget keys survive the panel's key parser (issue #21) --
 	// A Gadget key is "g:<source>:<label>" with HWiNFO's own spaces inside.

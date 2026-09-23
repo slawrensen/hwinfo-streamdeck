@@ -819,7 +819,7 @@
 	// landing point is always painted, never guessed.
 	let detailArm = null;
 
-	const DETAIL_RESTING_PLACEHOLDER = "Search sensors to add…";
+	const DETAIL_RESTING_PLACEHOLDER = "Search readings to add";
 	const DETAIL_CAP_PLACEHOLDER = "At the cap; remove a reading to add another.";
 
 	/** The search box's aim line always states the CURRENT aim. Movers

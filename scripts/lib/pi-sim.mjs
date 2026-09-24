@@ -23,6 +23,7 @@ import { WebSocketServer } from "ws";
 
 import { compose } from "../../src/actions/sensor-reading.ts";
 import { composeDialSvg } from "../../src/actions/sensor-dial.ts";
+import { PanelFoldMemory, panelKindOf } from "../../src/panel-folds.ts";
 import { buildPreview, buildSensorTree, buildThemesPayload } from "../../src/pi-protocol.ts";
 import { poller } from "../../src/poller.ts";
 import { SessionStatsStore } from "../../src/stats.ts";
@@ -68,6 +69,8 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		/** Reply latency for sendToPlugin requests (ms), for race suites. */
 		replyDelayMs: 0,
 		stats: new SessionStatsStore(),
+		/** The plugin's in-memory fold memory; a fresh sim is a fresh plugin. */
+		folds: new PanelFoldMemory(),
 		piWs: null
 	};
 	// Session stats and frozen sparkline history for every fixture reading,
@@ -182,6 +185,12 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 						else if (event === "getDetailSupport") toPi({ event: "detailSupport", supported: true, model: "Stream Deck +" });
 						else if (event === "getSupportReport") toPi({ event: "supportReport", report: "(simulated support report)" });
 						else if (event === "getPreview") sim.pushPreview();
+						else if (event === "getPanelFolds" || event === "setPanelFolds") {
+							const kind = panelKindOf(msg.payload?.kind);
+							if (kind === undefined) return;
+							if (event === "setPanelFolds") sim.folds.set(kind, msg.payload?.folds);
+							else toPi({ event: "panelFolds", kind, folds: sim.folds.get(kind) });
+						}
 					};
 					if (sim.replyDelayMs > 0) setTimeout(reply, sim.replyDelayMs);
 					else reply();

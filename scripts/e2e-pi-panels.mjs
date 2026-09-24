@@ -26,6 +26,7 @@ import { launch } from "./lib/cdp.mjs";
 import { makeCheck, sleep } from "./lib/e2e-common.mjs";
 import { FUTURE_BLOB, scaledSnapshot } from "./lib/pi-fixtures.mjs";
 import { startPiSim } from "./lib/pi-sim.mjs";
+import { PanelFoldMemory } from "../src/panel-folds.ts";
 
 const failures = [];
 const check = makeCheck((name) => failures.push(name));
@@ -312,8 +313,9 @@ try {
 	check("pointer: text typed just before the pointer leaves is saved at once, to this action", lastWrite()?.label === "Leaving" && sim.writes.length === 1, JSON.stringify({ writes: sim.writes.length, label: lastWrite()?.label }));
 
 	// ---- sections keep the folds a person chose (per kind, zero writes) ----
-	await open("key-configured");
-	await b.evaluate(`localStorage.removeItem("hw.folds.key")`);
+	// The real app gives every panel fresh web storage, so the folds live in
+	// the plugin's memory; a fresh sim memory is a freshly started plugin.
+	sim.folds = new PanelFoldMemory();
 	await open("key-configured");
 	const foldsOf = () => b.evaluate(`Object.fromEntries(Array.from(document.querySelectorAll("details.hw-sec[id]"), (d) => [d.id, d.open]))`);
 	const defaults = await foldsOf();
@@ -322,12 +324,27 @@ try {
 	await open("key-configured");
 	const kept = await foldsOf();
 	check("folds: a section a person opened stays open on the next panel", kept["sec-alerts"] === true && defaults["sec-alerts"] === false && kept["sec-reading"] === defaults["sec-reading"], JSON.stringify({ defaults, kept }));
-	// The plugin keeps none of it: toggling sends it nothing.
+	// A toggle goes to the plugin's memory, never to settings, and the
+	// panel keeps nothing in web storage.
 	await b.click("#sec-alerts > summary");
 	await b.click("#sec-alerts > summary");
 	await sleep(120);
-	const foldTraffic = sim.piMessages.filter((m) => /fold/i.test(JSON.stringify(m)));
-	check("folds: toggling a section sends the plugin nothing", foldTraffic.length === 0 && (await foldsOf())["sec-alerts"] === true, JSON.stringify(foldTraffic));
+	const foldTraffic = sim.piMessages.filter((m) => m.payload?.event === "setPanelFolds");
+	const webStorage = await b.evaluate(`Object.keys(localStorage).concat(Object.keys(sessionStorage)).filter((k) => /fold/i.test(k))`);
+	check("folds: a toggle reaches the plugin's memory, not settings or web storage", foldTraffic.length === 2 && foldTraffic.at(-1).payload.folds["sec-alerts"] === true && same(sim.folds.get("key"), { "sec-alerts": true }) && sim.writes.length === 0 && webStorage.length === 0, JSON.stringify({ sent: foldTraffic.length, plugin: sim.folds.get("key"), webStorage }));
+	// Until the plugin answers (at most 300 ms) the sections stay hidden, so
+	// a restored fold never moves a drawn panel; a silent plugin still gets
+	// the defaults shown.
+	sim.replyDelayMs = 1500;
+	sim.setFixture("key-configured");
+	await b.goto(sim.url("key-configured"));
+	const waiting = await b.evaluate(`getComputedStyle(document.getElementById("sec-reading")).visibility`);
+	await sleep(450);
+	const shown = await b.evaluate(`getComputedStyle(document.getElementById("sec-reading")).visibility`);
+	await sleep(1300);
+	const late = (await foldsOf())["sec-alerts"];
+	sim.replyDelayMs = 0;
+	check("folds: sections wait for the plugin's answer, at most 300 ms", waiting === "hidden" && shown === "visible" && late === true, JSON.stringify({ waiting, shown, late }));
 	await open("dial-configured");
 	await sleep(120);
 	check("folds: each kind of panel keeps its own", (await foldsOf())["sec-alerts"] === false);
@@ -379,8 +396,7 @@ try {
 	await open("slot-reading");
 	const slotBar = await b.evaluate(`document.getElementById("hw-folds") === null`);
 	check("folds: the Control panel has the pair; the detail tile, which has no sections, has none", controlBar && slotBar, JSON.stringify({ controlBar, slotBar }));
-	await b.evaluate(`localStorage.removeItem("hw.folds.control")`);
-	await b.evaluate(`localStorage.removeItem("hw.folds.key")`);
+	sim.folds = new PanelFoldMemory();
 
 	await open("dial-configured");
 	await b.evaluate(`(() => { const btn = document.querySelector('#rotation-set .hw-chip-move[data-move="1"]:not(:disabled)'); btn.focus(); })()`);

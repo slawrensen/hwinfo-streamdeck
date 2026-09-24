@@ -256,30 +256,47 @@ self.hwShell = (() => {
 	// or a script. The two chevron buttons in the header's top corner open or
 	// fold them all (Alt-click on a section title does the same).
 	// A view preference, never a setting, so folding a section writes nothing
-	// to any key, and the plugin keeps none of it: it lives in this webview's
-	// storage, which the app empties when the plugin restarts (bench
-	// 2026-09-23). A fresh start shows the defaults, and one press on Open
-	// all gets back whatever a person had open. Storage that throws or is
-	// missing leaves the defaults.
+	// to any key. The plugin holds the folds in memory while it runs
+	// (src/panel-folds.ts): the app gives every panel it opens fresh web
+	// storage, kept only across a reload of that same panel (bench
+	// 2026-09-24), so a panel cannot carry them to the next key itself. A
+	// restart shows the defaults again, one press on Open all from
+	// everything open. The panels' HTML starts with data-folds-pending, so
+	// the sections are hidden from the very first paint until the plugin
+	// answers; a remembered fold never flashes the defaults first. The wait
+	// is capped at 300 ms after the panel connects (the answer is one local
+	// round trip), and at 1.5 s overall for a plugin that never connects.
 	const sections = Array.from(document.querySelectorAll("details.hw-sec[id]"));
-	const foldsKey = `hw.folds.${kind}`;
-	let folds = {};
-	try {
-		const stored = JSON.parse(localStorage.getItem(foldsKey) ?? "{}");
-		if (isDoc(stored)) folds = stored;
-	} catch {
-		folds = {};
-	}
-	for (const section of sections) {
-		if (typeof folds[section.id] === "boolean") section.open = folds[section.id];
-	}
-	const keepFolds = () => {
-		try {
-			localStorage.setItem(foldsKey, JSON.stringify(folds));
-		} catch {
-			/* no storage: the next panel starts from the defaults */
-		}
+	const folds = {};
+	const keepFolds = () => client.send("sendToPlugin", { event: "setPanelFolds", kind, folds });
+	// A section a person toggled on this page keeps that state even if the
+	// plugin's answer arrives after the toggle.
+	const touched = new Set();
+	const foldsReady = (why) => {
+		if (!document.documentElement.hasAttribute("data-folds-pending")) return;
+		document.documentElement.removeAttribute("data-folds-pending");
+		performance.mark(`hw-folds-${why}`);
 	};
+	if (sections.length === 0) foldsReady("none");
+	else {
+		setTimeout(() => foldsReady("timeout"), 1500);
+		client.getConnectionInfo().then(() => {
+			performance.mark("hw-connected");
+			client.send("sendToPlugin", { event: "getPanelFolds", kind });
+			setTimeout(() => foldsReady("timeout"), 300);
+		});
+	}
+	client.sendToPropertyInspector.subscribe((ev) => {
+		const p = ev?.payload;
+		if (!isDoc(p) || p.event !== "panelFolds" || p.kind !== kind || !isDoc(p.folds)) return;
+		for (const [id, open] of Object.entries(p.folds)) {
+			if (typeof open === "boolean" && !touched.has(id)) folds[id] = open;
+		}
+		for (const section of sections) {
+			if (typeof folds[section.id] === "boolean") section.open = folds[section.id];
+		}
+		foldsReady("answer");
+	});
 	/** A person opening or folding every section at once, remembered like
 	 * a single toggle and said once (the sections are not focused, so their
 	 * own expanded state is not read). Every press is spoken: the text
@@ -289,6 +306,7 @@ self.hwShell = (() => {
 		for (const s of sections) {
 			s.open = open;
 			folds[s.id] = open;
+			touched.add(s.id);
 		}
 		keepFolds();
 		if (foldsSaid++ === 0) announce("folds", "");
@@ -345,6 +363,7 @@ self.hwShell = (() => {
 			if (toggledByPerson !== section) return;
 			toggledByPerson = null;
 			folds[section.id] = section.open;
+			touched.add(section.id);
 			keepFolds();
 		});
 	}

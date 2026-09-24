@@ -168,6 +168,17 @@ body {
 	font-size: var(--hw-size-sm);
 }
 
+/* Sections wait for the plugin's remembered folds (at most 300 ms) so a
+   fold it restores never moves content that has already drawn. */
+html[data-folds-pending] .hw-sec {
+	visibility: hidden;
+}
+
+/* A fold restored while hidden must not be caught mid-turn. */
+html[data-folds-pending] .hw-sec > summary::before {
+	transition: none;
+}
+
 /* Open all / Fold all: two chevron pairs in the header's top corner, on
    the kind line's otherwise empty right side, so they cost no height and
    pin with the header. Quiet at rest like the section markers (same muted

@@ -9,6 +9,7 @@ import { detailDensityOf, detailModeOf, detailRoleOf, pressBehaviorOf } from "./
 import { detailProfileFor } from "./detail/managed-profiles";
 import { deviceCapabilities } from "./devices";
 import { buildSupportReport } from "./diagnostics";
+import { panelFolds, panelKindOf } from "./panel-folds";
 import { poller, type PollerStatus } from "./poller";
 import { resolveControls, schemeCanSwitchGroups } from "./controls";
 import { alertLevel, convertUnit, parseThreshold, thresholdsApplyTo, type DecimalsSetting } from "./ui/format";
@@ -332,6 +333,16 @@ export function handlePiRequest(payload: JsonValue): void {
 		void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload());
 	} else if (payload.event === "getDetailSupport") {
 		void streamDeck.ui.sendToPropertyInspector(buildDetailSupportPayload());
+	} else if (payload.event === "getPanelFolds" || payload.event === "setPanelFolds") {
+		// Which sections a person keeps open: a view preference held in the
+		// plugin's memory (src/panel-folds.ts), never in settings or on disk.
+		const kind = panelKindOf(payload.kind);
+		if (kind === undefined) return;
+		if (payload.event === "setPanelFolds") {
+			panelFolds.set(kind, payload.folds);
+		} else {
+			void streamDeck.ui.sendToPropertyInspector({ event: "panelFolds", kind, folds: panelFolds.get(kind) });
+		}
 	}
 }
 

@@ -335,14 +335,17 @@ export function handlePiRequest(payload: JsonValue): void {
 	}
 }
 
-/** The last face pushed to the open panel, per panel context: a face rides
- * a preview only when it changed or the panel asked (getPreview), so an
- * unchanged face costs nothing per tick. Reset when another panel opens. */
-let lastPanelFace = { context: "", face: "" };
+/** The last face and preview pushed to the open panel, per panel context:
+ * a face rides a preview only when it changed or the panel asked
+ * (getPreview), and a preview identical to the last one is not sent at all.
+ * HWiNFO publishes every 2 s while reads run every 250 ms, so most ticks
+ * carry nothing new (bench 2026-09-23: about four identical previews a
+ * second). Reset when another panel opens or one asks. */
+let lastPanelFace = { context: "", face: "", preview: "" };
 
 /** Makes the next push carry the face even when unchanged (panel request). */
 export function forgetPanelFace(): void {
-	lastPanelFace = { context: "", face: "" };
+	lastPanelFace = { context: "", face: "", preview: "" };
 }
 
 /** Live numbers for the PI while it is open on one of the caller's instances
@@ -358,8 +361,14 @@ export function pushPreviewToPi(status: PollerStatus, manifestId: string | undef
 	const current = faceOf?.(piAction.id) ?? "";
 	const changed = lastPanelFace.context !== piAction.id || lastPanelFace.face !== current;
 	if (changed) {
-		lastPanelFace = { context: piAction.id, face: current };
+		lastPanelFace = { context: piAction.id, face: current, preview: "" };
 	}
 	const kind = alertsRecolor ? "key" : "dial";
-	void streamDeck.ui.sendToPropertyInspector(buildPreview(status, state?.settings, alertsRecolor, { context: piAction.id, kind, face: changed ? current : undefined }));
+	const preview = buildPreview(status, state?.settings, alertsRecolor, { context: piAction.id, kind, face: changed ? current : undefined });
+	const body = JSON.stringify(preview);
+	if (body === lastPanelFace.preview) {
+		return; // nothing new for the panel this tick
+	}
+	lastPanelFace.preview = body;
+	void streamDeck.ui.sendToPropertyInspector(preview);
 }

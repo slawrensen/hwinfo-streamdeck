@@ -1613,8 +1613,11 @@ try {
 	check("leg J5: the armed + says aria-pressed", pressedArmed === "true", String(pressedArmed));
 	check("leg J5: disarmed again", (await clickAdd("1")) === "ok");
 	await sleep(400);
-	const noteLive = (await evaluate(`document.querySelector('#detail-list .hw-set-note')?.getAttribute("aria-live") ?? "none"`)).result?.value;
-	check("leg J5: the list note is a live region", noteLive === "polite", String(noteLive));
+	// The note is rebuilt with the list, so it is not itself live (a region
+	// created with its text is often not read); its text reaches the
+	// panel's one persistent polite region instead.
+	const noteSaid = (await evaluate(`(() => { const note = document.querySelector('#detail-list .hw-set-note')?.textContent ?? ""; const live = document.querySelector('.hw-sr-only[aria-live="polite"]'); return { note, live: live?.textContent ?? "none", persistent: live !== null && !document.getElementById("detail-list").contains(live) }; })()`)).result?.value;
+	check("leg J5: the list note reaches a persistent live region", noteSaid?.persistent === true && noteSaid.note !== "" && noteSaid.live === noteSaid.note, JSON.stringify(noteSaid));
 	// Wide for the same reason as the L legs: short tiles share a row there.
 	await cdp("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
 	await sleep(200);

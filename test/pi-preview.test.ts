@@ -42,10 +42,13 @@ describe("preview identity and face", () => {
 		assert.equal(p.kind, "key");
 		assert.equal(p.face, face);
 	});
-	it("omits a face it was not handed, an empty one, and one past the size bound", () => {
+	it("omits a face it was not handed and an empty one", () => {
 		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, {}).face, undefined);
 		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { face: "" }).face, undefined);
-		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { face: "x".repeat(64 * 1024 + 1) }).face, undefined);
+	});
+	it("clears the panel's picture for a face past the size bound instead of leaving an older frame", () => {
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { face: "x".repeat(64 * 1024) }).face?.length, 64 * 1024);
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { face: "x".repeat(64 * 1024 + 1) }).face, "");
 	});
 	it("names the primary reading, its source and its display unit", () => {
 		const p = buildPreview(ok, { readingKey: "cpu:0:0", fahrenheit: true }, true, { kind: "key" });
@@ -109,6 +112,16 @@ describe("effective presentation", () => {
 		assert.equal(scoped?.level, "normal");
 		assert.equal(scoped?.scopeUnit, "RPM");
 		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0", critValue: "50", alertUnit: "°C" }, false, { kind: "dial" }).effective?.alert.level, "crit");
+	});
+	it("a junk unit anchor keeps a dial's thresholds off, exactly as the device reads it", () => {
+		const anchors: unknown[] = [5, null, ["°C"]];
+		for (const anchor of anchors) {
+			const junk = { readingKey: "cpu:0:0", critValue: "50", alertUnit: anchor } as never;
+			const alert: NonNullable<ReturnType<typeof buildPreview>["effective"]>["alert"] | undefined = buildPreview(ok, junk, false, { kind: "dial" }).effective?.alert;
+			assert.equal(alert?.applies, false, JSON.stringify(anchor));
+			assert.equal(alert?.level, "normal");
+			assert.equal(alert?.scopeUnit, null);
+		}
 	});
 	it("reports the key's drawn layout and press role, and the dial's resolved controls", () => {
 		const key = buildPreview(ok, { readingKey: "cpu:0:0", keyLayout: "quad", detailRole: "back", pressBehavior: "open-details" } as never, true, { kind: "key" }).effective;

@@ -170,6 +170,37 @@ try {
 	check("lossless: non-string list entries kept after the edited list", same(w?.detailKeys?.slice(-2), [99, { future: "entry" }]), JSON.stringify(w?.detailKeys));
 	check("lossless: the title and unknown field ride along", w?.detailTitle === "Gaming" && same(w?.futureBlob, FUTURE_BLOB));
 
+	// Kept entries go back where they were stored, and tiles this build
+	// cannot read are neither pruned nor rewritten.
+	const detailFx = sim.fixtures["key-details"].settings;
+	await open("key-details", { settings: { ...detailFx, detailKeys: [detailFx.detailKeys[0], 99, ...detailFx.detailKeys.slice(1)], detailTiles: [...detailFx.detailTiles, 3, { size: 6 }] } });
+	await b.evaluate(`(() => { document.getElementById("sec-interaction").open = true; })()`);
+	await sleep(150);
+	await b.evaluate(`(() => { const r = document.querySelectorAll('#detail-list .hw-set-chip .hw-set-remove'); r[r.length - 1]?.click(); })()`);
+	await sleep(300);
+	w = lastWrite();
+	check("lossless: a kept list entry stays at its stored position", w?.detailKeys?.[1] === 99 && w?.detailKeys?.length === detailFx.detailKeys.length, JSON.stringify(w?.detailKeys));
+	check("lossless: unreadable tiles are neither pruned nor rewritten", same(w?.detailTiles?.slice(1, 3), [3, { size: 6 }]), JSON.stringify(w?.detailTiles));
+	const groupsFx = sim.fixtures["dial-groups"].settings;
+	await open("dial-groups", { settings: { ...groupsFx, rotationGroups: [groupsFx.rotationGroups[0], "marker", groupsFx.rotationGroups[1]] } });
+	await b.evaluate(`document.querySelectorAll("#rotation-set .hw-set-chips")[1]?.querySelector('.hw-chip-move[data-move="1"]:not(:disabled)')?.click()`);
+	await sleep(300);
+	w = lastWrite();
+	check("lossless: a non-object group entry keeps its place", w?.rotationGroups?.[1] === "marker" && w?.rotationGroups?.length === 3, JSON.stringify(w?.rotationGroups));
+
+	// Elite to Custom seeds the Elite map on the person's pick and shows it
+	// at once; an echo carrying the same switch writes nothing.
+	await open("dial-groups");
+	await b.evaluate(`(() => { const s = document.getElementById("f-preset"); s.value = "custom"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	await sleep(400);
+	const seeded = await b.evaluate(`({ pressed: document.getElementById("g-pressed-rotate").value, short: document.getElementById("g-short").value })`);
+	check("preset: picking Custom from Elite seeds the Elite map and shows it", sim.settings.gesturePressedRotate === "stepGroup" && sim.settings.gestureShortPress === "pauseResume" && seeded.pressed === "stepGroup" && seeded.short === "pauseResume", JSON.stringify({ seeded, stored: [sim.settings.gesturePressedRotate, sim.settings.gestureShortPress] }));
+	await open("dial-groups");
+	sim.settings = { ...sim.settings, controlPreset: "custom" };
+	sim.piWs.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.dial", context: sim.context, device: "dev1", payload: { settings: sim.settings } }));
+	await sleep(400);
+	noWrites("preset: an echo switching Elite to Custom");
+
 	// Layout switches never touch hidden slot settings.
 	await open("key-dense");
 	const denseBefore = structuredClone(sim.settings);
@@ -263,6 +294,21 @@ try {
 	await sleep(450);
 	check("IME: the committed text saves once composed", lastWrite()?.label === "日本", JSON.stringify(lastWrite()?.label));
 
+	// A checklist is one Tab stop: Down Arrow enters, arrows move, Tab leaves.
+	await open("dial-configured");
+	await b.evaluate(`document.getElementById("pickerr-search").focus()`);
+	await sleep(150);
+	await b.key("Tab");
+	const leftList = await b.evaluate(`({ inList: document.getElementById("pickerr-list").contains(document.activeElement), tag: document.activeElement.tagName + "#" + document.activeElement.id })`);
+	check("keyboard: Tab leaves the rotation checklist in one step", !leftList.inList, JSON.stringify(leftList));
+	await b.evaluate(`document.getElementById("pickerr-search").focus()`);
+	await sleep(150);
+	await b.key("ArrowDown");
+	await b.key("ArrowDown");
+	const insideList = await b.evaluate(`({ inList: document.getElementById("pickerr-list").contains(document.activeElement), label: document.activeElement.getAttribute("aria-label") })`);
+	check("keyboard: arrows move inside the checklist and each box names its source", insideList.inList && /, /.test(insideList.label ?? ""), JSON.stringify(insideList));
+	noWrites("keyboard: moving through the checklist");
+
 	// The theme gallery is one radio group: one Tab stop, arrows pick.
 	await open("key-configured");
 	const chipIds = await b.evaluate(`[...document.querySelectorAll("#theme-gallery .hw-theme")].map((c) => c.dataset.theme)`);
@@ -291,6 +337,17 @@ try {
 	check("truth: a missing reading is named, its label kept, a repair offered", /not found/i.test(miss.ph) && miss.tone === "warn" && miss.head === "Old CPU" && miss.label === "Old CPU", JSON.stringify(miss));
 	await open("key-stale");
 	check("truth: stale is never Live", (await b.evaluate(`document.getElementById("head-state").textContent`)) === "Not updating");
+	const staleAlt = await b.evaluate(`document.getElementById("face-img").alt`);
+	check("truth: the face's alt text reads what the face draws, not a stale value", /Not updating/.test(staleAlt) && !/67\.4/.test(staleAlt), staleAlt);
+	// A ticking stale count never rebuilds the status region or drops focus.
+	await b.evaluate(`window.__mut = 0; new MutationObserver((l) => { window.__mut += l.length; }).observe(document.getElementById("reading-status"), { childList: true, subtree: true, characterData: true }); document.querySelector('#reading-status [data-status-action="retry"]').focus();`);
+	const lastStale = sim.toPiLog.filter((m) => m.event === "preview").at(-1);
+	for (let i = 0; i < 4; i++) {
+		sim.piWs.send(JSON.stringify({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: sim.context, payload: { ...lastStale, hint: `HWiNFO stopped updating ${50 + i}s ago.` } }));
+		await sleep(80);
+	}
+	const tick = await b.evaluate(`({ mutations: window.__mut, focus: document.activeElement?.dataset?.statusAction ?? document.activeElement?.tagName, live: document.getElementById("reading-status").getAttribute("aria-live") })`);
+	check("truth: a ticking stale count leaves the status region and its focus alone", tick.mutations === 0 && tick.focus === "retry" && tick.live === "polite", JSON.stringify(tick));
 	await open("key-zero-negative");
 	check("truth: valid zero and negative render as values", (await b.evaluate(`document.getElementById("head-state").textContent`)).startsWith("Live"));
 
@@ -325,7 +382,7 @@ try {
 	await sleep(600);
 	const reach = await b.evaluate(`(() => {
 		const list = document.getElementById("picker-list");
-		const options = list.querySelectorAll("[role=option]");
+		const options = list.querySelectorAll(".hw-row[role=option]"); // reading rows (the hidden no-match message is a disabled option too)
 		const sel = list.querySelector("[aria-selected=true]");
 		const a = sel?.getBoundingClientRect(), r = list.getBoundingClientRect();
 		return { options: options.length, selected: sel?.dataset.key ?? null, visible: !!sel && a.bottom > r.top && a.top < r.bottom };

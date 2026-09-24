@@ -85,9 +85,23 @@ self.hwModel = (() => {
 		if (preview?.missing === true || (name === null && preview?.state === "ok")) return "Saved reading not found in HWiNFO";
 		const shown = own ?? name ?? "Saved reading";
 		if (kind === "dial") {
-			const groups = Array.isArray(settings.rotationGroups) ? settings.rotationGroups.filter((g) => g !== null && typeof g === "object" && !Array.isArray(g)) : [];
-			const keys = Array.isArray(settings.rotationKeys) ? settings.rotationKeys.filter(nonEmpty) : [];
-			const set = groups.length >= 2 ? `rotation: ${groups.length} groups` : keys.length >= 2 ? `rotation: ${keys.length} readings` : "rotation: this sensor's readings";
+			// The runtime's rules (rotation.ts): groups count only when two or
+			// more hold a key no earlier group claimed; otherwise any stored
+			// string key makes a set, even one.
+			const claimed = new Set();
+			const groups = (Array.isArray(settings.rotationGroups) ? settings.rotationGroups : []).filter((g) => {
+				if (g === null || typeof g !== "object" || Array.isArray(g) || !Array.isArray(g.keys)) return false;
+				let owns = false;
+				for (const k of g.keys) {
+					if (typeof k === "string" && k.trim() !== "" && !claimed.has(k)) {
+						claimed.add(k);
+						owns = true;
+					}
+				}
+				return owns;
+			}).length;
+			const keys = Array.isArray(settings.rotationKeys) ? settings.rotationKeys.filter((k) => typeof k === "string").length : 0;
+			const set = groups >= 2 ? `rotation: ${groups} groups` : keys >= 1 ? `rotation: ${keys} ${keys === 1 ? "reading" : "readings"}` : "rotation: this sensor's readings";
 			return `${shown} · ${set}`;
 		}
 		const drawn = preview?.effective?.layout?.drawn ?? null;
@@ -133,12 +147,16 @@ self.hwModel = (() => {
 				const typed = [settings.warnValue, settings.critValue].some((v) => typeof v === "string" && v.trim() !== "");
 				return typed ? "Off: the values entered are not numbers" : "Off";
 			}
+			const typedBad = (v) => typeof v === "string" && v.trim() !== "";
 			const parts = [];
 			if (a.warn !== null) parts.push(`warn ${thresholdText(a.warn, a.below, a.unit)}`);
 			if (a.crit !== null) parts.push(`critical ${thresholdText(a.crit, a.below, a.unit)}`);
+			if (a.warn === null && typedBad(settings.warnValue)) parts.push("warn value is not a number");
+			if (a.crit === null && typedBad(settings.critValue)) parts.push("critical value is not a number");
 			let text = parts.join(" · ");
 			text = text.charAt(0).toUpperCase() + text.slice(1);
 			if (kind === "dial" && a.scopeUnit !== null && a.scopeUnit !== undefined) text += ` · ${a.scopeUnit === "" ? "unitless" : a.scopeUnit} readings only`;
+			else if (kind === "dial" && a.applies === false && a.unit !== null) text += " · not for this reading's unit";
 			if (kind === "key" && preview?.effective?.layout !== undefined && preview.effective.layout.drawn !== "single") text += " · first reading";
 			if (a.level === "warn") text += " · warning now";
 			if (a.level === "crit") text += " · critical now";
@@ -150,11 +168,17 @@ self.hwModel = (() => {
 		return [w !== "" ? `warn ${below ? "≤" : "≥"} ${w}` : "", c !== "" ? `critical ${below ? "≤" : "≥"} ${c}` : ""].filter(Boolean).join(" · ").replace(/^w/, "W").replace(/^c/, "C");
 	}
 
-	/** Key press behavior, the Back role winning outright (detailRoleOf). */
-	function keyInteractionSummary(settings) {
+	/** Key press behavior, the Back role winning outright (detailRoleOf).
+	 * `detailsSupported` is false when the plugin reported that this deck
+	 * has no detail view (the press then only shows an alert). */
+	function keyInteractionSummary(settings, detailsSupported) {
 		if (settings.detailRole === "back") return "Press returns to the previous profile (Back tile)";
 		const press = pressBehavior(settings);
 		if (press === "cycle-stat") return "Press cycles current, min, max, avg";
+		if (detailsSupported === false) return press === "open-details" ? "Press would open details, but this deck has none" : "Tap cycles; hold would open details, but this deck has none";
+		if (detailMode(settings) === "filter" && !(typeof settings.detailFilter === "string" && settings.detailFilter.trim() !== "")) {
+			return press === "open-details" ? "Press opens nothing until the filter is set" : "Tap cycles; hold opens nothing until the filter is set";
+		}
 		const mode = detailMode(settings);
 		const what =
 			mode === "custom"
@@ -168,7 +192,9 @@ self.hwModel = (() => {
 	/** Dial gestures from the plugin's resolved scheme; stored preset otherwise. */
 	function dialInteractionSummary(settings, preview) {
 		const c = preview?.effective?.controls;
-		const cycle = typeof settings.autoCycleMs === "string" && /^\d+$/.test(settings.autoCycleMs) && Number(settings.autoCycleMs) > 0 ? `auto cycle ${Number(settings.autoCycleMs) >= 60000 ? `${Number(settings.autoCycleMs) / 60000} min` : `${Number(settings.autoCycleMs) / 1000} s`}` : "";
+		// parseAutoCycleMs: any positive integer millisecond count runs.
+		const ms = typeof settings.autoCycleMs === "string" && settings.autoCycleMs !== "" ? Number(settings.autoCycleMs) : NaN;
+		const cycle = Number.isInteger(ms) && ms > 0 ? `auto cycle ${ms % 60000 === 0 ? `${ms / 60000} min` : `${ms / 1000} s`}` : "";
 		const bump = settings.rotationDisabled === true ? "turns ignored" : "";
 		if (c === undefined) {
 			const p = settings.controlPreset === "elite" || settings.controlPreset === "custom" ? settings.controlPreset : "legacy";
@@ -176,8 +202,9 @@ self.hwModel = (() => {
 		}
 		const name = `${c.preset.charAt(0).toUpperCase()}${c.preset.slice(1)}`;
 		const turn = settings.rotationDisabled === true ? "turns ignored" : `turn ${GESTURE[c.rotate]}`;
-		const tap = c.touchZones === "two" ? "touch sides switch readings" : `tap ${GESTURE[c.tap]}`;
-		return [`${name}: ${turn}`, `push ${GESTURE[c.shortPress]}`, tap, cycle].filter(Boolean).join(" · ");
+		const tap = c.touchZones === "two" ? "touch sides switch readings" : c.touchZones === "three" ? `touch sides switch readings, center tap ${GESTURE[c.tap]}` : `tap ${GESTURE[c.tap]}`;
+		const push = `push ${GESTURE[c.shortPress]}${c.shortPress === "pauseResume" && cycle === "" ? " (auto cycle is off)" : ""}`;
+		return [`${name}: ${turn}`, push, tap, cycle].filter(Boolean).join(" · ");
 	}
 
 	function controlSummary(settings) {
@@ -224,22 +251,43 @@ self.hwModel = (() => {
 	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 	/** Splits a raw list into what this build edits and what it keeps
-	 * untouched (non-strings, entries past the cap); a write appends the
-	 * kept entries back after the edited ones, so nothing is dropped. */
+	 * untouched (non-strings, empty strings, entries past the cap), with
+	 * each kept entry's original index, so a write can put it back where
+	 * it was (`mergeKept`) and nothing is dropped or moved. */
 	function splitKeyList(raw, cap = Infinity) {
 		const known = [];
 		const kept = [];
-		if (!Array.isArray(raw)) return { known, kept };
-		for (const entry of raw) {
-			if (typeof entry === "string" && entry !== "" && known.length < cap) known.push(entry);
-			else kept.push(entry);
-		}
-		return { known, kept };
+		const keptAt = [];
+		if (!Array.isArray(raw)) return { known, kept, keptAt };
+		raw.forEach((entry, index) => {
+			if (typeof entry === "string" && entry !== "" && known.length < cap) {
+				known.push(entry);
+			} else {
+				kept.push(entry);
+				keptAt.push(index);
+			}
+		});
+		return { known, kept, keptAt };
 	}
 
-	/** One stored object with only the fields that changed rewritten:
-	 * unknown fields and untouched known fields stay byte-identical. */
+	/** The edited list with the kept entries re-inserted at their original
+	 * indices (ascending, clamped to the list's end): an untouched list
+	 * comes back exactly as stored. */
+	function mergeKept(known, kept, keptAt) {
+		const out = [...known];
+		kept.forEach((entry, i) => {
+			const at = Math.min(keptAt?.[i] ?? out.length, out.length);
+			out.splice(at, 0, entry);
+		});
+		return out;
+	}
+
+	/** One stored entry with only the fields that changed rewritten:
+	 * unknown fields and untouched known fields stay byte-identical, and an
+	 * entry this build cannot read (not an object) stays exactly as stored
+	 * until an edit actually changes what it means. */
 	function patchEntry(raw, base, current, fields) {
+		if (raw !== undefined && !isPlainObject(raw) && fields.every((field) => same(base?.[field], current[field]))) return raw;
 		const out = isPlainObject(raw) ? { ...raw } : {};
 		for (const field of fields) {
 			if (!isPlainObject(raw) || !same(base?.[field], current[field])) out[field] = current[field];
@@ -284,6 +332,7 @@ self.hwModel = (() => {
 		advancedSummary,
 		thresholdText,
 		splitKeyList,
+		mergeKept,
 		patchEntry,
 		patchNames,
 		patchColors,

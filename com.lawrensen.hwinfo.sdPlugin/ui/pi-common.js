@@ -38,6 +38,7 @@
 
 	let tree = null; // [{ name, readings: [{ key, label, unit, value, type }] }]
 	let treeFetchedOk = false; // last sensorTree arrived while HWiNFO was up
+	let detailsSupported = null; // the plugin's one-shot detail-view answer for this deck
 	let treeRequestPending = false;
 
 	function requestTree() {
@@ -136,8 +137,10 @@
 	let rotationPicker = null; // the dial's membership checklist, created with the pickers
 	let rotationKeys = [];
 	let rotationKeysKept = []; // raw entries this build does not edit (non-strings)
-	let rotationGroups = null; // null = flat set; else [{ name, keys, raw, base, keysKept }]
+	let rotationKeysKeptAt = []; // ...and where they were stored
+	let rotationGroups = null; // null = flat set; else [{ name, keys, raw, base, keysKept, keysKeptAt }]
 	let rotationGroupsKept = []; // raw group entries that are not objects
+	let rotationGroupsKeptAt = [];
 	let rotationNamesRaw = {}; // the stored map, junk entries included
 	let rotationNames = {}; // per-reading display names, keyed by reading key
 	let collectorIndex = 0; // which group new ticks land in (PI-local, not persisted)
@@ -146,6 +149,7 @@
 		const split = model.splitKeyList(value);
 		rotationKeys = split.known;
 		rotationKeysKept = split.kept;
+		rotationKeysKeptAt = split.keptAt;
 		renderRotationSet();
 		rotationPicker?.renderList();
 	}
@@ -154,6 +158,7 @@
 		const parsed = parseGroupsSetting(value);
 		rotationGroups = parsed.groups;
 		rotationGroupsKept = parsed.kept;
+		rotationGroupsKeptAt = parsed.keptAt;
 		clampCollector();
 		renderRotationSet();
 		rotationPicker?.renderList();
@@ -187,19 +192,21 @@
 	// set). Each group keeps its raw entry so a write re-emits the fields
 	// and key entries this build does not know exactly as stored.
 	function parseGroupsSetting(value) {
-		if (!Array.isArray(value) || value.length === 0) return { groups: null, kept: [] };
+		if (!Array.isArray(value) || value.length === 0) return { groups: null, kept: [], keptAt: [] };
 		const groups = [];
 		const kept = [];
-		for (const entry of value) {
+		const keptAt = [];
+		value.forEach((entry, index) => {
 			if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
 				kept.push(entry);
-				continue;
+				keptAt.push(index);
+				return;
 			}
 			const split = model.splitKeyList(entry.keys);
 			const name = typeof entry.name === "string" ? entry.name : "";
-			groups.push({ name, keys: split.known, keysKept: split.kept, raw: entry, base: { name, keys: [...split.known, ...split.kept] } });
-		}
-		return { groups: groups.length > 0 ? groups : null, kept };
+			groups.push({ name, keys: split.known, keysKept: split.kept, keysKeptAt: split.keptAt, raw: entry, base: { name, keys: model.mergeKept(split.known, split.kept, split.keptAt) } });
+		});
+		return { groups: groups.length > 0 ? groups : null, kept, keptAt };
 	}
 
 	function unionKeys(groups) {
@@ -223,7 +230,7 @@
 
 	/** A group's stored form: only the fields the edit changed are rewritten. */
 	function serializeGroup(group) {
-		return model.patchEntry(group.raw, group.base, { name: group.name, keys: [...group.keys, ...group.keysKept] }, ["name", "keys"]);
+		return model.patchEntry(group.raw, group.base, { name: group.name, keys: model.mergeKept(group.keys, group.keysKept, group.keysKeptAt) }, ["name", "keys"]);
 	}
 
 	/**
@@ -239,9 +246,9 @@
 		if (writeGroups) {
 			// [] persists "no groups": the field is only ever written, never
 			// removed, and the plugin ignores anything under two groups.
-			groupsBinding[1](rotationGroups === null ? [...rotationGroupsKept] : [...rotationGroups.map(serializeGroup), ...rotationGroupsKept]);
+			groupsBinding[1](model.mergeKept(rotationGroups === null ? [] : rotationGroups.map(serializeGroup), rotationGroupsKept, rotationGroupsKeptAt));
 		}
-		rotationBinding[1]([...rotationKeys, ...rotationKeysKept]);
+		rotationBinding[1](model.mergeKept(rotationKeys, rotationKeysKept, rotationKeysKeptAt));
 		renderRotationSet();
 		if (rotationPicker !== null) {
 			for (const tick of rotationPicker.list.querySelectorAll(".hw-row .hw-tick")) {
@@ -334,13 +341,13 @@
 		return chip;
 	}
 
-	function setNote(text) {
+	function setNote(text, channel = null) {
 		const note = document.createElement("div");
 		note.className = "hw-set-note";
-		// Counts, cap refusals and empty-list guidance change without focus
-		// moving; a live region is the only way that reaches a screen reader.
-		note.setAttribute("aria-live", "polite");
 		note.textContent = text;
+		// Counts, cap refusals and empty-list guidance change without focus
+		// moving; the shell's one persistent live region carries the change.
+		if (channel !== null) hw.announce(channel, text);
 		return note;
 	}
 
@@ -440,7 +447,8 @@
 						? "Empty: rotation moves through all readings of the picked sensor."
 						: rotationKeys.length === 1
 							? "Only one reading picked. Rotation needs two or more to move."
-							: `Rotation moves through these ${rotationKeys.length} readings only, in this order.`
+							: `Rotation moves through these ${rotationKeys.length} readings only, in this order.`,
+					"rotation"
 				)
 			);
 			frag.appendChild(setActions([["split", "Split into groups"]]));
@@ -462,7 +470,8 @@
 						? "One group only: it acts as a plain rotation set until you add a second."
 						: populated < 2
 							? `${rotationGroups.length} groups. They take effect once two of them hold readings; until then rotation runs as one flat list.`
-							: `${rotationGroups.length} groups. Rotation needs two or more readings in a group to move inside it.`
+							: `${rotationGroups.length} groups. Rotation needs two or more readings in a group to move inside it.`,
+					"rotation"
 				)
 			);
 			frag.appendChild(setActions([["add", "Add group"], ["merge", "Merge back into one set"]]));
@@ -545,7 +554,7 @@
 	 * that changed; a tile the editor created writes all four. */
 	function serializeTile(tile) {
 		const current = { size: tile.size, labels: [...tile.labels], colors: [...tile.colors], cellLabels: tile.cellLabels };
-		return tile.raw === undefined || tile.raw === null ? current : model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels"]);
+		return tile.raw === undefined ? current : model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels"]);
 	}
 
 	function adoptDetailUniform(value) {
@@ -644,7 +653,7 @@
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
 		detailTilesStage[1]([...detailTiles.map(serializeTile), ...detailTilesKept]);
-		detailBinding[1]([...detailKeys, ...detailKeysKept]);
+		detailBinding[1](model.mergeKept(detailKeys, detailKeysKept, detailKeysKeptAt));
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow the edit
 	}
@@ -657,9 +666,20 @@
 		// own default prunes away instead of freezing a tile into the plan.
 		// A stored tile carrying fields this build does not know is never
 		// "only restating the fill": pruning it would drop those fields.
+		// Nor is one this build cannot fully read: a non-object entry or a
+		// known field holding a value the parser salvages ({ size: 6 }).
 		const KNOWN = ["size", "labels", "colors", "cellLabels"];
-		const carriesUnknown = (t) => typeof t.raw === "object" && t.raw !== null && Object.keys(t.raw).some((k) => !KNOWN.includes(k));
-		const isDefault = (t) => !carriesUnknown(t) && t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
+		const readable = (t) => {
+			if (t.raw === undefined) return true; // materialized here, never stored
+			const r = t.raw;
+			if (typeof r !== "object" || r === null || Array.isArray(r)) return false;
+			if (Object.keys(r).some((k) => !KNOWN.includes(k))) return false;
+			if (r.size !== undefined && ![1, 2, 3, 4, "1", "2", "3", "4"].includes(r.size)) return false;
+			if (r.labels !== undefined && !(Array.isArray(r.labels) && r.labels.every((l) => typeof l === "string"))) return false;
+			if (r.colors !== undefined && !(Array.isArray(r.colors) && r.colors.every((c) => c === null || (typeof c === "string" && HEX_COLOR.test(c))))) return false;
+			return r.cellLabels === undefined || typeof r.cellLabels === "boolean";
+		};
+		const isDefault = (t) => readable(t) && t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && c === QUAD_DEFAULT_COLORS[i]));
 		while (next.length > 0 && isDefault(next[next.length - 1])) {
 			next.pop();
 		}
@@ -671,6 +691,7 @@
 	// the cap. A write appends them after the edited list, unchanged, so a
 	// newer version's entries (or a hand-built tail) are never dropped.
 	let detailKeysKept = [];
+	let detailKeysKeptAt = [];
 
 	function adoptDetailKeys(value) {
 		// Mirror the plugin parser: a key sheds any friendly name pasted after
@@ -679,22 +700,27 @@
 		// move and remove need one chip per key; the runtime ignores the
 		// repeats too), and the same cap applies, so the panel never shows
 		// chips past what the runtime lists.
+		// Kept entries (non-strings, blanks, entries past the cap) go back
+		// where they were stored on the next write. Repeats are not kept: a
+		// removed key must not survive as its own duplicate.
 		const seen = new Set();
 		const known = [];
 		const kept = [];
-		for (const entry of Array.isArray(value) ? value : []) {
-			if (typeof entry !== "string") {
+		const keptAt = [];
+		(Array.isArray(value) ? value : []).forEach((entry, index) => {
+			const key = typeof entry === "string" ? bareKey(entry) : "";
+			if (typeof entry === "string" && key !== "" && seen.has(key)) return;
+			if (typeof entry !== "string" || key === "" || known.length >= DETAIL_KEYS_MAX) {
 				kept.push(entry);
-				continue;
+				keptAt.push(index);
+				return;
 			}
-			const key = bareKey(entry);
-			if (key === "" || seen.has(key)) continue;
 			seen.add(key);
-			if (known.length < DETAIL_KEYS_MAX) known.push(key);
-			else kept.push(entry);
-		}
+			known.push(key);
+		});
 		detailKeys = known;
 		detailKeysKept = kept;
+		detailKeysKeptAt = keptAt;
 		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
@@ -1339,6 +1365,7 @@
 		// click handler runs (the delegated keydown below forwards here).
 		name.tabIndex = 0;
 		name.setAttribute("role", "button");
+		name.setAttribute("aria-label", `Rename this cell's label, now ${name.textContent}`);
 		if (key === detailLanded) {
 			chip.classList.add("landed");
 		}
@@ -1711,7 +1738,8 @@
 					? "Empty: add readings above, in the order the detail view should list them."
 					: detailKeys.length >= DETAIL_KEYS_MAX
 						? `${listed.length} readings across ${walk.length} tiles. That is the cap; remove one to add another.`
-						: `${listed.length} reading${listed.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow Readings per tile.`
+						: `${listed.length} reading${listed.length === 1 ? "" : "s"} across ${walk.length} tile${walk.length === 1 ? "" : "s"}. Grouping is positional: readings flow through the tile sizes in list order, and readings past your groups follow Readings per tile.`,
+				"detail"
 			)
 		);
 		detailListEl.replaceChildren(frag);
@@ -1739,6 +1767,9 @@
 		const searchEl = config.search;
 		const listEl = config.list;
 		const combobox = config.setting !== undefined;
+		// A checklist's boxes leave the Tab order (arrows move among them),
+		// and its scroller must not become a Tab stop of its own either.
+		if (!combobox) listEl.tabIndex = -1;
 		let selectedKey = "";
 		let listOpen = false;
 		// True only after a real keystroke in the search box; cleared whenever
@@ -1836,7 +1867,7 @@
 		// repaints nothing else, so typing stays fast with thousands of
 		// readings and never loses the list's scroll position.
 		let built = null; // { tree, rows: [{ key, el, box, hay, tick, badge }], byKey, boxes: [{ box, rows }], none }
-		const ROW_PX = 24; // .hw-row min-height
+		const ROW_PX = 28; // a rendered .hw-row: 24 px content plus its padding
 		const GROUP_HEAD_PX = 27; // .hw-group line plus padding
 
 		function build() {
@@ -1854,11 +1885,12 @@
 				const title = document.createElement("span");
 				title.textContent = group.name;
 				header.appendChild(title);
-				if (combobox) {
-					box.setAttribute("role", "group");
-					box.setAttribute("aria-labelledby", header.id);
-					header.setAttribute("role", "presentation");
-				}
+				// Each source is a named group in both kinds of list, so a
+				// screen reader tells Drive #0's "Drive Temperature" from
+				// Drive #1's on entering the group.
+				box.setAttribute("role", "group");
+				box.setAttribute("aria-labelledby", header.id);
+				header.setAttribute("role", "presentation");
 				if (config.onGroupAdd !== undefined) {
 					// "Add this whole source" in one press. Bound by position in
 					// the rendered tree, not by name: source names are not unique
@@ -1869,6 +1901,7 @@
 					addAll.dataset.groupIndex = String(gi);
 					addAll.textContent = "+ all";
 					addAll.setAttribute("aria-label", `Add every reading of ${group.name}`);
+					if (!combobox) addAll.tabIndex = -1; // the checklist is one Tab stop; arrows move inside it
 					header.appendChild(addAll);
 				}
 				box.appendChild(header);
@@ -1892,6 +1925,9 @@
 						tick = document.createElement("input");
 						tick.type = "checkbox";
 						tick.className = "hw-tick";
+						// One Tab stop for the whole checklist: the search box. Down
+						// Arrow enters the list, arrows move, Tab leaves it.
+						tick.tabIndex = -1;
 						row.appendChild(tick);
 					}
 					row.dataset.key = reading.key;
@@ -1902,6 +1938,7 @@
 					val.className = "hw-val";
 					val.textContent = `${reading.display ?? ""}${typeName ? " · " + typeName : ""}`;
 					row.append(label, val);
+					if (tick !== null) tick.setAttribute("aria-label", [reading.label, group.name, reading.display ?? "", typeName].filter((part) => part !== "").join(", "));
 					box.appendChild(row);
 					const entry = { key: reading.key, el: row, hay: `${groupLower} ${reading.label.toLowerCase()}`, tick, badge: null, selected: false, marker: "" };
 					rows.push(entry);
@@ -1918,6 +1955,11 @@
 			const none = document.createElement("div");
 			none.className = "hw-more";
 			none.hidden = true;
+			// A listbox holds options only: its message is a disabled one.
+			if (combobox) {
+				none.setAttribute("role", "option");
+				none.setAttribute("aria-disabled", "true");
+			}
 			frag.appendChild(none);
 			listEl.replaceChildren(frag);
 			built = { tree, rows, byKey, boxes, none };
@@ -1930,6 +1972,10 @@
 				const loading = document.createElement("div");
 				loading.className = "hw-more";
 				loading.textContent = "Loading readings…";
+				if (combobox) {
+					loading.setAttribute("role", "option");
+					loading.setAttribute("aria-disabled", "true");
+				}
 				listEl.replaceChildren(loading);
 				return;
 			}
@@ -2141,7 +2187,19 @@
 					ev.preventDefault();
 					closeList();
 					searchEl.focus({ preventScroll: true });
+					return;
 				}
+				// Roving focus over the visible boxes and "+ all" buttons: the
+				// list is one stop in the Tab order however long it is.
+				if (!["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"].includes(ev.key)) return;
+				const items = Array.from(listEl.querySelectorAll(".hw-tick:not(:disabled), .hw-group-add")).filter((el) => el.closest("[hidden]") === null);
+				const at = items.indexOf(document.activeElement);
+				if (at < 0) return;
+				ev.preventDefault();
+				const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 10, PageUp: -10 }[ev.key];
+				const next = ev.key === "Home" ? 0 : ev.key === "End" ? items.length - 1 : at + step;
+				if (next < 0) searchEl.focus({ preventScroll: true });
+				else items[Math.min(next, items.length - 1)].focus();
 			});
 		}
 
@@ -2320,27 +2378,37 @@
 			["gestureTouchHold", "backToCurrent"]
 		];
 		const gestureBindings = ELITE_MAP.map(([setting]) => useSettings(setting, () => {}, null));
-		const seedFromElite = () => {
-			ELITE_MAP.forEach(([setting, command], index) => {
-				const [getGesture, setGesture] = gestureBindings[index];
-				getGesture().then((value) => {
-					if (typeof value === "string" && value !== "") return; // user-set: keep
-					setGesture(command);
-					// The store does not echo the panel's own writes; the shell
-					// re-reads every bound control after each save, so the
-					// select shows the seeded command at once.
-				});
-			});
-		};
-		let lastPreset = null;
-		const applyPreset = (value) => {
-			const preset = value === "elite" || value === "custom" ? value : "legacy";
-			if (lastPreset === "elite" && preset === "custom") seedFromElite();
-			lastPreset = preset;
+		const seedFromElite = () =>
+			Promise.all(
+				ELITE_MAP.map(([, command], index) => {
+					const [getGesture, setGesture] = gestureBindings[index];
+					return getGesture().then((value) => {
+						if (typeof value === "string" && value !== "") return; // user-set: keep
+						setGesture(command);
+					});
+				})
+			).then(() => hw.resyncBound()); // the store never echoes the panel's own writes
+		const presetOf = (value) => (value === "elite" || value === "custom" ? value : "legacy");
+		// Seeding is the person's act: it runs only when they pick Custom
+		// while Elite is shown, never on an echo or a replaced document. The
+		// document-level capture listener sees the choice before the shell
+		// saves it, so "before" is still the preset they switched from.
+		let shownPreset = null;
+		const presetEl = document.getElementById("f-preset");
+		document.addEventListener(
+			"change",
+			(ev) => {
+				if (ev.target !== presetEl || presetEl === null) return;
+				if (shownPreset === "elite" && presetOf(presetEl.value) === "custom") seedFromElite();
+			},
+			true
+		);
+		followSetting("controlPreset", (value) => {
+			const preset = presetOf(value);
+			shownPreset = preset;
 			controlsCustomEl.hidden = preset !== "custom";
 			if (controlsZonesEl !== null) controlsZonesEl.hidden = preset === "legacy";
-		};
-		followSetting("controlPreset", applyPreset);
+		});
 	}
 
 	// Key layout (reading PI only): the second-slot rows serve every multi
@@ -2781,7 +2849,10 @@
 		}
 		if (p.event === "detailSupport") {
 			// The note starts hidden and empty; the one-shot reply only ever
-			// needs to reveal it on an unsupported deck.
+			// needs to reveal it on an unsupported deck. The Press summary
+			// says the same thing without opening the section.
+			detailsSupported = p.supported === true;
+			hw.scheduleRender();
 			const note = document.getElementById("detail-unsupported");
 			if (note !== null && p.supported !== true) {
 				note.hidden = false;
@@ -3308,7 +3379,7 @@
 		hw.summary("reading", (st) => model.readingSummary(hw.kind, st.settings, st.preview, labelFor));
 		hw.summary("display", (st) => model.displaySummary(hw.kind, st.settings, st.globals, st.preview));
 		hw.summary("alerts", (st) => model.alertsSummary(hw.kind, st.settings, st.preview));
-		hw.summary("interaction", (st) => (hw.kind === "key" ? model.keyInteractionSummary(st.settings) : model.dialInteractionSummary(st.settings, st.preview)));
+		hw.summary("interaction", (st) => (hw.kind === "key" ? model.keyInteractionSummary(st.settings, detailsSupported) : model.dialInteractionSummary(st.settings, st.preview)));
 		hw.summary("advanced", (st) => model.advancedSummary(st.globals));
 	}
 

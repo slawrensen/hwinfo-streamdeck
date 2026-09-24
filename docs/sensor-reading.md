@@ -167,7 +167,7 @@ Bar and Ring find their range automatically:
 - **Percentages** (and duty cycles) run 0 to 100.
 - **Yes/No readings** run 0 to 1.
 - Everything else spans the **values actually seen**: HWiNFO's session min/max plus the plugin's own recent samples, so the gauge settles as the session accumulates. There are no manual bounds to type.
-- **Warn at / Critical at** draw amber and red zones that escalate **toward the alarmed end**: amber then red at the high side normally, mirrored to the low side when *Direction* alerts below, the classic instrument convention (a fuel gauge is red at empty, a tachometer at the top). The range widens to keep the zones visible.
+- **Warn at / Critical at** draw amber and red zones that escalate **toward the alarmed end**: amber then red at the high side normally, mirrored to the low side when the alert is set to fire on a drop, the classic instrument convention (a fuel gauge is red at empty, a tachometer at the top). The range widens to keep the zones visible.
 
 The zones are **fixed landmarks**, drawn as muted shades so they read as markers, not state; the **moving fill is the live value**, and it keeps its full color (accent normally, amber/red while alerting) so it always stands out over them. The gauge follows the **live** value even while the key's text shows MIN, MAX, or AVG, exactly like alert coloring. The dual, triple and quad layouts have no strip, so the Display row hides there.
 

@@ -6,7 +6,7 @@
 //   npx tsx scripts/pi-lab.mjs capture <outDir> [--widths 320,480] [--only a,b] [--inject <url>]
 //   npx tsx scripts/pi-lab.mjs tasks <out.json>
 //   npx tsx scripts/pi-lab.mjs perf <out.json> [--runs 3]
-//   npx tsx scripts/pi-lab.mjs a11y <out.json>        (AXE_CORE=<path to axe.min.js> adds axe-core)
+//   npx tsx scripts/pi-lab.mjs a11y <out.json> [--widths 400,320]  (AXE_CORE=<path to axe.min.js> adds axe-core)
 //   npx tsx scripts/pi-lab.mjs faces <out.png>        (device-face contact sheet)
 //
 // Owned processes only: the Chromium this script launches and its own
@@ -276,11 +276,17 @@ async function a11y() {
 	const axePath = process.env.AXE_CORE ?? "";
 	const axeSource = axePath === "" ? null : readFileSync(axePath, "utf8");
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
-	const browser = await launch({ port: PORTS.debug, width: 400, height: 800 });
+	const widths = opt("widths", "400").split(",").map(Number);
+	const browser = await launch({ port: PORTS.debug, width: widths[0], height: 800 });
 	const report = [];
 	try {
-		for (const [fixture, label, step] of STATES) {
+		let current = widths[0];
+		for (const [width, [fixture, label, step]] of widths.flatMap((w) => STATES.map((st) => [w, st]))) {
 			if (label === "picker-typed") continue;
+			if (width !== current) {
+				await browser.viewport(width, 800, 1);
+				current = width;
+			}
 			sim.setFixture(fixture);
 			await browser.goto(sim.url(fixture));
 			await settle(browser);
@@ -319,9 +325,7 @@ async function a11y() {
 			// summary), and any stop without a visible focus indicator.
 			await browser.evaluate(`document.activeElement?.blur(); window.scrollTo(0, 0)`);
 			const stops = [];
-			for (let i = 0; i < 80; i++) {
-				await browser.key("Tab");
-				const stop = await browser.evaluate(`(() => {
+			const probeStop = `(() => {
 					let a = document.activeElement;
 					while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
 					if (!a || a === document.body) return null;
@@ -336,23 +340,37 @@ async function a11y() {
 					const head = document.querySelector(".hw-head[data-pin]");
 					const hr = head && getComputedStyle(head).position === "sticky" ? head.getBoundingClientRect() : null;
 					const obscured = hr !== null && !head.contains(a) && r.bottom <= hr.bottom + 1;
-					return { tag: a.tagName + (a.id ? "#" + a.id : ""), hiddenBy, ring, obscured };
-				})()`);
+					const partly = hr !== null && !head.contains(a) && !obscured && r.top < hr.bottom - 1;
+					return { tag: a.tagName + (a.id ? "#" + a.id : ""), hiddenBy, ring, obscured, partly };
+				})()`;
+			for (let i = 0; i < 80; i++) {
+				await browser.key("Tab");
+				const stop = await browser.evaluate(probeStop);
 				if (stop === null) break;
 				stops.push(stop);
+			}
+			// And back up with Shift+Tab: a pinned header can cover what
+			// scrolls up into it, which a forward walk never exercises.
+			for (let i = 0; i < stops.length; i++) {
+				await browser.key("Tab", { shift: true });
+				const stop = await browser.evaluate(probeStop);
+				if (stop === null) break;
+				if (stop.obscured) own.push({ rule: "focus-obscured-by-pinned-header", el: `${stop.tag} (Shift+Tab)` });
+				if (stop.partly) own.push({ rule: "focus-partly-under-pinned-header", el: `${stop.tag} (Shift+Tab)` });
 			}
 			for (const stop of stops) {
 				if (stop.hiddenBy !== null) own.push({ rule: "focus-in-hidden", el: `${stop.tag} (${stop.hiddenBy})` });
 				if (!stop.ring) own.push({ rule: "no-visible-focus", el: stop.tag });
 				if (stop.obscured) own.push({ rule: "focus-obscured-by-pinned-header", el: stop.tag });
+				if (stop.partly) own.push({ rule: "focus-partly-under-pinned-header", el: stop.tag });
 			}
 			let axe = null;
 			if (axeSource !== null) {
 				await browser.evaluate(`${axeSource}; 0`);
 				axe = await browser.evaluate(`axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } }).then((r) => ({ violations: r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => n.target.join(" ")).slice(0, 8) })), passes: r.passes.length, incomplete: r.incomplete.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(" ") + " (" + (n.any?.[0]?.data?.messageKey ?? n.any?.[0]?.message ?? "needs review") + ")").slice(0, 8) })) }))`);
 			}
-			report.push({ fixture, state: label, own, axe });
-			console.log(`${fixture} ${label}: own ${own.length} issue(s)${axe ? `, axe ${axe.violations.length} violation(s)` : ", axe NOT RUN (set AXE_CORE)"}`);
+			report.push({ fixture, state: label, width, own, axe });
+			console.log(`${fixture} ${label} @${width}: own ${own.length} issue(s)${axe ? `, axe ${axe.violations.length} violation(s)` : ", axe NOT RUN (set AXE_CORE)"}`);
 		}
 	} finally {
 		await browser.close();

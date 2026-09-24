@@ -33,7 +33,7 @@
 					</div>
 					<p class="hw-help" id="picker-help">Turning the dial changes this too. Arrow keys browse, Enter picks, Escape closes without changing anything.</p>
 				</div>
-				<div class="hw-status" id="reading-status" hidden></div>
+				<div class="hw-status" id="reading-status" role="status" aria-live="polite" data-tone=""></div>
 
 				<div class="hw-row2">
 					<div class="hw-field">
@@ -57,7 +57,7 @@
 							<input id="pickerr-search" type="text" aria-controls="pickerr-list" aria-describedby="pickerr-help" placeholder="Search readings to tick" autocomplete="off" spellcheck="false" />
 							<div class="hw-picker-list hw-inline" id="pickerr-list" role="group" aria-labelledby="pickerr-label" hidden></div>
 						</div>
-						<p class="hw-help" id="pickerr-help">Ticking adds a reading to the rotation; it does not change what is on the dial now. Down Arrow moves into the list.</p>
+						<p class="hw-help" id="pickerr-help">Ticking adds a reading to the rotation; it does not change what is on the dial now. Down Arrow moves into the list, arrows move inside it, Tab leaves it.</p>
 					</div>
 					<span class="hw-label" id="rotation-label">Order and groups</span>
 					<div class="hw-set" id="rotation-set" role="group" aria-labelledby="rotation-label"></div>
@@ -151,12 +151,12 @@
 					<div class="hw-row2">
 						<div class="hw-field">
 							<label for="f-bar-min">Bar from</label>
-							<input id="f-bar-min" type="text" inputmode="decimal" data-setting="barMin" data-validate="number" placeholder="Session low" aria-describedby="bar-help f-bar-min-error" autocomplete="off" />
+							<input id="f-bar-min" type="text" inputmode="decimal" data-setting="barMin" data-validate="number" data-ignored-by="The bar" placeholder="Session low" aria-describedby="bar-help f-bar-min-error" autocomplete="off" />
 							<p class="hw-error" id="f-bar-min-error" hidden></p>
 						</div>
 						<div class="hw-field">
 							<label for="f-bar-max">Bar to</label>
-							<input id="f-bar-max" type="text" inputmode="decimal" data-setting="barMax" data-validate="number" placeholder="Session high" aria-describedby="bar-help f-bar-max-error" autocomplete="off" />
+							<input id="f-bar-max" type="text" inputmode="decimal" data-setting="barMax" data-validate="number" data-ignored-by="The bar" placeholder="Session high" aria-describedby="bar-help f-bar-max-error" autocomplete="off" />
 							<p class="hw-error" id="f-bar-max-error" hidden></p>
 						</div>
 					</div>
@@ -280,7 +280,7 @@
 				<div class="hw-row2">
 					<div class="hw-field">
 						<label for="f-autocycle">Auto cycle</label>
-						<select id="f-autocycle" data-setting="autoCycleMs" data-default="off" aria-describedby="autocycle-help">
+						<select id="f-autocycle" data-setting="autoCycleMs" data-default="off" data-kept="interval" aria-describedby="autocycle-help">
 							<option value="off">Off</option>
 							<option value="5000">Every 5 seconds</option>
 							<option value="10000">Every 10 seconds</option>
@@ -294,7 +294,7 @@
 						<select id="f-reset" data-setting="resetScope" data-default="current">
 							<option value="current">This reading only</option>
 							<option value="set">The whole rotation set</option>
-							<option value="all">Every dial (use with care)</option>
+							<option value="all">Every dial, everywhere (use with care)</option>
 						</select>
 					</div>
 				</div>

@@ -119,8 +119,10 @@ type PreviewEffective = {
 	controls?: { preset: string; rotate: string; pressedRotate: string; shortPress: string; longPress: string; tap: string; touchHold: string; touchZones: string; switchesGroups: boolean };
 };
 
-/** Faces past this size are never carried to the panel (bounded messages). */
-const MAX_FACE_BYTES = 64 * 1024;
+/** Faces longer than this (UTF-16 code units) are never carried to the
+ * panel (bounded messages); the panel is told to clear its picture instead
+ * of keeping an older frame. */
+const MAX_FACE_CHARS = 64 * 1024;
 
 export type PreviewExtras = {
 	context?: string;
@@ -221,8 +223,8 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 	if (extras.kind !== undefined) {
 		payload.kind = extras.kind;
 	}
-	if (extras.face !== undefined && extras.face !== "" && extras.face.length <= MAX_FACE_BYTES) {
-		payload.face = extras.face;
+	if (extras.face !== undefined && extras.face !== "") {
+		payload.face = extras.face.length <= MAX_FACE_CHARS ? extras.face : "";
 	}
 	if (status.state !== "unavailable") {
 		payload.source = status.source;
@@ -279,8 +281,12 @@ function effectiveOf(settings: PreviewSettings, kind: "key" | "dial" | undefined
 	const warn = parseThreshold(settings.warnValue) ?? null;
 	const crit = parseThreshold(settings.critValue) ?? null;
 	const below = settings.alertBelow === true;
-	const scopeUnit = kind === "dial" && typeof settings.alertUnit === "string" ? settings.alertUnit : null;
-	const applies = live === undefined ? false : kind === "dial" ? thresholdsApplyTo(scopeUnit ?? undefined, live.unit) : true;
+	// The dial compares the stored anchor as it is (thresholdsApplyTo): any
+	// value other than absent or the reading's own unit, junk included,
+	// keeps its thresholds off.
+	const anchor = (settings as Record<string, unknown>).alertUnit;
+	const scopeUnit = kind === "dial" && typeof anchor === "string" ? anchor : null;
+	const applies = live === undefined ? false : kind === "dial" ? thresholdsApplyTo(anchor as string | undefined, live.unit) : true;
 	const level = live !== undefined && applies ? alertLevel(live.value, warn ?? undefined, crit ?? undefined, below) : "normal";
 	const effective: PreviewEffective = {
 		theme: { id, drawn, own, unknown: own && config.themes[id] === undefined },

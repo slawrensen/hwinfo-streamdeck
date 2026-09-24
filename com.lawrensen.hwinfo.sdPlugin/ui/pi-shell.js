@@ -113,10 +113,19 @@ self.hwShell = (() => {
 	// it is never written. A stored value no option offers (a newer version's
 	// choice) is shown as such and kept until the person picks another.
 	const bound = [];
+	// Text saves waiting out their debounce. Switching to another action
+	// unloads this page; the pending text is saved first, to this panel's
+	// own context (the socket and registration are still this page's).
+	const pendingFlushes = new Set();
+	window.addEventListener("pagehide", () => {
+		for (const flush of [...pendingFlushes]) flush();
+	});
 
 	function showValue(el, value) {
 		if (el.type === "checkbox") {
-			const on = value === undefined || value === null ? el.dataset.default === "true" : value === true;
+			// The runtime reads a default-on flag as "on unless false" and a
+			// default-off flag as "on only if true"; junk shows what it does.
+			const on = el.dataset.default === "true" ? value !== false : value === true;
 			if (el.checked !== on) el.checked = on;
 			return;
 		}
@@ -133,7 +142,7 @@ self.hwShell = (() => {
 					el.appendChild(unknown);
 				}
 				unknown.value = text;
-				unknown.textContent = `Stored value "${text}" (not known to this version, kept)`;
+				unknown.textContent = keptLabel(el, text);
 			} else if (unknown !== null) {
 				unknown.remove();
 			}
@@ -142,9 +151,21 @@ self.hwShell = (() => {
 		if (el.tagName === "INPUT" && el.dataset.validate === "number") validateNumber(el);
 	}
 
+	/** The kept option's text. A stored value no option offers may still be
+	 * one the runtime uses (an auto cycle interval set by a newer version or
+	 * a configuration document), so the text says only what is true: it is
+	 * not in this list and it is kept. */
+	function keptLabel(el, text) {
+		if (el.dataset.kept === "interval") {
+			const ms = Number(text);
+			if (Number.isInteger(ms) && ms > 0) return `Every ${ms % 60000 === 0 ? `${ms / 60000} min` : `${ms / 1000} s`} (not in this list, kept)`;
+		}
+		return `Stored value "${text}" (not in this list, kept)`;
+	}
+
 	/** Thresholds and ranges: the runtime reads "70,5" as 70.5 and ignores
 	 * anything else. The text is saved as typed (nothing is lost); the
-	 * field says the runtime will ignore it. */
+	 * field says what will ignore it. */
 	function validateNumber(el) {
 		const raw = el.value.trim();
 		const ok = raw === "" || Number.isFinite(Number(raw.replace(",", ".")));
@@ -152,7 +173,7 @@ self.hwShell = (() => {
 		el.setAttribute("aria-invalid", ok ? "false" : "true");
 		if (err !== null) {
 			err.hidden = ok;
-			err.textContent = ok ? "" : "Not a number. Alerts ignore this field until it is one.";
+			err.textContent = ok ? "" : `Not a number. ${el.dataset.ignoredBy ?? "Alerts"} ignore${el.dataset.ignoredBy === undefined ? "" : "s"} this field until it is one.`;
 		}
 	}
 
@@ -166,7 +187,13 @@ self.hwShell = (() => {
 		const flush = () => {
 			clearTimeout(timer);
 			timer = 0;
+			pendingFlushes.delete(flush);
 			save(el.value);
+		};
+		const schedule = () => {
+			clearTimeout(timer);
+			timer = setTimeout(flush, 200);
+			pendingFlushes.add(flush);
 		};
 		if (el.type === "checkbox") {
 			el.addEventListener("change", () => save(el.checked));
@@ -174,6 +201,8 @@ self.hwShell = (() => {
 			el.addEventListener("change", () => {
 				if (el.selectedOptions[0]?.hasAttribute("data-unknown")) return;
 				save(el.value);
+				// The kept value is gone from the document once another is picked.
+				el.querySelector("option[data-unknown]")?.remove();
 			});
 		} else if (isText) {
 			// Typing saves 200 ms after the last keystroke (the sdpi textfield
@@ -183,14 +212,12 @@ self.hwShell = (() => {
 			});
 			el.addEventListener("compositionend", () => {
 				composing = false;
-				clearTimeout(timer);
-				timer = setTimeout(flush, 200);
+				schedule();
 			});
 			el.addEventListener("input", () => {
 				if (el.dataset.validate === "number") validateNumber(el);
 				if (composing) return;
-				clearTimeout(timer);
-				timer = setTimeout(flush, 200);
+				schedule();
 			});
 			el.addEventListener("change", () => {
 				if (timer !== 0) flush();
@@ -276,6 +303,51 @@ self.hwShell = (() => {
 		return { text: p.source === "gadget" ? "Live · Gadget registry" : "Live · Shared Memory", tone: "ok" };
 	}
 
+	/** The words a face SVG draws, in document order. Parsed as inert XML
+	 * data (a parsed document runs no script and is never inserted). */
+	let faceText = "";
+	function drawnText(svg) {
+		try {
+			const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+			if (doc.getElementsByTagName("parsererror").length > 0) return "";
+			const words = Array.from(doc.getElementsByTagName("text"), (t) => t.textContent.replace(/\s+/g, " ").trim()).filter((w) => w !== "");
+			return words.join(" ").slice(0, 200);
+		} catch {
+			return "";
+		}
+	}
+
+	// One persistent polite region for notes that are rebuilt with their
+	// lists (rotation and detail counts): a live region created together
+	// with its text is often not read, and a rebuilt one is read again for
+	// nothing. A channel speaks only when its text changes after the first.
+	const announcer = document.createElement("div");
+	announcer.className = "hw-sr-only";
+	announcer.setAttribute("role", "status");
+	announcer.setAttribute("aria-live", "polite");
+	document.body.appendChild(announcer);
+	const lastSaid = new Map();
+	function announce(channel, text) {
+		const had = lastSaid.has(channel);
+		const before = lastSaid.get(channel);
+		lastSaid.set(channel, text);
+		if (had && before !== text) announcer.textContent = text;
+	}
+
+	// The pinned header's real height, for scroll padding and the sticky
+	// dock; a header taller than a third of the panel is not pinned.
+	const pinnedHead = document.querySelector(".hw-head[data-pin]");
+	if (pinnedHead !== null && typeof ResizeObserver === "function") {
+		const measure = () => {
+			const h = Math.ceil(pinnedHead.getBoundingClientRect().height);
+			document.documentElement.style.setProperty("--hw-head-h", `${h}px`);
+			document.documentElement.toggleAttribute("data-pin-off", h > window.innerHeight / 3);
+		};
+		new ResizeObserver(measure).observe(pinnedHead);
+		window.addEventListener("resize", measure);
+		measure();
+	}
+
 	function renderHeader() {
 		const head = document.getElementById("hw-head");
 		if (head === null || (kind !== "key" && kind !== "dial")) return;
@@ -285,10 +357,10 @@ self.hwShell = (() => {
 		const found = configured ? labelOf(s.readingKey) : null;
 		const reading = p?.reading ?? (found === null ? null : { label: found.label, source: found.source });
 		const custom = typeof s.label === "string" && s.label.trim() !== "" ? s.label.trim() : null;
-		setText(document.getElementById("head-reading"), !configured ? "No reading selected" : reading !== null ? (custom ?? reading.label) : (custom ?? (p?.missing === true ? "Saved reading not found" : "Saved reading")));
+		setText(document.getElementById("head-reading"), !configured ? "No reading selected" : reading !== null ? (custom ?? reading.label) : (custom ?? "Saved reading"));
 		setText(
 			document.getElementById("head-source"),
-			reading !== null ? `${custom !== null ? `${reading.label} · ` : ""}${reading.source}` : configured && custom !== null ? (p?.missing === true ? "Saved reading not found in HWiNFO" : "Saved reading") : ""
+			reading !== null ? `${custom !== null ? `${reading.label} · ` : ""}${reading.source}` : configured && custom !== null ? "Saved reading" : ""
 		);
 		const ds = dataState();
 		const stateEl = document.getElementById("head-state");
@@ -302,10 +374,12 @@ self.hwShell = (() => {
 			if (state.face !== "" && img.dataset.face !== state.face) {
 				img.dataset.face = state.face;
 				img.src = `data:image/svg+xml,${encodeURIComponent(state.face)}`;
+				faceText = drawnText(state.face);
 			}
 			figure.hidden = state.face === "";
-			const value = p?.display !== undefined ? `, ${`${p.display.value} ${p.display.unit}`.trim()}` : "";
-			const alt = `${kind === "dial" ? "Dial" : "Key"} face now: ${custom ?? reading?.label ?? ds.text}${value}`;
+			// The alt text reads what the face itself draws (a status screen
+			// included), so it can never describe a value the key is not showing.
+			const alt = `${kind === "dial" ? "Dial" : "Key"} face now: ${faceText !== "" ? faceText : (custom ?? reading?.label ?? ds.text)}`;
 			if (img.alt !== alt) img.alt = alt;
 		}
 	}
@@ -336,8 +410,13 @@ self.hwShell = (() => {
 			];
 			actions = [["retry", "Reload sensor list"]];
 		} else if (p !== null && p.state === "stale") {
+			// Static text: the plugin's hint counts seconds, and a live region
+			// that changed every tick would be read out every tick.
 			tone = "warn";
-			lines = [p.hint || "HWiNFO stopped updating.", `The ${kind === "dial" ? 'dial shows "HWiNFO stalled"' : 'key shows "Not updating"'} until HWiNFO resumes. Your reading and settings are unchanged.`];
+			lines = [
+				p.source === "gadget" ? "HWiNFO's Gadget registry stopped changing. Check that HWiNFO is still running with Gadget reporting enabled." : "HWiNFO stopped updating. Check that the Sensors window is open and Shared Memory Support is still enabled.",
+				`The ${kind === "dial" ? 'dial shows "HWiNFO stalled"' : 'key shows "Not updating"'} until HWiNFO resumes. Your reading and settings are unchanged.`
+			];
 			actions = [["retry", "Retry now"]];
 		} else if (tree !== null && tree.state === "ok" && Array.isArray(tree.groups) && tree.groups.length === 0) {
 			tone = "warn";
@@ -350,10 +429,11 @@ self.hwShell = (() => {
 		const signature = JSON.stringify([tone, lines, actions]);
 		if (box.dataset.signature === signature) return;
 		box.dataset.signature = signature;
-		box.hidden = tone === "";
 		box.dataset.tone = tone;
-		// Only a change of kind is announced; the text itself never ticks.
-		box.setAttribute("aria-live", tone === "danger" || tone === "warn" ? "polite" : "off");
+		// The region (role=status, polite) stays in the page; it changes only
+		// when the kind of problem changes, never per tick. A focused action
+		// button keeps focus across the rebuild when the same action remains.
+		const focusedAction = box.contains(document.activeElement) ? document.activeElement.dataset.statusAction : undefined;
 		const frag = document.createDocumentFragment();
 		for (const line of lines) {
 			const para = document.createElement("p");
@@ -374,6 +454,7 @@ self.hwShell = (() => {
 			frag.appendChild(row);
 		}
 		box.replaceChildren(frag);
+		if (focusedAction !== undefined) box.querySelector(`[data-status-action="${focusedAction}"]`)?.focus({ preventScroll: true });
 	}
 	document.addEventListener("click", (ev) => {
 		const button = ev.target instanceof Element ? ev.target.closest("[data-status-action]") : null;
@@ -419,6 +500,7 @@ self.hwShell = (() => {
 		},
 		scheduleRender,
 		resyncBound,
+		announce,
 		model: hwModel
 	};
 })();

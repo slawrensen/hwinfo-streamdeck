@@ -162,9 +162,11 @@ no fold. B and C shorten the reach to Alerts, Press and Advanced by
 folding Display, which moves a fold onto every appearance edit and hides
 the theme gallery, the one control whose effect the header face shows
 live. Taken from C: on panels at least 560 px tall the header (with the
-exact device face) is sticky, and `scroll-padding-top` keeps a focused
-control from sliding under it (the traversal check
-`focus-obscured-by-pinned-header` stays at 0). Taken from B: the tighter
+exact device face) is sticky; the shell measures its height into
+`--hw-head-h`, which sets `scroll-padding-top` and the sticky offset of
+the "Add readings" dock, and a header taller than a third of the panel
+(the dial header wraps at narrow widths) is not pinned at all. The
+traversal check walks forward and back (Shift+Tab) at 320 and 400 px. Taken from B: the tighter
 field rhythm (8/12 px) that keeps Reading and Display within the first
 screen at 480 px. Rejected from B: label-left rows (they are what
 clipped at 320 on main). Rejected from C: a face larger than the device's
@@ -205,8 +207,9 @@ text tokens on each surface (WCAG ratio, computed from the token values):
 | link | 7.96 | 7.20 | 6.57 | 5.81 | 5.78 | 6.63 | 7.60 | 7.23 |
 | ok / warn / danger text | 8.29 / 9.45 / 8.11 on bg | | | | | | | |
 
-Placeholders appear only in empty fields (field surface, 4.51:1); the
-3.98:1 cell is a hovered empty field. The focus ring (`#7cc4ff`) is
+Placeholders appear only in empty fields (field surface, 4.51:1); on a
+hovered field they step up to `#b0b0b0` (4.63:1), so the 3.98:1 cell is
+never drawn. The focus ring (`#7cc4ff`) is
 7.34:1 on the background; control borders are 3.30:1 against it. The
 keyboard-highlighted picker row was 4.14:1 for its muted value text and
 was darkened during this run to 5.04:1.
@@ -290,11 +293,15 @@ the renderers use, sent as `effective` in the preview):
 - **Unknown enums:** a stored option value this build does not know is
   shown as kept and written back only if the user picks another option.
 - **Shared document Replace:** now needs a second click within 5 s.
-- **Residual races (accepted):** the SDK has no partial write, so two
-  panels of the same action (impossible in one app) or a second app
-  instance could still overwrite each other's whole document; a Replace
-  of the shared document can race a shared edit made in another panel in
-  the same second. Both are unchanged from main.
+- **Residual races and normalizations (accepted, all unchanged from
+  main):** the SDK has no partial write, so a second app instance could
+  overwrite a whole document; a Replace of the shared document can race
+  a shared edit made in another panel in the same second; rotation edits
+  go out as two writes (groups, then the mirror); with fewer than two
+  non-empty groups the panel still edits the group and rewrites the
+  mirror; duplicate `detailKeys` are dropped and a key stored with a
+  pasted friendly name is written back bare (the runtime reads both the
+  same way). Details: [reviews.md](reviews.md).
 - **Downgrade:** a 1.6.0 panel opened on settings this build wrote sees
   the same fields it always did.
 
@@ -365,11 +372,17 @@ same tokens as the table above). No failure found.
 
 Patterns: reading pickers are APG comboboxes (`aria-activedescendant`;
 arrows inspect, Enter commits, Escape closes and restores, Tab never
-commits); membership lists are native checkbox checklists; reorder uses
+commits); membership lists are native checkbox checklists that are one
+Tab stop (Down Arrow enters, arrows move, Tab leaves), each box named
+with its reading, source and value inside a named source group; reorder uses
 named buttons ("Move GPU Power earlier") and keeps focus on the moved
 item, with drag as an extra; the theme gallery is a radio group with a
 roving Tab stop; errors are tied with `aria-describedby`; the status
-block announces only a change of kind, never ticking values. Zoom 100,
+block is a persistent `role=status` region that changes only when the
+kind of problem changes (never per tick) and keeps a focused action
+focused; list notes speak through one persistent polite region; the
+header image's alt text is built from the words the face draws, so a
+status screen is never described as a value. Zoom 100,
 150 and 200% map to the 480, 320 and 240 CSS px captures. NOT RUN:
 screen readers (NVDA, Narrator), Windows high contrast, the embedded
 webview.

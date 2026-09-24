@@ -118,7 +118,7 @@ Open the dial's Property Inspector to configure it. The panel follows the same o
 | Alerts | **Warn at** / **Critical at** | Values at which the bar fill (or an overview row's value) turns amber or red, in the displayed unit. The title line says what is set, e.g. *Warn ≥ 80 °C · °C readings only*. |
 | Alerts | **Alert when the value drops to or below these numbers** | Flips the comparison: for fan RPM, clocks and other where-lower-is-worse readings. |
 | Alerts | **Auto cycle jumps to a critical reading** | Makes the auto cycle alert-aware: it jumps to a critical member of the rotation instead of waiting its turn, and holds there while the reading stays critical. Off by default. |
-| Controls | **Controls** | Legacy (default), Elite or Custom gesture map; Custom shows one command per gesture. See [Dial controls & presets](controls.md). |
+| Controls | **Gestures** | Legacy (default), Elite or Custom gesture map; Custom shows one command per gesture (Turn, Pressed turn, Short push, Long push, Touch tap, Long touch). See [Dial controls & presets](controls.md). |
 | Controls | **Touch zones** | Split the strip into previous and next (and optionally a center tap). |
 | Controls | **Ignore turns** | Disables rotation for bump protection. |
 | Controls | **Auto cycle** | Timer that steps through the rotation automatically. Off by default. |

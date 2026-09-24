@@ -41,8 +41,9 @@ Elgato Marketplace listing is a separate track.
   stays responsive on a 5,000-reading tree (PERF.md). It follows the
   combobox pattern: arrow keys browse, Enter picks, Escape closes
   without changing anything. Rotation membership and custom detail
-  lists are checklists instead, so ticking a reading never changes the
-  reading on the dial, and rotation chips gain up and down buttons.
+  lists are checklists instead (one Tab stop; arrow keys move inside),
+  so ticking a reading never changes the reading on the dial, and
+  rotation chips gain up and down buttons.
 - Every control has a programmatic name and a visible focus ring, text
   contrast and small targets were raised, and the panels reflow at
   320 px wide without horizontal scrolling.

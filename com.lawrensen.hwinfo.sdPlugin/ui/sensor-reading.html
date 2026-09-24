@@ -37,7 +37,7 @@
 					</div>
 					<p class="hw-help" id="picker-help">Type part of a reading or source name. Arrow keys browse, Enter picks, Escape closes without changing anything.</p>
 				</div>
-				<div class="hw-status" id="reading-status" hidden></div>
+				<div class="hw-status" id="reading-status" role="status" aria-live="polite" data-tone=""></div>
 
 				<div class="hw-field">
 					<label for="f-label">Label on the key</label>
@@ -59,7 +59,7 @@
 					<div class="hw-field">
 						<label id="picker2-label" for="picker2-search">Reading 2</label>
 						<div class="hw-picker">
-							<input id="picker2-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker2-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<input id="picker2-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker2-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
 							<button id="picker2-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
 							<div class="hw-picker-list" id="picker2-list" role="listbox" aria-labelledby="picker2-label" hidden></div>
 						</div>
@@ -86,7 +86,7 @@
 					<div class="hw-field">
 						<label id="picker3-label" for="picker3-search">Reading 3</label>
 						<div class="hw-picker">
-							<input id="picker3-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker3-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<input id="picker3-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker3-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
 							<button id="picker3-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
 							<div class="hw-picker-list" id="picker3-list" role="listbox" aria-labelledby="picker3-label" hidden></div>
 						</div>
@@ -101,7 +101,7 @@
 					<div class="hw-field">
 						<label id="picker4-label" for="picker4-search">Reading 4</label>
 						<div class="hw-picker">
-							<input id="picker4-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker4-list" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+							<input id="picker4-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker4-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
 							<button id="picker4-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
 							<div class="hw-picker-list" id="picker4-list" role="listbox" aria-labelledby="picker4-label" hidden></div>
 						</div>
@@ -251,7 +251,7 @@
 										<input id="pickerd-search" type="text" aria-controls="pickerd-list" aria-describedby="pickerd-help" placeholder="Search readings to add" autocomplete="off" spellcheck="false" />
 										<div class="hw-picker-list hw-inline" id="pickerd-list" role="group" aria-labelledby="pickerd-label" hidden></div>
 									</div>
-									<p class="hw-help" id="pickerd-help">Tick readings to add or remove them. The tile list below keeps their order; arrow buttons move them.</p>
+									<p class="hw-help" id="pickerd-help">Tick readings to add or remove them. Down Arrow moves into the list, arrows move inside it, Tab leaves it. The tile list below keeps their order; arrow buttons move them.</p>
 								</div>
 							</div>
 							<div id="detail-list" class="hw-set"></div>

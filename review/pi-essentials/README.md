@@ -9,6 +9,17 @@ and renderers over sample data. Nothing ran in the Stream Deck app's
 embedded webview, against live HWiNFO, on a physical device, or with a
 person. Those gates are listed at the end as NOT RUN.
 
+**Bench update, 2026-09-23.** The candidate then ran on Windows in the
+real Stream Deck app (7.4.2, QtWebEngine 6.9.3) with live HWiNFO and a
+Stream Deck + XL: [bench/2026-09-23/report.md](bench/2026-09-23/report.md).
+The bench found eight defects the simulated host could not show (typed
+text lost on a key switch, gaps the device's SVG engine dropped, a list
+the app gave no way to dismiss, and five smaller ones), fixed each with a
+check, and carried the owner's design pass (Open all and Fold all in the
+header, folds kept while the app runs, the dial's rotation first). The
+new source candidate is in [candidate.md](candidate.md); the plan for the
+1.7 line is [rebase-1.7-plan.md](rebase-1.7-plan.md).
+
 Contents: baseline, research evidence, task measurements, layout studies
 and decision, information architecture, visual system, state model,
 preview parity and precedence, compatibility, validation, performance,
@@ -429,17 +440,24 @@ and every suite above plus the live gates pass on it.
 ## Remaining gates (NOT RUN)
 
 1. The Stream Deck app's embedded webview: every capture, keyboard path
-   and timing above, at 100/150/200% Windows scaling.
+   and timing above, at 100/150/200% Windows scaling. Bench: run at 150%
+   (report B1 to B7); 100% and 200% NOT RUN.
 2. Live HWiNFO (Shared Memory and Gadget): `npm run e2e`,
-   `e2e:resilience`, `e2e:gadget`, `suite:full`, `test:native`.
+   `e2e:resilience`, `e2e:gadget`, `suite:full`, `test:native`. Bench:
+   `suite:full` all green with zero orphans and `test:native` 69/69 with
+   live HWiNFO present; Gadget on hardware NOT RUN.
 3. Physical devices: 15-key, XL, +, + XL (dial faces and touchscreen).
+   Bench: + XL faces captured from the app's canvas; photos and finger
+   passes NOT RUN.
 4. Screen readers: NVDA and Narrator on the four panels.
 5. The moderated human study ([human-test-script.md](human-test-script.md)).
 6. Pack and hash: `npm run build` with `hwsm.node`, `npm run pack`,
-   `validate-native`.
+   `validate-native`. Bench: build and `validate-native` done (hashes in
+   the bench report); `npm run pack` NOT RUN.
 7. Docs screenshots of the panel (`settings-panel.png`, `pi-*.png`):
    regenerate with `capture-pi.mjs` against the live pi-harness.
-8. Integration with the 1.7 line (above).
+8. Integration with the 1.7 line (above); plan in
+   [rebase-1.7-plan.md](rebase-1.7-plan.md).
 
 ## Rollback
 

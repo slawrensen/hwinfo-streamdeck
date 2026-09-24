@@ -35,10 +35,26 @@ does not allow).
    overflow at 480, 320 and 240 px.
 10. Candidate identified (candidate.md); issue #37; draft PR #38.
 
+## Done on the Windows bench (2026-09-23)
+
+11. Benched in the real Stream Deck app with live HWiNFO and a + XL
+    (bench/2026-09-23/report.md): defects D1 to D8 and D11 fixed with
+    checks, harness defects H1 and H2 fixed; D9, D10 and H3 open.
+12. The owner's design pass: dual pinned-row badges on the label line;
+    folds kept per panel kind while the app runs, with Open all and Fold
+    all in the header (a durable plugin-side copy was built and removed);
+    the picker closes only on a click or focus change; the dial's
+    rotation sits under the reading on the dial and its face beside the
+    name.
+13. Gates on the new candidate (candidate.md): lint 0, typecheck 0, unit
+    791/791, e2e-pi-panels 184/184, e2e-pi-persistence 551/551,
+    `npm run e2e` all passed; `suite:full` all green on the same
+    `plugin.js` (4808487d).
+
 ## Next
 
-Nothing on this branch without the bench: the remaining gates below, and
-integration with the 1.7 line (#33, #32, #36) before the PR leaves draft.
+Integration with the 1.7 line (#33, #32, #36) per rebase-1.7-plan.md
+before the PR leaves draft; the remaining gates below.
 
 ## Remaining gates
 

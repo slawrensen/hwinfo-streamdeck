@@ -171,6 +171,12 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 	};
 	await send("Page.enable");
 	await send("Runtime.enable");
+	// A property inspector the person is using is a focused page. Headless
+	// Chromium on Windows is not, and there a scripted focus() moves
+	// activeElement without firing focus events, so a combobox that opens
+	// on focus never opens. Emulating focus makes the page behave like the
+	// focused panel it stands in for.
+	await send("Emulation.setFocusEmulationEnabled", { enabled: true });
 	await client.viewport(width, height, scale);
 	return client;
 }

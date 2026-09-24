@@ -3,7 +3,7 @@
 // (scripts/lib/pi-sim.mjs). Runs anywhere Chromium runs; no Stream Deck app,
 // no HWiNFO. Every output is SAMPLE DATA on a SIMULATED HOST and says so.
 //
-//   npx tsx scripts/pi-lab.mjs capture <outDir> [--widths 320,480] [--only a,b] [--inject <url>]
+//   npx tsx scripts/pi-lab.mjs capture <outDir> [--widths 320,480] [--only a,b] [--inject <url>] [--dpr 2]
 //   npx tsx scripts/pi-lab.mjs tasks <out.json>
 //   npx tsx scripts/pi-lab.mjs perf <out.json> [--runs 3]
 //   npx tsx scripts/pi-lab.mjs a11y <out.json> [--widths 400,320]  (AXE_CORE=<path to axe.min.js> adds axe-core)
@@ -105,8 +105,10 @@ async function capture() {
 		if (p.type === "error") pageErrors.push(p.args.map((a) => a.value ?? a.description).join(" "));
 	});
 	try {
+		// --dpr 2 shoots close-ups at twice the pixels; layout is unchanged.
+		const dpr = Number(opt("dpr", "1")) || 1;
 		for (const width of widths) {
-			await browser.viewport(width, 800, 1);
+			await browser.viewport(width, 800, dpr);
 			for (const [fixture, label, step, shot = { full: true }] of STATES) {
 				if (only !== "" && !only.split(",").includes(fixture)) continue;
 				sim.setFixture(fixture);

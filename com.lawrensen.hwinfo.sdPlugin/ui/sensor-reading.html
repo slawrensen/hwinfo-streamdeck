@@ -5,7 +5,7 @@
 		<title>Sensor Reading settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-f01" />
+		<link rel="stylesheet" href="pi.css?v=1.6.0.0-f01l" />
 	</head>
 	<body data-kind="key">
 		<header class="hw-head" id="hw-head" data-kind="key" data-pin>
@@ -14,7 +14,13 @@
 				<figcaption>On the key now</figcaption>
 			</figure>
 			<div class="hw-head-text">
-				<p class="hw-head-kind" id="head-kind">Sensor Reading key</p>
+				<div class="hw-head-top">
+					<p class="hw-head-kind" id="head-kind">Sensor Reading key</p>
+					<div class="hw-folds" id="hw-folds" role="toolbar" aria-label="Sections">
+						<button type="button" data-folds="open" aria-label="Open all sections" title="Open all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 6 8 2.75 12.25 6M3.75 10 8 13.25 12.25 10" /></svg></button>
+						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 2.75 8 6 12.25 2.75M3.75 13.25 8 10 12.25 13.25" /></svg></button>
+					</div>
+				</div>
 				<p class="hw-head-reading" id="head-reading">No reading selected</p>
 				<p class="hw-head-source" id="head-source"></p>
 				<p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p>
@@ -35,7 +41,7 @@
 						<button id="picker-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
 						<div class="hw-picker-list" id="picker-list" role="listbox" aria-labelledby="picker-label" hidden></div>
 					</div>
-					<p class="hw-help" id="picker-help">Type part of a reading or source name. Arrow keys browse, Enter picks, Escape closes without changing anything.</p>
+					<p class="hw-help" id="picker-help">Type part of a reading or source name.<span class="hw-sr-only"> Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything.</span></p>
 				</div>
 				<div class="hw-status" id="reading-status" role="status" aria-live="polite" data-tone=""></div>
 
@@ -251,7 +257,7 @@
 										<input id="pickerd-search" type="text" aria-controls="pickerd-list" aria-describedby="pickerd-help" placeholder="Search readings to add" autocomplete="off" spellcheck="false" />
 										<div class="hw-picker-list hw-inline" id="pickerd-list" role="group" aria-labelledby="pickerd-label" hidden></div>
 									</div>
-									<p class="hw-help" id="pickerd-help">Tick readings to add or remove them. Down Arrow moves into the list, arrows move inside it, Tab leaves it. The tile list below keeps their order; arrow buttons move them.</p>
+									<p class="hw-help" id="pickerd-help">Tick readings to add or remove them. The tile list below keeps their order; arrow buttons move them.<span class="hw-sr-only"> Down Arrow moves into the list, arrows move inside it, Tab leaves it.</span></p>
 								</div>
 							</div>
 							<div id="detail-list" class="hw-set"></div>
@@ -381,7 +387,7 @@
 						<label for="config-key">This key's settings</label>
 						<textarea id="config-key" spellcheck="false" autocomplete="off"></textarea>
 						<div class="hw-config-row">
-							<button id="config-key-copy" type="button">Copy</button>
+							<button id="config-key-copy" type="button" aria-label="Copy this key's settings">Copy</button>
 							<button id="config-key-apply" type="button">Replace this key's settings</button>
 						</div>
 					</div>
@@ -389,7 +395,7 @@
 						<label for="config-deck">Shared settings <span class="hw-scope">All keys and dials</span></label>
 						<textarea id="config-deck" spellcheck="false" autocomplete="off"></textarea>
 						<div class="hw-config-row">
-							<button id="config-deck-copy" type="button">Copy</button>
+							<button id="config-deck-copy" type="button" aria-label="Copy shared settings">Copy</button>
 							<button id="config-deck-apply" type="button">Replace shared settings</button>
 						</div>
 					</div>
@@ -399,9 +405,9 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.6.0.0-f01"></script>
-		<script src="pi-shell.js?v=1.6.0.0-f01"></script>
-		<script src="pi-common.js?v=1.6.0.0-f01"></script>
-		<script src="pi-control.js?v=1.6.0.0-f01"></script>
+		<script src="pi-model.js?v=1.6.0.0-f01l"></script>
+		<script src="pi-shell.js?v=1.6.0.0-f01l"></script>
+		<script src="pi-common.js?v=1.6.0.0-f01l"></script>
+		<script src="pi-control.js?v=1.6.0.0-f01l"></script>
 	</body>
 </html>

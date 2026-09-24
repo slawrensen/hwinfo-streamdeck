@@ -609,7 +609,7 @@ try {
 			? item.previousElementSibling
 			: item;
 		const a = heading.getBoundingClientRect();
-		const b = help.getBoundingClientRect();
+		const b = help.hidden ? a : help.getBoundingClientRect();
 		const top = Math.min(a.top, b.top) + window.scrollY;
 		const bottom = Math.max(a.bottom, b.bottom) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 8)), h: Math.ceil(bottom - top + 18) };
@@ -667,7 +667,7 @@ try {
 		const help = document.getElementById("rotation-help");
 		if (!item || !help) return "missing";
 		const a = item.getBoundingClientRect();
-		const b = help.getBoundingClientRect();
+		const b = help.hidden ? a : help.getBoundingClientRect();
 		const top = Math.min(a.top, b.top) + window.scrollY;
 		const bottom = Math.max(a.bottom, b.bottom) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 10)), h: Math.ceil(bottom - top + 20) };

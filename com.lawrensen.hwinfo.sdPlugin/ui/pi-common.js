@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.6.0.0-f01";
+	const PI_BUILD = "1.6.0.0-f01l";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -398,11 +398,13 @@
 	function updateRotationHelp() {
 		const help = document.getElementById("rotation-help");
 		if (help === null) return;
-		// Keep the flat-mode sentence order in sync with the static fallback
-		// in sensor-dial.html (empty-set default leads).
+		// A plain rotation needs no paragraph here: the note under the chips
+		// says what rotates, and the help under the search says how ticking
+		// and the arrows work. Groups add gesture rules worth a paragraph.
+		help.hidden = rotationGroups === null;
 		help.textContent =
 			rotationGroups === null
-				? "Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the list above to limit rotation to just those; the arrows set their order."
+				? ""
 				: "Ticks land in the group marked by the radio. “Switch sensor or group” (Elite press+rotate) jumps between groups showing the group name and keeps plain rotate inside one; any control map without that gesture (Legacy always, Custom until you map it) rotates through all groups as one flat list.";
 	}
 
@@ -459,7 +461,7 @@
 				chips.className = "hw-set-chips";
 				group.keys.forEach((key, i) => chips.appendChild(setChip(key, index, i, group.keys.length)));
 				if (group.keys.length === 0) {
-					chips.appendChild(setNote("Empty: tick readings above to fill this group."));
+					chips.appendChild(setNote("Empty: tick readings in the list below to fill this group."));
 				}
 				frag.appendChild(chips);
 			});
@@ -2074,11 +2076,30 @@
 
 		// After a selection the input keeps focus (the option's mousedown is
 		// preventDefault-ed), so no focus event fires; reopen on click too.
+		// A click on the open box closes it again, like a select, and puts the
+		// saved choice back; while a search is typed a click only moves the
+		// caret.
+		// A click that opens the list selects the whole text on its mouseup:
+		// the click itself drops a caret after the focus handler selected,
+		// and typing would then splice into the old name instead of
+		// replacing it.
+		let selectOnUp = false;
 		searchEl.addEventListener("mousedown", () => {
-			if (!listOpen && document.activeElement === searchEl) {
-				searchEl.select();
-				openList();
+			if (document.activeElement !== searchEl) {
+				selectOnUp = true; // the focus handler opens it
+				return;
 			}
+			if (!listOpen) {
+				selectOnUp = true;
+				openList();
+			} else if (!searchTyped) {
+				closeList();
+			}
+		});
+		searchEl.addEventListener("mouseup", () => {
+			if (!selectOnUp) return;
+			selectOnUp = false;
+			if (listOpen && !searchTyped) searchEl.select();
 		});
 
 		searchEl.addEventListener("input", () => {
@@ -2220,6 +2241,10 @@
 			alsoWithin: config.alsoWithin ?? null,
 			isOpen: () => listOpen,
 			close: closeList,
+			/** Lets go of the search box, so the page regaining focus later
+			 * does not reopen the list on its own. */
+			release: () => searchEl.blur(),
+			/** A search is being typed (the list is filtered by it). */
 			selectedKey: () => selectedKey,
 			renderList,
 			/** Refresh after the shared tree changed (labels resolve, rows fill). */
@@ -2342,6 +2367,26 @@
 			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) picker.close();
 		}
 	});
+	// A click outside the panel (the app's own controls, its canvas, another
+	// window) never reaches this page as a mousedown: the page only loses
+	// focus, while activeElement still names the search box. Close every
+	// open list then, putting its saved choice back, and let go of the box.
+	const dismissAll = () => {
+		for (const picker of pickers) {
+			if (!picker.isOpen()) continue;
+			picker.close();
+			picker.release();
+		}
+	};
+	window.addEventListener("blur", dismissAll);
+	// Only a click or a focus change closes a list, never the pointer
+	// wandering out: overshooting the panel's edge while browsing is common
+	// and must not throw the list away (owner, bench 2026-09-23). The cost
+	// is known: the app's controls that take no focus (the disabled Title
+	// field, the grey surround, the canvas background) send this page
+	// nothing at all, so a click there leaves the list open until the next
+	// click anywhere else. The list is a view and never writes, so waiting
+	// is harmless.
 	// Focus leaving a checklist (Tab past its last box) closes it too.
 	document.addEventListener("focusin", (ev) => {
 		const target = ev.target;
@@ -3308,9 +3353,11 @@
 			}
 			dirty.delete(el);
 		};
+		// A draft survives folding: only an untouched well refills.
 		const fill = async () => {
-			await fillWell(configKeyEl);
-			await fillWell(configDeckEl);
+			for (const el of [configKeyEl, configDeckEl]) {
+				if (!dirty.has(el)) await fillWell(el);
+			}
 		};
 		// Filling is a read; it happens when the fold opens, never a write.
 		const fold = document.querySelector('details[data-fold="advanced"]');

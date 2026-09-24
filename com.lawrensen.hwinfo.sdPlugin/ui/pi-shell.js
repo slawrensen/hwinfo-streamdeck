@@ -117,9 +117,17 @@ self.hwShell = (() => {
 	// unloads this page; the pending text is saved first, to this panel's
 	// own context (the socket and registration are still this page's).
 	const pendingFlushes = new Set();
-	window.addEventListener("pagehide", () => {
+	const flushPending = () => {
 		for (const flush of [...pendingFlushes]) flush();
-	});
+	};
+	window.addEventListener("pagehide", flushPending);
+	// The app tears a panel down as soon as another action is selected, and
+	// a save sent from pagehide does not land (bench 2026-09-23, Stream Deck
+	// 7.4.2: 20 of 20 labels typed within 200 ms of a switch were lost). The
+	// pointer leaves the panel, or the panel loses focus, before a click
+	// elsewhere can select another action, so pending text is saved then.
+	document.documentElement.addEventListener("mouseleave", flushPending);
+	window.addEventListener("blur", flushPending);
 
 	function showValue(el, value) {
 		if (el.type === "checkbox") {
@@ -185,6 +193,7 @@ self.hwShell = (() => {
 		let timer = 0;
 		let composing = false;
 		const flush = () => {
+			if (composing) return; // an IME still owns the text; its end schedules the save
 			clearTimeout(timer);
 			timer = 0;
 			pendingFlushes.delete(flush);
@@ -238,17 +247,121 @@ self.hwShell = (() => {
 	});
 	on("globals", () => resyncBound());
 
+	// --- sections keep the folds a person chose -------------------------------
+	// Selecting another key loads a fresh panel, so without memory every
+	// section a person opened snapped shut again while they went from key to
+	// key. Each section stays as it was last left, per kind of panel (NN/g:
+	// "Items that are opened or closed should remain in that state until the
+	// user changes it"). Only a person's toggle is remembered, never a reveal
+	// or a script. The two chevron buttons in the header's top corner open or
+	// fold them all (Alt-click on a section title does the same).
+	// A view preference, never a setting, so folding a section writes nothing
+	// to any key, and the plugin keeps none of it: it lives in this webview's
+	// storage, which the app empties when the plugin restarts (bench
+	// 2026-09-23). A fresh start shows the defaults, and one press on Open
+	// all gets back whatever a person had open. Storage that throws or is
+	// missing leaves the defaults.
+	const sections = Array.from(document.querySelectorAll("details.hw-sec[id]"));
+	const foldsKey = `hw.folds.${kind}`;
+	let folds = {};
+	try {
+		const stored = JSON.parse(localStorage.getItem(foldsKey) ?? "{}");
+		if (isDoc(stored)) folds = stored;
+	} catch {
+		folds = {};
+	}
+	for (const section of sections) {
+		if (typeof folds[section.id] === "boolean") section.open = folds[section.id];
+	}
+	const keepFolds = () => {
+		try {
+			localStorage.setItem(foldsKey, JSON.stringify(folds));
+		} catch {
+			/* no storage: the next panel starts from the defaults */
+		}
+	};
+	/** A person opening or folding every section at once, remembered like
+	 * a single toggle and said once (the sections are not focused, so their
+	 * own expanded state is not read). Every press is spoken: the text
+	 * alternates a trailing no-break space so a repeat still differs. */
+	let foldsSaid = 0;
+	const setAllFolds = (open) => {
+		for (const s of sections) {
+			s.open = open;
+			folds[s.id] = open;
+		}
+		keepFolds();
+		if (foldsSaid++ === 0) announce("folds", "");
+		announce("folds", `${open ? "All sections open" : "All sections folded"}${foldsSaid % 2 === 0 ? "\u00a0" : ""}`);
+	};
+	let toggledByPerson = null;
+	document.addEventListener("click", (ev) => {
+		const summary = ev.target instanceof Element ? ev.target.closest("details.hw-sec[id] > summary") : null;
+		if (summary === null) return;
+		const section = summary.parentElement;
+		if (ev.altKey) {
+			ev.preventDefault();
+			setAllFolds(!section.open);
+			return;
+		}
+		toggledByPerson = section;
+	});
+
+	// Open all and Fold all: one toolbar, one Tab stop, arrow keys between
+	// the two (APG toolbar). A button that would change nothing (every shown
+	// section already open, or already folded) says so with aria-disabled
+	// and stays focusable, so focus never drops to the page after a press.
+	const foldBar = document.getElementById("hw-folds");
+	const foldButtons = foldBar === null ? [] : Array.from(foldBar.querySelectorAll("button[data-folds]"));
+	const syncFoldBar = () => {
+		const shown = sections.filter((s) => !s.hidden);
+		for (const button of foldButtons) {
+			const open = button.dataset.folds === "open";
+			button.setAttribute("aria-disabled", String(shown.every((s) => s.open === open)));
+		}
+	};
+	if (foldBar !== null && sections.length < 2) foldBar.hidden = true;
+	else if (foldBar !== null) {
+		foldBar.addEventListener("click", (ev) => {
+			const button = ev.target instanceof Element ? ev.target.closest("button[data-folds]") : null;
+			if (button === null || button.getAttribute("aria-disabled") === "true") return;
+			setAllFolds(button.dataset.folds === "open");
+		});
+		foldBar.addEventListener("keydown", (ev) => {
+			const at = foldButtons.indexOf(document.activeElement);
+			if (at < 0) return;
+			const to = { ArrowLeft: at - 1, ArrowRight: at + 1, Home: 0, End: foldButtons.length - 1 }[ev.key];
+			if (to === undefined) return;
+			ev.preventDefault();
+			const next = foldButtons[(to + foldButtons.length) % foldButtons.length];
+			for (const button of foldButtons) button.tabIndex = button === next ? 0 : -1;
+			next.focus();
+		});
+		syncFoldBar();
+	}
+	for (const section of sections) {
+		section.addEventListener("toggle", () => {
+			syncFoldBar();
+			if (toggledByPerson !== section) return;
+			toggledByPerson = null;
+			folds[section.id] = section.open;
+			keepFolds();
+		});
+	}
+
 	// --- disclosure: open a section and bring a target into view ----------------
 	/** Opens every closed disclosure around `target`, scrolls it into view and
 	 * focuses it (or its first focusable). A UI move, never a write. */
 	function reveal(target) {
 		const el = typeof target === "string" ? document.getElementById(target) : target;
 		if (el === null || el === undefined) return;
-		for (let n = el.parentElement; n !== null; n = n.parentElement) {
+		// The target itself too: "HWiNFO setup steps" is a disclosure, and
+		// landing on it closed would ask for a second click.
+		for (let n = el; n !== null; n = n.parentElement) {
 			if (n.tagName === "DETAILS" && !n.open) n.open = true;
 		}
 		el.scrollIntoView({ block: "center" });
-		const focusable = el.matches("input,select,textarea,button,summary,[tabindex]") ? el : el.querySelector("input,select,textarea,button,[tabindex]");
+		const focusable = el.matches("input,select,textarea,button,summary,[tabindex]") ? el : el.querySelector("summary,input,select,textarea,button,[tabindex]");
 		focusable?.focus({ preventScroll: true });
 	}
 	document.addEventListener("click", (ev) => {

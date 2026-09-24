@@ -88,6 +88,14 @@ body {
 	flex-wrap: wrap;
 }
 
+/* The dial's face sits beside its text at the app's panel width (373 CSS
+   px with the scrollbar, bench 2026-09-23): 176 + 12 + 140 fits, and the
+   header stays about as tall as the face instead of stacking to twice
+   that. A panel too narrow for both wraps the text under the face. */
+.hw-head[data-kind="dial"] .hw-head-text {
+	flex-basis: 140px;
+}
+
 /* On a tall panel the face stays in view while you edit below it (the
    preview-led study's one clear win). A short panel scrolls it away. The
    shell measures the header into --hw-head-h, so scroll padding (and the
@@ -133,7 +141,7 @@ body {
 }
 
 .hw-head[data-kind="dial"] .hw-face img {
-	width: 200px;
+	width: 176px;
 	height: auto;
 	aspect-ratio: 2 / 1;
 	max-width: 100%;
@@ -158,6 +166,71 @@ body {
 .hw-head-kind {
 	color: var(--hw-muted);
 	font-size: var(--hw-size-sm);
+}
+
+/* Open all / Fold all: two chevron pairs in the header's top corner, on
+   the kind line's otherwise empty right side, so they cost no height and
+   pin with the header. Quiet at rest like the section markers (same muted
+   grey); a hover lifts them like a section title. Each is a 24 px target
+   (WCAG 2.2 target size). A pair that would change nothing is dimmed and
+   stays focusable. */
+.hw-head-top {
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s2);
+}
+
+.hw-head-top .hw-head-kind {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.hw-folds {
+	flex: none;
+	display: flex;
+	gap: 2px;
+	margin: -4px -6px -4px 0;
+}
+
+.hw-folds button {
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	background: none;
+	border: 1px solid transparent;
+	border-radius: var(--hw-radius);
+	color: var(--hw-muted);
+	cursor: pointer;
+}
+
+.hw-folds button:hover {
+	background: var(--hw-raised);
+	border-color: var(--hw-rule);
+	color: var(--hw-text);
+}
+
+.hw-folds button:active {
+	background: var(--hw-field);
+}
+
+.hw-folds button[aria-disabled="true"] {
+	background: none;
+	border-color: transparent;
+	color: var(--hw-muted);
+	opacity: 0.4;
+	cursor: default;
+}
+
+.hw-folds svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 .hw-head-reading {

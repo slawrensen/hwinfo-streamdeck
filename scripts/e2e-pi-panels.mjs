@@ -267,6 +267,121 @@ try {
 	await sleep(200);
 	check("keyboard: Enter commits exactly the highlighted reading", typeof chosen === "string" && lastWrite()?.readingKey === chosen && sim.writes.length === 1, JSON.stringify({ wrote: lastWrite()?.readingKey, chosen }));
 
+	// ---- pointer dismissal: the app keeps Escape and most of its clicks -----
+	// Stream Deck 7.4.2 never delivers Escape to a panel, and a click on its
+	// own controls (the disabled Title field, the grey surround) reaches the
+	// page as nothing at all (bench 2026-09-23). So the box toggles, focus
+	// loss closes, and the pointer leaving the panel closes a browsing list.
+	await open("key-configured");
+	const listHidden = () => b.evaluate(`document.getElementById("picker-list").hidden`);
+	const saved = await b.evaluate(`document.getElementById("picker-search").value`);
+	await b.click("#picker-search");
+	await sleep(150);
+	const opened = !(await listHidden());
+	const selectedAll = await b.evaluate(`(() => { const i = document.getElementById("picker-search"); return i.value !== "" && i.selectionStart === 0 && i.selectionEnd === i.value.length; })()`);
+	check("pointer: a click opens the list with the whole name selected, so typing replaces it", opened && selectedAll, JSON.stringify({ opened, selectedAll }));
+	await b.click("#picker-search");
+	await sleep(150);
+	check("pointer: a second click on the box closes it and puts the saved reading back", (await listHidden()) && (await b.evaluate(`document.getElementById("picker-search").value`)) === saved);
+	await b.click("#picker-search");
+	await sleep(150);
+	await b.evaluate(`window.dispatchEvent(new Event("blur"))`);
+	await sleep(100);
+	check("pointer: the panel losing focus closes the list and lets go of the box", (await listHidden()) && (await b.evaluate(`document.activeElement.id !== "picker-search"`)));
+	await b.click("#picker-search");
+	await sleep(150);
+	await b.evaluate(`document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))`);
+	await sleep(1200);
+	check("pointer: leaving the panel never closes a browsing list on its own", !(await listHidden()));
+	await b.click("#hw-head");
+	await sleep(150);
+	check("pointer: a click anywhere else in the panel closes it and puts the saved reading back", (await listHidden()) && (await b.evaluate(`document.getElementById("picker-search").value`)) === saved);
+	await b.click("#picker-search");
+	await sleep(150);
+	await b.type("drive");
+	await b.evaluate(`document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))`);
+	await sleep(500);
+	check("pointer: a typed search stays open when the pointer leaves", !(await listHidden()) && (await b.evaluate(`document.getElementById("picker-search").value`)) === "drive");
+	check("pointer: none of it wrote", sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify(writes()));
+	// A save from pagehide never lands in the app (bench: 20 of 20 lost), so
+	// text still inside its 200 ms debounce is saved as the pointer leaves.
+	await b.evaluate(`(() => { const e = document.getElementById("f-label"); e.focus(); e.select(); })()`);
+	await b.type("Leaving");
+	await b.evaluate(`document.documentElement.dispatchEvent(new MouseEvent("mouseleave"))`);
+	await sleep(40); // well inside the 200 ms debounce
+	check("pointer: text typed just before the pointer leaves is saved at once, to this action", lastWrite()?.label === "Leaving" && sim.writes.length === 1, JSON.stringify({ writes: sim.writes.length, label: lastWrite()?.label }));
+
+	// ---- sections keep the folds a person chose (per kind, zero writes) ----
+	await open("key-configured");
+	await b.evaluate(`localStorage.removeItem("hw.folds.key")`);
+	await open("key-configured");
+	const foldsOf = () => b.evaluate(`Object.fromEntries(Array.from(document.querySelectorAll("details.hw-sec[id]"), (d) => [d.id, d.open]))`);
+	const defaults = await foldsOf();
+	await b.click("#sec-alerts > summary");
+	await sleep(120);
+	await open("key-configured");
+	const kept = await foldsOf();
+	check("folds: a section a person opened stays open on the next panel", kept["sec-alerts"] === true && defaults["sec-alerts"] === false && kept["sec-reading"] === defaults["sec-reading"], JSON.stringify({ defaults, kept }));
+	// The plugin keeps none of it: toggling sends it nothing.
+	await b.click("#sec-alerts > summary");
+	await b.click("#sec-alerts > summary");
+	await sleep(120);
+	const foldTraffic = sim.piMessages.filter((m) => /fold/i.test(JSON.stringify(m)));
+	check("folds: toggling a section sends the plugin nothing", foldTraffic.length === 0 && (await foldsOf())["sec-alerts"] === true, JSON.stringify(foldTraffic));
+	await open("dial-configured");
+	await sleep(120);
+	check("folds: each kind of panel keeps its own", (await foldsOf())["sec-alerts"] === false);
+	await open("key-configured");
+	await b.evaluate(`document.getElementById("sec-advanced").open = true`); // a script, not a person
+	await sleep(120);
+	await open("key-configured");
+	check("folds: a section opened by script is not remembered", (await foldsOf())["sec-advanced"] === false);
+	const altClick = async (sel) => {
+		const p = await b.evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return [r.left + 20, r.top + r.height / 2]; })()`);
+		for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: p[0], y: p[1], button: "left", clickCount: 1, modifiers: 1 });
+	};
+	await altClick("#sec-alerts > summary"); // open: Alt folds every section
+	await sleep(120);
+	const allFolded = Object.values(await foldsOf()).every((o) => o === false);
+	await altClick("#sec-reading > summary"); // folded: Alt opens every section
+	await sleep(120);
+	await open("key-configured");
+	const allOpen = Object.values(await foldsOf()).every((o) => o === true);
+	check("folds: Alt-click on a section title folds or opens them all, and that is kept too", allFolded && allOpen, JSON.stringify({ allFolded, allOpen }));
+	// The header's pair does what Alt-click does, for people who never find
+	// Alt-click: one toolbar, one Tab stop, remembered like any toggle.
+	const bar = () =>
+		b.evaluate(`({ open: document.querySelector('#hw-folds [data-folds="open"]').getAttribute("aria-disabled"), fold: document.querySelector('#hw-folds [data-folds="fold"]').getAttribute("aria-disabled"), focus: document.activeElement?.dataset?.folds ?? null, said: [...document.querySelectorAll('body > .hw-sr-only[role="status"]')].pop()?.textContent ?? "", tabs: [...document.querySelectorAll("#hw-folds button")].map((x) => x.tabIndex) })`);
+	await b.click('#hw-folds [data-folds="fold"]');
+	await sleep(120);
+	const folded = await foldsOf();
+	const barFolded = await bar();
+	check("folds: Fold all in the header folds every section, dims itself and says so", Object.values(folded).every((o) => o === false) && barFolded.fold === "true" && barFolded.open === "false" && barFolded.said.startsWith("All sections folded"), JSON.stringify({ folded, barFolded }));
+	await open("key-configured");
+	const foldedKept = await foldsOf();
+	check("folds: the header's Fold all is remembered on the next panel", Object.values(foldedKept).every((o) => o === false), JSON.stringify(foldedKept));
+	const tabsAtRest = (await bar()).tabs;
+	await b.evaluate(`document.querySelector('#hw-folds [data-folds="open"]').focus()`);
+	await b.key("ArrowRight");
+	const moved = (await bar()).focus;
+	await b.key("ArrowLeft");
+	await b.key("Enter");
+	await sleep(120);
+	const openedAll = await foldsOf();
+	const barOpened = await bar();
+	check("folds: the pair is one Tab stop, arrow keys move between them, Enter on Open all opens every section", same(tabsAtRest, [0, -1]) && moved === "fold" && Object.values(openedAll).every((o) => o === true) && barOpened.focus === "open" && barOpened.open === "true" && barOpened.said.startsWith("All sections open"), JSON.stringify({ tabsAtRest, moved, openedAll, barOpened }));
+	await b.click('#hw-folds [data-folds="open"]');
+	await sleep(120);
+	check("folds: a dimmed button changes nothing", Object.values(await foldsOf()).every((o) => o === true));
+	check("folds: none of it wrote a setting", sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify(writes()));
+	await open("control-default");
+	const controlBar = await b.evaluate(`(() => { const el = document.getElementById("hw-folds"); return el !== null && !el.hidden && el.getBoundingClientRect().width > 0; })()`);
+	await open("slot-reading");
+	const slotBar = await b.evaluate(`document.getElementById("hw-folds") === null`);
+	check("folds: the Control panel has the pair; the detail tile, which has no sections, has none", controlBar && slotBar, JSON.stringify({ controlBar, slotBar }));
+	await b.evaluate(`localStorage.removeItem("hw.folds.control")`);
+	await b.evaluate(`localStorage.removeItem("hw.folds.key")`);
+
 	await open("dial-configured");
 	await b.evaluate(`(() => { const btn = document.querySelector('#rotation-set .hw-chip-move[data-move="1"]:not(:disabled)'); btn.focus(); })()`);
 	const orderBefore = [...sim.settings.rotationKeys];
@@ -332,6 +447,10 @@ try {
 	await open("key-unavailable");
 	const down = await b.evaluate(`({ ph: document.getElementById("picker-search").placeholder, missing: document.getElementById("picker-search").classList.contains("missing"), tone: document.getElementById("reading-status").dataset.tone, state: document.getElementById("head-state").textContent })`);
 	check("truth: an unavailable source never reads as a missing reading", !/not found/i.test(down.ph) && !down.missing && down.tone === "danger" && down.state === "No HWiNFO data", JSON.stringify(down));
+	await b.click('#reading-status [data-status-action="setup"]');
+	await sleep(150);
+	const setup = await b.evaluate(`({ open: document.getElementById("setup-help").open, focus: document.activeElement === document.querySelector("#setup-help > summary") })`);
+	check("truth: HWiNFO setup steps opens the steps themselves and puts focus on them (one click, bench 2026-09-23)", setup.open && setup.focus, JSON.stringify(setup));
 	await open("key-missing");
 	const miss = await b.evaluate(`({ ph: document.getElementById("picker-search").placeholder, tone: document.getElementById("reading-status").dataset.tone, head: document.getElementById("head-reading").textContent, label: document.getElementById("f-label").value })`);
 	check("truth: a missing reading is named, its label kept, a repair offered", /not found/i.test(miss.ph) && miss.tone === "warn" && miss.head === "Old CPU" && miss.label === "Old CPU", JSON.stringify(miss));

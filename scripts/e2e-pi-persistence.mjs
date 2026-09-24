@@ -2340,7 +2340,7 @@ try {
 		zonesHelp: document.querySelector("#controls-zones .hw-help")?.textContent ?? null,
 		zonesShown: document.getElementById("controls-zones")?.hidden === false,
 		warnPlaceholder: document.getElementById("f-warn")?.getAttribute("placeholder") ?? "gone",
-		rotationHelp: document.getElementById("rotation-help")?.textContent ?? "gone"
+		rotationHelp: document.getElementById("pickerr-help")?.textContent ?? "gone"
 	})`)).result?.value ?? "{}"
 	);
 	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));

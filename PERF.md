@@ -27,6 +27,33 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-09-24: settings-panel reading picker without a row cap (F01, unreleased)
+
+Harness: `npx tsx scripts/pi-lab.mjs perf <out.json>`, a headless Chromium
+on Linux x64 (Node 22) driving the shipped `sensor-reading.html` against
+the simulated Stream Deck host (`scripts/lib/pi-sim.mjs`) with generated
+trees of 0, 1, 500 and 5,000 readings, the saved reading placed near the
+end. Each run: 3 warm-up queries, then 11 timed queries, each measured
+from the input event to the next frame (so ~16.7 ms, one frame, is the
+floor); 3 runs per size. Not the Stream Deck app's webview and not live
+HWiNFO; the embedded-host timing is a remaining gate.
+
+| Readings | main 2ca44e9 p50 / p95 | rows rendered | candidate p50 / p95 | rows rendered | saved reading visible on open (main / candidate) | open, worst (candidate) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 16.8 / 17.3 ms | 0 | 16.8 / 17.2 ms | 0 | n/a | 4.4 ms |
+| 1 | 16.6 / 18.0 ms | 1 | 16.8 / 17.7 ms | 1 | yes / yes | 8.2 ms |
+| 500 | 15.3 / 21.2 ms | 150 | 16.9 / 21.8 ms | 500 | no / yes | 18.4 ms |
+| 5,000 | 20.5 / 28.6 ms | 150 | 17.1 / 26.7 ms | 5,000 | no / yes | 62.6 ms |
+
+The 150-row cap is gone at the same filtering cost: the list is built
+once per sensor tree and filtered in place by toggling `hidden`, and
+groups off screen skip layout (`content-visibility: auto` with a
+per-group size estimate). The target was p95 ≤ 100 ms per query; the
+worst open (building 5,000 rows) is 62.6 ms. With no settings panel
+visible the plugin builds no preview at all. Raw samples:
+`review/pi-essentials/perf/picker-main-2ca44e9.json` and
+`picker-candidate.json`.
+
 ### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
 
 `node scripts/perf-report.mjs` against the final release candidate pack

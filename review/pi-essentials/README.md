@@ -311,12 +311,13 @@ the renderers use, sent as `effective` in the preview):
 | --- | --- | --- |
 | Lint | `npm run lint` | 0 problems |
 | Types | `npm run typecheck` | 0 errors |
-| Unit | `npm test` | 782 / 782 (main: 739; +43: pi-model, pi-preview, widened build-token) |
-| Panel suite (simulated host) | `npx tsx scripts/e2e-pi-panels.mjs` | 154 / 154 |
+| Unit | `npm test` | 789 / 789 (main: 739; +50: pi-model, pi-preview, widened build-token) |
+| Panel suite (simulated host) | `npx tsx scripts/e2e-pi-panels.mjs` | 164 / 164 |
 | Persistence suite (simulated host) | `npx tsx scripts/e2e-pi-persistence.mjs` | 551 / 551 |
 | Copy validator | `node scripts/validate-release-copy.mjs` | only the 5 failures main also has (internal release docs absent from the public repo) |
 | Docs anchors | scripted check of every `page.md#anchor` | 0 broken |
-| Captures (simulated host) | `pi-lab.mjs capture` | 64 states each for main and candidate; 0 page errors; candidate overflow 0 px at 320 and 480 |
+| Captures (simulated host) | `pi-lab.mjs capture` | 64 states each for main and candidate; 0 page errors; candidate overflow 0 px at 320 and 480 (and at 200 px in the states the review flagged) |
+| Bundle | `npx rollup -c` twice | byte-identical `bin/plugin.js` both times (see candidate.md) |
 | Accessibility | `AXE_CORE=… pi-lab.mjs a11y` | see Accessibility |
 | Performance | `pi-lab.mjs perf` | see Performance |
 
@@ -333,10 +334,10 @@ Headless Chromium on Linux x64, simulated host; not the embedded webview.
 
 | Readings | main p50 / p95 (ms) | main rows rendered | candidate p50 / p95 (ms) | candidate rows rendered | deep selection visible on open (main / candidate) | open max (candidate) |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 16.8 / 17.3 | 0 | 16.7 / 17.3 | 0 | n/a | 8.3 ms |
-| 1 | 16.6 / 18.0 | 1 | 16.8 / 17.4 | 1 | yes / yes | 6.3 ms |
-| 500 | 15.3 / 21.2 | 150 | 17.0 / 23.0 | 500 | no / yes | 18.2 ms |
-| 5,000 | 20.5 / 28.6 | 150 | 16.7 / 28.5 | 5,000 | no / yes | 84.9 ms |
+| 0 | 16.8 / 17.3 | 0 | 16.8 / 17.2 | 0 | n/a | 4.4 ms |
+| 1 | 16.6 / 18.0 | 1 | 16.8 / 17.7 | 1 | yes / yes | 8.2 ms |
+| 500 | 15.3 / 21.2 | 150 | 16.9 / 21.8 | 500 | no / yes | 18.4 ms |
+| 5,000 | 20.5 / 28.6 | 150 | 17.1 / 26.7 | 5,000 | no / yes | 62.6 ms |
 
 The ~16.7 ms floor is one frame. The candidate renders every row (no cap)
 at the same p95 as main's 150, because the list is built once per tree
@@ -351,11 +352,12 @@ it changed for that panel's context.
 ## Accessibility
 
 Target: WCAG 2.2 AA intent and the ARIA APG patterns. **Not a
-conformance claim.** Evidence: `a11y/candidate.json` and
-`a11y/main-2ca44e9.json` from `pi-lab.mjs a11y` over 31 states: a real
-Tab traversal of every stop (name, visible ring, hidden-by-fold, obscured
-by the pinned header) plus axe-core 4.13.0 (tags wcag2a, wcag2aa,
-wcag21a, wcag21aa, wcag22aa).
+conformance claim.** Evidence: `a11y/candidate.json` (31 states at 400
+and at 320 CSS px, 62 runs) and `a11y/main-2ca44e9.json` (31 states at
+400 px) from `pi-lab.mjs a11y`: a real Tab traversal of every stop and
+back again with Shift+Tab (name, visible ring, hidden-by-fold, fully or
+partly under the pinned header) plus axe-core 4.13.0 (tags wcag2a,
+wcag2aa, wcag21a, wcag21aa, wcag22aa).
 
 | | main 2ca44e9 | candidate |
 | --- | --- | --- |
@@ -363,12 +365,10 @@ wcag21a, wcag21aa, wcag22aa).
 | Own traversal issues | no-accessible-name 570, no-visible-focus 1309 | 0 |
 | Horizontal overflow at 320 CSS px | 24 px (every key state) | 0 (also 0 at 240 CSS px, the 320 px width at 133%) |
 
-axe "incomplete" (needs review) on the candidate, checked by hand:
-`#head-source` / `#head-reading` (overlapping header text box; tokens
-6.94:1 and 11.66:1 on the header), reorder arrow buttons (non-BMP glyph
-heuristic; `--hw-muted` 5.73:1 on the chip, `#dcebff` 5.21:1 on the
-selected chip), and rows inside a scrolled list (partially obscured;
-same tokens as the table above). No failure found.
+axe "incomplete" (needs review) on the candidate: 56 nodes, all reorder
+arrow buttons (axe skips contrast for glyphs it treats as icons),
+checked by hand: `--hw-muted` 5.73:1 on a chip, `#dcebff` 5.21:1 on the
+selected chip. No failure found.
 
 Patterns: reading pickers are APG comboboxes (`aria-activedescendant`;
 arrows inspect, Enter commits, Escape closes and restores, Tab never

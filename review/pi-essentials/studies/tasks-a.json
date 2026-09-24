@@ -91,7 +91,7 @@
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
 			"top": 492,
-			"pageHeight": 1837,
+			"pageHeight": 1853,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -103,8 +103,8 @@
 			"tabStop": 11,
 			"tabStopIsDisclosure": false,
 			"closedDisclosures": [],
-			"top": 625,
-			"pageHeight": 1837,
+			"top": 641,
+			"pageHeight": 1853,
 			"visibleWithoutScroll": true
 		},
 		{
@@ -133,8 +133,8 @@
 			"closedDisclosures": [
 				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
 			],
-			"top": 1558,
-			"pageHeight": 1597,
+			"top": 1574,
+			"pageHeight": 1613,
 			"visibleWithoutScroll": false
 		},
 		{

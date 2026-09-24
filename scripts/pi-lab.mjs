@@ -227,7 +227,8 @@ async function perf() {
 					const input = document.getElementById("picker-search");
 					const frame = () => new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
 					// Open: focus to the first frame after the rows exist (bounded).
-					const rows = () => document.querySelectorAll("#picker-list .hw-row, #picker-list [role=option]").length;
+					// Reading rows only: a disabled option is the list's message, not a reading.
+					const rows = () => document.querySelectorAll('#picker-list :is(.hw-row, [role=option]):not([aria-disabled="true"])').length;
 					const t0 = performance.now();
 					input.focus();
 					input.dispatchEvent(new Event("focus"));
@@ -249,7 +250,7 @@ async function perf() {
 					input.value = "";
 					input.dispatchEvent(new Event("input"));
 					await frame();
-					const allRows = document.querySelectorAll("#picker-list .hw-row:not([hidden]), #picker-list [role=option]:not([hidden])").length;
+					const allRows = document.querySelectorAll('#picker-list :is(.hw-row, [role=option]):not([hidden]):not([aria-disabled="true"])').length;
 					return { open, openRows, allRows, selectedVisible, samples, heap: performance.memory ? performance.memory.usedJSHeapSize : null };
 				})()`);
 				results.push({ size, run, ...r });

@@ -13,11 +13,11 @@ This page documents every setting in the key's settings panel. For the Stream De
 
 ## Settings
 
-The settings panel has five sections: **Reading** and **Display** open, **Alerts**, **Press** and **Advanced** folded, each fold showing a one-line summary of what it currently does. Above them, the header shows the key's face exactly as the plugin last drew it on the device, with the reading's name, its source, and whether the data is live, not updating, or unavailable.
+The settings panel has five sections: **Reading** and **Display** open, **Alerts**, **Press** and **Advanced** folded, each fold showing a one-line summary of what it currently does. A section you open or fold stays that way on every key's panel until the Stream Deck app restarts. The two chevron buttons at the top right of the header open or fold them all at once (so does Alt-click on any section title). Folding writes nothing to your keys. Above them, the header shows the key's face exactly as the plugin last drew it on the device, with the reading's name, its source, and whether the data is live, not updating, or unavailable.
 
 ### Sensor
 
-The **Reading** box in the Reading section searches every reading HWiNFO publishes (typically 500+), grouped by source (CPU, GPU, drives, network, and so on), and every match is listed. Type part of a reading or source name to filter; each row shows its value when the list loaded, so you can confirm you have the right one. Arrow keys browse without changing anything, Enter picks the highlighted reading, and Escape closes the list and puts your saved reading back. The **⟳** button reloads the list if HWiNFO's sensor set changed.
+The **Reading** box in the Reading section searches every reading HWiNFO publishes (typically 500+), grouped by source (CPU, GPU, drives, network, and so on), and every match is listed. Type part of a reading or source name to filter; each row shows its value when the list loaded, so you can confirm you have the right one. Arrow keys browse without changing anything, Enter picks the highlighted reading, and Tab or a click elsewhere closes the list and puts your saved reading back. The Stream Deck app keeps the Escape key for itself, so it does not reach the panel. The **⟳** button reloads the list if HWiNFO's sensor set changed.
 
 The selected sensor is stored as HWiNFO's stable `sensor-id : instance : reading-id` identity (on the Gadget registry, which carries no ids, as the source name and reading label HWiNFO writes), not a list position, so keys survive HWiNFO restarts and sensor reordering. If that identity later disappears from HWiNFO's output (a hardware, driver, or sensor-profile change, or a rename in HWiNFO while on the Gadget source), the key shows **Sensor missing / pick again** and the panel says **Saved reading not found**. The reading stays saved with its label and look, and returns by itself if HWiNFO publishes it again; pick another reading to replace it. When HWiNFO is not running at all, the panel says so instead and never calls your reading missing.
 
@@ -70,7 +70,7 @@ When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears i
 **Row 2 shows** decides the second row's stat:
 
 - **The same stat as row 1** *(default)*: both rows show the same stat, and the key press cycles them together. When that stat isn't the current value, **one MIN / MAX / AVG badge sits centered in the divider gap**, the key's most visible spot.
-- **Always the current value / minimum / maximum / average**: pins the second row to a fixed stat. When the two rows show different stats, the shared badge in the divider gap gives way and each non-current row carries its own small badge inline after its unit (the same idiom the dial uses), so row labels always keep their full width.
+- **Always the current value / minimum / maximum / average**: pins the second row to a fixed stat, and the key press then cycles row 1 alone. Each row that isn't showing the current value names its stat in a small badge after its own label (for example **CCD2 MAX**), so both values keep their full size and their place on every press.
 
 ![The key's settings panel with Layout set to Two readings, stacked: the Second sensor picker holding a GPU temperature, the Second label field and the Second shows select below it.]({{ '/assets/img/pi-key-dual.png' | relative_url }})
 

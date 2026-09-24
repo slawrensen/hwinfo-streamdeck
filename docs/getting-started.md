@@ -25,7 +25,7 @@ Click the **Reading** search box (at the top of the panel's Reading section) to 
 
 - **Grouped by source**: CPU, GPU, drives, motherboard and so on, under headings that match HWiNFO's own sensor names.
 - **Live values**: each row shows the reading's value, unit, and type (Temp, Fan, Power…), captured when the list loads; the **⟳** button re-reads them.
-- **Type to filter**: arrow keys browse, Enter picks, and Escape closes without changing anything. Search is multi-token: `cpu die` matches a row only if it contains *both* words, in any order, across the group name and the label. So `gpu hot` narrows straight to the GPU hotspot temperature.
+- **Type to filter**: arrow keys browse, Enter picks, and Tab or a click elsewhere closes without changing anything (the Stream Deck app keeps the Escape key for itself). Search is multi-token: `cpu die` matches a row only if it contains *both* words, in any order, across the group name and the label. So `gpu hot` narrows straight to the GPU hotspot temperature.
 - **⟳ refresh**: reload the list if you just enabled a sensor in HWiNFO and want it to appear.
 
 ![The Sensor picker open with "gpu" typed in the search box, showing matching readings grouped under their sensors (a PSU's GPU/CPU rails, then the GPU itself), each row with its value, unit, and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})

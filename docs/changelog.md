@@ -20,12 +20,15 @@ Elgato Marketplace listing is a separate track.
   Control keys and detail tiles share one essentials-first layout: a
   header with the exact face the plugin last drew and its live state,
   then Reading, Display, Alerts, Press (Controls on a dial) and
-  Advanced. Reading and Display start open, and every folded
-  section's title line says what it holds in the runtime's own terms:
-  inherited choices are marked "shared", thresholds read as at or
-  beyond (≥, ≤) with their unit and a dial's unit scope, and a dial's
-  gesture line follows the resolved preset, so a tap made dead by
-  touch zones is not listed.
+  Advanced. Reading and Display start open, a section you open or
+  fold stays that way on the next key's panel while the app runs (the
+  two chevron buttons at the top right of the header, or Alt-click on a
+  title, open or fold them all; never stored in a key's settings), and
+  every folded section's title line says what it holds in the
+  runtime's own terms: inherited choices are marked "shared",
+  thresholds read as at or beyond (≥, ≤) with their unit and a dial's
+  unit scope, and a dial's gesture line follows the resolved preset,
+  so a tap made dead by touch zones is not listed.
 - The panel tells its states apart: connecting, plugin not answering,
   no reading selected, HWiNFO unavailable (the saved reading is kept
   and never called missing), HWiNFO stalled, saved reading not found,
@@ -39,11 +42,26 @@ Elgato Marketplace listing is a separate track.
   Replacing the shared settings document asks for a second click.
 - The reading picker lists every match (the 150-row cap is gone) and
   stays responsive on a 5,000-reading tree (PERF.md). It follows the
-  combobox pattern: arrow keys browse, Enter picks, Escape closes
-  without changing anything. Rotation membership and custom detail
-  lists are checklists instead (one Tab stop; arrow keys move inside),
-  so ticking a reading never changes the reading on the dial, and
-  rotation chips gain up and down buttons.
+  combobox pattern: arrow keys browse, Enter picks, Tab or a click
+  elsewhere closes without changing anything. Rotation membership and
+  custom detail lists are checklists instead (one Tab stop; arrow keys
+  move inside), so ticking a reading never changes the reading on the
+  dial, and rotation chips gain up and down buttons. On a dial the
+  rotation sits right under the reading on the dial, with the chip on
+  the dial marked, so you can watch it move as you turn; the dial's face
+  sits beside its name in the header instead of above it.
+- The Stream Deck app keeps the Escape key and most of its own clicks
+  from reaching a panel, so the open list also closes on a second click
+  in the box and when the panel loses focus. Moving the pointer out of
+  the panel never closes it. A click that opens it selects the
+  whole name, so typing replaces it. Text typed just before selecting
+  another key is saved as the pointer leaves, instead of being lost
+  with the panel.
+- Faces as the device draws them: the app's SVG engine dropped the gap
+  before a unit on dual, triple and dial faces ("59.7°C"), and now
+  draws it ("59.7 °C"). On a dual key with a pinned second row, each
+  row's MIN, MAX or AVG sits after its own label, so a value no longer
+  shrinks or moves as a press cycles the stats.
 - Every control has a programmatic name and a visible focus ring, text
   contrast and small targets were raised, and the panels reflow at
   320 px wide without horizontal scrolling.

@@ -141,7 +141,7 @@ Byte quantities and transfer rates follow a separate, shared control: **Advanced
 Three gotchas cause almost all of these:
 
 1. **Thresholds are in *display* units.** The warn/critical fields are compared against the value **as shown on the key**. If you enabled **°F**, enter the threshold in °F (e.g. `176`), not °C (`80`). The placeholder text says "display units" for exactly this reason.
-2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Direction → "Alert when value drops below thresholds."**
+2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Alerts → Alert when the value drops to or below these numbers**.
 3. **A dial rotated to a different unit.** Warn/critical values are anchored to the unit they were typed against, so `80` typed while a °C reading was on screen stands down on the 3000 RPM fan you rotate to; the manual **Bar from** / **Bar to** stand down with it and the bar falls back to the session low/high. Edit the threshold while the reading you want is on screen and it re-anchors to that reading's unit. Thresholds saved before this behavior existed keep their old apply-everywhere reach until you next edit one. See [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
 Other notes:
@@ -233,7 +233,7 @@ Run through this first; most problems resolve here:
 - [ ] HWiNFO and Stream Deck are at the **same elevation** (both normal, or both admin).
 - [ ] **Stream Deck 6.9+**, **64-bit Windows 10+**.
 - [ ] You **re-picked the sensor** if it went missing after a hardware/driver change.
-- [ ] Threshold values are in the **displayed unit**, with the right **Direction**.
+- [ ] Threshold values are in the **displayed unit**, and **Alert when the value drops to or below these numbers** is ticked where low is bad.
 
 If it still fails, open an issue at the [project repository](https://github.com/slawrensen/hwinfo-streamdeck) and include:
 

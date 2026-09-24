@@ -98,14 +98,14 @@ Unlike keys (which read HWiNFO's own min/max/average), the dial tracks its **ses
 
 ## Settings
 
-Open the dial's Property Inspector to configure it. The panel follows the same order as the key panel: a header with the dial's current touchscreen face (the exact image the plugin last drew) and its live state, then **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**. Reading and Display start open; each folded section's title line summarizes what it holds, so you can check a dial without opening anything.
+Open the dial's Property Inspector to configure it. The panel follows the same order as the key panel: a header with the dial's current touchscreen face (the exact image the plugin last drew) and its live state, then **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**. Reading and Display start open; each folded section's title line summarizes what it holds, so you can check a dial without opening anything. Sections you open or fold stay that way on every dial's panel until the Stream Deck app restarts. The two chevron buttons at the top right of the header open or fold them all at once (so does Alt-click on a section title). Folding writes nothing to your dials.
 
 | Section | Setting | What it does |
 | --- | --- | --- |
-| Reading | **On the dial now** | Searchable picker over every reading HWiNFO publishes, with live values. Turning the dial changes it too. Arrow keys browse, Enter picks, Escape closes without changing anything. |
+| Reading | **On the dial now** | Searchable picker over every reading HWiNFO publishes, with live values. Turning the dial changes it too. Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything. |
+| Reading | **Readings to rotate through** | The rotation sits right under **On the dial now**: the ticked readings as chips in order, with up/down arrows, and the chip on the dial marked **on dial**, so you can watch it move as the dial turns. Below the chips, a checklist over the same readings: ticking adds a reading to the rotation without changing what is on the dial now. Empty means the picked sensor's readings. Can be split into named [rotation groups](controls.md#rotation-groups). |
 | Reading | **Title on the dial** | Custom title; blank falls back to the reading's own (renamed) label. |
 | Reading | **Title after a turn** | Whether a custom title clears when rotation moves to another reading (default), or stays as a fixed title. |
-| Reading | **Readings to rotate through** | A checklist over the same readings: ticking adds a reading to the rotation without changing what is on the dial now. The ticked readings show as chips below it with up/down arrows for their order; the chip on the dial is marked **on dial**. Empty means the picked sensor's readings. Can be split into named [rotation groups](controls.md#rotation-groups). |
 | Display | **View** | **One reading** (default), or an [overview](#overview-view) of the rotation list: two rows with big values and trend sparklines, or three compact rows. |
 | Display | **Row labels** | Overview only: shorten shared words into the context line (default), or always show full labels. |
 | Display | **Context line** | Three-row overview only: the shared name and session stats line sits above the rows (default) or below them. |

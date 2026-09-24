@@ -108,11 +108,12 @@ describe("key faces at every density target", () => {
 			for (const level of LEVELS) {
 				for (const extreme of EXTREMES) {
 					const palette = resolvePalette(config, themeId, null, level);
-					// warn exercises the inline per-row badge, crit the shared
-					// centered one, normal the badge-free face.
+					// warn exercises the inline per-row badges (two different
+					// pinned stats), crit the shared centered one, normal the
+					// badge-free face.
 					const svg = renderDualKey({
 						top: { label: extreme.label, valueText: extreme.value, unitText: extreme.unit, statBadge: level === "warn" ? "MAX" : "" },
-						bottom: { label: extreme.label, valueText: extreme.value, unitText: extreme.unit, statBadge: "" },
+						bottom: { label: extreme.label, valueText: extreme.value, unitText: extreme.unit, statBadge: level === "warn" ? "MIN" : "" },
 						sharedBadge: level === "crit" ? "AVG" : "",
 						palette
 					});

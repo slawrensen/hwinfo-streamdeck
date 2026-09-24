@@ -613,11 +613,12 @@ function primaryContext(settings: ReadingSettings, primary: Reading | undefined,
  * "Sensor missing" screen the single layout shows.
  *
  * Stat display: the second row FOLLOWS the first's stat mode unless
- * "Second shows" pins it (so the key press cycles both rows together by
- * default, like the dial's tap switches its whole face). When both rows
- * show the same stat, ONE badge sits centered in the divider gap and the
- * labels keep their full width; only rows whose stat differs carry their
- * own badge, inline after the unit.
+ * "Row 2 shows" pins it (so the key press cycles both rows together by
+ * default, like the dial's tap switches its whole face). A following row
+ * shares ONE badge, centered in the divider gap. A pinned row keeps its own
+ * badge on its own label line, and so does the first row beside it, even
+ * when both happen to show the same stat: each badge stays put, so a press
+ * only ever changes the first row's label line.
  */
 function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primaryKey: string, secondaryKey: string, returnMark = false): string {
 	const primary = snapshot.byKey.get(primaryKey);
@@ -632,8 +633,9 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	const topMode = isStatMode(settings.statMode) ? settings.statMode : "current";
 	// Absent, "follow", or junk all follow the first row (append-only
 	// salvage); only an explicit stat mode pins the second row.
-	const bottomMode = isStatMode(settings.secondaryStatMode) ? settings.secondaryStatMode : topMode;
-	const shared = topMode === bottomMode;
+	const pinned = isStatMode(settings.secondaryStatMode);
+	const bottomMode = pinned ? (settings.secondaryStatMode as StatMode) : topMode;
+	const shared = !pinned;
 	return renderDualKey({
 		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : STAT_BADGE[topMode]),
 		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : STAT_BADGE[bottomMode]),

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { formatQuadValue } from "../src/ui/format";
+import { estimateKeyTextWidth, formatQuadValue } from "../src/ui/format";
 import {
 	dualValueFontSize,
 	escapeXml,
@@ -495,8 +495,8 @@ describe("key text colors", () => {
 			text: custom
 		});
 		assert.match(dual, /y="56"[^>]*fill="#660000"/);
-		assert.match(dual, /<tspan dx="6" font-size="14" font-weight="600" fill="#660000">°C<\/tspan>/);
-		assert.match(dual, /fill="#660000">MAX<\/tspan>/);
+		assert.match(dual, /<tspan font-size="14" font-weight="600" fill="#660000">\u2002°C<\/tspan>/);
+		assert.match(dual, /fill="#660000">\u2002MAX<\/tspan><\/text>/); // a row badge, on its label line
 		const quad = renderQuadKey({ cells: [quadCell({ color: "#660000" }), null, null, null], palette: VOID, text: custom, sharedBadge: "MIN" });
 		assert.match(quad, /y="40"[^>]*fill="#660000"/);
 		assert.match(quad, /y="76"[^>]*fill="#660000">MIN<\/text>/);
@@ -553,7 +553,7 @@ describe("dual layout geometry (row B = row A + 72, divider at the midline)", ()
 
 	it("values 700 centered at x=72, y=56 and y=128, inline 14/600 unit in the chunk", () => {
 		const svg = renderDual({});
-		assert.match(svg, new RegExp(`<text x="72" y="56" text-anchor="middle" [^>]*font-size="32" font-weight="700" fill="${VOID.value}">56\\.3<tspan dx="6" font-size="14" font-weight="600" fill="${VOID.unit}">°C</tspan></text>`));
+		assert.match(svg, new RegExp(`<text x="72" y="56" text-anchor="middle" [^>]*font-size="32" font-weight="700" fill="${VOID.value}">56\\.3<tspan font-size="14" font-weight="600" fill="${VOID.unit}">\u2002°C</tspan></text>`));
 		assert.match(svg, new RegExp(`<text x="72" y="128" text-anchor="middle" [^>]*font-size="32" font-weight="700" fill="${VOID.value}">48\\.2<tspan`));
 		assert.doesNotMatch(svg, /text-anchor="start"/);
 	});
@@ -595,9 +595,16 @@ describe("dual value shrink ramp", () => {
 });
 
 describe("dual labels and badges", () => {
-	it("a row label keeps its full 120px band, badges or not, then ellipsizes at the floor", () => {
+	it("a row label keeps its full 120px band, then ellipsizes at the floor", () => {
 		assert.match(renderDual({ top: dualRow({ label: "Virtual Memory Committed" }) }), /font-size="14"[^>]*>Virtual Memory…</);
-		assert.match(renderDual({ top: dualRow({ label: "Virtual Memory Committed", statBadge: "AVG" }), sharedBadge: "" }), /font-size="14"[^>]*>Virtual Memory…</);
+	});
+
+	it("a row badge takes its width from the label's band: the label yields, the badge stays whole", () => {
+		const svg = renderDual({ top: dualRow({ label: "Virtual Memory Committed", statBadge: "AVG" }) });
+		const line = (svg.match(/<text x="72" y="22" [^>]*font-size="(\d+)"[^>]*>([^<]*)<tspan[^>]*>\u2002AVG<\/tspan><\/text>/) ?? []) as string[];
+		assert.ok(line.length === 3, "label line with its badge");
+		assert.match(line[2] as string, /…$/);
+		assert.ok(estimateKeyTextWidth(line[2] as string, Number(line[1]), { fontWeight: 600 }) + 6 + estimateKeyTextWidth("AVG", 12, { fontWeight: 700 }) + 1.5 <= 120, "label and badge fit the 120px band");
 	});
 
 	it("a shared badge is 12/700 CAPS centered in a divider gap, drawn over the divider", () => {
@@ -617,26 +624,36 @@ describe("dual labels and badges", () => {
 		assert.doesNotMatch(svg, /x="72" y="76"/);
 	});
 
-	it("a pinned row's badge rides inline after the unit, 12/700 accent (dial idiom)", () => {
+	it("a row's own badge rides on its label line after the label; the value keeps full size and center", () => {
 		const svg = renderDual({ bottom: dualRow({ label: "GPU Temp", valueText: "48.2", statBadge: "max" }) });
-		assert.match(
-			svg,
-			new RegExp(
-				`<text x="72" y="128" [^>]*font-weight="700" fill="${VOID.value}">48\\.2<tspan dx="6" font-size="14" font-weight="600" fill="${VOID.unit}">°C</tspan><tspan dx="6" font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">MAX</tspan></text>`
-			)
-		);
+		assert.match(svg, new RegExp(`<text x="72" y="94" text-anchor="middle" [^>]*font-weight="600" fill="${VOID.label}">GPU Temp<tspan font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">\u2002MAX</tspan></text>`));
+		assert.match(svg, new RegExp(`<text x="72" y="128" [^>]*font-size="32" font-weight="700" fill="${VOID.value}">48\\.2<tspan font-size="14" font-weight="600" fill="${VOID.unit}">\u2002°C</tspan></text>`));
+		assert.doesNotMatch(svg, /<rect x="47"/); // the divider stays whole
 		assert.doesNotMatch(svg, /x="132"/); // nothing end-anchored into the corner
 	});
 
-	it("an inline badge books three characters of the value's size budget", () => {
-		assert.equal(dualValueFontSize("56.3", false), 32);
-		assert.equal(dualValueFontSize("56.3", true), 24);
-		assert.match(renderDual({ top: dualRow({ valueText: "56.3", statBadge: "MIN" }) }), /<text x="72" y="56" [^>]*font-size="24"/);
+	it("both rows keep their own badges, even when they match; neither value shrinks", () => {
+		const svg = renderDual({ top: dualRow({ statBadge: "min" }), bottom: dualRow({ statBadge: "min" }) });
+		assert.equal((svg.match(/>\u2002MIN<\/tspan><\/text>/g) ?? []).length, 2);
+		assert.match(svg, /<text x="72" y="56" [^>]*font-size="32"/);
+		assert.match(svg, /<text x="72" y="128" [^>]*font-size="32"/);
+		assert.doesNotMatch(svg, /x="72" y="76"/); // no divider badge unless the caller shares one
 	});
 
-	it("an inline badge renders even on a unitless reading", () => {
-		const svg = renderDual({ top: dualRow({ unitText: "", statBadge: "avg" }) });
-		assert.match(svg, /y="56"[^>]*>56\.3<tspan dx="6" font-size="12" font-weight="700"[^>]*>AVG<\/tspan><\/text>/);
+	it("a value's size depends on its own text only", () => {
+		assert.equal(dualValueFontSize("56.3"), 32);
+		assert.match(renderDual({ top: dualRow({ valueText: "56.3", statBadge: "MIN" }), bottom: dualRow({ statBadge: "MAX" }) }), /<text x="72" y="56" [^>]*font-size="32"/);
+	});
+
+	it("gaps are characters the device engine draws, never dx (it ignores dx), kept by xml:space", () => {
+		const svg = renderDual({ top: dualRow({ statBadge: "avg" }) });
+		assert.doesNotMatch(svg, /dx=/);
+		// QtSvg trims chunk-edge whitespace unless the text element preserves it.
+		assert.match(svg, /<text x="72" y="22" text-anchor="middle" xml:space="preserve" [^>]*>CPU Package<tspan/);
+		assert.match(svg, /<text x="72" y="56" text-anchor="middle" xml:space="preserve" /);
+		assert.match(svg, /<text x="72" y="94" text-anchor="middle" font-family=/); // no badge, nothing to keep
+		assert.match(svg, />56\.3<tspan font-size="14"[^>]*>\u2002°C</);
+		assert.match(svg, /<tspan font-size="12"[^>]*>\u2002AVG</);
 	});
 });
 
@@ -655,7 +672,7 @@ describe("dual hardening", () => {
 		const svg = renderDual({ top: dualRow({ label: "A&B<C>", valueText: `1"2`, unitText: "'u" }) });
 		assert.match(svg, />A&amp;B&lt;C&gt;</);
 		assert.match(svg, />1&quot;2</);
-		assert.match(svg, />&apos;u</);
+		assert.match(svg, />\u2002&apos;u</);
 	});
 });
 
@@ -866,7 +883,7 @@ describe("triple layout geometry (three 48px bands, separators at y=47/95)", () 
 		] as const) {
 			assert.match(
 				svg,
-				new RegExp(`<text x="132" y="${y}" text-anchor="end" [^>]*font-size="18" font-weight="700" fill="${VOID.value}">${value.replace(".", "\\.")}<tspan dx="6" font-size="14" font-weight="600" fill="${VOID.unit}">°C</tspan></text>`)
+				new RegExp(`<text x="132" y="${y}" text-anchor="end" [^>]*font-size="18" font-weight="700" fill="${VOID.value}">${value.replace(".", "\\.")}<tspan font-size="14" font-weight="600" fill="${VOID.unit}">\u2002°C</tspan></text>`)
 			);
 		}
 	});
@@ -913,7 +930,7 @@ describe("triple layout geometry (three 48px bands, separators at y=47/95)", () 
 
 	it("a long custom unit is cut to 5 code points so the value's digits never leave the canvas", () => {
 		const svg = renderTripleKey({ rows: [{ label: "API", valueText: "1234.5", unitText: "requests/sec" }, tripleRowFixture(), null], palette: VOID });
-		assert.match(svg, />requ…<\/tspan>/);
+		assert.match(svg, />\u2002requ…<\/tspan>/);
 		assert.doesNotMatch(svg, /requests/);
 	});
 
@@ -1053,7 +1070,7 @@ describe("triple hardening", () => {
 		const svg = renderTripleKey({ rows: [{ label: "A&B<C>", valueText: `1"2`, unitText: "'u" }, tripleRowFixture(), null], palette: VOID });
 		assert.match(svg, />A&amp;B&lt;C&gt;</);
 		assert.match(svg, />1&quot;2</);
-		assert.match(svg, />&apos;u</);
+		assert.match(svg, />\u2002&apos;u</);
 	});
 });
 

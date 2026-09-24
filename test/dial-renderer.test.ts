@@ -34,7 +34,7 @@ describe("dial geometry", () => {
 
 	it("value 34/700 at x=12 y=58 with inline 17/600 unit in unit color", () => {
 		const svg = render({});
-		assert.match(svg, new RegExp(`<text x="12" y="58" text-anchor="start" [^>]*font-size="34" font-weight="700" fill="${MIDNIGHT.value}">56\\.3<tspan dx="6" font-size="17" font-weight="600" fill="${MIDNIGHT.unit}">°C</tspan></text>`));
+		assert.match(svg, new RegExp(`<text x="12" y="58" text-anchor="start" [^>]*font-size="34" font-weight="700" fill="${MIDNIGHT.value}">56\\.3<tspan font-size="17" font-weight="600" fill="${MIDNIGHT.unit}">\u2004°C</tspan></text>`));
 	});
 
 	it("long value prose steps down so status faces never clip at the slot edge", () => {
@@ -505,7 +505,7 @@ describe("dial text colors", () => {
 	it("single view: title, value, unit chunk and stats take the resolved text", () => {
 		const svg = render({ text: custom });
 		assert.match(svg, /<text x="12" y="24" [^>]*fill="#550505"/);
-		assert.match(svg, /<text x="12" y="58" [^>]*fill="#660000">56\.3<tspan [^>]*fill="#440A0A">°C<\/tspan><\/text>/);
+		assert.match(svg, /<text x="12" y="58" [^>]*fill="#660000">56\.3<tspan [^>]*fill="#440A0A">\u2004°C<\/tspan><\/text>/);
 		assert.match(svg, /<text x="12" y="78" [^>]*fill="#440A0A"/);
 	});
 

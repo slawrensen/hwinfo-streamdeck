@@ -325,8 +325,10 @@ try {
 	const kept = await foldsOf();
 	check("folds: a section a person opened stays open on the next panel", kept["sec-alerts"] === true && defaults["sec-alerts"] === false && kept["sec-reading"] === defaults["sec-reading"], JSON.stringify({ defaults, kept }));
 	// A toggle goes to the plugin's memory, never to settings, and the
-	// panel keeps nothing in web storage.
+	// panel keeps nothing in web storage. The pause lets the first toggle
+	// event fire: two clicks inside one task coalesce into a single event.
 	await b.click("#sec-alerts > summary");
+	await sleep(60);
 	await b.click("#sec-alerts > summary");
 	await sleep(120);
 	const foldTraffic = sim.piMessages.filter((m) => m.payload?.event === "setPanelFolds");

@@ -2318,6 +2318,17 @@
 					onOpenChange: (open) => {
 						document.getElementById("detail-custom")?.classList.toggle("picking", open);
 						if (open) detailListEl.querySelector(".hw-add.armed, .hw-add.lit")?.scrollIntoView({ block: "nearest" });
+						// Near the end of the section the sticky dock is pushed up by
+						// its container and can slide under the pinned header; bring
+						// it back down to sit just below the header.
+						if (open) {
+							const dock = document.getElementById("detail-add-dock");
+							const head = document.querySelector(".hw-head[data-pin]");
+							if (dock !== null && head !== null && getComputedStyle(head).position === "sticky") {
+								const overlap = head.getBoundingClientRect().bottom - dock.getBoundingClientRect().top;
+								if (overlap > 0) window.scrollBy(0, -Math.ceil(overlap));
+							}
+						}
 					}
 				});
 

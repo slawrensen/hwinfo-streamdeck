@@ -29,7 +29,7 @@ does not allow).
 ## Done after the reviews
 
 9. Both independent reviews folded in (reviews.md); every gate rerun on
-   `47b34e2`: lint 0, typecheck 0, unit 789/789, e2e-pi-panels 164/164,
+   `34dd1fc` (was `47b34e2` before the history rewrite; same tree): lint 0, typecheck 0, unit 789/789, e2e-pi-panels 164/164,
    e2e-pi-persistence 551/551, axe 0 violations and 0 traversal issues
    (forward and Shift+Tab) over 31 states at 400 and 320 px, captures 0
    overflow at 480, 320 and 240 px.

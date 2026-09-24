@@ -1,9 +1,12 @@
 # F01 candidate identity
 
-**Candidate:** commit `47b34e26c9b48ad96c7a51f20b4f5b07f008ea1d` on
+**Candidate:** commit `34dd1fc496d9c613ff0529110e0ec4ff096ae50d` on
 `claude/sweet-shannon-lss3s9` (tree `77825f707ecdacc3dae580fc9c82895ad6ae13bd`),
 based on `main` `2ca44e95c2d8b3442c3ed411952621b254d4cbf0` (1.6.0.0). The
-commit that adds this file changes nothing else. Every result in the
+commit that adds this file changes nothing else. The branch history was
+rewritten once to drop tool attribution from commit messages and authors;
+every tree is unchanged (this candidate was `47b34e2` before that), so
+the tree hash is the stable identity. Every result in the
 review record ran on this code.
 
 This is a **source candidate, not a package**. No `.streamDeckPlugin`

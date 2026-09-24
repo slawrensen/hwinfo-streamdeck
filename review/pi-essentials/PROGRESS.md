@@ -26,10 +26,19 @@ does not allow).
 8. Evidence: README (review record), coverage map, acceptance ledger,
    human test script (NOT RUN), before/after sheets, device-face sheet.
 
+## Done after the reviews
+
+9. Both independent reviews folded in (reviews.md); every gate rerun on
+   `47b34e2`: lint 0, typecheck 0, unit 789/789, e2e-pi-panels 164/164,
+   e2e-pi-persistence 551/551, axe 0 violations and 0 traversal issues
+   (forward and Shift+Tab) over 31 states at 400 and 320 px, captures 0
+   overflow at 480, 320 and 240 px.
+10. Candidate identified (candidate.md); issue #37; draft PR #38.
+
 ## Next
 
-1. Fold in the two independent reviews (reviews.md), rerun every gate.
-2. Identify the candidate (candidate.md), push, issue, draft PR.
+Nothing on this branch without the bench: the remaining gates below, and
+integration with the 1.7 line (#33, #32, #36) before the PR leaves draft.
 
 ## Remaining gates
 

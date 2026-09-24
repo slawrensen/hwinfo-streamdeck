@@ -443,8 +443,10 @@ and every suite above plus the live gates pass on it.
 
 ## Rollback
 
-The change is confined to the panel files, three plugin files that add
-fields to the preview message, docs, tests and scripts. Reverting the
+The change is confined to the panel files, four plugin files
+(`src/pi-protocol.ts`, the two sensor actions and the new
+`src/ui/key-layout.ts`) that add fields to the preview message and share
+the layout gate, docs, tests and scripts. Reverting the
 branch's commits restores 1.6.0.0 panels. Settings need no migration in
 either direction: this branch writes the same fields with the same
 types, and keeps (instead of dropping) anything it does not know.

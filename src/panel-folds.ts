@@ -45,9 +45,11 @@ export class PanelFoldMemory {
 		return { ...(this.byKind.get(kind) ?? {}) };
 	}
 
-	/** Replaces one kind's folds with what the panel sent, salvaged. */
+	/** Merges what a panel sent (salvaged) into one kind's folds. A merge,
+	 * not a replace: a panel that gave up waiting for the plugin's answer
+	 * knows only the sections toggled on it, and must not erase the rest. */
 	set(kind: PanelKind, raw: unknown): void {
-		this.byKind.set(kind, salvageFolds(raw));
+		this.byKind.set(kind, salvageFolds({ ...this.byKind.get(kind), ...salvageFolds(raw) }));
 	}
 }
 

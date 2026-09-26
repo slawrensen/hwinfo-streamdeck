@@ -14,6 +14,13 @@ describe("panel folds", () => {
 		assert.deepEqual(memory.get("key"), { "sec-alerts": true, "sec-advanced": false });
 	});
 
+	it("merges a partial update instead of erasing the other sections", () => {
+		const memory = new PanelFoldMemory();
+		memory.set("key", { "sec-alerts": true, "sec-interaction": true });
+		memory.set("key", { "sec-advanced": true, "sec-alerts": false });
+		assert.deepEqual(memory.get("key"), { "sec-alerts": false, "sec-interaction": true, "sec-advanced": true });
+	});
+
 	it("keeps each kind apart and starts empty", () => {
 		const memory = new PanelFoldMemory();
 		memory.set("dial", { "sec-interaction": true });

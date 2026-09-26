@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { parsePollInterval } from "../src/poller";
+
 type Settings = Record<string, unknown>;
 type Model = {
 	readingSummary(kind: string, settings: Settings, preview: unknown, labelOf: (key: string) => string | null): string;
@@ -146,8 +148,14 @@ describe("interaction summaries", () => {
 		assert.match(model.controlSummary({ command: "warp" }).command, /^Unknown command/);
 	});
 	it("summarizes the shared connection choices", () => {
-		assert.equal(model.advancedSummary({}), "Auto source · decimal data units");
-		assert.equal(model.advancedSummary({ source: "gadget", pollIntervalMs: "250", dataUnits: "binary" }), "Gadget only · binary data units", "a stored poll interval from 1.6 is not a setting any more");
+		assert.equal(model.advancedSummary({}), "Auto source · poll 1 s · decimal data units");
+		assert.equal(model.advancedSummary({ source: "gadget", pollIntervalMs: "250", dataUnits: "binary" }), "Gadget only · poll 250 ms · binary data units");
+		// The interval reads as the runtime parses it (parsePollInterval), not
+		// only as the menu offers it.
+		for (const [raw, shown] of [["2000", "poll 2 s"], [5000, "poll 5 s"], [1500, "poll 1.5 s"], ["100", "poll 250 ms"], [90_000, "poll 60 s"], ["", "poll 250 ms"], ["fast", "poll 1 s"], [null, "poll 1 s"]] as const) {
+			assert.equal(model.advancedSummary({ pollIntervalMs: raw } as Settings), `Auto source · ${shown} · decimal data units`, String(raw));
+			assert.equal(`poll ${((ms) => (ms >= 1000 ? `${ms / 1000} s` : `${ms} ms`))(parsePollInterval(raw))}`, shown, `runtime agrees for ${String(raw)}`);
+		}
 	});
 });
 

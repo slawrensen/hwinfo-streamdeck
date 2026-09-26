@@ -133,6 +133,20 @@ try {
 	await sleep(300);
 	check("edit shared theme: writes globals only", sim.writes.length === 0 && sim.globalWrites.length === 1, JSON.stringify(writes()));
 	check("edit shared theme: keeps other shared fields", sim.globalWrites.at(-1)?.theme === "forest" && sim.globalWrites.at(-1)?.textMode === "dim", JSON.stringify(sim.globalWrites.at(-1)));
+	// The read interval is a real shared control on both sensor panels: one
+	// globals write of pollIntervalMs alone, and the Advanced title line
+	// reads the new interval the way the runtime parses it.
+	for (const fixture of ["key-inherited", "dial-configured"]) {
+		await open(fixture);
+		const sharedBefore = structuredClone(sim.globals);
+		const poll = await b.evaluate(`(() => { document.getElementById("sec-advanced").open = true; const s = document.getElementById("shared-poll"); if (s === null) return null; const offered = [...s.options].map((o) => o.value); s.value = "2000"; s.dispatchEvent(new Event("change")); return { offered, fallback: s.dataset.default }; })()`);
+		await sleep(300);
+		check(`read every (${fixture}): the panel offers the five intervals with the 1 s default`, same(poll?.offered, ["250", "500", "1000", "2000", "5000"]) && poll?.fallback === "1000", JSON.stringify(poll));
+		const shared = sim.globalWrites.at(-1);
+		check(`read every (${fixture}): one globals write of pollIntervalMs alone`, sim.writes.length === 0 && sim.globalWrites.length === 1 && shared?.pollIntervalMs === "2000" && same(changedKeys(sharedBefore, shared ?? {}), ["pollIntervalMs"]), JSON.stringify({ ...writes(), shared }));
+		const summary = await b.evaluate(`document.querySelector('[data-summary="advanced"]')?.textContent ?? null`);
+		check(`read every (${fixture}): the Advanced title line names the new interval`, /· poll 2 s ·/.test(String(summary)), String(summary));
+	}
 
 	// ---- lossless: groups, names, tiles, lists -----------------------------
 	await open("dial-groups", {

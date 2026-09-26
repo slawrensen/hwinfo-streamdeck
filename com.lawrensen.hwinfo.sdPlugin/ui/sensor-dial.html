@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-f01p" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-f01q" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
@@ -395,6 +395,16 @@
 						</select>
 					</div>
 					<p class="hw-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
+					<div class="hw-field">
+						<label for="shared-poll">Read every</label>
+						<select id="shared-poll" data-setting="pollIntervalMs" data-global data-default="1000">
+							<option value="250">250 ms</option>
+							<option value="500">500 ms</option>
+							<option value="1000">1 second</option>
+							<option value="2000">2 seconds</option>
+							<option value="5000">5 seconds</option>
+						</select>
+					</div>
 					<details class="hw-inline-help" id="setup-help">
 						<summary>HWiNFO setup steps</summary>
 						<ol class="hw-help">
@@ -435,9 +445,9 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.0.0-f01p"></script>
-		<script src="pi-shell.js?v=1.7.0.0-f01p"></script>
-		<script src="pi-common.js?v=1.7.0.0-f01p"></script>
-		<script src="pi-control.js?v=1.7.0.0-f01p"></script>
+		<script src="pi-model.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-shell.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-common.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-control.js?v=1.7.0.0-f01q"></script>
 	</body>
 </html>

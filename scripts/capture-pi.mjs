@@ -179,7 +179,7 @@ try {
 	log("navigating: sensor-reading");
 	await cdp("Page.navigate", { url: `${BASE}/sensor-reading.html` });
 	await sleep(8000); // real time: plugin ticks + sensor tree + themes payload
-	// Advanced open (deck theme, accents, source, support report)
+	// Advanced open (deck theme, accents, source, poll rate, support report)
 	// and the viewport fitted, so the capture shows the whole panel.
 	expectOk("Advanced details", await evaluate(`(() => {
 		const adv = document.querySelector('details[data-fold="advanced"]');
@@ -193,14 +193,16 @@ try {
 	await sleep(300);
 	// The shot is the settings panel with its picker closed (the list only
 	// renders rows once the search box opens it). What must be there is the
-	// live value of the selected reading: refuse to shoot a panel the plugin
-	// has not fed yet, or a "—" preview ships as the documented state.
-	let liveValue = "";
-	for (let attempt = 0; attempt < 50 && !/\d/.test(liveValue); attempt++) {
-		liveValue = String((await evaluate(`document.getElementById("preview-value")?.textContent ?? ""`)).result?.value ?? "");
-		if (!/\d/.test(liveValue)) await sleep(200);
+	// live reading: the header says Live and its face (alt text = what the
+	// face draws) carries a number. Refuse to shoot a panel the plugin has not
+	// fed yet, or a "Connecting" header ships as the documented state.
+	let live = { state: "", face: "" };
+	const fed = () => /^Live\b/.test(live.state) && /\d/.test(live.face);
+	for (let attempt = 0; attempt < 50 && !fed(); attempt++) {
+		live = (await evaluate(`({ state: document.getElementById("head-state")?.textContent ?? "", face: document.getElementById("face-img")?.alt ?? "" })`)).result?.value ?? live;
+		if (!fed()) await sleep(200);
 	}
-	if (!/\d/.test(liveValue)) throw new Error(`the key PI never showed a live value (preview reads ${JSON.stringify(liveValue)}); refusing to capture a panel the plugin has not fed`);
+	if (!fed()) throw new Error(`the key PI never showed a live reading (header ${JSON.stringify(live.state)}, face ${JSON.stringify(live.face)}); refusing to capture a panel the plugin has not fed`);
 	await capture("pi-settings.png");
 	// The Advanced fold on its own, from its summary to the Config help line:
 	// the deck-wide groups (Deck defaults, Connection, Support) and the

@@ -93,14 +93,16 @@ They're two different things:
 
 The line holds 36 samples. Collection continues for subscribed readings while a Sensor Reading key or Sensor Dial is visible anywhere. HWiNFO Control keys do not keep polling alive. With no reading action visible, polling stops and the samples stay in memory; returning can append to them. The line is spaced by samples, so it does not measure the duration of that pause.
 
-Since 1.7, the plugin collects subsecond value changes as well as advancing producer timestamps. It does not count repeated held frames. How quickly the line fills depends on HWiNFO's polling period and the observed changes. With one accepted point every two seconds, 36 samples take about 72 seconds.
+Since 1.7, the plugin collects subsecond value changes as well as advancing producer timestamps. It does not count repeated held frames. How quickly the line fills depends on HWiNFO, the plugin's poll interval and the observed changes. With one accepted point every two seconds, 36 samples take about 72 seconds.
 
-A skipped read that could have hidden an update, a missing or non-finite reading, stale data (once the 15-second window opens), source transition or native-unit/type change clears the affected segment. A pairing edit clears only a segment whose saved key now stands for a different measurement. A plugin restart also starts fresh. See [collection rules](data-sources.md#freshness-and-local-history).
+A skipped read, missing or non-finite reading, stale data (once the 15-second window opens), source transition or native-unit/type change clears the affected segment. A poll-interval change clears all segments; a pairing edit clears only a segment whose saved key now stands for a different measurement. A plugin restart also starts fresh. See [collection rules](data-sources.md#freshness-and-local-history).
 
 Two more sparkline behaviors:
 
 - Toggling **°C/°F** no longer resets the graph: it stores native values and just relabels.
 - A **frozen** HWiNFO holds the line's last shape for up to 15 seconds instead of flattening it. Once the key reports **Not updating** the line is cleared, and it restarts when data resumes.
+
+Changing the plugin's **Read every** interval (Advanced) *does* clear the ring: the history is index-spaced, not time-stamped, so it does not preserve elapsed time across a cadence change.
 
 ## Performance and resource use
 

@@ -86,10 +86,6 @@ export interface SensorSnapshot {
 	/** Unix seconds of HWiNFO's last sensor poll. Gadget uses the time of an
 	 * observed value change, or zero when no change has been observed. */
 	readonly pollTime: number;
-	/** HWiNFO's own sensor polling period in ms, as the Shared Memory header
-	 * publishes it: the rate the data can change at. Absent when the source
-	 * does not publish one (Gadget, a revision-0 header). Diagnostic only. */
-	readonly pollingPeriodMs?: number;
 	/**
 	 * Bumped by the provider whenever any value actually changed or the
 	 * snapshot was rebuilt. pollTime alone cannot carry this: it has

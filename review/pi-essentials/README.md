@@ -439,12 +439,14 @@ and every suite above plus the live gates pass on it.
 
 **Update 2026-09-25: the combined release.** The owner chose to ship this
 work inside 1.7.0 rather than as a later 1.8.0. Branch
-`claude/f01-on-1.7` merges this branch into #36's tip (which sits on
-#33), keeps this folder as the record, and gates the result on the 1.7
-suites: the 1.7 alias contract runs through this panel's shell, the gap
-fix rides a counted transform inside 1.7's golden normalizers, "Read
-every" leaves with #36, and the four panel scripts ship in the pack
-contract. The sections above describe the review on main and are not
+`claude/f01-on-1.7` merges this branch into the 1.7 line, keeps this
+folder as the record, and gates the result on the 1.7 suites: the 1.7
+alias contract runs through this panel's shell, the gap fix rides a
+counted transform inside 1.7's golden normalizers, and the four panel
+scripts ship in the pack contract. The merge was first made onto #36's
+tip; a scope correction the same day deferred #36 (HWiNFO-cadence reads)
+to a later release, so this panel's "Read every" control and 1.7's
+configurable poll interval ship as they were. The sections above describe the review on main and are not
 rewritten; the combined branch's gate results are in its PR.
 
 ## Remaining gates (NOT RUN)

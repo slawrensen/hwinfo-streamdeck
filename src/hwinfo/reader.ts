@@ -56,25 +56,6 @@ function readPollTime(dv: DataView): number {
 	return dv.getInt32(HEADER.pollTime + 4, true) * 4294967296 + dv.getUint32(HEADER.pollTime, true);
 }
 
-/**
- * HWiNFO's declared sensor polling period in ms, or undefined when the
- * header does not carry one: revision 0, a section that starts inside the
- * field (the 44-byte header), or zero.
- */
-function readPollingPeriod(dv: DataView): number | undefined {
-	const end = HEADER.pollingPeriod + 4;
-	if (
-		dv.byteLength < end ||
-		dv.getUint32(HEADER.revision, true) < 1 ||
-		dv.getUint32(HEADER.sensorSectionOffset, true) < end ||
-		dv.getUint32(HEADER.entrySectionOffset, true) < end
-	) {
-		return undefined;
-	}
-	const ms = dv.getUint32(HEADER.pollingPeriod, true);
-	return ms > 0 ? ms : undefined;
-}
-
 /** Internal mutable twin of {@link Reading} — value fields updated in place. */
 interface MutableReading {
 	readonly key: string;
@@ -93,7 +74,6 @@ interface MutableSnapshot {
 	pollTime: number;
 	valueRevision: number;
 	freshnessRevision: number;
-	pollingPeriodMs: number | undefined;
 	version: number;
 	revision: number;
 	sensors: readonly SensorSource[];
@@ -258,8 +238,6 @@ export class SnapshotParser {
 			snap.valueRevision++;
 		}
 		if (evidenceChanged) snap.freshnessRevision++;
-		// Rewritten in place when the user changes it in HWiNFO; not a value.
-		snap.pollingPeriodMs = readPollingPeriod(dv);
 		return true;
 	}
 
@@ -374,7 +352,7 @@ export class SnapshotParser {
 			const old = previous.byKey.get(reading.key);
 			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
 		});
-		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), pollingPeriodMs: readPollingPeriod(dv), version, revision, sensors, readings, byKey };
+		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}
 }

@@ -24,7 +24,7 @@ const recovered = (role = "plugin") => ({
 	host: role === "host" ? { ...host, CreatedTicks: "638940000020000000" } : host,
 	hwinfoCount: 1
 });
-const goodLogs = ["2026-09-21T00:00:00.000Z INFO  HwinfoPoller: Started (Shared Memory every 250 ms, otherwise every 1000 ms)", "2026-09-21T00:00:00.100Z INFO  HwinfoPoller: Opened HWiNFO data source: shared-memory"];
+const goodLogs = ["2026-09-21T00:00:00.000Z INFO  HwinfoPoller: Started (1000 ms interval)", "2026-09-21T00:00:00.100Z INFO  HwinfoPoller: Opened HWiNFO data source: shared-memory"];
 function removeLogFixture(dir) {
 	assert.equal(path.dirname(path.resolve(dir)), path.resolve(os.tmpdir()));
 	assert(path.basename(dir).startsWith("soak-adversary-log-"));
@@ -61,7 +61,7 @@ test("ready source evidence must belong to the current plugin lifetime", () => {
 	const current = { ...plugin, CreatedTicks: (BigInt(Date.parse("2026-09-21T00:00:00.000Z")) * 10000n + 621355968000000000n).toString() };
 	assert.doesNotThrow(() => assertSharedMemoryReady(goodLogs, current));
 	assert.throws(() => assertSharedMemoryReady(goodLogs.map((line) => line.replace("2026-09-21", "2026-09-20")), current), /ready/);
-	for (const ending of ["Stopped (no visible actions)", "HWiNFO unavailable [busy]", "Opened HWiNFO data source: gadget", "Started (Shared Memory every 250 ms, otherwise every 1000 ms)"]) {
+	for (const ending of ["Stopped (no visible actions)", "HWiNFO unavailable [busy]", "Opened HWiNFO data source: gadget", "Started (1000 ms interval)"]) {
 		assert.throws(() => assertSharedMemoryReady([...goodLogs, `2026-09-21T00:00:01.000Z INFO  HwinfoPoller: ${ending}`], current), /ready/);
 	}
 });

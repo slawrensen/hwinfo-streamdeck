@@ -32,7 +32,7 @@ Click the **Reading** search box (at the top of the panel's Reading section) to 
 
 Click a row to select it. The panel's header then names the reading and its source, shows the key's face exactly as the plugin just drew it, and reports **Live** with the data source; the key on your deck switches from the blue prompt to the live number straight away. HWiNFO's min/max/average require Shared Memory: since 1.7, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changed from 1.6](whats-new-1.7.md).
 
-That's the whole loop: drag, pick, done. HWiNFO's own polling period (2 seconds by default) sets how often values change; see [update rate](data-sources.md#update-rate). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection; Gadget uses source names and reading labels. Switching between providers requires explicit links (since 1.7); see [data sources](data-sources.md).
+That's the whole loop: drag, pick, done. The plugin reads once a second by default; HWiNFO updates at its own rate (2 seconds by default). Change the plugin interval under [Read every](data-sources.md#read-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection; Gadget uses source names and reading labels. Switching between providers requires explicit links (since 1.7); see [data sources](data-sources.md).
 
 ## Where to go next
 

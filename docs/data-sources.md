@@ -82,13 +82,11 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 | **Shared Memory only** | Never touches the Gadget registry. If Shared Memory is off or expired, keys show a status screen instead of falling back. |
 | **Gadget registry only** | Reads only the registry. Current values only, but immune to the 12-hour limit. |
 
-### Update rate
+### Read every
 
-HWiNFO decides how often values change: it polls its sensors once per polling period, **2 seconds** by default, set in HWiNFO's own settings. No plugin setting can make values change faster. For faster updates, shorten HWiNFO's polling period.
+How often the plugin reads the source, from **250 ms** to **5 seconds** (default **1 second**), under *Advanced → Connection* (called **Poll every** before 1.7; the stored setting is unchanged). One reader serves every visible key and dial, so this is the plugin's total read rate, not per-key.
 
-The plugin reads Shared Memory four times a second, so a new HWiNFO value waits about a quarter second at most, and while every read succeeds none is missed at a polling period of 500 ms or longer. It reads the Gadget registry once a second, so a polling period under a second shows at most once a second there. A slow Gadget scan stretches its interval so reading stays within about a tenth of the plugin's time: on my bench a Gadget scan takes about 5 ms with 39 readings ticked and about 150 ms with all 554, against about 10 µs for a Shared Memory read. One reader serves every visible key and dial.
-
-Earlier versions had a **Poll every** setting. A value saved there is ignored. The support report shows both rates: `intervalMs` is the plugin's current read interval and `hwinfoPollingPeriodMs` is HWiNFO's polling period as Shared Memory reports it.
+> **Note:** HWiNFO updates its own sensors on a separate poll cycle (default **2 seconds**, set in HWiNFO's own settings). That cycle is the real ceiling on how fast values and sparklines change; polling the plugin faster than HWiNFO refreshes just re-reads the same numbers. Match or slightly under-run HWiNFO's interval for the freshest data without wasted reads. A slower plugin poll is a fine way to trim CPU further if you don't need sub-second updates.
 
 ## How this shows up elsewhere
 
@@ -209,12 +207,9 @@ row, for the same reason.
 
 Sparklines collect changed values between producer timestamps as well as
 advancing timestamps. Repeated held frames do not add points. A skipped
-read that could have hidden an update (always when HWiNFO's polling period
-is unknown, as on Gadget; otherwise once the gap between successful reads
-reaches half of that period), a missing or
-non-finite reading, stale data, a reading-type or native-unit change, or a
-provider transition clears the segment while retaining the subscription.
-A pairing edit
+read, missing or non-finite reading, stale data, reading-type or native-unit
+change, or provider transition clears the segment while retaining the
+subscription. A poll-interval change clears all segments. A pairing edit
 clears only the segment of a saved key that now stands for a different
 measurement.
 

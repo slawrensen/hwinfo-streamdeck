@@ -6,8 +6,8 @@ listing is a separate track.
 
 ## 1.7.0.0 - Unreleased
 
-Redesigned settings panels, per-reading dial colors, reads that follow
-HWiNFO's own cadence, and reliability fixes in one release.
+Redesigned settings panels, per-reading dial colors and reliability
+fixes in one release.
 
 - The settings panels for Sensor Reading keys, Sensor Dials, HWiNFO
   Control keys and detail tiles share one essentials-first layout: a
@@ -63,20 +63,13 @@ HWiNFO's own cadence, and reliability fixes in one release.
 - Labels follow the new vocabulary; stored settings are unchanged.
   "Deck default" is now Default; the deck theme, deck text and type
   accents are Theme, Text color and Accent colors under Advanced,
-  Shared defaults (marked "All keys and dials"); Label mode is Title
-  after a turn; Reset reach is A stats reset
+  Shared defaults (marked "All keys and dials"); Poll every is Read
+  every; Label mode is Title after a turn; Reset reach is A stats reset
   clears; Press does is A press; Detail contains is Details list; Tile
   shows is Readings per tile; and "Repeat Back under this key's own
   cell" is "Also go back from this key's own position". The Text
   color help explains that type accents color graphs and badges, never
   the numbers (issue #31).
-- Reads follow HWiNFO's own polling period instead of a plugin setting.
-  HWiNFO rewrites Shared Memory once per polling period (2 s by
-  default), so a faster plugin read cannot make data fresher and a
-  slower one discards writes. The plugin reads Shared Memory every
-  250 ms and Gadget once a second, and Poll every leaves both panels. A
-  saved poll interval is ignored and left in place. The support report
-  names HWiNFO's polling period next to the plugin's own read interval.
 - Malformed Gadget raw numbers remain unavailable instead of displaying a
   numeric prefix or adding it to freshness, history and session statistics.
   Healthy neighboring readings keep serving. Detail faces also refresh when

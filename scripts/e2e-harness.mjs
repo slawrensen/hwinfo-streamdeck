@@ -21,6 +21,9 @@ const harnessStart = new Date();
 // fixed window, so a healthy rebuild still returns in ~4 s and only a genuine
 // regression pays this deadline.
 const SPARKLINE_REBUILD_MS = 20_000;
+// The read interval the startup globals carry, as the panel stores it (a
+// string): not the 1 s default, so the run proves launch applies it.
+const STARTUP_POLL_MS = "500";
 
 const results = {
 	registered: false,
@@ -46,7 +49,11 @@ wss.on("connection", (ws) => {
 				await scenario(send);
 				break;
 			case "getGlobalSettings":
-				send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
+				// A saved non-default read interval, as the panel stores it: the
+				// plugin must run at it from launch (and, per the 1.5.1 defect,
+				// applying it at launch must not end collection for the keys
+				// that appeared first). 500 ms keeps every later wait short.
+				send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: STARTUP_POLL_MS } } });
 				break;
 			case "setImage":
 				results.images.push({ context: msg.context, image: msg.payload?.image ?? "" });
@@ -112,6 +119,10 @@ async function scenario(send) {
 	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", device: "dev1" });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getSensorTree" } });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getThemes" } });
+	// The interval the poller runs at from launch, read before any leg sends
+	// other shared settings (a shared-settings document without
+	// pollIntervalMs rightly means the 1 s default).
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getSupportReport" } });
 	await sleep(2600);
 
 	// Rotation set + ignore-turns + autocycle, driven with two live keys from
@@ -639,6 +650,45 @@ async function scenario(send) {
 	await sleep(300);
 	results.reappearFirstFrame = decodeSvg((results.images.filter((i) => i.context === "ctx-key")[keyFramesBefore] ?? {}).image);
 
+	// Poll-interval change: the panel's Advanced section pushes new globals
+	// mid-session, and the poller resets its sample rings for the new
+	// cadence. The rings ARE the subscription registry, so a reset that
+	// dropped them ended collection for every visible key until its action
+	// reloaded (the 1.5.1 defect). Drive the real chain the panel drives:
+	// globals in, then prove a sparkline REBUILDS on the live key.
+	// The wait is HWiNFO's own cadence, not the poll interval: a rebuilt line
+	// needs two FRESH snapshots (~2 s each). It waits for the line rather than
+	// a fixed window because the poller feeds AT MOST ONE sample per tick no
+	// matter how many snapshots elapsed since it last read, so a single stalled
+	// tick costs a whole sample and pushes the rebuild past any budget sized
+	// for a quiet box. The old fixed 6.5 s held barely 2 s of slack over the
+	// 4.1 s worst case and lost it under load right after a suite run.
+	const intervalFramesBefore = results.images.filter((i) => i.context === "ctx-key").length;
+	const keyFramesSince = () => results.images.filter((i) => i.context === "ctx-key").slice(intervalFramesBefore);
+	const rebuildStart = Date.now();
+	// The key must carry a line before the change, the change must empty the
+	// ring (a frame without the line), and a line drawn AFTER that frame is
+	// the rebuild. A line that was already there when the change landed, or
+	// a byte-changing tick in flight at the marker, proves nothing.
+	results.sparklineBeforeIntervalChange = decodeSvg(results.images.filter((i) => i.context === "ctx-key").at(-1)?.image ?? "")?.includes("<polyline") === true;
+	send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: 250 } } });
+	const rebuilt = () => {
+		const cleared = keyFramesSince().findIndex((i) => !decodeSvg(i.image).includes("<polyline"));
+		return cleared >= 0 && keyFramesSince().slice(cleared + 1).some((i) => decodeSvg(i.image).includes("<polyline"));
+	};
+	results.sparklineAfterIntervalChange = await waitUntil(rebuilt, SPARKLINE_REBUILD_MS, 100);
+	// On failure, say which half broke. The frame count alone cannot: the key
+	// repaints only when its composed bytes change, so a steady sensor legitimately
+	// yields a single frame even while the poller is healthy (reintroducing the
+	// 1.5.1 defect on a quiet box produced exactly one). What does separate them is
+	// whether the poller ever saw the new cadence, plus the deadline itself: a live
+	// rebuild lands in ~3.5 s here, so 20 s of silence is a dead ring, not a slow box.
+	results.sparklineRebuildDetail = results.sparklineAfterIntervalChange
+		? `polyline returned after ${((Date.now() - rebuildStart) / 1000).toFixed(1)}s`
+		: `no sparkline over ${(SPARKLINE_REBUILD_MS / 1000).toFixed(0)}s in ${keyFramesSince().length} frame(s); poller logged the new interval: ${loggedThisRun("Poll interval set to 250 ms") ? "yes, so the ring never refilled" : "NO, the globals never reached it"}`;
+	send({ event: "didReceiveGlobalSettings", payload: { settings: {} } }); // back to the default cadence
+	await sleep(400);
+
 	// A REPLAYED willAppear (no willDisappear before it) must repaint, even
 	// though the composed bytes have not changed. Stream Deck replays appear
 	// on reconnect and on wake, and the app's own image cache can be cold
@@ -685,7 +735,7 @@ async function scenario(send) {
 	});
 	await sleep(1200); // drain any in-flight tick
 	const framesAtIdle = results.images.length + results.feedbacks.length;
-	await sleep(3000); // 3 s of required silence (a dozen 250 ms reads)
+	await sleep(3000); // three poll intervals of required silence
 	results.idleDelta = results.images.length + results.feedbacks.length - framesAtIdle;
 	await finish();
 }
@@ -765,6 +815,11 @@ async function finish() {
 	const value = valueMatch ? Number(valueMatch[1]) : NaN;
 	check("key SVG value is a plausible CPU temp", Number.isFinite(value) && value > 15 && value < 120, `value=${value}`);
 	check("key SVG includes sparkline polyline", keyImages.some((s) => s.includes("<polyline")));
+	check(
+		"sparkline rebuilds after a poll-interval change (subscriptions survive the cadence reset)",
+		results.sparklineBeforeIntervalChange === true && results.sparklineAfterIntervalChange === true,
+		`${results.sparklineBeforeIntervalChange === true ? "line present before the change; " : "NO line before the change; "}${results.sparklineRebuildDetail ?? "leg did not run"}`
+	);
 	check(
 		"sparkline survives nav away + back (history persisted in poller)",
 		typeof results.reappearFirstFrame === "string" && results.reappearFirstFrame.includes("<polyline"),
@@ -1052,7 +1107,7 @@ async function finish() {
 	check("control key nextGroup honors rotation groups on any preset", results.controlGroupJumpTo === results.rotationKeys?.[1], `advanced to ${results.controlGroupJumpTo}`);
 
 	// Support report: valid JSON, models named, raw device IDs and names absent.
-	const supportMsg = results.piPayloads.find((p) => p?.event === "supportReport");
+	const supportMsg = results.piPayloads.findLast((p) => p?.event === "supportReport");
 	let reportOk = false;
 	let reportDetail = "no supportReport payload";
 	let reportControlVisible = null;
@@ -1074,6 +1129,21 @@ async function finish() {
 	// The control key saw a replayed willAppear and then one willDisappear:
 	// per-context tracking must report zero visible keys, not a stuck count.
 	check("support report: replayed control key is not double-counted", reportControlVisible === 0, `visibleKeys=${reportControlVisible}`);
+	// The first report was asked for right after launch, before any leg sent
+	// other shared settings: the poller must already run at the saved value.
+	const startupReport = results.piPayloads.find((p) => p?.event === "supportReport");
+	let startupIntervalMs;
+	try {
+		startupIntervalMs = JSON.parse(startupReport?.report ?? "null")?.dataSource?.intervalMs ?? null;
+	} catch {
+		startupIntervalMs = "unparseable";
+	}
+	const startupLogged = loggedThisRun(`Poll interval set to ${STARTUP_POLL_MS} ms`);
+	check(
+		"startup honors a saved non-default poll interval",
+		startupIntervalMs === Number(STARTUP_POLL_MS) && startupLogged,
+		`startup support report intervalMs=${startupIntervalMs}; log ${startupLogged ? "names" : "does NOT name"} the ${STARTUP_POLL_MS} ms interval`
+	);
 
 	const tree = results.piPayloads.find((p) => p?.event === "sensorTree");
 	check("PI got sensorTree", tree !== undefined);
@@ -1108,9 +1178,6 @@ async function finish() {
 
 	// Exit hygiene.
 	check("poller idles when no actions visible", results.idleDelta === 0, `frames in 3 s after willDisappear: ${results.idleDelta}`);
-	// The cadence follows the open source, not a setting: the start line
-	// names both rates, and Shared Memory is the source this run reads.
-	check("poller logs its per-source cadence", loggedThisRun("Started (Shared Memory every 250 ms, otherwise every 1000 ms)") && loggedThisRun("Opened HWiNFO data source: shared-memory"));
 	check("poller logged idle stop", loggedThisRun("Stopped (no visible actions)"));
 	const shutdown = await shutdownPlugin();
 	check("plugin exits when the app socket closes", shutdown.clean, shutdown.detail);
@@ -1118,7 +1185,8 @@ async function finish() {
 	// A deleted gate runs zero checks and everything left still passes:
 	// name the legs a merge must never lose and fail when one never ran.
 	for (const req of [
-		"poller logs its per-source cadence",
+		"sparkline rebuilds after a poll-interval change",
+		"startup honors a saved non-default poll interval",
 		"PI got live preview for selected reading",
 		"a replayed willAppear repaints the key despite unchanged bytes",
 		"a replayed willAppear repaints the dial despite unchanged bytes",

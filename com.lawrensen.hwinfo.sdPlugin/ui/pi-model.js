@@ -236,12 +236,21 @@ self.hwModel = (() => {
 		return { command: `${name}${reach}`, target: target === "" ? "every dial" : `dials with Link ID "${target}"` };
 	}
 
-	/** Advanced: the shared, plugin-wide choices (global settings). The read
-	 * cadence follows HWiNFO's own, so a stored pollIntervalMs is not one. */
+	/** The read interval the runtime uses, mirroring parsePollInterval
+	 * (src/poller.ts): a finite number is rounded and clamped to 250 ms..60 s,
+	 * anything else is the 1 s default. */
+	function pollIntervalOf(raw) {
+		const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : Number.NaN;
+		return Number.isFinite(n) ? Math.min(60_000, Math.max(250, Math.round(n))) : 1000;
+	}
+
+	/** Advanced: the shared, plugin-wide choices (global settings). */
 	function advancedSummary(globals) {
 		const src = globals.source === "shared-memory" ? "Shared Memory only" : globals.source === "gadget" ? "Gadget only" : "Auto source";
+		const ms = pollIntervalOf(globals.pollIntervalMs);
+		const poll = ms >= 1000 ? `poll ${ms / 1000} s` : `poll ${ms} ms`;
 		const units = globals.dataUnits === "binary" ? "binary data units" : "decimal data units";
-		return `${src} · ${units}`;
+		return `${src} · ${poll} · ${units}`;
 	}
 
 	// --- lossless writes ---------------------------------------------------

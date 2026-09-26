@@ -12,7 +12,7 @@
  *   ok ──(pollTime frozen > 15 s)──▶ stale ──(backend gone)──▶ unavailable
  *    ▲                                 │ (probe re-open every 5 s)
  *    └────────(pollTime advances)──────┘
- * `unavailable` re-attempts a full open every tick, once a second (cheap: one failing
+ * `unavailable` re-attempts a full open every tick (cheap: one failing
  * OpenFileMappingW / RegOpenKeyExW), so recovery is automatic. The one
  * exception is a present-but-empty Gadget key: it opens, and the bounded VSB
  * scan runs before the source is refused as "gadget-empty".
@@ -54,21 +54,9 @@ export type PollerStatus =
 
 type SourceMode = "auto" | "shared-memory" | "gadget";
 
-/**
- * Read cadence, per source. HWiNFO's own polling period (2 s by default,
- * published in the Shared Memory header) sets how often the data changes,
- * and no read rate can make it change faster, so this is not a setting.
- * A Shared Memory read is one guarded copy of about 10 µs (PERF.md), read
- * often enough that a write waits about a quarter second at most and a
- * period down to 500 ms is not under-sampled. A Gadget read scans the
- * ticked list (about 5 ms for 39 readings, about 150 ms for 554), and with
- * no source open a tick is only an open attempt: both run once a second,
- * slower when an attempt is slow (see tickMs). HWINFO_TICK_MS pins every
- * cadence for the e2e harnesses.
- */
-const PINNED_TICK_MS = Number(process.env.HWINFO_TICK_MS ?? "") || 0;
-const SHARED_MEMORY_TICK_MS = PINNED_TICK_MS || 250;
-const DEFAULT_TICK_MS = PINNED_TICK_MS || 1000;
+const DEFAULT_INTERVAL_MS = 1000;
+const MIN_INTERVAL_MS = 250;
+const MAX_INTERVAL_MS = 60_000;
 // Both timings are env-overridable so the resilience e2e can force the
 // stale/unavailable transitions in seconds instead of minutes.
 /** pollTime frozen for longer than this ⇒ HWiNFO stopped sharing. */
@@ -89,6 +77,14 @@ function stampAgeMs(pollTime: number): number {
 	return Math.max(0, Date.now() - pollTime * 1000);
 }
 
+export function parsePollInterval(raw: unknown): number {
+	const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : Number.NaN;
+	if (!Number.isFinite(n)) {
+		return DEFAULT_INTERVAL_MS;
+	}
+	return Math.min(MAX_INTERVAL_MS, Math.max(MIN_INTERVAL_MS, Math.round(n)));
+}
+
 export function parseSourceMode(raw: unknown): SourceMode {
 	return raw === "shared-memory" || raw === "gadget" ? raw : "auto";
 }
@@ -98,9 +94,7 @@ class HwinfoPoller extends EventEmitter {
 	private provider: SnapshotProvider | null = null;
 	private timer: NodeJS.Timeout | null = null;
 	private refs = 0;
-	/** How long the last attempt took to open (when it had to) and read,
-	 * failed or not; feeds tickMs. */
-	private attemptCostMs = 0;
+	private intervalMs = DEFAULT_INTERVAL_MS;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
 	private lastValueRevision: number | undefined;
@@ -198,13 +192,12 @@ class HwinfoPoller extends EventEmitter {
 	}
 
 	/** Redacted data-source facts for the support report (no sensor values). */
-	diagnostics(): { state: string; reason?: string; source?: string; readings?: number; intervalMs: number; hwinfoPollingPeriodMs: number | null; polling: boolean; retained: number; sampleAgeMs: number | null } {
+	diagnostics(): { state: string; reason?: string; source?: string; readings?: number; intervalMs: number; polling: boolean; retained: number; sampleAgeMs: number | null } {
 		const status = this.status;
 		return {
 			state: status.state,
 			...(status.state === "unavailable" ? { reason: status.reason } : { source: status.source, readings: status.snapshot.readings.length }),
-			intervalMs: this.tickMs(),
-			hwinfoPollingPeriodMs: status.state === "unavailable" ? null : status.snapshot.pollingPeriodMs ?? null,
+			intervalMs: this.intervalMs,
 			polling: this.timer !== null,
 			retained: this.refs,
 			sampleAgeMs: status.state === "unavailable" || (status.source === "gadget" && status.snapshot.pollTime === 0) || this.lastAdvanceAt === 0 ? null : monotonicNow() - this.lastAdvanceAt
@@ -247,6 +240,28 @@ class HwinfoPoller extends EventEmitter {
 		}
 	}
 
+	setIntervalMs(ms: number): void {
+		if (ms === this.intervalMs) {
+			return;
+		}
+		this.intervalMs = ms;
+		// The ring is index-spaced, not timestamped, so it cannot honestly
+		// span a cadence change: empty every ring in place. The map KEYS are
+		// the subscriptions (see subscribeSeries), so clearing the map would
+		// end collection for every visible key until its action replayed;
+		// nothing resubscribes a static visible key, and the globals response
+		// lands after the first willAppear subscriptions, so a saved
+		// non-default interval also fired this once on every launch.
+		for (const ring of this.series.values()) {
+			ring.length = 0;
+		}
+		this.logger.info(`Poll interval set to ${ms} ms`);
+		if (this.timer !== null) {
+			clearInterval(this.timer);
+			this.timer = setInterval(() => this.tick(), this.intervalMs).unref(); // see start()
+		}
+	}
+
 	setSourceMode(mode: SourceMode): void {
 		if (mode === this.mode) {
 			return;
@@ -267,52 +282,21 @@ class HwinfoPoller extends EventEmitter {
 		if (this.timer !== null) {
 			return;
 		}
-		this.logger.info(`Started (Shared Memory every ${SHARED_MEMORY_TICK_MS} ms, otherwise every ${DEFAULT_TICK_MS} ms)`);
-		this.step();
-	}
-
-	/**
-	 * The cadence of the source that is open right now (see
-	 * SHARED_MEMORY_TICK_MS). Anything but Shared Memory is stretched when
-	 * an attempt is slow, so reading stays within about a tenth of the
-	 * plugin's one thread (a Gadget key with every reading ticked scans for
-	 * about 150 ms). A slow Shared Memory read is a stall, not a cost:
-	 * stretching after one would skip HWiNFO writes.
-	 */
-	private tickMs(): number {
-		if (PINNED_TICK_MS > 0) return PINNED_TICK_MS;
-		if (this.provider?.source === "shared-memory") return SHARED_MEMORY_TICK_MS;
-		return Math.max(DEFAULT_TICK_MS, 10 * this.attemptCostMs);
-	}
-
-	/**
-	 * One tick, then the next one armed at the cadence of whatever source is
-	 * open by then, so a fallback or an upgrade changes the rate at once.
-	 * The re-arm survives a throw, as setInterval did, and is skipped when a
-	 * listener stopped the poller or already restarted it inside the tick.
-	 */
-	private step(): void {
-		this.timer = null;
-		try {
-			this.tick();
-		} finally {
-			if (this.refs > 0 && this.timer === null) {
-				// unref'd: the Stream Deck socket is what keeps this process
-				// alive, and it should be the ONLY thing. The SDK has no close
-				// handler and never reconnects, and ws drops sends after a close
-				// without raising, so a socket that dies while keys are visible
-				// would otherwise leave a plugin polling HWiNFO forever, painting
-				// into nothing, with no log line. With the timer unref'd the loop
-				// drains and the process exits, which is exactly what the e2e
-				// already asserts for the idle case.
-				this.timer = setTimeout(() => this.step(), this.tickMs()).unref();
-			}
-		}
+		this.logger.info(`Started (${this.intervalMs} ms interval)`);
+		// unref'd: the Stream Deck socket is what keeps this process alive, and
+		// it should be the ONLY thing. The SDK has no close handler and never
+		// reconnects, and ws drops sends after a close without raising, so a
+		// socket that dies while keys are visible would otherwise leave a
+		// plugin polling HWiNFO forever, painting into nothing, with no log
+		// line. With the timer unref'd the loop drains and the process exits,
+		// which is exactly what the e2e already asserts for the idle case.
+		this.timer = setInterval(() => this.tick(), this.intervalMs).unref();
+		this.tick();
 	}
 
 	private stop(): void {
 		if (this.timer !== null) {
-			clearTimeout(this.timer);
+			clearInterval(this.timer);
 			this.timer = null;
 		}
 		// On a single deck every page change, drill-down entry and Back
@@ -413,7 +397,6 @@ class HwinfoPoller extends EventEmitter {
 	}
 
 	private tick(): void {
-		const attemptStart = monotonicNow();
 		try {
 			if (this.provider === null) {
 				this.provider = this.openProvider();
@@ -445,7 +428,6 @@ class HwinfoPoller extends EventEmitter {
 					? `Data source layout changed; reopened in place (${this.provider.source})`
 					: `Opened HWiNFO data source: ${this.provider.source} (${poisoned} became unreadable)`);
 			}
-			this.attemptCostMs = monotonicNow() - attemptStart;
 			for (const line of this.provider.notices?.() ?? []) this.logger.warn(line);
 			this.holdingSince = 0;
 			if (snapshot !== null) {
@@ -507,16 +489,7 @@ class HwinfoPoller extends EventEmitter {
 				this.revisionProvider = this.provider;
 				this.lastFreshnessRevision = snapshot.freshnessRevision;
 			} else {
-				// A skipped read (busy mutex, Gadget interleave) ends the
-				// segments only when it could have hidden a producer write.
-				// Shared Memory publishes its polling period, and a write can
-				// be lost only if two land between accepted reads; half the
-				// period keeps a margin for HWiNFO's timing jitter. Without a
-				// published period, every skip ends them.
-				const period = this.lastRaw?.source === this.provider.source ? this.lastRaw.snapshot.pollingPeriodMs : undefined;
-				if (period === undefined || monotonicNow() - this.lastAcceptedAt + this.tickMs() >= period / 2) {
-					for (const ring of this.series.values()) ring.length = 0;
-				}
+				for (const ring of this.series.values()) ring.length = 0;
 			}
 			// Freshness is judged even when the read was skipped (mutex busy) —
 			// a consumer wedged on the mutex must not freeze us at "ok" forever.
@@ -548,9 +521,6 @@ class HwinfoPoller extends EventEmitter {
 			}
 			// Otherwise (skipped read, still fresh): keep the previous status.
 		} catch (err) {
-			// A failing attempt still paid for its open and scan (a Gadget key
-			// refused on every tick scans it every tick).
-			this.attemptCostMs = monotonicNow() - attemptStart;
 			for (const ring of this.series.values()) ring.length = 0;
 			this.preserveFreshness();
 			this.dropProvider();

@@ -1,6 +1,6 @@
 // Dense detail-view load measurement: the built plugin on a mock + XL
 // with the REAL shipped detail-plus-xl surface (32 reading slots + 4 nav
-// tiles) against live HWiNFO at the 250 ms Shared Memory read. Samples the
+// tiles) against live HWiNFO at the 250 ms poll option. Samples the
 // plugin process (CPU cumulative seconds, RSS, handles) every 15 s via
 // CIM and prints a PERF.md-ready summary plus per-sample CSV lines.
 //   node scripts/perf-detail.mjs          (PERF_DETAIL_SEC=480 default)
@@ -44,7 +44,7 @@ wss.on("connection", (ws) => {
 				scenarioFailed = String(err);
 			});
 		} else if (msg.event === "getGlobalSettings") {
-			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
+			send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: "250" } } });
 		} else if (msg.event === "setImage") {
 			frames++;
 		} else if (msg.event === "switchToProfile") {

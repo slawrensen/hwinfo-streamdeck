@@ -42,7 +42,7 @@ Both fields accept a period *or* a comma as the decimal separator, so `70.5` and
 
 ## Direction: alert when high vs. alert when low
 
-By default higher is worse, the right setting for temperatures, power draw, and usage. Tick **Alert when value drops below thresholds** for readings where *low* is the problem:
+By default higher is worse, the right setting for temperatures, power draw, and usage. Tick **Alert when the value drops to or below these numbers** for readings where *low* is the problem:
 
 - **Fan RPM**: a stalled or dying fan reads *low*.
 - **Free disk space**: you want to know when it drops *under* a floor.

@@ -1,0 +1,331 @@
+[
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Image",
+    "name": "Key face now: GPU 51.0 °C",
+    "focusable": false,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Reading GPU",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "ComboBox",
+    "name": "Reading",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Reload the sensor list",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Edit",
+    "name": "Label on the key",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Readings on this key",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Display Current value · auto decimals · Ember · custom text #ffd166",
+    "focusable": true,
+    "offscreen": false
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Value shown",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Decimals",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "CheckBox",
+    "name": "Show temperatures in °F",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Graph under the value",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Default: follow the shared theme, currently Void",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Ember theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Forest theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Graphite theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Midnight theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Paper theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Ultraviolet theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "RadioButton",
+    "name": "Void theme for this key",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Change the shared theme",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Text color",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Custom",
+    "name": "Custom text color, #FFD166",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "CheckBox",
+    "name": "Dim labels, units and stats (the value keeps the exact color)",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Alerts Off",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Edit",
+    "name": "Warn at",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Edit",
+    "name": "Critical at",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "CheckBox",
+    "name": "Alert when the value drops to or below these numbers (for fans and clocks)",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Press Press cycles current, min, max, avg",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "A press",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Advanced Auto source · poll 250 ms · decimal data units",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Theme",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Text color",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Accent colors",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Data units",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Data source",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Menu",
+    "name": "Read every",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "HWiNFO setup steps",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "ListItem",
+    "name": "",
+    "focusable": false,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "ListItem",
+    "name": "",
+    "focusable": false,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "ListItem",
+    "name": "",
+    "focusable": false,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Copy support report",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Edit",
+    "name": "This key's settings",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Copy",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Replace this key's settings",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Edit",
+    "name": "Shared settings All keys and dials",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Copy",
+    "focusable": true,
+    "offscreen": true
+  },
+  {
+    "doc": "Sensor Reading settings",
+    "type": "Button",
+    "name": "Replace shared settings",
+    "focusable": true,
+    "offscreen": true
+  }
+]

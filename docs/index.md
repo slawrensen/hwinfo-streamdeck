@@ -5,7 +5,7 @@ description: >-
   Live HWiNFO sensor readings on your Elgato Stream Deck.
 ---
 
-**HWiNFO Sensors** puts live [HWiNFO](https://www.hwinfo.com) readings (temperatures, clocks, fan speeds, usage, power, voltages and everything else HWiNFO measures) directly onto your Elgato Stream Deck. A key shows one value with an optional warn/critical color and a sparkline, bar or ring under it, stacks two readings, lists three as compact rows, or splits into a quad grid of four; on a Stream Deck + or Stream Deck + XL each dial gets a touchscreen readout with a range bar and per-reading session min/max, and you rotate to switch readings or list them in a two- or three-row overview. Seven display themes (per key or deck-wide) keep every key on the same visual language, the Text setting picks the value color, and data units render decimal or binary deck-wide. The design goal is a wall that reads like one instrument: the same anchors on every key, one bright element per face, and alert colors that override everything else.
+**HWiNFO Sensors** puts live [HWiNFO](https://www.hwinfo.com) readings (temperatures, clocks, fan speeds, usage, power, voltages and everything else HWiNFO measures) directly onto your Elgato Stream Deck. A key shows one value with an optional warn/critical color and a sparkline, bar or ring under it, stacks two readings, lists three as compact rows, or splits into a quad grid of four; on a Stream Deck + or Stream Deck + XL each dial gets a touchscreen readout with a range bar and per-reading session min/max, and you rotate to switch readings or list them in a two- or three-row overview. Seven display themes (per key or shared by all) keep every key on the same visual language, the Text color setting picks the value color, and data units render decimal or binary for the whole plugin. The design goal is a wall that reads like one instrument: the same anchors on every key, one bright element per face, and alert colors that override everything else.
 
 ![HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline, below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
@@ -39,7 +39,7 @@ New to the plugin? Follow these two pages in order:
 From there:
 
 - **[Sensor Reading (keys)](sensor-reading.md)**: every key setting and the press-to-cycle behavior.
-- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, Tile shows, grouped custom tiles, filter patterns and the Back tile.
+- **[Sensor details (drill-down)](sensor-details.md)**: the press that opens a page of related readings, readings per tile, grouped custom tiles, filter patterns and the Back tile.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**: the dial's rotate / push / touch controls, rotation sets, auto cycle and range bar.
 - **[Dial controls & presets](controls.md)**: the Legacy, Elite and Custom presets, touch zones, pause/pin, reset reach, and the HWiNFO Control key action.
 - **[Themes and alerts](themes.md)**: the seven presets, type accents, and how alerts override everything.

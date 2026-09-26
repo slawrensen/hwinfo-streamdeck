@@ -1,0 +1,10 @@
+/* Study C: preview-led task panel. The face is large and stays pinned while
+   scrolling; the sections below read as a task list. Study only. */
+body[data-study="c"] .hw-head { position: sticky; top: 0; z-index: 60; background: var(--hw-bg); flex-direction: column; align-items: stretch; text-align: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45); }
+body[data-study="c"] .hw-face img { width: 112px; height: 112px; }
+body[data-study="c"] .hw-head[data-kind="dial"] .hw-face img { width: 240px; height: 120px; }
+body[data-study="c"] .hw-head-text { flex: none; }
+body[data-study="c"] .hw-state { justify-content: center; }
+body[data-study="c"] .hw-sec > summary { background: var(--hw-raised); margin: 6px 8px 0; border-radius: 4px; }
+body[data-study="c"] .hw-sec { border-bottom: none; }
+body[data-study="c"] .hw-sec[open] > summary { border-radius: 4px 4px 0 0; }

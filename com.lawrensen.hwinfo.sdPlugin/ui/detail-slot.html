@@ -1,21 +1,26 @@
 <!doctype html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<title>Sensor detail tile</title>
-		<link rel="stylesheet" href="pi.css?v=1.6.0.0-3" />
+		<link rel="stylesheet" href="pi.css?v=1.6.0.0-f01n" />
 	</head>
-	<body>
-		<!-- Static on purpose: this tile has no user settings. Its role binding
-		     is baked into the bundled detail profile, and everything it shows
-		     comes from the key that opened the view. -->
-		<div class="hw-section">Sensor detail tile</div>
-		<div class="hw-help">
-			This tile belongs to the plugin-managed sensor detail view and has no
-			settings of its own: what it shows comes from the Sensor Reading key
-			that opened the view (configure that key's Press section to change
-			the readings, the title, or the look). The Back tile, top left,
-			returns to the profile you came from.
+	<body data-kind="slot">
+		<!-- This tile has no settings of its own: its role is baked into the
+		     bundled detail profile, and everything it shows comes from the key
+		     that opened the view. The page only names the role; it opens no
+		     connection and writes nothing. -->
+		<header class="hw-head" id="hw-head" data-kind="slot">
+			<div class="hw-head-text">
+				<p class="hw-head-kind">Sensor detail view tile</p>
+				<p class="hw-head-reading" id="slot-role">Detail view tile</p>
+				<p class="hw-head-source">Managed by the key that opened the view</p>
+			</div>
+		</header>
+		<div class="hw-sec-body">
+			<p class="hw-lede" id="slot-explain">This tile belongs to the plugin-managed sensor detail view and has no settings of its own.</p>
+			<p class="hw-lede">To change what the view lists, its title or its look, go back and select the Sensor Reading key that opened it, then open its Press section. The Back tile at the top left returns to the profile you came from.</p>
 		</div>
+		<script src="pi-slot.js?v=1.6.0.0-f01n"></script>
 	</body>
 </html>

@@ -48,7 +48,7 @@ The plugin runs **one reader** for the whole deck regardless of how many keys an
 
 ## Advanced settings
 
-Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced** (on dials the section is labelled **Dial gestures & advanced**). They are **global**: one setting for the whole plugin, not per key.
+Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced → Connection**, marked **All keys and dials**. They are **global**: one setting for the whole plugin, not per key.
 
 ### Data source
 
@@ -58,7 +58,7 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 | **Shared Memory only** | Never touches the Gadget registry. If Shared Memory is off or expired, keys show a status screen instead of falling back. |
 | **Gadget registry only** | Reads only the registry. Current values only, but immune to the 12-hour limit. |
 
-### Poll every
+### Read every
 
 How often the plugin reads the source, from **250 ms** to **5 seconds** (default **1 second**). One reader serves every visible key and dial, so this is the plugin's total read rate, not per-key.
 

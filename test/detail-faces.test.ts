@@ -327,13 +327,13 @@ describe("dense tile goldens", () => {
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(svg), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(svg), "1313a831a6e08acd43282d6d6d67907c44e3f6d57629ed031cb98f048ea281ec");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(svg), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		assert.equal(golden(svg), "76a1f0ebd3028bec375cc11e5463212eb40c4afa0087b53f25ea50dd16c6835c");
 	});
 
 	it("quad chunk with the shared badge", () => {

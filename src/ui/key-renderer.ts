@@ -89,6 +89,25 @@ const LABEL_SIZES = [20, 18, 16] as const;
 const BADGE_GAP_Y = 38;
 const BADGE_TEXT_Y = 48;
 
+/** The device draws faces with an SVG Tiny engine (QtSvg) that ignores
+ * dx on a tspan and, by default, trims the whitespace at both ends of every
+ * text chunk: on the bench (2026-09-23, Stream Deck 7.4.2) the keys showed
+ * "59.7°C" and "°CMAX" jammed while Chromium spaced them. So an inline gap
+ * is a space character at the start of the tspan, sized by that tspan's own
+ * font (an en space, 1/2 em, up to 14 px; a three-per-em space, 1/3 em,
+ * above: about 6 px either way), inside a text element marked
+ * xml:space="preserve" (PRESERVE), which both engines honor. */
+export function inlineGap(fontSize: number): string {
+	return fontSize <= 14 ? "\u2002" : "\u2004";
+}
+/** The attribute that keeps an inlineGap alive; set only on text elements
+ * that carry one (their other text has no spaces to keep). */
+export const PRESERVE = ' xml:space="preserve"';
+/** An inlineGap in px for width budgets: exact for the 12 px badge (an
+ * en space), one pixel short of the 14 px unit gap, which the label gap
+ * beside it absorbs; the same 6 px the dx gaps budgeted before. */
+export const INLINE_GAP_PX = 6;
+
 export function escapeXml(text: string): string {
 	// Fold unpaired surrogates first: settings text arrives through JSON
 	// escapes and registry labels as raw UTF-16, so a lone unit can reach
@@ -336,10 +355,11 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
  * row A shifted exactly 72 px, the key's midline, with a 2 px track-color
  * divider centered between them. Everything centers on x=72 like the single
  * layout (keys are optically centered surfaces; the divider badge already
- * was). A stat badge shared by both rows sits in a gap at the divider's
- * center; a per-row badge rides inline after the unit, the dial's own
- * idiom, so a row label always keeps its full 16 characters and nothing
- * crowds the key's corners. */
+ * was). A stat both rows share sits in a gap at the divider's center; a
+ * row's own stat (a pinned second row, and the first row beside it) rides
+ * on that row's label line, after the label. A value never shares its line
+ * with a badge, so it keeps its full size and its center on every press,
+ * and nothing crowds the key's corners. */
 const DUAL = { labelY: 22, valueY: 56, rowPitch: 72, dividerY: 71 } as const;
 /** Dual labels fit the same 120 px band as the single layout, one step
  * smaller: a short row label gains a size, a long one keeps today's 14.
@@ -366,22 +386,31 @@ function sharedBadgeSvg(badge: string, palette: Palette, badgeColor: string, gap
 /**
  * Dual-row value size by character count. One readout per half key: 32 px
  * for the numeric norm, stepped tiers for fixed-decimals extremes, never
- * below 14 px (the 12 px legibility floor plus margin). An inline badge
- * shares the line, so a badged row steps down exactly one tier.
+ * below 14 px (the 12 px legibility floor plus margin). No badge shares the
+ * value's line, so a stat never costs the value a size.
  */
-export function dualValueFontSize(text: string, badged = false): 32 | 24 | 17 | 14 {
+export function dualValueFontSize(text: string): 32 | 24 | 17 | 14 {
 	const count = Array.from(text).length;
 	const tier = count <= 4 ? 0 : count <= 6 ? 1 : count <= 9 ? 2 : 3;
 	const sizes = [32, 24, 17, 14] as const;
-	return sizes[Math.min(3, tier + (badged ? 1 : 0))] as 32 | 24 | 17 | 14;
+	return sizes[tier] as 32 | 24 | 17 | 14;
+}
+
+/** A row badge on the label line: 12/700 caps after the label, one inline
+ * gap apart. Its width comes off the label's budget, so a long label steps
+ * down or ellipsizes rather than pushing the badge off the face. */
+const DUAL_ROW_BADGE_SIZE = 12;
+function rowBadgeWidth(badge: string): number {
+	return INLINE_GAP_PX + estimateKeyTextWidth(badge, DUAL_ROW_BADGE_SIZE, { fontWeight: 700 }) + 0.5 * Array.from(badge).length;
 }
 
 export interface DualKeyRow {
 	label: string;
 	valueText: string;
 	unitText: string;
-	/** This row's own "MIN" | "MAX" | "AVG", drawn inline after the unit;
-	 * empty for the live value or when sharedBadge covers both rows. */
+	/** This row's own "MIN" | "MAX" | "AVG", drawn on the label line after
+	 * the label; empty for the live value or when sharedBadge covers both
+	 * rows. */
 	statBadge: string;
 }
 
@@ -389,8 +418,8 @@ export interface DualKeyOptions {
 	top: DualKeyRow;
 	bottom: DualKeyRow;
 	/** Stat both rows display; drawn once, centered in the divider gap.
-	 * The caller sets this INSTEAD of the per-row badges when the rows
-	 * show the same stat. Empty for none. */
+	 * The caller sets this INSTEAD of the per-row badges when the second
+	 * row follows the first. Empty for none. */
 	sharedBadge?: string;
 	/** Fully resolved tokens (alert override and type accent already applied;
 	 * alerts come from the primary reading's thresholds only). */
@@ -404,9 +433,8 @@ export interface DualKeyOptions {
 
 /**
  * The dual layout: two stacked readouts on one key, each a label line plus a
- * value line with the unit inline (the dial's proven tspan idiom), separated
- * by a track-color divider. No sparkline in this layout — two rows use the
- * full face.
+ * value line with the unit inline, separated by a track-color divider. No
+ * sparkline in this layout — two rows use the full face.
  */
 export function renderDualKey(opts: DualKeyOptions): string {
 	const { palette } = opts;
@@ -416,15 +444,14 @@ export function renderDualKey(opts: DualKeyOptions): string {
 	[opts.top, opts.bottom].forEach((row, i) => {
 		const labelY = DUAL.labelY + i * DUAL.rowPitch;
 		const valueY = DUAL.valueY + i * DUAL.rowPitch;
-		const label = fitTextLadder(row.label, LABEL_BUDGET, i === 0 ? DUAL_LABEL_SIZES_TOP : DUAL_LABEL_SIZES);
-		parts.push(`<text x="72" y="${labelY}" text-anchor="middle" font-family="${FONT}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}</text>`);
+		const badge = row.statBadge.toUpperCase();
+		const label = fitTextLadder(row.label, LABEL_BUDGET - (badge === "" ? 0 : rowBadgeWidth(badge)), i === 0 ? DUAL_LABEL_SIZES_TOP : DUAL_LABEL_SIZES);
+		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" letter-spacing="0.5" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
+		// One middle-anchored chunk: the label and its badge center as a unit.
+		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
 		const valueText = truncateLabel(row.valueText, DUAL_VALUE_MAX);
-		const badged = row.statBadge !== "";
-		const unit = row.unitText !== "" ? `<tspan dx="6" font-size="14" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</tspan>` : "";
-		const badge = badged ? `<tspan dx="6" font-size="12" font-weight="700" letter-spacing="0.5" fill="${text.badge}">${escapeXml(row.statBadge.toUpperCase())}</tspan>` : "";
-		// One middle-anchored chunk: the engine centers the value, unit and
-		// badge as a unit, exactly like the single layout centers its value.
-		parts.push(`<text x="72" y="${valueY}" text-anchor="middle" font-family="${FONT}" font-size="${dualValueFontSize(valueText, badged)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}${badge}</text>`);
+		const unit = row.unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${inlineGap(14)}${escapeXml(row.unitText)}</tspan>` : "";
+		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${dualValueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	});
 	parts.push(`<rect x="12" y="${DUAL.dividerY}" width="120" height="2" fill="${palette.track}"/>`);
 	if (sharedBadge !== "") {
@@ -462,8 +489,8 @@ const TRIPLE_VALUE_SIZES = [18, 16, 14] as const;
 const TRIPLE_LABEL_SIZES = [16, 15, 14, 13, 12] as const;
 /** Inline unit, the multi-readout family's 14 px step (dual and quad). */
 const TRIPLE_UNIT_SIZE = 14;
-/** The dual chunks' inline tspan gap. */
-const TRIPLE_UNIT_DX = 6;
+/** The inline gap before the unit, as the device draws it (inlineGap). */
+const TRIPLE_UNIT_DX = INLINE_GAP_PX;
 /** Defensive value cut (the formatter compacts long before this). 11 keeps
  * even an all-digit value plus the widest data unit inside the canvas when
  * the chunk grows leftward from its end anchor. */
@@ -588,8 +615,8 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 				`<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
 			);
 		}
-		const unit = row.unitText !== "" ? `<tspan dx="${TRIPLE_UNIT_DX}" font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</tspan>` : "";
-		parts.push(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(row.valueText)}${unit}</text>`);
+		const unit = row.unitText !== "" ? `<tspan font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${inlineGap(TRIPLE_UNIT_SIZE)}${escapeXml(row.unitText)}</tspan>` : "";
+		parts.push(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(row.valueText)}${unit}</text>`);
 	});
 	// A separator draws only between configured rows: a trailing rule over
 	// an unpicked band would read as a row that failed to load. The empty

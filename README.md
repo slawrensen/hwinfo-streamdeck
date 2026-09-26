@@ -60,8 +60,7 @@ status screens and troubleshooting. (The sections below are a condensed tour.)
 ## Data sources: Shared Memory vs. Gadget
 
 The plugin can read HWiNFO through two interfaces and picks automatically
-(*Advanced → Data source*; on dials the section is called *Dial gestures &
-advanced*):
+(*Advanced → Connection → Data source*, on keys and dials alike):
 
 | | **Shared Memory** (preferred) | **Gadget registry** (fallback) |
 | --- | --- | --- |
@@ -83,25 +82,29 @@ the first gap and showed only the readings before it.
 
 ## Sensor Reading (keys)
 
+The settings panel opens with the key's face exactly as the plugin drew it
+and its live state, then Reading and Display open, and Alerts, Press and
+Advanced folded with a one-line summary each.
+
 | Setting | What it does |
 | --- | --- |
-| **Sensor** | Searchable picker over every reading HWiNFO publishes, with a live preview. |
-| **Label** | Custom key label; defaults to the sensor's (renamed) label. Sizes itself to fit: short names render large, long names step down before they truncate. |
-| **Theme** | Preset gallery: this key only, or "Deck default" to follow the deck-wide theme. |
-| **Text** | Text intensity: deck default, theme, dim, or an exact custom color. |
-| **Show** | Current value, or HWiNFO's min / max / average since it started. |
-| **Layout** | One reading (default), two stacked readings with their own labels and stats, three compact rows with labels left and values right, or four in a 2x2 quad grid with per-cell colors or labels. |
-| **Decimals** | Auto (magnitude-based, compacts through k/M/G/T: 48 700 → `48.7k`) or fixed 0–3. Bytes and rates re-tier by the deck-wide **Data units** (decimal KB/MB/GB with Mbps rates, or binary KiB/MiB/GiB with MiB/s). |
-| **Unit** | Show temperatures in °F instead of °C. |
-| **Display** | Recent history as a sparkline, or the value in its range as a bar or ring, with amber/red threshold zones. History keeps collecting for readings that are off screen while a Sensor Reading key or Sensor Dial stays visible; with none visible, polling stops, and the line resumes where it left off when one returns. |
+| **Reading** | Searchable picker over every reading HWiNFO publishes, with live values. |
+| **Label on the key** | Custom key label; defaults to the sensor's (renamed) label. Sizes itself to fit: short names render large, long names step down before they truncate. |
+| **Theme** | Preset gallery: this key only, or "Default" to follow the shared theme. |
+| **Text color** | Default (follows the shared setting), theme text, dimmed, or an exact custom color. |
+| **Value shown** | Current value, or HWiNFO's min / max / average since it started. |
+| **Readings on this key** | One reading (default), two stacked readings with their own labels and stats, three compact rows with labels left and values right, or four in a 2x2 quad grid with per-cell colors or labels. |
+| **Decimals** | Auto (magnitude-based, compacts through k/M/G/T: 48 700 → `48.7k`) or fixed 0–3. Bytes and rates re-tier by the shared **Data units** (decimal KB/MB/GB with Mbps rates, or binary KiB/MiB/GiB with MiB/s). |
+| **Show temperatures in °F** | °F instead of °C. |
+| **Graph under the value** | Recent history as a sparkline, or the value in its range as a bar or ring, with amber/red threshold zones. History keeps collecting for readings that are off screen while a Sensor Reading key or Sensor Dial stays visible; with none visible, polling stops, and the line resumes where it left off when one returns. |
 | **Warn / Critical at** | Key turns amber / red at these values (in the displayed unit). |
-| **Direction** | "Alert when below" flips the comparison, for fan RPM, free space, etc. |
+| **Alert when the value drops** | Flips the comparison, for fan RPM, free space, etc. |
 
 **Pressing the key** cycles what's shown: current → MIN → MAX → AVG (the badge
 sits in a gap under the label, or on the row divider in a multi-reading
 layout). The warn/critical colors always track the *live* value.
 
-**Or the press can drill down** (issue #5): set **Press does** to *Open sensor
+**Or the press can drill down** (issue #5): set **A press** to *Opens sensor
 details* (or *Tap cycles; hold opens details*) and the press switches the deck
 to a bundled one-page detail view listing every reading of that sensor's
 HWiNFO source, a custom list you build, or everything matching a glob filter
@@ -112,7 +115,7 @@ top-left Back tile is a normal
 Sensor Reading key with its press fixed to returning: configure its sensor and
 any layout (or leave it showing the sensor you drilled down from).
 Previous/Next page through long sources, and pressing a listed reading cycles
-its stat for that visit. A Tile shows setting packs two, three or four
+its stat for that visit. A Readings per tile setting packs two, three or four
 readings onto each tile using the same stacked, row and quad faces, and a
 custom list can group and dress its tiles one by one. Six editable profiles
 ship, one per deck type (Mini, 15-key, Neo, +, XL, + XL); the Stream Deck app
@@ -172,8 +175,8 @@ or previous sensor or group, cycle stat mode, show current / session min / max
 session stats. Pause/resume and pin/unpin also exist as one-way commands, so a
 repeated press inside a Multi Action stays harmless.
 
-Targeting is explicit. Give a dial a **Link ID** in its settings (*Dial
-gestures & advanced*) and put the same name in the control key's **Target** to
+Targeting is explicit. Give a dial a **Link ID** in its settings (*Controls*)
+and put the same name in the control key's **Target** to
 steer just that dial; an empty Target drives every dial. The key shows a tick
 when the command reached at least one matching dial and an alert icon when
 none matched. The target dial has to be on screen somewhere, on any connected
@@ -185,9 +188,9 @@ Full command and targeting reference:
 ## Themes
 
 Seven presets, chosen from a live gallery in any key's or dial's settings: per
-key, or once for the whole deck (*Advanced → Deck theme*). A per-key pick
-always wins over the deck-wide theme. To make a key follow the deck-wide
-setting, choose the gallery's dashed "Deck default" chip; the theme it
+key, or once for every key and dial (*Advanced → Shared defaults → Theme*).
+A per-key pick always wins over the shared theme. To make a key follow the
+shared setting, choose the gallery's dashed "Default" chip; the theme it
 resolves to shows in the chip's tooltip and the help line under the gallery
 (e.g. *currently Void*):
 
@@ -201,7 +204,7 @@ resolves to shows in the chip's tooltip and the help line under the gallery
 | **Ember** | Amber-on-black monochrome, VFD nostalgia. |
 | **Paper** | High-contrast light theme (ink on warm paper) for bright rooms and low vision. |
 
-**Type accents** (*Advanced → Type accents*, on by default) color each key's
+**Type accents** (*Advanced → Shared defaults → Accent colors*, on by default) color each key's
 sparkline, badge and dial bar by sensor type: temperature rose, fan cyan, power
 gold, clock green, load violet, network blue, memory magenta. Only the accent
 changes; label, value and unit keep the theme's luminance rhythm. Paper ignores

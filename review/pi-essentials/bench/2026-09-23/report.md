@@ -158,21 +158,29 @@ Owner-requested design changes (not defects):
   Alerts and Press always visible, so this was a regression in effort).
   Now a person's toggle is remembered per panel kind (key, dial, control),
   Alt-click on a section title opens or folds them all, and a script or a
-  reveal is never remembered. Never a setting (zero writes), and the
-  plugin keeps none of it: the panel's own storage holds it while the
-  app runs (the app empties it when the plugin restarts, found live: a
-  deploy emptied it). A header pair, Open all and Fold all (chevrons
-  apart and together, Azure's pattern, one toolbar Tab stop), does what
-  Alt-click does for anyone who never finds Alt-click. A durable
-  plugin-side copy was built and then removed on the owner's call once
-  the pair existed: a restart shows the defaults, one press from
-  everything open. The pair was used in the real app on build f01j at
-  22:28 (the then-durable copy recorded every key section open). Basis:
+  reveal is never remembered. Never a setting (zero writes). The plugin
+  holds the folds in memory while it runs: the app gives every panel it
+  opens fresh web storage, kept only across a reload of that same panel
+  (found live 2026-09-24, after a panel-only version lost the folds from
+  key to key), so a panel cannot carry them itself. The panels' HTML
+  starts with the sections hidden, so the defaults never paint first; they
+  show when the plugin answers, at most 300 ms after the panel connects
+  (1.5 s if it never does). A first version hid them only once its script
+  ran and counted 300 ms from there, and the owner saw a fully folded
+  panel flash open on each key switch. A header pair, Open all and Fold all (chevrons apart and
+  together, Azure's pattern, one toolbar Tab stop), does what Alt-click
+  does for anyone who never finds Alt-click. A durable file copy was
+  built and removed on the owner's call: a restart shows the defaults,
+  one press from everything open. Proven in the real app on f01m: the
+  panel after a key switch opened with the owner's folds from a freshly
+  restarted plugin, and a reload restored them with nothing in the
+  panel's web storage. Basis:
   NN/g ("Items that are opened or closed should remain in that state until
   the user changes it"), GOV.UK's accordion (remembers open sections by
   default), Blender's modifier-click on panel headers, Azure's expand
-  and collapse all. e2e: 11 fold checks, including "toggling a section
-  sends the plugin nothing".
+  and collapse all. e2e: 12 fold checks, including "a toggle reaches the
+  plugin's memory, not settings or web storage" and "sections wait for
+  the plugin's answer, at most 300 ms"; unit: 6 (`test/panel-folds.test.ts`).
 - The picker list no longer closes when the pointer only leaves the
   panel (overshooting the edge while browsing closed it); a click, focus
   loss, Tab or a second click on the box closes it.
@@ -201,6 +209,9 @@ compared only by content.
 - A click outside the list reaches the page. Clicks on the app's own
   disabled or unfocusable areas produce no event at all.
 - `pagehide` can still send a save. It cannot.
+- Web storage is shared between panels. It is not: every key selection
+  opens a panel with fresh storage, and only a reload of that same panel
+  keeps it.
 - The header face (Chromium) looks like the device (QtSvg). It did not for
   inline gaps until D2.
 - The panel is tall enough to pin its header. At the default window size

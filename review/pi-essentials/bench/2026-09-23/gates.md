@@ -3,19 +3,33 @@
 The repository ignores `*.log`, so the raw logs stay on the bench
 machine; these are their result lines, verbatim where quoted.
 
-## Current candidate (`835b046`, panel token `1.6.0.0-f01l`)
+## Current candidate (`29a7a96`, panel token `1.6.0.0-f01n`, `plugin.js` `0c094740...`)
 
 | Gate | Result |
 | --- | --- |
 | `npm run lint` | 0 problems |
 | `npm run typecheck` | 0 errors |
-| `npm test` | `ℹ tests 791`, `ℹ pass 791`, `ℹ fail 0` |
-| `npm run e2e:pi-panels` | 184 PASS, 0 FAIL, `ALL GREEN` |
-| `npm run e2e:pi` | 551 PASS, 0 FAIL, `PI PERSISTENCE E2E: ALL CHECKS PASSED` |
+| `npm test` | `ℹ pass 798`, `ℹ fail 0` |
+| `npm run e2e:pi-panels` | 185 PASS, 0 FAIL, `ALL GREEN` (three runs) |
+| `npm run e2e:pi` | 551 PASS, 0 FAIL, `PI PERSISTENCE E2E: ALL CHECKS PASSED` (same panel files, `f01n`) |
 | `npm run e2e` | 102 PASS, 0 FAIL, `E2E: ALL CHECKS PASSED` |
 | `node scripts/validate-release-copy.mjs` | `release copy OK: 57 files checked, 0 warning(s).` |
 
-## Bench build with the same `plugin.js` (`4808487d...`)
+`npm run suite:full` on this `plugin.js`, live HWiNFO present:
+
+```
+processes before: 66, after: 62, new: 2 (0 ours, 2 unrelated)
+
+SUITE: ALL GREEN, ZERO ORPHANS
+```
+
+## Earlier candidate `835b046` (panel token `1.6.0.0-f01l`)
+
+lint 0, typecheck 0, unit 791/791, e2e:pi-panels 184/184, e2e:pi
+551/551, e2e 102/102. Its panel-only fold memory lost the folds between
+keys in the real app; superseded.
+
+## Bench build `plugin.js` `4808487d...`
 
 `npm run suite:full` on Windows with live HWiNFO present, every suite in
 order: `E2E: ALL CHECKS PASSED` (102), `e2e:resilience`,

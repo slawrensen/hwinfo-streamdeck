@@ -42,14 +42,16 @@ does not allow).
     checks, harness defects H1 and H2 fixed; D9, D10 and H3 open.
 12. The owner's design pass: dual pinned-row badges on the label line;
     folds kept per panel kind while the app runs, with Open all and Fold
-    all in the header (a durable plugin-side copy was built and removed);
-    the picker closes only on a click or focus change; the dial's
-    rotation sits under the reading on the dial and its face beside the
-    name.
-13. Gates on the new candidate (candidate.md): lint 0, typecheck 0, unit
-    791/791, e2e-pi-panels 184/184, e2e-pi-persistence 551/551,
-    `npm run e2e` all passed; `suite:full` all green on the same
-    `plugin.js` (4808487d).
+    all in the header; the picker closes only on a click or focus change;
+    the dial's rotation sits under the reading on the dial and its face
+    beside the name.
+13. 2026-09-24: the folds stopped following key switches once they lived
+    in the panel (the app gives every panel fresh web storage), so the
+    plugin holds them in memory again, merged per update, and the
+    sections stay hidden from the first paint until it answers.
+14. Gates on the current candidate (candidate.md, gates.md): lint 0,
+    typecheck 0, unit 798/798, e2e-pi-panels 185/185, e2e-pi-persistence
+    551/551, `npm run e2e` 102/102, `suite:full` all green, zero orphans.
 
 ## Next
 

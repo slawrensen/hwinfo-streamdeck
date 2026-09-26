@@ -2,20 +2,24 @@
 
 ## Current candidate: after the Windows bench
 
-**Candidate:** commit `835b046f9af536c4b519ec3b1742465b55c22940` on
-`claude/sweet-shannon-lss3s9` (tree `74c8e73945f823700a559b5786ebc379a736347b`),
-five commits over the first candidate `34dd1fc`: the bench fixes and the
-owner's design pass from
-[bench/2026-09-23/report.md](bench/2026-09-23/report.md). The commit that
-adds this section changes only files under `review/`. Manifest version is
-unchanged (`1.6.0.0`); no version bump.
+**Candidate:** commit `29a7a9669120e8351560cbc420f3c38883363fcd` on
+`claude/sweet-shannon-lss3s9` (tree `1bdc59c5fd60df564aad5c7148234e6f4d7311a2`),
+over the first candidate `34dd1fc`: the bench fixes and the owner's
+design pass from [bench/2026-09-23/report.md](bench/2026-09-23/report.md),
+then the fold memory moved back into the plugin's RAM (`63b7c74`, the app
+gives every panel fresh web storage) with merged updates (`7246a46`),
+a deterministic fold check from the cloud session (`2ca74b8`) and a
+docs label fix. It supersedes `835b046` (tree `74c8e73`), whose
+panel-only fold memory lost the folds between keys on the owner's deck.
+The commit that updates this section changes only files under `review/`.
+Manifest version is unchanged (`1.6.0.0`); no version bump.
 
 Gates on this tree (Windows 10 LTSC 2021, Node 24.16.0): lint 0,
-typecheck 0, unit 791/791, e2e-pi-panels 184/184, e2e-pi-persistence
-551/551, `npm run e2e` all checks passed. `suite:full` all green with zero
-orphans and `test:native` 69/69 ran on the bench build whose `plugin.js`
-is byte-identical to this one; the commits after it changed panel files
-only. Result lines: [bench/2026-09-23/gates.md](bench/2026-09-23/gates.md).
+typecheck 0, unit 798/798, e2e-pi-panels 185/185, `npm run e2e`
+102/102, `npm run suite:full` all green with zero orphans on this
+`plugin.js`, copy validator OK; e2e-pi-persistence 551/551 on the same
+panel files (`1.6.0.0-f01n`).
+Result lines: [bench/2026-09-23/gates.md](bench/2026-09-23/gates.md).
 
 ### Bundle
 
@@ -23,7 +27,7 @@ only. Result lines: [bench/2026-09-23/gates.md](bench/2026-09-23/gates.md).
 
 | File | Bytes | SHA-256 |
 | --- | --- | --- |
-| `com.lawrensen.hwinfo.sdPlugin/bin/plugin.js` | 188,516 | `4808487da695297e8e02d984b59a7786ad646e0578d172ae24e71a86f006ba95` |
+| `com.lawrensen.hwinfo.sdPlugin/bin/plugin.js` | 189,212 | `0c0947404d46ac79c6e9b42284f8df31739a53c2c4b771dfae97454b0cb13da1` |
 | `com.lawrensen.hwinfo.sdPlugin/bin/hwsm.node` | | `be3527d829d84efc54473c235c35a0454272b3d32f3d36c825369e1cbd3f2453` (main's unchanged native source) |
 
 ### Shipped panel and manifest files
@@ -32,20 +36,20 @@ only. Result lines: [bench/2026-09-23/gates.md](bench/2026-09-23/gates.md).
 | --- | --- |
 | `manifest.json` | `15827568d498b2aeadb59eb31514fa42953e1377c8bcadcc7f55a97b3c14a59c` (unchanged from main) |
 | `themes.json` | `df94bd990a76cd6d7d4f36d339e900a7e82d90a26a8ed717b2b27e4bf09f1aa5` (unchanged from main) |
-| `ui/control.html` | `eff1b74981240381627815300a7949fbfddbd71722f965bf2ade809edfab0d14` |
-| `ui/detail-slot.html` | `9eca3bcb4d8c0bcc23a112898ec1f11f87c4fe60b0b777c2b3351f6b15ee3c78` |
+| `ui/control.html` | `9589cf0869d6b37900be5081b97166f98bdb678c26c4c6d2a3173d1ed7fce309` |
+| `ui/detail-slot.html` | `2165166340f8e5437e6c36aafc65799f0d40a3822144f9e273dcca9cdd292705` |
 | `ui/pi-command.js` | `98d76a355df544a19debbc1f63ef7cad6ae5f464949c71819ef1dca2a9072174` (unchanged from the first candidate) |
-| `ui/pi-common.js` | `d86a5ff005f4ae2484164e40f28ae240d9b777ca7a85f30d3010783c02c311fd` |
+| `ui/pi-common.js` | `c71d61e8cc168545b3a2308b0f154f2193a10917845619d8fee7eef30113585b` |
 | `ui/pi-control.js` | `d89104f95624304673995a9d30b64da72b178064fbe49a7234e2b592c816d9f9` (unchanged) |
 | `ui/pi-model.js` | `1a5ddc8b604dd5b417d3f71c8402033c29d062a96d34cfc95330dc0ee04a5f88` (unchanged) |
-| `ui/pi-shell.js` | `610215cabfebf7ead77c95ef6895a611ba91c2a1fa60866c1f6570f220bce1c2` |
+| `ui/pi-shell.js` | `46ad5ae7643debfde7a55410881b4eaecf3600d417420592ad9e98eefaecd33e` |
 | `ui/pi-slot.js` | `4b82c5f37b5f004e6eee2588bc8f2e2c813990a4cdfa2a458fa7d859099f56ea` (unchanged) |
-| `ui/pi.css` | `133ae9d3923782b7436c3384b7e2ea5e372c3a9bb2330bff7fd0ca6dda3fa8ab` |
+| `ui/pi.css` | `ddee5498aacab89cd2400408c339f266259584e8a0f7e99e255d1d7577ca794f` |
 | `ui/sdpi-components.js` | `f6c0dfd2ed68e18084b9952842b86e3850cf837d674704700c2a0718e0a24f6b` (unchanged vendor file) |
-| `ui/sensor-dial.html` | `d549ff2995672f20d4849f2b1c9984a9a4cb18037cb6244c878fc0d8794a54cb` |
-| `ui/sensor-reading.html` | `5f187c7bf4050cb319444491ce7ba6aa45de8b39e29752f449c276b739475919` |
+| `ui/sensor-dial.html` | `1de1a20458e68e794a885676be3a04f0b919264ced68cc99300fbc0492b95a22` |
+| `ui/sensor-reading.html` | `70cefd15194cceb059090873bc4e03bf8850a321471f5e36fce6bd9631993a23` |
 
-The panels' cache token is `1.6.0.0-f01l`. The `.streamDeckPlugin` pack
+The panels' cache token is `1.6.0.0-f01n`. The `.streamDeckPlugin` pack
 and its hash were not produced.
 
 ## First candidate: simulated host only

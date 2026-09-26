@@ -17,22 +17,22 @@ In the actions list, open **HWiNFO Sensors** and drag **Sensor Reading** onto an
 
 With a readable source, the key shows **Pick a sensor / in settings** on a black background. The settings panel opens below the canvas. If the key shows a source error instead, follow [Status screens](status-screens.md).
 
-> **First run?** The settings panel starts with a collapsible **"First time? HWiNFO setup"** tip that walks through the three HWiNFO steps: install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want; no 12-hour limit), then pick a sensor. Expand it if you haven't set HWiNFO up yet.
+> **First run?** If HWiNFO isn't publishing yet, the panel's **Reading** section says so and offers **HWiNFO setup steps**, which opens the three steps (kept under *Advanced → Connection*): install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want; no 12-hour limit), then pick a reading. **Retry now** checks again without waiting for the next poll.
 
 ## 3. Pick a sensor
 
-Click the **Sensor** search box to open the picker. It lists every reading HWiNFO is currently publishing:
+Click the **Reading** search box (at the top of the panel's Reading section) to open the picker. It lists every reading HWiNFO is currently publishing:
 
 - **Grouped by source**: CPU, GPU, drives, motherboard and so on, under headings that match HWiNFO's own sensor names.
 - **Live values**: each row shows the reading's value, unit, and type (Temp, Fan, Power…), captured when the list loads; the **⟳** button re-reads them.
-- **Type to filter**: search is multi-token: `cpu die` matches a row only if it contains *both* words, in any order, across the group name and the label. So `gpu hot` narrows straight to the GPU hotspot temperature.
+- **Type to filter**: arrow keys browse, Enter picks, and Tab or a click elsewhere closes without changing anything (the Stream Deck app keeps the Escape key for itself). Search is multi-token: `cpu die` matches a row only if it contains *both* words, in any order, across the group name and the label. So `gpu hot` narrows straight to the GPU hotspot temperature.
 - **⟳ refresh**: reload the list if you just enabled a sensor in HWiNFO and want it to appear.
 
 ![The Sensor picker open with "gpu" typed in the search box, showing matching readings grouped under their sensors (a PSU's GPU/CPU rails, then the GPU itself), each row with its value, unit, and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
-Click a row to select it. **Live value** previews the reading, and the key shows it when data is available. HWiNFO's min/max/average require Shared Memory. Since 1.7, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changed from 1.6](whats-new-1.7.md).
+Click a row to select it. The panel's header then names the reading and its source, shows the key's face exactly as the plugin just drew it, and reports **Live** with the data source; the key on your deck switches from the blue prompt to the live number straight away. HWiNFO's min/max/average require Shared Memory: since 1.7, Gadget historical modes show **N/A**, and **Age unknown** appears until a value change establishes freshness. See [what changed from 1.6](whats-new-1.7.md).
 
-The plugin reads once a second by default; HWiNFO updates at its own rate. Change the plugin interval under [Poll every](data-sources.md#poll-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection. Gadget uses source names and reading labels. Switching between providers requires explicit links (since 1.7); see [data sources](data-sources.md).
+That's the whole loop: drag, pick, done. The plugin reads once a second by default; HWiNFO updates at its own rate (2 seconds by default). Change the plugin interval under [Read every](data-sources.md#read-every). Shared Memory selections use HWiNFO's reading identity, so reordering the list does not change the selection; Gadget uses source names and reading labels. Switching between providers requires explicit links (since 1.7); see [data sources](data-sources.md).
 
 ## Where to go next
 
@@ -42,7 +42,7 @@ Choose a guide for the next setting you want to change:
 - **[Sensor details (drill-down)](sensor-details.md)**. A key press can instead open a full page of related readings, with the pressed key staying live as the Back tile. One bundled view per deck type, installed on first use.
 - **[Sensor Dial (Stream Deck +)](sensor-dial.md)**. The dial/touchscreen action for the Stream Deck + and + XL: rotate-to-switch, rotation sets, auto cycle, push-to-reset, and a session range bar.
 - **[Dial controls & presets](controls.md)**. The Legacy, Elite and Custom gesture presets, touch zones, pause/pin, reset reach, and the **HWiNFO Control** key action that drives dials from any key or pedal.
-- **[Themes](themes.md)**. The seven presets (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), per-key vs. deck-wide, and type accents.
+- **[Themes](themes.md)**. The seven presets (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), per-key vs. shared, and type accents.
 - **[Thresholds & alerts](thresholds-alerts.md)**. **Warn at** / **Critical at** and the **Direction** flip for fan RPM, free space, and other alert-when-low readings.
 - **[Data sources](data-sources.md)**. Shared Memory vs. Gadget registry, what each gives you, and the automatic fallback.
 - **[Status screens](status-screens.md)**. What "Start HWiNFO", "Shared Memory is off", "Not updating", "Access denied", and "Sensor missing" mean and how to fix each.

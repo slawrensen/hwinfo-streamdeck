@@ -1,0 +1,36 @@
+{
+	"label": "K13",
+	"at": "2026-09-24T01:48:25.753Z",
+	"hoverPoints": 44,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "key",
+				"context": "5380f9736a8fe7affb16774e9e393edd",
+				"url": "sensor-reading.html"
+			}
+		],
+		[
+			"picker",
+			{
+				"expanded": "false",
+				"w": 0
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": "ok",
+				"head": "Live · Shared Memory"
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

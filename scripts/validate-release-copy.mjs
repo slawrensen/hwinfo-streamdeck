@@ -108,7 +108,7 @@ checkCopy(RULES_DOC, { emDashOnly: true });
 
 // Runtime strings users see on keys, dials and the settings panel. Em-dash
 // check only: identifiers like unlock() would false-positive the word list.
-for (const f of ["src/ui/state-screens.ts", "src/probe.ts", `${SD}/ui/pi-common.js`, `${SD}/ui/pi-control.js`]) {
+for (const f of ["src/ui/state-screens.ts", "src/probe.ts", `${SD}/ui/pi-common.js`, `${SD}/ui/pi-control.js`, `${SD}/ui/pi-shell.js`, `${SD}/ui/pi-model.js`, `${SD}/ui/pi-command.js`, `${SD}/ui/pi-slot.js`]) {
 	checkCopy(f, { emDashOnly: true });
 }
 
@@ -130,6 +130,8 @@ const GUIDANCE_FILES = [
 	"src/ui/state-screens.ts",
 	"src/probe.ts",
 	`${SD}/ui/pi-common.js`,
+	`${SD}/ui/pi-shell.js`,
+	`${SD}/ui/pi-model.js`,
 ];
 for (const rel of GUIDANCE_FILES) {
 	if (!exists(rel)) continue;

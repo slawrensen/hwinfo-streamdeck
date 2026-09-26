@@ -72,7 +72,7 @@ The plugin runs **one reader** across all connected decks, so all keys and dials
 
 ## Advanced settings
 
-Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced** (on dials the section is labelled **Dial gestures & advanced**). They are **global**: one setting for the whole plugin, not per key.
+Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced → Connection**, marked **All keys and dials**. They are **global**: one setting for the whole plugin, not per key.
 
 ### Data source
 
@@ -82,9 +82,9 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 | **Shared Memory only** | Never touches the Gadget registry. If Shared Memory is off or expired, keys show a status screen instead of falling back. |
 | **Gadget registry only** | Reads only the registry. Current values only, but immune to the 12-hour limit. |
 
-### Poll every
+### Read every
 
-How often the plugin reads the source, from **250 ms** to **5 seconds** (default **1 second**). One reader serves every visible key and dial, so this is the plugin's total read rate, not per-key.
+How often the plugin reads the source, from **250 ms** to **5 seconds** (default **1 second**), under *Advanced → Connection* (called **Poll every** before 1.7; the stored setting is unchanged). One reader serves every visible key and dial, so this is the plugin's total read rate, not per-key.
 
 > **Note:** HWiNFO updates its own sensors on a separate poll cycle (default **2 seconds**, set in HWiNFO's own settings). That cycle is the real ceiling on how fast values and sparklines change; polling the plugin faster than HWiNFO refreshes just re-reads the same numbers. Match or slightly under-run HWiNFO's interval for the freshest data without wasted reads. A slower plugin poll is a fine way to trim CPU further if you don't need sub-second updates.
 

@@ -24,10 +24,13 @@ import { renderDualKey, renderQuadKey, renderReadingKey } from "../src/ui/key-re
 import { resolveTextColors, themeTextColors } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings, effectiveThemeFor, getDeckTheme } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
+import { beforeInlineGap, gapSitesIn } from "./inline-gap";
 
 const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
-// Retain the historical artifacts. Authorize only these foreground changes;
-// all other bytes still compare exactly, including number and unit geometry.
+// Retain the historical artifacts. Authorize only these foreground changes
+// and the device gap fix (the gap before a unit or badge is a space inside
+// its tspan, not dx; counted per face by beforeInlineGap); all other bytes
+// still compare exactly, including number and unit geometry.
 const golden = Object.fromEntries(Object.entries(legacy).map(([name, svg]) => [name, svg.replaceAll("#667082", "#6B7586").replaceAll("#8A6326", "#926E35")]));
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
@@ -35,15 +38,15 @@ const EMBER = resolvePalette(config, "ember", "temperature", "normal");
 
 describe("legacy faces retain all bytes except the approved numeric colors", () => {
 	it("single key, plain (no sparkline field ever set)", () => {
-		assert.equal(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", palette: VOID }), golden.singlePlain);
+		assert.equal(beforeInlineGap(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", palette: VOID }), gapSitesIn(golden.singlePlain)), golden.singlePlain);
 	});
 
 	it("single key with the legacy sparkline", () => {
-		assert.equal(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", history: [50, 60, 55, 70, 65], palette: VOID }), golden.singleSparkline);
+		assert.equal(beforeInlineGap(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "", history: [50, 60, 55, 70, 65], palette: VOID }), gapSitesIn(golden.singleSparkline)), golden.singleSparkline);
 	});
 
 	it("single key with a stat badge, type accent and sparkline", () => {
-		assert.equal(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "MAX", history: [50, 60, 55, 70, 65], palette: EMBER }), golden.singleBadge);
+		assert.equal(beforeInlineGap(renderReadingKey({ label: "CPU Package", valueText: "56.3", unitText: "°C", statBadge: "MAX", history: [50, 60, 55, 70, 65], palette: EMBER }), gapSitesIn(golden.singleBadge)), golden.singleBadge);
 	});
 
 	it("dual layout defaults", () => {
@@ -53,7 +56,7 @@ describe("legacy faces retain all bytes except the approved numeric colors", () 
 			sharedBadge: "",
 			palette: VOID
 		});
-		assert.equal(svg, golden.dual);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.dual)), golden.dual);
 	});
 
 	it("quad layout defaults", () => {
@@ -66,7 +69,7 @@ describe("legacy faces retain all bytes except the approved numeric colors", () 
 			],
 			palette: VOID
 		});
-		assert.equal(svg, golden.quad);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.quad)), golden.quad);
 	});
 
 	it("quad micro-label variant (pinned at the adaptive-label change)", () => {
@@ -80,17 +83,17 @@ describe("legacy faces retain all bytes except the approved numeric colors", () 
 			labels: true,
 			palette: VOID
 		});
-		assert.equal(svg, golden.quadLabeled);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.quadLabeled)), golden.quadLabeled);
 	});
 
 	it("dial with no thresholds: track and fill only, exactly as before", () => {
 		const svg = renderDial({ title: "CPU Package", valueText: "56.3", unitText: "°C", statsText: "▼ 41.2   ▲ 79.0   session", fraction: 0.42, palette: VOID, barColor: VOID.accent });
-		assert.equal(svg, golden.dialNoThreshold);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.dialNoThreshold)), golden.dialNoThreshold);
 	});
 
 	it("dial at full bar with an inline badge", () => {
 		const svg = renderDial({ title: "CPU Package", valueText: "79.0", unitText: "°C · MAX", statsText: "", fraction: 1, palette: EMBER, barColor: EMBER.accent });
-		assert.equal(svg, golden.dialFullBar);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.dialFullBar)), golden.dialFullBar);
 	});
 
 	it("three-row overview defaults", () => {
@@ -104,7 +107,7 @@ describe("legacy faces retain all bytes except the approved numeric colors", () 
 			statsText: "▼41.2 ▲79.0",
 			palette: VOID
 		});
-		assert.equal(svg, golden.overview);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.overview)), golden.overview);
 	});
 
 	it("two-row view defaults", () => {
@@ -116,7 +119,7 @@ describe("legacy faces retain all bytes except the approved numeric colors", () 
 			footerText: "▼ 41.2  ▲ 79.0  session",
 			palette: VOID
 		});
-		assert.equal(svg, golden.twoRow);
+		assert.equal(beforeInlineGap(svg, gapSitesIn(golden.twoRow)), golden.twoRow);
 	});
 });
 

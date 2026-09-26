@@ -1,66 +1,80 @@
 <!doctype html>
-<html>
+<html lang="en" data-folds-pending>
 	<head>
 		<meta charset="utf-8" />
 		<title>HWiNFO Control settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-8" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-f01q" />
 	</head>
-	<body>
-		<details class="hw-setup">
-			<summary>What this key does</summary>
-			<p>
-				It drives your <b>Sensor Dial</b> actions from any key: a pedal, a G-key,
-				a Multi Action step, or a plain key on another deck. Pick a command and,
-				optionally, a target. The key shows a tick when the command reached at
-				least one matching dial and an alert icon when none matched.
-			</p>
+	<body data-kind="control">
+		<header class="hw-head" id="hw-head" data-kind="control">
+			<div class="hw-head-text">
+				<div class="hw-head-top">
+					<p class="hw-head-kind">HWiNFO Control key</p>
+					<div class="hw-folds" id="hw-folds" role="toolbar" aria-label="Sections">
+						<button type="button" data-folds="open" aria-label="Open all sections" title="Open all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 6 8 2.75 12.25 6M3.75 10 8 13.25 12.25 10" /></svg></button>
+						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 2.75 8 6 12.25 2.75M3.75 13.25 8 10 12.25 13.25" /></svg></button>
+					</div>
+				</div>
+				<p class="hw-head-reading" id="control-command">Next reading</p>
+				<p class="hw-head-source" id="control-target">Sends to every dial</p>
+			</div>
+		</header>
+		<p class="hw-lede">Steers Sensor Dial actions from any key, pedal, G-key or Multi Action step, on this or another Stream Deck. The key shows a tick when the command reached at least one dial and an alert when none matched.</p>
+
+		<details class="hw-sec" id="sec-command" open>
+			<summary><span class="hw-sec-title">Command</span><span class="hw-sec-sum" data-summary="command"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-field">
+					<label for="f-command">When pressed</label>
+					<select id="f-command" data-setting="command" data-default="next">
+						<option value="next">Next reading</option>
+						<option value="prev">Previous reading</option>
+						<option value="nextGroup">Next sensor or group</option>
+						<option value="prevGroup">Previous sensor or group</option>
+						<option value="cycleStat">Cycle stat mode</option>
+						<option value="showCurrent">Show current value</option>
+						<option value="showMin">Show session min</option>
+						<option value="showMax">Show session max</option>
+						<option value="showAvg">Show session average</option>
+						<option value="pauseCycle">Pause auto cycle</option>
+						<option value="resumeCycle">Resume auto cycle</option>
+						<option value="toggleCycle">Pause/resume auto cycle</option>
+						<option value="pin">Pin reading</option>
+						<option value="unpin">Unpin reading</option>
+						<option value="togglePin">Pin/unpin reading</option>
+						<option value="resetStats">Reset session stats</option>
+					</select>
+				</div>
+				<div class="hw-field" id="reset-reach">
+					<label for="f-reset">A reset clears</label>
+					<select id="f-reset" data-setting="resetScope" data-default="current" aria-describedby="reset-help">
+						<option value="current">The dial's current reading</option>
+						<option value="set">The dial's rotation set</option>
+						<option value="all">Every dial, everywhere (use with care)</option>
+					</select>
+					<p class="hw-help" id="reset-help">"Every dial, everywhere" ignores the Target and clears session stats on all dials, on all Stream Decks, including hidden ones.</p>
+				</div>
+				<div class="hw-field">
+					<label for="f-target">Target</label>
+					<input id="f-target" type="text" data-setting="target" placeholder="Every dial" aria-describedby="target-help" autocomplete="off" spellcheck="false" />
+					<p class="hw-help" id="target-help">Leave empty to steer every dial, or type a Link ID (set on a dial under Controls) to steer only the dials that carry it.</p>
+				</div>
+			</div>
 		</details>
 
-		<sdpi-item label="Command">
-			<sdpi-select setting="command" default="next">
-				<option value="next">Next reading</option>
-				<option value="prev">Previous reading</option>
-				<option value="nextGroup">Next sensor or group</option>
-				<option value="prevGroup">Previous sensor or group</option>
-				<option value="cycleStat">Cycle stat mode</option>
-				<option value="showCurrent">Show current value</option>
-				<option value="showMin">Show session min</option>
-				<option value="showMax">Show session max</option>
-				<option value="showAvg">Show session average</option>
-				<option value="pauseCycle">Pause auto cycle</option>
-				<option value="resumeCycle">Resume auto cycle</option>
-				<option value="toggleCycle">Pause/resume auto cycle</option>
-				<option value="pin">Pin reading</option>
-				<option value="unpin">Unpin reading</option>
-				<option value="togglePin">Pin/unpin reading</option>
-				<option value="resetStats">Reset session stats</option>
-			</sdpi-select>
-		</sdpi-item>
-
-		<sdpi-item label="Target">
-			<sdpi-textfield setting="target" placeholder="Link ID (empty: every dial)"></sdpi-textfield>
-		</sdpi-item>
-		<div class="hw-help">Give a dial a Link ID in its settings (under "Dial gestures &amp; advanced", Remote control) and put the same name here to steer just that dial or group of dials. The dial can be on a different Stream Deck than this key.</div>
-
-		<sdpi-item label="Reset reach">
-			<sdpi-select setting="resetScope" default="current">
-				<option value="current">Current reading only</option>
-				<option value="set">The dial's rotation set</option>
-				<option value="all">Every dial, everywhere (use with care)</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div class="hw-help">Only used by "Reset session stats". "Every dial, everywhere" ignores the Target and clears session stats on all dials, on all decks, including hidden ones.</div>
-
-		<details>
-			<summary>Support</summary>
-			<sdpi-item label="Support">
-				<button class="hw-support" id="support-report" type="button">Copy support report</button>
-			</sdpi-item>
-			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
+		<details class="hw-sec" id="sec-advanced">
+			<summary><span class="hw-sec-title">Advanced</span><span class="hw-sec-sum">Support report</span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-actions"><button class="hw-support" id="support-report" type="button" aria-describedby="support-help">Copy support report</button></div>
+				<p class="hw-help" id="support-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard. Nothing is uploaded.</p>
+			</div>
 		</details>
 
-		<script src="pi-control.js?v=1.7.0.0-8"></script>
+		<script src="pi-model.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-shell.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-command.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-control.js?v=1.7.0.0-f01q"></script>
 	</body>
 </html>

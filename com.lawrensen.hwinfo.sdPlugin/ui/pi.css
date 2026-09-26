@@ -1,127 +1,1086 @@
-/* Styling for the custom searchable sensor picker + live preview, matched to
-   the sdpi-components dark look (#2d2d2d page, #3d3d3d inputs). */
+/* Property inspector styles, shared by every panel.
 
-/* Bare elements (details/summary) fall back to the webview's serif default —
-   pin the app font for everything sdpi-components doesn't style itself. */
+   One small token set (surfaces, text, borders, spacing, focus, selection,
+   status) on the Stream Deck app's own dark page. Text tokens clear WCAG AA
+   on the surfaces they sit on (4.5:1 for text, 3:1 for field edges and the
+   focus ring; see review/pi-essentials for the measured ratios). The panel
+   chrome never touches what a key or dial draws: themes, custom colors and
+   dimming belong to the device faces and are shown here only as those
+   faces, unchanged. */
+
+:root {
+	--hw-font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+	--hw-mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+	--hw-size: 12px;
+	--hw-size-sm: 11.5px;
+	--hw-bg: #2d2d2d;
+	--hw-raised: #343434;
+	--hw-field: #3a3a3a;
+	--hw-field-hover: #424242;
+	--hw-edge: #7c7c7c;
+	--hw-rule: #454545;
+	--hw-text: #ececec;
+	--hw-muted: #b8b8b8;
+	--hw-placeholder: #a3a3a3;
+	--hw-link: #8ecbff;
+	--hw-focus: #7cc4ff;
+	--hw-select-bg: #2660aa;
+	--hw-select-text: #ffffff;
+	--hw-active-bg: #3a4350;
+	--hw-ok: #7fdca0;
+	--hw-warn-text: #ffcf70;
+	--hw-warn-bg: #44381f;
+	--hw-danger-text: #ffb4ab;
+	--hw-danger-bg: #4a2626;
+	--hw-info-bg: #263545;
+	--hw-s1: 4px;
+	--hw-s2: 8px;
+	--hw-s3: 12px;
+	--hw-s4: 16px;
+	--hw-radius: 4px;
+}
+
+html,
 body {
-	font-family: "Segoe UI", Arial, sans-serif;
-	color: #d8d8d8;
+	background: var(--hw-bg);
 }
 
-details > summary {
-	font-size: 9pt;
-	color: #969696;
+body {
+	margin: 0;
+	padding: 0 0 var(--hw-s4);
+	color: var(--hw-text);
+	font-family: var(--hw-font);
+	font-size: var(--hw-size);
+	line-height: 1.4;
+	overflow-x: hidden;
+}
+
+/* One focus treatment for everything the panel draws. */
+:focus-visible {
+	outline: 2px solid var(--hw-focus);
+	outline-offset: 1px;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.hw-sr {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+/* --- header: identity, truthful face, status ------------------------ */
+
+.hw-head {
+	display: flex;
+	gap: var(--hw-s3);
+	align-items: center;
+	padding: var(--hw-s3) var(--hw-s3) var(--hw-s2);
+	border-bottom: 1px solid var(--hw-rule);
+}
+
+.hw-head[data-kind="dial"] {
+	flex-wrap: wrap;
+}
+
+/* The dial's face sits beside its text at the app's panel width (373 CSS
+   px with the scrollbar, bench 2026-09-23): 176 + 12 + 140 fits, and the
+   header stays about as tall as the face instead of stacking to twice
+   that. A panel too narrow for both wraps the text under the face. */
+.hw-head[data-kind="dial"] .hw-head-text {
+	flex-basis: 140px;
+}
+
+/* On a tall panel the face stays in view while you edit below it (the
+   preview-led study's one clear win). A short panel scrolls it away. The
+   shell measures the header into --hw-head-h, so scroll padding (and the
+   sticky "Add readings" dock) clear it at any width; a header that would
+   take more than a third of the panel (a wrapped dial header) is not
+   pinned at all (data-pin-off). */
+@media (min-height: 560px) {
+	html[data-pin]:not([data-pin-off]) {
+		--hw-sticky-top: var(--hw-head-h, 118px);
+		scroll-padding-top: calc(var(--hw-head-h, 118px) + 8px);
+	}
+
+	html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
+		position: sticky;
+		top: 0;
+		z-index: 60;
+		background: var(--hw-bg);
+		box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.6);
+	}
+}
+
+.hw-face {
+	flex: none;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+}
+
+.hw-face img {
+	display: block;
+	width: 72px;
+	height: 72px;
+	border-radius: 8px;
+	background: #000;
+}
+
+.hw-head[data-kind="dial"] .hw-face {
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.hw-head[data-kind="dial"] .hw-face img {
+	width: 176px;
+	height: auto;
+	aspect-ratio: 2 / 1;
+	max-width: 100%;
+	border-radius: 6px;
+}
+
+.hw-face figcaption {
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-head-text {
+	flex: 1 1 160px;
+	min-width: 0;
+}
+
+.hw-head-text p {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.hw-head-kind {
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+/* Sections wait for the plugin's remembered folds (at most 300 ms) so a
+   fold it restores never moves content that has already drawn. */
+html[data-folds-pending] .hw-sec {
+	visibility: hidden;
+}
+
+/* A fold restored while hidden must not be caught mid-turn. */
+html[data-folds-pending] .hw-sec > summary::before {
+	transition: none;
+}
+
+/* Open all / Fold all: two chevron pairs in the header's top corner, on
+   the kind line's otherwise empty right side, so they cost no height and
+   pin with the header. Quiet at rest like the section markers (same muted
+   grey); a hover lifts them like a section title. Each is a 24 px target
+   (WCAG 2.2 target size). A pair that would change nothing is dimmed and
+   stays focusable. */
+.hw-head-top {
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s2);
+}
+
+.hw-head-top .hw-head-kind {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.hw-folds {
+	flex: none;
+	display: flex;
+	gap: 2px;
+	margin: -4px -6px -4px 0;
+}
+
+.hw-folds button {
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	background: none;
+	border: 1px solid transparent;
+	border-radius: var(--hw-radius);
+	color: var(--hw-muted);
 	cursor: pointer;
-	padding: 6px 12px 2px;
 }
 
-details > summary:hover {
-	color: #d8d8d8;
+.hw-folds button:hover {
+	background: var(--hw-raised);
+	border-color: var(--hw-rule);
+	color: var(--hw-text);
 }
 
-/* Collapsed first-run onboarding at the top of both property inspectors. */
-.hw-setup > summary {
-	color: #8ecbff;
+.hw-folds button:active {
+	background: var(--hw-field);
 }
 
-.hw-setup > p {
-	margin: 4px 12px 8px;
-	padding: 6px 8px;
-	background: #353535;
-	border-left: 3px solid #2660aa;
-	color: #c8c8c8;
-	font-size: 8.5pt;
-	line-height: 1.45;
+.hw-folds button[aria-disabled="true"] {
+	background: none;
+	border-color: transparent;
+	color: var(--hw-muted);
+	opacity: 0.4;
+	cursor: default;
 }
+
+.hw-folds svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.hw-head-reading {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hw-head-source {
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-state {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 2px !important;
+	font-size: var(--hw-size-sm);
+	color: var(--hw-muted);
+}
+
+.hw-state::before {
+	content: "";
+	flex: none;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--hw-muted);
+}
+
+.hw-state[data-tone="ok"]::before {
+	background: var(--hw-ok);
+}
+
+.hw-state[data-tone="warn"] {
+	color: var(--hw-warn-text);
+}
+
+.hw-state[data-tone="warn"]::before {
+	background: var(--hw-warn-text);
+	border-radius: 1px;
+}
+
+.hw-state[data-tone="danger"] {
+	color: var(--hw-danger-text);
+}
+
+.hw-state[data-tone="danger"]::before {
+	background: var(--hw-danger-text);
+	border-radius: 1px;
+	transform: rotate(45deg);
+}
+
+.hw-lede {
+	margin: var(--hw-s2) var(--hw-s3) 0;
+	color: var(--hw-muted);
+}
+
+/* --- sections: independent disclosures with an effective summary ------ */
+
+.hw-sec {
+	border-bottom: 1px solid var(--hw-rule);
+}
+
+.hw-sec > summary {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 2px var(--hw-s2);
+	padding: 8px var(--hw-s3) 8px 28px;
+	cursor: pointer;
+	list-style: none;
+	position: relative;
+}
+
+.hw-sec > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hw-sec > summary::before {
+	content: "";
+	position: absolute;
+	left: 12px;
+	top: 13px;
+	border: 5px solid transparent;
+	border-left-color: var(--hw-muted);
+	border-right-width: 0;
+	transition: transform 0.12s;
+}
+
+.hw-sec[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.hw-sec > summary:hover {
+	background: var(--hw-raised);
+}
+
+.hw-sec-title {
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--hw-text);
+}
+
+.hw-sec-sum {
+	flex: 1 1 140px;
+	min-width: 0;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	overflow-wrap: anywhere;
+}
+
+.hw-sec-body {
+	padding: 0 var(--hw-s3) var(--hw-s3);
+}
+
+/* A labeled group inside a section. */
+.hw-group-box {
+	margin: var(--hw-s3) 0 0;
+	padding: 0;
+	border: none;
+	min-width: 0;
+}
+
+.hw-group-box > legend,
+.hw-sub {
+	padding: 0;
+	margin: 0 0 var(--hw-s1);
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.hw-scope {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 0 6px;
+	border: 1px solid var(--hw-edge);
+	border-radius: 9px;
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--hw-text);
+	letter-spacing: 0;
+}
+
+/* --- fields: visible label above its control ---------------------------- */
+
+.hw-field {
+	margin-top: var(--hw-s2);
+	min-width: 0;
+}
+
+.hw-field > label,
+.hw-label {
+	display: block;
+	margin-bottom: 3px;
+	color: var(--hw-text);
+}
+
+.hw-row2 {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+	gap: 0 var(--hw-s2);
+}
+
+.hw-field select,
+.hw-field input[type="text"],
+.hw-field textarea,
+.hw-input {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	min-height: 28px;
+	margin: 0;
+	padding: 4px 8px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	font: inherit;
+}
+
+.hw-field select:hover,
+.hw-field input[type="text"]:hover,
+.hw-input:hover {
+	background: var(--hw-field-hover);
+}
+
+.hw-field input::placeholder,
+.hw-input::placeholder {
+	color: var(--hw-placeholder);
+}
+
+/* On the lighter hover fill the placeholder steps up to stay at 4.5:1
+   (#b0b0b0 on #424242 is 4.63:1; the resting #a3a3a3 would be 3.98:1). */
+.hw-field input:hover::placeholder,
+.hw-input:hover::placeholder,
+.hw-picker > input:hover:not(.missing)::placeholder {
+	color: #b0b0b0;
+}
+
+.hw-field input[aria-invalid="true"] {
+	border-color: var(--hw-danger-text);
+}
+
+.hw-error {
+	margin: 3px 0 0;
+	color: var(--hw-danger-text);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-check {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--hw-s2);
+	margin-top: var(--hw-s2);
+	cursor: pointer;
+}
+
+.hw-check input {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin: 1px 0 0;
+	accent-color: var(--hw-select-bg);
+}
+
+/* Help links open in the person's browser (pi-common's openUrl handler);
+   unstyled, the webview would paint them near-invisible #0000EE. */
+.hw-help a {
+	color: var(--hw-link);
+}
+
+.hw-help {
+	margin: 3px 0 0;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	line-height: 1.4;
+}
+
+/* Status blocks: a tone, a sentence, and the local repair next to it. */
+.hw-hint,
+.hw-status {
+	margin: var(--hw-s2) 0 0;
+	padding: var(--hw-s2) 10px;
+	border-radius: var(--hw-radius);
+	background: var(--hw-info-bg);
+	color: var(--hw-text);
+	font-size: var(--hw-size-sm);
+	line-height: 1.4;
+}
+
+.hw-hint,
+.hw-status[data-tone="warn"] {
+	background: var(--hw-warn-bg);
+	box-shadow: inset 3px 0 0 var(--hw-warn-text);
+}
+
+.hw-status[data-tone="danger"] {
+	background: var(--hw-danger-bg);
+	box-shadow: inset 3px 0 0 var(--hw-danger-text);
+}
+
+.hw-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.hw-status p {
+	margin: 0 0 var(--hw-s1);
+}
+
+/* The live region is always rendered (a region inserted together with its
+   first message is often not announced); with nothing to say it takes no
+   space. */
+.hw-status[data-tone=""] {
+	margin: 0;
+	padding: 0;
+	background: none;
+}
+
+.hw-status p:last-child {
+	margin-bottom: 0;
+}
+
+/* --- buttons ------------------------------------------------------------- */
+
+.hw-btn,
+.hw-config-row button,
+.hw-reading-colors button,
+.hw-set-actions button,
+.hw-support {
+	min-height: 26px;
+	padding: 3px 10px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.hw-btn:hover,
+.hw-config-row button:hover,
+.hw-set-actions button:hover,
+.hw-support:hover {
+	background: var(--hw-field-hover);
+}
+
+.hw-btn-primary {
+	background: var(--hw-select-bg);
+	border-color: var(--hw-select-bg);
+	color: var(--hw-select-text);
+}
+
+.hw-btn-primary:hover {
+	background: #2f6fc0;
+}
+
+.hw-btn[data-armed="true"] {
+	background: var(--hw-danger-bg);
+	border-color: var(--hw-danger-text);
+}
+
+.hw-link {
+	padding: 0;
+	background: none;
+	border: none;
+	color: var(--hw-link);
+	font: inherit;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.hw-actions,
+.hw-config-row,
+.hw-set-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: var(--hw-s2);
+}
+
+.hw-support:disabled {
+	color: var(--hw-muted);
+	cursor: default;
+}
+
+/* --- reading pickers: combobox + listbox, checklists --------------------- */
 
 .hw-picker {
 	position: relative;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: var(--hw-s1);
 }
 
-.hw-picker input {
-	flex: 1;
+.hw-picker > input {
+	flex: 1 1 0;
 	box-sizing: border-box;
-	background: #3d3d3d;
-	border: none;
-	border-radius: 0;
-	color: #d8d8d8;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 9pt;
-	padding: 4px 6px;
-	outline: none;
 	min-width: 0;
+	min-height: 28px;
+	padding: 4px 8px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	font: inherit;
 }
 
-.hw-picker input::placeholder {
-	color: #7f7f7f;
+.hw-picker > input::placeholder {
+	color: var(--hw-placeholder);
 }
 
-.hw-picker input.missing::placeholder {
-	color: #f5a623;
+.hw-picker > input.missing::placeholder {
+	color: var(--hw-warn-text);
 }
 
-.hw-picker button {
-	background: #3d3d3d;
-	border: none;
-	color: #969696;
+.hw-picker > button {
+	flex: none;
+	min-width: 32px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	font: inherit;
 	cursor: pointer;
-	font-size: 9pt;
-	padding: 0 8px;
 }
 
-.hw-picker button:hover {
-	color: #d8d8d8;
+.hw-picker > button:hover {
+	background: var(--hw-field-hover);
 }
 
-/* A plain select styled like the sdpi ones (the Display selector resolves
-   its shown value from two settings, which sdpi-select cannot express). */
-.hw-select {
-	width: 100%;
-	min-width: 0;
-	background: #3d3d3d;
-	border: none;
-	border-radius: 0;
-	color: #d8d8d8;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 9pt;
-	padding: 4px 2px;
-	outline: none;
+.hw-picker-list {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 50;
+	max-height: 300px;
+	margin-top: 2px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	background: #333;
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
-/* Quad cell colors: the preset select plus four native color wells. */
-.hw-quad-colors {
+.hw-picker-list.hw-inline {
+	position: static;
+	flex-basis: 100%;
+	max-height: 240px;
+	box-shadow: none;
+}
+
+/* Off-screen sources skip layout and paint until scrolled near, which
+   keeps a list of thousands of readings quick to open and to filter. */
+.hw-optgroup {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 240px;
+}
+
+.hw-group {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--hw-s2);
+	padding: 4px 8px;
+	background: #2a2a2a;
+	color: var(--hw-link);
+	font-weight: 600;
+}
+
+.hw-group > span {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hw-row {
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s2);
+	min-height: 24px;
+	padding: 2px 8px 2px 14px;
+	color: var(--hw-text);
+	cursor: pointer;
+}
+
+.hw-row:hover {
+	background: var(--hw-field-hover);
+}
+
+/* Highlight (keyboard inspection) and selection (the saved choice) are
+   different states and look different: an outline for the active option,
+   a fill for the selected one. */
+.hw-row.active {
+	background: var(--hw-active-bg);
+	box-shadow: inset 0 0 0 2px var(--hw-focus);
+}
+
+.hw-row.selected,
+.hw-row[aria-selected="true"] {
+	background: var(--hw-select-bg);
+	color: var(--hw-select-text);
+}
+
+.hw-row.selected.active,
+.hw-row[aria-selected="true"].active {
+	box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+.hw-row .hw-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hw-row .hw-val {
+	flex: none;
+	color: var(--hw-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.hw-row.selected .hw-val,
+.hw-row[aria-selected="true"] .hw-val {
+	color: #dcebff;
+}
+
+.hw-row .hw-tick {
+	flex: 0 0 16px;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	accent-color: var(--hw-select-bg);
+	cursor: pointer;
+}
+
+.hw-row .hw-now {
+	flex: none;
+	padding: 0 5px;
+	border: 1px solid currentColor;
+	border-radius: 8px;
+	font-size: 10.5px;
+}
+
+.hw-more {
+	padding: 6px 8px;
+	color: var(--hw-muted);
+}
+
+.hw-group-add {
+	flex: none;
+	padding: 0 6px;
+	background: none;
+	border: 1px solid var(--hw-edge);
+	border-radius: 3px;
+	color: var(--hw-link);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.hw-group-add:hover {
+	background: var(--hw-select-bg);
+	color: var(--hw-select-text);
+}
+
+/* --- chips: the rotation set and the custom detail list ----------------- */
+
+.hw-set {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--hw-s1);
+	padding: 2px 0;
+}
+
+.hw-set-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	max-width: 100%;
+	min-height: 26px;
+	padding: 1px 2px 1px 8px;
+	background: var(--hw-field);
+	border: 1px solid #555;
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	box-sizing: border-box;
+}
+
+.hw-set-chip.missing {
+	color: var(--hw-warn-text);
+	border-style: dashed;
+}
+
+/* The reading on the dial right now: a fill plus a text badge, so the
+   distinction from membership never rests on color alone. */
+.hw-set-chip.current {
+	background: var(--hw-select-bg);
+	border-color: var(--hw-select-bg);
+	color: var(--hw-select-text);
+}
+
+.hw-set-chip > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 170px;
+}
+
+.hw-set-name {
+	cursor: text;
+	border-radius: 2px;
+}
+
+.hw-set-name:hover {
+	text-decoration: underline dotted;
+}
+
+.hw-set-name.parked {
+	cursor: default;
+}
+
+.hw-set-name.parked:hover {
+	text-decoration: none;
+}
+
+.hw-set-name.renamed {
+	font-style: italic;
+}
+
+.hw-chip-badge {
+	padding: 0 4px;
+	border: 1px solid currentColor;
+	border-radius: 7px;
+	font-size: 10px;
+}
+
+.hw-chip-rename {
+	flex: 0 1 auto;
+	width: 110px;
+}
+
+.hw-set-remove,
+.hw-group-remove,
+.hw-detail-move,
+.hw-chip-move {
+	min-width: 22px;
+	min-height: 22px;
+	padding: 0 4px;
+	background: none;
+	border: none;
+	border-radius: 3px;
+	color: var(--hw-muted);
+	font: inherit;
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.hw-set-chip.current .hw-set-remove,
+.hw-set-chip.current .hw-chip-move {
+	color: #dcebff;
+}
+
+.hw-set-remove:hover,
+.hw-group-remove:hover,
+.hw-detail-move:hover:not(:disabled),
+.hw-chip-move:hover:not(:disabled) {
+	color: var(--hw-text);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.hw-detail-move:disabled,
+.hw-chip-move:disabled {
+	color: #6a6a6a;
+	cursor: default;
+}
+
+.hw-set-note {
+	flex-basis: 100%;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-group-head {
+	flex-basis: 100%;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s1);
+	margin-top: var(--hw-s2);
+}
+
+.hw-group-head:first-child {
+	margin-top: 0;
+}
+
+.hw-collector {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	accent-color: var(--hw-select-bg);
+	cursor: pointer;
+}
+
+.hw-group-name {
+	flex: 1 1 0;
+	width: 0;
+	min-width: 0;
+	min-height: 24px;
+	box-sizing: border-box;
+	padding: 2px 6px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: 3px;
+	color: var(--hw-text);
+	font: inherit;
+}
+
+.hw-group-name::placeholder {
+	color: var(--hw-placeholder);
+}
+
+.hw-set-chips {
+	flex-basis: 100%;
+	box-sizing: border-box;
+	min-width: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--hw-s1);
+	padding: 2px 0 2px 20px;
+}
+
+/* A small disclosure inside a section (the HWiNFO setup steps). */
+.hw-inline-help {
+	margin-top: var(--hw-s2);
+}
+
+.hw-inline-help > summary {
+	display: inline-flex;
+	align-items: center;
+	min-height: 24px;
+	color: var(--hw-link);
+	cursor: pointer;
+}
+
+.hw-inline-help ol {
+	margin: var(--hw-s1) 0 0;
+	padding-left: 20px;
+}
+
+/* --- theme gallery ------------------------------------------------------ */
+
+.hw-themes {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+	gap: 6px;
+}
+
+.hw-theme {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 3px;
+	min-width: 0;
+	padding: 2px;
+	background: none;
+	border: none;
+	border-radius: var(--hw-radius);
+	color: var(--hw-muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.hw-theme-face {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 100%;
+	height: 34px;
+	overflow: hidden;
+	border: 1px solid #1f1f1f;
+	border-radius: var(--hw-radius);
+}
+
+.hw-theme[aria-checked="true"] .hw-theme-face,
+.hw-theme.selected .hw-theme-face {
+	outline: 2px solid var(--hw-focus);
+	outline-offset: 1px;
+}
+
+.hw-theme[aria-checked="true"] .hw-theme-name {
+	color: var(--hw-text);
+	font-weight: 600;
+}
+
+.hw-theme-deck .hw-theme-face {
+	border: 2px dashed var(--hw-link);
+}
+
+.hw-theme-badge {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	border-radius: 3px;
+	background: rgba(8, 10, 14, 0.78);
+	color: var(--hw-link);
+	pointer-events: none;
+}
+
+.hw-theme-badge svg {
+	display: block;
+	width: 10px;
+	height: 10px;
+}
+
+.hw-theme-value {
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.hw-theme-spark {
+	position: absolute;
+	left: 4px;
+	right: 4px;
+	bottom: 4px;
+	height: 2px;
+	border-radius: 1px;
+}
+
+.hw-theme-name {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+}
+
+/* --- colors -------------------------------------------------------------- */
+
+.hw-quad-colors {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
 }
 
 .hw-quad-colors select {
-	flex: 1;
-	min-width: 0;
-	background: #3d3d3d;
-	border: none;
-	border-radius: 0;
-	color: #d8d8d8;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 9pt;
-	padding: 4px 2px;
-	outline: none;
+	flex: 1 1 140px;
 }
 
-.hw-quad-colors input[type="color"] {
-	flex: 0 0 26px;
-	width: 26px;
-	height: 22px;
-	padding: 0;
-	border: 1px solid #1f1f1f;
-	background: #3d3d3d;
-	cursor: pointer;
-}
-
-/* Dial reading colors reuse the quad wells; names keep large rotation sets clear. */
+/* Dial reading colors reuse the quad wells; names keep large rotation
+   sets clear. */
 .hw-reading-colors {
 	max-height: 220px;
 	overflow-y: auto;
@@ -139,621 +1098,84 @@ details > summary:hover {
 	white-space: nowrap;
 }
 
-.hw-picker-list {
-	position: absolute;
-	top: 100%;
-	left: 0;
-	right: 0;
-	z-index: 50;
-	max-height: 280px;
-	overflow-y: auto;
-	background: #383838;
-	border: 1px solid #1f1f1f;
-	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 9pt;
-}
-
-.hw-picker-list[hidden] {
-	display: none;
-}
-
-.hw-group {
-	position: sticky;
-	top: 0;
-	background: #2f2f2f;
-	color: #8ecbff;
-	font-weight: 600;
-	padding: 4px 8px;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.hw-row {
-	display: flex;
-	justify-content: space-between;
-	gap: 8px;
-	padding: 3px 8px 3px 14px;
-	color: #d8d8d8;
-	cursor: pointer;
-	white-space: nowrap;
-}
-
-.hw-row:hover {
-	background: #4a4a4a;
-}
-
-.hw-row.selected {
-	background: #2660aa;
-	color: #ffffff;
-}
-
-.hw-row .hw-label {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	flex: 1 1 auto;
-	min-width: 0;
-}
-
-.hw-row .hw-val {
-	color: #9a9a9a;
-	flex-shrink: 0;
-	font-variant-numeric: tabular-nums;
-}
-
-.hw-row.selected .hw-val {
-	color: #cfe3ff;
-}
-
-.hw-more {
-	padding: 4px 8px;
-	color: #8a8a8a;
-	font-style: italic;
-}
-
-/* Membership ticks in picker rows (the dial's rotation set and the reading
-   PI's drill-down collector share the one pattern) + removable chips under
-   the picker. The label flexes so the tick/label/value row keeps the label
-   left-aligned. */
-
-.hw-row .hw-tick {
-	/* Explicit box: the webview's native checkbox otherwise shrinks with the
-	   flex row (long labels squeezed some ticks into dots on the real deck). */
-	flex: 0 0 13px;
-	width: 13px;
-	height: 13px;
-	box-sizing: border-box;
-	margin: 1px 2px 0 0;
-	accent-color: #2660aa;
+.hw-quad-colors input[type="color"],
+.hw-color {
+	flex: 0 0 32px;
+	width: 32px;
+	height: 26px;
+	padding: 1px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
 	cursor: pointer;
 }
 
-.hw-set {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	padding: 2px 0;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 8.5pt;
-}
-
-.hw-set-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	background: #3d3d3d;
-	border-radius: 3px;
-	padding: 2px 2px 2px 8px;
-	color: #d8d8d8;
-	max-width: 100%;
-}
-
-.hw-set-chip.missing {
-	color: #f5a623;
-}
-
-/* The chip whose reading is on the dial right now. Rotation, group jumps
-   and the auto cycle move it live while the panel is open, so the set
-   doubles as a position indicator. Declared after .missing on purpose: a
-   current chip reads selection-blue even while its label resolves. */
-.hw-set-chip.current {
-	background: #2660aa;
-	color: #ffffff;
-}
-
-.hw-set-chip.current .hw-set-remove {
-	color: #cfe3ff;
-}
-
-.hw-set-chip > span {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	max-width: 170px;
-}
-
-.hw-set-name {
-	cursor: text;
-}
-
-.hw-set-name:hover {
-	text-decoration: underline dotted;
-}
-
-/* The parked primary's name. It has no cell, so there is no cell label to
-   rename and the click handler refuses it: drop the affordance too. */
-.hw-set-name.parked {
-	cursor: default;
-}
-
-.hw-set-name.parked:hover {
-	text-decoration: none;
-}
-
-/* A cell wearing the user's own label rather than HWiNFO's; without the
-   paint an override reads exactly like the sensor's own name. Brighter,
-   the same way a planned tile reads brighter than the uniform fill. */
-.hw-set-name.renamed {
-	color: #e8eaed;
-}
-
-/* Chip rename input: group-name look, chip-sized. */
-.hw-chip-rename {
-	flex: 0 1 auto;
-	width: 110px;
-}
-
-.hw-set-remove,
-.hw-group-remove {
-	background: none;
-	border: none;
-	color: #969696;
-	cursor: pointer;
-	font-size: 10pt;
-	line-height: 1;
-	padding: 0 4px;
-}
-
-.hw-set-remove:hover,
-.hw-group-remove:hover {
-	color: #ffffff;
-}
-
-.hw-set-note {
-	flex-basis: 100%;
-	color: #8a8a8a;
-	font-size: 8pt;
-	line-height: 1.35;
-}
-
-/* Rotation groups: each group is a header row (collector radio, name field,
-   remove) with its chips indented beneath, all inside the .hw-set flexbox. */
-
-.hw-group-head {
-	flex-basis: 100%;
+.hw-swatch-row {
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	margin-top: 6px;
+	gap: var(--hw-s2);
 }
 
-.hw-group-head:first-child {
-	margin-top: 0;
+.hw-swatch-row code {
+	font-family: var(--hw-mono);
+	color: var(--hw-muted);
 }
 
-.hw-collector {
-	flex: 0 0 12px;
-	width: 12px;
-	height: 12px;
-	margin: 0;
-	accent-color: #2660aa;
-	cursor: pointer;
-}
+/* --- configuration documents -------------------------------------------- */
 
-.hw-group-name {
-	flex: 1 1 auto;
-	min-width: 0;
-	box-sizing: border-box;
-	background: #3d3d3d;
-	border: none;
-	border-radius: 3px;
-	color: #d8d8d8;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 8.5pt;
-	padding: 2px 6px;
-	outline: none;
-}
-
-.hw-group-name::placeholder {
-	color: #7f7f7f;
-}
-
-.hw-set-chips {
-	flex-basis: 100%;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	padding: 2px 0 2px 16px;
-}
-
-.hw-set-actions {
-	flex-basis: 100%;
-	display: flex;
-	gap: 6px;
-	margin-top: 6px;
-}
-
-.hw-config-row button,
-.hw-reading-colors button,
-.hw-set-actions button,
-.hw-support {
-	background: #3d3d3d;
-	border: 1px solid #555555;
-	border-radius: 3px;
-	color: #d8d8d8;
-	cursor: pointer;
-	font-family: "Segoe UI", Arial, sans-serif;
-}
-
-/* Config export/apply: the document is hand-edited JSON, so it reads in
-   a monospaced well and never wraps a line out of shape. */
 .hw-config {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	width: 100%;
+	gap: var(--hw-s1);
 }
 
 .hw-config textarea {
+	box-sizing: border-box;
 	width: 100%;
 	min-height: 120px;
+	padding: 6px;
 	resize: vertical;
-	box-sizing: border-box;
-	padding: 4px;
-	font-family: ui-monospace, Consolas, monospace;
-	font-size: 10px;
+	background: #1c1f24;
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: #e2e5ea;
+	font-family: var(--hw-mono);
+	font-size: 11px;
 	tab-size: 2;
 	white-space: pre;
-	background: #1c1f24;
-	color: #d7dae0;
-	border: 1px solid #3a3f46;
-	border-radius: 4px;
 }
 
-.hw-config-row {
-	display: flex;
-	gap: 6px;
-}
+/* --- custom detail list (tile editor) ----------------------------------- */
 
-/* Shares the panel button recipe (the .hw-set-actions group); only
-   the size and padding are this row's own. */
-.hw-config-row button {
-	font-size: 8.5pt;
-	padding: 2px 10px;
-}
-
-.hw-set-actions button {
-	font-size: 8pt;
-	padding: 2px 8px;
-}
-
-.hw-config-row button:hover,
-.hw-set-actions button:hover,
-.hw-support:hover {
-	background: #4a4a4a;
-}
-
-/* "Copy support report" button (all PIs). */
-.hw-support {
-	font-size: 8.5pt;
-	padding: 3px 10px;
-}
-
-.hw-support:disabled {
-	color: #8a8a8a;
-	cursor: default;
-}
-
-.hw-preview {
-	display: flex;
-	align-items: baseline;
-	gap: 10px;
-	font-family: "Segoe UI", Arial, sans-serif;
-	color: #d8d8d8;
-	padding: 2px 0;
-	min-height: 22px;
-}
-
-/* The live preview reserves two lines: the value, then the stats caption.
-   Wide values (RPM, MB) must never re-wrap the row and push the controls
-   below it down mid-click, so the geometry is constant for every reading
-   and for the empty states. */
-.hw-preview-live {
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 2px;
-	min-height: 44px;
-}
-
-/* With plugin-resolved colors the preview becomes a mini face: the theme
-   background behind the theme/Dim/Custom text, so the Text setting's result
-   is visible in the panel exactly as it lands on the key. */
-.hw-preview-live.themed {
-	padding: 5px 10px;
-	border-radius: 4px;
-	border: 1px solid #1f1f1f;
-}
-
-#preview-value {
-	font-size: 14pt;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-	flex: none;
-}
-
-/* Safety net only (the caption line has the full panel width): never wrap,
-   clip with an ellipsis, full string in the title tooltip. */
-#preview-stats {
-	font-size: 8pt;
-	color: #969696;
-	font-variant-numeric: tabular-nums;
-	min-width: 0;
-	max-width: 100%;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-/* Passive help lines (neutral — .hw-hint's amber is for warnings). */
-.hw-help {
-	margin: -2px 12px 6px;
-	color: #8a8a8a;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 8pt;
-	line-height: 1.35;
-}
-
-/* The only links the panel carries sit in those help lines. Unstyled, the
-   webview paints them its own #0000EE, which is all but invisible on the
-   #2d2d2d page; this is the setup fold's blue. */
-.hw-help a {
-	color: #8ecbff;
-}
-
-.hw-hint {
-	margin: 6px 12px;
-	padding: 6px 8px;
-	background: #4a3a1e;
-	border-left: 3px solid #f5a623;
-	color: #ffd996;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 8.5pt;
-	line-height: 1.35;
-}
-
-.hw-hint[hidden] {
-	display: none;
-}
-
-/* Quiet Sections: flat non-interactive headers, uppercase micro-type over a
-   hairline rule. Static divs on purpose: no focus stop, nothing to click.
-   Rhythm is deliberately tight: seven headers ride the dial panel, so every
-   vertical pixel here is paid that many times. */
-.hw-section {
-	margin: 10px 12px 3px;
-	padding-top: 7px;
-	border-top: 1px solid #3a3a3a;
-	color: #969696;
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 7.5pt;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-}
-
-/* Inside the advanced folds the rhythm tightens another step. */
-details .hw-section {
-	margin: 8px 12px 2px;
-	padding-top: 6px;
-}
-
-/* The first header after the setup fold: the fold's edge is rule enough.
-   The reading PI parks the usually hidden role note between them, so the
-   hint-interposed form is the same first header. */
-.hw-setup + .hw-section,
-.hw-setup + .hw-hint + .hw-section {
-	border-top: none;
-	margin-top: 6px;
-	padding-top: 0;
-}
-
-/* Conditional blocks a select reveals: a left rule marks their scope. The
-   1px vertical padding contains the child rows' margins, so two visible
-   blocks in a row (#second-slot then #dual-rows/#quad-rows) touch and
-   their rules read as one. */
-.hw-cond {
-	border-left: 2px solid #3d3d3d;
-	margin-left: 10px;
-	padding: 1px 0 1px 2px;
-}
-
-.hw-cond[hidden] {
-	display: none;
-}
-
-/* Theme preset gallery: "Deck default" + the seven presets as mini key faces. */
-
-.hw-themes {
-	display: grid;
-	grid-template-columns: repeat(4, 1fr);
-	gap: 6px;
-	padding: 2px 0;
-}
-
-.hw-theme {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 3px;
-	background: none;
-	border: none;
-	padding: 0;
-	cursor: pointer;
-	/* Grid items default to min-width:auto — a long nowrap label would blow
-	   the 1fr column wide (seen with "Deck default · <name>"). */
-	min-width: 0;
-}
-
-.hw-theme-face {
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 100%;
-	height: 34px;
-	border-radius: 4px;
-	border: 1px solid #1f1f1f;
-	box-sizing: border-box;
-	overflow: hidden;
-}
-
-.hw-theme.selected .hw-theme-face {
-	outline: 2px solid #2660aa;
-	outline-offset: 1px;
-}
-
-/* The leading "Deck default" chip follows the deck-wide theme. It previews the
-   resolved palette truthfully, but a dashed frame + link badge (structure, not
-   typography) keep it from ever reading as a twin of the preset it resolves to
-   (e.g. Void). border-box keeps the 2px dashed border the same outer size as
-   the 1px solid preset chips, so the equal-width grid is untouched. */
-.hw-theme-deck .hw-theme-face {
-	border: 2px dashed #8ecbff;
-}
-
-.hw-theme-badge {
-	position: absolute;
-	top: 2px;
-	left: 2px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 14px;
-	height: 14px;
-	border-radius: 3px;
-	background: rgba(8, 10, 14, 0.78);
-	color: #8ecbff;
-	pointer-events: none;
-}
-
-.hw-theme-badge svg {
-	display: block;
-	width: 10px;
-	height: 10px;
-}
-
-.hw-theme-value {
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 13px;
-	font-weight: 700;
-	line-height: 1;
-}
-
-.hw-theme-spark {
-	position: absolute;
-	left: 4px;
-	right: 4px;
-	bottom: 4px;
-	height: 2px;
-	border-radius: 1px;
-}
-
-.hw-theme-name {
-	font-family: "Segoe UI", Arial, sans-serif;
-	font-size: 7.5pt;
-	color: #969696;
-	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.hw-theme.selected .hw-theme-name {
-	color: #d8d8d8;
-}
-
-/* Detail list (reading PI): the collector rows carry the same membership
-   checkbox as the rotation set (one pattern everywhere), group headers grow
-   an add-all button, and the ordered chips carry move arrows. */
-
-.hw-group-add {
-	float: right;
-	background: none;
-	border: 1px solid #4a4a4a;
-	border-radius: 3px;
-	color: #8ecbff;
-	cursor: pointer;
-	font-size: 7.5pt;
-	line-height: 1.2;
-	padding: 0 5px;
-	margin-left: 8px;
-}
-
-.hw-group-add:hover {
-	background: #2660aa;
-	color: #ffffff;
-}
-
-.hw-detail-move {
-	background: none;
-	border: none;
-	color: #969696;
-	cursor: pointer;
-	font-size: 8pt;
-	line-height: 1;
-	padding: 0 2px;
-}
-
-.hw-detail-move:hover:not(:disabled) {
-	color: #ffffff;
-}
-
-.hw-detail-move:disabled {
-	color: #4a4a4a;
-	cursor: default;
-}
-
-/* Hand-grouped detail tiles: one bordered run per tile, its drag grip
-   and size cycler in front, chips (names rename on click; quad cells
-   add color wells) inside. A planned tile reads slightly brighter than
-   the uniform fill so the hand-made part is visible at a glance. */
 .hw-tile {
 	display: inline-flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 3px;
+	max-width: 100%;
 	margin: 2px 4px 2px 0;
 	padding: 2px 3px;
-	border: 1px solid #3a3f46;
+	border: 1px solid #56606c;
 	border-radius: 6px;
-	max-width: 100%;
-	flex-wrap: wrap;
+	box-sizing: border-box;
 }
 
 .hw-tile.planned {
-	border-color: #4a5563;
-	background: #22262c;
+	border-color: #6d7a8a;
+	background: #262b31;
 }
 
 .hw-tile-size,
 .hw-tile-abc {
+	min-height: 22px;
+	padding: 2px 6px;
 	background: #2c313a;
-	border: none;
+	border: 1px solid #56606c;
 	border-radius: 4px;
-	color: #c9d1d9;
+	color: #dde3ea;
+	font: inherit;
+	font-size: 11px;
 	cursor: pointer;
-	font-size: 8pt;
-	padding: 2px 5px;
 }
 
 .hw-tile-size:hover,
@@ -762,59 +1184,26 @@ details .hw-section {
 }
 
 .hw-tile-color {
-	flex: 0 0 20px;
-	width: 20px;
-	height: 18px;
+	flex: 0 0 22px;
+	width: 22px;
+	height: 20px;
 	padding: 0;
-	border: none;
 	background: none;
+	border: none;
 	cursor: pointer;
 }
 
-/* The detail collector's results render INLINE (the shared picker list
-   is an overlay elsewhere): adding sensors must not bury the tile list
-   you are adding into. Full-basis so the static list wraps UNDER the
-   search row instead of joining its flex row and crushing the input.
-   margin-right gives the inner scrollbar daylight from the panel's own
-   bar; overscroll containment stops wheel input chaining into the body. */
-.hw-picker-list.hw-inline {
-	position: static;
-	flex-basis: 100%;
-	max-height: 220px;
-	margin-top: 4px;
-	margin-right: 10px;
-	overscroll-behavior: contain;
-}
-
-/* The list's scrollbar reads as interior menu chrome, not a second
-   window bar: thin inset thumb, transparent track. */
-.hw-picker-list::-webkit-scrollbar {
-	width: 8px;
-}
-
-.hw-picker-list::-webkit-scrollbar-track {
-	background: transparent;
-}
-
-.hw-picker-list::-webkit-scrollbar-thumb {
-	background: #565d68;
-	border-radius: 4px;
-	border: 2px solid #383838;
-}
-
-/* One + per tile that can still take a pick, sitting exactly where that
-   pick would land. lit = the current landing point; armed = picks are
-   aimed at this tile. Transparent dashed border keeps geometry identical
-   across states, so lighting never reflows the tile. */
 .hw-add {
+	min-width: 22px;
+	min-height: 22px;
+	padding: 2px 6px;
 	background: #2c313a;
 	border: 1px dashed transparent;
 	border-radius: 4px;
-	color: #c9d1d9;
-	cursor: pointer;
-	font-size: 9pt;
+	color: #dde3ea;
+	font: inherit;
 	line-height: 1;
-	padding: 2px 6px;
+	cursor: pointer;
 }
 
 .hw-add:hover {
@@ -824,58 +1213,47 @@ details .hw-section {
 .hw-add.lit {
 	background: none;
 	border-color: #4cc2ff;
-	color: #8ecbff;
+	color: var(--hw-link);
 }
 
 .hw-add.armed {
-	background: #2660aa;
+	background: var(--hw-select-bg);
 	border-color: #4cc2ff;
-	color: #ffffff;
+	color: #fff;
 }
 
 .hw-tile.ghost {
 	border-style: dashed;
 }
 
-/* Landing receipt: 0.5s so the capture harness's 700 ms post-pick frame
-   is past it (deterministic screenshots). No idle animations anywhere. */
 .hw-set-chip.landed {
 	animation: hw-landed 0.5s ease-out;
 }
 
 @keyframes hw-landed {
 	from {
-		background: #2660aa;
+		background: var(--hw-select-bg);
 	}
 	to {
-		background: #3d3d3d;
+		background: var(--hw-field);
 	}
 }
 
-/* While the results list is open the Add sensor row pins, so results and
-   the landing marker stay co-visible from first pick to last. The
-   scroll-margins keep nearest-scrolled chips out from under the pinned
-   dock (about 30px search row + 4px margin + 220px list + slack), and
-   exist only while the dock does. */
 #detail-custom.picking #detail-add-dock {
 	position: sticky;
-	top: 0;
+	top: var(--hw-sticky-top, 0px);
 	z-index: 40;
-	background: #2d2d2d;
+	padding-bottom: var(--hw-s1);
+	background: var(--hw-bg);
 	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
-	padding-bottom: 4px;
 }
 
 #detail-custom.picking #detail-list .hw-set-chip,
 #detail-custom.picking #detail-list .hw-add {
-	scroll-margin-top: 270px;
+	scroll-margin-top: 290px;
 	scroll-margin-bottom: 8px;
 }
 
-/* Drag: an honest insertion caret on the matching edge (box-shadow, so
-   it is layout-neutral and cannot oscillate the element under the
-   pointer) for chips and whole tiles alike, and a lit tile frame for
-   append. */
 .hw-set-chip.dragging,
 .hw-tile.dragging {
 	opacity: 0.5;
@@ -895,24 +1273,36 @@ details .hw-section {
 	border-color: #4cc2ff;
 }
 
-/* Whole-tile drag: the grip is the handle, and the landing edge is the
-   tile's left or right. The list is a wrapping flex row (.hw-set) of
-   inline-flex tiles, so two short tiles share a row and the side is a
-   question about x, not y. */
 .hw-tile-grip {
-	color: #7c8694;
-	cursor: grab;
-	padding: 0 2px;
-	font-size: 11px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
+	padding: 0 3px;
+	box-sizing: border-box;
+	color: #9aa3ae;
+	font-size: 12px;
 	line-height: 1;
+	cursor: grab;
 }
 
 .hw-tile-grip:hover,
 .hw-tile-grip:focus-visible {
-	color: #e8eaed;
+	color: var(--hw-text);
 }
 
 .hw-tile.drop-append .hw-add {
 	border-color: #4cc2ff;
 	color: #4cc2ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hw-sec > summary::before {
+		transition: none;
+	}
+
+	.hw-set-chip.landed {
+		animation: none;
+	}
 }

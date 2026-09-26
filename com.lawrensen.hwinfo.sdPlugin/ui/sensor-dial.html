@@ -1,389 +1,453 @@
 <!doctype html>
-<html>
+<html lang="en" data-pin="dial" data-folds-pending>
 	<head>
 		<meta charset="utf-8" />
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-8" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-f01q" />
 	</head>
-	<body>
-		<details class="hw-setup">
-			<summary>First time? HWiNFO setup</summary>
-			<p>
-				1. Install and start <b>HWiNFO</b> (hwinfo.com) in Sensors-only mode.<br />
-				2. In HWiNFO Settings, enable <b>Shared Memory Support</b>. On the free
-				version you can instead click <b>Configure Sensors</b> in the sensor
-				window, open the <b>HWiNFO Gadget</b> tab, tick <b>Enable reporting to
-				Gadget</b>, then tick <b>“Report value in Gadget”</b> on the readings
-				you want (no 12-hour limit).<br />
-				3. Pick a sensor below. That's it.
-			</p>
+	<body data-kind="dial">
+		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
+			<figure class="hw-face" id="face" hidden>
+				<img id="face-img" alt="" width="200" height="100" />
+				<figcaption>On the dial now</figcaption>
+			</figure>
+			<div class="hw-head-text">
+				<div class="hw-head-top">
+					<p class="hw-head-kind" id="head-kind">Sensor Dial</p>
+					<div class="hw-folds" id="hw-folds" role="toolbar" aria-label="Sections">
+						<button type="button" data-folds="open" aria-label="Open all sections" title="Open all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 6 8 2.75 12.25 6M3.75 10 8 13.25 12.25 10" /></svg></button>
+						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 2.75 8 6 12.25 2.75M3.75 13.25 8 10 12.25 13.25" /></svg></button>
+					</div>
+				</div>
+				<p class="hw-head-reading" id="head-reading">No reading selected</p>
+				<p class="hw-head-source" id="head-source"></p>
+				<p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p>
+			</div>
+		</header>
+
+		<details class="hw-sec" id="sec-reading" open>
+			<summary><span class="hw-sec-title">Reading</span><span class="hw-sec-sum" data-summary="reading"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-field">
+					<label id="picker-label" for="picker-search">On the dial now</label>
+					<div class="hw-picker" data-hw-picker="primary">
+						<input id="picker-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
+						<button id="picker-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+						<div class="hw-picker-list" id="picker-list" role="listbox" aria-labelledby="picker-label" hidden></div>
+					</div>
+					<p class="hw-help" id="picker-help">Turning the dial changes this too.<span class="hw-sr-only"> Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything.</span></p>
+				</div>
+				<div class="hw-status" id="reading-status" role="status" aria-live="polite" data-tone=""></div>
+
+				<fieldset class="hw-group-box">
+					<legend id="rotation-label">Rotation</legend>
+					<div class="hw-set" id="rotation-set" role="group" aria-labelledby="rotation-label"></div>
+					<div class="hw-field">
+						<label id="pickerr-label" for="pickerr-search">Readings to rotate through</label>
+						<div class="hw-picker">
+							<input id="pickerr-search" type="text" aria-controls="pickerr-list" aria-describedby="pickerr-help" placeholder="Search readings to tick" autocomplete="off" spellcheck="false" />
+							<div class="hw-picker-list hw-inline" id="pickerr-list" role="group" aria-labelledby="pickerr-label" hidden></div>
+						</div>
+						<p class="hw-help" id="pickerr-help">Ticking adds a reading; it never changes what is on the dial now. On each reading, the arrows set their order.<span class="hw-sr-only"> Down Arrow moves into the list, arrows move inside it, Tab leaves it.</span></p>
+					</div>
+					<p class="hw-help" id="rotation-help" hidden></p>
+					<p class="hw-help" id="groups-preset-help" hidden>Rotation groups need a gesture that can switch groups, and this dial's control map has none. Set Controls to Elite, or map a gesture to "Switch sensor or group" in Custom.</p>
+				</fieldset>
+
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-label">Title on the dial</label>
+						<input id="f-label" type="text" data-setting="label" placeholder="The reading's own name" autocomplete="off" spellcheck="false" />
+					</div>
+					<div class="hw-field">
+						<label for="f-label-mode">Title after a turn</label>
+						<select id="f-label-mode" data-setting="labelMode" data-default="auto">
+							<option value="auto">Clears (default)</option>
+							<option value="fixed">Stays for this dial</option>
+						</select>
+					</div>
+				</div>
+			</div>
 		</details>
 
-		<div class="hw-section">Sensor</div>
-
-		<sdpi-item label="Sensor">
-			<div class="hw-picker">
-				<input id="picker-search" type="text" placeholder="Search sensors…" autocomplete="off" spellcheck="false" />
-				<button id="picker-refresh" type="button" title="Reload sensor list">⟳</button>
-				<div class="hw-picker-list" id="picker-list" hidden></div>
-			</div>
-		</sdpi-item>
-
-		<sdpi-item label="Live value">
-			<div class="hw-preview hw-preview-live">
-				<span id="preview-value">—</span>
-				<span id="preview-stats"></span>
-			</div>
-		</sdpi-item>
-
-		<div class="hw-hint" id="status-hint" hidden></div>
-
-		<sdpi-item label="Label">
-			<sdpi-textfield setting="label" placeholder="Custom label (default: sensor name)"></sdpi-textfield>
-		</sdpi-item>
-		<sdpi-item label="Label mode">
-			<sdpi-select setting="labelMode" default="auto">
-				<option value="auto">Clears when rotation moves on (default)</option>
-				<option value="fixed">Stays as a fixed title for this dial</option>
-			</sdpi-select>
-		</sdpi-item>
-
-		<div class="hw-section">Rotation</div>
-
-		<sdpi-item label="Rotation set">
-			<div class="hw-set" id="rotation-set"></div>
-		</sdpi-item>
-		<div class="hw-help" id="rotation-help">Leave the set empty to rotate through every reading of the picked sensor. Tick readings in the sensor list above to limit rotation to just those, in the order you tick them.</div>
-		<div class="hw-help hw-cond" id="groups-preset-help" hidden>Rotation groups need a gesture that can switch groups, and this dial's control map has none. Set Controls to Elite under "Dial gestures &amp; advanced", or map a gesture to "Switch sensor or group" in Custom.</div>
-
-		<sdpi-item label="Bump guard">
-			<sdpi-checkbox setting="rotationDisabled" label="Ignore turns (protects against accidental bumps)"></sdpi-checkbox>
-		</sdpi-item>
-
-		<sdpi-item label="Auto cycle">
-			<sdpi-select setting="autoCycleMs" default="off">
-				<option value="off">Off</option>
-				<option value="5000">Every 5 seconds</option>
-				<option value="10000">Every 10 seconds</option>
-				<option value="30000">Every 30 seconds</option>
-				<option value="60000">Every minute</option>
-				<option value="300000">Every 5 minutes</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div class="hw-help">Steps through the rotation set (or the picked sensor's readings) on a timer. Runs even while turns are ignored.</div>
-
-		<sdpi-item label="On alert">
-			<sdpi-checkbox setting="alertInterrupt" label="Auto cycle follows alerts: jumps to a critical reading in the set and holds there while it stays critical"></sdpi-checkbox>
-		</sdpi-item>
-
-		<div class="hw-section">View</div>
-
-		<sdpi-item label="View">
-			<sdpi-select setting="dialView" default="single">
-				<option value="single">One reading (default)</option>
-				<option value="tworow">Overview (two rows, big values + trend)</option>
-				<option value="overview">Overview (three rows)</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div id="overview-rows" class="hw-cond" hidden>
-			<sdpi-item label="Row labels">
-				<sdpi-select setting="overviewLabels" default="shorten">
-					<option value="shorten">Shorten shared prefixes, name in the context line</option>
-					<option value="full">Always full labels</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div id="overview-three-rows" hidden>
-				<sdpi-item label="Context line">
-					<sdpi-select setting="overviewHeader" default="top">
-						<option value="top">Above the rows (default)</option>
-						<option value="bottom">Below the rows</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Separators">
-					<sdpi-select setting="overviewSeparators" default="on">
-						<option value="on">Thin lines between rows (default)</option>
-						<option value="off">No separator lines</option>
-					</sdpi-select>
-				</sdpi-item>
-			</div>
-			<div class="hw-help">The overviews list what rotation moves through: the rotation set, the active group, or the picked sensor's readings. Three rows marks the reading on the dial with a thumb on the left rail and keeps the shared name and session min/max on one context line (only the name shortens); two rows trades a row for big values and a trend sparkline.</div>
-		</div>
-
-		<div class="hw-section">Format</div>
-
-		<sdpi-item label="Decimals">
-			<sdpi-select setting="decimals" default="auto">
-				<option value="auto">Auto</option>
-				<option value="0">0</option>
-				<option value="1">1</option>
-				<option value="2">2</option>
-				<option value="3">3</option>
-			</sdpi-select>
-		</sdpi-item>
-
-		<sdpi-item label="Unit">
-			<sdpi-checkbox setting="fahrenheit" label="Show temperatures in °F"></sdpi-checkbox>
-		</sdpi-item>
-
-		<div class="hw-section">Appearance</div>
-
-		<sdpi-item label="Theme">
-			<div class="hw-themes" id="theme-gallery"></div>
-		</sdpi-item>
-		<div class="hw-help" id="theme-help">Pick a preset for this dial only, or “Deck default” to follow the deck-wide theme (set under Dial gestures &amp; advanced).</div>
-
-		<sdpi-item label="Text">
-			<sdpi-select setting="textMode" default="">
-				<option value="">Deck default</option>
-				<option value="theme">Theme</option>
-				<option value="dim">Dim</option>
-				<option value="custom">Custom</option>
-			</sdpi-select>
-		</sdpi-item>
-		<div id="text-custom" class="hw-cond" hidden>
-			<sdpi-item label="Text color">
-				<div class="hw-quad-colors">
-					<input type="color" id="text-color" title="Main value color; exact as picked" />
-				</div>
-			</sdpi-item>
-			<sdpi-item label="Other text">
-				<sdpi-checkbox setting="textDimSecondary" label="Dim labels, units and stats"></sdpi-checkbox>
-			</sdpi-item>
-		</div>
-
-		<div id="sensor-value-colors" class="hw-cond" hidden>
-			<sdpi-item label="Numbers">
-				<sdpi-checkbox id="sensor-value-colors-toggle" label="Color numbers by sensor type"></sdpi-checkbox>
-			</sdpi-item>
-			<div class="hw-help">Off by default. Use Text → Theme or Dim with Type accents enabled. Valid Custom Text overrides these colors, including a deck-wide Custom default. Alerts keep priority. Paper and unknown sensor types keep normal text.</div>
-			<sdpi-item label="Reading colors">
-				<div class="hw-quad-colors">
-					<select id="reading-color-preset" aria-label="Reading color preset">
-						<option value="automatic">Automatic</option>
-						<option value="signal">Signal (four hues)</option>
-						<option value="pairs">Pairs (two hues)</option>
-						<option value="uniform">Uniform</option>
-						<option value="custom" disabled>Custom</option>
+		<details class="hw-sec" id="sec-display" open>
+			<summary><span class="hw-sec-title">Display</span><span class="hw-sec-sum" data-summary="display"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-field">
+					<label for="f-view">View</label>
+					<select id="f-view" data-setting="dialView" data-default="single">
+						<option value="single">One reading</option>
+						<option value="tworow">Overview, two rows (big values and trend)</option>
+						<option value="overview">Overview, three rows</option>
 					</select>
 				</div>
-			</sdpi-item>
-			<sdpi-item label="Readings">
-				<div id="reading-color-list" class="hw-reading-colors"></div>
-			</sdpi-item>
-			<div class="hw-help">Pick a color for each reading, independent of Type accents. Colors follow readings through rotation. Automatic uses the option above. Text → Custom overrides these colors; Dim dims them. Alerts keep priority. Graphs stay unchanged.</div>
-		</div>
-
-		<div id="bar-range">
-			<div class="hw-section">Bar range</div>
-
-			<sdpi-item label="Bar min">
-				<sdpi-textfield setting="barMin" pattern="^-?\d*([.,]\d+)?$" placeholder="min (auto: session low)"></sdpi-textfield>
-			</sdpi-item>
-			<sdpi-item label="Bar max">
-				<sdpi-textfield setting="barMax" pattern="^-?\d*([.,]\d+)?$" placeholder="max (auto: session high)"></sdpi-textfield>
-			</sdpi-item>
-			<div class="hw-help">Blank fields follow the session low and high. The bar draws on the single view only.</div>
-		</div>
-
-		<div class="hw-section">Alerts</div>
-
-		<sdpi-item label="Warn at">
-			<sdpi-textfield setting="warnValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns amber (see units below)"></sdpi-textfield>
-		</sdpi-item>
-
-		<sdpi-item label="Critical at">
-			<sdpi-textfield setting="critValue" pattern="^-?\d*([.,]\d+)?$" placeholder="bar turns red (see units below)"></sdpi-textfield>
-		</sdpi-item>
-
-		<sdpi-item label="Direction">
-			<sdpi-checkbox setting="alertBelow" label="Alert when value drops below thresholds"></sdpi-checkbox>
-		</sdpi-item>
-		<div class="hw-help">Warn at and Critical at use the live reading, with temperatures in °F when Unit is on. For bytes and rates, use HWiNFO's original number and unit before Data units changes the display scale.</div>
-
-		<details data-fold="advanced">
-			<summary>Dial gestures &amp; advanced</summary>
-			<div class="hw-section">Gestures</div>
-			<sdpi-item label="Controls">
-				<sdpi-select setting="controlPreset" default="legacy">
-					<option value="legacy">Legacy (default)</option>
-					<option value="elite">Elite</option>
-					<option value="custom">Custom</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Legacy: rotate cycles readings (pressed or not), push resets session stats, touch cycles the stat, long touch returns to current. Elite: plain rotate cycles readings without leaving the rotation set (or the picked sensor), pressed rotation jumps to the next rotation group (or the next sensor while no groups are defined), short push pauses the auto cycle, long push resets stats.</div>
-			<div id="controls-custom" class="hw-cond" hidden>
-				<div class="hw-help">Switching Elite to Custom copies the Elite map into the selects below, so you can change just the one gesture you want different.</div>
-				<sdpi-item label="Rotate">
-					<sdpi-select setting="gestureRotate" default="step">
-						<option value="step">Cycle readings</option>
-						<option value="stepGroup">Switch sensor or group</option>
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Press+rotate">
-					<sdpi-select setting="gesturePressedRotate" default="step">
-						<option value="step">Cycle readings</option>
-						<option value="stepGroup">Switch sensor or group</option>
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Short push">
-					<sdpi-select setting="gestureShortPress" default="resetStats">
-						<option value="resetStats">Reset session stats</option>
-						<option value="pauseResume">Pause/resume auto cycle</option>
-						<option value="pin">Pin/unpin this reading</option>
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="backToCurrent">Back to current value</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Long push">
-					<sdpi-select setting="gestureLongPress" default="resetStats">
-						<option value="resetStats">Reset session stats</option>
-						<option value="pauseResume">Pause/resume auto cycle</option>
-						<option value="pin">Pin/unpin this reading</option>
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="backToCurrent">Back to current value</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Touch tap">
-					<sdpi-select setting="gestureTap" default="cycleStat">
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="backToCurrent">Back to current value</option>
-						<option value="pauseResume">Pause/resume auto cycle</option>
-						<option value="pin">Pin/unpin this reading</option>
-						<option value="resetStats">Reset session stats</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-				<sdpi-item label="Long touch">
-					<sdpi-select setting="gestureTouchHold" default="backToCurrent">
-						<option value="backToCurrent">Back to current value</option>
-						<option value="cycleStat">Cycle stat mode</option>
-						<option value="pauseResume">Pause/resume auto cycle</option>
-						<option value="pin">Pin/unpin this reading</option>
-						<option value="resetStats">Reset session stats</option>
-						<option value="none">Do nothing</option>
-					</sdpi-select>
-				</sdpi-item>
-			</div>
-			<div id="controls-zones" class="hw-cond" hidden>
-				<sdpi-item label="Touch zones">
-					<sdpi-select setting="touchZones" default="off">
-						<option value="off">Off (whole surface = one tap)</option>
-						<option value="two">Two: left/right switch readings</option>
-						<option value="three">Three: left/right switch, center taps</option>
-					</sdpi-select>
-				</sdpi-item>
-				<div class="hw-help">Two zones split the whole strip into previous and next, so the tap command (Touch tap in Custom, stat cycling in Elite) no longer fires. Three keeps a center tap.</div>
-			</div>
-			<sdpi-item label="Reset reach">
-				<sdpi-select setting="resetScope" default="current">
-					<option value="current">This reading only</option>
-					<option value="set">The whole rotation set</option>
-					<option value="all">Every dial (use with care)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-section">Remote control</div>
-			<sdpi-item label="Link ID">
-				<sdpi-textfield setting="linkId" placeholder="Name for HWiNFO Control keys to target"></sdpi-textfield>
-			</sdpi-item>
-			<div class="hw-help">HWiNFO Control keys whose Target matches this name steer this dial.</div>
-			<div class="hw-section">Deck defaults (every key and dial)</div>
-			<sdpi-item label="Deck theme">
-				<sdpi-select setting="theme" global default="void">
-					<option value="void">Void</option>
-					<option value="graphite">Graphite</option>
-					<option value="ultraviolet">Ultraviolet</option>
-					<option value="midnight">Midnight</option>
-					<option value="forest">Forest</option>
-					<option value="ember">Ember</option>
-					<option value="paper">Paper</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Fallback for keys and dials set to “Deck default”. Keys and dials with their own theme keep it.</div>
-			<sdpi-item label="Deck text">
-				<sdpi-select setting="textMode" global default="theme">
-					<option value="theme">Theme</option>
-					<option value="dim">Dim</option>
-					<option value="custom">Custom</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div id="deck-text-custom" class="hw-cond" hidden>
-				<sdpi-item label="Text color">
-					<div class="hw-quad-colors">
-						<input type="color" id="deck-text-color" title="Deck-wide main value color; exact as picked" />
+				<div id="overview-rows" hidden>
+					<div class="hw-field">
+						<label for="f-row-labels">Row labels</label>
+						<select id="f-row-labels" data-setting="overviewLabels" data-default="shorten">
+							<option value="shorten">Shorten shared words; name on the context line</option>
+							<option value="full">Always full labels</option>
+						</select>
 					</div>
-				</sdpi-item>
-				<sdpi-item label="Other text">
-					<sdpi-checkbox setting="textDimSecondary" global label="Dim labels, units and stats"></sdpi-checkbox>
-				</sdpi-item>
-			</div>
-			<div class="hw-help">Deck-wide text intensity: Dim lowers the theme text, Custom uses your color, and keys or dials with their own Text setting keep it. Warn and critical colors always win.</div>
-			<sdpi-item label="Type accents">
-				<sdpi-select setting="typeAccents" global default="on">
-					<option value="on">On (accent color by sensor type)</option>
-					<option value="off">Off (theme accent everywhere)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<sdpi-item label="Data units">
-				<sdpi-select setting="dataUnits" global default="decimal">
-					<option value="decimal">Decimal (KB, MB, GB · rates in Mbps)</option>
-					<option value="binary">Binary (KiB, MiB, GiB · rates in MiB/s)</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-section">Connection</div>
-			<sdpi-item label="Data source">
-				<sdpi-select setting="source" global default="auto">
-					<option value="auto">Auto (Shared Memory, else Gadget)</option>
-					<option value="shared-memory">Shared Memory only</option>
-					<option value="gadget">Gadget registry only</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-help">Auto switches providers. To keep a selection working on both, explicitly link its Shared Memory and Gadget keys in the deck Config document. See <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</div>
-			<sdpi-item label="Poll every">
-				<sdpi-select setting="pollIntervalMs" global default="1000">
-					<option value="250">250 ms</option>
-					<option value="500">500 ms</option>
-					<option value="1000">1 second</option>
-					<option value="2000">2 seconds</option>
-					<option value="5000">5 seconds</option>
-				</sdpi-select>
-			</sdpi-item>
-			<div class="hw-section">Support</div>
-			<sdpi-item label="Support">
-				<button class="hw-support" id="support-report" type="button">Copy support report</button>
-			</sdpi-item>
-			<div class="hw-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard for a bug report. Nothing is uploaded.</div>
-			<div class="hw-section">Config</div>
-			<sdpi-item label="This dial">
-				<div class="hw-config">
-					<textarea id="config-key" spellcheck="false" autocomplete="off" aria-label="This dial's configuration as JSON"></textarea>
-					<div class="hw-config-row">
-						<button id="config-key-copy" type="button">Copy</button>
-						<button id="config-key-apply" type="button">Apply</button>
+					<div id="overview-three-rows" hidden>
+						<div class="hw-row2">
+							<div class="hw-field">
+								<label for="f-context">Context line</label>
+								<select id="f-context" data-setting="overviewHeader" data-default="top">
+									<option value="top">Above the rows</option>
+									<option value="bottom">Below the rows</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="f-separators">Separators</label>
+								<select id="f-separators" data-setting="overviewSeparators" data-default="on">
+									<option value="on">Thin lines</option>
+									<option value="off">None</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<p class="hw-help">Overviews list what rotation moves through: the rotation set, the active group, or the picked sensor's readings. Three rows mark the reading on the dial with a thumb on the left rail; two rows trade a row for big values and a trend line.</p>
+				</div>
+				<div id="sensor-value-colors" hidden>
+					<label class="hw-check"><input type="checkbox" id="sensor-value-colors-toggle" /><span>Color numbers by sensor type</span></label>
+					<p class="hw-help">Off by default; needs Text color on Theme text or Dimmed, with Accent colors by sensor type. A valid custom text color overrides it, alerts keep priority, and Paper and unknown sensor types keep normal text.</p>
+					<div class="hw-field">
+						<label for="reading-color-preset">Reading colors</label>
+						<div class="hw-quad-colors">
+							<select id="reading-color-preset">
+								<option value="automatic">Automatic</option>
+								<option value="signal">Signal (four hues)</option>
+								<option value="pairs">Pairs (two hues)</option>
+								<option value="uniform">Uniform</option>
+								<option value="custom" disabled>Custom</option>
+							</select>
+						</div>
+					</div>
+					<div id="reading-color-list" class="hw-reading-colors" role="group" aria-label="Number color for each reading"></div>
+					<p class="hw-help">A color for each reading, independent of type accents, that follows it through rotation. A custom text color overrides these colors and Dimmed dims them; alerts keep priority and graphs stay unchanged.</p>
+				</div>
+
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-decimals">Decimals</label>
+						<select id="f-decimals" data-setting="decimals" data-default="auto">
+							<option value="auto">Auto</option>
+							<option value="0">0</option>
+							<option value="1">1</option>
+							<option value="2">2</option>
+							<option value="3">3</option>
+						</select>
 					</div>
 				</div>
-			</sdpi-item>
-			<sdpi-item label="Deck">
-				<div class="hw-config">
-					<textarea id="config-deck" spellcheck="false" autocomplete="off" aria-label="Deck-wide configuration as JSON"></textarea>
-					<div class="hw-config-row">
-						<button id="config-deck-copy" type="button">Copy</button>
-						<button id="config-deck-apply" type="button">Apply</button>
-					</div>
+				<label class="hw-check"><input type="checkbox" data-setting="fahrenheit" /><span>Show temperatures in °F</span></label>
+
+				<div class="hw-field">
+					<span class="hw-label" id="theme-label">Theme</span>
+					<div class="hw-themes" id="theme-gallery" role="radiogroup" aria-labelledby="theme-label"></div>
+					<p class="hw-help" id="theme-help">Pick a theme for this dial, or Default to follow the shared theme.</p>
 				</div>
-			</sdpi-item>
-			<div class="hw-hint" id="config-note" aria-live="polite" hidden></div>
-			<div class="hw-help">The exact settings this dial runs on, and the deck-wide settings, as canonical JSON. Copy one into a file to back a hand-built layout up, or paste a saved document and Apply to restore it here or clone it onto another dial or machine; Apply replaces the whole document, reloads this panel, and leaves fields this build does not know untouched.</div>
+
+				<div class="hw-field">
+					<label for="f-text">Text color</label>
+					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
+						<option value="">Default</option>
+						<option value="theme">Theme text</option>
+						<option value="dim">Dimmed</option>
+						<option value="custom">Custom color</option>
+					</select>
+					<p class="hw-help" id="text-help">Colors the numbers and labels. An alerting value keeps its warn or critical color. The bar and selection marks take the accent color instead.</p>
+				</div>
+				<div id="text-custom" hidden>
+					<div class="hw-field">
+						<label for="text-color">Custom text color</label>
+						<div class="hw-swatch-row">
+							<input type="color" class="hw-color" id="text-color" />
+							<code id="text-color-code" aria-hidden="true"></code>
+						</div>
+					</div>
+					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
+				</div>
+
+				<div id="bar-range">
+					<div class="hw-row2">
+						<div class="hw-field">
+							<label for="f-bar-min">Bar from</label>
+							<input id="f-bar-min" type="text" inputmode="decimal" data-setting="barMin" data-validate="number" data-ignored-by="The bar" placeholder="Session low" aria-describedby="bar-help f-bar-min-error" autocomplete="off" />
+							<p class="hw-error" id="f-bar-min-error" hidden></p>
+						</div>
+						<div class="hw-field">
+							<label for="f-bar-max">Bar to</label>
+							<input id="f-bar-max" type="text" inputmode="decimal" data-setting="barMax" data-validate="number" data-ignored-by="The bar" placeholder="Session high" aria-describedby="bar-help f-bar-max-error" autocomplete="off" />
+							<p class="hw-error" id="f-bar-max-error" hidden></p>
+						</div>
+					</div>
+					<p class="hw-help" id="bar-help">One-reading view only. Blank ends follow the session low and high.</p>
+				</div>
+			</div>
 		</details>
 
-		<script src="pi-common.js?v=1.7.0.0-8"></script>
-		<script src="pi-control.js?v=1.7.0.0-8"></script>
+		<details class="hw-sec" id="sec-alerts">
+			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum" data-summary="alerts"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-warn">Warn at</label>
+						<input id="f-warn" type="text" inputmode="decimal" data-setting="warnValue" data-validate="number" placeholder="Off (bar turns amber)" aria-describedby="alerts-help f-warn-error" autocomplete="off" />
+						<p class="hw-error" id="f-warn-error" hidden></p>
+					</div>
+					<div class="hw-field">
+						<label for="f-crit">Critical at</label>
+						<input id="f-crit" type="text" inputmode="decimal" data-setting="critValue" data-validate="number" placeholder="Off (bar turns red)" aria-describedby="alerts-help f-crit-error" autocomplete="off" />
+						<p class="hw-error" id="f-crit-error" hidden></p>
+					</div>
+				</div>
+				<label class="hw-check"><input type="checkbox" data-setting="alertBelow" /><span>Alert when the value drops to or below these numbers (for fans and clocks)</span></label>
+				<label class="hw-check"><input type="checkbox" data-setting="alertInterrupt" /><span>Auto cycle jumps to a critical reading in the rotation and holds there while it stays critical</span></label>
+				<p class="hw-help" id="alerts-help">Use the live reading's number, in °F when °F is on; for bytes and rates, HWiNFO's original number and unit, before Data units rescales them. Thresholds apply only to readings in the unit that was on the dial when you set them, so a temperature limit never fires on a fan. The dial stays themed; the bar, or an overview row's value, takes the alert color.</p>
+			</div>
+		</details>
+
+		<details class="hw-sec" id="sec-interaction">
+			<summary><span class="hw-sec-title">Controls</span><span class="hw-sec-sum" data-summary="interaction"></span></summary>
+			<div class="hw-sec-body">
+				<div class="hw-field">
+					<label for="f-preset">Gestures</label>
+					<select id="f-preset" data-setting="controlPreset" data-default="legacy" aria-describedby="preset-help">
+						<option value="legacy">Legacy (default)</option>
+						<option value="elite">Elite</option>
+						<option value="custom">Custom</option>
+					</select>
+					<p class="hw-help" id="preset-help">Legacy: turn cycles readings (pressed or not), push resets session stats, touch cycles the stat, long touch returns to the current value. Elite: turn cycles readings in the rotation, pressed turn jumps to the next group (or sensor), short push pauses the auto cycle, long push resets stats.</p>
+				</div>
+				<div id="controls-custom" hidden>
+					<p class="hw-help">Switching from Elite to Custom copies the Elite map into the choices below, so you change only the gesture you want different.</p>
+					<div class="hw-row2">
+						<div class="hw-field">
+							<label for="g-rotate">Turn</label>
+							<select id="g-rotate" data-setting="gestureRotate" data-default="step">
+								<option value="step">Cycle readings</option>
+								<option value="stepGroup">Switch sensor or group</option>
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+						<div class="hw-field">
+							<label for="g-pressed-rotate">Pressed turn</label>
+							<select id="g-pressed-rotate" data-setting="gesturePressedRotate" data-default="step">
+								<option value="step">Cycle readings</option>
+								<option value="stepGroup">Switch sensor or group</option>
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+						<div class="hw-field">
+							<label for="g-short">Short push</label>
+							<select id="g-short" data-setting="gestureShortPress" data-default="resetStats">
+								<option value="resetStats">Reset session stats</option>
+								<option value="pauseResume">Pause/resume auto cycle</option>
+								<option value="pin">Pin/unpin this reading</option>
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="backToCurrent">Back to current value</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+						<div class="hw-field">
+							<label for="g-long">Long push</label>
+							<select id="g-long" data-setting="gestureLongPress" data-default="resetStats">
+								<option value="resetStats">Reset session stats</option>
+								<option value="pauseResume">Pause/resume auto cycle</option>
+								<option value="pin">Pin/unpin this reading</option>
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="backToCurrent">Back to current value</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+						<div class="hw-field">
+							<label for="g-tap">Touch tap</label>
+							<select id="g-tap" data-setting="gestureTap" data-default="cycleStat">
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="backToCurrent">Back to current value</option>
+								<option value="pauseResume">Pause/resume auto cycle</option>
+								<option value="pin">Pin/unpin this reading</option>
+								<option value="resetStats">Reset session stats</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+						<div class="hw-field">
+							<label for="g-hold">Long touch</label>
+							<select id="g-hold" data-setting="gestureTouchHold" data-default="backToCurrent">
+								<option value="backToCurrent">Back to current value</option>
+								<option value="cycleStat">Cycle stat mode</option>
+								<option value="pauseResume">Pause/resume auto cycle</option>
+								<option value="pin">Pin/unpin this reading</option>
+								<option value="resetStats">Reset session stats</option>
+								<option value="none">Do nothing</option>
+							</select>
+						</div>
+					</div>
+				</div>
+				<div id="controls-zones" hidden>
+					<div class="hw-field">
+						<label for="f-zones">Touch zones</label>
+						<select id="f-zones" data-setting="touchZones" data-default="off" aria-describedby="zones-help">
+							<option value="off">Off (the whole strip is one tap)</option>
+							<option value="two">Two: left and right switch readings</option>
+							<option value="three">Three: left and right switch, center taps</option>
+						</select>
+						<p class="hw-help" id="zones-help">Two zones split the strip into previous and next, so the tap command (Touch tap in Custom, stat cycling in Elite) no longer fires. Three keeps a center tap.</p>
+					</div>
+				</div>
+				<label class="hw-check"><input type="checkbox" data-setting="rotationDisabled" /><span>Ignore turns (protects against accidental bumps)</span></label>
+				<div class="hw-row2">
+					<div class="hw-field">
+						<label for="f-autocycle">Auto cycle</label>
+						<select id="f-autocycle" data-setting="autoCycleMs" data-default="off" data-kept="interval" aria-describedby="autocycle-help">
+							<option value="off">Off</option>
+							<option value="5000">Every 5 seconds</option>
+							<option value="10000">Every 10 seconds</option>
+							<option value="30000">Every 30 seconds</option>
+							<option value="60000">Every minute</option>
+							<option value="300000">Every 5 minutes</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="f-reset">A stats reset clears</label>
+						<select id="f-reset" data-setting="resetScope" data-default="current">
+							<option value="current">This reading only</option>
+							<option value="set">The whole rotation set</option>
+							<option value="all">Every dial, everywhere (use with care)</option>
+						</select>
+					</div>
+				</div>
+				<p class="hw-help" id="autocycle-help">Auto cycle steps through the rotation (or the picked sensor's readings) on a timer, even while turns are ignored.</p>
+				<div class="hw-field">
+					<label for="f-link">Link ID</label>
+					<input id="f-link" type="text" data-setting="linkId" placeholder="Optional name" aria-describedby="link-help" autocomplete="off" spellcheck="false" />
+					<p class="hw-help" id="link-help">HWiNFO Control keys whose Target is this name steer this dial, from any key, pedal or Multi Action.</p>
+				</div>
+			</div>
+		</details>
+
+		<details class="hw-sec" id="sec-advanced" data-fold="advanced">
+			<summary><span class="hw-sec-title">Advanced</span><span class="hw-sec-sum" data-summary="advanced"></span></summary>
+			<div class="hw-sec-body">
+				<fieldset class="hw-group-box" id="shared-defaults">
+					<legend>Shared defaults <span class="hw-scope">All keys and dials</span></legend>
+					<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. Keys and dials with their own choice keep it.</p>
+					<div class="hw-field">
+						<label for="shared-theme">Theme</label>
+						<select id="shared-theme" data-setting="theme" data-global data-default="void">
+							<option value="void">Void</option>
+							<option value="graphite">Graphite</option>
+							<option value="ultraviolet">Ultraviolet</option>
+							<option value="midnight">Midnight</option>
+							<option value="forest">Forest</option>
+							<option value="ember">Ember</option>
+							<option value="paper">Paper</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="shared-text">Text color</label>
+						<select id="shared-text" data-setting="textMode" data-global data-default="theme">
+							<option value="theme">Theme text</option>
+							<option value="dim">Dimmed</option>
+							<option value="custom">Custom color</option>
+						</select>
+					</div>
+					<div id="deck-text-custom" hidden>
+						<div class="hw-field">
+							<label for="deck-text-color">Shared custom text color</label>
+							<div class="hw-swatch-row">
+								<input type="color" class="hw-color" id="deck-text-color" />
+								<code id="deck-text-color-code" aria-hidden="true"></code>
+							</div>
+						</div>
+						<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
+					</div>
+					<div class="hw-field">
+						<label for="shared-accents">Accent colors</label>
+						<select id="shared-accents" data-setting="typeAccents" data-global data-default="on" aria-describedby="accents-help">
+							<option value="on">By sensor type</option>
+							<option value="off">Theme accent everywhere</option>
+						</select>
+						<p class="hw-help" id="accents-help">Accents color graphs, bars and selection marks, never the numbers (Text color does that). Paper keeps its own accent.</p>
+					</div>
+					<div class="hw-field">
+						<label for="shared-units">Data units</label>
+						<select id="shared-units" data-setting="dataUnits" data-global data-default="decimal">
+							<option value="decimal">Decimal (KB, MB, GB; rates in Mbps)</option>
+							<option value="binary">Binary (KiB, MiB, GiB; rates in MiB/s)</option>
+						</select>
+					</div>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Connection <span class="hw-scope">All keys and dials</span></legend>
+					<div class="hw-field">
+						<label for="shared-source">Data source</label>
+						<select id="shared-source" data-setting="source" data-global data-default="auto">
+							<option value="auto">Auto (Shared Memory, else Gadget)</option>
+							<option value="shared-memory">Shared Memory only</option>
+							<option value="gadget">Gadget registry only</option>
+						</select>
+					</div>
+					<p class="hw-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
+					<div class="hw-field">
+						<label for="shared-poll">Read every</label>
+						<select id="shared-poll" data-setting="pollIntervalMs" data-global data-default="1000">
+							<option value="250">250 ms</option>
+							<option value="500">500 ms</option>
+							<option value="1000">1 second</option>
+							<option value="2000">2 seconds</option>
+							<option value="5000">5 seconds</option>
+						</select>
+					</div>
+					<details class="hw-inline-help" id="setup-help">
+						<summary>HWiNFO setup steps</summary>
+						<ol class="hw-help">
+							<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
+							<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
+							<li>Pick a reading under Reading.</li>
+						</ol>
+					</details>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Support</legend>
+					<div class="hw-actions"><button class="hw-support" id="support-report" type="button" aria-describedby="support-help">Copy support report</button></div>
+					<p class="hw-help" id="support-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard. Nothing is uploaded.</p>
+				</fieldset>
+
+				<fieldset class="hw-group-box">
+					<legend>Configuration documents</legend>
+					<div class="hw-field hw-config">
+						<label for="config-key">This dial's settings</label>
+						<textarea id="config-key" spellcheck="false" autocomplete="off"></textarea>
+						<div class="hw-config-row">
+							<button id="config-key-copy" type="button" aria-label="Copy this dial's settings">Copy</button>
+							<button id="config-key-apply" type="button">Replace this dial's settings</button>
+						</div>
+					</div>
+					<div class="hw-field hw-config">
+						<label for="config-deck">Shared settings <span class="hw-scope">All keys and dials</span></label>
+						<textarea id="config-deck" spellcheck="false" autocomplete="off"></textarea>
+						<div class="hw-config-row">
+							<button id="config-deck-copy" type="button" aria-label="Copy shared settings">Copy</button>
+							<button id="config-deck-apply" type="button">Replace shared settings</button>
+						</div>
+					</div>
+					<div class="hw-status" id="config-note" aria-live="polite" hidden></div>
+					<p class="hw-help">The exact settings as JSON. Copy one to back a dial up; paste a saved document and Replace to restore or clone it. Replace swaps the whole document, reloads this panel, and keeps fields this version does not know. Replacing shared settings changes every HWiNFO key and dial and asks for a second click.</p>
+				</fieldset>
+			</div>
+		</details>
+
+		<script src="pi-model.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-shell.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-common.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-control.js?v=1.7.0.0-f01q"></script>
 	</body>
 </html>

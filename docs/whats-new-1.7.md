@@ -10,7 +10,7 @@ says what that changes on your deck and what, if anything, you need to do.
 
 | Change | What you see | What you need to do |
 | --- | --- | --- |
-| Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Open a multi-row dial's **Appearance > Reading colors**. Choose a preset or set each color. |
+| Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Open a multi-row dial's **Display > Reading colors**. Choose a preset or set each color. |
 | Linked source selections | A saved reading, its name and its color can follow a switch between Shared Memory and Gadget. A pairing edit applies at once on every key, dial and tile. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
 | Gadget freshness | **Age unknown** replaces a claim that unchanged registry values are definitely stale. | Check HWiNFO and Gadget reporting. A steady value alone cannot prove the producer is running. |
 | Gadget history | Key and detail MIN/MAX/AVG modes show **N/A** instead of presenting the current value as history. | Use Current, or enable Shared Memory for HWiNFO history. Dials have separate local statistics. |
@@ -36,7 +36,7 @@ removes that reading's override.
 *Production dial renderer with fixed sample readings and generated histories.
 The layouts and values are identical on both sides; only number colors change.*
 
-![The 1.7 dial Appearance panel with the Signal preset and five individual reading colors.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+![The 1.7 dial Display section with the Signal preset and five individual reading colors.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host. This is not a photograph of the physical deck.*

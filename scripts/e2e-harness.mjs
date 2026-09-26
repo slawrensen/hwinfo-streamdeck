@@ -21,6 +21,9 @@ const harnessStart = new Date();
 // fixed window, so a healthy rebuild still returns in ~4 s and only a genuine
 // regression pays this deadline.
 const SPARKLINE_REBUILD_MS = 20_000;
+// The read interval the startup globals carry, as the panel stores it (a
+// string): not the 1 s default, so the run proves launch applies it.
+const STARTUP_POLL_MS = "500";
 
 const results = {
 	registered: false,
@@ -46,7 +49,11 @@ wss.on("connection", (ws) => {
 				await scenario(send);
 				break;
 			case "getGlobalSettings":
-				send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
+				// A saved non-default read interval, as the panel stores it: the
+				// plugin must run at it from launch (and, per the 1.5.1 defect,
+				// applying it at launch must not end collection for the keys
+				// that appeared first). 500 ms keeps every later wait short.
+				send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: STARTUP_POLL_MS } } });
 				break;
 			case "setImage":
 				results.images.push({ context: msg.context, image: msg.payload?.image ?? "" });
@@ -112,6 +119,10 @@ async function scenario(send) {
 	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", device: "dev1" });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getSensorTree" } });
 	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getThemes" } });
+	// The interval the poller runs at from launch, read before any leg sends
+	// other shared settings (a shared-settings document without
+	// pollIntervalMs rightly means the 1 s default).
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-key", payload: { event: "getSupportReport" } });
 	await sleep(2600);
 
 	// Rotation set + ignore-turns + autocycle, driven with two live keys from
@@ -904,7 +915,7 @@ async function finish() {
 		dualFrame !== undefined && (dualFrame.match(/font-weight="700"/g) ?? []).length >= 3 && dualFrame.includes('y="56"') && dualFrame.includes('y="128"'),
 		`${results.dualFrames?.length ?? 0} frames`
 	);
-	check("dual key pinned second row carries its MAX badge inline", dualFrame !== undefined && dualFrame.includes(">MAX<") && !dualFrame.includes('x="132"'));
+	check("dual key pinned second row names its MAX after its own label", dualFrame !== undefined && /<text x="72" y="94" [^>]*>[^<]*<tspan [^>]*>\u2002MAX<\/tspan><\/text>/.test(dualFrame) && !dualFrame.includes('x="132"'));
 	check(
 		"follow mode centers one shared badge in the divider gap",
 		typeof results.dualSharedFrame === "string" && results.dualSharedFrame.includes('<text x="72" y="76"') && results.dualSharedFrame.includes(">MAX<") && !results.dualSharedFrame.includes('x="132"'),
@@ -1096,7 +1107,7 @@ async function finish() {
 	check("control key nextGroup honors rotation groups on any preset", results.controlGroupJumpTo === results.rotationKeys?.[1], `advanced to ${results.controlGroupJumpTo}`);
 
 	// Support report: valid JSON, models named, raw device IDs and names absent.
-	const supportMsg = results.piPayloads.find((p) => p?.event === "supportReport");
+	const supportMsg = results.piPayloads.findLast((p) => p?.event === "supportReport");
 	let reportOk = false;
 	let reportDetail = "no supportReport payload";
 	let reportControlVisible = null;
@@ -1118,6 +1129,21 @@ async function finish() {
 	// The control key saw a replayed willAppear and then one willDisappear:
 	// per-context tracking must report zero visible keys, not a stuck count.
 	check("support report: replayed control key is not double-counted", reportControlVisible === 0, `visibleKeys=${reportControlVisible}`);
+	// The first report was asked for right after launch, before any leg sent
+	// other shared settings: the poller must already run at the saved value.
+	const startupReport = results.piPayloads.find((p) => p?.event === "supportReport");
+	let startupIntervalMs;
+	try {
+		startupIntervalMs = JSON.parse(startupReport?.report ?? "null")?.dataSource?.intervalMs ?? null;
+	} catch {
+		startupIntervalMs = "unparseable";
+	}
+	const startupLogged = loggedThisRun(`Poll interval set to ${STARTUP_POLL_MS} ms`);
+	check(
+		"startup honors a saved non-default poll interval",
+		startupIntervalMs === Number(STARTUP_POLL_MS) && startupLogged,
+		`startup support report intervalMs=${startupIntervalMs}; log ${startupLogged ? "names" : "does NOT name"} the ${STARTUP_POLL_MS} ms interval`
+	);
 
 	const tree = results.piPayloads.find((p) => p?.event === "sensorTree");
 	check("PI got sensorTree", tree !== undefined);
@@ -1160,6 +1186,7 @@ async function finish() {
 	// name the legs a merge must never lose and fail when one never ran.
 	for (const req of [
 		"sparkline rebuilds after a poll-interval change",
+		"startup honors a saved non-default poll interval",
 		"PI got live preview for selected reading",
 		"a replayed willAppear repaints the key despite unchanged bytes",
 		"a replayed willAppear repaints the dial despite unchanged bytes",

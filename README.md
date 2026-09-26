@@ -75,7 +75,7 @@ Press a key to cycle **current > MIN > MAX > AVG**. Those historical fields
 come from HWiNFO and require Shared Memory. Alerts always use the current
 value, even while a historical value is displayed.
 
-Set **Press does** to open [sensor details](docs/sensor-details.md) for a
+Set **A press** to open [sensor details](docs/sensor-details.md) for a
 whole source, a custom list, or a filter such as `*gpu*fan*`. Detail pages
 support multi-reading tiles and a Back tile that can also show readings.
 
@@ -93,7 +93,7 @@ offer other gesture mappings. Local session averages count accepted
 observations, not elapsed time. Data gaps and source or unit changes start
 a new session.
 
-Since 1.7, **Appearance > Reading colors** assigns colors to
+Since 1.7, **Display > Reading colors** assigns colors to
 individual numbers on multi-row dials. Choose Signal, Pairs or Uniform,
 then adjust individual readings. Alerts and valid Custom Text colors take
 priority. Individual reading colors remain off until you enable them.
@@ -111,8 +111,8 @@ all visible dials. It also works as a Multi Action step.
 ## Themes
 
 Choose **Void, Graphite, Ultraviolet, Midnight, Forest, Ember or Paper** per
-action, or set one deck default. **Text** offers Theme, Dim or Custom.
-Optional **Type accents** color display accents by sensor category.
+action, or set one deck default. **Text color** offers Theme text, Dimmed or Custom color.
+**Accent colors** can follow the sensor category.
 
 Warnings use amber; critical alerts use red.
 Alerts override decorative colors. Built-in value, unit and numeric

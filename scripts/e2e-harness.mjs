@@ -860,7 +860,7 @@ async function finish() {
 		dualFrame !== undefined && (dualFrame.match(/font-weight="700"/g) ?? []).length >= 3 && dualFrame.includes('y="56"') && dualFrame.includes('y="128"'),
 		`${results.dualFrames?.length ?? 0} frames`
 	);
-	check("dual key pinned second row carries its MAX badge inline", dualFrame !== undefined && dualFrame.includes(">MAX<") && !dualFrame.includes('x="132"'));
+	check("dual key pinned second row names its MAX after its own label", dualFrame !== undefined && /<text x="72" y="94" [^>]*>[^<]*<tspan [^>]*>\u2002MAX<\/tspan><\/text>/.test(dualFrame) && !dualFrame.includes('x="132"'));
 	check(
 		"follow mode centers one shared badge in the divider gap",
 		typeof results.dualSharedFrame === "string" && results.dualSharedFrame.includes('<text x="72" y="76"') && results.dualSharedFrame.includes(">MAX<") && !results.dualSharedFrame.includes('x="132"'),

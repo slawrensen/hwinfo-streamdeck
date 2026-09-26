@@ -1,0 +1,375 @@
+{
+	"method": "Automated expert walkthrough on the simulated host; not a human study.",
+	"rows": [
+		{
+			"task": "T1",
+			"fixture": "key-empty",
+			"what": "Pick a reading",
+			"width": 320,
+			"found": true,
+			"tabStop": 2,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 284,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Change decimals",
+			"width": 320,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 602,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Theme gallery",
+			"width": 320,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 858,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Text color (this key)",
+			"width": 320,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 1039,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-configured",
+			"what": "Layout select",
+			"width": 320,
+			"found": true,
+			"tabStop": 5,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 463,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T4",
+			"fixture": "key-configured",
+			"what": "Warn threshold",
+			"width": 320,
+			"found": true,
+			"tabStop": 7,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
+			],
+			"top": 642,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation membership list",
+			"width": 320,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 518,
+			"pageHeight": 1281,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation order (first move button)",
+			"width": 320,
+			"found": true,
+			"tabStop": 11,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 667,
+			"pageHeight": 1281,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T6",
+			"fixture": "key-configured",
+			"what": "Press behavior",
+			"width": 320,
+			"found": true,
+			"tabStop": 8,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"PressPress cycles current, min, max, avg"
+			],
+			"top": 683,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T6",
+			"fixture": "dial-configured",
+			"what": "Dial controls preset",
+			"width": 320,
+			"found": true,
+			"tabStop": 20,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
+			],
+			"top": 1086,
+			"pageHeight": 1130,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-missing",
+			"what": "Missing-reading status",
+			"width": 320,
+			"found": true,
+			"tabStop": 4,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 403,
+			"pageHeight": 900,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T8",
+			"fixture": "key-inherited",
+			"what": "Shared theme default",
+			"width": 320,
+			"found": true,
+			"tabStop": 9,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AdvancedAuto source · poll 1 s · decimal data units"
+			],
+			"top": 822,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T9",
+			"fixture": "key-configured",
+			"what": "Config document",
+			"width": 320,
+			"found": true,
+			"tabStop": 9,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AdvancedAuto source · poll 1 s · decimal data units"
+			],
+			"top": 1427,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T1",
+			"fixture": "key-empty",
+			"what": "Pick a reading",
+			"width": 480,
+			"found": true,
+			"tabStop": 2,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 284,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Change decimals",
+			"width": 480,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 570,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Theme gallery",
+			"width": 480,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 793,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Text color (this key)",
+			"width": 480,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"DisplayCurrent value · auto decimals · Void (shared) · theme text (shared)"
+			],
+			"top": 959,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-configured",
+			"what": "Layout select",
+			"width": 480,
+			"found": true,
+			"tabStop": 5,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 447,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T4",
+			"fixture": "key-configured",
+			"what": "Warn threshold",
+			"width": 480,
+			"found": true,
+			"tabStop": 7,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AlertsWarn ≥ 80 °C · critical ≥ 90 °C"
+			],
+			"top": 610,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation membership list",
+			"width": 480,
+			"found": true,
+			"tabStop": 6,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 487,
+			"pageHeight": 1046,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation order (first move button)",
+			"width": 480,
+			"found": true,
+			"tabStop": 11,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 604,
+			"pageHeight": 1046,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T6",
+			"fixture": "key-configured",
+			"what": "Press behavior",
+			"width": 480,
+			"found": true,
+			"tabStop": 8,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"PressPress cycles current, min, max, avg"
+			],
+			"top": 650,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T6",
+			"fixture": "dial-configured",
+			"what": "Dial controls preset",
+			"width": 480,
+			"found": true,
+			"tabStop": 20,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"ControlsLegacy: turn cycles readings · push resets session stats · tap cycles the stat"
+			],
+			"top": 930,
+			"pageHeight": 958,
+			"visibleWithoutScroll": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-missing",
+			"what": "Missing-reading status",
+			"width": 480,
+			"found": true,
+			"tabStop": 4,
+			"tabStopIsDisclosure": false,
+			"closedDisclosures": [],
+			"top": 371,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T8",
+			"fixture": "key-inherited",
+			"what": "Shared theme default",
+			"width": 480,
+			"found": true,
+			"tabStop": 9,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AdvancedAuto source · poll 1 s · decimal data units"
+			],
+			"top": 759,
+			"pageHeight": 800,
+			"visibleWithoutScroll": true
+		},
+		{
+			"task": "T9",
+			"fixture": "key-configured",
+			"what": "Config document",
+			"width": 480,
+			"found": true,
+			"tabStop": 9,
+			"tabStopIsDisclosure": true,
+			"closedDisclosures": [
+				"AdvancedAuto source · poll 1 s · decimal data units"
+			],
+			"top": 1332,
+			"pageHeight": 800,
+			"visibleWithoutScroll": false
+		}
+	]
+}

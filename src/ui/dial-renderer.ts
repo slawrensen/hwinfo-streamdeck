@@ -10,7 +10,7 @@
  */
 import { HISTORY_LENGTH } from "../series";
 import { cappedUnit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, truncateLabel, wrapLabelTwoLines } from "./format";
-import { barSegment, escapeXml, FONT, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
+import { barSegment, escapeXml, FONT, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -420,9 +420,9 @@ export function renderDial(opts: DialRenderOptions): string {
 		...svgOpen(200, 100, palette.bg),
 		`<text x="12" y="24" text-anchor="start" font-family="${FONT}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
-	const unit = opts.unitText !== "" ? `<tspan dx="6" font-size="17" font-weight="600" fill="${text.unit}">${escapeXml(opts.unitText)}</tspan>` : "";
+	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${inlineGap(17)}${escapeXml(opts.unitText)}</tspan>` : "";
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
-	parts.push(`<text x="12" y="58" text-anchor="start" font-family="${FONT}" font-size="${valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
 		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(opts.statsText)}</text>`);
 	}

@@ -13,6 +13,7 @@ import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-c
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
 import { alertValueColor, classifyTypeAccent, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
+import { beforeInlineGap } from "./inline-gap";
 
 const config = loadThemes();
 type Fixture = ReturnType<typeof dialGalleryFixture>;
@@ -180,8 +181,11 @@ const goldenFixture = (key: string): Fixture => {
 /** The face as 1.6.0 drew it: each enumerated role's fill put back, after
  * checking that the face draws that role in the enumerated 1.7 token and
  * that every text fill on the face belongs to some role. */
-const asOf160 = (key: string, svg: string): string => {
+const asOf160 = (key: string, drawn: string): string => {
 	const view = key.split("/")[0] as string;
+	// The device gap fix (bench 2026-09-23): the single view's unit gap is a
+	// space inside its tspan now; put the 1.6.0 dx back, exactly one site.
+	const svg = beforeInlineGap(drawn, view === "single" ? 1 : 0);
 	const roles = ROLES[view] as Record<string, RegExp>;
 	const moved = SINCE_1_6_0[key] ?? {};
 	const claimed = Object.values(roles).reduce((n, re) => n + roleFills(svg, re).length, 0);

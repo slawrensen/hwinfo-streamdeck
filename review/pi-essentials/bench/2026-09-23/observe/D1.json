@@ -1,0 +1,36 @@
+{
+	"label": "D1",
+	"at": "2026-09-24T01:51:26.885Z",
+	"hoverPoints": 63,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "dial",
+				"context": "1db76ddcd7dd7eb03e1dcce7ca623879",
+				"url": "sensor-dial.html"
+			}
+		],
+		[
+			"picker",
+			{
+				"expanded": "false",
+				"w": 0
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": "ok",
+				"head": "Live · Shared Memory"
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

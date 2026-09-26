@@ -64,7 +64,7 @@ After the timer expires:
 | Free-version limit | disables after 12 h | none |
 | Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
 
-Set it under **Advanced → Data source** in any key's settings, or under **Dial gestures & advanced → Data source** on a dial (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
+Set it under **Advanced → Connection → Data source** in any key's or dial's settings (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
 
 A provider switch does not translate saved identities by itself. Configure explicit [reading links](data-sources.md#link-readings-across-providers) for continuity in either direction. See [Data sources](data-sources.md) for the full breakdown.
 
@@ -121,7 +121,7 @@ With no Sensor Reading key or Sensor Dial visible, source polling stops. The plu
 
 ### How many sensors / keys can I use?
 
-There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker lists all of them, and typing narrows the list. You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Layout** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
+There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them and lists every match, with no row cap (a 5,000-reading test tree stays responsive). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Readings on this key** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
 
 ### Can multiple keys show the same sensor?
 
@@ -138,7 +138,7 @@ It's crossed a threshold you set. In the key's settings:
 
 With **Display** set to **Bar** or **Ring**, those same thresholds also mark muted amber and red zones on the gauge track, escalating toward the alarmed end (the high side normally, the low side when *Direction* alerts below). The zones are fixed landmarks: they show whenever the thresholds are set, crossed or not, so red on the track is not by itself an alert. The field flip is. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
 
-Alerts always track the **live** value (not the displayed stat: a key showing MAX still colors by the current reading). By default higher is worse; tick **Direction → Alert when value drops below thresholds** to flip the comparison (for fan RPM, free disk space, etc.).
+Alerts always track the **live** value (not the displayed stat: a key showing MAX still colors by the current reading). By default higher is worse; tick **Alerts → Alert when the value drops to or below these numbers** to flip the comparison (for fan RPM, free disk space, etc.).
 
 On a **dial**, the alert colors the range-bar fill instead of the whole face; the touchscreen slot is too small for a full field flip. Once you set thresholds, the bar's track also marks the warn and critical bands in dimmed amber and red, so you can see where the trip points sit before the value reaches them. The two **Overview** views (two rows and three rows) have no range bar: there an alerting row shows its **value** in the alert color instead. See [Sensor Dial](sensor-dial.md).
 
@@ -146,24 +146,24 @@ To disable an alert, clear **Warn at** and **Critical at**. Key alert palettes s
 
 ### How do I reset a dial's session min/max?
 
-Under **Legacy**, push the dial. Under **Elite**, hold the push for half a second. **Reset reach** can widen the reset to the rotation set or every dial; an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can also send it. The next accepted sample starts the new session. Data or source changes can also reset sessions since 1.7; see [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading). Reset a key's Shared Memory statistics inside HWiNFO.
+Under **Legacy**, push the dial. Under **Elite**, hold the push for half a second. **A stats reset clears** can widen the reset to the rotation set or every dial; an [HWiNFO Control key](controls.md#the-hwinfo-control-key-action) can also send it. The next accepted sample starts the new session. Data or source changes can also reset sessions since 1.7; see [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading). Reset a key's Shared Memory statistics inside HWiNFO.
 
 ## Themes
 
-### Why isn't "Deck default" the same as Void?
+### Why isn't "Default" the same as Void?
 
-"Deck default" isn't a theme; it's a **link**. It means "this key follows whatever the deck-wide theme is set to," which you set under **Advanced → Deck theme**. It happens to *resolve* to Void on a fresh install because Void is the default deck theme, but they're not the same choice:
+"Default" (called *Deck default* before this release) isn't a theme; it's a **link**. It means "this key follows whatever the shared theme is set to," which you set under **Advanced → Shared defaults → Theme**. It happens to *resolve* to Void on a fresh install because Void is the default shared theme, but they're not the same choice:
 
-- Pick the **Void** chip → this key is pinned to Void forever, even if you later change the deck theme.
-- Pick the **Deck default** chip → this key changes whenever you change the deck-wide theme.
+- Pick the **Void** chip → this key is pinned to Void forever, even if you later change the shared theme.
+- Pick the **Default** chip → this key changes whenever you change the shared theme.
 
-In the gallery the Deck default chip is drawn with a dashed border and a small link badge so it's structurally distinct from the preset it currently resolves to; the resolved theme is named in its tooltip and in the help line under the gallery (e.g. "currently Void").
+In the gallery the Default chip is drawn with a dashed border and a small link badge so it's structurally distinct from the preset it currently resolves to; the resolved theme is named in its tooltip and in the help line under the gallery (e.g. "currently Void").
 
-Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the deck default you inherit may be Graphite, not the fresh-install Void. That's deliberate, so an update never changes how your deck already looks. See [Themes](themes.md).
+Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the shared default you inherit may be Graphite, not the fresh-install Void. That's deliberate, so an update never changes how your deck already looks. See [Themes](themes.md).
 
-### A per-key theme won't follow my deck theme: why?
+### A per-key theme won't follow my shared theme: why?
 
-Because a per-key pick always wins. The **Deck theme** (Advanced) only affects keys set to **Deck default**. If a key has its own theme selected, changing the deck theme won't touch it; pick the **Deck default** chip on that key to make it follow again.
+Because a per-key pick always wins. The shared **Theme** (Advanced → Shared defaults) only affects keys set to **Default**. If a key has its own theme selected, changing the shared theme won't touch it; pick the **Default** chip on that key to make it follow again. The folded Display section tells the two apart at a glance: *Void (shared)* follows the shared theme, *Void* alone is the key's own pick.
 
 ## Privacy
 

@@ -1,7 +1,8 @@
 /**
  * The property inspector's alias contract, proven through the PRODUCTION
- * panel: ui/pi-common.js is loaded in a node vm over a minimal fake DOM
- * and a fake SDPIComponents store, then fed the REAL sensorTree and
+ * panel: ui/pi-model.js, ui/pi-shell.js and ui/pi-common.js are loaded, in
+ * the panels' order, into one node vm over a minimal fake DOM and a fake
+ * SDPIComponents store, then fed the REAL sensorTree and
  * preview payloads that src/pi-protocol.ts builds over applyReadingLinks
  * snapshots. Whatever the runtime resolves through a confirmed link (a
  * saved Shared Memory key while the Gadget provider is live, and the
@@ -11,6 +12,10 @@
  * identity table at the end runs the extracted bareKey, namedKey and
  * mapReadingKeys helpers verbatim over every whitespace edge a Gadget
  * label can carry.
+ *
+ * The panel header and status block (pi-shell.js) are read where 1.7 read
+ * its Live value line: the header names the reading and its data state,
+ * and the face beside it is the plugin's own SVG, passed through as is.
  *
  * The fake DOM supports exactly the selectors and element behavior the two
  * settings panels use; it is not a browser, so nothing here speaks for
@@ -42,6 +47,8 @@ type OkStatus = Extract<PollerStatus, { state: "ok" }>;
 
 const PI_PATH = new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js", import.meta.url);
 const PI_SOURCE = readFileSync(PI_PATH, "utf8");
+/** The panels load these before pi-common.js (sensor-reading.html, sensor-dial.html). */
+const PI_PRELUDE = ["pi-model.js", "pi-shell.js"].map((name) => ({ name, source: readFileSync(new URL(`../com.lawrensen.hwinfo.sdPlugin/ui/${name}`, import.meta.url), "utf8") }));
 
 // ------------------------------------------------------------- fixtures
 const SM = ["f0000501:0:1000000", "e0002000:0:1000000", "f7006687:0:3000001"] as const;
@@ -52,8 +59,8 @@ const LINKS = [
 	{ sharedMemory: SM[1], gadget: G[1], unit: "°C", sensorType: SensorType.Temperature },
 	{ sharedMemory: SM[2], gadget: G[2], unit: "RPM", sensorType: SensorType.Fan }
 ];
-const NOT_PRESENT = "⚠ Sensor not present. Pick again";
-const RESTING = "Search sensors…";
+const NOT_PRESENT = "Saved reading not found. Search to pick another";
+const RESTING = "Search readings";
 
 function sample(key: string, id: number, label: string, type: SensorType, unit: string, value: number, sensorIndex = 0): Reading {
 	return { key, sensorIndex, id, label, type, unit, value, valueMin: value, valueMax: value, valueAvg: value, statistics: "unavailable" };
@@ -222,6 +229,21 @@ class FakeElement {
 	getAttribute(k: string): string | null {
 		return this.attrs[k] ?? null;
 	}
+	hasAttribute(k: string): boolean {
+		return k in this.attrs;
+	}
+	removeAttribute(k: string): void {
+		delete this.attrs[k];
+	}
+	toggleAttribute(k: string, force?: boolean): boolean {
+		const on = force ?? !(k in this.attrs);
+		if (on) this.attrs[k] = "";
+		else delete this.attrs[k];
+		return on;
+	}
+	matches(selector: string): boolean {
+		return matches(this, selector);
+	}
 	focus(): void {
 		this.doc.activeElement = this;
 	}
@@ -271,11 +293,14 @@ function matches(el: FakeElement, selectorList: string): boolean {
 }
 
 class FakeDocument {
+	readonly documentElement: FakeElement;
 	readonly body: FakeElement;
 	activeElement: FakeElement;
 	private readonly elements = new Map<string, FakeElement>();
 	constructor(readonly title: string) {
+		this.documentElement = new FakeElement("html", this);
 		this.body = new FakeElement("body", this);
+		this.documentElement.appendChild(this.body);
 		this.activeElement = this.body;
 	}
 	getElementById(id: string): FakeElement | null {
@@ -327,13 +352,14 @@ type Mounted = {
 	lastWrite(name: string): unknown;
 };
 
-const SHARED_IDS = ["preview-value", "preview-stats", "status-hint", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
-const DIAL_IDS = ["rotation-set", "rotation-help", "reading-color-list", "overview-rows", "sensor-value-colors"];
+const SHARED_IDS = ["hw-head", "head-reading", "head-source", "head-state", "reading-status", "face", "face-img", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
+const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors"];
 const READING_IDS = ["detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
 
 /** Loads the production panel over a fresh DOM, store and socket. */
 function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}, replies?: { settings?: () => Promise<Record<string, unknown>>; globals?: () => Promise<Record<string, unknown>>; textControls?: boolean }): Mounted {
 	const doc = new FakeDocument(shape === "dial" ? "Sensor Dial settings" : "Sensor Reading settings");
+	doc.body.dataset.kind = shape === "dial" ? "dial" : "key";
 	for (const id of [...SHARED_IDS, ...(shape === "dial" ? DIAL_IDS : READING_IDS)]) doc.make(id, id.endsWith("-copy") || id.endsWith("-apply") ? "button" : id.startsWith("config-") && !id.endsWith("-note") ? "textarea" : "div");
 	const pickerWrap = doc.createElement("div");
 	pickerWrap.className = "hw-picker";
@@ -345,6 +371,10 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 	}
 	if (shape === "dial") {
 		doc.make("reading-color-preset", "select").value = "automatic";
+		const rotationWrap = doc.createElement("div");
+		rotationWrap.className = "hw-picker";
+		doc.body.appendChild(rotationWrap);
+		doc.make("pickerr-search", "input", rotationWrap);
 	} else {
 		const collectorWrap = doc.createElement("div");
 		collectorWrap.className = "hw-picker";
@@ -369,7 +399,15 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			}
 		];
 	};
-	let piSubscriber: ((ev: { payload: unknown }) => void) | null = null;
+	// The shell, the fold memory and pi-common each subscribe; every one hears every message.
+	const piSubscribers: ((ev: { payload: unknown }) => void)[] = [];
+	// The app sends each document on connect and again on every change made
+	// outside this panel; the shell keeps its own copy from these.
+	const settingsSubscribers: ((ev: { payload: { settings: unknown } }) => void)[] = [];
+	const globalSubscribers: ((ev: { payload: { settings: unknown } }) => void)[] = [];
+	const deliver = (subscribers: typeof settingsSubscribers, target: Record<string, unknown>): void => {
+		for (const cb of subscribers) cb({ payload: { settings: { ...target } } });
+	};
 	const SDPIComponents = {
 		useSettings: useStore(store),
 		useGlobalSettings: useStore(globalStore),
@@ -377,9 +415,12 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			send: (event: string, payload: unknown) => sent.push({ event, payload }),
 			sendToPropertyInspector: {
 				subscribe: (cb: (ev: { payload: unknown }) => void) => {
-					piSubscriber = cb;
+					piSubscribers.push(cb);
 				}
 			},
+			didReceiveSettings: { subscribe: (cb: (typeof settingsSubscribers)[number]) => settingsSubscribers.push(cb) },
+			didReceiveGlobalSettings: { subscribe: (cb: (typeof globalSubscribers)[number]) => globalSubscribers.push(cb) },
+			getConnectionInfo: async () => ({ actionInfo: { context: "" } }),
 			getSettings: async () => ({ settings: replies?.settings === undefined ? store : await replies.settings() }),
 			getGlobalSettings: async () => replies?.globals === undefined ? globalStore : await replies.globals(),
 			setSettings: (docValue: unknown) => {
@@ -396,6 +437,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		setTimeout,
 		clearTimeout,
 		queueMicrotask,
+		requestAnimationFrame: (fn: () => void) => setTimeout(fn, 0),
+		cancelAnimationFrame: clearTimeout,
 		setInterval: (fn: () => void) => {
 			intervals.push(fn);
 			return intervals.length;
@@ -417,7 +460,14 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		addEventListener() {}
 	};
 	sandbox.window = sandbox;
-	vm.runInNewContext(PI_SOURCE, sandbox, { filename: "pi-common.js" });
+	sandbox.self = sandbox;
+	const context = vm.createContext(sandbox);
+	for (const { name, source } of PI_PRELUDE) vm.runInContext(source, context, { filename: name });
+	vm.runInContext(PI_SOURCE, context, { filename: "pi-common.js" });
+	setTimeout(() => {
+		deliver(settingsSubscribers, store);
+		deliver(globalSubscribers, globalStore);
+	}, 0);
 	return {
 		doc,
 		store,
@@ -431,8 +481,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			return found;
 		},
 		feed: (payload) => {
-			assert.ok(piSubscriber !== null, "the panel subscribed to sendToPropertyInspector");
-			piSubscriber({ payload });
+			assert.ok(piSubscribers.length > 0, "the panel subscribed to sendToPropertyInspector");
+			for (const cb of piSubscribers) cb({ payload });
 		},
 		flush: async () => {
 			for (const fn of intervals) fn();
@@ -441,6 +491,7 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		echo: (name, value) => {
 			store[name] = value;
 			for (const cb of subs.get(name) ?? []) cb(value);
+			deliver(settingsSubscribers, store);
 		},
 		lastWrite: (name) => writes.filter((w) => w.name === name).at(-1)?.value
 	};
@@ -457,18 +508,28 @@ async function openPanel(shape: "dial" | "reading", seed: Record<string, unknown
 	return m;
 }
 
-it("the production Live value consumer paints the selected overview row color from the real preview payload", async () => {
+it("the preview carries the selected overview row color, and the panel shows the face the plugin drew", async () => {
 	applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "theme" });
 	const status = linkedStatus();
 	for (const dialView of ["overview", "tworow"]) {
 		const seed = { readingKey: SM[0], rotationKeys: [...G], dialView, theme: "void", textMode: "theme", readingColors: { [SM[0]]: "#4CC2FF", [G[0]]: "#FF7E8E" } };
 		const m = await openPanel("dial", seed, status);
-		assert.equal(m.el("preview-value").style.color, "#FF7E8E", "the row's exact color wins over the selection alias");
-		assert.equal(m.el("preview-value").style.color, paint(m.store, status)[0]);
-		assert.equal(m.el("preview-value").textContent, "71.4 °C");
+		const face = composeDialSvg(dialState(m.store), status, () => []);
+		const preview = buildPreview(status, m.store as { readingKey?: string }, false, { kind: "dial", face });
+		assert.equal(preview.display?.valueColor, "#FF7E8E", "the row's exact color wins over the selection alias");
+		assert.equal(preview.display?.valueColor, paint(m.store, status)[0]);
+		assert.equal(`${preview.display?.value}${preview.display?.unit}`, "71.4°C");
+		m.feed(preview);
+		await m.flush();
+		assert.equal(m.el("face-img").dataset.face, face, "the header shows the face exactly as drawn");
+		assert.deepEqual(header(m), { reading: LABELS[0], state: "Live · Gadget registry" });
 		assert.deepEqual(plain(m.store), seed);
 	}
 });
+
+/** The header the shell draws from the preview (pi-shell.js renderHeader). */
+const header = (m: Mounted): { reading: string; state: string } => ({ reading: m.el("head-reading").textContent, state: m.el("head-state").textContent });
+const NOT_FOUND = "Saved reading not found";
 
 const chips = (m: Mounted, list = "rotation-set"): FakeElement[] => m.el(list).querySelectorAll(".hw-set-chip");
 const chipNames = (m: Mounted, list = "rotation-set"): string[] => chips(m, list).map((c) => c.querySelector(".hw-set-name")!.textContent);
@@ -485,14 +546,14 @@ const colorRow = (m: Mounted, key: string): ColorRow => {
 	assert.ok(row !== undefined, `a color row for ${key}`);
 	return row;
 };
-/** Clicks the tick of one picker row as the browser would: the box has
- * already flipped to `checked` when the delegated click handler runs. */
-const clickTick = (m: Mounted, key: string, checked: boolean, list = "picker-list"): void => {
+/** Ticks one checklist row as the browser would: the box has already
+ * flipped to `checked` when the delegated change handler runs. */
+const clickTick = (m: Mounted, key: string, checked: boolean, list = "pickerr-list"): void => {
 	const row = pickerRows(m, list).find((r) => r.dataset.key === key);
 	assert.ok(row !== undefined, `picker row ${key}`);
 	const tick = tickOf(row);
 	tick.checked = checked;
-	m.el(list).fire("click", { target: tick });
+	m.el(list).fire("change", { target: tick });
 };
 const choosePreset = (m: Mounted, preset: string): void => {
 	const select = m.el("reading-color-preset");
@@ -527,7 +588,7 @@ describe("remaining PI review regressions", () => {
 			m.feed({ event: "themes", ...config, effectiveDeckTheme: "paper" });
 			await m.flush();
 			assert.equal(m.el("text-color").value, resolvePalette(config, effectiveThemeFor({ theme }), null, "normal").value.toLowerCase(), theme);
-			assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Paper");
+			assert.equal(m.el("theme-gallery").children[0]!.title, "Default: follows the shared theme (Paper)");
 			assert.equal(m.store.theme, theme, "salvage does not rewrite the setting");
 			assert.equal(m.writes.length, 0);
 			m.echo("theme", "");
@@ -543,7 +604,7 @@ describe("remaining PI review regressions", () => {
 		m.feed({ event: "themes", ...loadThemes(), effectiveDeckTheme: "constructor" });
 		await m.flush();
 		assert.equal(m.el("text-color").value, loadThemes().themes.void!.value.toLowerCase());
-		assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Void");
+		assert.equal(m.el("theme-gallery").children[0]!.title, "Default: follows the shared theme (Void)");
 		assert.equal(m.writes.length, 0);
 	});
 
@@ -625,14 +686,18 @@ describe("remaining PI review regressions", () => {
 		const stale: PollerStatus = { ...status, state: "stale", staleForMs: 16_000 };
 		m.feed(buildSensorTree(stale));
 		m.feed(buildPreview(stale, { readingKey: "gone:0:1" }, false));
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		await m.flush();
+		assert.equal(header(m).state, NOT_FOUND);
+		assert.match(m.el("reading-status").children[0]!.textContent, /^The saved reading is not in HWiNFO's current sensor list/);
 		assert.equal(m.el("picker-search").placeholder, NOT_PRESENT);
 		assert.ok(chips(m)[0]!.classList.contains("missing"));
 		const before = m.sent.length;
 		m.feed(buildPreview(status, { readingKey: "gone:0:1" }, false));
 		assert.equal(m.sent.length, before + 1, "ok after stale still requests a fresh tree");
 		m.feed({ event: "sensorTree", state: "unavailable", groups: [], hint: "Down" });
-		assert.equal(m.el("picker-search").placeholder, RESTING);
+		assert.equal(m.el("picker-search").placeholder, "Saved reading kept (no HWiNFO data to show it)", "unknown, not missing");
+		assert.equal(m.el("picker-search").title, "", "the missing tooltip goes with the missing mark");
+		assert.ok(!m.el("picker-search").classList.contains("missing"));
 		assert.ok(!chips(m)[0]!.classList.contains("missing"));
 		assert.equal(m.writes.length, 0);
 	});
@@ -904,7 +969,7 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 		assert.equal(search.value, `${LABELS[0]}  ·  Sample sensors`);
 		assert.equal(search.placeholder, RESTING);
 		assert.ok(!search.classList.contains("missing"), "no missing mark on a resolvable key");
-		assert.equal(m.el("preview-value").textContent, "71.4 °C");
+		assert.deepEqual(header(m), { reading: LABELS[0], state: "Live · Gadget registry" });
 		assert.ok(!composeDialSvg(dialState(m.store), status, () => []).includes("Sensor missing"));
 		assert.equal(m.store.readingKey, SM[0], "the saved key is never rewritten");
 	});
@@ -922,11 +987,16 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 	});
 
 	it("the live rows tick as members through their aliases and the selection highlights its live row", () => {
-		m.el("picker-search").fire("focus");
-		const rows = pickerRows(m);
+		m.el("pickerr-search").fire("focus");
+		const rows = pickerRows(m, "pickerr-list");
 		assert.deepEqual(rows.map((r) => r.dataset.key), [...G], "the tree lists live keys only");
 		for (const row of rows) assert.equal(tickOf(row).checked, true, `${row.dataset.key} ticks as a member`);
-		assert.deepEqual(rows.filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [G[0]]);
+		const onDial = rows.filter((r) => r.querySelector(".hw-now")?.textContent === "on dial").map((r) => r.dataset.key);
+		assert.deepEqual(onDial, [G[0]], "the saved key's live twin is the row marked on the dial");
+		m.el("picker-search").fire("focus");
+		const picked = pickerRows(m);
+		assert.deepEqual(picked.map((r) => r.dataset.key), [...G]);
+		assert.deepEqual(picked.filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [G[0]]);
 	});
 
 	it("a second tick on the live twin writes nothing: a key and its aliases are one member", () => {
@@ -944,7 +1014,7 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 		assert.deepEqual(m.lastWrite("rotationKeys"), [SM[1], SM[2]]);
 		assert.deepEqual(chipNames(m), [LABELS[1], LABELS[2]]);
 		assert.equal(rotationReadings(m.store.rotationKeys as string[], SM[1], status.snapshot).length, 2);
-		assert.equal(tickOf(pickerRows(m).find((r) => r.dataset.key === G[0])!).checked, false, "the tick follows the set");
+		assert.equal(tickOf(pickerRows(m, "pickerr-list").find((r) => r.dataset.key === G[0])!).checked, false, "the tick follows the set");
 	});
 
 	it("the config document names a hex key that resolves only through its alias", async () => {
@@ -974,12 +1044,14 @@ describe("the picker lists every reading however long the tree", () => {
 		const m = await openPanel("dial", { readingKey: HOT, rotationKeys: [HOT, RAIL] }, status);
 		m.el("picker-search").fire("focus");
 		assert.equal(pickerRows(m).length, readings.length, "no row budget");
-		assert.equal(m.el("picker-list").querySelector(".hw-more"), null, "nothing is held back behind a refine note");
-		assert.deepEqual(ticked(m, "picker-list"), [HOT, RAIL]);
+		assert.equal(m.el("picker-list").querySelector(".hw-more:not([hidden])") === null, true, "nothing is held back behind a refine note");
 		assert.deepEqual(pickerRows(m).filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [HOT]);
+		m.el("pickerr-search").fire("focus");
+		assert.equal(pickerRows(m, "pickerr-list").length, readings.length, "no row budget in the rotation list either");
+		assert.deepEqual(ticked(m, "pickerr-list"), [HOT, RAIL]);
 		clickTick(m, RAIL, false);
 		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT]);
-		assert.deepEqual(ticked(m, "picker-list"), [HOT], "the unticked row stays listed to be ticked again");
+		assert.deepEqual(ticked(m, "pickerr-list"), [HOT], "the unticked row stays listed to be ticked again");
 		clickTick(m, RAIL, true);
 		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT, RAIL]);
 	});
@@ -1083,7 +1155,7 @@ describe("without a usable link the editor falls back to exact keys, like the ru
 		const search = m.el("picker-search");
 		assert.equal(search.placeholder, NOT_PRESENT);
 		assert.ok(search.classList.contains("missing"));
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		assert.equal(header(m).state, NOT_FOUND);
 		assert.deepEqual(chips(m).map((c) => c.classList.contains("missing")), [true, false], "the surviving pair still resolves");
 		assert.deepEqual(chipNames(m), [SM[0], LABELS[2]]);
 		assert.equal(rotationReadings(m.store.rotationKeys as string[], SM[0], status.snapshot).length, 1);
@@ -1093,7 +1165,7 @@ describe("without a usable link the editor falls back to exact keys, like the ru
 		const status = linkedStatus([{ sharedMemory: SM[0], gadget: "g:Sample sensors:Absent", unit: "°C", sensorType: SensorType.Temperature }]);
 		const m = await openPanel("dial", { readingKey: SM[0], ...OVERVIEW }, status);
 		assert.equal(m.el("picker-search").placeholder, NOT_PRESENT);
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		assert.equal(header(m).state, NOT_FOUND);
 		assert.deepEqual(colorRows(m).map((r) => r.key), [SM[0]], "no tree group resolves, so the pick alone is listed");
 	});
 
@@ -1118,7 +1190,7 @@ describe("a legacy Gadget key the provider republishes", () => {
 	it("resolves in the picker, the preview and the document, and the g: spelling is never annotated", async () => {
 		const m = await openPanel("dial", { readingKey: legacy, ...OVERVIEW }, status);
 		assert.equal(m.el("picker-search").value, "Hot Spot:Max  ·  GPU");
-		assert.equal(m.el("preview-value").textContent, "70.0 °C");
+		assert.deepEqual(header(m), { reading: "Hot Spot:Max", state: "Live · Gadget registry" });
 		const exported = await copiedDocument(m);
 		assert.equal(exported.readingKey, legacy);
 		assert.equal((await applyDocument(m, exported)).readingKey, legacy);

@@ -1,0 +1,36 @@
+{
+	"label": "D5",
+	"at": "2026-09-24T01:52:30.824Z",
+	"hoverPoints": 48,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "dial",
+				"context": "6c7f642a361c3e52b3a806603ccd1f17",
+				"url": "sensor-dial.html"
+			}
+		],
+		[
+			"picker",
+			{
+				"expanded": "false",
+				"w": 0
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": "ok",
+				"head": "Saved reading not found"
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

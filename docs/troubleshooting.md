@@ -103,13 +103,15 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 6. **Two ticked Gadget readings share a source name and label** (1.7). Both are withheld while both are ticked, and the settings panel says that names are withheld. This one needs no reselection: see [below](#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 7. **Shared Memory reports an ambiguous or ownerless identity** (1.7). Rows sharing the same `sensor-id : instance : reading-id`, or pointing to a missing sensor owner, are withheld. A saved unique identity recovers when the producer repairs it. An older selection carrying a duplicate suffix (`~n`) or an ownerless key (`?:...`) needs reselection once a valid unique reading is available. See [Data sources](data-sources.md#enabling-shared-memory).
 
+The settings panel tells this apart from HWiNFO being down: its header reads **Saved reading not found**, and the Reading section keeps the saved reading (with its label and colors) until you pick another. While HWiNFO itself is unavailable the panel never calls a reading missing; it says the reading is kept and no data is coming in.
+
 **Fix:** open the key's settings and **pick the sensor again**. A dial shows **Sensor missing / waiting** and ignores turns while the sensor is gone, so a temporary dropout (an HWiNFO restart, a sleeping GPU) can't move it off your saved pick; it recovers by itself when the sensor returns. If the sensor is gone for good, pick a new reading in the dial's settings panel.
 
 ## Picker is empty or shows "No sensors reported"
 
-The settings-panel sensor list is populated live from whatever source is active:
+The settings-panel sensor list is populated live from whatever source is active. The current panel says "HWiNFO publishes no readings right now" in the list, and the Reading section explains why (older versions said "No sensors reported"):
 
-1. **HWiNFO isn't up yet.** Start HWiNFO, then click the **⟳ refresh** button next to the search box.
+1. **HWiNFO isn't up yet.** Start HWiNFO, then click **Retry now** in the Reading section (or the **⟳** button next to the search box). **HWiNFO setup steps** there opens the setup checklist.
 2. **On the Gadget source with nothing ticked**: the key shows **Start HWiNFO / not detected** while HWiNFO is running, because HWiNFO 8.48 creates the registry key only once a reading is ticked. In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for each value you want. **Tick sensors / in Gadget** means the key is there but holds no rows, which unticking everything can leave.
 3. **Shared memory is disabled/expired** and you're forced to **Gadget only**; same fix as above.
 4. **Search filter too narrow.** Clear the search box; the list groups readings by source (CPU, GPU, drives…).
@@ -136,15 +138,15 @@ HWiNFO gives every reading you tick **Report value in Gadget** a numbered regist
 
 Each key/dial has a per-key **Unit** checkbox: **"Show temperatures in °F."** It only affects `°C` readings. If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
 
-Byte quantities and transfer rates follow a separate, deck-wide control: **Advanced → Data units**, either **Decimal (KB, MB, GB, rates in Mbps)** or **Binary (KiB, MiB, GiB, rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (deck-wide)](sensor-reading.md#advanced-deck-wide).
+Byte quantities and transfer rates follow a separate, shared control: **Advanced → Shared defaults → Data units**, either **Decimal (KB, MB, GB, rates in Mbps)** or **Binary (KiB, MiB, GiB, rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (shared by all keys and dials)](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
 
 ## Thresholds (warn/critical) don't fire
 
 Three gotchas cause almost all of these:
 
 1. **Check the threshold unit.** The warn/critical fields compare the **live** reading. If you enabled **°F**, enter the threshold in °F (e.g. `176`), not °C (`80`). For byte and rate readings, use HWiNFO's original number and unit before **Data units** changes the display scale: `12000000 B/s` compares as `12000000` even when the key shows `96.0 Mbps`. See [Thresholds & alerts](thresholds-alerts.md#how-the-comparison-works).
-2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Direction → "Alert when value drops below thresholds."**
-3. **A dial rotated to a different unit.** Warn/critical values are anchored to the unit they were typed against, so `80` typed while a °C reading was on screen stands down on the 3000 RPM fan you rotate to; the manual **Bar min**/**Bar max** stand down with it and the bar falls back to the session low/high. Edit the threshold while the reading you want is on screen and it re-anchors to that reading's unit. Thresholds saved before this behavior existed keep their old apply-everywhere reach until you next edit one. See [Dial controls & presets](controls.md#thresholds-and-mixed-units).
+2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Alerts → Alert when the value drops to or below these numbers**.
+3. **A dial rotated to a different unit.** Warn/critical values are anchored to the unit they were typed against, so `80` typed while a °C reading was on screen stands down on the 3000 RPM fan you rotate to; the manual **Bar from** / **Bar to** stand down with it and the bar falls back to the session low/high. Edit the threshold while the reading you want is on screen and it re-anchors to that reading's unit. Thresholds saved before this behavior existed keep their old apply-everywhere reach until you next edit one. See [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
 Other notes:
 - Alerts always track the **live** value, even while the key is showing MIN/MAX/AVG (a key press cycles the *displayed* stat, not what's tested).
@@ -215,7 +217,7 @@ Useful lines to look for:
 - `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid`, `not-running` or `busy`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.
 - `Gadget slot <n> withheld: formatted value "…" does not agree with raw value "…"`: one Gadget row was withheld because its two registry fields contradict each other; the other rows keep working. Logged once per reading and slot while the plugin runs; a return to the Gadget source after time on Shared Memory can log it once more.
 - `Gadget slots <a> and <b> withheld while they report one name (…)`: two ticked Gadget readings share a source name and label, and both are withheld while they do; the other rows keep working. Logged once while the name stays shared, and again only if it was free for two polls and is shared anew; a return to the Gadget source after time on Shared Memory can log it once more.
-- `Deck theme = … (source: …)`: the resolved deck-wide theme.
+- `Deck theme = … (source: …)`: the resolved shared theme (the log keeps its older wording).
 - `Stopped (no visible actions)`: the poller correctly idled (no leak).
 - `Parent probe failed [<code>]`: the plugin could not inspect the Stream Deck app's process. It keeps running; the code names why (`EPERM` means the app is there but sealed off, anything else is unusual).
 - `Parent watchdog disabled` / `watchdog standing down`: the app-liveness check found it cannot answer reliably on this machine and switched itself off, which is the safe direction.
@@ -237,7 +239,7 @@ Run through this first; most problems resolve here:
 - [ ] HWiNFO and Stream Deck are at the **same elevation** (both normal, or both admin).
 - [ ] **Stream Deck 6.9+**, **64-bit Windows 10+**.
 - [ ] You **re-picked the sensor** if it went missing after a hardware/driver change.
-- [ ] Threshold values use the **displayed temperature unit**, or HWiNFO's **original byte/rate unit** before Data units changes the display scale, with the right **Direction**.
+- [ ] Threshold values use the **displayed temperature unit**, or HWiNFO's **original byte/rate unit** before Data units changes the display scale, and **Alert when the value drops to or below these numbers** is ticked where low is bad.
 
 If it still fails, open an issue at the [project repository](https://github.com/slawrensen/hwinfo-streamdeck) and include:
 

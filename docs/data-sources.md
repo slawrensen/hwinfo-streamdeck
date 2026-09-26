@@ -72,7 +72,7 @@ The plugin runs **one reader** across all connected decks, so all keys and dials
 
 ## Advanced settings
 
-Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced** (on dials the section is labelled **Dial gestures & advanced**). They are **global**: one setting for the whole plugin, not per key.
+Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced → Connection**, marked **All keys and dials**. They are **global**: one setting for the whole plugin, not per key.
 
 ### Data source
 

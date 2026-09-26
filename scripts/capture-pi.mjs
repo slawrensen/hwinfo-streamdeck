@@ -26,12 +26,16 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
+import { chromePath } from "./lib/cdp.mjs";
 import { cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const outDir = process.argv[2] ?? ".";
-const BASE = "http://127.0.0.1:28997/ui";
+// PI_CAPTURE_BASE points the run at another host serving the panels (the
+// simulated host, for a dry run of this script's steps with sample data);
+// the documented run is the live pi-harness below.
+const BASE = process.env.PI_CAPTURE_BASE ?? "http://127.0.0.1:28997/ui";
 const DEBUG_PORT = 0; // Chrome writes its assigned port into our unique profile.
-const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+const CHROME = chromePath();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(`[capture] ${m}`);
@@ -39,6 +43,7 @@ const chromeProfile = createBrowserProfile("pi-capture-profile-");
 const chromeStartedAt = new Date().toISOString();
 
 const chrome = spawn(CHROME, [
+	...(process.platform === "linux" && process.getuid?.() === 0 ? ["--no-sandbox"] : []),
 	"--headless=new",
 	"--disable-gpu",
 	`--remote-debugging-port=${DEBUG_PORT}`,
@@ -51,6 +56,11 @@ chrome.once("error", (err) => { chromeError = err; });
 
 /** Only this run's disposable profile can authorize browser cleanup. */
 function killChromeTree() {
+	if (process.platform !== "win32") {
+		// Only the browser this script spawned; its renderers exit with it.
+		chrome.kill("SIGKILL");
+		return;
+	}
 	try {
 		cleanupBrowser(chromeProfile, chromeStartedAt);
 	} catch (err) {
@@ -143,22 +153,24 @@ try {
 			throw new Error(`${what} did not resolve (${JSON.stringify(res.result?.value ?? res.exceptionDetails?.text)})`);
 		}
 	};
-	/** Set an sdpi-select's value, driving the inner <select> if the host
-	 * element's value accessor did not take. */
+	/** Set a panel select bound to `setting` (the action's own, never the
+	 * shared default of the same name), opening its section first: controls
+	 * in a collapsed section neither render nor take input. */
 	const setSelect = async (setting, value) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-select[setting="${setting}"]');
+			const el = document.querySelector('select[data-setting="${setting}"]:not([data-global])');
 			if (!el) return "missing";
-			el.value = ${JSON.stringify(value)};
-			const inner = (el.shadowRoot ?? el).querySelector("select");
-			if (inner && inner.value !== ${JSON.stringify(value)}) {
-				inner.value = ${JSON.stringify(value)};
-				inner.dispatchEvent(new Event("change", { bubbles: true }));
+			for (let n = el.parentElement; n; n = n.parentElement) if (n.tagName === "DETAILS") n.open = true;
+			if (el.value !== ${JSON.stringify(value)}) {
+				el.value = ${JSON.stringify(value)};
+				el.dispatchEvent(new Event("change", { bubbles: true }));
 			}
 			return "ok";
 		})()`);
-		expectOk(`sdpi-select[setting="${setting}"]`, res);
+		expectOk(`select[data-setting="${setting}"]`, res);
 	};
+	/** Opens one section of the panel (a UI step, never a write). */
+	const openSection = async (id) => expectOk(`section ${id}`, await evaluate(`(() => { const d = document.getElementById("${id}"); if (!d) return "missing"; d.open = true; return "ok"; })()`));
 
 	await viewport(880);
 	await cdp("Page.enable");
@@ -210,14 +222,15 @@ try {
 	const treeRows = Number((await evaluate(`document.querySelectorAll("#picker-list .hw-row").length`)).result?.value ?? 0);
 	if (treeRows === 0) throw new Error("the key picker rendered no rows for \"gpu\"; refusing to capture a blank list");
 	await capture("pi-picker.png");
-	// The same state clipped to end at the Press section instead of at
+	// The same state clipped to end with the Reading section instead of at
 	// whatever row a consumer's height budget lands on: cutting mid-swatch
 	// reads as a rendering fault rather than as a scrolled panel.
 	await captureClipped("pi-picker-block.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
-		if (!sel) return "missing";
-		const item = sel.closest("sdpi-item") ?? sel;
-		return { y: 0, h: Math.ceil(item.getBoundingClientRect().bottom + window.scrollY + 14) };
+		const list = document.getElementById("picker-list");
+		const sec = document.getElementById("sec-reading");
+		if (!list || !sec) return "missing";
+		const bottom = Math.max(list.getBoundingClientRect().bottom, sec.getBoundingClientRect().bottom);
+		return { y: 0, h: Math.ceil(bottom + window.scrollY + 14) };
 	})()`));
 
 	// ---- key PI: Display selector on Bar (the select + its help line) ----
@@ -250,10 +263,10 @@ try {
 	})()`));
 	await sleep(900); // preview push carries the custom color back
 	await captureClipped("pi-key-text.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="textMode"]');
+		const sel = document.querySelector('[data-setting="textMode"]:not([data-global])');
 		const block = document.getElementById("text-custom");
 		if (!sel || !block) return "missing";
-		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const items = [sel.closest(".hw-field") ?? sel, block];
 		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		// Tight top: -10 shears the tail of the theme help line above the row.
@@ -265,14 +278,15 @@ try {
 
 	// ---- key PI: Press on Open sensor details (the drill-down rows) ----
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+	await openSection("sec-interaction");
 	await setSelect("pressBehavior", "open-details");
 	await sleep(900); // the press poll reveals #detail-config within 400 ms
 	expectOk("detail config revealed", await evaluate(`document.getElementById("detail-config").hidden === false ? "ok" : "hidden"`));
 	await captureClipped("pi-key-press.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
+		const sel = document.querySelector('[data-setting="pressBehavior"]');
 		const block = document.getElementById("detail-config");
 		if (!sel || !block) return "missing";
-		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const items = [sel.closest(".hw-field") ?? sel, block];
 		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
@@ -280,10 +294,8 @@ try {
 
 	// ---- key PI: the Second Back checkbox, ticked by default (1.6.0) ----
 	expectOk("second-back ticked by default", await evaluate(`(() => {
-		const el = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]');
-		if (!el) return "missing";
-		const input = (el.shadowRoot ?? el).querySelector("input[type=checkbox]");
-		if (!input) return "no input";
+		const input = document.querySelector('input[type=checkbox][data-setting="detailMirrorBack"]');
+		if (!input) return "missing";
 		// No click: the mirror is on by default, and this pins the
 		// default="true" attribute actually rendering ticked in a real
 		// webview with no stored setting and no write.
@@ -291,10 +303,10 @@ try {
 	})()`));
 	await sleep(600); // layout settles before the clip is measured
 	await captureClipped("pi-key-detail-back.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="pressBehavior"]');
+		const sel = document.querySelector('[data-setting="pressBehavior"]');
 		const block = document.getElementById("detail-config");
 		if (!sel || !block) return "missing";
-		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const items = [sel.closest(".hw-field") ?? sel, block];
 		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
@@ -302,7 +314,7 @@ try {
 	// Untick: an explicit false (the opt-out), so later states show the
 	// single-Back panel and the stored-false path gets exercised too.
 	expectOk("second-back cleared", await evaluate(`(() => {
-		const input = document.querySelector('sdpi-checkbox[setting="detailMirrorBack"]').shadowRoot.querySelector("input[type=checkbox]");
+		const input = document.querySelector('input[type=checkbox][data-setting="detailMirrorBack"]');
 		input.click();
 		return input.checked === false ? "ok" : "still ticked";
 	})()`));
@@ -315,10 +327,10 @@ try {
 	await evaluate(`(() => { const el = document.getElementById("pickerd-search"); el.focus(); el.value = "gpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
 	expectOk("collector rows added", await evaluate(`(() => {
-		const rows = [...document.querySelectorAll("#pickerd-list .hw-row")].slice(0, 3);
+		const rows = [...document.querySelectorAll("#pickerd-list .hw-row:not([hidden])")].slice(0, 3);
 		if (rows.length === 0) return "missing";
 		for (const row of rows) {
-			row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+			row.querySelector(".hw-tick")?.click();
 		}
 		return "ok";
 	})()`));
@@ -389,9 +401,8 @@ try {
 	await setSelect("detailMode", "filter");
 	await sleep(900);
 	expectOk("filter editor revealed", await evaluate(`document.getElementById("detail-filter").hidden === false ? "ok" : "hidden"`));
-	// sdpi-textfield: drive the shadow input (the property path throws on
-	// plain strings; same gotcha as the placeholder).
-	await evaluate(`(() => { const input = document.querySelector('sdpi-textfield[setting="detailFilter"]').shadowRoot.querySelector("input"); input.focus(); input.value = "*4090*"; input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	// The Filter field is a plain labeled input bound to detailFilter.
+	await evaluate(`(() => { const input = document.getElementById("f-filter"); input.focus(); input.value = ${JSON.stringify(process.env.PI_CAPTURE_FILTER ?? "*4090*")}; input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 	await sleep(1200); // the setting echo, the 400 ms follow poll, the count
 	expectOk("live match count shown", await evaluate(`(() => { const el = document.getElementById("detail-filter-count"); return el && !el.hidden && /Matches \\d+ readings right now/.test(el.textContent) ? "ok" : (el ? "text: " + el.textContent : "missing"); })()`));
 	await captureClipped("pi-key-detail-filter.png", await evaluate(`(() => {
@@ -416,7 +427,7 @@ try {
 	await evaluate(`(() => { const el = document.getElementById("picker2-search"); el.focus(); el.value = "gpu temp"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
 	expectOk("second picker row", await evaluate(`(() => {
-		const row = document.querySelector("#picker2-list .hw-row");
+		const row = document.querySelector("#picker2-list .hw-row:not([hidden])");
 		if (!row) return "missing";
 		row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 		return "ok";
@@ -438,15 +449,14 @@ try {
 	expectOk("dual-only stat pin hidden", await evaluate(`document.getElementById("dual-rows").hidden === true ? "ok" : "visible"`));
 	expectOk("display row hidden on triple", await evaluate(`document.getElementById("display-item").hidden === true ? "ok" : "visible"`));
 	expectOk("third label reads as a normal label in triple", await evaluate(`(() => {
-		const el = document.getElementById("third-label");
-		const input = (el.shadowRoot ?? el).querySelector("input");
-		if (!input) return "no rendered input";
-		return input.placeholder === "Custom label (default: sensor name)" ? "ok" : input.placeholder;
+		const input = document.getElementById("third-label");
+		if (!input) return "missing";
+		return input.placeholder === "The reading's own name" ? "ok" : input.placeholder;
 	})()`));
 	await evaluate(`(() => { const el = document.getElementById("picker3-search"); el.focus(); el.value = "gpu clock"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
 	expectOk("third picker row", await evaluate(`(() => {
-		const row = document.querySelector("#picker3-list .hw-row");
+		const row = document.querySelector("#picker3-list .hw-row:not([hidden])");
 		if (!row) return "missing";
 		row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 		return "ok";
@@ -466,15 +476,14 @@ try {
 	expectOk("quad rows revealed", await evaluate(`document.getElementById("quad-rows").hidden === false ? "ok" : "hidden"`));
 	expectOk("triple help hidden on quad", await evaluate(`document.getElementById("triple-help").hidden === true ? "ok" : "visible"`));
 	expectOk("third label reads as a micro-label in quad", await evaluate(`(() => {
-		const el = document.getElementById("third-label");
-		const input = (el.shadowRoot ?? el).querySelector("input");
-		if (!input) return "no rendered input";
+		const input = document.getElementById("third-label");
+		if (!input) return "missing";
 		return input.placeholder === "Short name; 4 characters show" ? "ok" : input.placeholder;
 	})()`));
 	await evaluate(`(() => { const el = document.getElementById("picker4-search"); el.focus(); el.value = "pump"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
 	expectOk("fourth picker row", await evaluate(`(() => {
-		const row = document.querySelector("#picker4-list .hw-row");
+		const row = document.querySelector("#picker4-list .hw-row:not([hidden])");
 		if (!row) return "missing";
 		row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 		return "ok";
@@ -490,10 +499,10 @@ try {
 	// The marketplace settings shot needs the part that does the work, not
 	// the whole panel scaled down until the labels stop reading.
 	await captureClipped("pi-key-quad-rows.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="keyLayout"]');
+		const sel = document.querySelector('[data-setting="keyLayout"]');
 		const block = document.getElementById("quad-rows");
 		if (!sel || !block) return "missing";
-		const item = sel.closest("sdpi-item") ?? sel;
+		const item = sel.closest(".hw-field") ?? sel;
 		// Start at the "Layout" section heading: clipping from the item
 		// shears the heading in half (same lesson as the dial rename shot).
 		const heading = item.previousElementSibling?.classList.contains("hw-section") ? item.previousElementSibling : item;
@@ -507,29 +516,31 @@ try {
 	log("navigating: sensor-dial");
 	await cdp("Page.navigate", { url: `${BASE}/sensor-dial.html` });
 	await sleep(8000);
-	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = "cpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	// The rotation checklist (its own list since F01: ticking picks what
+	// rotation moves through, never what is on the dial now).
+	await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.focus(); el.value = "cpu"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
 	// Two rows ticked so the capture shows checked and unchecked boxes side
 	// by side; unticked again after the shot (the chips shot below builds
 	// the real cross-sensor set).
-	const ticked = await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#picker-list input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
+	const ticked = await evaluate(`(() => { let n = 0; for (const tick of document.querySelectorAll('#pickerr-list .hw-row:not([hidden]) input.hw-tick:not(:checked)')) { if (n >= 2) break; tick.click(); n++; } return n; })()`);
 	if (ticked.result?.value !== 2) throw new Error(`dial picker: expected to tick 2 rows, ticked ${JSON.stringify(ticked.result?.value ?? ticked.exceptionDetails?.text)}; refusing to capture`);
 	await sleep(500);
 	await capture("pi-dial-picker.png");
-	await evaluate(`(() => { for (const tick of document.querySelectorAll('#picker-list input.hw-tick:checked')) tick.click(); return "ok"; })()`);
+	await evaluate(`(() => { for (const tick of document.querySelectorAll('#pickerr-list input.hw-tick:checked')) tick.click(); return "ok"; })()`);
 	await sleep(400);
 
 	// ---- dial PI: rotation set (cross-sensor ticks, shown as chips) ----
 	// Tick one reading from three different sensors, the way a user would:
 	// search, then click the row's checkbox. A cross-sensor set is the point.
 	for (const query of ["tctl", "gpu temp", "pump"]) {
-		await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = ${JSON.stringify(query)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+		await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.focus(); el.value = ${JSON.stringify(query)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 		await sleep(700);
-		await evaluate(`document.querySelector('#picker-list input.hw-tick:not(:checked)')?.click()`);
+		await evaluate(`document.querySelector('#pickerr-list .hw-row:not([hidden]) input.hw-tick:not(:checked)')?.click()`);
 		await sleep(400);
 	}
-	// Close the picker (outside mousedown) so the chips under it show.
-	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	// Close the checklist (outside mousedown) so the chips under it show.
+	await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
 	await sleep(600);
 	await capture("pi-dial-rotation.png");
@@ -604,14 +615,14 @@ try {
 	// the item shears the heading in half. The help line under the set is the
 	// bottom edge, so the crop is a whole section rather than a floating row.
 	await captureClipped("pi-dial-rename.png", await evaluate(`(() => {
-		const item = document.getElementById("rotation-set").closest("sdpi-item");
+		const item = document.getElementById("rotation-set").closest("fieldset");
 		const help = document.getElementById("rotation-help");
 		if (!item || !help) return "missing";
 		const heading = item.previousElementSibling?.classList.contains("hw-section")
 			? item.previousElementSibling
 			: item;
 		const a = heading.getBoundingClientRect();
-		const b = help.getBoundingClientRect();
+		const b = help.hidden ? a : help.getBoundingClientRect();
 		const top = Math.min(a.top, b.top) + window.scrollY;
 		const bottom = Math.max(a.bottom, b.bottom) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 8)), h: Math.ceil(bottom - top + 18) };
@@ -654,37 +665,37 @@ try {
 	await nameGroup(0, "Overview");
 	await sleep(300);
 	for (const query of ["gpu hot", "gpu clock"]) {
-		await evaluate(`(() => { const el = document.getElementById("picker-search"); el.focus(); el.value = ${JSON.stringify(query)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+		await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.focus(); el.value = ${JSON.stringify(query)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 		await sleep(700);
-		await evaluate(`document.querySelector('#picker-list input.hw-tick:not(:checked)')?.click()`);
+		await evaluate(`document.querySelector('#pickerr-list .hw-row:not([hidden]) input.hw-tick:not(:checked)')?.click()`);
 		await sleep(400);
 	}
 	await nameGroup(1, "GPU");
 	await sleep(300);
-	await evaluate(`(() => { const el = document.getElementById("picker-search"); el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await evaluate(`document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
 	await sleep(600);
 	await captureClipped("pi-dial-groups.png", await evaluate(`(() => {
-		const item = document.getElementById("rotation-set").closest("sdpi-item");
+		const item = document.getElementById("rotation-set").closest("fieldset");
 		const help = document.getElementById("rotation-help");
 		if (!item || !help) return "missing";
 		const a = item.getBoundingClientRect();
-		const b = help.getBoundingClientRect();
+		const b = help.hidden ? a : help.getBoundingClientRect();
 		const top = Math.min(a.top, b.top) + window.scrollY;
 		const bottom = Math.max(a.bottom, b.bottom) + window.scrollY;
 		return { y: Math.max(0, Math.floor(top - 10)), h: Math.ceil(bottom - top + 20) };
 	})()`));
 
-	// ---- dial PI: Elite preset under "Dial gestures & advanced" ----
+	// ---- dial PI: Elite preset in the Controls section ----
 	const openGestures = `(() => {
 		for (const d of document.querySelectorAll("details")) d.open = false;
-		const g = document.querySelector('details[data-fold="advanced"]');
+		const g = document.getElementById("sec-interaction");
 		if (!g) return "missing";
 		g.open = true;
 		g.scrollIntoView({ block: "start" });
 		return "ok";
 	})()`;
-	expectOk("Dial gestures details", await evaluate(openGestures));
+	expectOk("Controls section", await evaluate(openGestures));
 	await setSelect("controlPreset", "elite");
 	await sleep(900); // the PI polls its local settings cache every 400 ms
 	await evaluate(openGestures);
@@ -699,7 +710,7 @@ try {
 	await sleep(300);
 	// The page cannot always scroll the section to the top, so clip to it.
 	await captureClipped("pi-dial-custom.png", await evaluate(`(() => {
-		const g = document.querySelector('details[data-fold="advanced"]');
+		const g = document.getElementById("sec-interaction");
 		const r = g.getBoundingClientRect();
 		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
 	})()`), { y: 0, h: 1500 });
@@ -715,10 +726,10 @@ try {
 	// Clip to the View select plus the controls it revealed: row labels,
 	// context line and separators, with the help line under them.
 	await captureClipped("pi-dial-overview.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="dialView"]');
+		const sel = document.querySelector('[data-setting="dialView"]');
 		const block = document.getElementById("overview-rows");
 		if (!sel || !block) return "missing";
-		const item = sel.closest("sdpi-item") ?? sel;
+		const item = sel.closest(".hw-field") ?? sel;
 		const a = item.getBoundingClientRect();
 		const b = block.getBoundingClientRect();
 		const top = Math.min(a.top, b.top) + window.scrollY;
@@ -733,10 +744,10 @@ try {
 	await sleep(900);
 	expectOk("dial text custom rows revealed", await evaluate(`document.getElementById("text-custom").hidden === false ? "ok" : "hidden"`));
 	await captureClipped("pi-dial-text.png", await evaluate(`(() => {
-		const sel = document.querySelector('sdpi-select[setting="textMode"]');
+		const sel = document.querySelector('[data-setting="textMode"]:not([data-global])');
 		const block = document.getElementById("text-custom");
 		if (!sel || !block) return "missing";
-		const items = [sel.closest("sdpi-item") ?? sel, block];
+		const items = [sel.closest(".hw-field") ?? sel, block];
 		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
 		// Tight top: -10 shears the tail of the theme help line above the row.
@@ -745,22 +756,19 @@ try {
 	await setSelect("textMode", "");
 	await sleep(400);
 
-	// ---- dial PI: the deck-wide tail of "Dial gestures & advanced" ----
-	// From the Remote control header (Link ID) through Deck defaults,
-	// Connection, Support and the Config wells, clipped so the per-gesture
-	// rows above stay out of it. Feeds docs/assets/img/pi-live-dial-advanced.png.
+	// ---- dial PI: the Advanced section (shared defaults, connection,
+	// support and the configuration documents), whole.
+	// Feeds docs/assets/img/pi-live-dial-advanced.png.
 	await setSelect("controlPreset", "elite");
 	await sleep(900);
 	await viewport(2400);
-	await evaluate(openGestures);
+	await evaluate(`(() => { for (const d of document.querySelectorAll("details.hw-sec")) d.open = false; const g = document.querySelector('details[data-fold="advanced"]'); g.open = true; g.scrollIntoView({ block: "start" }); return "ok"; })()`);
 	await sleep(300);
 	await captureClipped("pi-dial-advanced.png", await evaluate(`(() => {
 		const g = document.querySelector('details[data-fold="advanced"]');
-		const head = [...document.querySelectorAll('details[data-fold="advanced"] .hw-section')].find((el) => el.textContent.trim() === "Remote control");
-		if (!g || !head) return "missing";
-		const top = head.getBoundingClientRect().top + window.scrollY;
-		const bottom = g.getBoundingClientRect().bottom + window.scrollY;
-		return { y: Math.max(0, Math.floor(top - 6)), h: Math.ceil(bottom - top + 16) };
+		if (!g) return "missing";
+		const r = g.getBoundingClientRect();
+		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 6)), h: Math.ceil(r.height + 16) };
 	})()`));
 
 	// ---- HWiNFO Control PI: command + Link ID target ----

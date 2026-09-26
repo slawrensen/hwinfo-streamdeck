@@ -16,6 +16,7 @@ import { DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, r
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import { contrast } from "./wcag";
+import { beforeInlineGap } from "./inline-gap";
 
 function reading(key: string, value: number, unit = "°C", label = key): Reading {
 	return { key, type: unit === "W" ? SensorType.Power : SensorType.Temperature, sensorIndex: 0, id: 0, label, unit, value, valueMin: value - 10, valueMax: value + 10, valueAvg: value };
@@ -367,8 +368,10 @@ describe("dense tile goldens", () => {
 	// nothing else: 2 fills on the dual, 3 on the triple, 4 on the quad.
 	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
 	const SINCE_1_6_0: ReadonlyArray<readonly [before: string, after: string]> = [["#667082", "#6B7586"]];
-	const asOf160 = (svg: string, movedFills: number): string => {
-		let out = svg;
+	// September 2026 (bench): the device gap fix moved each unit gap from
+	// dx into the tspan; beforeInlineGap puts the dx back, counted per face.
+	const asOf160 = (svg: string, movedFills: number, gaps: number): string => {
+		let out = beforeInlineGap(svg, gaps);
 		for (const [before, after] of SINCE_1_6_0) {
 			assert.equal(out.split(after).length - 1, movedFills, `${after} must appear exactly ${movedFills} times`);
 			assert.ok(!out.includes(before), `${before} is the 1.6.0 token and cannot still be drawn`);
@@ -380,19 +383,19 @@ describe("dense tile goldens", () => {
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(asOf160(svg, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(asOf160(svg, 2, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(asOf160(svg, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		assert.equal(golden(asOf160(svg, 3, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
 	});
 
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(asOf160(svg, 4)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		assert.equal(golden(asOf160(svg, 4, 0)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

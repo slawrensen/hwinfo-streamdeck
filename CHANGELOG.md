@@ -6,8 +6,77 @@ listing is a separate track.
 
 ## 1.7.0.0 - Unreleased
 
-Per-reading dial colors and reliability fixes in one release.
+Redesigned settings panels, per-reading dial colors, reads that follow
+HWiNFO's own cadence, and reliability fixes in one release.
 
+- The settings panels for Sensor Reading keys, Sensor Dials, HWiNFO
+  Control keys and detail tiles share one essentials-first layout: a
+  header with the exact face the plugin last drew and its live state,
+  then Reading, Display, Alerts, Press (Controls on a dial) and
+  Advanced. Reading and Display start open, a section you open or
+  fold stays that way on the next key's panel while the app runs (the
+  two chevron buttons at the top right of the header, or Alt-click on a
+  title, open or fold them all; never stored in a key's settings), and
+  every folded section's title line says what it holds in the
+  runtime's own terms: inherited choices are marked "shared",
+  thresholds read as at or beyond (≥, ≤) with their unit and a dial's
+  unit scope, and a dial's gesture line follows the resolved preset,
+  so a tap made dead by touch zones is not listed.
+- The panel tells its states apart: connecting, plugin not answering,
+  no reading selected, HWiNFO unavailable (the saved reading is kept
+  and never called missing), no new Shared Memory data, an unknown
+  Gadget data age (named as unknown, never as stopped), saved reading
+  not found, and no search matches. The header's state uses the words
+  on the face. Each comes with its local fix: Retry now, HWiNFO setup
+  steps, or picking another reading.
+- Opening a panel writes nothing, and an edit changes only the field it
+  touched. Rotation groups, detail tiles, per-reading names, quad cell
+  colors and list entries keep fields and entries this version does not
+  know instead of being normalized away, and a stored choice this
+  version does not know shows as kept rather than silently replaced.
+  Replacing the shared settings document asks for a second click.
+- The reading picker is built once per sensor list and filtered in
+  place, and stays responsive on a 5,000-reading tree (PERF.md). It follows the
+  combobox pattern: arrow keys browse, Enter picks, Tab or a click
+  elsewhere closes without changing anything. Rotation membership and
+  custom detail lists are checklists instead (one Tab stop; arrow keys
+  move inside), so ticking a reading never changes the reading on the
+  dial, and rotation chips gain up and down buttons. On a dial the
+  rotation sits right under the reading on the dial, with the chip on
+  the dial marked, so you can watch it move as you turn; the dial's face
+  sits beside its name in the header instead of above it.
+- The Stream Deck app keeps the Escape key and most of its own clicks
+  from reaching a panel, so the open list also closes on a second click
+  in the box and when the panel loses focus. Moving the pointer out of
+  the panel never closes it. A click that opens it selects the
+  whole name, so typing replaces it. Text typed just before selecting
+  another key is saved as the pointer leaves, instead of being lost
+  with the panel.
+- Faces as the device draws them: the app's SVG engine dropped the gap
+  before a unit on dual, triple and dial faces ("59.7°C"), and now
+  draws it ("59.7 °C"). On a dual key with a pinned second row, each
+  row's MIN, MAX or AVG sits after its own label, so a value no longer
+  shrinks or moves as a press cycles the stats.
+- Every control has a programmatic name and a visible focus ring, text
+  contrast and small targets were raised, and the panels reflow at
+  320 px wide without horizontal scrolling.
+- Labels follow the new vocabulary; stored settings are unchanged.
+  "Deck default" is now Default; the deck theme, deck text and type
+  accents are Theme, Text color and Accent colors under Advanced,
+  Shared defaults (marked "All keys and dials"); Label mode is Title
+  after a turn; Reset reach is A stats reset
+  clears; Press does is A press; Detail contains is Details list; Tile
+  shows is Readings per tile; and "Repeat Back under this key's own
+  cell" is "Also go back from this key's own position". The Text
+  color help explains that type accents color graphs and badges, never
+  the numbers (issue #31).
+- Reads follow HWiNFO's own polling period instead of a plugin setting.
+  HWiNFO rewrites Shared Memory once per polling period (2 s by
+  default), so a faster plugin read cannot make data fresher and a
+  slower one discards writes. The plugin reads Shared Memory every
+  250 ms and Gadget once a second, and Poll every leaves both panels. A
+  saved poll interval is ignored and left in place. The support report
+  names HWiNFO's polling period next to the plugin's own read interval.
 - Malformed Gadget raw numbers remain unavailable instead of displaying a
   numeric prefix or adding it to freshness, history and session statistics.
   Healthy neighboring readings keep serving. Detail faces also refresh when
@@ -30,7 +99,7 @@ Per-reading dial colors and reliability fixes in one release.
 - Group jumps skip a confirmed alias of the current reading so the next
   distinct reading in the target group remains reachable.
 - Two-row and three-row dials can color each reading's number separately.
-  Appearance adds Reading colors with Signal, Pairs and Uniform presets,
+  Display adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading
   through rotation, reordering, groups and confirmed cross-source links,
   including with Type accents off. An optional Color numbers by sensor
@@ -90,7 +159,7 @@ Per-reading dial colors and reliability fixes in one release.
   such as the GPU only appeared when searched for, and a reading ticked
   or selected there could not be seen or unticked in the list.
 - A stale sensor snapshot keeps the picker's missing-reading cue, matching
-  Live value; an unavailable source still leaves the picker neutral. Bar
+  the panel header; an unavailable source still leaves the picker neutral. Bar
   and Ring help now distinguishes Shared Memory session min/max from
   Gadget's moving window of 36 samples, which restarts after a gap.
 - Gadget starts with unknown freshness until a value change is observed.

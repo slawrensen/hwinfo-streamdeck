@@ -30,7 +30,7 @@ import { registerDiagnostics } from "../diagnostics";
 import { IDLE_GESTURE, routeGesture, type GestureState } from "../gestures";
 import { liveKeyOf, readingMatchesKey } from "../hwinfo/reading-links";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
-import { buildThemesPayload, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
+import { buildThemesPayload, forgetPanelFace, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
@@ -203,7 +203,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			// in real time (theme, Text and Data units are all deck-wide).
 			if (streamDeck.ui.action?.manifestId === this.manifestId) {
 				void streamDeck.ui.sendToPropertyInspector(buildThemesPayload());
-				pushPreviewToPi(poller.getStatus(), this.manifestId, this.instances, false);
+				this.pushPanelPreview(poller.getStatus());
 			}
 		});
 		registerDialCommandHandler((command) => this.applyControlCommand(command));
@@ -326,6 +326,8 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			this.pushTriggerDescriptions(ev.action, state.settings);
 		}
 		this.renderAll(poller.getStatus(), ev.action.id);
+		// The panel sees an edit's result at once, not on the next tick.
+		this.pushPanelPreview(poller.getStatus());
 	}
 
 	/** Rotate: routed by the scheme (legacy: step, whether pressed or not). */
@@ -421,7 +423,25 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 	}
 
 	override onSendToPlugin(ev: SendToPluginEvent<JsonValue, DialSettings>): void {
-		handlePiRequest(ev.payload);
+		const payload = ev.payload;
+		if (typeof payload === "object" && payload !== null && !Array.isArray(payload) && payload.event === "getPreview") {
+			// A freshly loaded panel asks once: resend the face even when it
+			// has not changed since the previous panel on this context.
+			forgetPanelFace();
+			this.pushPanelPreview(poller.getStatus());
+			return;
+		}
+		handlePiRequest(payload);
+	}
+
+	override onPropertyInspectorDidAppear(): void {
+		forgetPanelFace();
+	}
+
+	/** The open panel's preview, carrying the frame this action last sent
+	 * to the device (never a separate render). No-op with no panel open. */
+	private pushPanelPreview(status: PollerStatus): void {
+		pushPreviewToPi(status, this.manifestId, this.instances, false, (id) => this.instances.get(id)?.lastFeedback);
 	}
 
 	/** One gesture (or control command) becomes exactly one of these. */
@@ -603,7 +623,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			}
 		}
 		this.renderAll(status);
-		pushPreviewToPi(status, this.manifestId, this.instances, false);
+		this.pushPanelPreview(status);
 	}
 
 	private sampleStats(state: InstanceState, snapshot: SensorSnapshot, source: string): void {

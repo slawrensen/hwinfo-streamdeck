@@ -8,10 +8,13 @@ on the hardware myself: the app was not mine to click.
 1. **Theme line and inheritance.** Open any configured Sensor Reading
    key. Under the header: "Theme  Default (shared: Void)  Change" on one
    line, the eight named chips under it. Click **Ember**: the line reads
-   "Ember (set on this key)", Change disappears but nothing below moves.
-   Click **Default** again, then **Change**: Advanced opens at the
-   shared Theme select and nothing is written. Fail: the line and chips
-   jump on a pick, a name is cut off, or Change writes anything.
+   "Ember (set on this key)" and **Make shared** takes Change's place;
+   nothing below moves. Press **Make shared**: the line reads "Default
+   (shared: Ember)" with Default checked, and every key on Default turns
+   Ember. Then **Change**: Advanced opens at the shared Theme select; set
+   it back to Void. Fail: the line and chips jump on a pick, a name is
+   cut off, Make shared changes a different theme, or Change writes
+   anything by itself.
 2. **Fold pair.** The two chevron buttons at the top right: Open all
    (arrows apart) and Fold all (arrows together) look like one pair,
    same weight and size, no middle line. The Reload button next to the

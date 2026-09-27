@@ -33,7 +33,7 @@
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
@@ -472,14 +472,22 @@ function killChromeTree() {
 	if (process.platform !== "win32") {
 		// Only the browser this suite spawned; its renderers exit with it.
 		chrome.kill("SIGKILL");
-		return;
+	} else {
+		try {
+			cleanupBrowser(chromeProfile, chromeStartedAt);
+		} catch (err) {
+			const message = `[pi-persistence] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`;
+			console.error(message);
+			results.errors.push(message);
+			return;
+		}
 	}
+	// The browser is gone, so its throwaway profile goes too: a run used to
+	// leave one in the temp folder every time.
 	try {
-		cleanupBrowser(chromeProfile, chromeStartedAt);
-	} catch (err) {
-		const message = `[pi-persistence] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`;
-		console.error(message);
-		results.errors.push(message);
+		rmSync(chromeProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+	} catch {
+		/* a straggling renderer may still hold a file; the OS temp sweep owns it */
 	}
 }
 const watchdog = setTimeout(() => {

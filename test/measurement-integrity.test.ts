@@ -18,13 +18,17 @@ import { contrast } from "./wcag";
 describe("dial press replay through the production action", () => {
 	type Down = Parameters<SensorDialAction["onDialDown"]>[0];
 	type Up = Parameters<SensorDialAction["onDialUp"]>[0];
+	type Received = Parameters<SensorDialAction["onDidReceiveSettings"]>[0];
 	type ActionBoundary = {
 		instances: Map<string, InstanceState>;
 		hidden: Map<string, { at: number; state: InstanceState }>;
 		traceGesture(): void;
 		renderAll(): void;
+		pushTriggerDescriptions(): void;
+		pushPanelPreview(): void;
 		onDialDown(event: Down): Promise<void>;
 		onDialUp(event: Up): Promise<void>;
+		onDidReceiveSettings(event: Received): void;
 	};
 	function fixture() {
 		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
@@ -36,6 +40,8 @@ describe("dial press replay through the production action", () => {
 		action.hidden = new Map();
 		action.traceGesture = () => {};
 		action.renderAll = () => {};
+		action.pushTriggerDescriptions = () => {};
+		action.pushPanelPreview = () => {};
 		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
 		let eventAt = 1000;
 		const now = mock.method(performance, "now", () => eventAt);
@@ -45,6 +51,7 @@ describe("dial press replay through the production action", () => {
 			state,
 			down: (afterMs = 0) => { eventAt += afterMs; return action.onDialDown(down); },
 			up: (afterMs = 0) => { eventAt += afterMs; return action.onDialUp(up); },
+			receive: (settings: InstanceState["settings"]) => action.onDidReceiveSettings({ action: { id: "ctx", isDial: () => true, setSettings: async () => {} }, payload: { settings } } as unknown as Received),
 			close: () => { if (state.overlayTimer !== null) clearTimeout(state.overlayTimer); getStatus.mock.restore(); now.mock.restore(); }
 		};
 	}
@@ -65,6 +72,30 @@ describe("dial press replay through the production action", () => {
 			await f.down();
 			assert.equal(f.state.stats.get("fixture:0:1"), undefined, "a new press after release still resets");
 		} finally { f.close(); }
+	});
+	it("a held press whose settings change to another command or reach does nothing on release; an unchanged echo keeps it", async () => {
+		// external review AX26: an Elite press (Pause/resume on release) held
+		// while the panel switched to Custom with a reset of every dial used to
+		// reset every dial on release.
+		for (const change of ["new command", "echo"] as const) {
+			const f = fixture();
+			try {
+				f.state.settings = { ...f.state.settings, controlPreset: "elite" };
+				f.state.stats.sample("fixture:0:1", 50);
+				await f.down();
+				f.receive(change === "echo" ? { ...f.state.settings } : { ...f.state.settings, controlPreset: "custom", gestureShortPress: "resetStats", resetScope: "all" });
+				await f.up(100);
+				if (change === "echo") {
+					assert.equal(f.state.cyclePaused, true, "an unchanged echo keeps the press: Pause/resume runs");
+					continue;
+				}
+				assert.equal(f.state.stats.get("fixture:0:1")?.count, 1, "the held press did not become a reset");
+				assert.equal(f.state.cyclePaused, false, "nor did it run its old command");
+				await f.down(100);
+				await f.up(100);
+				assert.equal(f.state.stats.get("fixture:0:1"), undefined, "a fresh press runs the new command");
+			} finally { f.close(); }
+		}
 	});
 	it("a consumed legacy press cannot fire again after switching to Elite before release", async () => {
 		const f = fixture();

@@ -260,6 +260,58 @@ try {
 	await sleep(400);
 	check("lossless: one cell's label rewrites that label only", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, labels: ["EDITED", { future: "label" }, "C", "D", "TAIL"] }]), JSON.stringify({ ...writes(), tiles: lastWrite()?.detailTiles }));
 
+	// Structural edits keep what this version cannot read (external review
+	// AX17 to AX19): a cell's stored entries move with its reading through
+	// removals, resizes and swaps; entries past a tile's cells stay at their
+	// stored index; stored tiles no reading reaches, and trailing tiles
+	// holding such entries, stay stored.
+	const tilesOut = () => JSON.stringify({ ...writes(), tiles: lastWrite()?.detailTiles, keys: lastWrite()?.detailKeys });
+	await openTile();
+	await b.evaluate(`document.querySelectorAll("#detail-list .hw-set-chip .hw-set-remove")[3].click()`);
+	await sleep(400);
+	check("lossless: removing a tile's fourth reading keeps the other cells' stored entries and the entries past the cells", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, size: 3, labels: [" A ", { future: "label" }, "C", "", "TAIL"], colors: ["#112233", { future: "color" }, "#334455", null, "#ABCDEF"], automaticColors: [true, { future: "automatic" }, false, false, true] }]), tilesOut());
+	await openTile();
+	await b.evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="0"]').click()`);
+	await sleep(400);
+	check("lossless: a 4-to-1 resize keeps the entries past the cells, and the reading with unread entries keeps them in a tile of its own", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, size: 1, labels: [" A ", "", "", "", "TAIL"], colors: ["#112233", null, null, null, "#ABCDEF"], automaticColors: [true, false, false, false, true] }, { size: 1, labels: [{ future: "label" }], colors: [{ future: "color" }], cellLabels: true, automaticColors: [{ future: "automatic" }] }]), tilesOut());
+	await openTile();
+	await b.evaluate(`document.querySelectorAll('#detail-list .hw-set-chip')[1].querySelector('.hw-detail-move[data-move="-1"]').click()`);
+	await sleep(400);
+	check("lossless: swapping two cells of a four-reading tile moves each reading's stored entries with it", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, labels: [{ future: "label" }, " A ", "C", "D", "TAIL"], colors: [{ future: "color" }, "#112233", "#334455", "#445566", "#ABCDEF"], automaticColors: [{ future: "automatic" }, true, false, false, true] }]) && same(lastWrite()?.detailKeys?.slice(0, 2), [detailFx.detailKeys[1], detailFx.detailKeys[0]]), tilesOut());
+	{
+		const k = detailFx.detailKeys;
+		const dormant = [{ size: 1, labels: ["A"] }, { size: 1, labels: ["B"] }, { size: 1, labels: ["DORMANT"], future: { keep: 1 } }];
+		await open("key-details", { settings: { ...detailFx, detailKeys: [k[0], k[1]], detailTiles: structuredClone(dormant) } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		await b.evaluate(`document.querySelector('#detail-list .hw-tile-grip[data-tile="0"]').focus()`);
+		await b.key("ArrowDown");
+		await sleep(400);
+		check("lossless: a whole-tile move keeps a stored tile no reading reaches", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [dormant[1], dormant[0], dormant[2]]) && same(lastWrite()?.detailKeys, [k[1], k[0]]), tilesOut());
+		for (const [what, trailing] of [["entries past its cells", { size: 1, labels: ["", "TAIL"], colors: [null, "#ABCDEF"], automaticColors: [false, true], cellLabels: true }], ["a label stored with spaces", { size: 1, labels: ["  "] }]]) {
+			await open("key-details", { settings: { ...detailFx, detailKeys: [k[0], k[1]], detailTiles: [{ size: 1, labels: ["A"] }, structuredClone(trailing)] } });
+			await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+			await sleep(150);
+			await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-name").click()`);
+			await sleep(150);
+			await b.evaluate(`(() => { const i = document.querySelector("#detail-list .hw-cell-rename"); i.value = "EDITED"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+			await sleep(400);
+			check(`lossless: renaming the first tile keeps an untouched trailing tile holding ${what}`, sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 1, labels: ["EDITED"] }, trailing]), tilesOut());
+		}
+	}
+	// One press removes one reading from a detail list too (external review
+	// AX20): Enter held on a chip's remove used to empty the list.
+	await open("key-details");
+	await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+	await sleep(150);
+	await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-remove").focus()`);
+	const enterKey = { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" };
+	await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...enterKey });
+	for (let i = 0; i < 5; i++) await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...enterKey, autoRepeat: true });
+	await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+	await sleep(400);
+	check("details: Enter held on a reading's remove removes one reading", sim.writes.length === 1 && same(lastWrite()?.detailKeys, detailFx.detailKeys.slice(1)), JSON.stringify({ ...writes(), keys: lastWrite()?.detailKeys }));
+
 	// A double click only arms, however long the system's double-click time
 	// (external review AX13: clicks 470 or 650 ms apart used to confirm):
 	// the second click of one gesture carries detail 2. A separate click
@@ -1472,6 +1524,20 @@ try {
 				check(`Make shared (${where}, ${how}): a theme arriving between press and release makes the press stale; nothing is shared and Forest stays`, sim.writes.length === 0 && sim.globalWrites.length === 0 && s.checked === "forest" && s.line === `Forest (set on this ${where})`, JSON.stringify({ ...writes(), checked: s.checked, line: s.line }));
 			}
 		}
+		// Tab between press and release ends nothing (external review AX21):
+		// the press can still click, and it is still stale.
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		const tabPoint = await shareCenter();
+		await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: tabPoint.x, y: tabPoint.y });
+		await b.send("Input.dispatchMouseEvent", { type: "mousePressed", x: tabPoint.x, y: tabPoint.y, button: "left", clickCount: 1 });
+		sim.pushSettings({ ...sim.settings, theme: "forest" });
+		await b.key("Tab");
+		await sleep(40);
+		await b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: tabPoint.x, y: tabPoint.y, button: "left", clickCount: 1 });
+		await sleep(400);
+		const tabbed = await ms();
+		check("Make shared: Tab between press and release keeps the press stale; nothing is shared and Forest stays", sim.writes.length === 0 && sim.globalWrites.length === 0 && tabbed.checked === "forest", JSON.stringify({ ...writes(), checked: tabbed.checked }));
 		sim.folds = new PanelFoldMemory();
 		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
 		await b.evaluate(`document.getElementById("theme-share").focus()`);
@@ -1556,6 +1622,16 @@ try {
 		const perTileAfter = await note("#detail-list");
 		const perTileSaid = await said();
 		check("FA06: changing Readings per tile says the regrouped note; opening said nothing", perTileOpen === "" && perTileAfter !== perTileBefore && perTileSaid === perTileAfter, JSON.stringify({ perTileOpen, perTileBefore, perTileAfter, perTileSaid }));
+		// AX24: the same change arriving from elsewhere (a settings delivery,
+		// no person here) regroups the list quietly.
+		await open("key-details");
+		await sleep(300);
+		const echoBefore = await note("#detail-list");
+		sim.pushSettings({ ...sim.settings, detailDensity: "2" });
+		await sleep(900);
+		const echoAfter = await note("#detail-list");
+		const echoSaid = await said();
+		check("AX24: Readings per tile arriving from elsewhere regroups the list quietly", echoAfter !== echoBefore && echoSaid === "" && sim.writes.length === 0, JSON.stringify({ echoBefore, echoAfter, echoSaid, ...writes() }));
 		// FA02: on Custom with two touch zones a tap set to switch groups
 		// never fires, yet the map keeps group boundaries: the line says so
 		// instead of "turns run through all groups as one list".

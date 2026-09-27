@@ -334,7 +334,9 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 function effectiveOf(settings: PreviewSettings, kind: "key" | "dial" | undefined, live: { unit: string; displayUnit: string; value: number } | undefined): PreviewEffective {
 	const config = loadThemes();
 	const id = effectiveThemeFor(settings);
-	const drawn = config.themes[id] !== undefined ? id : config.defaultTheme;
+	// Own themes only: a stored "constructor" draws the spec default.
+	const known = Object.hasOwn(config.themes, id);
+	const drawn = known ? id : config.defaultTheme;
 	const own = typeof settings.theme === "string" && settings.theme !== "";
 	const text = effectiveTextFor(settings);
 	const warn = parseThreshold(settings.warnValue) ?? null;
@@ -348,7 +350,7 @@ function effectiveOf(settings: PreviewSettings, kind: "key" | "dial" | undefined
 	const applies = live === undefined ? false : kind === "dial" ? thresholdsApplyTo(anchor as string | undefined, live.unit) : true;
 	const level = live !== undefined && applies ? alertLevel(live.value, warn ?? undefined, crit ?? undefined, below) : "normal";
 	const effective: PreviewEffective = {
-		theme: { id, drawn, own, unknown: own && config.themes[id] === undefined },
+		theme: { id, drawn, own, unknown: own && !known },
 		text: { mode: text.mode, applied: appliedTextMode(text), own: parseTextSettings(settings) !== null, color: text.color ?? null, dimSecondary: text.dimSecondary },
 		typeAccents: typeAccentsEnabled() && !config.typeAccentsDisabledOn.includes(drawn),
 		dataUnits: getDataUnits(),

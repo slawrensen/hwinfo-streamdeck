@@ -263,3 +263,30 @@ describe("theme names", () => {
 		assert.equal(model.themeName(undefined), "");
 	});
 });
+
+describe("stored names are this build's own", () => {
+	// external review AX22 and AX23.
+	const inherited = ["constructor", "__proto__", "toString", "hasOwnProperty"];
+	it("a Control command named like a JavaScript member is unknown", () => {
+		for (const id of inherited) {
+			assert.deepEqual(model.controlSummary({ command: id }), { command: `Unknown command "${id}": the key shows an alert`, target: "" }, id);
+		}
+	});
+	it("names Back to current value, a command the dial runs", () => {
+		assert.deepEqual(model.controlSummary({ command: "backToCurrent" }), { command: "Back to current value", target: "every dial" });
+	});
+	it("a gesture command named like a JavaScript member does nothing", () => {
+		for (const id of inherited) assert.equal(model.gestureWords(id, {}), "does nothing", id);
+	});
+	it("the detail slot panel names an inherited slot as unrecognized instead of throwing", () => {
+		const slotSource = readFileSync(fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-slot.js", import.meta.url)), "utf8");
+		for (const slot of [...inherited, "back"]) {
+			const text: Record<string, string> = {};
+			const doc = { getElementById: (id: string) => ({ set textContent(v: string) { text[id] = v; } }) };
+			const win: { connectElgatoStreamDeckSocket?: (...args: string[]) => void } = {};
+			new Function("window", "document", slotSource)(win, doc);
+			win.connectElgatoStreamDeckSocket?.("0", "u", "e", "{}", JSON.stringify({ payload: { settings: { slot } } }));
+			assert.equal(text["slot-role"], slot === "back" ? "Back tile" : "Unrecognized detail tile", slot);
+		}
+	});
+});

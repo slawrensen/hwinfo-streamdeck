@@ -180,6 +180,13 @@ const HIDDEN_STATE_CAP = 64;
 /** On-device hint duration. */
 const OVERLAY_MS = 1600;
 
+/** What the release of a held press acts on: the gesture map, the reset
+ * reach and the reading or rotation it targets. Equal for an unchanged
+ * settings echo. */
+export function pressContextOf(settings: DialSettings): string {
+	return JSON.stringify([resolveControls(settings), parseResetScope(settings.resetScope), settings.readingKey ?? null, rotationKeysOf(settings) ?? null, rotationGroupsOf(settings.rotationGroups) ?? null]);
+}
+
 @action({ UUID: "com.lawrensen.hwinfo.dial" })
 export class SensorDialAction extends SingletonAction<DialSettings> {
 	private readonly instances = new Map<string, InstanceState>();
@@ -305,6 +312,14 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			return;
 		}
 		const previous = state.settings;
+		// A held press keeps the command it started with. A settings change
+		// that would give its release a different command, target or reset
+		// reach consumes the press, and the next press uses the new settings
+		// (external review AX26: Pause/resume became "reset all dials"). An
+		// unchanged echo leaves the press alone.
+		if (state.gesture.downAt !== null && pressContextOf(previous) !== pressContextOf(ev.payload.settings)) {
+			state.gesture = { downAt: state.gesture.downAt, rotatedWhileDown: true };
+		}
 		if (previous.readingKey !== ev.payload.settings.readingKey) {
 			state.statMode = "current";
 		}

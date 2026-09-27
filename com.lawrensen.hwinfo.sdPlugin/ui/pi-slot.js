@@ -12,7 +12,7 @@
 	};
 	function describe(settings) {
 		const slot = settings?.slot;
-		if (typeof slot === "string" && ROLES[slot] !== undefined) return ROLES[slot];
+		if (typeof slot === "string" && Object.hasOwn(ROLES, slot)) return ROLES[slot];
 		const index = settings?.index;
 		if (slot === "reading" && Number.isInteger(index) && index >= 0 && index <= 255) {
 			return [`Reading tile ${index + 1}`, `Shows reading ${index + 1} of the current page. Pressing it cycles current, min, max and average for this visit.`];

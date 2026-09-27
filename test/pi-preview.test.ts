@@ -109,6 +109,13 @@ describe("effective presentation", () => {
 		const theme = buildPreview(ok, { readingKey: "cpu:0:0", theme: "neon" }, true, { kind: "key" }).effective?.theme;
 		assert.deepEqual(theme, { id: "neon", drawn: loadThemes().defaultTheme, own: true, unknown: true });
 	});
+	it("a stored theme named like a JavaScript member is unknown and draws the spec default", () => {
+		// external review AX22: config.themes["constructor"] is Object's.
+		for (const id of ["constructor", "__proto__", "toString", "hasOwnProperty"]) {
+			const got: unknown = buildPreview(ok, { readingKey: "cpu:0:0", theme: id }, true, { kind: "key" }).effective?.theme;
+			assert.deepEqual(got, { id, drawn: loadThemes().defaultTheme, own: true, unknown: true }, id);
+		}
+	});
 	it("the local Text setting wins; Custom without a valid color draws theme text", () => {
 		applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "dim" });
 		assert.deepEqual(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { kind: "key" }).effective?.text, { mode: "dim", applied: "dim", own: false, color: null, dimSecondary: false });

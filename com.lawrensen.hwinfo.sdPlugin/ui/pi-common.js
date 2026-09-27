@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d11";
+	const PI_BUILD = "1.7.0.0-d12";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -1254,6 +1254,17 @@
 	let detailTiles = [];
 	let detailSourceTiles = [];
 	let detailDuplicatesHidden = false;
+	// Each listed reading's stored cell entries (label, color, automatic
+	// flag) as last read from storage, with what this build parses from
+	// them. A write gives a cell back its reading's stored entry while that
+	// value is unchanged, wherever the reading moved, so entries this build
+	// cannot read and labels stored with spaces survive every edit
+	// (external review AX19). Recaptured from stored data only, never from
+	// the panel's own unsaved plan.
+	const CELL_FIELDS = ["labels", "colors", "automaticColors"];
+	const CELL_NEUTRAL = { labels: "", colors: null, automaticColors: false };
+	let detailCellRaw = new Map();
+	let detailFromStorage = false;
 	let detailProjectionVersion = 0;
 	let detailUniform = 1;
 	const detailTilesBinding = detailListEl === null ? null : useSettings("detailTiles", adoptDetailTiles, null);
@@ -1274,6 +1285,7 @@
 		// a write rewrites only the fields an edit changed, so a tile's
 		// unknown fields and its untouched (even junk) fields stay stored
 		// exactly as they were. Salvage is for display, never for storage.
+		detailFromStorage = true;
 		detailTilesKept = Array.isArray(value) ? value.slice(DETAIL_TILES_MAX) : [];
 		detailSourceTiles = !Array.isArray(value)
 			? []
@@ -1301,37 +1313,59 @@
 		renderDetailList();
 	}
 
-	/** A tile's stored form: a tile from storage rewrites only the fields
-	 * that changed; a tile the editor created writes all four. */
-	function serializeTile(tile) {
+	/** A tile's stored form. A tile from storage rewrites only the fields
+	 * that changed; a tile the editor created writes all four. In every cell
+	 * list, a cell takes back its reading's stored entry while that
+	 * reading's value is unchanged (so an entry this build cannot read, or a
+	 * label with spaces, moves with its reading through removals, resizes,
+	 * swaps and drags), and entries past the tile's cells stay at the index
+	 * they were stored at (external review AX12, AX19). `keys` are the
+	 * readings in the tile's cells, in order. */
+	function serializeTile(tile, keys = []) {
 		const current = { size: tile.size, labels: [...tile.labels], colors: [...tile.colors], cellLabels: tile.cellLabels, automaticColors: storedAutomatic(tile.automaticColors) };
-		if (tile.raw === undefined) {
-			if (current.automaticColors === undefined) delete current.automaticColors;
-			return current;
-		}
-		const out = model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels", "automaticColors"]);
-		// A cell edit in a tile that kept its size rewrites only the cells it
-		// changed: entries this version cannot read, entries past the tile's
-		// size and the rest of each list stay exactly as stored (external
-		// review AX12). A resize still writes whole lists.
 		const rawIsObject = tile.raw !== null && typeof tile.raw === "object" && !Array.isArray(tile.raw);
-		if (rawIsObject && tile.size === tile.base.size) {
-			const cell = {
-				labels: [(i) => tile.base.labels[i], (i) => current.labels[i]],
-				colors: [(i) => tile.base.colors[i], (i) => current.colors[i]],
-				automaticColors: [(i) => tile.base.automaticColors?.[i] === true, (i) => tile.automaticColors[i] === true]
-			};
-			for (const [field, [before, after]] of Object.entries(cell)) {
-				if (!Array.isArray(tile.raw[field])) continue;
-				const values = [...tile.raw[field]];
-				for (let i = 0; i < tile.size; i++) {
-					if (JSON.stringify(before(i)) === JSON.stringify(after(i))) continue;
-					// A gap before a newly set cell takes that cell's shown value.
-					for (let j = values.length; j < i; j++) values.push(after(j));
-					values[i] = after(i);
+		let out;
+		if (tile.raw === undefined) {
+			out = current;
+			if (out.automaticColors === undefined) delete out.automaticColors;
+		} else {
+			out = model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels", "automaticColors"]);
+			if (!rawIsObject) return out;
+		}
+		// A four-reading tile gives a moved chip the identity color it showed,
+		// stored as an automatic hue. For a reading whose stored color this
+		// build cannot read, the stored entry travels instead.
+		const wornDefault = (i) => tile.automaticColors[i] === true && QUAD_DEFAULT_COLORS.includes(tile.colors[i]);
+		const carriedEntry = (key, field, i) => {
+			const entry = detailCellRaw.get(key);
+			const cell = entry?.[field];
+			if (cell === undefined) return undefined;
+			if (cell.parsed === cellParsed(tile, field, i)) return cell;
+			const color = entry.colors;
+			const unreadColor = color !== undefined && color.parsed === null && color.raw !== null;
+			return (field === "colors" || field === "automaticColors") && unreadColor && wornDefault(i) ? cell : undefined;
+		};
+		for (const field of CELL_FIELDS) {
+			const stored = rawIsObject && Array.isArray(tile.raw[field]) ? tile.raw[field] : null;
+			const carried = Array.from({ length: tile.size }, (_, i) => (keys[i] === undefined ? undefined : carriedEntry(keys[i], field, i)));
+			const carriesData = carried.some((cell) => cell !== undefined && cell.raw !== cell.parsed);
+			if (out[field] === undefined && stored === null && !carriesData) continue;
+			// A cell no reading fills (a dormant tile's) keeps its stored entry
+			// while its value is unchanged: no reading can be misplaced there.
+			const baseParsed = (i) => (field === "automaticColors" ? tile.base?.automaticColors?.[i] === true : tile.base?.[field]?.[i]);
+			const values = carried.map((cell, i) => {
+				if (cell !== undefined) return cell.raw;
+				if (keys[i] === undefined && stored !== null && i < stored.length && baseParsed(i) === cellParsed(tile, field, i)) return stored[i];
+				return cellParsed(tile, field, i);
+			});
+			if (stored !== null) {
+				const tailStart = Math.max(tile.size, tile.base?.size ?? 0);
+				if (stored.length > tailStart) {
+					for (let j = tile.size; j < tailStart; j++) values.push(CELL_NEUTRAL[field]);
+					values.push(...stored.slice(tailStart));
 				}
-				out[field] = values;
 			}
+			out[field] = values;
 		}
 		return out;
 	}
@@ -1343,16 +1377,20 @@
 		return Array.isArray(automaticColors) && automaticColors.some(Boolean) ? [...automaticColors] : undefined;
 	}
 
-	let detailUniformSeen = false;
+	// Only a change of Readings per tile in this panel is a person's edit and
+	// is spoken; the panel opening and a value arriving from elsewhere repaint
+	// quietly (external review AX24).
+	let detailDensityEdited = false;
+	document.getElementById("f-density")?.addEventListener("change", () => {
+		detailDensityEdited = true;
+	});
 	function adoptDetailUniform(value) {
 		const next = value === 2 || value === "2" ? 2 : value === 3 || value === "3" ? 3 : value === 4 || value === "4" ? 4 : 1;
-		// The first delivery is the panel opening; later ones are the
-		// Readings per tile select in this panel, a person's edit.
-		const edited = detailUniformSeen;
-		detailUniformSeen = true;
 		// followSetting polls every 400 ms: a no-op tick must not rebuild
 		// #detail-list under an in-flight chip drag or landing flash.
 		if (next === detailUniform) return;
+		const edited = detailDensityEdited;
+		detailDensityEdited = false;
 		detailUniform = next;
 		projectDetailState();
 		revalidateDetailAim(); // the regrouped walk may have no cell for a standing aim
@@ -1386,7 +1424,40 @@
 	 * saved source copies so a tree/link update is read-only and unlinking
 	 * restores the authored layout. Only an explicit detail edit commits
 	 * the visible projection through writeDetailState. */
+	/** What this build parses from one stored cell entry. */
+	function cellParsed(tile, field, i) {
+		return field === "automaticColors" ? tile.automaticColors[i] === true : tile[field][i];
+	}
+
+	function captureDetailCells() {
+		detailCellRaw = new Map();
+		const listed = detailSourceKeys.filter((k) => !isDetailPrimary(k));
+		let head = 0;
+		for (const tile of detailSourceTiles) {
+			const raw = tile.raw;
+			if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+				for (let i = 0; i < tile.size && head + i < listed.length; i++) {
+					const entry = {};
+					for (const field of CELL_FIELDS) {
+						if (Array.isArray(raw[field]) && i < raw[field].length) entry[field] = { raw: raw[field][i], parsed: cellParsed(tile, field, i) };
+					}
+					detailCellRaw.set(listed[head + i], entry);
+				}
+			}
+			head += tile.size;
+		}
+	}
+
+	/** Whether a reading's stored cell entries hold anything this build's
+	 * own values would not restate: an entry it cannot read, a label with
+	 * spaces, an automatic flag on no color. */
+	function cellCarriesData(key) {
+		const entry = detailCellRaw.get(key);
+		return entry !== undefined && CELL_FIELDS.some((field) => entry[field] !== undefined && entry[field].raw !== entry[field].parsed);
+	}
+
 	function projectDetailState() {
+		if (detailFromStorage) captureDetailCells();
 		const before = JSON.stringify([detailKeys, detailTiles.map((t) => t.size)]);
 		const source = detailSourceKeys.filter((k) => !isDetailPrimary(k));
 		const seen = new Set();
@@ -1518,11 +1589,19 @@
 		detailSourceKeys = [...detailKeys];
 		detailSourceTiles = cloneTiles(detailTiles);
 		detailDuplicatesHidden = false;
+		detailFromStorage = false;
 		// An edit can shorten the walk out from under a standing aim (a
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
-		detailTilesStage[1]([...detailTiles.map(serializeTile), ...detailTilesKept]);
+		const listed = listedDetailKeys();
+		let head = 0;
+		const serialized = detailTiles.map((tile) => {
+			const keys = listed.slice(head, head + tile.size);
+			head += tile.size;
+			return serializeTile(tile, keys);
+		});
+		detailTilesStage[1]([...serialized, ...detailTilesKept]);
 		detailBinding[1](model.mergeKept(detailKeys, detailKeysKept, detailKeysKeptAt));
 		// A person's edit: its note (the count, the cap) is spoken, like the
 		// rotation's; opening the panel or a sensor list arriving stays quiet.
@@ -1555,7 +1634,36 @@
 			return r.cellLabels === undefined || typeof r.cellLabels === "boolean";
 		};
 		const isDefault = (t) => readable(t) && t.size === detailUniform && t.cellLabels === true && t.labels.every((l) => l === "") && t.colors.every((c, i) => c === null || (t.size === 4 && t.automaticColors[i] === true && c === QUAD_DEFAULT_COLORS[i]));
-		while (next.length > 0 && isDefault(next[next.length - 1])) {
+		// A reading whose stored cell entries hold data this build would not
+		// restate keeps an explicit tile: one that lands past the plan (a
+		// resize or a move into the fill) gets default entries through its
+		// tile, and a trailing tile holding one, or storing entries past its
+		// cells, is not pruned (external review AX18, AX19).
+		const listed = listedDetailKeys();
+		const heads = [];
+		let head = 0;
+		for (const t of next) {
+			heads.push(head);
+			head += t.size;
+		}
+		let need = next.length - 1;
+		for (let t = next.length; head < listed.length; t++) {
+			if (listed.slice(head, head + detailUniform).some(cellCarriesData)) need = t;
+			head += detailUniform;
+		}
+		for (let t = next.length; t <= need; t++) {
+			heads.push(heads.length === 0 ? 0 : heads[heads.length - 1] + next[next.length - 1].size);
+			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true, automaticColors: Array.from({ length: detailUniform }, () => false) });
+		}
+		const carriesData = (t, i) => {
+			const r = t.raw;
+			if (r !== null && typeof r === "object" && !Array.isArray(r)) {
+				const cells = Math.max(t.size, t.base?.size ?? 0);
+				if (CELL_FIELDS.some((field) => Array.isArray(r[field]) && r[field].length > cells)) return true;
+			}
+			return listed.slice(heads[i], heads[i] + t.size).some(cellCarriesData);
+		};
+		while (next.length > 0 && isDefault(next[next.length - 1]) && !carriesData(next[next.length - 1], next.length - 1)) {
 			next.pop();
 		}
 		detailTiles = next;
@@ -1596,6 +1704,7 @@
 		detailSourceKeys = known;
 		detailKeysKept = kept;
 		detailKeysKeptAt = keptAt;
+		detailFromStorage = true;
 		projectDetailState();
 		revalidateDetailAim();
 		renderDetailList();
@@ -2072,6 +2181,9 @@
 			landAt = listed.length - 1; // append past the tail (one shorter once the chip is pulled out)
 			if (dressed) {
 				next.push(parkedSpec());
+				// Rebuilt from the walk: stored tiles past it stay stored,
+				// after the parked one (external review AX17).
+				next.push(...cloneTiles(detailTiles.slice(walk.length)));
 			}
 		} else {
 			const target = walk[targetTileIdx];
@@ -2151,6 +2263,9 @@
 		const finalIdx = insertBefore > fromIdx ? insertBefore - 1 : insertBefore;
 		specs.splice(fromIdx, 1);
 		specs.splice(finalIdx, 0, movedSpec);
+		// Stored tiles past the walk (no reading reaches them) stay stored,
+		// after the moved ones (external review AX17).
+		specs.push(...cloneTiles(detailTiles.slice(walk.length)));
 		// Landing offset in the REDUCED listed order: the tiles left of the
 		// landing slot keep their exact member counts (removing a whole
 		// run preserves every other tile's contiguity).
@@ -3931,6 +4046,19 @@
 		followSetting("readingColors", adoptReadingColors);
 	}
 
+	// One press, one action: a held Enter clicks a button again on every key
+	// repeat, and a remove moves focus to the next remove, so a held key
+	// emptied a list (d10 rotation, external review AX20 details). On every
+	// control that removes, merges or replaces, a repeat does nothing.
+	const ONE_PRESS = '.hw-set-remove, .hw-group-remove, .hw-set-tools button[data-tool="remove"], [data-set-action="merge"], #config-key-apply, #config-deck-apply';
+	document.addEventListener(
+		"keydown",
+		(ev) => {
+			if (ev.repeat && (ev.key === "Enter" || ev.key === " ") && ev.target instanceof Element && ev.target.closest(ONE_PRESS) !== null) ev.preventDefault();
+		},
+		true
+	);
+
 	// --- theme preset gallery -------------------------------------------------
 	// Tokens come from the plugin (parsed themes.json) over the message channel;
 	// the shared default renders as the leading "Default" chip and the seven
@@ -4258,25 +4386,35 @@
 	// A press remembers the key's theme choice it started on: a theme that
 	// arrives between press and release makes that press stale, and it
 	// shares nothing until a fresh press (external review AX14).
-	let sharePressChoice = null;
+	// The record ends only with its own kind of release, after the click that
+	// release may fire: focus leaving (Tab) or another key mid-press ends
+	// nothing, since the press can still click and is still stale (AX21).
+	let sharePress = null; // { choice, kind: "pointer" | "key" }
 	themeShareEl?.addEventListener("pointerdown", () => {
-		sharePressChoice = themeChoice;
+		sharePress = { choice: themeChoice, kind: "pointer" };
 	});
 	themeShareEl?.addEventListener("keydown", (ev) => {
-		if (!ev.repeat && (ev.key === " " || ev.key === "Enter")) sharePressChoice = themeChoice;
+		if (!ev.repeat && (ev.key === " " || ev.key === "Enter")) sharePress = { choice: themeChoice, kind: "key" };
 	});
-	const forgetSharePress = () => {
-		sharePressChoice = null;
+	themeShareEl?.addEventListener("pointercancel", () => {
+		if (sharePress?.kind === "pointer") sharePress = null;
+	});
+	const endSharePress = (kind) => {
+		const press = sharePress;
+		if (press?.kind !== kind) return;
+		setTimeout(() => {
+			if (sharePress === press) sharePress = null;
+		}, 0);
 	};
-	themeShareEl?.addEventListener("pointercancel", forgetSharePress);
-	themeShareEl?.addEventListener("blur", forgetSharePress);
-	// A press released elsewhere never clicks; forget it after any click.
-	for (const type of ["pointerup", "keyup"]) document.addEventListener(type, () => setTimeout(forgetSharePress, 0), true);
+	document.addEventListener("pointerup", () => endSharePress("pointer"), true);
+	document.addEventListener("keyup", (ev) => {
+		if (ev.key === " " || ev.key === "Enter") endSharePress("key");
+	}, true);
 	hw.announce("theme-share", ""); // primed: the first Make shared is said
 	themeShareEl?.addEventListener("click", async (ev) => {
-		const pressedChoice = sharePressChoice;
-		sharePressChoice = null;
-		if (pressedChoice !== null && pressedChoice !== themeChoice) return;
+		const press = sharePress;
+		sharePress = null;
+		if (press !== null && press.choice !== themeChoice) return;
 		const id = themeOverride;
 		const choice = themeChoice;
 		// A stale press (the state moved on), or one while a share is still
@@ -4703,11 +4841,6 @@
 		followSetting("detailDensity", adoptDetailUniform);
 	}
 	if (rotationBinding !== null) {
-		// One press removes one reading: Enter held on Remove would click again
-		// on every repeat and empty the list one reading after another.
-		rotationSetEl.addEventListener("keydown", (ev) => {
-			if (ev.repeat && (ev.key === "Enter" || ev.key === " ") && ev.target.closest?.('.hw-set-tools button[data-tool="remove"]')) ev.preventDefault();
-		}, true);
 		rotationSetEl.addEventListener("click", (ev) => {
 			// The toolbar acts on the selected member; a button that cannot
 			// act (aria-disabled) does nothing and keeps focus.

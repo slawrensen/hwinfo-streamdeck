@@ -217,7 +217,7 @@ self.hwModel = (() => {
 	 * to what it does on this dial now. */
 	function gestureWords(command, settings) {
 		if (command === "stepGroup") return groupsActive(settings) ? "switches group" : "switches sensor";
-		return GESTURE[command] ?? "does nothing";
+		return typeof command === "string" && Object.hasOwn(GESTURE, command) ? GESTURE[command] : "does nothing";
 	}
 
 	/** Dial gestures from the plugin's resolved scheme; stored preset otherwise. */
@@ -260,6 +260,7 @@ self.hwModel = (() => {
 			showMin: "Show session min",
 			showMax: "Show session max",
 			showAvg: "Show session average",
+			backToCurrent: "Back to current value",
 			pauseCycle: "Pause auto cycle",
 			resumeCycle: "Resume auto cycle",
 			toggleCycle: "Pause/resume auto cycle",
@@ -269,7 +270,9 @@ self.hwModel = (() => {
 			resetStats: "Reset session stats"
 		};
 		const id = settings.command === undefined ? "next" : settings.command;
-		const name = COMMANDS[id];
+		// Own names only: a stored "constructor" is an unknown command, not
+		// Object (external review AX22).
+		const name = typeof id === "string" && Object.hasOwn(COMMANDS, id) ? COMMANDS[id] : undefined;
 		if (name === undefined) return { command: `Unknown command "${String(id)}": the key shows an alert`, target: "" };
 		const scope = settings.resetScope === "set" || settings.resetScope === "all" ? settings.resetScope : "current";
 		const target = typeof settings.target === "string" ? settings.target.trim() : "";

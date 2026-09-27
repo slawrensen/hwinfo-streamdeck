@@ -1,0 +1,358 @@
+{
+	"role": "Agent 5, adversarial UXR and regression evidence, round 3 integrated-candidate re-review. Read-only on every repository and frozen dir. I ran simulated-host probes against the frozen candidate (token 1.7.0.0-d04) and, where it mattered for new_in_candidate, against the frozen baseline (d03). Nothing here is real-host evidence. Evidence labels: MEASURED means I ran it, READ means code, INFERRED means judgment. All probe scripts, logs and JSON are in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-adversarial\\ (pa-arm, pb-ack, pc-open, pd-dbl/pd-dbl2/pd-dbl3, pe-names, pf-integrity, pg-moves, ph-zoom, pi-r01, pj-replace, pk-support, pl-speech, pm-keycross, pn-gadget, po-reveal-dbl, pp-twins, pq-atomic, pr-band). I did not write report.md because the harness forbids report files for subagents.",
+	"environment": "Simulated Stream Deck host scripts/lib/pi-sim.mjs, imported by file URL from C:\\Users\\stephen\\git\\hwinfo-pi-density. Headless system Chrome launched by scripts/lib/cdp.mjs with focus emulation. Scripts ran with npx tsx, with the worktree as cwd only. Lab ports: 32050 (sim websocket), 32051 (sim http) and 32052 (Chrome debugger). PI_SIM_PLUGIN_DIR pointed at scratchpad\\r3-cand-d04\\com.lawrensen.hwinfo.sdPlugin (the candidate, byte-identical to the worktree ui/, checked with diff -rq) or scratchpad\\r3-baseline\\com.lawrensen.hwinfo.sdPlugin (d03). Viewports: 373x410 at DPR 1.5 (the app panel), plus 240, 239, 200, 189 and 160 x 410 at DPR 1. Input was trusted CDP mouse and key events at fixed coordinates. In every page, navigator.clipboard.writeText was stubbed to reject and document.execCommand was stubbed to return true. I did not run e2e-pi-panels.mjs or e2e-pi-persistence.mjs, because their fixed ports could collide with other reviewers. Instead I replicated the checks that mattered (the R01 replica on both builds). I never touched the Stream Deck app, HWiNFO, the installed plugin, port 23654 or the real clipboard. Disclosure: my first probe (pa-arm) wrote its outputs relative to the worktree cwd. That put pa-arm.log, pa-arm.json and pa-last-{160,189,240,373}.png into C:\\Users\\stephen\\git\\hwinfo-pi-density. I moved them into my scratch dir within about 2 minutes and switched every later write to absolute scratch paths. Afterwards, git status in the worktree lists only the untracked entries that are not mine (docs/assets/img/pi-theme-strip.png, review/pi-density/, scripts/pi-studies/palette.css, scripts/pi-studies/palette.js). No tracked file was touched.",
+	"verified": [
+		{
+			"id": "R01",
+			"status": "fixed",
+			"evidence": "MEASURED pi-r01-cand.json vs pi-r01-base.json: Elite to Custom by trusted ArrowDown on dial-groups. Candidate: stored custom, shown custom, Custom rows visible, Elite map seeded. Baseline: stored elite. The sequence Custom, Elite, Custom on dial-custom-gestures keeps gestureTap 'pin'. The seed still sends 7 frames (see AY11)."
+		},
+		{
+			"id": "R02",
+			"status": "fixed",
+			"evidence": "MEASURED pa-arm.json at 373/240/189/160, real pointer at a fixed point. The armed text grows leftward from the right edge, so the original point is still on the armed button, with 0 px horizontal overflow. A real double click (clickCount 1 then 2) only arms, with 0 writes. A second press 600 ms later removes exactly one group in 1 frame, and focus goes to a group name field. Merge behaves the same. One gap: any rebuild while armed disarms silently (AY10)."
+		},
+		{
+			"id": "R03",
+			"status": "fixed",
+			"evidence": "MEASURED pe-names.json. Cell rename: type 'Gra', pointer leaves, 1 frame, caret and focus kept, typing continues, Enter writes the final label (2 frames total, by design). Rotation rename: a window blur mid-word saves 'Sp', typing continues, and the next leave saves 'Spot'. Group name typed and then Tab: 1 frame (pf-integrity)."
+		},
+		{
+			"id": "R04",
+			"status": "fixed",
+			"evidence": "MEASURED pr-band.json: across 9 real clicks at 373, 189 and 160 on key and dial, the line always names the stored theme ('X (set on this key/dial)' or 'Default (shared: Void)'). READ: renderThemeLine reads themeOverride only, and the pointer and focus preview listeners are gone."
+		},
+		{
+			"id": "R05",
+			"status": "fixed",
+			"evidence": "MEASURED pg-moves.json: the missing pill is visible with 0 overflow at 373/189/160, and the pill wraps under the name below 240. READ: keyIsMissing requires treeHasSnapshot, so an unavailable source never shows 'missing'."
+		},
+		{
+			"id": "R06",
+			"status": "fixed",
+			"evidence": "MEASURED ph-zoom-cand.json: 15 fixtures x 240/239/200/189/160, default and all-open, plus Gadget and the armed remove and Merge states. Horizontal overflow is 0 everywhere and the face share is 1.0 everywhere. The theme line is never cut."
+		},
+		{
+			"id": "R07",
+			"status": "partly",
+			"evidence": "MEASURED pp-twins.json: when two sensors share HWiNFO's instance mark (a synthetic 'CPU [#0]: ...: DTS' and 'CPU [#0]: ...: Enhanced'), both pills read '#0'. See AY08. Drives #0 and #1 work as the e2e check shows."
+		},
+		{
+			"id": "R08",
+			"status": "fixed",
+			"evidence": "MEASURED pe-names.json and the e2e logic (READ): Enter on a group name keeps focus on that name, and Enter on a cell label returns focus to the cell's name."
+		},
+		{
+			"id": "R09",
+			"status": "fixed",
+			"evidence": "MEASURED pj-replace.json. A pointer arm, then a second press at the same point 0.85 s later, replaces once (1 global write). The armed label stays under the pointer at 373 and 189. Keyboard: Enter, then Enter at 300 ms (ignored silently), then Enter at 800 ms applies once."
+		},
+		{
+			"id": "R10",
+			"status": "partly",
+			"evidence": "MEASURED pk-support-cand.json: focus stays on the button, aria-disabled is set while waiting, and a second request is blocked. The outcome is never announced on any panel: typeof hw is 'undefined', so speak() is a no-op (AY03). The cited proof 'Persistence leg C' tests the tile editor."
+		},
+		{
+			"id": "R11",
+			"status": "partly",
+			"evidence": "MEASURED pn-gadget-*.json: the status is 96 px and 42 words on d03, and 48 px and 14 words on the candidate. The palette top is 172 on the key and 188 on the dial, against 116 and 132 when healthy. The line is two lines rather than one, and 'More under Advanced, Connection.' is plain text (AY07)."
+		},
+		{
+			"id": "R12",
+			"status": "partly",
+			"evidence": "MEASURED pf-integrity.json: each grouped rotation edit (tick, Add, Split, Merge, remove, empty-group remove, group name, cross-group Later, Alt+Left, Alt+End) is exactly 1 frame, and futureBlob and futureGroupField survive. READ: e2e-pi-panels.mjs line 137 still asserts '>= 1'. The claimed palette checks at 373 and 189 are in neither suite (the panel suite's palette checks run at 400x900). The preset seed is 7 frames. See AY06 and AY11."
+		},
+		{
+			"id": "R15",
+			"status": "fixed",
+			"evidence": "READ sensor-reading.html (Readings per tile, Title tile text and Also go back sit above Details list). MEASURED pf-integrity: the density edit by keyboard is 1 frame on detailDensity."
+		},
+		{
+			"id": "R16",
+			"status": "fixed",
+			"evidence": "MEASURED pl-speech.json: '7a' is spoken once. More letters are not spoken. After returning to valid and becoming invalid again ('7x'), it is spoken again. Nothing is spoken on load."
+		},
+		{
+			"id": "R17",
+			"status": "regressed",
+			"evidence": "MEASURED pd-dbl2/pd-dbl3/po-reveal-dbl (both builds): the list comes into view as designed, but the page scrolls during the opening press. A double click then writes a reading the person never chose on four pickers that were safe on d03, and double-clicking 'Pick another reading' replaces a missing key (AY01, AY02)."
+		},
+		{
+			"id": "R18",
+			"status": "fixed",
+			"evidence": "READ src/rotation.ts: stepReading enters at list[0], and stepGroup enters at present[0].first. Legacy with groups steps the flat union, which starts with group 1. This matches the panel's target (the first live member of the first holding group, else of the set)."
+		},
+		{
+			"id": "R19",
+			"status": "fixed",
+			"evidence": "MEASURED pi-r01: the groups line follows the preset (Elite: 'Turns stay inside a group; a pressed turn jumps...'). READ updateRotationHelp handles the Legacy, Custom and Ignore turns branches."
+		},
+		{
+			"id": "R20",
+			"status": "partly",
+			"evidence": "MEASURED pb-ack.json: the ack appears and persists through ticks, and focus stays on Check again. Gaps: it says 'no change yet' after the problem changed (unavailable to stale), it quotes an unclamped interval ('100 ms'), and Reload sensor list still gives no acknowledgement (AY04)."
+		},
+		{
+			"id": "R21",
+			"status": "fixed",
+			"evidence": "MEASURED pm-keycross.json: Alt+Arrow moves keep the selected chip visible and write 1 frame each. Focus follows into the neighbor list, and the announcement names the group."
+		},
+		{
+			"id": "R23",
+			"status": "fixed",
+			"evidence": "MEASURED pg-moves.json: at 373/189/160, Later at a group's end moves the member into the next group in 1 frame. The page follows, so the button stays under the pointer (the same point is still on 'Later'). pm-keycross: the keyboard path crosses and comes back."
+		},
+		{
+			"id": "R29",
+			"status": "fixed",
+			"evidence": "READ dialMovers against src/actions/sensor-dial.ts: backToCurrent only resets the stat, so it is correctly not counted. The e2e strings match the effective map."
+		},
+		{
+			"id": "R30",
+			"status": "fixed",
+			"evidence": "READ pi-model.js gestureWords, and groupsActive mirrors rotationGroupsOf (dedupe, 2+ holding groups)."
+		},
+		{
+			"id": "R34",
+			"status": "fixed",
+			"evidence": "READ: the summary and select take the plugin's effectiveDeckTheme and write nothing. MEASURED: 0 writes on open across 18 fixtures (pf-integrity)."
+		},
+		{
+			"id": "R36",
+			"status": "partly",
+			"evidence": "MEASURED pe-names.json step 4: when the dial's reading starts outside every group, picking a dial reading held by group 2 moves the marked group without the person touching it (AY09)."
+		},
+		{
+			"id": "R37",
+			"status": "fixed",
+			"evidence": "READ: aria-keyshortcuts on every list and the shortcut names in the tool titles. Delete is unadvertised."
+		},
+		{
+			"id": "R38",
+			"status": "fixed",
+			"evidence": "MEASURED pr-band.json: 0 px chip movement across 9 picks at 373/189/160. 1 frame per pick. The line is accurate. Band 106 px at 373 (125 on an empty key). ph-zoom: Change is 44x25 and hittable where on screen."
+		},
+		{
+			"id": "R41",
+			"status": "not-checked",
+			"evidence": "The lab only. Real QtWebEngine rendering of color-scheme: dark was not observed by me or, per the register, by the integrator."
+		},
+		{
+			"id": "R42",
+			"status": "fixed",
+			"evidence": "READ and e2e: one derived groups line, and the order sentence hides with groups."
+		},
+		{
+			"id": "R43",
+			"status": "fixed",
+			"evidence": "MEASURED pp-twins.json on dial-groups: the head reads 'Hot Spot', and the source line keeps 'GPU Hot Spot Temperature · GPU [#0]...'."
+		},
+		{
+			"id": "R44",
+			"status": "fixed",
+			"evidence": "MEASURED ph-zoom: 373, 240, 239, 200, 189 and 160 all measured. The matrices live in scratch scripts, not in the suites (AY06)."
+		},
+		{
+			"id": "R52",
+			"status": "not-checked",
+			"evidence": "OWNER item on the real host. Not in my scope."
+		},
+		{
+			"id": "R13, R14, R26, R27, R28, R32, R39, R40, R45-R49",
+			"status": "not-checked",
+			"evidence": "Visual, forced-colors and a11y rendering items belong to the other roles. My zero-write and overflow batteries touched these surfaces without finding a write or an overflow."
+		}
+	],
+	"findings": [
+		{
+			"id": "AY01",
+			"title": "A double click on a reading search field at the app's panel size writes a reading the person never chose",
+			"severity": "S2",
+			"category": "RD",
+			"register_ref": "R17 (regression), X11",
+			"state_task_viewport": "373x410 DPR 1.5. key-configured (#picker-search), key-dense (#picker2/3/4-search), dial-configured and dial-groups (#pickerr-search, the rotation checklist), key-details (#pickerd-search). Task: open a reading list by clicking its search field, or close it with the panel's documented second click on the box (Escape never reaches the real panel). Real CDP press and release at the field's center, then a second press 120 ms later at the same point (clickCount 2). A triple click was also tried.",
+			"observed": "The first press scrolls the page by 100 to 333 px before the release: mousedown sets pointerOpening, the focus handler calls openList(true), and revealOpenList calls scrollBy. The second press therefore lands on a list row, and rows pick on mousedown. Candidate writes: second reading GPU Temperature to GPU Power, third reading to 'Write Rate', fourth reading to 'Total CPU Usage', and the rotation checklist ticks CPU CCD2 into rotationKeys or the collector group (a triple click ticks and then unticks: 2 frames). On d03 these four fields wrote nothing on a double click, because the page did not move under the pointer. The primary Reading picker (CPU (Tctl/Tdie) to CPU CCD1 (Tdie)) and the detail collector (second press on a move arrow reorders detailKeys) already wrote on d03, where row.scrollIntoView moved the page. So they are pre-existing, but R17 made the scroll deliberate and left them unguarded.",
+			"evidence": "MEASURED pd-dbl2-cand.json and pd-dbl2-base.json, pd-dbl3-cand.json and pd-dbl3-base.json, and pc-open.json (the element under the pointer at release is a list row in every case). READ pi-common.js revealOpenList, openList(pointerOpening), and the searchEl mousedown and focus handlers. The suite's R17 check (e2e-pi-panels.mjs:826) asserts scrollY > 0 and the field's position only. The pointer dismissal checks (331-361) run at 400x900, where nothing scrolls, so both pass on this behavior.",
+			"affected_user": "Everyone using a pointer: people who double-click a text field to select, and anyone closing a list with the documented second click on the box. The added rotation member or changed second, third or fourth reading can go unnoticed.",
+			"confidence": "high",
+			"correction": "Never move the page while a press on the field is in progress. Run revealOpenList from the click (after release), not from the mousedown-driven focus. Also ignore row picks and checklist toggles from a press that begins within about 500 ms of a panel-initiated scroll, reusing the 450 ms armPress idiom. Apply the same guard to the primary picker and the detail collector.",
+			"tradeoff": "A deliberate pick within about 500 ms of opening is ignored once, and the reveal starts a few ms later.",
+			"acceptance_test": "At 373x410 DPR 1.5, a real double click and triple click at the center of #picker-search, #picker2-4-search, #pickerr-search and #pickerd-search on key-configured, key-dense, key-details, dial-configured and dial-groups writes 0 frames. A single click still reveals the list under the pinned header. The check lives in e2e-pi-panels at 373x410, and making revealOpenList run on mousedown again turns it red.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY02",
+			"title": "Double clicking 'Pick another reading' replaces a missing reading with the first row of the list",
+			"severity": "S2",
+			"category": "RD",
+			"register_ref": "R17, X11 (reveal() picker branch)",
+			"state_task_viewport": "key-missing and dial-missing, 373x410 DPR 1.5. Task: repair a reading HWiNFO no longer lists, from the status region. Real double click on 'Pick another reading' at one point.",
+			"observed": "On the candidate, the first click runs reveal(), which scrolls so the Reading field sits under the pinned header, and the list opens on focus. The pointer (y 191 on the key, 207 on the dial) now rests on the first row, CPU (Tctl/Tdie). The second press picks it: readingKey f0099999:0:1000000 becomes f0000300:0:1000000 in 1 frame. On d03 the second press landed on the Reading section summary and nothing was written. A saved key that HWiNFO no longer lists cannot be picked again once it is replaced.",
+			"evidence": "MEASURED po-reveal-dbl-cand.json vs po-reveal-dbl-base.json (changed: [readingKey] on both panels, 0 writes on d03). READ pi-shell.js reveal(), picker branch (window.scrollBy to put the field under the header). The other reveal targets (setup steps, Data source, Change, Change gestures) wrote nothing on a double click.",
+			"affected_user": "Anyone repairing a missing reading with a pointer, and double-clickers in particular.",
+			"confidence": "high",
+			"correction": "Use the same guard as AY01: after reveal() moves the page, ignore presses on list rows for about 500 ms. Alternatively, open the list on the next person's action instead of on the programmatic focus.",
+			"tradeoff": "A deliberate fast pick right after the reveal is ignored once.",
+			"acceptance_test": "On key-missing and dial-missing at 373x410, a double click on Pick another reading writes 0 frames, focus is in the Reading field, and the list is open. A later deliberate click on a row still picks it with 1 frame.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY03",
+			"title": "Copy support report never announces its outcome: the new announcement calls an undefined 'hw'",
+			"severity": "S3",
+			"category": "RD",
+			"register_ref": "R10 (A03)",
+			"state_task_viewport": "control-reset, key-configured and dial-configured, 373x410 DPR 1.5. Task: press Copy support report by keyboard with the plugin answering (clipboard rejects, execCommand fallback) and with the plugin silent for 3.6 s.",
+			"observed": "typeof hw is 'undefined' in the page. In pi-control.js, 'const speak = typeof hw !== \"undefined\" ? ... : () => {}' therefore resolves to the no-op, and the priming call never runs. A MutationObserver on every live region recorded nothing for 'Copied to clipboard' or 'Plugin not responding' on all three panels. Only the button's own text changes, for 2 s. Focus retention and aria-disabled do work.",
+			"evidence": "MEASURED pk-support-cand.json (typeofHw undefined, typeofHwShell object, said []). READ pi-control.js 21-25, pi-common.js 23 and pi-command.js 10 (hw is a local 'const hw = hwShell' inside each file's own closure). READ: the register's proof 'Persistence leg C' is e2e-pi-persistence.mjs 978-986, which tests the detail tile editor. No suite presses #support-report (only e2e-harness.mjs mentions it).",
+			"affected_user": "Screen reader users diagnosing a broken plugin, which is the case this button exists for.",
+			"confidence": "high",
+			"correction": "In pi-control.js use the global: 'const shell = typeof hwShell !== \"undefined\" ? hwShell : null'. Prime with shell?.announce(\"support\", \"\") and speak with shell?.announce(\"support\", text, { repeat: true }). Add a panel check with a stubbed clipboard.",
+			"tradeoff": "None. It adds one polite announcement per press.",
+			"acceptance_test": "With the clipboard stubbed, Enter on Copy support report puts 'Copied to clipboard' (plugin answers) and 'Plugin not responding' (plugin silent 3 s) into the shell's polite region on the control, key and dial panels, with focus still on the button. The check fails if speak is a no-op.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY06",
+			"title": "Several round 3 proofs pass on broken behavior or test something else",
+			"severity": "S4",
+			"category": "RD",
+			"register_ref": "R12, R17, R10, R11, R20 (X02 carried over)",
+			"state_task_viewport": "The suites scripts/e2e-pi-panels.mjs and scripts/e2e-pi-persistence.mjs, read and not run, cross-checked against my lab runs at 373x410.",
+			"observed": "(1) The R17 check (line 826) asserts scroll and field position only. AY01 and AY02 pass it, and the pointer dismissal checks (331-361) run at 400x900, where nothing scrolls. (2) 'edit ...: one write' (line 137) still asserts sim.writes.length >= 1 (X02 item 1, carried over). (3) The preset seed sends 7 frames, and line 246 asserts >= 2. (4) R12 claims palette checks at 373 and 189, but the panel suite's palette checks (454-490) run at the default 400x900 (only the R17/R15 block sets 373x410), and the persistence suite sets no viewport. (5) R10's cited proof is the tile editor leg, so AY03 passes every suite. (6) The R11 check asserts the line's text, not the palette position. The R20 check covers only the same-problem path, so AY04 passes.",
+			"evidence": "READ e2e-pi-panels.mjs lines 137, 246, 331-361, 454-490, 815-829, 836-851. READ e2e-pi-persistence.mjs (no viewport calls, and no support-report check). MEASURED pd-dbl2, po-reveal-dbl, pf-integrity, pk-support and pb-ack show behavior these checks let through.",
+			"affected_user": "Everyone, indirectly: regressions in these paths reach the owner's deck.",
+			"confidence": "high",
+			"correction": "Add the AY01 and AY02 double-click checks at 373x410. Use === 1 at line 137, with an explicit allowance list. Stage the seed in one frame and assert === 1 after the preset frame. Move the palette position checks into passes at 373x410 DPR 1.5 and 189x410. Add a Copy support report announcement check. Assert the Gadget palette top at 373, and add a check where the problem changes before the answer to Check again.",
+			"tradeoff": "Stricter checks go red until AY01, AY03, AY04 and AY11 are fixed.",
+			"acceptance_test": "Mutation test: restoring the mousedown-time reveal, making writeRotation send twice, deleting speak(), or reverting the Gadget line each turns the suite red.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY04",
+			"title": "'Check again' says 'no change yet' after a change, quotes an interval the plugin does not use, and Reload stays silent",
+			"severity": "S5",
+			"category": "RD",
+			"register_ref": "R20",
+			"state_task_viewport": "key-unavailable and key-stale, 373x410 DPR 1.5. Task: press Check again or Reload sensor list while HWiNFO has a problem.",
+			"observed": "(1) The source turns stale between the last render and the answer. The whole status is rebuilt (danger 'could not open a sensor feed' becomes warn 'No new Shared Memory measurements...'), and the new line says 'Checked again at 11:54:44 AM: no change yet.' (2) The source recovers, and the tree answer arrives 600 ms before the preview. 'no change yet' is shown and put into the polite region, then the status clears. (3) A stored pollIntervalMs of '100' reads 'every 100 ms' while the plugin clamps to 250 ms (src/poller.ts MIN_INTERVAL_MS 250; pi-model already has a 250 to 60000 clamp). (4) Reload sensor list with the source down gives no acknowledgement, because checkAskedAt is set only by the status button, although the shell comment says Reload is covered.",
+			"evidence": "MEASURED pb-ack.json steps 1b, 3, 4 and 6. READ pi-shell.js answerCheck, which fires on any tree after the ask and never compares with what was shown when the person pressed. READ pi-common.js picker refresh handler.",
+			"affected_user": "Anyone recovering from an outage, and screen reader users most (the contradiction is spoken).",
+			"confidence": "high",
+			"correction": "Record the status signature when Check again is pressed, and write 'no change yet' only if the signature after the answer equals it. Take the interval from the model's clamped parser. Set checkAskedAt from Reload sensor list too, or drop Reload from the comment and the register.",
+			"tradeoff": "None material.",
+			"acceptance_test": "Case (1): the problem changes during the press, and no 'no change yet' appears. A stored '100' reads '250 ms'. Reload while unavailable fills the line once. The same-problem path is unchanged.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY05",
+			"title": "The Check again line makes assistive tech re-read the whole status region",
+			"severity": "S5",
+			"category": "SB",
+			"register_ref": "R20",
+			"state_task_viewport": "key-unavailable, 373x410. Task: press Check again with a screen reader.",
+			"observed": "The ack paragraph is filled inside #reading-status (role=status, aria-live=polite, no aria-atomic). The code comment says 'only that line's text changes, so only it is read out'.",
+			"evidence": "SB: in WAI-ARIA 1.2, role=status has an implicit aria-atomic value of true. MEASURED pq-atomic.json: Chromium's accessibility tree reports live: polite, atomic: true and relevant: additions text for #reading-status. Assistive tech that honors aria-atomic therefore reads the whole region (about 40 words plus the button names) each time the ack fills. How each screen reader handles this was INFERRED, not measured.",
+			"affected_user": "Screen reader users.",
+			"confidence": "medium",
+			"correction": "Speak the ack through the shell's separate announcer channel (hw.announce('status-ack', text, { repeat: true })) and keep the visible line out of the live region. Alternatively set aria-atomic=\"false\" on #reading-status and check that a newly shown status is still read whole.",
+			"tradeoff": "aria-atomic=false changes how every status change is read (changed nodes only).",
+			"acceptance_test": "With NVDA and Chromium, or an accessibility event log, pressing Check again on key-unavailable speaks only the ack sentence.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY07",
+			"title": "The healthy Gadget line is two lines, and its 'More' is plain text two folds away",
+			"severity": "S5",
+			"category": "MF",
+			"register_ref": "R11 (X05)",
+			"state_task_viewport": "key-configured and dial-configured with the sim's gadget data state (the free-HWiNFO route), 373x410 DPR 1.5.",
+			"observed": "The status is 48 px, two lines and 14 words, down from 96 px and 42 words on d03. The palette top is 172 on the key and 188 on the dial (116 and 132 when healthy; 221 and 237 on d03). The picker bottom is 336 and 352, which fits. 'More under Advanced, Connection.' is not a control. Its target #source-now sits inside two folded sections, while every other status pointer is a reveal button. The register asked for one line.",
+			"evidence": "MEASURED pn-gadget-cand.json and pn-gadget-base.json, pb-ack.json step 7. The first-pass acceptance C5 (palette top <= 150 on the key and <= 166 on the dial) fails by 22 px.",
+			"affected_user": "Every Gadget user, on every key and dial panel.",
+			"confidence": "high",
+			"correction": "Either make 'More' a reveal button to #source-now (reveal opens both folds without remembering them), or drop the pointer sentence so the line fits on one line of about 24 px.",
+			"tradeoff": "A button adds a Tab stop. Dropping the sentence hides where the rest of the account lives.",
+			"acceptance_test": "With gadget data at 373x410, the status is <= 28 px, or 'More' is a button that puts focus on #source-now with 0 writes. The palette top is <= 150 on the key and <= 166 on the dial.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY08",
+			"title": "Twin tags collide when both sensors carry the same HWiNFO instance mark",
+			"severity": "S5",
+			"category": "RD",
+			"register_ref": "R07",
+			"state_task_viewport": "dial-configured with a synthetic snapshot that adds 'CPU [#0]: Example 16-Core Processor: DTS', carrying the same label 'CPU (Tctl/Tdie)' as the '...: Enhanced' sensor. The rotation is [cpu, twin, gpu], 373x410.",
+			"observed": "Both chips show the pill '#0'. The difference (Enhanced vs DTS) appears only in the title and the sr-only 'from ...' text, so the visible disambiguation R07 promised fails.",
+			"evidence": "MEASURED pp-twins.json. READ twinTagOf: the /\\[#(\\d+)\\]/ mark takes precedence over the tail after the last colon. INFERRED: HWiNFO lists several sensors for one CPU under the same '[#0]' mark (DTS and Enhanced blocks), so a same-label pair across them is plausible. The exact labels were not verified.",
+			"affected_user": "Power users with multi-block CPU sensors who rotate or detail same-named readings.",
+			"confidence": "medium",
+			"correction": "Use the mark only when the twins' marks differ. Otherwise use the tail after the last colon, or mark plus tail, truncated to 14 characters.",
+			"tradeoff": "Slightly longer pills in that case.",
+			"acceptance_test": "The synthetic snapshot shows two distinct pills ('Enhanced' and 'DTS'), and the drives still show '#0' and '#1'.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY09",
+			"title": "The marked group jumps while the person works when the dial's reading starts outside every group",
+			"severity": "S5",
+			"category": "RD",
+			"register_ref": "R36",
+			"state_task_viewport": "dial-groups with readingKey set to GPU Power (in no group), 373x410. Task: pick a different dial reading, then tick readings into the marked group.",
+			"observed": "At load, group 1 is marked ('Readings for CPU') and nothing is settled, because no group holds the reading. After the person picks Hot Spot (held by group 2) in the dial's picker, the radio and label move to group 2 ('Readings for GPU') although the person never touched them. The register says the group is settled once per page, never while the person works.",
+			"evidence": "MEASURED pe-names.json step 4. READ renderRotationSet: collectorSettled becomes true only when a holding group is found.",
+			"affected_user": "People building rotation groups.",
+			"confidence": "high",
+			"correction": "Set collectorSettled = true after the first render with groups, whether or not a holding group was found.",
+			"tradeoff": "None.",
+			"acceptance_test": "The same sequence leaves group 1 marked, and the e2e R36 check (reading held by group 2 at load) still passes.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY10",
+			"title": "An armed remove disarms silently on any rebuild and leaves 'Press again' as the last spoken words",
+			"severity": "S5",
+			"category": "RD",
+			"register_ref": "R02",
+			"state_task_viewport": "dial-groups, 373x410. Task: arm group 1's remove, then a plugin settings echo arrives (the dial is turned) or a sensorTree message arrives, then press again.",
+			"observed": "After the echo the button shows 'x' again, focus stays on it, and the polite region still holds 'Press again to remove group 1 and its 2 readings.' The next press only arms again (0 writes), so a screen reader user hears 'Press again' twice and nothing is removed. A sensorTree message does the same. Related: after typing a group name and clicking straight into another group's name field, group 1's listbox keeps its old accessible name ('Group 1, CPU'), because rebuilds are skipped while a name field has focus.",
+			"evidence": "MEASURED pa-arm.json (the last two rows) and pe-names.json step 3. READ armPress (the arm lives on the DOM node) and the renderRotationSet focus guard.",
+			"affected_user": "Screen reader and keyboard users. It happens only when an echo or tree arrives while armed, which is rare.",
+			"confidence": "high",
+			"correction": "When a rebuild replaces an armed button, carry the arm over if the group's member keys are unchanged. Otherwise say 'Not removed.', as Replace says 'Not replaced. Nothing was changed.' Rebuild the list labels when a name field blurs, even without a change.",
+			"tradeoff": "Carrying an arm across a rebuild must compare member keys, or it could confirm against a changed group.",
+			"acceptance_test": "Arm, push an echo, press again: either the unchanged group is removed in 1 frame, or the region says it was not removed before re-arming.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "AY11",
+			"title": "Picking Custom from Elite sends seven frames, the first with no gestures",
+			"severity": "S6",
+			"category": "RD",
+			"register_ref": "R01, R12",
+			"state_task_viewport": "dial-groups and dial-custom-gestures, 373x410. Task: pick Custom from Elite by keyboard.",
+			"observed": "The first frame carries only controlPreset custom. For that instant the runtime runs Custom with Legacy fallbacks, so there is no group switch. Then 6 identical frames follow, each carrying all six seeded gestures (5 when a gesture was already set). The suite asserts >= 2.",
+			"evidence": "MEASURED pf-integrity.json (changed-key counts per frame [1,7,7,7,7,7,7]) and pi-r01-cand.json. On d03 the seed also sent 6 frames, but carrying Elite.",
+			"affected_user": "Nobody visibly. It is wasteful traffic and a torn state for an instant.",
+			"confidence": "high",
+			"correction": "Stage the six gesture fields with the non-saving useSettings pattern (as groupsStage does) and let one save carry the preset and the seed together.",
+			"tradeoff": "The seed and preset must still land after the shell's own save (keep the R01 ordering).",
+			"acceptance_test": "Elite to Custom by keyboard produces exactly 1 frame carrying controlPreset custom and the six seeded gestures, and the R01 checks still pass.",
+			"new_in_candidate": false
+		}
+	],
+	"keep": [
+		"Zero writes on observation holds on the candidate across 18 fixtures with real pointer and keys, including the new surfaces. The battery covered chip hover, Change, Check again, setup, source, Pick, Reload, every summary twice, Open all, arming and leaving every group remove and Merge, arming and leaving Replace, 90 Tab and 90 Shift+Tab, listbox arrows and Alt+Home at the first place, focus and blur of every text field, pointer leave and window blur. Result: 0 settings writes, 0 global writes, 0 page errors (pf-integrity.json).",
+		"One frame per grouped rotation edit (tick, Add, Split, confirmed Merge, confirmed remove, empty-group remove, group name, cross-group Later, Alt+Arrow, Alt+End), with futureBlob and futureGroupField kept byte-identical.",
+		"Arm-then-confirm on group remove, Merge and Replace grows leftward from the right edge and stays under the pointer at 373/240/189/160. A double click only arms, leaving by blur disarms, and there is 0 overflow when armed.",
+		"The R01 fix: the seed runs after the shell's save and only the gesture selects resync. Trusted keyboard picks now stick (d03 snapped back to Elite).",
+		"Theme band: 0 px chip movement across 9 real picks at 373/189/160, 1 frame per pick, and the line always names what is drawn and where it comes from. All eight names, Default's link mark and '(shared: Void)' stay visible without hover.",
+		"Zoom reflow: 0 horizontal overflow and a whole face on 15 fixtures at 240/239/200/189/160, default and all-open, plus Gadget and armed states.",
+		"Keyboard cross-group moves: focus follows into the neighbor list, the announcement names the group, the chip stays in view, 1 frame per move. The toolbar path keeps the button under the pointer.",
+		"The leave flush for panel-committed names (cell label, rotation name, group name) keeps caret and focus and never rebuilds under the caret.",
+		"R16: an invalid threshold is spoken once per transition, not per keystroke and not on load.",
+		"The R18 target copy matches the runtime entry rule (stepReading list[0], stepGroup present[0]).",
+		"The healthy Gadget status shrank from 96 px and 42 words to 48 px and 14 words, and the full account moved to Advanced, Connection."
+	],
+	"cleanup": "Every lab run started one headless Chrome on debugger port 32052 (main PIDs 124752, 127536, 124968, 130896, 129952, 134248, 135000, 134252, 137780, 128600, 126760, 123060, 118384, 142316, 144556, 129344, 146504, 126300, 123092, 129504, 140412, 130852, 20424, 144728, 120500, 122304, logged in pids.txt) plus the foreground npx/tsx/node process of that run. Each run closed its browser with b.close() and stopped the sim's servers on 32050 and 32051. After each run, run.sh stopped any leftover chrome.exe whose command line carried remote-debugging-port=32052 (only mine; the renderer children are listed as 'stopped leftover chrome' in each log). All node processes exited with their runs. Final check: no process carries remote-debugging-port=3205x, and ports 32050 to 32052 show only TIME_WAIT, with no listener. I killed no process I did not start. The six stray output files from the first probe were moved out of the worktree into C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-adversarial\\ (disclosed under environment). No repository file was created, edited, staged or committed."
+}

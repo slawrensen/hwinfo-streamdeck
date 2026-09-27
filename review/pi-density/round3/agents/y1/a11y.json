@@ -1,0 +1,428 @@
+{
+	"role": "Agent 4, accessibility, round 3 integrated-candidate adversarial re-review of token 1.7.0.0-d04 against the d03 baseline. Every claim is labelled MEASURED (I ran it on the simulated host), READ (code) or INFERRED (my judgment). Every screen reader statement comes from Chrome's accessibility tree, not from real speech. Real NVDA, JAWS, Narrator, Windows contrast themes and the QtWebEngine host were not run. I changed nothing in any repository or frozen dir. report.md was not written because the harness forbids report files from subagents; this structured result is the report.",
+	"environment": "I ran headless Chrome (default Windows path) through scripts/lib/cdp.mjs, against scripts/lib/pi-sim.mjs, from C:\\Users\\stephen\\git\\hwinfo-pi-density with npx tsx. PI_SIM_PLUGIN_DIR pointed at the frozen candidate (r3-cand-d04) by default, or at the frozen baseline (r3-baseline) when I set WHICH=base.\n\nPorts: candidate sim ws 32040, http 32041, Chrome 32042. Baseline sim ws 32044, http 32045, Chrome 32046. Nothing else.\n\nScratch dir: C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-a11y. It holds lab.mjs, the probes p1-arm, p2-status, p3-misc, p4-band, p5-rotation, p6-walk, p7-details-walk, p8-forced, p9-cb/p9b, p10-more, p11-onload, p12-preset, p13-final, p14-recover and p15-desc, their JSON and logs, and shots\\*.png.\n\nViewports: 373x410 at DPR 1 and 1.5, 320x410, 189x410 and 160x410 at DPR 3. Forced colors, reduced motion and color-scheme were emulated through Emulation.setEmulatedMedia. Every probe stubbed navigator.clipboard and document.execCommand.\n\nLab tooling defect: on this Windows machine, cdp.mjs launch() spawns chrome.exe, and that process relaunches a child browser that owns the debug port. close() then SIGTERMs only the launcher, so every run leaked a headless browser tree. I found 19 such trees on my ports (the 18 main runs plus the last check). The other labs, which use the same helper, probably leak the same way.\n\nNo e2e suites were run, and nothing touched the Stream Deck app, HWiNFO, the installed plugin or port 23654. No computer use.",
+	"verified": [
+		{
+			"id": "R02",
+			"status": "partly",
+			"evidence": "MEASURED p1-arm.mjs, dial-groups 373x410. First Enter arms: 0 frames, focus kept, one announcement 'Press again to remove group 1 and its 2 readings.'. Second Enter 850 ms later removes 1 group in 1 frame, focus goes to .hw-group-name[g=0] (never a remove button) and says 'Removed group 1 and its 2 readings.'. A real double click (clickCount 1 then 2) only arms. Merge arms and confirms the same way. Gaps: a held Enter confirms (AY01), any rebuild silently disarms (AY02), the names fail label in name (AY07), and zoom crushes the name field (AY10)."
+		},
+		{
+			"id": "R09",
+			"status": "partly",
+			"evidence": "MEASURED p1-arm.mjs G3: arm, wait 6 s, Enter gives exactly 1 setGlobalSettings (the 5 s window is gone). The label reads 'Press again to replace for all keys and dials'. READ: blur and well input disarm and say 'Not replaced. Nothing was changed.'. Gap: a held Enter replaces with no second press (G1 and G2: 1 global write each), then re-arms and leaves 'Press again to confirm.' as the last message before the reload (AY01)."
+		},
+		{
+			"id": "R10",
+			"status": "partly",
+			"evidence": "MEASURED p2-status.mjs with replyDelayMs 600. Focus stays on the button during the wait and after the reply, AX disabled:true through aria-disabled, and 2 presses send 1 getSupportReport. The execCommand fallback puts focus back on the button. Not fixed: the outcome is never announced, because typeof hw is 'undefined' in pi-control.js on all three panels (p3-misc.mjs), so speak() is a no-op (AY03). The claimed proof 'Persistence leg C' covers the Copy-settings leg, not this button (READ)."
+		},
+		{
+			"id": "R20",
+			"status": "partly",
+			"evidence": "MEASURED p2-status.mjs and p3-misc.mjs. When the answer is the same, the line 'Checked again at 11:53:35 AM: no change yet. The plugin also reads HWiNFO every 1 s on its own.' appears on key-unavailable, key-stale, dial-unavailable and key-missing (Reload sensor list), with focus kept on the button. Gaps: the region is atomic, so the whole block (73 words) is re-read on each press (AY04). The line says 'no change yet' under a status that did change (AY05). A successful check drops focus to BODY and says nothing (AY06, baseline too)."
+		},
+		{
+			"id": "R38",
+			"status": "fixed",
+			"evidence": "MEASURED p4-band.mjs at 373@1.5, 320@1.5, 189@3 and 160@3, for shared Void, Paper and Ultraviolet, explicit Ember, an unknown value, the dial and key-empty. The line 'Default (shared: Void)' is never cut. Change is 44.5x24.8 px and 96 to 100% hittable, and no ancestor or viewport edge clips its focus ring. On an explicit pick Change is visibility:hidden, out of the Tab order and out of the AX tree. Tab order is fold toolbar, Change, checked chip. The radiogroup description is the scope line ('Follows the shared theme, now Void.' or 'Set on this key; kept when the shared theme changes.'). Across 8 arrow picks the gallery top and chip x positions do not change and the band height stays 106 or 217 px. Pressing Change focuses #shared-theme at y 235 under the 89 px header, with 0 writes."
+		},
+		{
+			"id": "R04",
+			"status": "fixed",
+			"evidence": "READ: the pointerover and focusin preview listeners are gone and renderThemeLine uses themeOverride only. MEASURED p4-band.mjs: during arrow-key picks the line always names the stored theme."
+		},
+		{
+			"id": "R46",
+			"status": "fixed",
+			"evidence": "MEASURED p4-band.mjs: the Default chip's AX description is empty at every width, and its name is 'Default: follow the shared theme, currently <theme>'."
+		},
+		{
+			"id": "R14",
+			"status": "fixed",
+			"evidence": "MEASURED: the screenshot shots/cand-band-default-paper-373.png (DPR 1.5, keyboard focus on the checked Default chip) shows a separate blue ring outside the white checked ring. The nearest chip gap is 6 px and the ring reaches 5 px."
+		},
+		{
+			"id": "R28",
+			"status": "fixed",
+			"evidence": "READ and computed from themes.json: the Default chip mark (palette value color) is 12.22:1 (Ember) to 21:1 (Void) against the chip face, 15.01:1 on Paper. The dashed frame (palette label color) is 5.22:1 to 7.43:1 (Paper). MEASURED on the Paper screenshot: dark mark and dark dashes are clearly visible."
+		},
+		{
+			"id": "R05",
+			"status": "fixed",
+			"evidence": "MEASURED p5-rotation.mjs at 373 and 160: a visible 'missing' pill 49x17, never clipped. The option's AX name is 'f0099999:0:1000000 missing' (missing is said once). The note reads 'Rotation moves through 2 of these 3 readings, in this order; the missing one is skipped until HWiNFO lists it again.' and has no raw key. In forced colors the pill keeps a 1 px border. The chip name is still the raw key, which is R54, deferred."
+		},
+		{
+			"id": "R07",
+			"status": "fixed",
+			"evidence": "MEASURED p5-rotation.mjs and p10-more.mjs: the pills '#0' and '#1' stay visible and 24 px wide at 373, 189 and 160. The option names ('Drive Temperature #0 from Drive [#0]: ...'), the toolbar names and the move announcement all name the sensor. Nits: the tag is spoken twice (AY14), and at 160 the on-dial twin's name shrinks to 36 px (the tag stays visible)."
+		},
+		{
+			"id": "R08",
+			"status": "fixed",
+			"evidence": "MEASURED p5-rotation.mjs: Enter in group 2's name keeps focus on .hw-group-name[g=1] with the new value and 1 write. Tab from it lands on that group's remove button, unarmed. After an F2 rename, Enter returns focus to the member's list."
+		},
+		{
+			"id": "R03",
+			"status": "fixed",
+			"evidence": "MEASURED p5-rotation.mjs: typing 'Tctl' in the F2 rename and firing mouseleave writes 1 frame, keeps the caret [4,4] and the field focus, and a later Enter writes 0 more. Nit: the flush announces mid-edit (AY12)."
+		},
+		{
+			"id": "R21",
+			"status": "fixed",
+			"evidence": "MEASURED p5-rotation.mjs: after Alt+Right the moved chip is at y 364 to 392, inside the 410 px viewport and below the 118 px header. Alt+Home moves the chip to 1 of 2 and announces once. Alt+Home at the edge writes 0."
+		},
+		{
+			"id": "R23",
+			"status": "partly",
+			"evidence": "MEASURED p5-rotation.mjs: Alt+Right on the last member of group 1 writes 1 frame. Focus goes to group 2's listbox with aria-activedescendant on CPU CCD1 and says 'CPU CCD1 (Tdie), moved to group 2 (GPU), 1 of 3'. Alt+Left moves it back. A toolbar Later press at the edge keeps focus on the tool and the same button under the pointer. Gap: at the edge the visible 'Later' or 'Earlier' is not in the accessible name (AY07)."
+		},
+		{
+			"id": "R37",
+			"status": "partly",
+			"evidence": "MEASURED p5-rotation.mjs: each list exposes keyshortcuts 'Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2', and #rotation-keys-help describes them. Gap: the new tool titles repeat each full name as the AX description (AY08)."
+		},
+		{
+			"id": "R16",
+			"status": "fixed",
+			"evidence": "MEASURED p2-status.mjs: typing '8o' in Warn at gives exactly one announcement, 'Not a number. Alerts ignore this field until it is one.', on the first typo after load (the channel is primed). Another letter gives none. Clearing then typing '9q' gives one more. aria-invalid and aria-describedby are intact."
+		},
+		{
+			"id": "R11",
+			"status": "partly",
+			"evidence": "MEASURED p2-status.mjs and p11-onload.mjs: the healthy Gadget panel shows one 15-word line (it was 42 words), and #source-now under Connection carries the full hint. The line is still inserted into the role=status region on every panel open (AY11)."
+		},
+		{
+			"id": "R06",
+			"status": "fixed",
+			"evidence": "MEASURED p6-walk.mjs at 189@3 and 160@3 on key-configured, dial-groups, key-details and key-unavailable. The kind line is 1 or 2 lines, the key face is 72x72, the dial face 112x56 and whole, overflowX is 0, and the header is unpinned (186 to 202 px). Full Tab walks (41 to 78 stops) found no stop outside the viewport horizontally."
+		},
+		{
+			"id": "R13",
+			"status": "fixed",
+			"evidence": "MEASURED p8-forced.mjs: on dial-groups, 99.4% of both fold buttons answer elementFromPoint at 373 and at 320."
+		},
+		{
+			"id": "R26",
+			"status": "fixed",
+			"evidence": "MEASURED p8-forced.mjs in forced colors: the markers of .hw-sec, .hw-sub, .hw-how and .hw-inline-help have a transparent background, a colored border-left only and a 0x0 box, so they draw as triangles, not bars."
+		},
+		{
+			"id": "R27",
+			"status": "fixed",
+			"evidence": "MEASURED p13-final.mjs in forced colors, list open, highlight moved twice: the saved row has a SelectedItem fill and the active row has a solid outline."
+		},
+		{
+			"id": "R45",
+			"status": "fixed",
+			"evidence": "MEASURED p8-forced.mjs under reduce: all four markers compute 0s, and no other element has a nonzero transition."
+		},
+		{
+			"id": "R47",
+			"status": "fixed",
+			"evidence": "MEASURED p13-final.mjs: the focused section summary has an outline of 2 px at offset -2 px, drawn fully inside the row (shots/cand-summary-focus.png)."
+		},
+		{
+			"id": "R48",
+			"status": "fixed",
+			"evidence": "MEASURED p13-final.mjs on key-back: the role note is inset (left 12, width 349), with text #ececec on #263545, about 10.6:1."
+		},
+		{
+			"id": "R41",
+			"status": "fixed",
+			"evidence": "MEASURED p9b at DPR 1.5 (headless Chrome only): color-scheme is dark. The unchecked checkbox edge #858585 is 3.73:1 against the #2d2d2d page, and its fill is #3b3b3b. Real host rendering not observed."
+		},
+		{
+			"id": "R29",
+			"status": "fixed",
+			"evidence": "MEASURED p10-more.mjs: on dial-groups (Elite), #picker-moves reads 'Turns and pressed turns change this too.', and the sr-only keyboard sentence in #picker-help survives."
+		},
+		{
+			"id": "R19",
+			"status": "fixed",
+			"evidence": "MEASURED p10-more.mjs on a Legacy dial with groups: #rotation-help says Legacy cannot switch groups and ends with a 'Change gestures' button (its name matches its text). Pressing it focuses #f-preset at y 250 under the 118 px header, with 0 writes."
+		},
+		{
+			"id": "R42",
+			"status": "fixed",
+			"evidence": "MEASURED p10-more.mjs: one derived line, 'New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name.'. The order sentence is hidden from the search's description while groups exist."
+		},
+		{
+			"id": "R36",
+			"status": "fixed",
+			"evidence": "MEASURED p10-more.mjs on a fresh dial-groups page: collector [false, true], and the search's AX name is 'Readings for GPU'."
+		},
+		{
+			"id": "R15",
+			"status": "fixed",
+			"evidence": "MEASURED p10-more.mjs: DOM order equals visual order (f-density, f-detail-title, detailMirrorBack, f-detail-mode, pickerd-search)."
+		},
+		{
+			"id": "R17",
+			"status": "partly",
+			"evidence": "MEASURED p3-misc.mjs at 373x410: after 'Pick another reading' the search is at y 116 under the 89 px header and the list bottom is 373 of 410. At 189 and 160 the detail picker's own open scroll still puts the focused search 307 to 323 px above the viewport (AY09, baseline too)."
+		},
+		{
+			"id": "R01",
+			"status": "fixed",
+			"evidence": "MEASURED p12-preset.mjs: a trusted 'c' and a trusted ArrowDown from Elite store 'custom'. The select shows Custom and keeps focus. Every write carries 'custom'."
+		}
+	],
+	"findings": [
+		{
+			"id": "AY01",
+			"title": "Holding Enter confirms the arm-then-confirm (group remove, Replace shared settings) without a second press",
+			"severity": "S2",
+			"category": "RD",
+			"state_task_viewport": "dial-groups, Rotation open, keyboard focus on group 1's remove button (CPU, 2 readings). Also key-configured, Advanced > Configuration documents, shared well filled, focus on Replace shared settings. 373x410.",
+			"observed": "One Enter held with OS auto-repeat. The first keydown arms. The first auto-repeat that arrives 450 ms or more after arming counts as the confirm. With a first repeat after 250, 500 or 750 ms (Windows' default delay is about 500 ms), group 1 and its 2 readings are removed in 1 frame (CPU:2,GPU:2 becomes GPU:2), and Replace sends 1 setGlobalSettings. On Replace, the remaining repeats re-arm the button, so the last message before the reload is 'Press again to confirm.' right after 'Replaced the shared settings; reloading the panel.'.",
+			"evidence": "MEASURED with p1-arm.mjs (CDP keyDown, then autoRepeat keyDowns 33 ms apart). B1, B2 and B3: writes 1, groups 'GPU:2'. G1 and G2: globalWrites 1. A real double click only arms (D: 0 writes), so the 450 ms guard does work for clicks. READ: pi-common.js armPress returns 'confirm' once Date.now()-armedAt >= 450, and apply() does the same. Neither looks at KeyboardEvent.repeat or click.detail. INFERRED: the host forwards OS key auto-repeat the way Chromium does.",
+			"affected_user": "keyboard users, motor impairments (tremor, slow key release), switch users whose interface holds Enter",
+			"confidence": "high",
+			"correction": "Confirm only on a fresh press. After arming, set awaitingRelease. Clear it on keyup of Enter or Space, on pointerup, or on blur. While it is set, treat any activation as 'wait'. Also treat any keydown with ev.repeat, and any click with detail > 1, as 'wait'. Put the same guard in apply() for Replace.",
+			"tradeoff": "A person who holds Enter has to release it and press again, which is the intent. If a keyup is swallowed because focus moved between keydown and keyup, the guard must also clear on blur, or the button could refuse a real second press.",
+			"acceptance_test": "dial-groups at 373x410, focus on group 1's remove: keyDown Enter, 20 autoRepeat keyDowns over 1.2 s, keyUp. Expect 0 frames and the button armed. Then one normal Enter press gives exactly 1 frame. On Replace shared settings, the same sequence gives 0 setGlobalSettings, then 1.",
+			"new_in_candidate": false,
+			"register_ref": "R02, R09"
+		},
+		{
+			"id": "AY02",
+			"title": "An armed group remove (or Merge) is silently dropped by every dial turn, auto-cycle step or sensor list arrival",
+			"severity": "S3",
+			"category": "RD",
+			"state_task_viewport": "dial-groups, Rotation open. Keyboard Enter on group 1's remove (armed), then a readingKey echo (what a turn or an auto-cycle step sends). Separately, a sensorTree arrival (Check again or Reload sensor list). 373x410.",
+			"observed": "The echo rebuilds the editor. Focus is restored to a new, unarmed × button at the same index, and nothing says the arm was dropped. The person's second Enter arms again and repeats 'Press again to remove group 1 and its 2 readings.', with 0 frames. A sensorTree arrival does the same. Preview ticks alone keep the arm. On a dial that auto-cycles faster than the roughly 4 s announcement plus a reaction, a screen reader user loops arm, rebuild, arm and cannot remove the group.",
+			"evidence": "MEASURED p1-arm.mjs. C: before the echo, button.hw-group-remove[armed=true]. After the echo, active button.hw-group-remove[g=0] with text '×'. After the second Enter, writes 0, armed again, and two identical announcements. C3 (sensorTree): sameNode false, unarmed. C2 (two preview ticks): still armed. READ: renderRotationSet's own comment says 'a settings echo (rotation moved, autocycle stepped)', primaryPicker's onSelectionEcho calls renderRotationSet, and armPress keeps the state only on the node. The x1 cross-review asked for the arm to survive this rebuild.",
+			"affected_user": "screen reader, switch and slower keyboard users on an auto-cycling or turning dial; pointer users who pause between presses",
+			"confidence": "medium",
+			"correction": "Keep the arm in module state, keyed by group identity (index plus name and key list; for Merge, the group count). Have groupHeader and setActions render the armed text and label on rebuild, and ignore the blur a rebuild causes (flag it inside renderRotationSet). Disarm only on a person moving focus elsewhere, a pointer press elsewhere, any rotation edit, or a change in the group list.",
+			"tradeoff": "An arm that survives rebuilds can confirm later than today. The identity check must drop it when the groups change underneath.",
+			"acceptance_test": "dial-groups: arm group 1's remove, then push 3 readingKey echoes and one sensorTree over 10 s. The button stays armed, focus stays on it, and there is no second announcement. The next Enter removes exactly group 1 in 1 frame. Arm, then edit the rotation elsewhere: the button is disarmed.",
+			"new_in_candidate": true,
+			"register_ref": "R02"
+		},
+		{
+			"id": "AY03",
+			"title": "The support report outcome is never announced: the speak call is dead code",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "key-configured (and dial-configured, control-reset), Advanced > Support, Enter on Copy support report, plugin reply delayed 600 ms, clipboard stubbed. 373x410.",
+			"observed": "Focus stays on the button and a second press sends no second request, but the shell announcer never changes. The outcome exists only as the button's label ('Copied to clipboard') for 2 s. In pi-control.js's scope, typeof hw is 'undefined': the shell exposes hwShell, and hw is a const inside the pi-common.js and pi-command.js closures. So speak takes the no-op branch on all three panels.",
+			"evidence": "MEASURED p2-status.mjs 'R10 support': live [] after the reply and after the execCommand fallback. p3-misc.mjs: {hw:'undefined', hwShell:'object'} on all three panels. READ pi-control.js lines 24-25: typeof hw !== 'undefined' ? ... : () => {}. A grep of scripts/e2e-pi-persistence.mjs finds no support-report check; its 'leg C' is the Copy-settings leg. WCAG 2.2 SC 4.1.3 Status Messages (AA).",
+			"affected_user": "screen reader",
+			"confidence": "high",
+			"correction": "In pi-control.js, use const hw = self.hwShell (or call hwShell.announce directly) and keep the priming call. Add a panel-suite check that the announcer text becomes the outcome exactly once.",
+			"tradeoff": "Screen readers that already speak a focused button's name change may hear the outcome twice. Acceptable, or stop swapping the label.",
+			"acceptance_test": "key-configured with replyDelayMs 600: Enter on Copy support report makes the shell announcer read 'Copied to clipboard' exactly once. With the clipboard throwing (fallback), the result is the same. With no reply within 3 s, it reads 'Plugin not responding' once. control.html behaves the same.",
+			"new_in_candidate": false,
+			"register_ref": "R10"
+		},
+		{
+			"id": "AY04",
+			"title": "Check again makes the whole status block the announcement, not just the answer line",
+			"severity": "S4",
+			"category": "SB",
+			"state_task_viewport": "key-unavailable, key-stale, dial-unavailable; keyboard Enter on Check again with the same answer. 373x410.",
+			"observed": "#reading-status is role=status with no aria-atomic, so Chrome exposes atomic:true. The new answer line sits inside it, so each press changes an atomic region: 73 words on key-unavailable (54 before the line) and 56 on key-stale. The register says 'only that line's text changes, so only it is read out', which does not hold for an atomic region.",
+			"evidence": "MEASURED p2-status.mjs: region AX props {live:'polite', atomic:true, relevant:'additions text'}, regionWordsBefore 54 and regionWordsAfter 73, one region mutation per press. SB: WAI-ARIA 1.2 gives role status an implicit aria-atomic of true. Speech NOT RUN. INFERRED: NVDA and JAWS read atomic regions whole.",
+			"affected_user": "screen reader",
+			"confidence": "medium",
+			"correction": "Set aria-atomic='false' on #reading-status. renderStatus always replaces the whole block, so a real status change still reads every line as an addition. Alternatively, speak the answer through the shell announcer and keep the answer element out of the live region.",
+			"tradeoff": "With atomic false, an in-place edit of one text node reads only that node. Nothing edits the block in place today, but future code would need to know this.",
+			"acceptance_test": "key-unavailable at 373x410, Check again with the same answer: either the region's AX atomic is false or the answer line is outside it, and the only live text that changes is the answer line. A status change still inserts the full block.",
+			"new_in_candidate": true,
+			"register_ref": "R20"
+		},
+		{
+			"id": "AY05",
+			"title": "The answer line says 'no change yet' under a status that did change",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "key-unavailable, Enter on Check again while the source becomes stale (HWiNFO starts, Shared Memory stale). 373x410.",
+			"observed": "The block becomes the stale block ('No new Shared Memory measurements are arriving...') and ends with 'Checked again at 11:53:48 AM: no change yet.'. The two lines contradict each other, and the whole block is read aloud.",
+			"evidence": "MEASURED p2-status.mjs 'R20 answer changed unavailable->stale', status innerText. READ pi-shell.js: renderStatus calls answerCheck(box, tone) after a rebuild with a new signature as well as on the unchanged path.",
+			"affected_user": "everyone reading the status, screen reader users most",
+			"confidence": "high",
+			"correction": "Save the status signature when Check again is pressed. answerCheck writes 'no change yet' only if the signature is still the same. After a different answer, write nothing (the new block is the answer) or 'Checked again at HH:MM:SS: the answer changed.'.",
+			"tradeoff": "none found",
+			"acceptance_test": "key-unavailable: set data to stale, press Check again. The new block contains no 'no change' text. With the data unchanged, the line still appears.",
+			"new_in_candidate": true,
+			"register_ref": "R20"
+		},
+		{
+			"id": "AY06",
+			"title": "A successful Check again drops focus to the page and says nothing",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "key-unavailable, key-stale, dial-unavailable; Enter on Check again while HWiNFO comes back. 373x410.",
+			"observed": "The status block is removed (tone ''). Focus goes to BODY, the live region empties so nothing is spoken, and the next Tab lands on Change. The one press that fixes the problem is the one met with silence, and a screen reader loses its place.",
+			"evidence": "MEASURED p14-recover.mjs. Candidate and baseline both end with active BODY and the live log ending in reading-status=''. The next Tab goes to theme-change (candidate) or the Default chip (baseline).",
+			"affected_user": "screen reader, keyboard",
+			"confidence": "high",
+			"correction": "When the region empties within a few seconds of a person's Check again (checkAskedAt is set), announce 'HWiNFO answered: live again.' once through the shell announcer. If the focused status button was removed, move focus with preventScroll to a stable control, such as the Reading search or its section summary.",
+			"tradeoff": "This is a focus move the person did not ask for. Limit it to the case where the focused button disappeared, and announce only after a person's press.",
+			"acceptance_test": "key-unavailable: set data to ok, press Check again. document.activeElement is not BODY, and the announcer says the source is live exactly once.",
+			"new_in_candidate": false,
+			"register_ref": "R20"
+		},
+		{
+			"id": "AY07",
+			"title": "Label in name fails on the armed buttons and on Earlier or Later at a group's edge",
+			"severity": "S4",
+			"category": "SB",
+			"state_task_viewport": "dial-groups, 373x410: group 1's remove armed; Merge armed; CPU CCD1 (last in group 1) selected with the toolbar.",
+			"observed": "Armed remove: visible 'Remove group and its 2 readings?', name 'Press again to remove group 1 (CPU) and its 2 readings'. Armed Merge: visible 'Merge and drop the group names?', name 'Press again to merge every group into one set; 2 group names are dropped'. Later at the edge: visible '→ Later', name 'Move CPU CCD1 (Tdie) to the start of group 2 (GPU)' (Earlier at a group's start behaves the same). The visible words are not in the names, so 'click Later' or 'click Remove group' by speech input finds no match in exactly these states.",
+			"evidence": "MEASURED p1-arm.mjs A1, E and F AX names. p5-rotation.mjs 'R23 toolbar Later at the group edge': label and innerText. SB: WCAG 2.2 SC 2.5.3 Label in Name (A).",
+			"affected_user": "speech input (Voice Access, Dragon); screen reader users pairing visible and spoken labels",
+			"confidence": "high",
+			"correction": "Start each name with its visible words, for example 'Remove group and its 2 readings? Press again to remove group 1 (CPU)', 'Merge and drop the group names? Press again to merge', 'Later: move CPU CCD1 (Tdie) to the start of group 2 (GPU)', and 'Earlier: move X to the end of group 1 (CPU)'.",
+			"tradeoff": "Names get a word or two longer.",
+			"acceptance_test": "In each of these states, the button's AX name starts with its innerText (normalized, arrow glyph ignored).",
+			"new_in_candidate": true,
+			"register_ref": "R02, R23"
+		},
+		{
+			"id": "AY08",
+			"title": "Toolbar tooltips repeat each button's full name as its description",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "dial-configured with two Drive Temperature readings, rotation list focused, member 2 selected. 373x410.",
+			"observed": "syncRotationTools sets each tool's title to its aria-label plus ' (Alt+Left in the list)', and Chrome exposes that as the description. So Earlier reads 'Move Drive Temperature from Drive [#1]: Example NVMe SSD 1TB earlier, button, Move Drive Temperature from Drive [#1]: Example NVMe SSD 1TB earlier (Alt+Left in the list)'. Remove's title equals its name and is still exposed as the description, so it is read twice. The baseline tool buttons had no title. R46 removed this exact pattern from the Default chip.",
+			"evidence": "MEASURED p5-rotation.mjs 'R07 twins' toolAx: name and description for all four tools. READ: pi-common.js syncRotationTools, button.title = .... The x1 R37 verdict asked for descriptions that are only the shortcut sentence.",
+			"affected_user": "screen reader",
+			"confidence": "high",
+			"correction": "Title only the shortcut ('Alt+Left in the list') and give Remove no title, or drop the titles and rely on the lists' aria-keyshortcuts plus #rotation-keys-help.",
+			"tradeoff": "Pointer tooltips no longer name the action, but the visible label ('Earlier') already does.",
+			"acceptance_test": "Each tool's AX description is empty or exactly its shortcut sentence, and never contains its name.",
+			"new_in_candidate": true,
+			"register_ref": "R37"
+		},
+		{
+			"id": "AY09",
+			"title": "At 200% zoom, tabbing into the detail search scrolls the focused field off the top of the panel",
+			"severity": "S3",
+			"category": "RD",
+			"state_task_viewport": "key-details, all sections open. Keyboard Tab from Details list into 'Search readings to add', then type 'gpu'. 189x410 and 160x410 at DPR 3.",
+			"observed": "While the list opens, the focused search sits at top -307 px (189) or -323 px (160), fully off-screen. After three typed characters it is still 5 px above the viewport. At 373 it lands at 108 px, under the 89 px header. The baseline behaves the same.",
+			"evidence": "MEASURED p7-details-walk.mjs, candidate and WHICH=base: 'input#pickerd-search top=-307 sy=2088 LIST'. p8-forced.mjs: at top -307 with the landing + at 378..402 and the dock position static; after typing, top -5. READ: the detail picker's onOpenChange calls scrollIntoView({block:'nearest'}) on '.hw-add.armed, .hw-add.lit', and the add dock does not stick when the header is unpinned. WCAG 2.2 SC 2.4.7 Focus Visible and 2.4.11 Focus Not Obscured (Minimum).",
+			"affected_user": "low vision (zoom) keyboard users",
+			"confidence": "high",
+			"correction": "In onOpenChange, after bringing the landing + into view, clamp the scroll so the search field's top stays at or below the pinned header's bottom (0 when unpinned), the same rule revealOpenList uses. Or skip the + scroll when the open list is taller than the viewport.",
+			"tradeoff": "At zoom the landing + may stay below the fold while the person types, and they scroll to it.",
+			"acceptance_test": "key-details at 189x410 and 160x410: after Tab into the detail search, its rect is fully inside the viewport, and it is still fully inside after typing 'gpu'. The 373x410 behavior is unchanged.",
+			"new_in_candidate": false,
+			"register_ref": "R17, R44"
+		},
+		{
+			"id": "AY10",
+			"title": "At 200% zoom the armed remove squeezes the group's name to 18 px and pushes the list down",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "dial-groups at 373, 320, 189 and 160 x410; Enter on group 1's remove.",
+			"observed": "The armed text 'Remove group and its 2 readings?' takes the row. The name field shrinks from 289 to 126 px at 373, 236 to 73 at 320, 105 to 18 at 189 and 76 to 18 at 160, where the name 'CPU' can no longer be seen. The head grows from 28 to 35 px (189) and from 28 to 49 px (160), so everything below moves down 6 or 21 px while armed. Nothing visible then says which group is armed.",
+			"evidence": "MEASURED p1-arm.mjs 'E armed geometry'; shots/cand-armed-remove-160.png.",
+			"affected_user": "low vision (zoom)",
+			"confidence": "high",
+			"correction": "Use a short armed text ('Remove?', as x1 recommended) and keep the detail in the name and the announcement. Or, below 240 px, give the armed button its own row under the name.",
+			"tradeoff": "The button itself says less, and the name and announcement carry the detail.",
+			"acceptance_test": "dial-groups at 160x410, armed: the name field is at least 40 px wide and shows its value, and the head grows by at most one line.",
+			"new_in_candidate": true,
+			"register_ref": "R02, R06"
+		},
+		{
+			"id": "AY11",
+			"title": "New notes are spoken on every panel open when a rotation member is missing",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "Panel open, no user action: dial-configured with rotationKeys [GPU, missing key, Hot Spot]; dial-groups with a missing key in group 1; dial-missing. 373x410.",
+			"observed": "On open, the shell announcer speaks 'Rotation moves through 2 of these 3 readings, in this order; the missing one is skipped until HWiNFO lists it again.', where the baseline is silent. dial-groups with a missing member speaks the groups note twice, the second time adding 'One missing reading is skipped...'. dial-missing speaks 'Only one of these 2 readings is in HWiNFO's list now...' on top of the status block. The cause: the note's text changes when the sensor tree arrives after the first render, and setNote announces every change on the 'rotation' channel. Already on the baseline: '2 groups. Rotation needs...' on every dial-groups open and '5 readings across 4 tiles...' on key-details. The Gadget line is still inserted into the status region on every open.",
+			"evidence": "MEASURED p11-onload.mjs, with a MutationObserver installed at document start, comparing the candidate and WHICH=base.",
+			"affected_user": "screen reader (every key selection loads a fresh page, so this repeats for every key)",
+			"confidence": "high",
+			"correction": "Announce the rotation and detail notes only when a person's edit caused the render: pass the channel from the edit paths, not from adopt or tree renders. Or re-prime the channel with the note produced by the first tree render. Keep warnings in the status region.",
+			"tradeoff": "A member that goes missing while the panel is open is no longer spoken from the note. The pill and the note still show it.",
+			"acceptance_test": "Open dial-configured with a missing member, dial-groups and key-details: the shell announcer stays empty until the first user action. A Delete in the rotation still speaks once.",
+			"new_in_candidate": true,
+			"register_ref": "R05, R11"
+		},
+		{
+			"id": "AY12",
+			"title": "The leave flush announces 'Named X on the dial' while the person is still typing",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "dial-groups: F2 on CPU (Tctl/Tdie), type 'Tctl', then the pointer leaves the panel (mouseleave) with the caret still in the field. 373x410.",
+			"observed": "The flush writes 1 frame, keeps the caret and does not rebuild, but it also announces 'Named Tctl on the dial' mid-edit. A later Enter writes nothing and says nothing.",
+			"evidence": "MEASURED p5-rotation.mjs 'R03 rename leave flush'. READ: registerLeaveCommit calls commitChipRename, which announces. x1 R03 asked that the flush never announce.",
+			"affected_user": "screen reader",
+			"confidence": "high",
+			"correction": "Pass a quiet flag from the flush path, for example commitChipRename(input, { speak: false }).",
+			"tradeoff": "none",
+			"acceptance_test": "Same steps: 1 frame and the announcer unchanged. A later Enter says at most the name once.",
+			"new_in_candidate": true,
+			"register_ref": "R03"
+		},
+		{
+			"id": "AY13",
+			"title": "The theme scope line is exposed twice to screen reader browse mode",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "key-configured, accessibility tree of the look band. 373x410.",
+			"observed": "#theme-desc is the radiogroup's description, and it is also a StaticText at the end of the band: 'Follows the shared theme, now Void.' comes after the eight radios and after the visible 'Default (shared: Void)'. Browse mode reads the scope a second time.",
+			"evidence": "MEASURED p15-desc.mjs: queryAXTree order under #look ends with 'StaticText:Follows the shared theme, now Void.'.",
+			"affected_user": "screen reader",
+			"confidence": "high",
+			"correction": "Add the hidden attribute to #theme-desc. aria-describedby still computes a description from a hidden referenced node.",
+			"tradeoff": "none",
+			"acceptance_test": "There is no StaticText for #theme-desc in the band's AX tree, and the radiogroup description is unchanged.",
+			"new_in_candidate": true,
+			"register_ref": "R38"
+		},
+		{
+			"id": "AY14",
+			"title": "The twin tag is spoken twice in the option name",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "dial-configured with drive0 and drive1 in the rotation. 373x410.",
+			"observed": "The option name is 'Drive Temperature #0 from Drive [#0]: Example NVMe SSD 2TB on dial'. The visible pill '#0' and the sr-only 'from Drive [#0]: ...' both carry the instance mark.",
+			"evidence": "MEASURED p5-rotation.mjs 'R07 twins' options.",
+			"affected_user": "screen reader",
+			"confidence": "high",
+			"correction": "Set aria-hidden='true' on the .hw-chip-source pill and keep the sr-only 'from <sensor>' text.",
+			"tradeoff": "none",
+			"acceptance_test": "The option names read 'Drive Temperature from Drive [#0]: ... on dial' and stay unique.",
+			"new_in_candidate": true,
+			"register_ref": "R07"
+		},
+		{
+			"id": "AY15",
+			"title": "The Reading colors scroller clips the wells' focus ring",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "dial-groups, all open, keyboard Tab through the Reading colors wells. 373@1.5, 189@3, 160@3.",
+			"observed": "#reading-color-list (overflow-y:auto) clips the left side of each well's 2 px ring, and the top or bottom at the list's edges. The ring shows on three sides.",
+			"evidence": "MEASURED p6-walk.mjs: clips ['reading-color-list'] for all four wells at every width. READ: .hw-reading-colors has max-height 220px and overflow-y auto, the same as the baseline.",
+			"affected_user": "keyboard, low vision",
+			"confidence": "high",
+			"correction": "Add 3 px of inline padding to .hw-reading-colors, or give the wells outline-offset -2px.",
+			"tradeoff": "3 px less width for the row labels.",
+			"acceptance_test": "A Tab walk finds no stop whose ring is clipped by an ancestor.",
+			"new_in_candidate": false,
+			"register_ref": "R47"
+		}
+	],
+	"keep": [
+		"Theme band P1b: the resolved theme is on screen in words ('Default (shared: Void)', 'Ember (set on this key)'). Change is a separate 44x25 target outside the ellipsis, 96 to 100% hittable with an unclipped ring at 373, 320, 189 and 160. It is invisible and out of the Tab order on an explicit pick. Chips do not move across all 8 picks. The radiogroup is described by the scope line, and the Default chip has no duplicate description (MEASURED).",
+		"The owner's theme constraints hold: all eight chips are named and visible without hover, the Default link mark reads on every palette (12.2 to 21:1) with the dashed frame at 5.2 to 7.4:1, the theme band sits directly under the header in every fold state, and nothing tracks the pointer (MEASURED and READ).",
+		"Arm-then-confirm itself: a double click only arms, focus after a removal goes to the next group's name field and never to a remove button, and the armed and removed announcements come on a primed channel (MEASURED).",
+		"Replace shared settings has no timer: it arms until blur or edit, says 'Press again', and on disarm says 'Not replaced. Nothing was changed.' (MEASURED at 6 s).",
+		"Keyboard moves across groups: focus follows into the new listbox with aria-activedescendant on the moved chip, the announcement names the group and position, Alt+Home and Alt+End work, the edge writes nothing, and a toolbar press keeps the same button under the pointer (MEASURED).",
+		"The visible 'missing' pill is spoken once, the twin tags never shrink, and the notes count live members without raw keys (MEASURED).",
+		"The validate channel is primed: one announcement per valid-to-invalid transition, none per keystroke (MEASURED).",
+		"The support button uses aria-disabled while waiting, keeps focus, guards against a duplicate request, and restores focus after the execCommand fallback (MEASURED).",
+		"quietFocus: removing the last member moves focus to the rotation search without opening its list (MEASURED).",
+		"Enter commits in the group and chip name fields keep focus where the person was (MEASURED).",
+		"Forced-color fixes (border-only triangles, the saved row with a SelectedItem fill, bordered pills, readable armed text with a border), reduced motion on all four markers, the fold pair at 99.4% hittable, the header wrapping under 240 px with the face whole and no horizontal overflow, the inset summary focus ring, and color-scheme dark with the checkbox edge at 3.73:1 (MEASURED).",
+		"The 28 px control scale, rotation groups, Read every and the control-map meanings are unchanged. The groups line is derived from the stored map, and 'Change gestures' reveals Gestures with 0 writes (MEASURED and READ)."
+	],
+	"cleanup": "I started one node process per probe run (npx tsx). Each exited by itself with process.exit, and no node listener remains on 32040..32049.\n\nThe Chromes did not stop cleanly. For each of the 19 runs the lab printed the launcher PID: 121036, 119056, 129096, 130648, 141508, 125116, 146152, 143736, 123524, 138084, 143760, 131888, 136936, 122772, 123616, 147380, 114748, 118012, 142760. cdp.mjs close() stopped those launchers, but each had relaunched a child browser tree that kept holding port 32042 or 32046. PID 121036 was later reused by an unrelated crashpad handler, so I did not treat that number as mine.\n\nI found the leaked trees by the --remote-debugging-port=32042 or 32046 argument on their command lines, which only my lab uses. I stopped them with taskkill /T /F, and then the last one (profile hw-pi-lab-VnYyyi) with Stop-Process on it and its children. After that, 0 chrome.exe processes carried my ports and nothing listened on 32040..32049.\n\nI removed exactly the 19 hw-pi-lab-* profile directories those browsers used, by name. I killed no process that was not on my ports and touched no other profile.\n\nNothing in any repository or frozen dir was modified. Only C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-a11y received files."
+}

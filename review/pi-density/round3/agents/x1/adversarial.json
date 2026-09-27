@@ -1,0 +1,508 @@
+{
+	"key": "adversarial",
+	"role": "Agent 5, cross-review round 3: evidence and regression credibility for the whole register. Read-only on every repository; scratch C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-adversarial; lab ports 31910..31912; frozen baseline served through PI_SIM_PLUGIN_DIR (token 1.7.0.0-d03); headless Chrome on Windows, simulated host, sample data. Nothing here is real-host evidence. All my Chrome processes on port 31912 were stopped (0 left; cdp.mjs close() leaked 24 of them on Windows, see new concerns). Labels: MEASURED (I ran it), READ (code or files), INFERRED (judgment).",
+	"verdicts": [
+		{
+			"id": "R01",
+			"verdict": "modify",
+			"rationale": "The defect is solid: P01 and X02 MEASURED it with trusted CDP input, and the cause is READ. The capture listener (pi-common.js:2961-2966) runs seedFromElite, whose promise chain ends in hw.resyncBound() (2943). That resets #f-preset to the stored 'elite' before the shell's own change listener saves the pick. A microtask checkpoint between listeners happens only for UA-dispatched events, so the same fault applies to Chrome 130 in the host (INFERRED, high). The weak part is the wording of the fix. 'Seed only after the preset write lands' can be built as 'wait for the plugin's answer'. The simulator answers every setSettings with a preview 5 ms later (READ pi-sim.mjs setSettings case), but the real host sends the panel no settings echo. A seed gated on an answer would be tuned to simulator timing.",
+			"regression_risk": "A seed gated on an echo or preview never runs, or runs late, on the real host. Resyncing #f-preset in any form brings the snap-back back. A deferred seed can race a replaced configuration document. A Custom frame that lands before its seeds leaves Legacy fallbacks behind if the panel is torn down in between.",
+			"revised_correction": "Capture the intent in the capture phase. Never resync #f-preset; resync only the six gesture selects. Run the seed within the same user event, after the shell's target listener (for example setTimeout 0 scheduled from the capture listener), and never from an echo. Write order must leave a safe state: either one frame that carries controlPreset 'custom' plus the six seeded gestures, or the seeds first and the 'custom' frame last. Seeds stored under Elite change nothing the dial does.",
+			"acceptance_test": "Battery B1. dial-groups at 373x410, DPR 1.5, Controls open, three trusted paths: typeahead 'c', ArrowDown, and a CDP mouse press on the select followed by ArrowDown and Enter. Each must end with 'custom' stored and shown, #controls-custom visible and the six gestures equal to the Elite map. The last frame carries 'custom', and no frame after the first 'custom' frame carries 'elite'. dial-custom-gestures, ArrowUp then ArrowDown: ends on 'custom' with gestureTap 'pin' kept. dial-configured, Legacy to Custom: exactly 1 frame and no gesture field. An echo that switches Elite to Custom: 0 frames. Mutation: put #f-preset back into the resync and path 1 must fail. Host (owner): pick Custom by mouse on an Elite dial, reselect the dial, Custom is still shown.",
+			"evidence": "MEASURED by P01 (p6-preset.json, p6b log order, p6c) and X02. READ pi-common.js:2917-2968, pi-shell.js:209-244, scripts/lib/pi-sim.mjs (setSettings answered by setTimeout(pushPreview, 5); no didReceiveSettings echo). READ live e2e-pi-panels.mjs:233-253 (at the time read): trusted ArrowDown is already used, but it asserts writes >= 2, not order or count."
+		},
+		{
+			"id": "R02",
+			"verdict": "modify",
+			"rationale": "Reproduced defect (V01 and P02 MEASURED; B02's 'x reads as clear field' is only a walkthrough hypothesis). Reusing the Replace idiom literally does not fix the gesture that was reproduced. Replace confirms on any second press within 5 s (READ pi-common.js:4247-4248) and has no dwell or click-count guard. A real double click would arm the clicked group and then remove it before the person sees the question, which fails V01's own test (a double click writes 0). The live e2e (READ, not run) now asserts that a 60 ms double press only arms, so the working tree has a dwell; that dwell must become the stated contract. R02 also drops P02's Merge finding. Merge sits 6 px from Add group and drops every group name in one press, and Split afterwards gives unnamed groups (MEASURED P02 p3 G4, p7 e).",
+			"regression_risk": "The armed words widen the group head. At 189 and 160 px they can wrap and move the control out from under the pointer. An arm that survives a rebuild can fire on a later stray click. Separate arm helpers for R02 and R09 will drift apart. Suites that remove a group in one click need a second press.",
+			"revised_correction": "Use one arm helper for Replace, group remove and Merge. The first press arms and says so in words. A second press counts only after a 500 ms dwell, which ignores a click with event.detail >= 2 and a double Enter. The arm clears on blur, on rebuild and on any other edit, with a polite announcement. After a removal, focus goes to a non-destructive control, and the element under the pointer is neither a remove nor Merge. Merge arms whenever any group is named or two or more groups hold readings.",
+			"acceptance_test": "Battery B2. dial-groups plus Add group, at 373x410 DPR 1.5 and at 189x410. (a) CDP double click on group 1's remove (press and release with clickCount 1, then clickCount 2, 120 ms apart): 0 frames, armed words visible. (b) Enter twice, 120 ms apart, on the focused remove: 0 frames. (c) Press, wait 700 ms, press: exactly 1 frame and only group 1 gone. activeElement is neither .hw-group-remove nor BODY, and elementFromPoint at the press point is neither a remove nor Merge. (d) Arm, then Tab away: disarmed, 0 frames. (e) One press on Merge with a named group: 0 frames, names intact. (f) At 189, elementFromPoint at the press point is still the armed control after arming.",
+			"evidence": "MEASURED V01 (p5 group-remove-twice.json) and P02 (p3 G3, G4; p7 d, e). READ pi-common.js:3980-3995 and 4228-4262. READ live e2e-pi-panels.mjs:566-588."
+		},
+		{
+			"id": "R03",
+			"verdict": "agree",
+			"rationale": "Reproduced in the simulator (X07 and P08 MEASURED). The host half is a walkthrough hypothesis, but the fix reuses the leave flush the shell already runs for bound fields, and that flush rests on bench evidence (READ pi-shell.js:124-130: 20 of 20 quick Label edits were lost before it existed). With no new mechanism, the fix is exactly as credible on the host as the existing flush, which is the right bar.",
+			"regression_risk": "A commit on leave could rebuild the rotation editor under the caret (the guard at pi-common.js:676 protects only .hw-group-name). Writing an unchanged or empty value could clear a custom name. An IME commit could land mid-composition.",
+			"revised_correction": "As disposed, plus three rules: write only when the value differs from the stored one, never rebuild the editor as a result of the flush, and honor the shell's composing guard.",
+			"acceptance_test": "Battery B3. Fields: dial-groups group name, dial-configured F2 rename, key-details cell rename; 373x410. Type 'Zzq' without Enter, then dispatch mouseleave on documentElement and a window blur: exactly 1 frame per field containing the text, and the same input node keeps focus with the caret at the end. Unchanged value plus leave: 0 frames. compositionstart, typing and leave: 0 frames, then compositionend: 1 frame. Host (integrator): 10 trials per field of typing, clicking another key within 200 ms and reselecting: 10 of 10 names stored.",
+			"evidence": "MEASURED X07 (p8-d03.json) and P08 (p3 G6). READ pi-shell.js:116-130. READ live e2e-pi-panels.mjs:602-640: one write and kept focus are already asserted, but not the unchanged-value or IME cases."
+		},
+		{
+			"id": "R04",
+			"verdict": "agree",
+			"rationale": "Three reviewers MEASURED it with real pointer and keyboard (X01, V04, B13), and contract 1 breaks on every hover. The problem is the acceptance check. The live e2e (READ e2e-pi-panels.mjs:460-470) hovers 3 of 8 chips and calls programmatic focus() on a tabindex=-1 chip, which is not a keyboard path. It also skips the unknown-stored-theme Tab path, where X01 reproduced the band naming a theme that is not drawn.",
+			"regression_risk": "The hover echo of the pointed chip's name goes away, but the chip already shows its name. The e2e check must change in the same commit.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "Battery B4. Fixtures: key-configured (Default, shared Void); key-custom-dim (Ember); key-configured with theme 'neon-future' and shared Midnight. 373x410 DPR 1.5. Real CDP mouseMoved over all 8 chips and then off the band, then Tab from a blurred page into the gallery without arrow keys. #theme-current must stay 'Default · Void', 'Ember' and '\"neon-future\" · draws Void' respectively at every step. The resolved name stays visible outside the chips at every step, with 0 writes. Mutation: restore the pointerover listener and the check must fail.",
+			"evidence": "MEASURED X01 (p1-theme.json, ev-hover-forest.png, ev-unknown-tab.png), V04 and B13. READ pi-common.js:3484-3499 (renderThemeLine prefers previewTheme). READ live e2e lines 460-470."
+		},
+		{
+			"id": "R05",
+			"verdict": "modify",
+			"rationale": "Reproduced defect (B01, A04). The fix's counting rule is under-specified. The runtime skips keys the snapshot lacks, and it also collapses a linked pair to one entry (READ src/rotation.ts:16-26 pickedReadings). Counting 'live members' with keyIsMissing alone would still overcount linked pairs. Grouped mode has the same fault: populated counts a group whose members are all missing (READ pi-common.js:719). The pill needs the existing treeHasSnapshot guard (READ pi-common.js:118-119), or an unavailable source would accuse every chip. At 160 px the existing 'on dial' pill is already cut (A09), so a second pill needs flex:none.",
+			"regression_risk": "Wider chips. Two pills on a chip that is both current and missing. The count changes when a sensor sleeps, and the note speaks on the 'rotation' live channel, so dropouts may be announced. Screen readers hear the phrase twice unless the sr-only span goes.",
+			"revised_correction": "Show a visible 'not in HWiNFO' pill (flex:none) on rotation and detail chips and drop the sr-only duplicate. The note's number must come from the runtime's own rule (the same skip and link dedupe as rotationReadings). The grouped-mode note must count groups by their live members. No pill and no 'skipped' claim unless the tree has a snapshot.",
+			"acceptance_test": "Battery B5. Cases: dial-configured with rotationKeys [gpu, 'f0099999:0:1000000', hot]; the same list with a linked duplicate pair; dial-groups with group 2 holding only a missing key; dial-unavailable with the same keys; key-details with one missing detail key. Viewports 373x410 and 160x410, plus emulated forced colors at 373. Pass: the pill is visible and unclipped in innerText (sr-only excluded) at 373, at 160 and in forced colors. The phrase occurs exactly once in the AX name. The note's number equals rotationReadings(keys, current, snapshot).length, computed by importing src/rotation.ts in the probe. The groups note agrees with the runtime. dial-unavailable shows no pill and no skip claim. Opening writes 0.",
+			"evidence": "MEASURED B01 (probe2 P2) and A04 (ax.mjs). READ src/rotation.ts:16-50, pi-common.js:118-119, 410-448 and 715-729."
+		},
+		{
+			"id": "R06",
+			"verdict": "modify",
+			"rationale": "Three problems. (1) Evidence: every measurement came from headless Chrome at emulated widths. No reviewer checked that the Stream Deck app can zoom its panel at all (a11y lists it under not_run), and WCAG 1.4.10 is defined at 320 CSS px, where the panel already reflows. S3 rests on that unverified assumption. Keep FIX because the change is scoped CSS, but mark it lab-only until the owner confirms Ctrl+wheel or Ctrl+= zoom. (2) The merge dropped X03's layout-shift defect, and the disposed correction ('the slot and hint may wrap') does not fix it. MEASURED on dial-groups (pb-slot.mjs): selecting in group 1 moves group 2 by 32 px at 310, 298, 280, 249, 240 and 189 px, and by 96 px at 160. After a real press on group 2's first member, the pointer rests on '← Earlier' (310 to 280) or '→ Later' (160). With A09's wrap CSS the shift is 32, 4 and 68 px (240, 189, 160); with V07's ellipsis it is 32, 32 and 96 px. It is 0 px at 373 and 320. The no-shift promise therefore breaks below about 315 px, not only below 240. (3) A09's cut theme line at 160 px (the resolved name) is missing, and it is a contract 1 failure.",
+			"regression_risk": "An unscoped header wrap unpins the dial header at 252 to 270 px (A01 MEASURED). A wrapping theme line sits above the chips, so a pick moves the chips at zoom widths (MEASURED pd-zoomband: P0 with the wrap rule at 160 is 234 px for Default/Ultraviolet against 217 for Ember). Reserving the measured toolbar height makes each grouped list taller at narrow widths.",
+			"revised_correction": "Keep the header wrap scoped below 240 px, the face flex:none, and no breaks inside words. For the rotation slot at every width: min-width:0; the hint ellipsizes and never wraps; every slot reserves the toolbar's measured height (one ResizeObserver writing --hw-tools-h). The resolved theme name must stay whole at 160 without moving the chips on a pick (reserve the line's height, or show the resolved name below the chips at narrow widths).",
+			"acceptance_test": "Battery B6. Fixtures: key-configured, key-unavailable, dial-configured, dial-groups (default and all-open) and control-reset. Widths: 373 (DPR 1.5), 320, 310, 298, 240, 189 and 160, all at height 410. Pass: overflowX 0 everywhere. Header rectangles and pinned state at 373 and 320 identical to the frozen baseline (0 px difference). At 189 and 160 the kind line uses at most 2 lines with no break inside a word, and the dial face's visible share is 1.0. Key and dial chips end at or above 410 at 189 and 160 (baseline: key 406 and 649, dial 341 and 440). Shift test: select group 1's first option by CDP click, then press group 2's first option at its pre-press point. Group 2 moves 0 px, and elementFromPoint after the press is the pressed option at every width.",
+			"evidence": "MEASURED here: pb-slot.mjs and pb-slot2.mjs (dial-groups shift table), pd-zoomband.mjs, and density-373-189-160.json (dial-groups overflowX 58 at 189 and 87 at 160; key header 232 at 189 and 476 at 160). MEASURED A01 (injection verification), X03, X04, V07 and B03. READ pi.css:1380-1405."
+		},
+		{
+			"id": "R07",
+			"verdict": "modify",
+			"rationale": "Reproduced defect (P03). The disposed suffix goes at the end of the chip text, and chips ellipsize at their 170 to 190 px cap. For long labels ('Drive Temperature' on two SSDs) the ellipsis cuts exactly the part that tells the two apart, so the screenshot looks fixed while the task still fails.",
+			"regression_risk": "Wider colliding chips wrap the row sooner at 320. A missing member cannot name its source (no tree entry).",
+			"revised_correction": "Put the distinguishing text where it cannot be ellipsized: a flex:none suffix pill (the 'on dial' style) or text before the label. Add it only to colliding chips. Titles and every accessible name (option, toolbar buttons, rename label, tile buttons) name the sensor.",
+			"acceptance_test": "dial-configured with rotationKeys [Drive #0, Drive #1, CPU] and key-details with drive0 and drive1, at 373x410 and 189x410. The distinguishing substring of each colliding chip lies wholly inside the chip's clip box (range test). The accessible names and titles of the two differ, and so do the toolbar names when each one is selected and the two remove buttons in the tile editor. Non-colliding chips are byte-identical to baseline.",
+			"evidence": "MEASURED P03 (p3 G7, p4 D4). READ pi.css chip max-width rules and pi-common.js:410-448. The ellipsis risk is INFERRED from the chip cap."
+		},
+		{
+			"id": "R08",
+			"verdict": "agree",
+			"rationale": "Reproduced defect (P07). This is focus loss and backward Tab order, which WCAG 2.4.3 covers.",
+			"regression_risk": "A deferred rebuild could clobber typing in another field. Tab from a group name now lands on a remove button, so R02's arm must ship first, and focus alone must never arm it.",
+			"revised_correction": "As disposed. Focus arriving on a remove button never arms it.",
+			"acceptance_test": "dial-groups at 373x410. Type in group 2's name and press Enter: focus stays on group 2's name field. Type in group 1's name and press Tab: focus lands on the next control in DOM order (group 1's remove), nothing is armed and 0 frames beyond the name's own write. key-details: rename cell 1 and press Enter: focus is on that cell's name button, and the next Tab reaches its down arrow.",
+			"evidence": "MEASURED P07 (p3 G1, p7 c, p4 D3). READ live e2e 612-640 covers Enter but not Tab."
+		},
+		{
+			"id": "R09",
+			"verdict": "agree",
+			"rationale": "The 5 s window and the re-arm are READ (pi-common.js:4247-4248) and MEASURED (A02 behaviors.mjs). The '5 s of speech' figure is INFERRED (180 wpm), but the fault stands without it. The live e2e (READ line 657) already asserts 'still armed after 5.5 s'.",
+			"regression_risk": "A stale arm could apply on a much later press. It must disarm on blur and on any edit of the well.",
+			"revised_correction": "As disposed, sharing the one arm helper with R02 and Merge.",
+			"acceptance_test": "Arm, wait 10 s with focus kept, press Enter: exactly 1 setGlobalSettings. Arm, Tab away and back, press Enter: it only re-arms, 0 writes. Arm, type in the well, press: it only re-arms.",
+			"evidence": "MEASURED A02. READ pi-common.js:4228-4262. READ live e2e:657."
+		},
+		{
+			"id": "R10",
+			"verdict": "agree",
+			"rationale": "MEASURED by A03 (focus falls to BODY while disabled, and the result sits in no live region). WCAG 4.1.3 applies to a status message.",
+			"regression_risk": "Without the waiting guard, aria-disabled lets a double press send duplicate getSupportReport requests.",
+			"revised_correction": "As disposed, keeping the 'waiting' guard.",
+			"acceptance_test": "key-configured with all sections open and sim.replyDelayMs = 600, clipboard stubbed: press Enter, then Enter again within 100 ms. Exactly 1 getSupportReport is sent, focus stays on the button throughout, and a polite region's text becomes the outcome exactly once.",
+			"evidence": "MEASURED A03. READ pi-control.js:20-50."
+		},
+		{
+			"id": "R11",
+			"verdict": "modify",
+			"rationale": "The measured 96 px is the smallest case. statusSentence appends gadgetWithheldNotes whenever blockedReadingCount or contradictoryReadingCount is set (READ src/ui/state-screens.ts:87-95), and no first-pass fixture used those variants (V lists them under not_run). MEASURED with blockedReadingCount 2 and contradictoryReadingCount 1 at 373x410 DPR 1.5: the status box is 193 px. The key palette runs 317 to 387 and the key picker ends at 500 (off screen). The dial palette runs 333 to 403 and its picker ends at 516. The header already says 'Live · Gadget registry' (MEASURED), so the box is not needed to answer 'is it live'. A new disclosure in the status region moves complexity rather than removing it, and splitting the plugin's sentence in the panel would couple the panel to plugin copy.",
+			"regression_risk": "Hiding the withheld-reading remedy (untick or relabel one of two readings in HWiNFO) when a rotation member is the withheld one. Copy in state-screens.ts falls under the release copy rules and validator.",
+			"revised_correction": "For info tone, show one panel-owned line ('Gadget registry: current values only, no min, max or average.') and move the plugin's full hint, withheld notes included, into Advanced > Connection next to the existing Gadget setup text. No new disclosure widget in the status region. When a source is forced, its sentence replaces the generic hint rather than following it.",
+			"acceptance_test": "Battery B7 at 373x410 DPR 1.5. Cases: data 'gadget' with the plain sample snapshot, and with blockedReadingCount 2 and contradictoryReadingCount 1; key-configured and dial-configured each. Pass: status height <= 40 px, key palette top <= 150, dial palette top <= 166, key #picker-search bottom <= 410, 'no min' visible without a click. The withheld remedy is reachable in <= 2 activations with 0 writes. key-unavailable and dial-unavailable with globals.source 'gadget': no sentence advises enabling Shared Memory, and both chip rows end at or above 410. node scripts/validate-release-copy.mjs passes if plugin copy changed.",
+			"evidence": "MEASURED here (pc-misc.mjs): statuses 96 and 193 px; palette tops 221 and 317 (key), 237 and 333 (dial); picker bottoms 404 and 500. READ src/ui/state-screens.ts:87-95 and pi-shell.js:619-621. MEASURED X05 and V08."
+		},
+		{
+			"id": "R12",
+			"verdict": "modify",
+			"rationale": "Agreed as far as it goes, but it drops two of X02's five points. The zero/negative check claims more than it tests: it only reads the state line. The observe loop never hovers, so a regression like R04 passes. The register also says 'palette checks at 373 and 189' without defining 'in view under the header' at 189, where the header is not pinned. The live tree now asserts one frame for group removal and for reorders (READ e2e:588, 592), but line 137 still uses sim.writes.length >= 1 at the time read.",
+			"regression_risk": "Changing to === 1 turns currently passing edits red until each one is audited. Merging frames risks torn pairs unless the detailTilesStage pattern is reused.",
+			"revised_correction": "Assert === 1 for every entry in the edit table, with an explicit exception list that states each count. The palette check runs at 373x410 (pinned: chips end at or above 410 under the header) and at 189x410 (unpinned: chips end at or above 410 at load). Add real CDP hover to the observe loop. The zero/negative check asserts the face text, or it is renamed.",
+			"acceptance_test": "Battery B8. The suite is green on the final tree and turns red for each mutation: (a) writeRotation writes twice; (b) the pointerover preview is restored; (c) a face renders '--' for a valid 0. The palette check fails on the frozen baseline at 160x410 (chips bottom 649).",
+			"evidence": "READ e2e-pi-panels.mjs:137, 453-470, 588 and 592 (live tree, uncommitted). MEASURED X02 (frames). MEASURED here: chips bottom at 160 is 649 in the baseline."
+		},
+		{
+			"id": "R13",
+			"verdict": "agree",
+			"rationale": "MEASURED by A05 with elementFromPoint over every pixel: 75.4% and 81.0% on dial-groups. The fix was verified by injection.",
+			"regression_risk": "The raised hover fill covers the top 6 px of the reading name under the pair.",
+			"revised_correction": "As disposed (position: relative; z-index: 1), or a -2 px bottom margin if the overlap shows.",
+			"acceptance_test": "dial-groups, dial-configured, key-configured and control-reset at 373x410 DPR 1.5: at least 98% of each 28x28 fold button box resolves to the button. Header height is unchanged at 373, 320, 189 and 160.",
+			"evidence": "MEASURED A05 (fold-hit.mjs)."
+		},
+		{
+			"id": "R14",
+			"verdict": "agree",
+			"rationale": "MEASURED by A06: a 1 px sliver at DPR 1.5, 1.59:1 against the checked ring. It must be sequenced after R28, which changes the frames it sits beside.",
+			"regression_risk": "A 3 px offset depends on the current 6 px grid gap and the 4 px gap under the theme line. A future tighter gap would let rings touch.",
+			"revised_correction": "As disposed. Re-measure after R28 and R38 land.",
+			"acceptance_test": "key-configured and dial-groups at 373x410 DPR 1.5, with each of the 8 chips checked in turn: Tab into the gallery. At least 2 CSS px of focus color, separated from the checked ring, shows on all four sides, and the ring does not overlap the theme line's text box.",
+			"evidence": "MEASURED A06 (focus.mjs, chip-focus-pair.png)."
+		},
+		{
+			"id": "R15",
+			"verdict": "modify",
+			"rationale": "Moving the row relocates cost rather than removing it. Reaching 'Readings per tile' gets cheaper, but everyone adding readings then passes the row's controls and about 90 px first (P09's own trade-off). The per-reading cost A07 measured (83 Tab presses for 12 readings) does not change, so the fix must not be counted as closing A07.",
+			"regression_risk": "The Press section's reading order changes, and with it the docs images, alt text and suite order assumptions.",
+			"revised_correction": "As disposed, with the claim limited to P09's route. A07 stays open (roving focus deferred) and is listed as such.",
+			"acceptance_test": "key-details with 25 readings at 373x410. Tab presses from the Details list select to 'Readings per tile' <= 4. Tab presses from the Details list select to 'Add readings' rise by at most the row's own stop count, which is reported. The A07 count (12 readings, Add readings to the end of the list) is reported next to baseline and not claimed as fixed. Drag and arrow chains are unchanged.",
+			"evidence": "MEASURED P09 (p4 D0, D1) and A07 (tabcost.mjs). The trade-off is INFERRED from the layout."
+		},
+		{
+			"id": "R16",
+			"verdict": "modify",
+			"rationale": "The label is wrong. A08 says WCAG 3.3.1 is met and 4.1.3 only 'arguable' for inline validation, and the evidence is the AX tree, not a screen reader. That makes this a walkthrough hypothesis, not standards-backed. Still worth doing because it is cheap and one-shot.",
+			"regression_risk": "Chatter while typing unless the announcement fires only on the valid-to-invalid transition.",
+			"revised_correction": "Keep the fix; relabel the category as walkthrough hypothesis (S4 to S5).",
+			"acceptance_test": "key-configured with Alerts open, 373x410. Typing '8o' produces exactly one polite announcement, '8oo' none more, and clearing none. Valid then invalid again produces one more.",
+			"evidence": "MEASURED A08 (AX tree only). READ pi-shell.js:177-186."
+		},
+		{
+			"id": "R17",
+			"verdict": "modify",
+			"rationale": "MEASURED here: the lists open on keyboard focus alone. key-empty: 4 Tab presses give aria-expanded true with the list at 301 to 529 in a 410 panel. dial-configured: 7 Tab presses open the rotation checklist, the page focus-scrolls 173 px, and the checklist stays open when the next Tab enters the rotation list. A disposition of 'on open, scroll so the list fits' would therefore also jump the page on every keyboard pass through a search field.",
+			"regression_risk": "The page moves under keyboard users who are only passing through. It could fight the 'Pick another reading' reveal. The status block scrolls out of view while picking.",
+			"revised_correction": "Scroll only on pointer open, on the first typed character, or on ArrowDown. Never on focus alone, during IME composition or on echoes. For 'Pick another reading', place the input just under the pinned header.",
+			"acceptance_test": "373x410 DPR 1.5. Click #picker-search on key-empty: at least 6 whole rows visible and the input below the pinned header. Click the visible part of #pickerr-search on dial-configured: at least 4 rows. 'Pick another reading' on key-missing: list bottom <= 410 and focus in the picker. A Tab walk through each search moves scrollY by no more than the browser's own focus scroll (compare with the baseline walk). 0 writes.",
+			"evidence": "MEASURED here (pc-misc.mjs). MEASURED B04 (probe2 P1, P3) and X11 (p4, p7)."
+		},
+		{
+			"id": "R18",
+			"verdict": "agree",
+			"rationale": "Walkthrough hypothesis, but the runtime fact is READ (src/rotation.ts:63-72: a turn from a reading outside the set enters at the first member and never returns). The fix is one derived line with no writes.",
+			"regression_risk": "It adds a line to the dial's longest fieldset while R42 removes lines; nobody owns the net budget.",
+			"revised_correction": "As disposed, counted inside R42's help-line budget.",
+			"acceptance_test": "dial-empty: pick GPU Temperature, then tick Hot Spot and Power (J2 steps). The rotation block's visible text names GPU Temperature as not in the rotation and names the first member. Ticking GPU Temperature removes the line. 0 extra writes.",
+			"evidence": "MEASURED B05 (J2). READ src/rotation.ts."
+		},
+		{
+			"id": "R19",
+			"verdict": "agree",
+			"rationale": "The runtime fact is READ (groups never take effect without a group-switch gesture: src/controls.ts, src/ui/dial-overview.ts), and the misleading note is MEASURED (B06 J5b). The walkthrough part is only the reader's inference.",
+			"regression_risk": "The note must re-render when a Custom gesture changes; it adds to the rotation text budget.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "dial-configured (Legacy) after Split at 373x410: text saying these gestures cannot switch groups is inside the viewport, and the note no longer says 'They take effect once two of them hold readings'. Switching Gestures to Elite removes the caveat, and so does setting Custom with pressed turn = stepGroup.",
+			"evidence": "MEASURED B06. READ pi-common.js:715-729."
+		},
+		{
+			"id": "R20",
+			"verdict": "modify",
+			"rationale": "Measured friction (B07). B07's own acceptance test contradicts itself: 'a second click still produces a perceivable change' conflicts with the signature guard that keeps preview ticks from re-announcing. The contract must say which one wins.",
+			"regression_risk": "Re-announcing on every tick if the line joins the status signature naively.",
+			"revised_correction": "Each Retry or Reload click is a user act. Clear the acknowledgement line on click and set it again when the answer arrives, so each click announces once. Ticks never touch it.",
+			"acceptance_test": "key-missing and key-unavailable at 373x410. Click once: within 1.5 s the status text contains 'again' and the live region fires once. Click a second time: it fires once more. 10 preview ticks with the same problem: 0 announcements. 0 writes.",
+			"evidence": "MEASURED B07. READ pi-shell.js:623-625."
+		},
+		{
+			"id": "R21",
+			"verdict": "modify",
+			"rationale": "Measured friction (P04). The keep-in-view part is safe. Alt+Home and Alt+End are new keys that nobody has tried on the real host, which is the same untested situation as R52 (the app already swallows Escape).",
+			"regression_risk": "Auto-scroll can fight the user's own scroll. The host or the app may keep Alt+Home.",
+			"revised_correction": "Keep the moved chip in view (block 'nearest'). Add Alt+Home and Alt+End only together with R52's host key check, with Alt+PageUp and Alt+PageDown as the fallback.",
+			"acceptance_test": "Rerun P04's p2 at 373x410 with 37 members: the moved chip is inside the viewport after every Earlier click and every Alt+Arrow press. Alt+End moves member 1 to last with one key press. Host: the key is included in the R52 check.",
+			"evidence": "MEASURED P04 (p2-373.json). INFERRED host risk."
+		},
+		{
+			"id": "R22",
+			"verdict": "agree",
+			"rationale": "Measured friction (P05: 34 clicks and 30 in-list scrolls against 3 presses in the detail checklist). It is parity with a sibling list built by the same factory, not a new pattern.",
+			"regression_risk": "Very large sets in one press, which grow the overview and the Reading colors list. It must follow the runtime's first-group-wins dedupe.",
+			"revised_correction": "As disposed: one write per field, into the collector group, and alias-aware.",
+			"acceptance_test": "dial-configured at 373x410: the CPU header shows '+ all'. One press adds its readings minus the current members and writes rotationKeys once (rotationGroups once when grouped). Ticks update in place, the list keeps its scroll, and a second press writes 0.",
+			"evidence": "MEASURED P05 (p2, p7 b, p4 D1)."
+		},
+		{
+			"id": "R23",
+			"verdict": "modify",
+			"rationale": "Measured friction (P06). But a 'Later' button that silently moves the reading into another group breaks the brief's 'what will my next click change' question.",
+			"regression_risk": "Overshoot into the neighbor group; the meaning of the end-of-list buttons changes.",
+			"revised_correction": "At a group edge the button's visible label, title and aria-label name the target ('To GPU'). Earlier at the first place of group 1 and Later at the last place of the last group stay disabled.",
+			"acceptance_test": "dial-groups at 373x410: select CPU CCD1 (last in group 1). The Later button's visible text names group 2. Press it: CCD1 is first in group 2, one frame, and selection and focus stay on it. The announcement names group 2.",
+			"evidence": "MEASURED P06 (p3 G2). The label concern is INFERRED."
+		},
+		{
+			"id": "R24",
+			"verdict": "defer",
+			"rationale": "X06 labels its own evidence a walkthrough hypothesis. Two first-pass reviewers list the current marks as working: B keep says 'on dial' is a fill plus a text pill and the editing selection a ring (J4); A keep says selection is distinct from 'on dial' in normal and forced colors. The proposed acceptance test (4 of 5 people) cannot run in this campaign. A recolor would invalidate a learned visual and the docs images on hypothesis alone.",
+			"regression_risk": "If recolored: relearning for existing users, docs recapture, and forced-colors parity to keep.",
+			"revised_correction": "None now. If it is revisited, the visible caption before the toolbar is the cheaper test.",
+			"acceptance_test": "None until a comprehension check with people exists. Meanwhile, a computed-style guard: the selected option and .current never share an identical fill AND outline.",
+			"evidence": "READ X06, B keep_unchanged and A keep_unchanged. No measurement of confusion exists."
+		},
+		{
+			"id": "R25",
+			"verdict": "defer",
+			"rationale": "Measured friction (X10), but its main trigger, a one-key Delete, is itself untested on the host (R52) and new in this pass. An Undo line is a new transient control, and the brief asks for demonstrated need first.",
+			"regression_risk": "An Undo that survives other edits or reloads restores stale state. An Undo under the pointer after a double click could undo at once.",
+			"revised_correction": "Revisit after R52 and R36 land.",
+			"acceptance_test": "If adopted: Remove, then Undo: rotationGroups is byte-identical to the original in one frame, and any other edit clears the Undo.",
+			"evidence": "MEASURED X10 (p2-integrity recovery)."
+		},
+		{
+			"id": "R26",
+			"verdict": "agree",
+			"rationale": "Seen only under Chromium's forced-colors emulation (A10 and V12). Whether the real host's QtWebEngine maps Windows contrast themes to forced colors at all was not checked (INFERRED unknown). The fix is scoped to @media (forced-colors) and cannot affect normal colors.",
+			"regression_risk": "None outside forced colors.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "Under emulated forced colors at 373x410, closed markers point right and open markers point down for sections, sub-sections and help disclosures. A normal-color screenshot is byte-identical to baseline.",
+			"evidence": "MEASURED A10 and V12 (emulation only)."
+		},
+		{
+			"id": "R27",
+			"verdict": "agree",
+			"rationale": "Same evidence limits as R26 (emulation). The fix is scoped and cheap.",
+			"regression_risk": "Where SelectedItem equals Highlight, only shape tells the saved row from the active row.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "Emulated forced colors, list open with the highlight moved: the saved row has a system-color fill and the active row an outline. Normal colors are unchanged.",
+			"evidence": "MEASURED A11 (emulation)."
+		},
+		{
+			"id": "R28",
+			"verdict": "modify",
+			"rationale": "The register merged a measured contrast failure (A12 and V02: link mark 1.39:1 and dashes 1.59:1 on Paper) with V03, which is aesthetic preference at S6 (a 1 px frame). The contrast half is the defect. Thinning the frame is taste, and it weakens Default's identity next to the chip it resolves to.",
+			"regression_risk": "The mark loses its fixed blue. A 1 px frame makes Default harder to tell from the resolved-theme chip beside it. R14's focus measurement depends on the frame.",
+			"revised_correction": "Draw the mark and the dashes in the resolved palette's own colors. Keep the 2 px frame width unless the owner accepts 1 px as a separate taste decision.",
+			"acceptance_test": "For each of the 7 shared themes: the Default mark is >= 3:1 and the dash color >= 3:1 against the Default face, and every chip name is whole at 373, 320, 189 and 160. Re-run R14's test afterwards.",
+			"evidence": "MEASURED A12 and V02 (contrast). V03 is labeled aesthetic-preference by its author."
+		},
+		{
+			"id": "R29",
+			"verdict": "agree",
+			"rationale": "Reproduced defect (B08), with runtime facts READ (sensor-dial.ts:346-350 and 521-526; rotation.ts:52-57).",
+			"regression_risk": "Help text that changes with state adds small layout shifts and lines to the budget.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "With rotationDisabled true, #picker-help's visible text no longer says turning changes the reading. On dial-empty the rotation note does not mention a picked sensor. The ordering sentence is absent while #rotation-set has no option. 0 writes.",
+			"evidence": "MEASURED B08."
+		},
+		{
+			"id": "R30",
+			"verdict": "agree",
+			"rationale": "Measured friction (B09), and cheap.",
+			"regression_risk": "The summary wraps to 3 lines at 373; exact strings in test/pi-model.test.ts:148-154 change.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "dial-groups: the Controls summary contains 'pressed turn switches sensor or group' and fits in 3 lines at 373. On Legacy it is unchanged.",
+			"evidence": "MEASURED B09. READ pi-model.js:195-210."
+		},
+		{
+			"id": "R32",
+			"verdict": "modify",
+			"rationale": "Walkthrough hypothesis. 'Switch sensor or group' is a command name that docs/controls.md and the control map share, so renaming it in the panel alone would split the vocabulary. Contract 6 bars control-map redesign.",
+			"regression_risk": "The docs, the control map and the panel disagree; summary strings in test/pi-model.test.ts change.",
+			"revised_correction": "Panel prose only. Leave command and gesture names and every device face untouched.",
+			"acceptance_test": "A grep of visible panel prose finds 'source' only next to data source, Shared Memory or Gadget, and 'sensor' never for a single reading. Command option labels are byte-identical to baseline. validate-release-copy passes.",
+			"evidence": "READ B11 greps. INFERRED vocabulary coupling."
+		},
+		{
+			"id": "R34",
+			"verdict": "agree",
+			"rationale": "Reproduced in the simulator, and the simulator uses production applyGlobalThemeSettings and buildThemesPayload (READ pi-sim.mjs:140 and 177), so the state is realistic. The integrity risk needs its own test: a displayed but unstored value in a bound shared select must never ride along on another shared write (contract 5).",
+			"regression_risk": "An accidental global theme write when an unrelated shared field changes. Picking the same visible value fires no change, so the person cannot store it explicitly by picking it.",
+			"revised_correction": "As disposed, strictly for display.",
+			"acceptance_test": "globals without theme and a resolved Ember deck theme: the band, the shared select and the shared summary all name Ember. Opening writes 0. Changing shared Text color writes one globals frame whose keys changed by exactly ['textMode'] and which has no 'theme' key.",
+			"evidence": "MEASURED B14 (probe2 P5). READ src/ui/theme-store.ts:80-83."
+		},
+		{
+			"id": "R36",
+			"verdict": "agree",
+			"rationale": "Measured friction (P10). The value is derived and panel-local with zero writes.",
+			"regression_risk": "It must not move mid-session when a turn echo changes the reading on the dial.",
+			"revised_correction": "Derive the collector on page load only.",
+			"acceptance_test": "dial-groups with Hot Spot on the dial: a fresh page shows 'Readings for GPU' with the GPU radio checked and 0 writes. Pushing a turn echo that moves the dial to CPU Tctl leaves the collector on GPU.",
+			"evidence": "MEASURED P10 (p3 G5)."
+		},
+		{
+			"id": "R37",
+			"verdict": "agree",
+			"rationale": "Titles and aria-keyshortcuts only; nothing visible changes.",
+			"regression_risk": "Titles drift from the handlers if R52 drops Delete.",
+			"revised_correction": "As disposed, kept in step with R52's outcome.",
+			"acceptance_test": "Each rotation toolbar button's title names its shortcut, and both list kinds expose aria-keyshortcuts matching the handlers actually bound. axe finds 0 violations at 373 and 320.",
+			"evidence": "MEASURED P11."
+		},
+		{
+			"id": "R38",
+			"verdict": "modify",
+			"rationale": "Walkthrough hypothesis; no measured comprehension difference exists. The only measured gain is height: 19 px at 373 and 320, 35 px at 189 and 160. I re-measured the four prototypes at 373 (DPR 1.5), 320, 240, 189 and 160 on key and dial with the longest name. P1 as prototyped fails: see band_prototype. A corrected P1 (P1b: Change as a sibling outside the ellipsizing span, per-kind scope word) keeps contract 1 at 373 and 320, but cuts 'Ultraviolet' at 240, 189 and 160. Letting the line wrap there moves the chips on a pick, because the line sits above them (MEASURED: P1b with wrap at 189 is 215 px for Default/Ultraviolet against 182 for Ember).",
+			"regression_risk": "Change reads as 'change this key' next to 'Theme Default'. The click only reveals the shared select, with 0 writes (MEASURED), so the risk is friction, not an unintended global write. The radiogroup loses its description when #theme-help is hidden. Chips move on a pick at narrow widths if the line wraps. The density baselines and e2e help-text checks change.",
+			"revised_correction": "Adopt P1b only under the conditions in band_prototype; otherwise keep P0 with R04. Land R04 first.",
+			"acceptance_test": "Battery B9 (pa-band.mjs and pd-zoomband.mjs extended to all 7 shared themes and all 8 picks).",
+			"evidence": "MEASURED here: pa-band.json, pa2.mjs, pe-hit.mjs, pd-zoomband.mjs. The integrator's band-proto.json agrees on heights at 373 (P0 125, P1 106, P2 125, P3 124 and 140)."
+		},
+		{
+			"id": "R39",
+			"verdict": "modify",
+			"rationale": "Reproduced defect (V06). Seeding a well from 'the colour the dial actually draws' needs the dial's resolver, including sensor-type coloring, and that lives plugin-side. A guessed seed swaps a known-false white for a plausible-looking wrong color.",
+			"regression_risk": "A new misleading state. Any render must never fire change or write readingColors.",
+			"revised_correction": "When 'Color numbers by sensor type' is off, seed with the palette's value color (as the text wells already do via themeValueSeed). When it is on, show a neutral 'Auto' swatch. Disabled Auto buttons take the rotation toolbar's disabled look.",
+			"acceptance_test": "Under Paper with type coloring off, no automatic well shows #ffffff and each equals the palette's value color. With type coloring on, automatic wells show the neutral swatch. Disabled Auto buttons differ from enabled ones in text color and border and use the default cursor. Opening writes 0.",
+			"evidence": "MEASURED V06. READ pi-common.js:3348, 3361 and 3643-3650."
+		},
+		{
+			"id": "R40",
+			"verdict": "agree",
+			"rationale": "Walkthrough hypothesis, but the scope is limited to tokens and wording, and the 'x2' next to the remove 'x' is a measured ambiguity.",
+			"regression_risk": "Tiles wrap sooner at 320; suites that match glyph text break.",
+			"revised_correction": "As disposed (no restructuring).",
+			"acceptance_test": "Inside #detail-list, no color falls outside the :root tokens (face and theme colors excepted), no visible 'x' sits on a control that does not remove, and tiles at 320x560 do not overflow.",
+			"evidence": "MEASURED V09."
+		},
+		{
+			"id": "R41",
+			"verdict": "agree",
+			"rationale": "The lab effect is MEASURED (V10); the host rendering is only INFERRED. The disposition is already gated on the host check, which is right.",
+			"regression_risk": "Native select popups, the color picker chrome and scrollbars all change in QtWebEngine.",
+			"revised_correction": "As disposed: OWNER-gated.",
+			"acceptance_test": "getComputedStyle(document.documentElement).colorScheme === 'dark'. Host screenshots of an unchecked checkbox, an open select popup and the color picker are all readable; otherwise revert.",
+			"evidence": "MEASURED V10 (lab only)."
+		},
+		{
+			"id": "R42",
+			"verdict": "modify",
+			"rationale": "Walkthrough hypothesis, and it interacts with R18, R19 and R29, which add lines to the same fieldset; nobody owns the net result. Removing the search help's 'Select one ..., then Earlier and Later set their order' leaves the slot hint as the only copy, and R06 makes that hint ellipsize at zoom widths, so the instruction would appear nowhere whole there. The disclosure relocates the plain-rotate versus group-switch rules one click away.",
+			"regression_risk": "Group semantics are hidden by default. The one whole instruction is lost at zoom widths. Suites that assert paragraph text break.",
+			"revised_correction": "Set one help-line budget for #rotation-box across batches 2 and 5. Keep one whole copy of the select-then-move instruction at every width. The Legacy caveat and the radio's meaning stay visible.",
+			"acceptance_test": "dial-groups (default fold) at 373x410 after ALL batches: at most 5 visible help lines inside #rotation-box, counted by line boxes. The box is at least 60 px shorter than baseline (490). The Legacy caveat is visible without a click, the radio's meaning sits within 120 px of the first radio, and the select-then-move instruction is whole at 189x410.",
+			"evidence": "MEASURED V14 (box 490 px). READ pi-common.js:651-729."
+		},
+		{
+			"id": "R43",
+			"verdict": "modify",
+			"rationale": "Split it. The dial part is a reproduced defect (B15): the face's precedence is label, then rotation name, then HWiNFO label (READ src/actions/sensor-dial.ts:1089-1091), and the header skips the rotation name. The multi-reading key heading is a walkthrough hypothesis with low confidence, and V16's own trade-off is +16 px of pinned header on every multi-reading key at 320.",
+			"regression_risk": "A taller pinned header on multi-reading keys (a density regression on every open).",
+			"revised_correction": "Take the dial part (rotation name as the heading, HWiNFO label on the source line). Defer the quad-key heading.",
+			"acceptance_test": "dial-groups: #head-reading is 'Hot Spot' and #head-source starts with 'GPU Hot Spot Temperature'. Header height at 373 stays 105. key-dense is unchanged.",
+			"evidence": "MEASURED B15 and V16. READ pi-shell.js:521-534."
+		},
+		{
+			"id": "R44",
+			"verdict": "modify",
+			"rationale": "Agree, and it is more urgent than batch 5. The integrator's own density-r3-baseline.json has no 373, 189 or 160 rows (READ: sizes 320x400, 320x560, 378x410, 380x560, 380x720, 400x800, 560x800), and it still flags T5 rotation search (top 393, bottom 421) as first screen. The 'before' side of every before-and-after is therefore at the wrong width. MEASURED here on the frozen copy at 373x410: dial rows are 16 to 32 px taller than the 378 numbers (dial all-open 3265 against 3249; dial-groups default 1672 against 1656 and all-open 3919 against 3887; custom gestures 3381 against 3365; key-dense 1002 against 988).",
+			"regression_risk": "Old and new first-screen tables are not comparable, so publish both for one round.",
+			"revised_correction": "Use density-373-189-160.json (mine) or a fresh equivalent as the baseline. First screen means folds 0, top >= pinned header bottom (0 when unpinned) and bottom <= viewport height. Spot-check header heights at DPR 1.5, because the lab runs at DPR 1.",
+			"acceptance_test": "Battery B10 and B11.",
+			"evidence": "READ density-r3-baseline.json. MEASURED here: density-373-189-160.json and density.log."
+		},
+		{
+			"id": "R45",
+			"verdict": "agree",
+			"rationale": "MEASURED by A14; trivial fix.",
+			"regression_risk": "None.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "Under prefers-reduced-motion: reduce, the four summary markers compute a transition-duration of 0s.",
+			"evidence": "MEASURED A14."
+		},
+		{
+			"id": "R46",
+			"verdict": "agree",
+			"rationale": "MEASURED by A15 in the AX tree.",
+			"regression_risk": "The pointer tooltip goes away, or duplicates the name.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "The Default radio's AX description is empty or equal to its name.",
+			"evidence": "MEASURED A15."
+		},
+		{
+			"id": "R47",
+			"verdict": "agree",
+			"rationale": "MEASURED by V11 (22 summaries show clipped rings).",
+			"regression_risk": "An inset ring can cover the triangle at 12 px.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "A full Tab audit at 373x410 and 189x410 finds 0 focus stops whose outline extends past the viewport edge, and the triangle stays visible under focus.",
+			"evidence": "MEASURED V11."
+		},
+		{
+			"id": "R48",
+			"verdict": "agree",
+			"rationale": "MEASURED by V13; the cause (a cascade order) is READ.",
+			"regression_risk": "Only the Back tile's first screen changes.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "key-back: the role note's rectangle has left 12 and width 349 at 373, and its background equals --hw-info-bg.",
+			"evidence": "MEASURED V13."
+		},
+		{
+			"id": "R49",
+			"verdict": "agree",
+			"rationale": "Aesthetic preference, S6, low risk. The fold pair already uses Lucide.",
+			"regression_risk": "One more inline SVG.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "Reload is an inline SVG whose stroke-width equals the fold pair's, it keeps its accessible name, and no text glyph is the only visible label of any control.",
+			"evidence": "READ V15 and the brief's contract 2 precedent."
+		},
+		{
+			"id": "R50",
+			"verdict": "reject",
+			"rationale": "Aesthetic preference with low confidence. The correction moves the label field between two positions when the layout changes, a predictability regression that V17 itself names.",
+			"regression_risk": "Layout switches move fields under the pointer.",
+			"revised_correction": "None.",
+			"acceptance_test": "n/a.",
+			"evidence": "READ V17."
+		},
+		{
+			"id": "R51",
+			"verdict": "agree",
+			"rationale": "MEASURED by X12, and it matches the existing kept-value contract for bound selects.",
+			"regression_risk": "None known.",
+			"revised_correction": "As disposed.",
+			"acceptance_test": "key-configured with displayMode 'heatmap': the select reads 'Stored value \"heatmap\" (not in this list, kept)' with 0 writes on open, and heatmap survives a Label edit.",
+			"evidence": "MEASURED X12."
+		},
+		{
+			"id": "R52",
+			"verdict": "modify",
+			"rationale": "The Delete, F2 and Alt+Arrow bindings are new in this uncommitted pass. They are absent from pi-common.js in both v1.6.0 and 4bf09c0 (READ via git show) and present in the frozen copy (pi-common.js:4134 F2, 4141 Delete). No user has ever run them, the host already intercepts at least one key (Escape never reaches the page), and the owner declined app control, so an OWNER check may never happen. An S1 risk needs a default for that case.",
+			"regression_risk": "Dropping Delete removes a shortcut that no release ever shipped; the Remove button stays.",
+			"revised_correction": "Keep OWNER, and add a release default: if the check has not run by release, ship without the Delete binding (F2 and Alt+Arrow do not destroy anything). Fold R21's Alt+Home and Alt+End into the same check, and test Delete in the Label text field as a control.",
+			"acceptance_test": "On a throwaway profile in the real app: click a rotation member, then press Delete, F2, Alt+Left and Alt+Home in turn. After each one the dial action is still on the canvas and the rotation changes only as the panel intends. Delete in the Label field deletes text only.",
+			"evidence": "READ git show v1.6.0 and 4bf09c0 (no binding); READ frozen pi-common.js:4134-4141; READ bench fact (Escape swallowed)."
+		},
+		{
+			"id": "R53",
+			"verdict": "agree",
+			"rationale": "Low-confidence standards finding with an injected stylesheet; the host offers no user stylesheet (INFERRED).",
+			"regression_risk": "None.",
+			"revised_correction": "KEEP. Re-check only if batch 3 changes chip padding.",
+			"acceptance_test": "If padding changes: under the 1.4.12 override at 320 and 373, no .hw-theme-value has scrollWidth > clientWidth.",
+			"evidence": "MEASURED A13."
+		},
+		{
+			"id": "R54",
+			"verdict": "agree",
+			"rationale": "Walkthrough hypothesis, and the fix needs plugin-side label memory, which is outside this pass's scope under contract 6.",
+			"regression_risk": "n/a.",
+			"revised_correction": "DEFER as disposed.",
+			"acceptance_test": "n/a.",
+			"evidence": "READ B16."
+		},
+		{
+			"id": "B10 (unregistered)",
+			"verdict": "modify",
+			"rationale": "Missing from the register: no R row carries it (the numbering skips R31, R33 and R35). It is a high-confidence reproduced defect (S5): Split, and by the same focus fallback Merge and group remove, open the rotation checklist as a side effect (READ pi-common.js:588 falls back to focusing #pickerr-search, and focus opens the list). The live e2e now asserts Split (READ lines ~593-598), so the fix is landing without a tracked row, and Merge and group remove are not asserted.",
+			"regression_risk": "None beyond the focus path in rotationFocusRestore.",
+			"revised_correction": "Add a row. The fallback focuses the search without opening it, or it is skipped when the handler places focus itself.",
+			"acceptance_test": "After Split, Merge and group remove (each by click and by Enter) on dial-configured and dial-groups: #pickerr-list.hidden is true and #pickerr-search is not aria-expanded='true'.",
+			"evidence": "MEASURED B10 (probe3, Split only). READ pi-common.js:576-589."
+		}
+	],
+	"band_prototype": {
+		"preferred": "P1b: P1's single line, corrected. 'Theme Default (shared: Void)' with Change as a flex:none sibling outside the ellipsizing #theme-current, and 'Theme Ember (this key only)' or '(this dial only)' by panel kind. The help line appears only for a key with no reading and for an unknown stored value. MEASURED at 373 (DPR 1.5) and 320: band 106 px for Default and for explicit picks (P0: 125); 'Default' twice instead of three times; the resolved name whole for Void and Ultraviolet on key and dial; Change 44x25 with a 93.9% hit share (P0: 93.6%); 0 writes; Change still reveals #shared-theme with 0 writes. If the conditions below cannot all be met without a second layout, keep P0's wording with R04. P2's wording is an acceptable no-gain tidy, not a reason for a change.",
+		"conditions": "(1) R04 lands first: the line reports stored and drawn state only. (2) Change is never inside an overflow:hidden element: its focus ring is unclipped and its hit share is >= 90% at every width. (3) The scope word follows the panel kind ('this dial only' on the dial). (4) Contract 1 at zoom widths: 'Ultraviolet' is cut at 240, 189 and 160 in P1b (MEASURED), and letting the line wrap moves the chips on a pick, because the line sits above them (MEASURED: P1b with the wrap rule at 189 gives 215 px for Default/Ultraviolet against 182 for Ember; P0 with the wrap rule at 160 gives 234 against 217). So below the width where 'Default (shared: Ultraviolet)' plus Change no longer fits one row, either reserve the line's wrapped height for every pick or move Change to its own row with reserved height. Chips must move 0 px across all 8 picks at every width. (5) The radiogroup keeps a description that states the scope (re-point aria-describedby to the line when the help is hidden). (6) Acceptance battery B9 passes: at 373 and 320, band <= 106 and constant over the 8 picks; the resolved name whole for all 7 shared themes as Default at 373, 320, 240, 189 and 160; Change whole, >= 24 px tall and >= 90% hittable; 'Default' at most twice; 0 writes; the unknown-value and no-reading help unchanged.",
+		"rejected_because": "P1 as prototyped puts Change inside the ellipsizing, overflow:hidden #theme-current. MEASURED at 373 DPR 1.5: the line box is 17 px tall around a 25 px button, so only 18 of 25 rows hit (hit share 68.8% against P0's 93.6%). That is below contract 3's 24 px target, and the focus ring is clipped. The line reports truncated at every width. The dial says '(this key only)'. At 189 and 160 the resolved name is cut ('Void' at 160, 'Ultraviolet' at 189 and 160), which fails contract 1. The contact sheet cannot show any of this, because a clipped hit area and focus ring are invisible in a static screenshot. P3: band height changes with the pick (124 for Default against 140 for explicit at 373 and 320; 216 against 232 at 189), so every pick moves everything below the band, and it drops the line that states the stored choice apart from the checked chip. P2: no density gain (125, same as P0); it only removes the third 'Default'. None of the four has comprehension evidence; R38 is a walkthrough hypothesis, so height and contract measurements are the only admissible deciders."
+	},
+	"new_concerns": [
+		"Missed from the register: B10 (S5, reproduced, high confidence). Split, Merge and group remove open the rotation checklist through the focus fallback at pi-common.js:588. The live e2e asserts only Split.",
+		"Merged away: R02 drops P02's Merge finding. Merge sits 6 px from Add group, drops every group name in one press, and Split afterwards gives unnamed groups. That is irreversible name loss (S2 class).",
+		"Merged away and wider than reported: X03's layout jump is folded into R06, but R06's correction ('the slot and hint may wrap') does not fix it. MEASURED on dial-groups: group 2 moves 32 px at 310, 298, 280, 249, 240 and 189 px and 96 px at 160 when selection moves to group 1. After a press on group 2's first member, the pointer rests on '← Earlier' (310 to 280) or '→ Later' (160). With A09's wrap CSS the shift is 32, 4 and 68 px (240, 189, 160); with V07's ellipsis CSS it is 32, 32 and 96 px. Only reserving the measured toolbar height restores the no-shift promise. At 373 and 320 it holds (0 px).",
+		"Before/after baseline at the wrong width: review/pi-density/round3/density-r3-baseline.json has no 373, 189 or 160 rows and keeps the lenient first-screen flag (T5 rotation search at 393 to 421 marked first screen). At 373 the dial rows are 16 to 32 px taller than the 378 numbers the REPORT quotes. My frozen-copy run at 373x410, 189x410 and 160x410 is C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-adversarial\\density-373-189-160.json.",
+		"R11 understates the Gadget case: the withheld-notes variants of the plugin hint double the info box (193 px). The key picker then ends at y 500 and the dial's at 516 (MEASURED). No first-pass fixture used them.",
+		"R17 would fire on keyboard walks: the key reading list and the dial rotation checklist open on Tab focus alone (MEASURED). A scroll-on-open rule must exclude focus-only opening.",
+		"R52 has no fallback: the Delete, F2 and Alt+Arrow list bindings are new in this uncommitted pass (absent in v1.6.0 and 4bf09c0), and the owner declined app control. Without a stated default, an S1 hypothesis ships untested.",
+		"Severity basis for every zoom-only S3 item (R06 and parts of R05 and R38): no reviewer verified that the Stream Deck app can zoom its property inspector. WCAG 1.4.10 is defined at 320 CSS px, where the panel already reflows. Ask the owner for one Ctrl+wheel or Ctrl+= check before treating these as S3 on the host.",
+		"Simulator timing leaks into fixes: pi-sim answers every setSettings with a preview after 5 ms and echoes didReceiveGlobalSettings on setGlobalSettings. Any fix that waits for 'the write to land' (R01) or reads state from an echo (R34) must not depend on that timing.",
+		"Density lab DPR: pi-lab density runs at DPR 1 while the host runs at 1.5. Wrap thresholds for the header, the band line and the toolbar can differ, so spot-check the 373 header and band heights at DPR 1.5 in the final battery.",
+		"Lab hygiene threatens the battery itself: on Windows, scripts/lib/cdp.mjs close() leaves Chrome running on the debug port. Here, 24 processes were left after 6 runs, and later runs attached to the stale browser. A reused page can carry emulation such as forced colors, reduced motion or viewport into an unrelated measurement. Before each battery run, kill that port's chrome.exe trees, and record window.__hwPiVersion in every row so a stale or wrong tree cannot pass.",
+		"Cross-item budget: R18, R19, R20 and R29 add lines to the dial's longest fieldset while R42 removes lines. R42's removal of the search help's second sentence leaves the slot hint, which R06 ellipsizes at zoom widths, as the only copy of the select-then-move instruction.",
+		"Sequencing: R04 before R38; R28 before R14; the arm helper shared by R02, R09 and Merge before R08's Tab test (Tab from a group name lands on a remove button).",
+		"Live e2e R04 check (e2e-pi-panels.mjs:460-470, read at review time) hovers 3 of 8 chips and uses programmatic focus() on a tabindex=-1 chip. It misses the unknown-stored-theme Tab path where X01 reproduced the wrong resolved theme.",
+		"BATTERY B0 (run on the frozen copy and on the final tree, one lab at a time, same Chrome). PI_SIM_PLUGIN_DIR is set per tree. Before and after each run, assert that no chrome.exe carries --remote-debugging-port=<base+2>. Record window.__hwPiVersion and sim write counts in every row. Real-host legs are the integrator's or owner's.",
+		"BATTERY B1 (R01). Fixtures: dial-groups (Elite), dial-custom-gestures (Custom, gestureTap pin), dial-configured (Legacy); 373x410 DPR 1.5, Controls open. Steps: three trusted paths from Elite (CDP typeahead 'c'; ArrowDown; CDP mouse press on #f-preset then ArrowDown and Enter); Custom to Elite to Custom by ArrowUp then ArrowDown; Legacy to Custom; an echo that switches Elite to Custom. Metrics: stored and shown preset, #controls-custom hidden, the six gesture fields, the ordered frame list. Pass: 'custom' stored and shown with the Elite map seeded; the last frame carries 'custom' and none after the first 'custom' frame carries 'elite'; gestureTap 'pin' kept; Legacy to Custom is 1 frame with no gesture field; the echo gives 0 frames. Mutation: resync #f-preset again and path 1 fails. Baseline expectation: every path ends on 'elite' with 6 frames.",
+		"BATTERY B2 (R02, Merge, B10). Fixture: dial-groups plus Add group; 373x410 DPR 1.5 and 189x410. Steps: CDP double click (clickCount 1 then 2, 120 ms apart) on group 1's remove; Enter twice 120 ms apart; press, wait 700 ms, press; arm then Tab away; one Merge press with a named group; Split, Merge and group remove by click and by Enter. Metrics: frames, rotationGroups and rotationKeys, activeElement, elementFromPoint at the press point, #pickerr-list hidden. Pass: double click and double Enter give 0 frames with armed words visible; press, dwell, press gives exactly 1 frame and removes only that group; focus lands neither on a remove nor on BODY, and the point under the pointer is not a remove or Merge; Tab away disarms with 0 frames; one Merge press gives 0 frames; the checklist stays hidden after all three actions; at 189 the armed control stays under the press point. Baseline: a double click removes both populated groups (4 frames).",
+		"BATTERY B3 (R03). Fixtures: dial-groups group name, dial-configured F2 rename, key-details cell rename; 373x410. Steps: type 'Zzq', mouseleave on documentElement, window blur; unchanged value then leave; IME composition then leave then compositionend. Pass: 1 frame containing the text per field; the same node focused and the caret kept; unchanged gives 0; IME gives 0 then 1. Host: 10 of 10 names survive a click on another key within 200 ms. Baseline: 0 frames.",
+		"BATTERY B4 (R04). Fixtures: key-configured (Default, shared Void), key-custom-dim (Ember), key-configured with theme 'neon-future' and shared Midnight; 373x410 DPR 1.5. Steps: CDP mouseMoved to the center of each of 8 chips, then off the band; blur, then Tab into the gallery (no arrows). Metric: #theme-current text and the resolved name visible outside the chips (range clip test) at every step; writes. Pass: the line is constant at every step, the resolved name is visible at every step, 0 writes. Baseline: the line changes on 8 of 8 hovers, and the unknown case shows 'Default · Midnight' on Tab.",
+		"BATTERY B5 (R05). Cases: dial-configured with rotationKeys [gpu, 'f0099999:0:1000000', hot]; the same with a linked duplicate pair; dial-groups with group 2 holding only a missing key; dial-unavailable with the same keys; key-details with a missing detail key; 373x410 and 160x410, plus emulated forced colors at 373. Pass: the missing chip's innerText (sr-only excluded) shows 'not in HWiNFO', unclipped; the AX name contains it once; the note's number equals rotationReadings(...).length from src/rotation.ts (baseline: the note says 3 where the runtime moves through 2); the groups note agrees with the runtime; dial-unavailable shows no pill; 0 writes.",
+		"BATTERY B6 (R06 with X03). Fixtures: key-configured, key-unavailable, dial-configured, dial-groups (default and all-open), control-reset; widths 373 (DPR 1.5), 320, 310, 298, 240, 189, 160; height 410. Metrics: overflowX, header rectangle and pinned state, kind-line line count and breaks inside words, dial face visible share, chips bottom; shift test (CDP click on group 1's first option, then a press on group 2's first option at its pre-press point; group 2's y delta; elementFromPoint after). Pass: overflowX 0 everywhere (baseline 58 at 189, 87 at 160, 7 at 240); header identical at 373 and 320; kind line at most 2 lines with no break inside a word at 189 and 160; face share 1.0 at 240, 189 and 160; chips bottom <= 410 at 189 and 160 (baseline key 406 and 649, dial 341 and 440); shift 0 px and the pressed option under the pointer at every width (baseline 32 px at 310 to 189, 96 px at 160).",
+		"BATTERY B7 (R11). Fixtures: key-configured and dial-configured with data 'gadget' (a) on the plain sample snapshot and (b) with blockedReadingCount 2 and contradictoryReadingCount 1; key-unavailable and dial-unavailable with globals.source 'gadget'; 373x410 DPR 1.5. Pass: status <= 40 px (baseline 96 and 193); key palette top <= 150 (baseline 221 and 317); dial palette top <= 166 (baseline 237 and 333); key #picker-search bottom <= 410 (baseline 404 and 500); 'no min' visible without a click; the withheld remedy reachable in <= 2 activations with 0 writes; forced-source outages carry no Shared Memory advice and both chip rows end at or above 410.",
+		"BATTERY B8 (R12). Run: e2e-pi-panels with the edit table asserting === 1 frame per field (exceptions listed with their counts); palette checks at 373x410 (pinned, chips bottom <= 410) and 189x410 (chips bottom <= 410 at load); real CDP hover in the observe loop; the zero and negative check asserts face text. Pass: green on the final tree, red under three mutations: writeRotation writes twice, the hover preview is restored, and a valid 0 renders as '--'.",
+		"BATTERY B9 (R38). Fixtures: key-configured with each of the 7 shared themes as Default; key explicit for each of the 7 themes; key 'neon-future'; key-empty; dial Default with Ultraviolet and dial explicit Ember. Widths: 373 (DPR 1.5), 320, 240, 189, 160. Metrics as in pa-band.mjs and pd-zoomband.mjs: band height, chips top for each of the 8 picks, resolved name whole (range clip test), Change box height and elementFromPoint hit share, focus ring clip, 'Default' count, radiogroup AX description, writes. Pass: see band_prototype condition (6). Baseline (P0): 125 px at 373 and 320, 217 at 189 and 160; 'Ultraviolet' cut at 160; Change hit share 0.936.",
+		"BATTERY B10 (density). Run: pi-lab density --sizes 373x410,320x560,189x410,160x410 on both trees, plus a DPR 1.5 spot check of header and band at 373. Baseline at 373x410 (MEASURED, frozen copy): key-empty and key-configured default 748, key all-open 2256, all-folded 403, key-dense default 1002, key-details all-open 2886, dial-configured default 1159, all-open 3265, dial-groups default 1672, all-open 3919, dial-custom-gestures all-open 3381, control-reset all-open 576; headers 89 (key), 102 (dense and triple), 105 (dial) pinned; palette top 116, 129, 132; key-missing, stale, unavailable 240, 261, 277; overflowX 0 at 373. Pass: every state at 373 <= baseline plus that batch's declared delta (each added line names its px); overflowX 0 at all four widths; writes 0; healthy-fixture palette tops <= baseline. The REPORT quotes 373 numbers and leads with the all-open deltas, not the default fold.",
+		"BATTERY B11 (first screen). Definition: folds 0, top >= pinned header bottom (0 when unpinned) and bottom <= 410, at 373x410. Baseline (strict): T1 picker top 271, T2 gallery 116 and 132, T3 layout 326, T7 recovery 177 and 214 are on the first screen; T5 rotation search (393 to 421) is NOT. Pass: T1, T2, T3 and T7 strictly on the first screen in the final tree. Any claim that the rotation search is on the first screen requires bottom <= 410. No Tab route grows by more than 1 over baseline except routes declared by R15 (baseline Tab counts: T1 4, T2 2, 2, 10, 12, T3 8, 13, T4 17, T5 7, 7, 11, T6 18, 23, T7 2, 2, T8 20, T9 23)."
+	],
+	"report_path": "NOT WRITTEN: this session's harness instructions forbid subagents from writing report or findings .md files, and those instructions outrank the computed task text. This structured result is the full report. The intended path was C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-adversarial\\report.md. The evidence and probe scripts are in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-adversarial\\:\n- pa-band.mjs and pa-band\\pa-band.json (with PNGs at 189 and 160)\n- pa2.mjs\n- pb-slot.mjs and pb-slot2.mjs\n- pc-misc.mjs\n- pd-zoomband.mjs\n- pe-hit.mjs\n- density-373-189-160.json and density.log\n\nThe probes' own output is in this transcript. No lab process is left running on ports 31910 to 31912."
+}

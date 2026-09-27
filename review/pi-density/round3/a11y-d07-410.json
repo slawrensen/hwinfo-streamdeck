@@ -1,0 +1,1164 @@
+{
+	"method": "Simulated host, headless Chromium. Own name/tabindex/hidden-focus checks plus axe-core when AXE_CORE is set. Not a full WCAG audit and not the embedded host.",
+	"axe": true,
+	"report": [
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "alerts-editing",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-custom-dim",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-inherited",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-alert",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 30,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"span[data-key=\"e0002000:0:1000000\"][data-tile=\"0\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power up the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power down the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-tile=\"3\"][data-key=\"f0200101:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-zero-negative",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-empty",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 35,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 35,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-alert",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"earlier\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 31,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 23,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "control-reset",
+			"state": "expanded",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 23,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-back",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 373,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "alerts-editing",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-custom-dim",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-inherited",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-alert",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 30,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"span[data-key=\"e0002000:0:1000000\"][data-tile=\"0\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power up the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power down the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-tile=\"3\"][data-key=\"f0200101:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-zero-negative",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-empty",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 35,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 35,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-alert",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"earlier\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 31,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 29,
+				"incomplete": [
+					{
+						"id": "bypass",
+						"nodes": [
+							"html (No valid skip link found)"
+						]
+					},
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[data-tool=\"later\"] > span[aria-hidden=\"true\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 23,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "control-reset",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 23,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-back",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		}
+	]
+}

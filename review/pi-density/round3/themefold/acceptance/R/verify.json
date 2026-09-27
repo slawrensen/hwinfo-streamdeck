@@ -1,0 +1,1236 @@
+[
+ {
+  "name": "373: the fold row is one section row, open and folded (VT04)",
+  "ok": true,
+  "detail": {
+   "open": [
+    30,
+    30.2
+   ],
+   "folded": [
+    30,
+    30.2
+   ]
+  }
+ },
+ {
+  "name": "373: \"Theme\" is styled and placed like a section title (VT01)",
+  "ok": true,
+  "detail": {
+   "o": [
+    "13px 600 rgb(236, 236, 236)",
+    "13px 600 rgb(236, 236, 236)",
+    28,
+    28
+   ]
+  }
+ },
+ {
+  "name": "373: the folded chip is 24 px, at least 72 px wide, its stripe 3+ px under the word (VT03)",
+  "ok": true,
+  "detail": {
+   "h": 24,
+   "w": 76.2,
+   "stripeBelowBaseline": 3.5,
+   "text": "Default"
+  }
+ },
+ {
+  "name": "373: open, the row ends before Change and Change is outside it (AT01, PT01)",
+  "ok": true,
+  "detail": {
+   "sumRight": 305,
+   "changeLeft": 318.5
+  }
+ },
+ {
+  "name": "373: the band folds from 111 to 31 px with no overflow",
+  "ok": true,
+  "detail": {
+   "open": 111,
+   "folded": 31
+  }
+ },
+ {
+  "name": "320: the fold row is one section row, open and folded (VT04)",
+  "ok": true,
+  "detail": {
+   "open": [
+    30,
+    30.2
+   ],
+   "folded": [
+    30,
+    30.2
+   ]
+  }
+ },
+ {
+  "name": "320: \"Theme\" is styled and placed like a section title (VT01)",
+  "ok": true,
+  "detail": {
+   "o": [
+    "13px 600 rgb(236, 236, 236)",
+    "13px 600 rgb(236, 236, 236)",
+    28,
+    28
+   ]
+  }
+ },
+ {
+  "name": "320: the folded chip is 24 px, at least 72 px wide, its stripe 3+ px under the word (VT03)",
+  "ok": true,
+  "detail": {
+   "h": 24,
+   "w": 76.2,
+   "stripeBelowBaseline": 3.5,
+   "text": "Default"
+  }
+ },
+ {
+  "name": "320: open, the row ends before Change and Change is outside it (AT01, PT01)",
+  "ok": true,
+  "detail": {
+   "sumRight": 252,
+   "changeLeft": 265.5
+  }
+ },
+ {
+  "name": "320: the band folds from 111 to 31 px with no overflow",
+  "ok": true,
+  "detail": {
+   "open": 111,
+   "folded": 31
+  }
+ },
+ {
+  "name": "373: 27 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (3 landed on other controls or off screen)",
+  "ok": true,
+  "detail": {
+   "bad": [],
+   "n": 0,
+   "pressed": 27
+  }
+ },
+ {
+  "name": "373: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "320: 28 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (2 landed on other controls or off screen)",
+  "ok": true,
+  "detail": {
+   "bad": [],
+   "n": 0,
+   "pressed": 28
+  }
+ },
+ {
+  "name": "320: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "298: 29 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (1 landed on other controls or off screen)",
+  "ok": false,
+  "detail": {
+   "bad": [
+    {
+     "dir": "above",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    }
+   ],
+   "n": 8,
+   "pressed": 29
+  }
+ },
+ {
+  "name": "298: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "249: 29 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (1 landed on other controls or off screen)",
+  "ok": false,
+  "detail": {
+   "bad": [
+    {
+     "dir": "above",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    }
+   ],
+   "n": 8,
+   "pressed": 29
+  }
+ },
+ {
+  "name": "249: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "213: 29 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (1 landed on other controls or off screen)",
+  "ok": false,
+  "detail": {
+   "bad": [
+    {
+     "dir": "above",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    }
+   ],
+   "n": 8,
+   "pressed": 29
+  }
+ },
+ {
+  "name": "213: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "189: 29 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (1 landed on other controls or off screen)",
+  "ok": false,
+  "detail": {
+   "bad": [
+    {
+     "dir": "above",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    }
+   ],
+   "n": 8,
+   "pressed": 29
+  }
+ },
+ {
+  "name": "189: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "160: 29 near misses 1 to 6 px around Change fold nothing, scroll nothing, write nothing (1 landed on other controls or off screen)",
+  "ok": false,
+  "detail": {
+   "bad": [
+    {
+     "dir": "above",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 3,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 4,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 5,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    },
+    {
+     "dir": "above-left",
+     "k": 6,
+     "hit": "row",
+     "folded": true,
+     "scrolled": 0,
+     "writes": 0
+    }
+   ],
+   "n": 8,
+   "pressed": 29
+  }
+ },
+ {
+  "name": "160: a press 1 px inside Change's top edge opens Shared defaults and leaves the band open",
+  "ok": true,
+  "detail": {
+   "open": true,
+   "shared": true
+  }
+ },
+ {
+  "name": "373 key-configured: open costs 4.9 px over d04 (budget 30), folded saves 75.1 px (at least 40); band 111 / 31 vs d04 106.1",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 195.1,
+    "band": 106.1
+   },
+   "open": 200,
+   "folded": 120,
+   "bandO": 111,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "373 dial-configured: open costs 4.9 px over d04 (budget 30), folded saves 75.1 px (at least 40); band 111 / 31 vs d04 106.1",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 211.1,
+    "band": 106.1
+   },
+   "open": 216,
+   "folded": 136,
+   "bandO": 111,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "320 key-configured: open costs 4.9 px over d04 (budget 30), folded saves 75.1 px (at least 40); band 111 / 31 vs d04 106.1",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 207.7,
+    "band": 106.1
+   },
+   "open": 212.6,
+   "folded": 132.6,
+   "bandO": 111,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "320 dial-configured: open costs 4.9 px over d04 (budget 30), folded saves 75.1 px (at least 40); band 111 / 31 vs d04 106.1",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 207.7,
+    "band": 106.1
+   },
+   "open": 212.6,
+   "folded": 132.6,
+   "bandO": 111,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "298 key-configured: open costs 30.8 px over d04 (budget 36), folded saves 185.7 px (at least 40); band 247.6 / 31 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 318.3,
+    "band": 216.7
+   },
+   "open": 349.1,
+   "folded": 132.6,
+   "bandO": 247.6,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "298 dial-configured: open costs 30.8 px over d04 (budget 36), folded saves 185.7 px (at least 40); band 247.6 / 31 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 318.3,
+    "band": 216.7
+   },
+   "open": 349.1,
+   "folded": 132.6,
+   "bandO": 247.6,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "249 key-configured: open costs 30.9 px over d04 (budget 36), folded saves 185.6 px (at least 40); band 247.6 / 31 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 334.3,
+    "band": 216.7
+   },
+   "open": 365.2,
+   "folded": 148.7,
+   "bandO": 247.6,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "249 dial-configured: open costs 30.9 px over d04 (budget 36), folded saves 185.6 px (at least 40); band 247.6 / 31 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 334.3,
+    "band": 216.7
+   },
+   "open": 365.2,
+   "folded": 148.7,
+   "bandO": 247.6,
+   "bandF": 31
+  }
+ },
+ {
+  "name": "213 key-configured: open costs 30.8 px over d04 (budget 36), folded saves 168.9 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 402.3,
+    "band": 216.7
+   },
+   "open": 433.1,
+   "folded": 233.4,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "213 dial-configured: open costs 30.8 px over d04 (budget 36), folded saves 168.9 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 370.2,
+    "band": 216.7
+   },
+   "open": 401,
+   "folded": 201.3,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "189 key-configured: open costs 30.8 px over d04 (budget 36), folded saves 168.9 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 402.3,
+    "band": 216.7
+   },
+   "open": 433.1,
+   "folded": 233.4,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "189 dial-configured: open costs 30.8 px over d04 (budget 36), folded saves 168.9 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 386.3,
+    "band": 216.7
+   },
+   "open": 417.1,
+   "folded": 217.4,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "160 key-configured: open costs 30.9 px over d04 (budget 36), folded saves 168.8 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 418.3,
+    "band": 216.7
+   },
+   "open": 449.2,
+   "folded": 249.5,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "160 dial-configured: open costs 30.8 px over d04 (budget 36), folded saves 168.9 px (at least 40); band 247.6 / 47.8 vs d04 216.7",
+  "ok": true,
+  "detail": {
+   "d04": {
+    "reading": 386.3,
+    "band": 216.7
+   },
+   "open": 417.1,
+   "folded": 217.4,
+   "bandO": 247.6,
+   "bandF": 47.8
+  }
+ },
+ {
+  "name": "373 key-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    121
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "373 dial-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    137
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "320 key-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    133.6
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "320 dial-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    133.6
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "189 key-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    278.1
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "189 dial-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    262.1
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "160 key-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    294.2
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "160 dial-configured: 8 picks, chips move 0 px, no line is cut, the folded chip wears the checked chip's colors",
+  "ok": true,
+  "detail": {
+   "tops": [
+    262.1
+   ],
+   "cut": 0,
+   "colorMiss": []
+  }
+ },
+ {
+  "name": "the fold row is a disclosure named by its visible words, expanded open and collapsed folded",
+  "ok": true,
+  "detail": {
+   "axOpen": {
+    "role": "DisclosureTriangle",
+    "name": "Theme Default (shared: Void)",
+    "expanded": true
+   },
+   "axFolded": {
+    "role": "DisclosureTriangle",
+    "name": "Theme Default (shared: Void)",
+    "expanded": false
+   }
+  }
+ },
+ {
+  "name": "373: six states, the folded row names what the open row names (plus the empty-key sentence)",
+  "ok": true,
+  "detail": []
+ },
+ {
+  "name": "160: six states, the folded row names what the open row names (plus the empty-key sentence)",
+  "ok": true,
+  "detail": []
+ },
+ {
+  "name": "373: a long unknown stored theme is never cut, open or folded, and is named in full (VT07)",
+  "ok": true,
+  "detail": {
+   "o": false,
+   "f": false,
+   "name": "Theme \"synthwave-sunset-2027\" (unknown; draws Void)"
+  }
+ },
+ {
+  "name": "320: a long unknown stored theme is never cut, open or folded, and is named in full (VT07)",
+  "ok": true,
+  "detail": {
+   "o": false,
+   "f": false,
+   "name": "Theme \"synthwave-sunset-2027\" (unknown; draws Void)"
+  }
+ },
+ {
+  "name": "Tab order: the row, Change, then the checked chip",
+  "ok": true,
+  "detail": [
+   "summary:sec-theme",
+   "theme-change",
+   "chip:"
+  ]
+ },
+ {
+  "name": "Enter folds and Space opens the band from the keyboard, writing nothing",
+  "ok": true,
+  "detail": {
+   "enterFolds": true,
+   "spaceOpens": true
+  }
+ },
+ {
+  "name": "Fold all folds the band with the rest; Open all opens it",
+  "ok": true,
+  "detail": {
+   "allFolded": false,
+   "allOpen": true
+  }
+ },
+ {
+  "name": "folded on a key: the next key opens folded, a dial opens open",
+  "ok": true,
+  "detail": {
+   "same": false,
+   "differ": true
+  }
+ },
+ {
+  "name": "folded on a dial: the next dial opens folded, a key opens open",
+  "ok": true,
+  "detail": {
+   "same": false,
+   "differ": true
+  }
+ },
+ {
+  "name": "a fold answer 900 ms late folds nothing under the person: focus kept, no section moves",
+  "ok": false,
+  "detail": {
+   "shown": true,
+   "focus": true,
+   "moved": [
+    {
+     "id": "sec-reading",
+     "before": [
+      true,
+      200
+     ],
+     "after": [
+      true,
+      89
+     ]
+    },
+    {
+     "id": "sec-display",
+     "before": [
+      true,
+      352.8
+     ],
+     "after": [
+      false,
+      200
+     ]
+    },
+    {
+     "id": "sec-alerts",
+     "before": [
+      false,
+      623.5
+     ],
+     "after": [
+      true,
+      231.2
+     ]
+    },
+    {
+     "id": "sec-interaction",
+     "before": [
+      false,
+      654.7
+     ],
+     "after": [
+      false,
+      502
+     ]
+    },
+    {
+     "id": "sec-advanced",
+     "before": [
+      false,
+      685.9
+     ],
+     "after": [
+      false,
+      533.1
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "the late answer leaves the plugin's memory as it was",
+  "ok": true,
+  "detail": {
+   "sec-theme": false,
+   "sec-reading": false
+  }
+ },
+ {
+  "name": "the next key panel, answered in time, opens with the remembered folds",
+  "ok": true,
+  "detail": {
+   "theme": false,
+   "reading": false
+  }
+ },
+ {
+  "name": "empty key, folded: the row says the theme shows once a reading is picked, and says it to assistive tech",
+  "ok": true,
+  "detail": {
+   "note": {
+    "text": "Shows on the key once a reading is picked.",
+    "shown": true,
+    "h": 16.1
+   },
+   "name": "Theme Default (shared: Void) Shows on the key once a reading is picked.",
+   "bandH": 47.1
+  }
+ },
+ {
+  "name": "empty key, folded: once a reading arrives the note empties and the Reading section does not move",
+  "ok": true,
+  "detail": {
+   "before": 136.1,
+   "after": 136.1,
+   "note": {
+    "text": "",
+    "shown": true,
+    "h": 16.1
+   }
+  }
+ },
+ {
+  "name": "then opened and folded again, the held line is gone: the band is a plain folded row",
+  "ok": false,
+  "detail": {
+   "bandH": 47.1,
+   "ref": 31,
+   "note": {
+    "text": "",
+    "shown": true,
+    "h": 16.1
+   }
+  }
+ },
+ {
+  "name": "empty key, picked while open, then folded: no blank line is held",
+  "ok": false,
+  "detail": {
+   "bandH": 47.1,
+   "ref": 31,
+   "note": {
+    "text": "",
+    "shown": true,
+    "h": 16.1
+   }
+  }
+ },
+ {
+  "name": "empty key with an unknown stored theme, folded: the row still carries the empty-key sentence",
+  "ok": false,
+  "detail": {
+   "text": "",
+   "shown": false,
+   "h": 0
+  }
+ },
+ {
+  "name": "empty key with shared Paper, folded: the row still carries the empty-key sentence",
+  "ok": true,
+  "detail": {
+   "text": "Shows on the key once a reading is picked.",
+   "shown": true,
+   "h": 16.1
+  }
+ },
+ {
+  "name": "373: in six states, open and folded, the marker sits on the title's line and wrapped lines start under the title",
+  "ok": false,
+  "detail": [
+   {
+    "label": "key synthwave-sunset-2027",
+    "state": "open",
+    "off": 4.8,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   }
+  ]
+ },
+ {
+  "name": "320: in six states, open and folded, the marker sits on the title's line and wrapped lines start under the title",
+  "ok": false,
+  "detail": [
+   {
+    "label": "key neon-2031",
+    "state": "open",
+    "off": 4.8,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key synthwave-sunset-2027",
+    "state": "open",
+    "off": 4.8,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key synthwave-sunset-2027",
+    "state": "folded",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "empty key neon-2031",
+    "state": "open",
+    "off": 4.8,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   }
+  ]
+ },
+ {
+  "name": "249: in six states, open and folded, the marker sits on the title's line and wrapped lines start under the title",
+  "ok": false,
+  "detail": [
+   {
+    "label": "key Default",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "dial Ember",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "dial Ember",
+    "state": "folded",
+    "off": 4.8,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key neon-2031",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   }
+  ]
+ },
+ {
+  "name": "189: in six states, open and folded, the marker sits on the title's line and wrapped lines start under the title",
+  "ok": false,
+  "detail": [
+   {
+    "label": "key Default",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "dial Ember",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key neon-2031",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key neon-2031",
+    "state": "folded",
+    "off": 13.2,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   }
+  ]
+ },
+ {
+  "name": "160: in six states, open and folded, the marker sits on the title's line and wrapped lines start under the title",
+  "ok": false,
+  "detail": [
+   {
+    "label": "key Default",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "dial Ember",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key neon-2031",
+    "state": "open",
+    "off": 2.9,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   },
+   {
+    "label": "key neon-2031",
+    "state": "folded",
+    "off": 13.2,
+    "titleLeft": 28,
+    "offLeft": [],
+    "overflow": 0
+   }
+  ]
+ }
+]

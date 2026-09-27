@@ -1,0 +1,308 @@
+{
+	"method": "Simulated host, sample data, headless Chromium. Every swatch clicked in turn; every name line tried in #theme-current.",
+	"rows": [
+		{
+			"width": 373,
+			"fixture": "key-configured",
+			"swatch": "83x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 373,
+			"fixture": "dial-configured",
+			"swatch": "83x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 373,
+			"fixture": "key-empty",
+			"swatch": "83x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 378,
+			"fixture": "key-configured",
+			"swatch": "84x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 378,
+			"fixture": "dial-configured",
+			"swatch": "84x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 378,
+			"fixture": "key-empty",
+			"swatch": "84x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 360,
+			"fixture": "key-configured",
+			"swatch": "80x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 360,
+			"fixture": "dial-configured",
+			"swatch": "80x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 360,
+			"fixture": "key-empty",
+			"swatch": "80x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 320,
+			"fixture": "key-configured",
+			"swatch": "70x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 320,
+			"fixture": "dial-configured",
+			"swatch": "70x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 320,
+			"fixture": "key-empty",
+			"swatch": "70x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 315,
+			"fixture": "key-configured",
+			"swatch": "68x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 315,
+			"fixture": "dial-configured",
+			"swatch": "68x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 315,
+			"fixture": "key-empty",
+			"swatch": "68x32",
+			"bands": [
+				125
+			],
+			"swatchRows": [
+				2
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 189,
+			"fixture": "key-configured",
+			"swatch": "80x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 189,
+			"fixture": "dial-configured",
+			"swatch": "80x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 189,
+			"fixture": "key-empty",
+			"swatch": "80x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": []
+		},
+		{
+			"width": 160,
+			"fixture": "key-configured",
+			"swatch": "65x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": [
+				"Default · Ultraviolet",
+				"Default · Midnight"
+			]
+		},
+		{
+			"width": 160,
+			"fixture": "dial-configured",
+			"swatch": "65x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": [
+				"Default · Ultraviolet",
+				"Default · Midnight"
+			]
+		},
+		{
+			"width": 160,
+			"fixture": "key-empty",
+			"swatch": "65x32",
+			"bands": [
+				217
+			],
+			"swatchRows": [
+				4
+			],
+			"overflow": 0,
+			"reach": true,
+			"cut": [
+				"Default · Ultraviolet",
+				"Default · Midnight"
+			]
+		}
+	]
+}

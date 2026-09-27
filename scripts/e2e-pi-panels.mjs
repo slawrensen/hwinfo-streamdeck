@@ -614,6 +614,26 @@ try {
 	await sleep(250);
 	const afterDelete = lastWrite()?.rotationGroups;
 	check("T5: Delete in group 1's list removes group 1's first member and leaves group 2 alone", same(afterDelete?.[0]?.keys, groupsBefore2[0].keys.slice(1)) && same(afterDelete?.[1], groupsBefore2[1]), JSON.stringify(afterDelete));
+	// One press removes one reading: a held Delete, or Enter held on Remove,
+	// removes only the selected reading, never the ones after it.
+	const holdKey = async (key, on) => {
+		await open("dial-configured");
+		const before = structuredClone(sim.settings.rotationKeys);
+		await b.evaluate(`document.querySelector('#rotation-set .hw-set-list').focus()`);
+		await sleep(80);
+		if (on !== null) await b.evaluate(`document.querySelector('${on}').focus()`);
+		const info = key === "Delete" ? { key, code: "Delete", windowsVirtualKeyCode: 46 } : { key, code: "Enter", windowsVirtualKeyCode: 13, text: "\r" };
+		const type = key === "Delete" ? "rawKeyDown" : "keyDown";
+		await b.send("Input.dispatchKeyEvent", { type, ...info });
+		for (let i = 0; i < 5; i++) await b.send("Input.dispatchKeyEvent", { type, ...info, autoRepeat: true });
+		await b.send("Input.dispatchKeyEvent", { type: "keyUp", key, code: info.code, windowsVirtualKeyCode: info.windowsVirtualKeyCode });
+		await sleep(300);
+		return { before, after: sim.settings.rotationKeys };
+	};
+	const heldDelete = await holdKey("Delete", null);
+	check("rotation: a held Delete removes one reading", heldDelete.before.length === 3 && same(heldDelete.after, heldDelete.before.slice(1)), JSON.stringify(heldDelete));
+	const heldEnter = await holdKey("Enter", '#rotation-set .hw-set-tools button[data-tool="remove"]');
+	check("rotation: Enter held on Remove removes one reading", heldEnter.before.length === 3 && same(heldEnter.after, heldEnter.before.slice(1)), JSON.stringify(heldEnter));
 
 	// Round 3 (R02, R12): a group holding readings needs a second press,
 	// said in words; a double press only arms; leaving the button disarms;
@@ -859,7 +879,7 @@ try {
 		await sleep(250);
 		const toEnd = await b.evaluate(`(() => { const o = document.querySelector('#rotation-set [role="option"][aria-selected="true"]'); const r = o.getBoundingClientRect(); return { key: o.dataset.key, visible: r.top >= 0 && r.bottom <= innerHeight, focus: document.activeElement.matches(".hw-set-list") }; })()`);
 		check("R21: Alt+End moves the selected member to the end of its list in one frame and keeps it in view", same(lastWrite()?.rotationGroups?.[1]?.keys, [K.gpu, K.hot, K.cpuPower]) && sim.writes.length === 1 && toEnd.key === K.cpuPower && toEnd.visible && toEnd.focus, JSON.stringify({ toEnd, n: sim.writes.length, wrote: lastWrite()?.rotationGroups }));
-		check("R37: the lists name their shortcuts, and the tools' tooltips name theirs", (await b.evaluate(`document.querySelector("#rotation-set .hw-set-list").getAttribute("aria-keyshortcuts")`)) === "Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2" && /\(Alt\+Right in the list\)$/.test(await b.evaluate(`document.querySelector('#rotation-set .hw-set-tools button[data-tool="later"]').title`)));
+		check("R37: the lists name their shortcuts, Delete included since the owner checked it on the real app (R52), and the tools' tooltips name theirs", (await b.evaluate(`document.querySelector("#rotation-set .hw-set-list").getAttribute("aria-keyshortcuts")`)) === "Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2 Delete" && /\(Alt\+Right in the list\)$/.test(await b.evaluate(`document.querySelector('#rotation-set .hw-set-tools button[data-tool="later"]').title`)) && /\(Delete in the list\)$/.test(await b.evaluate(`document.querySelector('#rotation-set .hw-set-tools button[data-tool="remove"]').title`)));
 	}
 
 	// ---- round 3: a list opened by a person comes into view (R17), tile

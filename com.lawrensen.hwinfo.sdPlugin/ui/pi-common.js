@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d09";
+	const PI_BUILD = "1.7.0.0-d10";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -553,7 +553,7 @@
 		list.setAttribute("aria-label", label);
 		list.setAttribute("aria-orientation", "horizontal");
 		list.setAttribute("aria-describedby", "rotation-keys-help");
-		list.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2");
+		list.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2 Delete");
 		list.tabIndex = 0;
 		list.dataset.group = groupIndex === null ? "" : String(groupIndex);
 		keys.forEach((key, i) => list.appendChild(rotationOption(key, groupIndex, i, keys.length)));
@@ -612,9 +612,10 @@
 	}
 
 	// The list's own shortcuts, named in each tool's tooltip and on the list
-	// (aria-keyshortcuts). Delete is left unadvertised until it is checked
-	// on the real app, which may take the key itself (round 3, R37, R52).
-	const TOOL_KEYS = { earlier: "Alt+Left", later: "Alt+Right", rename: "F2" };
+	// (aria-keyshortcuts). Delete joined them once the owner checked that
+	// the Stream Deck app leaves it to the panel (2026-09-26; round 3, R37,
+	// R52).
+	const TOOL_KEYS = { earlier: "Alt+Left", later: "Alt+Right", rename: "F2", remove: "Delete" };
 
 	/** Names and enables the toolbar for the current selection. A button
 	 * that cannot act says so with aria-disabled and stays focusable, so a
@@ -1051,7 +1052,7 @@
 			frag.appendChild(
 				setNote(
 					total === 0
-						? "Empty: rotation moves through all readings of the picked sensor."
+						? "Empty: rotation moves through all readings of the picked sensor; an overview shows the one on the dial and the ones after it."
 						: total === 1
 							? "Only one reading picked. Rotation needs two or more to move."
 							: missing === 0
@@ -4654,6 +4655,11 @@
 		followSetting("detailDensity", adoptDetailUniform);
 	}
 	if (rotationBinding !== null) {
+		// One press removes one reading: Enter held on Remove would click again
+		// on every repeat and empty the list one reading after another.
+		rotationSetEl.addEventListener("keydown", (ev) => {
+			if (ev.repeat && (ev.key === "Enter" || ev.key === " ") && ev.target.closest?.('.hw-set-tools button[data-tool="remove"]')) ev.preventDefault();
+		}, true);
 		rotationSetEl.addEventListener("click", (ev) => {
 			// The toolbar acts on the selected member; a button that cannot
 			// act (aria-disabled) does nothing and keeps focus.
@@ -4919,10 +4925,11 @@
 				return;
 			}
 			// Delete removes the selected member (APG rearrangeable listbox);
-			// ticking it again in the search puts it back.
+			// ticking it again in the search puts it back. One press removes
+			// one: a held key's repeats do nothing.
 			if (ev.key === "Delete") {
 				ev.preventDefault();
-				if (at >= 0) removeSelectedRotation();
+				if (at >= 0 && !ev.repeat) removeSelectedRotation();
 				return;
 			}
 			const to = { ArrowDown: at + 1, ArrowRight: at + 1, ArrowUp: at - 1, ArrowLeft: at - 1, Home: 0, End: options.length - 1 }[ev.key];

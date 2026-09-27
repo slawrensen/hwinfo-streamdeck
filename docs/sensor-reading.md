@@ -90,7 +90,7 @@ What carries over, and what stays with the first reading:
 - **Warn at / Critical at** watch the **first** reading only, and an alert recolors the whole key exactly like the single layout. There are no per-row thresholds; put the reading you want alerts on first (or use two keys).
 - The sensor-type accent (badge color) follows the first reading.
 - The **Display strip is a single-layout feature**: the second row takes its space, so **Graph under the value** hides while the layout is dual (the setting is kept for when you switch back).
-- Row labels size themselves like the single layout's label. Badges never cost label space.
+- Row labels size themselves like the single layout's label. A pinned row's stat badge shares its label line, so a long label can shrink or shorten to make room.
 - If one row's sensor drops out of HWiNFO's output, that row shows an em-dash placeholder while the other keeps updating; if both drop out, the key shows the usual **Sensor missing** screen.
 
 Switching back to **One reading** restores the exact single-layout face; the second reading's settings are remembered.

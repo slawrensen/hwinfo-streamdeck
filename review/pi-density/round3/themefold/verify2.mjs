@@ -29,7 +29,7 @@ const { startPiSim } = await import(repo + "scripts/lib/pi-sim.mjs");
 const D04 = JSON.parse(readFileSync(path.join(here, "baseline-d04.json"), "utf8")).values;
 const BASE = Number(process.argv[3] ?? 34600);
 const sim = await startPiSim({ httpPort: BASE + 1, wsPort: BASE });
-const b = await launch({ port: BASE + 2, width: 373, height: 410 });
+const b = await launch({ width: 373, height: 410 });
 const results = [];
 const check = (name, ok, detail) => {
 	results.push({ name, ok, detail });

@@ -14,7 +14,7 @@ process.env.PI_SIM_PLUGIN_DIR = `${S}/themefold/proto-${variant}/com.lawrensen.h
 const { startPiSim } = await import(repo + "scripts/lib/pi-sim.mjs");
 const BASE = Number(process.argv[3] ?? 34100);
 const sim = await startPiSim({ httpPort: BASE + 1, wsPort: BASE });
-const b = await launch({ port: BASE + 2, width: 373, height: 410 });
+const b = await launch({ width: 373, height: 410 });
 const results = [];
 const check = (name, ok, detail) => {
 	results.push({ name, ok, detail });

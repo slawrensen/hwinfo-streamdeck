@@ -312,3 +312,55 @@ panel files fail the 9 new panel checks); unit 1,362 of 1,362; lint,
 typecheck 0; copy validator 0 warnings; pack validation and `streamdeck
 validate` pass. Archive `223a4cef...` (364,894 bytes, 47 members),
 plugin.js `dd92f64f93bad053...` (changed: AX22 preview metadata, AX26).
+
+## d13 (2026-09-27): the external review's fourth pass
+
+The fourth pass (on d12; report private) found nineteen items, AX27 to
+AX45, and proposed four simplifications, MS01 to MS04. All were checked
+against the code first and all are fixed or adopted. Two independent
+reviews of the first d13 then tried to break the fixes; they found a
+duplicate-entry regression in the AX29 fix, an incomplete AX35 and
+AX28, and missing tests, all fixed below before install.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX27 | must | A held key press resolved under settings delivered mid-press, or after a replayed appear: another reading, behavior or detail target (predates 1.7). | Any change to the key's settings document (compared with sorted keys, so an echo in another key order is no change) and any replayed appear consume the press. | 20 unit cases on the production handlers with the real press engine; the d12 source fails 16. |
+| AX28 | must | A threshold typed while HWiNFO was away took the unit of whatever reading was selected when data returned (predates 1.6). | The edit records the reading on screen, if it is on screen, and stamps that reading's unit; carried across hide and replay. | 3 unit tests; each fails with its line reverted. |
+| AX29 | must | Moving a partial tile dropped its empty cells' stored entries. | Cells no reading fills when the plan is read are dormant; their entries stay stored past the tile's new size. A removal or drag that shifts dormant cells falls back to the stored size, so nothing is written twice. | 3 panel checks (move, removal without duplicates, prune). |
+| AX30 | must | Group Remove and Merge arms were joined strings: a changed group could share the old arm and a second press removed it. | The arm names the whole stored group (sorted-key JSON). The shared Config Apply arm also names its exact document text. | 5 panel checks (3 collisions, a reordered echo that keeps the arm, a refilled well). |
+| AX31 | must | A hand-edited `autoCycleMs` of true or a list enabled cycling; an object threw mid-tick (predates 1.6). The panel described a numeric interval as off. | Only a string or number counts, in the plugin and one shared panel function. | 1 unit test (8 inputs); 8 panel checks across three panel surfaces. |
+| AX32 | must | The archive carried credits but not the license texts of its bundled code. | NOTICE carries the exact license texts of every package in `bin/plugin.js` (measured from the bundle: the SDK, utils, schemas, ws, tslib), sdpi-components and Lit. | 6 unit tests read the license files from `node_modules`. |
+| AX33 | should | An unrelated cell edit grew untouched short stored lists (`colors: []` became `[null, null]`). | Generated blank entries past a stored list's length are not written. | 1 panel check. |
+| AX34 | should | A queued Elite-to-Custom seed wrote six gesture fields into a newer document. | The seed runs only if no document arrived from outside since the pick. | 1 panel check. |
+| AX35 | should | A stored key spelled `__proto__` lost its name and color on edit, in the panel and in the dial. | Own-property writes in the panel; a prototype-free name map in the plugin. | 1 panel check, 1 unit test. |
+| AX36 | should | Releasing Enter elsewhere ended a held Space press on Make shared. | The press record holds the exact key. | 1 panel check. |
+| AX37 | should | An unrelated detail edit rewrote every stored key's spelling (pasted names, spacing). | Each key keeps its stored spelling; a key removed and added back is written bare. | 2 panel checks. |
+| AX38 | should | The standalone snapshot parser threw RangeError on truncated input. | Typed errors for short buffers, sections past the end and counts past the native bound; the cached fast path needs the validated length. | 5 unit tests. |
+| AX39 | should | A packer that wrote its archive and then failed left it in `release/`. | Any failure removes the archive. | 1 unit test. |
+| AX40 | should | The lab browser accepted any debugger on its fixed port. | The browser binds a free port and names it in its own profile; a failed launch stops its browser. | Probe: a real launch works; a launcher that starts no browser is refused and leaves nothing. |
+| AX41 | should | The panel suite's watchdog exited without closing its browser. | It closes the browser and the simulated host first (10 s at most). | Read and probe. |
+| AX42 | should | The 5,000-reading search check passed on one wrong result. | It requires the exact last reading. | Astra's wrong-result mutant (not rerun here). |
+| AX43 | should | Auto cycle ran on the wall clock; a clock correction hurried or stalled it. | Monotonic time for auto cycle, the hidden-dial memory and the strip overlays. | 2 unit tests. |
+| AX44 | should | A data reading that overflowed once converted to bytes showed "Infinity". | The unavailable mark in the reading's own unit. | 1 unit test (32 cases). |
+| AX45 | nit | Comments and a test title claimed a universal 4-glyph cap. | Worded to the range it holds; the renderer's truncation of larger values is tested. | 1 unit test. |
+| MS01 | | A reading-color preset copied the whole map once per reading. | One copy, edited in place. | Existing checks and the recaptured image. |
+| MS02 | | Each visible dial was sampled twice per tick. | Once, by the render; an auto-cycle move samples the reading it leaves. | Astra's differential over 90 configurations, rerun here d12 against d13: 720 of 720 checkpoints equal; 1 unit test. |
+| MS03 | | The persistence suite slept a fixed 3.5 s at 26 panel starts. | It waits for a loaded, connected, settled panel, 3.5 s at most. | 646 of 646 twice; 205 s to 130 s. |
+| MS04 | | Each lab navigation left its listener and a 10 s timer behind. | Both released when the navigation settles. | Suites. |
+
+The open item since d05 is explained for this dial: the "SL Film 1.7"
+dial at Encoder 5,0 has auto cycle on (`autoCycleMs` "5000"), which the
+d12 record missed. Two snapshots taken 7 s apart with no install between
+them show it stepping from rotation member 2 to member 3, so a reinstall
+proves nothing about it. The d05 observation (three dials) was not
+rechecked.
+
+d13 gates: panel suite 388 of 388 (the d12 panel files fail 12; a copy with
+the four review-of-d13 fixes reverted fails exactly those 4); persistence
+646 of 646 in 130 s; theme-band runner 70 of 70; unit 1,403 of 1,403; lint,
+typecheck 0; copy validator 0 warnings; pack validation and `streamdeck
+validate` pass. Archive `b74069565b35446c...` (367,303 bytes, 47 members),
+plugin.js `b171a4a3a47d2e4f...`. Installed 2026-09-27 13:32 local from the
+archive's own bytes (47 files hash-verified, 0 WARN or ERROR); 48-hour soak
+restarted on d13, CSV `release/soak-1.7.0.0-d13-20260927-1333.csv`, closing
+2026-09-29 13:33 local.

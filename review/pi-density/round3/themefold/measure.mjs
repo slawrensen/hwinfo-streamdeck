@@ -18,7 +18,7 @@ for (const [name, dir] of Object.entries(builds)) {
 	process.env.PI_SIM_PLUGIN_DIR = dir;
 	const { startPiSim } = await import(repo + `scripts/lib/pi-sim.mjs?tf=${name}`);
 	const sim = await startPiSim({ httpPort: base + 1, wsPort: base });
-	const b = await launch({ port: base + 2, width: 373, height: 410 });
+	const b = await launch({ width: 373, height: 410 });
 	const r = (results[name] = {});
 	const open = async (fixture, overrides, keepFolds = false) => {
 		if (!keepFolds) sim.folds = new PanelFoldMemory();

@@ -1,31 +1,40 @@
 # Continuation
 
-## Now (2026-09-27): d12 on the deck after three external review passes
+## Now (2026-09-27): d13 on the deck after four external review passes
 
-- **External review:** a different AI model reviewed `f98c76f` / d08 end
-  to end; verdict "do not ship d08". Its report, findings and my answer
-  to every finding live in the private release docs
-  (`docs/release/external-review-1.7/`: `ASTRA-REVIEW.md`,
-  `findings.json`, `RESPONSE.md`), not in this repo. `RESPONSE.md` answers
-  every finding
-  (AX01 to AX11) with the fix and the check that proves it.
-- **Pushed:** `claude/pi-density` on GitHub (d09 in `452932a`, `d241bea`,
-  `5b7d6ed`, `c270e63`, `a2b12a4`; d10 after it); private mirror `main`
-  with the review files and drafts.
-- **Installed:** panel build `1.7.0.0-d12`, archive sha256
-  `223a4cefc51d5aec0a1e8ce1567117810be9e8ad59f2614695340b40f60daee1`
-  (364,894 bytes, 47 members), plugin.js `dd92f64f...` (changed: AX22
-  preview metadata, AX26 held-press guard), by the bench route (47 files
-  hash-verified, 0 WARN or ERROR after restart). Settings across the
-  install: only the dial at "SL Film 1.7" (Stream Deck + XL) Encoder 5,0,
-  Elite, six-reading rotation, no auto cycle, moved from rotation member 2
-  to member 5 (asked the owner whether he turned it; if not, this is the
-  d05 observation again).
-- **Soak:** monitor pid 44352, CSV
-  `release/soak-1.7.0.0-d12-20260927-1036.csv`, closes 2026-09-29 10:36
+- **External review:** a different AI model has reviewed the candidate
+  four times (d08, d09 and d10, d11, d12). Its reports, findings and my
+  answer to every finding live in the private release docs
+  (`docs/release/external-review-1.7/`, one folder per pass, and
+  `RESPONSE.md`, which answers AX01 to AX45 and MS01 to MS04 with the fix
+  and the check that proves it), not in this repo. The fifth pass runs on
+  d13.
+- **Pushed:** `claude/pi-density` on GitHub; private mirror `main` with the
+  review files and drafts.
+- **Installed:** panel build `1.7.0.0-d13`, archive sha256
+  `b74069565b35446ce2a040ab0d36607817495cc57de4cfd8ab431e774c1e1f36`
+  (367,303 bytes, 47 members), plugin.js `b171a4a3...`, by the bench route
+  from the archive's own bytes (47 files hash-verified, 0 WARN or ERROR
+  after restart). Settings across the install: only the "SL Film 1.7"
+  dial at Encoder 5,0 changed, and it has auto cycle on (5 s): it steps on
+  its own between any two snapshots, so this is not a finding.
+- **Soak:** monitor pid 67908, CSV
+  `release/soak-1.7.0.0-d13-20260927-1333.csv`, closes 2026-09-29 13:33
   local. It only counts if the machine stays up, with an HWiNFO restart,
-  an app restart and a sleep/wake inside. The d11 window ran about 11 h
-  clean overnight (machine stable) before it was stopped for d12.
+  an app restart and a sleep/wake inside. The d12 window (pid 44352) was
+  stopped at 13:32 for d13.
+- **d13 over d12:** the fourth review pass: AX27 (a held key press is
+  consumed by changed settings or a replayed appear), AX28 (a deferred
+  threshold keeps its reading's unit), AX29 and AX33 (dormant tile cells
+  and short stored lists survive edits), AX30 (arms name the whole group or
+  document), AX31 (malformed auto cycle is off), AX32 (full license texts
+  in NOTICE), AX34 to AX37 (queued seed, `__proto__` keys, exact-key Make
+  shared, stored key spellings), AX38 to AX42 (parser, packer and harness
+  hardening), AX43 (monotonic dial timers), AX44 and AX45 (overflow and
+  comments); MS01 to MS04 (one preset copy, one dial sample per tick,
+  condition waits in the persistence suite, released navigation
+  listeners). Two independent reviews of the first d13 found an AX29
+  duplicate-entry regression and gaps, fixed before install.
 - **d12 over d11:** the third review pass: AX17 to AX19 (structural detail
   edits keep entries this build cannot read), AX20 (one press, one removal
   panel-wide), AX21 (Make shared press record survives Tab), AX22 and
@@ -45,16 +54,18 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10, d11 and d12 sections.
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d13 sections.
 - **Next:** the rest of the owner's hands-on check (step 8, the list keys,
   passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean
   clone on the final commit, the 70-check runner on the final archive,
   then the owner's merge, tag and publish.
-- **Open, unexplained:** across the d05 install three dials without auto
-  cycle moved from the second to the first member of their two-reading
-  rotations. The external review read the dial code (no cold write of
-  readingKey) and could not explain it either. Not seen since.
+- **Open, unexplained, and probably closed:** across the d05 install three
+  dials moved from the second to the first member of their two-reading
+  rotations; the d12 and d13 "moves" of the Encoder 5,0 dial turned out to
+  be its auto cycle, which the d12 record missed. Whether the d05 dials had
+  auto cycle on was not rechecked. The fourth review pass found no plugin
+  path that writes a reading on start (48 restart and clock cases).
 - **Rollback:** `deploy.ps1 -From %USERPROFILE%\hwinfo-bench-backup\2026-09-26-0857-f01q\com.lawrensen.hwinfo.sdPlugin`
   (the pushed d08 bytes can also be rebuilt from `f98c76f`).
 

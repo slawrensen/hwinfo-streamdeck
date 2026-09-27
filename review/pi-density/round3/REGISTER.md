@@ -364,3 +364,8 @@ plugin.js `b171a4a3a47d2e4f...`. Installed 2026-09-27 13:32 local from the
 archive's own bytes (47 files hash-verified, 0 WARN or ERROR); 48-hour soak
 restarted on d13, CSV `release/soak-1.7.0.0-d13-20260927-1333.csv`, closing
 2026-09-29 13:33 local.
+
+After install, `81d449c`: the persistence suite removes its throwaway
+browser profile once its browser is gone (every run had left one in the
+temp folder); 646 of 646 again. Test harness only; the installed bytes
+are unchanged.

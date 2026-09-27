@@ -240,6 +240,67 @@ try {
 	w = lastWrite();
 	check("lossless: a non-object group entry keeps its place", w?.rotationGroups?.[1] === "marker" && w?.rotationGroups?.length === 3, JSON.stringify(w?.rotationGroups));
 
+	// One cell's color or label rewrites that cell only (external review
+	// AX12): entries this version cannot read, entries past the tile's size
+	// and the automatic-color list's other entries stay as stored.
+	const TILE = { size: 4, labels: [" A ", { future: "label" }, "C", "D", "TAIL"], colors: ["#112233", { future: "color" }, "#334455", "#445566", "#ABCDEF"], automaticColors: [true, { future: "automatic" }, false, false, true], cellLabels: true, future: { keep: 1 } };
+	const openTile = async () => {
+		await open("key-details", { settings: { ...detailFx, detailTiles: [structuredClone(TILE)] } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+	};
+	await openTile();
+	await b.evaluate(`(() => { const c = document.querySelector("#detail-list input[type=color]"); c.value = "#aabbcc"; c.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	await sleep(400);
+	check("lossless: one cell's color rewrites that color and turns off only its automatic flag", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, colors: ["#aabbcc", { future: "color" }, "#334455", "#445566", "#ABCDEF"], automaticColors: [false, { future: "automatic" }, false, false, true] }]), JSON.stringify({ ...writes(), tiles: lastWrite()?.detailTiles }));
+	await openTile();
+	await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-name").click()`);
+	await sleep(150);
+	await b.evaluate(`(() => { const i = document.querySelector("#detail-list .hw-cell-rename"); i.value = "EDITED"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	await sleep(400);
+	check("lossless: one cell's label rewrites that label only", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, labels: ["EDITED", { future: "label" }, "C", "D", "TAIL"] }]), JSON.stringify({ ...writes(), tiles: lastWrite()?.detailTiles }));
+
+	// A double click only arms, however long the system's double-click time
+	// (external review AX13: clicks 470 or 650 ms apart used to confirm):
+	// the second click of one gesture carries detail 2. A separate click
+	// then confirms once.
+	const doubleClick = async (sel, gap) => {
+		const p = await b.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+		await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y });
+		for (const clickCount of [1, 2]) {
+			await b.send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount });
+			await b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", clickCount });
+			if (clickCount === 1) await sleep(gap);
+		}
+		await sleep(250);
+		return p;
+	};
+	const singleClick = async (p) => {
+		for (const type of ["mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", clickCount: 1 });
+		await sleep(300);
+	};
+	const armCases = [
+		["Merge", "dial-groups", '#rotation-set [data-set-action="merge"]', () => sim.writes.length],
+		["group Remove", "dial-groups", "#rotation-set .hw-group-remove", () => sim.writes.length],
+		["Replace shared settings", "key-configured", "#config-deck-apply", () => sim.globalWrites.length]
+	];
+	for (const [name, fixture, sel, count] of armCases) {
+		for (const gap of [470, 650]) {
+			await open(fixture);
+			if (fixture === "key-configured") {
+				await b.evaluate(`(() => { document.querySelectorAll("details").forEach((d) => { d.open = true; }); const t = document.getElementById("config-deck"); t.value = JSON.stringify({ theme: "paper", futureBlob: { keep: 42 } }); t.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+				await sleep(150);
+			}
+			const p = await doubleClick(sel, gap);
+			const armed = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
+			check(`${name}: a double click ${gap} ms apart only arms`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
+			if (gap === 650) {
+				await singleClick(p);
+				check(`${name}: a separate click after the double click confirms once`, count() === 1, JSON.stringify({ writes: count() }));
+			}
+		}
+	}
+
 	// Elite to Custom seeds the Elite map on the person's pick and shows it
 	// at once; an echo carrying the same switch writes nothing.
 	await open("dial-groups");
@@ -1384,6 +1445,58 @@ try {
 		const moved = await ms();
 		const movedFocus = await b.evaluate(`document.activeElement?.id ?? ""`);
 		check("Make shared, then a click where Change now sits, 180 ms later: Shared defaults opens with its theme focused; nothing more is written", apart > 4 && moved.advancedOpen === true && movedFocus === "shared-theme" && sim.writes.length === 2 && sim.globalWrites.length === 1, JSON.stringify({ apart: Math.round(apart), movedFocus, advanced: moved.advancedOpen, ...writes() }));
+
+		// A theme that arrives between press and release makes the press stale
+		// (external review AX14): it shares nothing, and the newer choice
+		// stays until a fresh press. Mouse and Space, key and dial.
+		const SPACE = { key: " ", code: "Space", windowsVirtualKeyCode: 32 };
+		const shareCenter = async () => b.evaluate(`(() => { const e = document.getElementById("theme-share"); e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+		for (const [fx, where] of [["key-configured", "key"], ["dial-configured", "dial"]]) {
+			for (const how of ["mouse", "Space"]) {
+				sim.folds = new PanelFoldMemory();
+				await open(fx, { settings: { ...sim.fixtures[fx].settings, theme: "ember" } });
+				const p = await shareCenter();
+				if (how === "mouse") {
+					await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y });
+					await b.send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount: 1 });
+				} else {
+					await b.evaluate(`document.getElementById("theme-share").focus()`);
+					await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...SPACE, text: " " });
+				}
+				sim.pushSettings({ ...sim.settings, theme: "forest" });
+				await sleep(40);
+				if (how === "mouse") await b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", clickCount: 1 });
+				else await b.send("Input.dispatchKeyEvent", { type: "keyUp", ...SPACE });
+				await sleep(400);
+				const s = await ms();
+				check(`Make shared (${where}, ${how}): a theme arriving between press and release makes the press stale; nothing is shared and Forest stays`, sim.writes.length === 0 && sim.globalWrites.length === 0 && s.checked === "forest" && s.line === `Forest (set on this ${where})`, JSON.stringify({ ...writes(), checked: s.checked, line: s.line }));
+			}
+		}
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		await b.evaluate(`document.getElementById("theme-share").focus()`);
+		await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...SPACE, text: " " });
+		await b.send("Input.dispatchKeyEvent", { type: "keyUp", ...SPACE });
+		await sleep(400);
+		const spaced = await ms();
+		check("Make shared by Space with nothing arriving meanwhile shares as usual", same(sim.globalWrites.map((x) => x.theme), ["ember"]) && same(sim.writes.map((x) => x.theme), [""]) && spaced.line === "Default (shared: Ember)", JSON.stringify({ line: spaced.line, ...writes() }));
+
+		// A newer stored theme this version does not know (external review
+		// AX15): the share lands, the stored id stays, and the panel says it
+		// the way the line shows it, never an inherited JavaScript name.
+		for (const unknownId of ["constructor", "__proto__", "toString", "future-theme"]) {
+			sim.folds = new PanelFoldMemory();
+			sim.holdGlobalsReplies = true;
+			await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+			await b.click("#theme-share");
+			await sleep(200);
+			sim.pushSettings({ ...sim.settings, theme: unknownId });
+			await sleep(150);
+			sim.releaseGlobals();
+			await sleep(500);
+			const u = await ms();
+			check(`Make shared, slow shared settings, then a stored "${unknownId}": Ember is shared, "${unknownId}" stays, and the panel says it is unknown and draws Void`, same(sim.globalWrites.map((x) => x.theme), ["ember"]) && sim.writes.length === 0 && sim.settings.theme === unknownId && u.said === `Ember is now the shared theme, was Void. This key keeps its stored theme "${unknownId}" (unknown; draws Void).`, JSON.stringify({ said: u.said, ...writes(), stored: sim.settings.theme }));
+		}
 		sim.folds = new PanelFoldMemory();
 		await b.viewport(400, 900, 1);
 	}

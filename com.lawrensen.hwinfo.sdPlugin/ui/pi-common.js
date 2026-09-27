@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d10";
+	const PI_BUILD = "1.7.0.0-d11";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -746,9 +746,11 @@
 	 * "wait" or "confirm". */
 	let rotationArm = null; // { id, at, text, label }
 	let rotationRebuilding = false;
-	function armPress(button, armedText, armedLabel, spoken) {
+	function armPress(button, armedText, armedLabel, spoken, detail = 0) {
 		const id = button.dataset.armId;
-		if (rotationArm !== null && rotationArm.id === id) return Date.now() - rotationArm.at < 450 ? "wait" : "confirm";
+		// The second (or third) click of one multi-click gesture only waits,
+		// whatever the system's double-click time (external review AX13).
+		if (rotationArm !== null && rotationArm.id === id) return detail > 1 || Date.now() - rotationArm.at < 450 ? "wait" : "confirm";
 		rotationArm = { id, at: Date.now(), text: armedText, label: `${armedText} ${armedLabel}` };
 		applyArm(button);
 		hw.announce("rotation-order", spoken, { repeat: true });
@@ -1307,7 +1309,31 @@
 			if (current.automaticColors === undefined) delete current.automaticColors;
 			return current;
 		}
-		return model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels", "automaticColors"]);
+		const out = model.patchEntry(tile.raw, tile.base, current, ["size", "labels", "colors", "cellLabels", "automaticColors"]);
+		// A cell edit in a tile that kept its size rewrites only the cells it
+		// changed: entries this version cannot read, entries past the tile's
+		// size and the rest of each list stay exactly as stored (external
+		// review AX12). A resize still writes whole lists.
+		const rawIsObject = tile.raw !== null && typeof tile.raw === "object" && !Array.isArray(tile.raw);
+		if (rawIsObject && tile.size === tile.base.size) {
+			const cell = {
+				labels: [(i) => tile.base.labels[i], (i) => current.labels[i]],
+				colors: [(i) => tile.base.colors[i], (i) => current.colors[i]],
+				automaticColors: [(i) => tile.base.automaticColors?.[i] === true, (i) => tile.automaticColors[i] === true]
+			};
+			for (const [field, [before, after]] of Object.entries(cell)) {
+				if (!Array.isArray(tile.raw[field])) continue;
+				const values = [...tile.raw[field]];
+				for (let i = 0; i < tile.size; i++) {
+					if (JSON.stringify(before(i)) === JSON.stringify(after(i))) continue;
+					// A gap before a newly set cell takes that cell's shown value.
+					for (let j = values.length; j < i; j++) values.push(after(j));
+					values[i] = after(i);
+				}
+				out[field] = values;
+			}
+		}
+		return out;
 	}
 
 	/** automaticColors as stored: only when some cell's hue is automatic
@@ -4229,8 +4255,28 @@
 		renderGallery();
 	}
 
+	// A press remembers the key's theme choice it started on: a theme that
+	// arrives between press and release makes that press stale, and it
+	// shares nothing until a fresh press (external review AX14).
+	let sharePressChoice = null;
+	themeShareEl?.addEventListener("pointerdown", () => {
+		sharePressChoice = themeChoice;
+	});
+	themeShareEl?.addEventListener("keydown", (ev) => {
+		if (!ev.repeat && (ev.key === " " || ev.key === "Enter")) sharePressChoice = themeChoice;
+	});
+	const forgetSharePress = () => {
+		sharePressChoice = null;
+	};
+	themeShareEl?.addEventListener("pointercancel", forgetSharePress);
+	themeShareEl?.addEventListener("blur", forgetSharePress);
+	// A press released elsewhere never clicks; forget it after any click.
+	for (const type of ["pointerup", "keyup"]) document.addEventListener(type, () => setTimeout(forgetSharePress, 0), true);
 	hw.announce("theme-share", ""); // primed: the first Make shared is said
 	themeShareEl?.addEventListener("click", async (ev) => {
+		const pressedChoice = sharePressChoice;
+		sharePressChoice = null;
+		if (pressedChoice !== null && pressedChoice !== themeChoice) return;
 		const id = themeOverride;
 		const choice = themeChoice;
 		// A stale press (the state moved on), or one while a share is still
@@ -4262,7 +4308,9 @@
 			renderGallery();
 			syncSharedThemeDefault();
 			hw.resyncBound(["theme"]);
-			const now = themeOverride === "" ? "follows it" : `keeps ${model.themeName(themeOverride)}`;
+			// An unknown stored theme is said the way the line shows it
+			// (external review AX15).
+			const now = themeOverride === "" ? "follows it" : knownTheme(themeOverride) ? `keeps ${model.themeName(themeOverride)}` : `keeps its stored theme "${themeOverride}" (unknown; draws ${model.themeName(themesConfig.defaultTheme)})`;
 			hw.announce("theme-share", `${model.themeName(id)} is now the shared theme, was ${was}. This ${where} ${now}.`, { repeat: true });
 			return;
 		}
@@ -4698,7 +4746,7 @@
 				const groupName = rotationGroups[index].name;
 				if (members > 0) {
 					const called = groupName !== "" ? groupName : `group ${index + 1}`;
-					const step = armPress(groupRemove, `Remove ${called} and its ${what}?`, "Press again to remove it.", `Press again to remove ${called} and its ${what}.`);
+					const step = armPress(groupRemove, `Remove ${called} and its ${what}?`, "Press again to remove it.", `Press again to remove ${called} and its ${what}.`, ev.detail);
 					if (step !== "confirm") return;
 				}
 				rotationArm = null;
@@ -4757,7 +4805,7 @@
 				const holding = (rotationGroups ?? []).filter((group) => group.keys.length > 0).length;
 				if (named > 0 || holding >= 2) {
 					const text = named > 0 ? "Merge and drop the group names?" : `Merge ${holding} groups into one list?`;
-					const step = armPress(action, text, `Press again to merge every group into one set${named > 0 ? `; ${named} group name${named === 1 ? " is" : "s are"} dropped` : ""}.`, `Press again to merge${named > 0 ? "; the group names are dropped" : ""}.`);
+					const step = armPress(action, text, `Press again to merge every group into one set${named > 0 ? `; ${named} group name${named === 1 ? " is" : "s are"} dropped` : ""}.`, `Press again to merge${named > 0 ? "; the group names are dropped" : ""}.`, ev.detail);
 					if (step !== "confirm") return;
 				}
 				rotationArm = null;
@@ -5035,7 +5083,7 @@
 			};
 			button?.addEventListener("blur", () => disarm());
 			el.addEventListener("input", () => disarm());
-			return () => {
+			return (ev) => {
 				let doc;
 				try {
 					doc = JSON.parse(el.value);
@@ -5049,8 +5097,9 @@
 				}
 				// The shared document reaches every key and dial: the first
 				// press only arms, and says so; a second press replaces it. A
-				// press within 450 ms of arming is ignored, so a double click
-				// only arms.
+				// press within 450 ms of arming, or the second click of a double
+				// click however slow (AX13), is ignored, so a double click only
+				// arms.
 				if (confirmFirst && armedAt === 0) {
 					armedAt = Date.now();
 					if (button !== null) {
@@ -5060,7 +5109,7 @@
 					say("This replaces the shared settings every HWiNFO key and dial uses. Press again to confirm.");
 					return;
 				}
-				if (confirmFirst && Date.now() - armedAt < 450) return;
+				if (confirmFirst && (ev.detail > 1 || Date.now() - armedAt < 450)) return;
 				disarm(true);
 				// Names come off here, whether this build wrote them or a person
 				// typed them: what lands in settings is keys alone. A document

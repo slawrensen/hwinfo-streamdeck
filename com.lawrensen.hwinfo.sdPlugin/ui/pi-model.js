@@ -18,7 +18,7 @@ self.hwModel = (() => {
 	const STAT = { current: "Current value", min: "Minimum", max: "Maximum", avg: "Average" };
 	const isStat = (v) => v === "current" || v === "min" || v === "max" || v === "avg";
 	const THEME_NAMES = { void: "Void", graphite: "Graphite", ultraviolet: "Ultraviolet", midnight: "Midnight", forest: "Forest", ember: "Ember", paper: "Paper" };
-	const themeName = (id) => THEME_NAMES[id] ?? (typeof id === "string" && id !== "" ? id.charAt(0).toUpperCase() + id.slice(1) : "");
+	const themeName = (id) => (typeof id === "string" && Object.hasOwn(THEME_NAMES, id) ? THEME_NAMES[id] : typeof id === "string" && id !== "" ? id.charAt(0).toUpperCase() + id.slice(1) : "");
 	const TEXT_NAMES = { theme: "Theme text", dim: "Dimmed text", custom: "Custom text color" };
 	const LAYOUT_NAMES = { single: "One reading", dual: "Two readings, stacked", triple: "Three readings, rows", quad: "Four readings, quad grid" };
 	const VIEW_NAMES = { single: "One reading", tworow: "Overview, two rows", overview: "Overview, three rows" };

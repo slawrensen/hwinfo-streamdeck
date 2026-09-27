@@ -30,6 +30,7 @@ type Model = {
 	patchEntry(raw: unknown, base: unknown, current: Record<string, unknown>, fields: string[]): Record<string, unknown>;
 	patchNames(raw: unknown, key: string, name: string): Record<string, unknown>;
 	patchColors(raw: unknown, updates: Record<number, string>, defaults: string[]): unknown[];
+	themeName(id: unknown): string;
 };
 
 const source = readFileSync(fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js", import.meta.url)), "utf8");
@@ -246,5 +247,19 @@ describe("lossless write helpers", () => {
 	it("sets color indices, keeps entries past them, fills gaps with defaults", () => {
 		assert.deepEqual(model.patchColors(["#111111", "bad", "#333333", "#444444", "#FUTURE"], { 1: "#222222" }, ["d0", "d1", "d2", "d3"]), ["#111111", "#222222", "#333333", "#444444", "#FUTURE"]);
 		assert.deepEqual(model.patchColors(undefined, { 2: "#ABCDEF" }, ["d0", "d1", "d2", "d3"]), ["d0", "d1", "#ABCDEF"]);
+	});
+});
+
+describe("theme names", () => {
+	it("names this build's own themes and never an inherited JavaScript member", () => {
+		// A stored "constructor" used to name Object's native function in a
+		// spoken line (external review AX15).
+		assert.equal(model.themeName("ember"), "Ember");
+		assert.equal(model.themeName("constructor"), "Constructor");
+		assert.equal(model.themeName("toString"), "ToString");
+		assert.equal(model.themeName("__proto__"), "__proto__");
+		assert.equal(model.themeName("future-theme"), "Future-theme");
+		assert.equal(model.themeName(""), "");
+		assert.equal(model.themeName(undefined), "");
 	});
 });

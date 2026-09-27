@@ -31,16 +31,22 @@ import { PanelFoldMemory } from "../src/panel-folds.ts";
 const failures = [];
 const check = makeCheck((name) => failures.push(name));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const PORTS = { ws: 29320, http: 29321, debug: 29322 };
+// PI_PANELS_PORT_BASE moves the three ports, so a second copy (a control
+// run against other panel files through PI_SIM_PLUGIN_DIR) can run beside.
+const PORT_BASE = Number(process.env.PI_PANELS_PORT_BASE ?? 29320);
+const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1, debug: PORT_BASE + 2 };
 
 const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
 const b = await launch({ port: PORTS.debug, width: 400, height: 900 });
 const pageErrors = [];
 b.on("Runtime.exceptionThrown", (p) => pageErrors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
+// A hang guard, not a speed check: a normal run takes about four minutes
+// (it ran 214 s against the earlier 300 s guard before the external
+// review's race checks were added), so the guard sits well above that.
 const watchdog = setTimeout(() => {
-	console.error("[e2e-pi-panels] watchdog: 300 s elapsed, aborting");
+	console.error("[e2e-pi-panels] watchdog: 420 s elapsed, aborting");
 	process.exit(2);
-}, 300_000);
+}, 420_000);
 watchdog.unref();
 
 async function open(fixture, overrides) {
@@ -134,7 +140,7 @@ try {
 		await b.evaluate(script);
 		await sleep(450);
 		const after = lastWrite();
-		check(`edit ${name}: one write`, sim.writes.length >= 1 && sim.globalWrites.length === 0, JSON.stringify(writes()));
+		check(`edit ${name}: one write`, sim.writes.length === 1 && sim.globalWrites.length === 0, JSON.stringify(writes()));
 		check(`edit ${name}: changed exactly ${expected.join(", ")}`, after !== undefined && same(changedKeys(before, after), expected), JSON.stringify(after === undefined ? null : changedKeys(before, after)));
 		if (before.futureBlob !== undefined) check(`edit ${name}: unknown nested field intact`, same(after?.futureBlob, FUTURE_BLOB));
 	}
@@ -185,10 +191,25 @@ try {
 	await sleep(300);
 	w = lastWrite();
 	check("lossless: a rename changed one name and kept the junk entry", same(w?.rotationNames, { ...groupsBefore.rotationNames, [renameKey]: "Die" }), JSON.stringify(w?.rotationNames));
-	// Merge groups and split again: the unknown top-level field rides along.
+	// Merge: named groups ask for a second press (arm, then confirm after
+	// 450 ms). The confirmed merge is one fresh write: the groups flatten
+	// into one list in group order (the flat mirror's non-string entry
+	// kept), reading names and the unknown top-level field ride along
+	// (external review AX05: the old check read the rename's write).
+	const mergeNames = structuredClone(sim.settings.rotationNames);
+	const mergeKeys = [...new Set(sim.settings.rotationGroups.flatMap((g) => g.keys)), 42];
+	sim.writes.length = 0;
+	await b.evaluate(`document.querySelector('#rotation-set [data-set-action="merge"]').click()`);
+	await sleep(100);
+	check("lossless: the first Merge press only arms", sim.writes.length === 0, JSON.stringify(writes()));
+	await sleep(450);
 	await b.evaluate(`document.querySelector('#rotation-set [data-set-action="merge"]').click()`);
 	await sleep(300);
-	check("lossless: merge keeps the unknown top-level field", same(lastWrite()?.futureBlob, FUTURE_BLOB));
+	const merged = lastWrite();
+	check("lossless: the confirmed merge writes once", sim.writes.length === 1, JSON.stringify(writes()));
+	check("lossless: the confirmed merge flattens the groups into one list and keeps the non-string entry", same(merged?.rotationGroups, []) && same(merged?.rotationKeys, mergeKeys), JSON.stringify({ groups: merged?.rotationGroups, keys: merged?.rotationKeys, mergeKeys }));
+	check("lossless: merge keeps the reading names", same(merged?.rotationNames, mergeNames), JSON.stringify(merged?.rotationNames));
+	check("lossless: merge keeps the unknown top-level field", same(merged?.futureBlob, FUTURE_BLOB));
 
 	await open("key-details", { settings: { ...sim.fixtures["key-details"].settings, detailKeys: [...sim.fixtures["key-details"].settings.detailKeys, 99, { future: "entry" }] } });
 	const tilesBefore = structuredClone(sim.settings);
@@ -969,12 +990,13 @@ try {
 		const wideFolded = await row();
 		check("theme band (160 px): a long unknown theme wraps under the title, which stays on its marker's line, open and folded", wideOpen.markerOff <= 1 && wideFolded.markerOff <= 1 && wideOpen.overflow <= 0 && wideFolded.overflow <= 0, JSON.stringify({ open: wideOpen.markerOff, folded: wideFolded.markerOff }));
 		await b.viewport(373, 410, 1.5);
-		// A late fold answer (900 ms): the panel shows at 300 ms with every
-		// section open. The owner's deck answers after the cap (2026-09-26,
-		// the hw-folds-timeout mark with no answer mark), so a late answer
-		// still applies the remembered folds while the person has not
-		// pressed, typed or scrolled; after they have, it folds nothing
-		// under them and focus stays. The memory is untouched either way.
+		// A late fold answer (900 ms): the panel shows at the 600 ms cap with
+		// every section open. The owner's deck once answered after the then
+		// 300 ms cap (2026-09-26, the hw-folds-timeout mark with no answer
+		// mark), so a late answer still applies the remembered folds while
+		// the person has not pressed, typed, scrolled or moved focus; after
+		// they have, it folds nothing under them and focus stays. The memory
+		// is untouched either way.
 		sim.foldsDelayMs = 900;
 		const tops = () => b.evaluate(`[...document.querySelectorAll("details.hw-sec[id]")].map((d) => [d.id, d.open, Math.round(d.getBoundingClientRect().top + scrollY)])`);
 		const openLate = async () => {
@@ -1004,6 +1026,16 @@ try {
 			const t2 = await tops();
 			const focus = await b.evaluate(`document.activeElement === document.querySelector("#sec-theme > summary")`);
 			check("folds: after a key press, a late answer folds nothing under the person and focus stays", shownB && focus && JSON.stringify(t1) === JSON.stringify(t2), JSON.stringify({ shownB, focus, t1, t2 }));
+			// Focus moved to a field with no key or pointer event, as assistive
+			// technology can (external review AX03): the late answer folds
+			// nothing, and the field stays shown and focused.
+			const shownC = await openLate();
+			await b.evaluate(`document.getElementById("f-label").focus()`);
+			const t3 = await tops();
+			await sleep(1300);
+			const t4 = await tops();
+			const kept = await b.evaluate(`({ section: document.getElementById("f-label").closest("details.hw-sec")?.open ?? null, focus: document.activeElement?.id ?? "", late: performance.getEntriesByType("mark").some((m) => m.name === "hw-folds-late") })`);
+			check("folds: after focus moves to a field without a key or pointer, a late answer folds nothing and the field stays shown and focused", shownC && kept.late && kept.section === true && kept.focus === "f-label" && JSON.stringify(t3) === JSON.stringify(t4), JSON.stringify({ shownC, kept, t3, t4 }));
 		} finally {
 			sim.foldsDelayMs = 0;
 		}
@@ -1200,6 +1232,125 @@ try {
 		await b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: r.x, y: r.y, button: "right", clickCount: 1 });
 		await sleep(200);
 		check("Make shared: a right click on a chip writes nothing", sim.writes.length + sim.globalWrites.length === w3);
+
+		// The first shared-settings answer is slow, so the share waits for it
+		// (external review AX02). A theme picked for this key or dial in the
+		// meantime is the newer choice and stays; the share still lands.
+		for (const [fx, where] of [["key-configured", "key"], ["dial-configured", "dial"]]) {
+			sim.folds = new PanelFoldMemory();
+			sim.holdGlobalsReplies = true;
+			await open(fx, { settings: { ...sim.fixtures[fx].settings, theme: "ember" } });
+			await b.click("#theme-share");
+			await sleep(250);
+			const pending = { ...writes(), held: sim.heldGlobals.length };
+			await b.click('#theme-gallery .hw-theme[data-theme="forest"]');
+			await sleep(250);
+			sim.releaseGlobals();
+			await sleep(500);
+			const s = await ms();
+			check(`Make shared (${fx}), slow shared settings: a theme picked before they answer stays; Ember becomes shared and the ${where} keeps Forest and focus`, pending.settings === 0 && pending.globals === 0 && pending.held > 0 && same(sim.writes.map((x) => x.theme), ["forest"]) && same(sim.globalWrites.map((x) => x.theme), ["ember"]) && s.checked === "forest" && s.active === "forest" && s.line === `Forest (set on this ${where})` && s.share, JSON.stringify({ pending, s, themes: sim.writes.map((x) => x.theme), shared: sim.globalWrites.map((x) => x.theme) }));
+			check(`Make shared (${fx}), slow shared settings: the panel says Ember is shared and the ${where} keeps Forest`, s.said === `Ember is now the shared theme, was Void. This ${where} keeps Forest.`, JSON.stringify(s.said));
+		}
+		sim.folds = new PanelFoldMemory();
+		sim.holdGlobalsReplies = true;
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		await b.click("#theme-share");
+		await sleep(150);
+		await b.click('#theme-gallery .hw-theme[data-theme="forest"]');
+		await sleep(150);
+		await b.click('#theme-gallery .hw-theme[data-theme="ember"]');
+		await sleep(150);
+		sim.releaseGlobals();
+		await sleep(500);
+		const back = await ms();
+		check("Make shared, slow shared settings: Ember, Forest, then Ember again leaves Ember set on this key and shared, and says so", same(sim.writes.map((x) => x.theme), ["forest", "ember"]) && same(sim.globalWrites.map((x) => x.theme), ["ember"]) && back.checked === "ember" && back.line === "Ember (set on this key)" && !back.share && back.said === "Ember is now the shared theme, was Void. This key keeps Ember.", JSON.stringify({ back, themes: sim.writes.map((x) => x.theme) }));
+		sim.folds = new PanelFoldMemory();
+		sim.holdGlobalsReplies = true;
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		await b.click("#theme-share");
+		await sleep(250);
+		sim.releaseGlobals();
+		await sleep(500);
+		const late = await ms();
+		check("Make shared, slow shared settings, nothing picked meanwhile: the share completes as usual, Default checked and focused", same(sim.writes.map((x) => x.theme), [""]) && same(sim.globalWrites.map((x) => x.theme), ["ember"]) && late.line === "Default (shared: Ember)" && late.checked === "" && late.active === "" && late.said === "Ember is now the shared theme, was Void. This key follows it.", JSON.stringify({ late, ...writes() }));
+
+		// An older themes payload after the share (AX07): the stored shared
+		// theme is what the plugin draws, so the line keeps it.
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		const stale = structuredClone(sim.toPiLog.find((p) => p.event === "themes"));
+		await b.click("#theme-share");
+		await sleep(400);
+		sim.sendToPi(stale);
+		await sleep(150);
+		sim.pushPreview();
+		await sleep(150);
+		const kept = await ms();
+		const keptSummary = await b.evaluate(`document.querySelector('[data-summary="shared"]')?.textContent ?? null`);
+		check("Make shared: an older themes payload after the share does not bring back the old shared theme", stale?.effectiveDeckTheme === "void" && kept.line === "Default (shared: Ember)" && kept.sharedSelect === "ember" && /^Ember ·/.test(String(keptSummary)), JSON.stringify({ stale: stale?.effectiveDeckTheme, kept, keptSummary }));
+		// The shared theme changed elsewhere; the plugin's themes payload and
+		// the host's shared settings reach this panel in either order.
+		for (const order of ["themes first", "shared settings first"]) {
+			sim.folds = new PanelFoldMemory();
+			await open("key-inherited");
+			const old = structuredClone(sim.toPiLog.find((p) => p.event === "themes"));
+			const next = { ...sim.globals, theme: "ember" };
+			if (order === "themes first") {
+				sim.sendToPi({ ...old, effectiveDeckTheme: "ember" });
+				await sleep(100);
+				sim.pushGlobals(next);
+			} else {
+				sim.pushGlobals(next);
+				await sleep(100);
+				sim.sendToPi(old);
+			}
+			await sleep(300);
+			const o = await ms();
+			check(`shared theme changed elsewhere (${order}, the other one older): the line reads Default (shared: Ember), nothing written`, old?.effectiveDeckTheme === "midnight" && o.line === "Default (shared: Ember)" && sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify({ o, ...writes() }));
+		}
+		// With no known shared theme stored, the plugin's answer stands (its
+		// legacy migration included): here it draws Graphite.
+		sim.setFixture("key-inherited", { globals: { theme: "graphite", typeAccents: "on" } });
+		for (const theme of [undefined, "constructor", "neon-2031"]) {
+			sim.folds = new PanelFoldMemory();
+			await open("key-inherited", { globals: { typeAccents: "on", ...(theme === undefined ? {} : { theme }) } });
+			const f = await ms();
+			check(`shared theme ${theme === undefined ? "absent" : `"${theme}"`}: the line keeps the plugin's answer, Default (shared: Graphite), nothing written`, f.line === "Default (shared: Graphite)" && sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify({ f, ...writes() }));
+		}
+		sim.setFixture("key-configured"); // the plugin draws Void again
+
+		// Only the second click of a double click is swallowed (AX04): a
+		// keyboard press on Change, or a click where Change now sits, runs.
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured");
+		await b.click('#theme-gallery .hw-theme[data-theme="ember"]');
+		await sleep(250);
+		await b.evaluate("window.scrollTo(0, 0)");
+		await b.evaluate(`document.getElementById("theme-share").focus()`);
+		await b.key("Enter");
+		await sleep(60);
+		await b.key("Tab", { shift: true });
+		const onChange = await b.evaluate(`document.activeElement?.id ?? ""`);
+		await b.key("Enter");
+		await sleep(300);
+		const kb = await ms();
+		const kbFocus = await b.evaluate(`document.activeElement?.id ?? ""`);
+		check("Make shared, then Shift+Tab and Enter on Change at once: Shared defaults opens with its theme focused; nothing more is written", onChange === "theme-change" && kb.advancedOpen === true && kbFocus === "shared-theme" && sim.writes.length === 2 && sim.globalWrites.length === 1, JSON.stringify({ onChange, kbFocus, advanced: kb.advancedOpen, ...writes() }));
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured");
+		await b.click('#theme-gallery .hw-theme[data-theme="ember"]');
+		await sleep(250);
+		await b.evaluate("window.scrollTo(0, 0)");
+		const sharePoint = await b.evaluate(`(() => { const r = document.getElementById("theme-share").getBoundingClientRect(); return { x: r.right - 4, y: r.top + r.height / 2 }; })()`);
+		for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: sharePoint.x, y: sharePoint.y, button: "left", clickCount: 1 });
+		await sleep(180);
+		const changeAt = await b.evaluate(`(() => { const r = document.getElementById("theme-change").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+		const apart = Math.hypot(changeAt.x - sharePoint.x, changeAt.y - sharePoint.y);
+		for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: changeAt.x, y: changeAt.y, button: "left", clickCount: 1 });
+		await sleep(300);
+		const moved = await ms();
+		const movedFocus = await b.evaluate(`document.activeElement?.id ?? ""`);
+		check("Make shared, then a click where Change now sits, 180 ms later: Shared defaults opens with its theme focused; nothing more is written", apart > 4 && moved.advancedOpen === true && movedFocus === "shared-theme" && sim.writes.length === 2 && sim.globalWrites.length === 1, JSON.stringify({ apart: Math.round(apart), movedFocus, advanced: moved.advancedOpen, ...writes() }));
 		sim.folds = new PanelFoldMemory();
 		await b.viewport(400, 900, 1);
 	}

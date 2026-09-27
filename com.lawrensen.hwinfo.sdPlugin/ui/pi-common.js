@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d08";
+	const PI_BUILD = "1.7.0.0-d09";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -3921,11 +3921,16 @@
 		return [...new Set([...listed, ...Object.keys(config.themes)])];
 	}
 	let themeOverride = "";
+	// Counts every change to this key's theme, picked here or delivered, so
+	// a Make shared that finishes after a later pick leaves that pick alone.
+	let themeChoice = 0;
 
 	const setThemeOverride = useSettings(
 		"theme",
 		(value) => {
-			themeOverride = typeof value === "string" ? value : "";
+			const next = typeof value === "string" ? value : "";
+			if (next !== themeOverride) themeChoice += 1;
+			themeOverride = next;
 			renderGallery();
 		},
 		null
@@ -3987,11 +3992,15 @@
 		return chip;
 	}
 
-	// The RESOLVED deck default: effectiveDeckTheme when the payload knows
-	// it, else the spec default. Callers null-guard themesConfig first.
-	// The plugin resolves the effective deck default (theme store, incl.
-	// legacy migration); never guess it from raw global settings here.
+	// The RESOLVED deck default. A known theme stored in the shared settings
+	// is the one the plugin draws (src/ui/theme-store.ts), including one this
+	// panel has just written, so an older themes payload cannot contradict
+	// it. Without one, the plugin's answer stands (effectiveDeckTheme, which
+	// includes the legacy migration), else the spec default. Callers
+	// null-guard themesConfig first.
 	function resolvedDeckId() {
+		const shared = hw.state.globals.theme;
+		if (typeof shared === "string" && Object.hasOwn(themesConfig.themes, shared)) return shared;
 		return Object.hasOwn(themesConfig.themes, themesConfig.effectiveDeckTheme) ? themesConfig.effectiveDeckTheme : themesConfig.defaultTheme;
 	}
 
@@ -4018,6 +4027,7 @@
 	const themeShareEl = document.getElementById("theme-share");
 	const setSharedTheme = useGlobalSettings("theme", () => {}, null)[1];
 	let themeShareAt = -Infinity; // no press yet: Change works from the first frame
+	let themeSharePoint = null; // where a pointer press on Make shared landed
 	let themeSharing = false;
 	/** Whether an id is a theme this build knows (own keys only, so a
 	 * stored "constructor" is unknown, as the plugin reads it). */
@@ -4198,23 +4208,37 @@
 			if (option.textContent !== text) option.textContent = text;
 		});
 	}
-	hw.on("globals", labelSharedOptions);
+	// A shared theme stored from anywhere redraws the line and the Default
+	// chip at once, whichever of it and the plugin's themes payload lands
+	// first.
+	hw.on("globals", () => {
+		if (themesConfig === null) {
+			labelSharedOptions();
+			return;
+		}
+		renderGallery();
+		syncSharedThemeDefault();
+	});
 
 	function pickTheme(id) {
 		if (id === themeOverride) return;
+		themeChoice += 1;
 		themeOverride = id;
 		setThemeOverride(themeOverride);
 		renderGallery();
 	}
 
 	hw.announce("theme-share", ""); // primed: the first Make shared is said
-	themeShareEl?.addEventListener("click", async () => {
+	themeShareEl?.addEventListener("click", async (ev) => {
 		const id = themeOverride;
+		const choice = themeChoice;
 		// A stale press (the state moved on), or one while a share is still
 		// being written, does nothing.
 		if (themeSharing || themesConfig === null || id === "" || !knownTheme(id) || id === resolvedDeckId()) return;
 		const was = model.themeName(resolvedDeckId());
 		const where = hw.kind === "dial" ? "dial" : "key";
+		// A keyboard press (detail 0) has no point for a double click to land on.
+		themeSharePoint = ev.detail > 0 ? { x: ev.clientX, y: ev.clientY } : null;
 		themeShareAt = performance.now();
 		// The shared theme first, and only then the key, so the device never
 		// draws the old one on this key in between and a panel closed in the
@@ -4229,6 +4253,18 @@
 		}
 		themeShareAt = performance.now();
 		themesConfig = { ...themesConfig, effectiveDeckTheme: id };
+		// The shared settings can take a while to answer (the first write waits
+		// for them). A theme picked for this key in the meantime is the newer
+		// choice: it stays, focus stays where the person put it, and the panel
+		// says what the key draws now.
+		if (themeChoice !== choice) {
+			renderGallery();
+			syncSharedThemeDefault();
+			hw.resyncBound(["theme"]);
+			const now = themeOverride === "" ? "follows it" : `keeps ${model.themeName(themeOverride)}`;
+			hw.announce("theme-share", `${model.themeName(id)} is now the shared theme, was ${was}. This ${where} ${now}.`, { repeat: true });
+			return;
+		}
 		pickTheme("");
 		syncSharedThemeDefault();
 		hw.resyncBound(["theme"]);
@@ -4242,9 +4278,12 @@
 	});
 	// The second click of a double click on Make shared lands on Change,
 	// which has just taken the slot, or on the fold row, which reaches 22 px
-	// further right once Change is back: it opens and folds nothing.
+	// further right once Change is back: it opens and folds nothing. Only
+	// that click: a pointer click within 500 ms, within 4 px of the first.
+	// A keyboard press or a click somewhere else is a new command and runs.
 	const swallowAfterShare = (ev) => {
-		if (performance.now() - themeShareAt > 500) return;
+		if (ev.detail === 0 || themeSharePoint === null || performance.now() - themeShareAt > 500) return;
+		if (Math.hypot(ev.clientX - themeSharePoint.x, ev.clientY - themeSharePoint.y) > 4) return;
 		ev.preventDefault();
 		ev.stopImmediatePropagation();
 	};
@@ -4268,7 +4307,8 @@
 		pickTheme(target.dataset.theme);
 	});
 	// The plugin pushes a fresh themes payload (with effectiveDeckTheme)
-	// whenever the deck theme changes; no global-settings guessing here.
+	// whenever the deck theme changes; its answer covers an absent or unknown
+	// stored theme (resolvedDeckId).
 	streamDeckClient.send("sendToPlugin", { event: "getThemes" });
 
 	// --- Text setting (issue #2) ----------------------------------------------

@@ -8,14 +8,18 @@
  *
  * The browser binary comes from CHROME when set; otherwise the Windows
  * Chrome path the Windows harnesses use, or the Playwright-managed Chromium
- * a Linux container provides. Only the process this module spawned is ever
- * stopped: no name-based sweeps of other browsers.
+ * a Linux container provides. Only the process this module spawned, and on
+ * Windows the processes launched with its own throwaway profile, are ever
+ * stopped: no name-based sweeps of other browsers. (On Windows the spawned
+ * chrome.exe can hand off to a browser process that outlives it and keeps
+ * its connections open; close() stops that one too.)
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
+import { cleanupBrowser } from "./process-ownership.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,6 +37,7 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 	const profile = mkdtempSync(path.join(os.tmpdir(), "hw-pi-lab-"));
 	const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--hide-scrollbars", "--font-render-hinting=none", "about:blank"];
 	if (process.platform === "linux" && process.getuid?.() === 0) args.unshift("--no-sandbox");
+	const startedAt = new Date().toISOString();
 	const proc = spawn(chromePath(), args, { stdio: "ignore" });
 	let target = null;
 	for (let i = 0; i < 60 && target === null; i++) {
@@ -169,7 +174,16 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 				setTimeout(() => {
 					if (proc.exitCode === null) proc.kill("SIGKILL");
 				}, 3000).unref();
+				// A process that cannot be ended never holds the run open.
+				setTimeout(resolve, 5000).unref();
 			});
+			if (process.platform === "win32") {
+				try {
+					cleanupBrowser(profile, startedAt);
+				} catch {
+					/* best effort: a leftover is reported by the caller's own sweep */
+				}
+			}
 			try {
 				rmSync(profile, { recursive: true, force: true });
 			} catch {

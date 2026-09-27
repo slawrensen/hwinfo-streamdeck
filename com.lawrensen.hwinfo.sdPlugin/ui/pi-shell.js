@@ -285,13 +285,18 @@ self.hwShell = (() => {
 	// A section a person toggled on this page keeps that state even if the
 	// plugin's answer arrives after the toggle.
 	const touched = new Set();
-	// Whether the person has pressed, typed or scrolled in this panel yet.
+	// Whether the person has pressed, typed, scrolled or moved focus to a
+	// control in this panel yet. Focus counts because assistive technology
+	// can move it with no key or pointer event reaching the page; the page
+	// itself taking focus (the body) does not.
 	let personActed = false;
-	for (const type of ["pointerdown", "keydown", "wheel"]) {
-		document.addEventListener(type, () => {
-			personActed = true;
-		}, { capture: true, passive: true, once: true });
-	}
+	const ACTS = ["pointerdown", "keydown", "wheel", "focusin"];
+	const acted = (ev) => {
+		if (ev.type === "focusin" && (ev.target === document.body || ev.target === document.documentElement)) return;
+		personActed = true;
+		for (const type of ACTS) document.removeEventListener(type, acted, true);
+	};
+	for (const type of ACTS) document.addEventListener(type, acted, { capture: true, passive: true });
 	const foldsReady = (why) => {
 		if (!document.documentElement.hasAttribute("data-folds-pending")) return;
 		document.documentElement.removeAttribute("data-folds-pending");
@@ -315,8 +320,9 @@ self.hwShell = (() => {
 		// On the Stream Deck app the answer can land after the panel shows
 		// (hardware, 2026-09-26: shown at the then 300 ms cap, answer 17 ms
 		// later). It
-		// still applies until the person presses, types or scrolls; after
-		// that it only opens sections, never folds one under them (ADR05).
+		// still applies until the person presses, types, scrolls or moves
+		// focus; after that it only opens sections, never folds one under
+		// them (ADR05, AX03).
 		// The memory itself is untouched either way.
 		const showing = !document.documentElement.hasAttribute("data-folds-pending");
 		if (showing) performance.mark("hw-folds-late");

@@ -76,6 +76,11 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		/** Extra latency for the remembered-folds answer alone (ms), so a
 		 * late fold answer can be tested while every other reply is prompt. */
 		foldsDelayMs: 0,
+		/** When true, getGlobalSettings replies wait in heldGlobals until
+		 * releaseGlobals(), so a slow first shared-settings answer can be
+		 * tested. setFixture drops held replies but keeps the flag. */
+		holdGlobalsReplies: false,
+		heldGlobals: [],
 		stats: new SessionStatsStore(),
 		/** The plugin's in-memory fold memory; a fresh sim is a fresh plugin. */
 		folds: new PanelFoldMemory(),
@@ -129,6 +134,22 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	};
 	sim.face = face;
 	sim.status = status;
+	/** A plugin message to the open panel, as the plugin would send it. */
+	sim.sendToPi = (payload) => toPi(payload);
+	/** Answers every held getGlobalSettings with the current globals and
+	 * stops holding. */
+	sim.releaseGlobals = () => {
+		sim.holdGlobalsReplies = false;
+		const held = sim.heldGlobals.splice(0);
+		for (const ws of held) ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
+	};
+	/** The shared settings changed somewhere else (another panel, the
+	 * plugin): the host tells this panel. */
+	sim.pushGlobals = (doc) => {
+		sim.globals = structuredClone(doc);
+		applyGlobalThemeSettings(sim.globals);
+		sim.piWs?.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
+	};
 
 	sim.fixtureNames = () => Object.keys(all.list);
 	sim.setFixture = (name, overrides = {}) => {
@@ -145,6 +166,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		sim.globalWrites.length = 0;
 		sim.piMessages.length = 0;
 		sim.toPiLog.length = 0;
+		sim.heldGlobals.length = 0;
 		applyGlobalThemeSettings(sim.globals);
 		seedHistory();
 	};
@@ -178,7 +200,8 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 					setTimeout(sim.pushPreview, 5);
 					break;
 				case "getGlobalSettings":
-					ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
+					if (sim.holdGlobalsReplies) sim.heldGlobals.push(ws);
+					else ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
 					break;
 				case "setGlobalSettings":
 					sim.globalWrites.push(structuredClone(msg.payload ?? {}));
@@ -268,6 +291,9 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		if (ticker !== null) clearInterval(ticker);
 		for (const client of wss.clients) client.terminate();
 		await new Promise((resolve) => wss.close(resolve));
+		// A browser that outlived its launcher keeps connections open;
+		// close() alone would wait on them.
+		server.closeAllConnections?.();
 		await new Promise((resolve) => server.close(resolve));
 	};
 	return sim;

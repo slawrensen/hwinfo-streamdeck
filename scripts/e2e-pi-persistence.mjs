@@ -2926,9 +2926,20 @@ try {
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });
 	await sleep(500);
 	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Void"`)).result?.value === true);
+	// A Paper deck the way the plugin produces one: Paper is the stored
+	// shared theme and the plugin's answer. (A known stored shared theme is
+	// what the plugin draws, src/ui/theme-store.ts, so the panel reads it
+	// first since the external review's AX07; a payload saying Paper over a
+	// stored Void is a state the plugin cannot reach.)
+	const deckGlobals = (theme) => (mode === "linked" ? { theme, readingLinks: LINKED_LINKS } : { theme });
+	toPi({ event: "didReceiveGlobalSettings", payload: { settings: deckGlobals("paper") } });
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "paper" });
 	await sleep(500);
 	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Paper"`)).result?.value === true);
+
+	toPi({ event: "didReceiveGlobalSettings", payload: { settings: deckGlobals("void") } }); // the host's stored settings again
+	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "void" });
+	await sleep(200);
 
 	// Hold the real socket reply while the user edits each config textarea.
 	// This races the production async fill path, with no helper extraction.

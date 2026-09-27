@@ -287,9 +287,10 @@ self.hwModel = (() => {
 	}
 
 	/** Shared defaults, folded: what a key or dial set to Default draws.
-	 * `resolvedTheme` is the plugin's answer (effectiveDeckTheme, which
-	 * includes the legacy migration when no shared theme is stored); without
-	 * it, a stored id this version does not know draws the spec default. */
+	 * `resolvedTheme` is the panel's resolved deck theme (a known stored
+	 * shared theme, else the plugin's effectiveDeckTheme, which includes the
+	 * legacy migration); without it, a stored id this version does not know
+	 * draws the spec default. */
 	function sharedDefaultsSummary(globals, resolvedTheme) {
 		const id = typeof resolvedTheme === "string" && Object.hasOwn(THEME_NAMES, resolvedTheme) ? resolvedTheme : Object.hasOwn(THEME_NAMES, globals.theme) ? globals.theme : "void";
 		const theme = themeName(id);

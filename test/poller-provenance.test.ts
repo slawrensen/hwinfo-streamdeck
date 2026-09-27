@@ -703,3 +703,47 @@ describe("auto mode reports a refused Gadget scan instead of an absent HWiNFO", 
 		assert.match(status.message, /mapping not found/);
 	});
 });
+
+describe("a single-source mode never opens the other provider", () => {
+	// The Start HWiNFO guidance says a single-source mode never checks the
+	// other provider (external review AX09); this holds the poller to it.
+	afterEach(() => mock.restoreAll());
+
+	function opens(mode: "auto" | "shared-memory" | "gadget"): { status: PollerStatus; sharedMemory: number; gadget: number } {
+		const subject = isolated();
+		subject.setSourceMode(mode);
+		let sharedMemory = 0;
+		smOpen = () => {
+			sharedMemory++;
+			throw new HwinfoError("not-running", "canned: shared memory absent");
+		};
+		const gadget = mock.method(GadgetRegistryProvider, "open", () => {
+			throw new HwinfoError("not-running", "canned: gadget key absent");
+		});
+		for (let i = 0; i < 3; i++) {
+			now += 20_000;
+			subject.tick();
+		}
+		return { status: subject.getStatus(), sharedMemory, gadget: gadget.mock.callCount() };
+	}
+
+	it("Shared Memory only: a failed open never tries Gadget", () => {
+		const r = opens("shared-memory");
+		assert.equal(r.status.state, "unavailable");
+		assert.ok(r.sharedMemory >= 1, "Shared Memory was tried");
+		assert.equal(r.gadget, 0);
+	});
+
+	it("Gadget registry only: a failed open never tries Shared Memory", () => {
+		const r = opens("gadget");
+		assert.equal(r.status.state, "unavailable");
+		assert.ok(r.gadget >= 1, "Gadget was tried");
+		assert.equal(r.sharedMemory, 0);
+	});
+
+	it("Auto tries both before it reports HWiNFO unavailable", () => {
+		const r = opens("auto");
+		assert.equal(r.status.state, "unavailable");
+		assert.ok(r.sharedMemory >= 1 && r.gadget >= 1, JSON.stringify(r));
+	});
+});

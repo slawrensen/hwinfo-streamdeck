@@ -143,6 +143,12 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		const held = sim.heldGlobals.splice(0);
 		for (const ws of held) ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
 	};
+	/** This action's settings arrive from the host (an echo, or the plugin
+	 * writing them). */
+	sim.pushSettings = (doc) => {
+		sim.settings = structuredClone(doc);
+		sim.piWs?.send(JSON.stringify({ event: "didReceiveSettings", action: PAGES[sim.page].action, context: sim.context, device: "dev1", payload: { settings: sim.settings, coordinates: { column: 0, row: 0 } } }));
+	};
 	/** The shared settings changed somewhere else (another panel, the
 	 * plugin): the host tells this panel. */
 	sim.pushGlobals = (doc) => {

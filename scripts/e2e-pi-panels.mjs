@@ -1273,6 +1273,19 @@ try {
 		await sleep(500);
 		const late = await ms();
 		check("Make shared, slow shared settings, nothing picked meanwhile: the share completes as usual, Default checked and focused", same(sim.writes.map((x) => x.theme), [""]) && same(sim.globalWrites.map((x) => x.theme), ["ember"]) && late.line === "Default (shared: Ember)" && late.checked === "" && late.active === "" && late.said === "Ember is now the shared theme, was Void. This key follows it.", JSON.stringify({ late, ...writes() }));
+		// The host re-sends this key's settings during the wait (same theme,
+		// another field changed by the plugin): not a new pick.
+		sim.folds = new PanelFoldMemory();
+		sim.holdGlobalsReplies = true;
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		await b.click("#theme-share");
+		await sleep(200);
+		sim.pushSettings({ ...sim.settings, label: "From the plugin" });
+		await sleep(150);
+		sim.releaseGlobals();
+		await sleep(500);
+		const echoed = await ms();
+		check("Make shared, slow shared settings: a settings echo during the wait is not a new pick; the share completes as usual", same(sim.writes.map((x) => x.theme), [""]) && same(sim.globalWrites.map((x) => x.theme), ["ember"]) && echoed.line === "Default (shared: Ember)" && echoed.checked === "" && echoed.active === "" && sim.settings.label === "From the plugin", JSON.stringify({ echoed, themes: sim.writes.map((x) => x.theme), label: sim.settings.label }));
 
 		// An older themes payload after the share (AX07): the stored shared
 		// theme is what the plugin draws, so the line keeps it.

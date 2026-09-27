@@ -276,3 +276,9 @@ d11 gates: panel suite 357 of 357 (exit 0, 263 s, no browser left);
 unit 1,356 of 1,356; lint, typecheck 0; copy validator 0 warnings; pack
 validation and `streamdeck validate` pass. Archive `0a6f13e2...`
 (363,041 bytes, 47 members).
+
+R52 closed (2026-09-26): the owner checked F2, Alt+Left, Alt+Right,
+Alt+Home and Alt+End in a dial's rotation list on d11 in the Stream Deck
+app; each did its job and the app took none. With Delete (checked on d09),
+every list shortcut named in `aria-keyshortcuts` is confirmed on the real
+host. OWNER-CHECK step 8 passes.

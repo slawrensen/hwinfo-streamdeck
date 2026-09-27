@@ -38,8 +38,8 @@
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
 - **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 and d11 sections.
-- **Next:** the owner's eight-step hands-on check (Delete done; F2 and the
-  Alt keys left in step 8),
+- **Next:** the rest of the owner's hands-on check (step 8, the list keys,
+  passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean
   clone on the final commit, the 70-check runner on the final archive,
   then the owner's merge, tag and publish.

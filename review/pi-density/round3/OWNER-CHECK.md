@@ -57,7 +57,12 @@ on the hardware myself: the app was not mine to click.
    selected reading from the rotation list and nothing else; the dial and
    its key stayed. (Emptying the list then ran the dial through every
    reading of its sensor, as designed; the panel note and the docs now say
-   what an overview shows then.) F2 and the Alt keys are still to check.
+   what an overview shows then.)
+   **F2 and the Alt keys: done by the owner on d11 (2026-09-26).** F2
+   opened the name field and Alt+Left, Alt+Right, Alt+Home and Alt+End
+   moved the selected reading; the app took none of them. Settings after
+   the check: only the readings ticked for it, and no name stored by an
+   unchanged F2 and Enter. Step 8 passes.
 
 Rollback, if anything is wrong:
 

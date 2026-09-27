@@ -218,11 +218,13 @@ deck" had a stored Void shared theme under a plugin answer of Paper, a
 state the plugin cannot reach once a known stored theme is read first
 (AX07); it now stores Paper for that check and Void again after it.
 
-d09 gates (simulated host unless stated): panel suite 334 of 334 (exit 0,
-235 s, no browser left; the d08 panel files fail the 10 new race checks, a
+d09 gates (simulated host unless stated): panel suite 335 of 335 (exit 0,
+about 235 s, no browser left; the d08 panel files fail the 10 new race checks, a
 Merge no-op copy fails 4, a double-write copy fails 1); persistence 646 of
 646; the theme-band runner 70 of 70 with exit 0 (`themefold/acceptance/D09/`;
-d08 69 of 70, exit 1, `acceptance/D08/`); unit 1,352 of 1,352; lint and
+d08 69 of 70, exit 1, `acceptance/D08/`); unit 1,355 of 1,355 (with `c270e63`: a single-source mode never opens the
+other provider; a settings echo during a slow Make shared is not a pick,
+each failed by a mutant); lint and
 typecheck 0; copy validator 0 warnings; pack validation and `streamdeck
 validate` pass. Archive `82b2b856...` (362,033 bytes, 47 members),
 installed on the deck by the bench route with every file hash-verified,

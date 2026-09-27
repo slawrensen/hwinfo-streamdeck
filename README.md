@@ -19,8 +19,9 @@ Deck + and + XL dials show a single reading or a two- or three-row overview.
 a layout comparison, not a photograph of hardware. The board predates the
 1.7 contrast changes described below.*
 
-> **1.7** combines per-reading dial colors with source, identity and history
-> fixes. [What changed for you](docs/whats-new-1.7.md).
+> **1.7** redesigns the settings panels, adds per-reading dial colors and
+> fixes source, identity and history handling.
+> [What changed for you](docs/whats-new-1.7.md).
 
 ## Requirements
 
@@ -36,8 +37,8 @@ a layout comparison, not a photograph of hardware. The board predates the
    download from GitHub Releases.
 2. Start HWiNFO. Enable **Shared Memory Support** in Settings and open its
    Sensors window. **Sensors-only** mode works too.
-3. Drag **HWiNFO Sensors > Sensor Reading** onto a key. Pick a reading from
-   the searchable list.
+3. Drag **HWiNFO Sensors > Sensor Reading** onto a key. In its settings
+   panel, type in the **Reading** box and pick a reading from the list.
 
 [Setup guide](docs/getting-started.md) · [Troubleshooting](docs/troubleshooting.md)
 
@@ -67,17 +68,20 @@ that need a reselection.
 
 ## Sensor Reading (keys)
 
-Choose one reading, two stacked readings, three rows, or four cells. Set a
-label, theme, text color and decimal precision. A single-reading key can
-show a sparkline, bar or ring.
+**Readings on this key** chooses one reading, two stacked readings, three
+rows, or four cells. Set a label, theme, text color and decimal precision. A
+single-reading key can show a sparkline, bar or ring (**Graph under the
+value**).
 
 Press a key to cycle **current > MIN > MAX > AVG**. Those historical fields
 come from HWiNFO and require Shared Memory. Alerts always use the current
 value, even while a historical value is displayed.
 
-Set **A press** to open [sensor details](docs/sensor-details.md) for a
-whole source, a custom list, or a filter such as `*gpu*fan*`. Detail pages
-support multi-reading tiles and a Back tile that can also show readings.
+Set **A press** to **Opens sensor details** (or **Tap cycles; hold opens
+details**) to open [sensor details](docs/sensor-details.md). **Details list**
+chooses the reading's whole sensor, a custom list, or a filter such as
+`*gpu*fan*`, and **Readings per tile** puts one to four readings on each tile.
+The Back tile can also show readings.
 
 [All key settings](docs/sensor-reading.md) · [Thresholds and alerts](docs/thresholds-alerts.md)
 
@@ -93,6 +97,10 @@ offer other gesture mappings. Local session averages count accepted
 observations, not elapsed time. Data gaps and source or unit changes start
 a new session.
 
+In the dial's settings, tick readings under **Rotation**, then select one in
+the list and use **Earlier**, **Later**, **Rename** or **Remove**. **Split into
+groups** divides the rotation into named groups.
+
 Since 1.7, **Display > Reading colors** assigns colors to
 individual numbers on multi-row dials. Choose Signal, Pairs or Uniform,
 then adjust individual readings. Alerts and valid Custom Text colors take
@@ -103,16 +111,20 @@ priority. Individual reading colors remain off until you enable them.
 ## HWiNFO Control (keys)
 
 A **HWiNFO Control** action can switch readings, pause auto-cycle, pin a
-reading or reset local statistics. Target one dial by its **Link ID**, or
-all visible dials. It also works as a Multi Action step.
+reading or reset local statistics. Its **Target** is a dial's **Link ID**
+(every dial that carries it) or, left empty, every dial. It also works as a
+Multi Action step.
 
 [Control action setup](docs/controls.md#the-hwinfo-control-key-action)
 
 ## Themes
 
-Choose **Void, Graphite, Ultraviolet, Midnight, Forest, Ember or Paper** per
-action, or set one deck default. **Text color** offers Theme text, Dimmed or Custom color.
-**Accent colors** can follow the sensor category.
+Pick **Void, Graphite, Ultraviolet, Midnight, Forest, Ember or Paper** from
+the theme chips at the top of a key's or dial's settings, or pick **Default**
+to follow the shared theme under **Advanced > Shared defaults**, which every
+key and dial set to Default uses. **Text color** offers Default, Theme text,
+Dimmed or Custom color. **Accent colors** (also under Shared defaults) can
+follow the sensor type.
 
 Warnings use amber; critical alerts use red.
 Alerts override decorative colors. Built-in value, unit and numeric
@@ -143,15 +155,19 @@ physical readability. See the [display reference](docs/themes.md#the-display-sys
 | **Age unknown** | Check Gadget reporting. Unchanged registry values cannot prove that HWiNFO is still updating. |
 | **Bridge failed** | Reinstall the plugin. If Windows reports a block, keep that report for support. |
 | **Access denied** | Check the Windows account, session and permissions. See the troubleshooting guide before changing elevation. |
-| **Source error** | Open settings and copy the support report. |
+| **Source error** | Open settings and choose **Copy support report** under Advanced > Support. |
 | **Pick a sensor** | Select a reading in the action's settings. |
 | **Sensor missing** | Check the saved selection, the current source and any explicit source link. |
 
-[Status screens and fixes](docs/troubleshooting.md)
+The settings panel shows the same state under its header, with the fix as a
+button where there is one, such as **Check again** or **HWiNFO setup steps**.
 
-One reader serves all keys and dials. It polls once per second by default,
-configurable from 250 ms to 5 s. HWiNFO updates on its own schedule. Reading
-faster does not create extra sensor samples.
+[Status screens](docs/status-screens.md) · [Troubleshooting](docs/troubleshooting.md)
+
+One reader serves all keys and dials. It reads HWiNFO once per second by
+default; **Read every** under **Advanced > Connection** sets 250 ms to 5 s.
+HWiNFO updates on its own schedule. Reading faster does not create extra
+sensor samples.
 
 ## Building from source
 

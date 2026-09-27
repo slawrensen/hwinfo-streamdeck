@@ -21,41 +21,80 @@ Redesigned settings panels, per-reading dial colors and reliability
 fixes in one release.
 
 - The settings panels for Sensor Reading keys, Sensor Dials, HWiNFO
-  Control keys and detail tiles share one essentials-first layout: a
-  header with the exact face the plugin last drew and its live state,
-  then Reading, Display, Alerts, Press (Controls on a dial) and
-  Advanced. Reading and Display start open, a section you open or
-  fold stays that way on the next key's panel while the app runs (the
-  two chevron buttons at the top right of the header, or Alt-click on a
-  title, open or fold them all; never stored in a key's settings), and
-  every folded section's title line says what it holds in the
+  Control keys and detail tiles share one essentials-first layout. On
+  Sensor Reading keys and Sensor Dials a header with the exact face the
+  plugin last drew and its live state stays pinned while you scroll the
+  app's own 410 px panel, and a theme strip under it opens on a first
+  visit (one line naming what is drawn and where it comes from, such as
+  "Default (shared: Void)" with Change beside it, then every theme as a
+  chip drawn in its own colors with its name on it). The strip folds
+  like a section; folded, its line keeps the checked theme as a small
+  chip in that theme's colors, beside where it comes from. When a key's or
+  dial's own theme differs from the shared one, Make shared takes
+  Change's place: it makes that theme the shared theme and sets the key
+  or dial back to Default. The
+  chips keep the themes' defined order in the Stream Deck app, which
+  delivered them alphabetized. Then come
+  Reading,
+  Display, Alerts, Press (Controls on a dial) and Advanced, whose
+  Shared defaults, Connection, Support and Configuration documents
+  fold on their own. Reading and Display start open, a section you open
+  or fold stays that way on the next key's panel while the app runs
+  (the two chevron buttons at the top right of the header, or Alt-click
+  on a title, open or fold them all; never stored in a key's settings),
+  and every folded section's title line says what it holds in the
   runtime's own terms: inherited choices are marked "shared",
   thresholds read as at or beyond (≥, ≤) with their unit and a dial's
   unit scope, and a dial's gesture line follows the resolved preset,
-  so a tap made dead by touch zones is not listed.
+  so a tap made dead by touch zones is not listed. Open, a section
+  drops that line and keeps its longer explanations behind a How …
+  works link. A default key's panel measures more than a quarter
+  shorter than the first 1.7 draft's, which never shipped (1,042 to 753
+  CSS px on the simulated test host, review/pi-density). Fields and buttons share
+  one height (28 px), every theme chip carries its name, and small
+  marks (checkboxes, group radios, text actions) take at least a 24 px
+  target.
 - The panel tells its states apart: connecting, plugin not answering,
   no reading selected, HWiNFO unavailable (the saved reading is kept
-  and never called missing), no new Shared Memory data, an unknown
-  Gadget data age (named as unknown, never as stopped), saved reading
-  not found, and no search matches. The header's state uses the words
-  on the face. Each comes with its local fix: Retry now, HWiNFO setup
-  steps, or picking another reading.
+  and never called missing), no new Shared Memory data (with how long,
+  for example "Not updating for 42 s"), an unknown Gadget data age
+  (named as unknown, never as stopped), the source being reopened
+  after a layout change or restart ("Reopening source", never "Live"),
+  saved reading not found, and no search matches. The header's state
+  uses the words on the face. Where there is a local fix, it sits right
+  under the header: Check again (which says when the answer came back
+  if nothing changed), HWiNFO setup steps, Pick another reading, or,
+  when Data source is set to one provider only, a way to that setting.
+  A healthy Gadget source says so in one line; the rest sits under
+  Advanced, Connection.
 - Opening a panel writes nothing, and an edit changes only the field it
   touched. Rotation groups, detail tiles, per-reading names, quad cell
   colors and list entries keep fields and entries this version does not
   know instead of being normalized away, and a stored choice this
   version does not know shows as kept rather than silently replaced.
-  Replacing the shared settings document asks for a second click.
+  Replacing the shared settings document, removing a rotation group
+  that holds readings and a merge that drops group names or folds two
+  or more groups of readings into one each ask for a second press; a quick double click only arms them.
 - The reading picker is built once per sensor list and filtered in
   place, and stays responsive on a 5,000-reading tree (PERF.md). It follows the
   combobox pattern: arrow keys browse, Enter picks, Tab or a click
   elsewhere closes without changing anything. Rotation membership and
   custom detail lists are checklists instead (one Tab stop; arrow keys
   move inside), so ticking a reading never changes the reading on the
-  dial, and rotation chips gain up and down buttons. On a dial the
-  rotation sits right under the reading on the dial, with the chip on
-  the dial marked, so you can watch it move as you turn; the dial's face
-  sits beside its name in the header instead of above it.
+  dial. On a dial the rotation sits right under the reading on the dial:
+  the search that ticks readings first, then the rotation as one list
+  (one Tab stop; arrow keys select) with the reading on the dial marked,
+  so you can watch it move as you turn, and one toolbar under it,
+  Earlier, Later, Rename and Remove, for the selected reading. At a
+  group's edge Earlier and Later move the reading into the neighboring
+  group.
+  A reading HWiNFO no longer lists shows a "missing" pill, two readings
+  with the same name carry the word that tells their sensors apart
+  (for example #0 and #1), and the lines
+  under the lists follow the dial's control map (what a turn or a
+  pressed turn does, and when the reading on the dial is outside the
+  set). The dial's face sits beside its name in the header instead of
+  above it, and the header leads with the name the dial shows.
 - The Stream Deck app keeps the Escape key and most of its own clicks
   from reaching a panel, so the open list also closes on a second click
   in the box and when the panel loses focus. Moving the pointer out of
@@ -79,8 +118,9 @@ fixes in one release.
   clears; Press does is A press; Detail contains is Details list; Tile
   shows is Readings per tile; and "Repeat Back under this key's own
   cell" is "Also go back from this key's own position". The Text
-  color help explains that type accents color graphs and badges, never
-  the numbers (issue #31).
+  color help says it colors the numbers and labels while graphs, bars
+  and stat badges take the accent color, and the Accent colors help says
+  which colors reach the numbers (issue #31).
 - Malformed Gadget raw numbers remain unavailable instead of displaying a
   numeric prefix or adding it to freshness, history and session statistics.
   Healthy neighboring readings keep serving. Detail faces also refresh when

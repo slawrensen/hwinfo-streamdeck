@@ -64,19 +64,19 @@ After the timer expires:
 | Free-version limit | disables after 12 h | none |
 | Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
 
-Set it under **Advanced → Connection → Data source** in any key's or dial's settings (`Auto`, `Shared Memory only`, `Gadget registry only`). It's a global setting: it applies to every key and dial.
+Set it under **Advanced → Connection → Data source** in any key's or dial's settings (**Auto (Shared Memory, else Gadget)**, **Shared Memory only**, **Gadget registry only**). It's a global setting, marked **All keys and dials**: it applies to every key and dial.
 
 A provider switch does not translate saved identities by itself. Configure explicit [reading links](data-sources.md#link-readings-across-providers) for continuity in either direction. See [Data sources](data-sources.md) for the full breakdown.
 
 ### I ticked many readings in Gadget but only a few show up. Why?
 
-HWiNFO gives every ticked reading a numbered slot, and a reading that stays ticked but is not being written (one disabled in the sensor window, for example) leaves its slot empty, so the list can carry gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press **⟳** in the picker. Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
+HWiNFO gives every ticked reading a numbered slot, and a reading that stays ticked but is not being written (one disabled in the sensor window, for example) leaves its slot empty, so the list can carry gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press the circular-arrow button beside the **Reading** box (**Reload the sensor list**). Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 
 ### Why are min / max / avg showing the current value?
 
 Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. Versions through 1.6.0 filled those fields with the current value. Since 1.7.0 they are unavailable: historical modes on keys and detail tiles show N/A with an empty value.
 
-This happens when Shared Memory isn't available, most commonly after the free version's 12-hour timeout in Auto mode, or if you've forced `Gadget registry only`. When it's active, the settings panel shows a note. To get real min/max/avg back, re-enable Shared Memory Support in HWiNFO (or use Pro).
+This happens when Shared Memory isn't available, most commonly after the free version's 12-hour timeout in Auto mode, or if you've forced `Gadget registry only`. When it's active, the settings panel says so under its header: *Gadget registry: current values only, no min, max or average.* To get real min/max/avg back, re-enable Shared Memory Support in HWiNFO (or use Pro).
 
 > Dials calculate local session statistics from accepted observations on either source. **Age unknown** or another unavailable state replaces the display and resets the session since 1.7; the first live frame afterwards shows **stats reset: data gap** once.
 
@@ -84,7 +84,7 @@ This happens when Shared Memory isn't available, most commonly after the free ve
 
 They're two different things:
 
-- **Key** (Sensor Reading): the `Show` setting and the key-press cycle display **HWiNFO's own** min/max/avg, measured since HWiNFO started (or since you last reset them *inside HWiNFO*). These come from the shared-memory data, so they're unavailable on the Gadget source.
+- **Key** (Sensor Reading): the **Value shown** setting and the key-press cycle display **HWiNFO's own** min/max/avg, measured since HWiNFO started (or since you last reset them *inside HWiNFO*). These come from the shared-memory data, so they're unavailable on the Gadget source.
 - **Dial** (Sensor Dial): min/max/avg are local, per-reading session statistics. Since 1.7, the dial counts accepted observations once and calculates a sample-weighted average. Ordinary rotation preserves the session; data gaps and changes to the source or reading can reset it. See [session statistics](sensor-dial.md#session-stats-are-the-dials-own-per-reading).
 
 ## Sparklines
@@ -102,7 +102,7 @@ Two more sparkline behaviors:
 - Toggling **°C/°F** no longer resets the graph: it stores native values and just relabels.
 - A **frozen** HWiNFO holds the line's last shape for up to 15 seconds instead of flattening it. Once the key reports **Not updating** the line is cleared, and it restarts when data resumes.
 
-Changing the plugin's **Read every** interval (Advanced) *does* clear the ring: the history is index-spaced, not time-stamped, so it does not preserve elapsed time across a cadence change.
+Changing the plugin's **Read every** interval (Advanced, Connection) *does* clear the line: the history is index-spaced, not time-stamped, so it does not preserve elapsed time across a cadence change.
 
 ## Performance and resource use
 
@@ -123,11 +123,11 @@ With no Sensor Reading key or Sensor Dial visible, source polling stops. The plu
 
 ### How many sensors / keys can I use?
 
-There's no practical limit you'll hit. HWiNFO typically exposes 500+ readings; the picker searches across all of them and lists every match, with no row cap (a 5,000-reading test tree stays responsive). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Readings on this key** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts + 8 dials without trouble.
+The plugin puts no limit on how many keys and dials show readings. HWiNFO typically exposes 500+ readings; the picker searches across all of them and lists every match, with no row cap (a 5,000-reading test tree stays responsive). You can place as many keys and dials as your Stream Deck hardware has, and one key isn't limited to one reading: the key's **Readings on this key** setting puts [two](sensor-reading.md#layout-two-readings-on-one-key), [three](sensor-reading.md#layout-three-readings-rows) or [four](sensor-reading.md#layout-four-readings-the-quad-grid) readings on a single key, so a deck can show more readings than it has keys. All of them read from the same single poller. The load test above ran 518 key contexts and 8 dials; PERF.md has its results.
 
 ### Can multiple keys show the same sensor?
 
-Yes. Put the same sensor on as many keys as you like; each can have its own label, layout, theme, text color, decimals, unit, stat mode, display (sparkline, bar or ring) and thresholds. They all read from the shared poller, so extra copies cost nothing meaningful.
+Yes. Put the same sensor on as many keys as you like; each can have its own **Label on the key**, layout, theme, **Text color**, **Decimals**, **°F**, **Value shown**, **Graph under the value** (sparkline, bar or ring) and thresholds. They all read from the shared poller, so an extra copy adds rendering work, not another source read.
 
 ## Alerts, thresholds and colors
 
@@ -138,7 +138,7 @@ It's crossed a threshold you set. In the key's settings:
 - **Warn at** → the whole key flips to an **amber** field with black text.
 - **Critical at** → a **red** field with white text.
 
-With **Display** set to **Bar** or **Ring**, those same thresholds also mark muted amber and red zones on the gauge track, escalating toward the alarmed end (the high side normally, the low side when *Direction* alerts below). The zones are fixed landmarks: they show whenever the thresholds are set, crossed or not, so red on the track is not by itself an alert. The field flip is. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
+With **Graph under the value** set to **Bar** or **Ring**, those same thresholds also mark muted amber and red zones on the gauge track, escalating toward the alarmed end (the high side normally, the low side when **Alert when the value drops to or below these numbers** is ticked). The zones are fixed landmarks: they show whenever the thresholds are set, crossed or not, so red on the track is not by itself an alert. The field flip is. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
 
 Alerts always track the **live** value (not the displayed stat: a key showing MAX still colors by the current reading). By default higher is worse; tick **Alerts → Alert when the value drops to or below these numbers** to flip the comparison (for fan RPM, free disk space, etc.).
 
@@ -159,13 +159,13 @@ Under **Legacy**, push the dial. Under **Elite**, hold the push for half a secon
 - Pick the **Void** chip → this key is pinned to Void forever, even if you later change the shared theme.
 - Pick the **Default** chip → this key changes whenever you change the shared theme.
 
-In the gallery the Default chip is drawn with a dashed border and a small link badge so it's structurally distinct from the preset it currently resolves to; the resolved theme is named in its tooltip and in the help line under the gallery (e.g. "currently Void").
+In the theme strip the Default chip has a dashed frame and a small link mark before its name, which tell it apart from the preset it currently resolves to; the line above the chips names the resolved theme: *Default (shared: Void)*, or *Void (set on this key)* for a key's own pick.
 
-Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the shared default you inherit may be Graphite, not the fresh-install Void. That's deliberate, so an update never changes how your deck already looks. See [Themes](themes.md).
+Also note: **existing installs that predate the theme system stay on Graphite** after updating, not Void, so the shared default you inherit may be Graphite, not the fresh-install Void. That way an update does not change how an existing deck looks. See [Themes](themes.md).
 
 ### A per-key theme won't follow my shared theme: why?
 
-Because a per-key pick always wins. The shared **Theme** (Advanced → Shared defaults) only affects keys set to **Default**. If a key has its own theme selected, changing the shared theme won't touch it; pick the **Default** chip on that key to make it follow again. The folded Display section tells the two apart at a glance: *Void (shared)* follows the shared theme, *Void* alone is the key's own pick.
+Because a per-key pick always wins. The shared **Theme** (Advanced → Shared defaults) only affects keys set to **Default**. If a key has its own theme selected, changing the shared theme won't touch it; pick the **Default** chip on that key to make it follow again. The theme line above the chips tells the two apart: *Default (shared: Void)* follows the shared theme, *Void (set on this key)* is the key's own pick.
 
 ## Privacy
 

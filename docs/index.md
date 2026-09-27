@@ -15,7 +15,8 @@ no ads, no telemetry.
 a layout comparison, not a hardware photograph. The board predates the 1.7
 contrast changes.*
 
-> **1.7** brings reliability changes and per-reading dial colors.
+> **1.7** redesigns the settings panels, adds per-reading dial colors and
+> changes how sources, identities and history are handled.
 > [See what changed for you](whats-new-1.7.md).
 
 ## What it does
@@ -25,7 +26,7 @@ contrast changes.*
 - **Dials:** a single reading or a two- or three-row overview. Rotate through
   readings, use named groups or enable auto-cycle. Local session statistics
   record accepted observations.
-- **Colors:** seven themes, per-action or deck-wide text settings, and
+- **Colors:** seven themes, per-action or shared text settings, and
   individual reading colors on multi-row dials in 1.7. Alerts take priority.
 - **Details:** press a key to open a page for its source, a custom list or a
   filter. Return with the Back tile.
@@ -48,13 +49,15 @@ fallback.
 | [Sensor Reading](sensor-reading.md) | Key layouts, history and press behavior |
 | [Sensor details](sensor-details.md) | Detail pages, custom tiles and Back navigation |
 | [Sensor Dial](sensor-dial.md) | Dial views, rotation, session statistics and reading colors |
-| [Controls](controls.md) | Gesture presets and the HWiNFO Control action |
+| [Controls](controls.md) | Gesture presets, rotation groups and the HWiNFO Control action |
 | [Themes](themes.md) | Themes, text colors and display geometry |
 | [Thresholds and alerts](thresholds-alerts.md) | Warning and critical states |
 | [Data sources](data-sources.md) | Sharing, fallback, identity and freshness limits |
 | [Hardware](hardware.md) | Physically tested devices and simulated coverage |
+| [Status screens](status-screens.md) | What each key, dial and settings-panel status means |
 | [Troubleshooting](troubleshooting.md) | Status messages and fixes |
 
 Requires Stream Deck software 6.9+ and [HWiNFO](https://www.hwinfo.com) running
-on the same Windows PC. Not affiliated with or endorsed by REALiX or Elgato.
+on the same Windows PC with Shared Memory Support or Gadget reporting enabled.
+Not affiliated with or endorsed by REALiX or Elgato.
 HWiNFO belongs to REALiX; Stream Deck and Elgato are trademarks of Corsair.

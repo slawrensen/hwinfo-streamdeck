@@ -14,25 +14,25 @@ The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory a
 | What it reads | `Global\HWiNFO_SENS_SM2` mapping | `HKCU\Software\HWiNFO64\VSB` registry key |
 | Sensor coverage | readings HWiNFO publishes through Shared Memory | only the sensors you tick in HWiNFO |
 | Min / max / average | HWiNFO's statistics since start or its last reset | current value only; historical modes display **N/A** |
-| Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | ✅ no time limit |
+| Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | no time limit |
 | Windows access | depends on account, session and object permissions | reads the current user's registry; depends on account and key permissions |
-| Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Report value in Gadget** |
+| Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Enable reporting to Gadget**, then **Report value in Gadget** per reading |
 
 Shared Memory provides hardware identities, a producer timestamp and HWiNFO's statistics. On the free version it switches off after 12 hours. Gadget has no such timer, but provides current values under name-based identities, without a producer timestamp or historical statistics.
 
-> **Note:** Because the Gadget source has no historical stats, a key or detail tile set to **Show: Minimum / Maximum / Average** displays **N/A** with an empty value while reading from it. When a key is on the Gadget source, the settings panel shows a small note explaining this.
+> **Note:** Because the Gadget source has no historical stats, a key with **Value shown** set to **Minimum**, **Maximum** or **Average**, or a detail tile showing one of those, displays **N/A** with an empty value while reading from it. While a Gadget source is live, the message under the settings panel's header says "Gadget registry: current values only, no min, max or average." (unless a note about withheld readings takes its place), and the plugin's full note about the source sits under **Advanced → Connection**.
 
 ### Enabling Shared Memory
 
 In HWiNFO → **Settings** → tick **Shared Memory Support**. This is the recommended setup and gives you full stats. See [Getting started](getting-started.md) for the full first-run checklist.
 
-A Shared Memory selection uses HWiNFO's `sensor-id : instance : reading-id` identity. If two published rows have the same identity, both are withheld. A row whose sensor owner is missing is also withheld. Labels, units and list order cannot distinguish those rows safely. Healthy neighboring readings keep serving; a saved unique identity recovers automatically when HWiNFO publishes it unambiguously again, starting a fresh local history and statistics segment after the gap.
+A Shared Memory selection uses HWiNFO's `sensor-id : instance : reading-id` identity. If two published rows have the same identity, both are withheld. A row whose sensor owner is missing is also withheld. Labels, units and list order cannot tell those rows apart. Healthy neighboring readings keep serving; a saved unique identity recovers automatically when HWiNFO publishes it unambiguously again, starting a fresh local history and statistics segment after the gap.
 
 Saved settings are not rewritten. A selection saved by an older version with a duplicate suffix (`~n`) or an ownerless positional key (`?:...`) remains missing. Once the producer's identity is valid and unique, select the reading again and update any explicit source link that used the old key.
 
 ### Enabling Gadget reporting
 
-In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab, tick **Enable reporting to Gadget**, then tick **Report value in Gadget** for each reading you want. Shift-click selects a whole range at once. Tick the readings you put on the deck: every poll reads the whole ticked list on the plugin's one thread, and with all 554 readings on my bench ticked one scan took about 150 ms, against about 5 ms for a 39-reading test key (measured in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md)). Only ticked readings appear to the plugin. HWiNFO 8.48 creates the registry key only once a reading is ticked: with reporting enabled and nothing ticked, the keys show **Start HWiNFO / not detected** while HWiNFO is running. A key that is there but holds no rows, which unticking everything can leave, shows **Tick sensors / in Gadget**.
+In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab, tick **Enable reporting to Gadget**, then tick **Report value in Gadget** for each reading you want. Shift-click selects a whole range at once. Tick the readings you put on the deck: every poll reads the whole ticked list on the plugin's one thread, and with all 554 readings on my bench ticked one scan took about 150 ms, against about 5 ms for the 39-row registry test fixture (measured in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md)). Only ticked readings appear to the plugin. HWiNFO 8.48 creates the registry key only once a reading is ticked: with reporting enabled and nothing ticked, the keys show **Start HWiNFO / not detected** while HWiNFO is running. A key that is there but holds no rows, which unticking everything can leave, shows **Tick sensors / in Gadget**.
 
 HWiNFO gives every ticked reading a numbered slot and leaves that number reserved even while the reading itself is switched off, so the numbering can carry permanent gaps. The plugin reads across them (since 1.6.0; earlier versions stopped at the first gap, see [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up)).
 
@@ -44,7 +44,7 @@ HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stor
 
 These old selections get no alias and need one reselection:
 
-- A label spelled exactly `Reading 0` through `Reading 1023`. Earlier versions invented those labels when the registry label was missing, so an old selection cannot safely identify a real producer label. The real named reading remains selectable under a new identity.
+- A label spelled exactly `Reading 0` through `Reading 1023`. Earlier versions invented those labels when the registry label was missing, so an old selection cannot identify a real producer label. The real named reading remains selectable under a new identity.
 - Any literal tilde (`~`) in either the source name or reading label, even in a unique name such as `CPU~Package`, `Hot~Spot` or `Core~`.
 - A key carrying the old `~n` duplicate suffix.
 
@@ -62,9 +62,9 @@ The **Data source** setting defaults to **Auto**, and it's what most setups shou
 2. **Falls back to the Gadget registry** when Shared Memory isn't usable, for example after the free version's 12-hour timer expires, or if you turned Shared Memory Support off but still have Gadget reporting on.
 3. **Switches back to Shared Memory** when it becomes readable, checked roughly every 15 seconds while on Gadget.
 
-There's one exception to the "prefer Shared Memory" rule: if Shared Memory is simply not running *and* the Gadget registry key is there but holds no rows, the plugin shows the more helpful **Tick sensors / in Gadget** guidance rather than a generic "Start HWiNFO". The same goes for a Gadget key that opened but whose scan was refused: a registry changing during the scan shows **Source busy / retrying**, and a registry value that cannot be read as text shows **Source error / open settings**. A Shared Memory mapping that exists but is switched off is still reported as **Shared Memory / is off**. Gadget reporting enabled with nothing ticked is none of these: HWiNFO writes no key then, so the keys show **Start HWiNFO / not detected**.
+There's one exception to the "prefer Shared Memory" rule: if Shared Memory is simply not running *and* the Gadget registry key is there but holds no rows, the plugin shows **Tick sensors / in Gadget** rather than "Start HWiNFO", because ticking readings is the step that fixes it. The same goes for a Gadget key that opened but whose scan was refused: a registry changing during the scan shows **Source busy / retrying**, and a registry value that cannot be read as text shows **Source error / open settings**. A Shared Memory mapping that exists but is switched off is still reported as **Shared Memory / is off**. Gadget reporting enabled with nothing ticked is none of these: HWiNFO writes no key then, so the keys show **Start HWiNFO / not detected**.
 
-> **Note:** When the free version disables Shared Memory it leaves the named mapping behind flagged with a `DEAD` marker rather than removing it. As of 1.1.5/1.1.6 the plugin validates that marker the moment it opens the mapping, so Auto mode reliably falls back to the Gadget registry instead of getting stuck on the **Shared Memory / is off** screen. (Earlier versions could strand there.)
+> **Note:** When the free version disables Shared Memory it leaves the named mapping behind flagged with a `DEAD` marker rather than removing it. As of 1.1.5/1.1.6 the plugin validates that marker the moment it opens the mapping, so Auto mode falls back to the Gadget registry instead of getting stuck on the **Shared Memory / is off** screen. (Earlier versions could strand there.)
 
 Provider availability and reading identity are separate. Without explicit links, a saved Shared Memory key is missing on Gadget and a saved Gadget key is missing on Shared Memory. Selecting a similarly named reading is not proof of equivalence.
 
@@ -72,7 +72,7 @@ The plugin runs **one reader** across all connected decks, so all keys and dials
 
 ## Advanced settings
 
-Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced → Connection**, marked **All keys and dials**. They are **global**: one setting for the whole plugin, not per key.
+Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-source controls under **Advanced → Connection**, marked **All keys and dials**. They are **global**: one setting for the whole plugin, not per key. Connection also carries the note on [reading links](#link-readings-across-providers), the **HWiNFO setup steps** checklist and, while a Gadget source is live, the plugin's full note about it.
 
 ### Data source
 
@@ -82,30 +82,35 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 | **Shared Memory only** | Never touches the Gadget registry. If Shared Memory is off or expired, keys show a status screen instead of falling back. |
 | **Gadget registry only** | Reads only the registry. Current values only, but immune to the 12-hour limit. |
 
+With either single-provider choice, when that provider has no data the message under the settings panel's header says which setting keeps the other provider out, with a **Data source setting** button that opens it.
+
 ### Read every
 
 How often the plugin reads the source, from **250 ms** to **5 seconds** (default **1 second**), under *Advanced → Connection* (called **Poll every** before 1.7; the stored setting is unchanged). One reader serves every visible key and dial, so this is the plugin's total read rate, not per-key.
 
-> **Note:** HWiNFO updates its own sensors on a separate poll cycle (default **2 seconds**, set in HWiNFO's own settings). That cycle is the real ceiling on how fast values and sparklines change; polling the plugin faster than HWiNFO refreshes just re-reads the same numbers. Match or slightly under-run HWiNFO's interval for the freshest data without wasted reads. A slower plugin poll is a fine way to trim CPU further if you don't need sub-second updates.
+> **Note:** HWiNFO updates its own sensors on a separate poll cycle (default **2 seconds**, set in HWiNFO's own settings). That cycle is the real ceiling on how fast values and sparklines change; reading faster than HWiNFO refreshes re-reads the same numbers. Set **Read every** to HWiNFO's interval or a little shorter to pick up each new value soon after HWiNFO writes it. A longer interval means fewer reads, and less plugin CPU, when you do not need sub-second updates.
 
 ## How this shows up elsewhere
 
-- On the Gadget source, key **Show: Min/Max/Average** modes display N/A; dials use explicitly local session statistics. There is no HWiNFO-provided history on Gadget; see [Sensor Reading](sensor-reading.md) and [Sensor Dial](sensor-dial.md).
-- On Shared Memory, if the source stops updating (HWiNFO's Sensors window closed, or HWiNFO stopped polling), keys switch to a **Not updating** screen with **check sharing**. Gadget shows **Age unknown / check Gadget**: steady values look the same as ones a killed or crashed HWiNFO left. The free version's 12-hour expiry is different: it shows **Shared Memory off**, or Auto mode falls back to Gadget on its own. Full list in [Troubleshooting](troubleshooting.md).
+- On the Gadget source, a key with **Value shown** on **Minimum**, **Maximum** or **Average** displays N/A; dials use explicitly local session statistics. There is no HWiNFO-provided history on Gadget; see [Sensor Reading](sensor-reading.md) and [Sensor Dial](sensor-dial.md).
+- On Shared Memory, if the source stops updating (HWiNFO's Sensors window closed, or HWiNFO stopped polling), keys switch to a **Not updating** screen with **check sharing** (dials: **No new data**). Gadget shows **Age unknown / check Gadget**: steady values look the same as ones a killed or crashed HWiNFO left. The free version's 12-hour expiry is different: it shows **Shared Memory off**, or Auto mode falls back to Gadget on its own. Full list in [Troubleshooting](troubleshooting.md).
 
 ## Link readings across providers
 
-This is an advanced, explicit pairing step. Set the source to each provider
-in turn, select the reading on that provider, then open **Advanced > Config >
-This key**, press **Copy** and take the `readingKey` value (the key before
-the appended friendly name; the picker itself never shows keys). Select the
-reading afresh on the Gadget source first: a key saved by 1.6.0 for a source
-name with a colon is an alias spelling, and a link only accepts the current
-key the picker writes. Verify the
-source, label, native unit and reading type against HWiNFO. Return to Auto,
-then add
-`readingLinks` to the existing **Advanced > Config > Deck** document and
-Apply. Preserve its other fields. Example only; use your own keys:
+This is an advanced, explicit pairing step. Set **Data source** to each
+provider in turn, select the reading on that provider, then open
+**Advanced > Configuration documents**, press **Copy** under **This key's
+settings** (**This dial's settings** on a dial) and take the `readingKey`
+value (the key before the appended friendly name; the picker itself never
+shows keys). Select the reading afresh on the Gadget source first: a key
+saved by 1.6.0 for a source name with a colon is an alias spelling, and a
+link only accepts the current key the picker writes. Verify the source,
+label, native unit and reading type against HWiNFO. Return to Auto, then
+add `readingLinks` to the existing **Shared settings** document in the same
+group and press **Replace shared settings**, which asks for a second click
+because it changes every HWiNFO key and dial. Replace swaps the whole
+document, so edit the one the well shows and keep its other fields. Example
+only; use your own keys:
 
 ```json
 {
@@ -149,8 +154,8 @@ settings panel shows a linked saved key as present, with its label, tick and
 color. Removing a pair stops that fallback without rewriting any action. A
 dial session or sparkline segment ends for a pairing edit only when its
 saved key now stands for a different measurement; adding or removing an
-alias for the same measurement resets nothing. A picker-based pairing flow
-is still planned; the Config step is currently required.
+alias for the same measurement resets nothing. There is no picker-based pairing
+flow yet; the Configuration documents step is required.
 
 ## Freshness and local history
 

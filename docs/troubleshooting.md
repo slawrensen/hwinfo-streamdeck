@@ -28,7 +28,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 | **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
-![Production-rendered key and dial examples for Source busy, no new Shared Memory data, and Gadget Age unknown.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
+![Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on the key and No new data / check sharing on the dial for Shared Memory; and Age unknown / check Gadget on both for Gadget.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
 
 *Simulated source states rendered by the 1.7 production code, not a hardware photograph.*
 
@@ -63,11 +63,11 @@ No Shared Memory producer timestamp or value revision advanced for more than ~15
 2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
 3. **HWiNFO itself crashed or hung.** Restart it. On Shared Memory the plugin checks a fresh connection about every 5 seconds while stale; on Gadget the next value change brings the keys back. Both recover on their own.
 4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
-5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If your plugin poll interval is *faster* than HWiNFO's, you'll see the same number repeat between HWiNFO updates; that's normal, not a freeze. The plugin only calls it stale after 15 s of no change.
+5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If **Read every** is shorter than HWiNFO's interval, you'll see the same number repeat between HWiNFO updates; that's expected, not a freeze. The plugin only calls it stale after 15 s of no change.
 
 ## Keys freeze, and only closing the Stream Deck app brings them back
 
-Different from **"Not updating"** above: there is no status screen at all. The keys sit on their last reading, the settings panel's **Copy support report** button does nothing, restarting HWiNFO changes nothing, and closing the Stream Deck app and reopening it fixes it for a while. In the app's own key preview the keys show the plain **HWiNFO 62 °C** action icon rather than live values.
+Different from **"Not updating"** above: there is no status screen at all. The keys sit on their last reading, the settings panel's **Copy support report** button gets no answer (current versions change it to **Plugin not responding**, and the panel says the plugin is not answering), restarting HWiNFO changes nothing, and closing the Stream Deck app and reopening it fixes it for a while. In the app's own key preview the keys show the plain **HWiNFO 62 °C** action icon rather than live values.
 
 That combination means the plugin process is not running. Every symptom follows from it: the deck keeps showing the last picture it was sent, the app falls back to the action's icon, and nothing is left to answer the support report.
 
@@ -103,26 +103,27 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 6. **Two ticked Gadget readings share a source name and label** (1.7). Both are withheld while both are ticked, and the settings panel says that names are withheld. This one needs no reselection: see [below](#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 7. **Shared Memory reports an ambiguous or ownerless identity** (1.7). Rows sharing the same `sensor-id : instance : reading-id`, or pointing to a missing sensor owner, are withheld. A saved unique identity recovers when the producer repairs it. An older selection carrying a duplicate suffix (`~n`) or an ownerless key (`?:...`) needs reselection once a valid unique reading is available. See [Data sources](data-sources.md#enabling-shared-memory).
 
-The settings panel tells this apart from HWiNFO being down: its header reads **Saved reading not found**, and the Reading section keeps the saved reading (with its label and colors) until you pick another. While HWiNFO itself is unavailable the panel never calls a reading missing; it says the reading is kept and no data is coming in.
+The settings panel tells this apart from HWiNFO being down: its header reads **Saved reading not found**, and the message under the header says the reading stays saved with its label and colors and shows again if HWiNFO publishes it, with **Reload sensor list** and **Pick another reading** buttons. While HWiNFO itself is unavailable the panel never calls a reading missing; it says the reading and every setting stay saved and no data is coming in.
 
-**Fix:** open the key's settings and **pick the sensor again**. A dial shows **Sensor missing / waiting** and ignores turns while the sensor is gone, so a temporary dropout (an HWiNFO restart, a sleeping GPU) can't move it off your saved pick; it recovers by itself when the sensor returns. If the sensor is gone for good, pick a new reading in the dial's settings panel.
+**Fix:** open the key's settings and **pick the sensor again** (**Pick another reading** takes you to the picker). A dial shows **Sensor missing / waiting** and ignores turns while the sensor is gone, so a temporary dropout (an HWiNFO restart, a sleeping GPU) can't move it off your saved pick; it recovers by itself when the sensor returns. If the sensor is gone for good, pick a new reading in the dial's settings panel.
 
 ## Picker is empty or shows "No sensors reported"
 
-The settings-panel sensor list is populated live from whatever source is active. The current panel says "HWiNFO publishes no readings right now" in the list, and the Reading section explains why (older versions said "No sensors reported"):
+The settings-panel sensor list is populated live from whatever source is active. The current panel says "HWiNFO publishes no readings right now" in the list, and the message under the panel's header explains why (older versions said "No sensors reported"):
 
-1. **HWiNFO isn't up yet.** Start HWiNFO, then click **Retry now** in the Reading section (or the **⟳** button next to the search box). **HWiNFO setup steps** there opens the setup checklist.
-2. **On the Gadget source with nothing ticked**: the key shows **Start HWiNFO / not detected** while HWiNFO is running, because HWiNFO 8.48 creates the registry key only once a reading is ticked. In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **"Report value in Gadget"** for each value you want. **Tick sensors / in Gadget** means the key is there but holds no rows, which unticking everything can leave.
-3. **Shared memory is disabled/expired** and you're forced to **Gadget only**; same fix as above.
-4. **Search filter too narrow.** Clear the search box; the list groups readings by source (CPU, GPU, drives…).
+1. **HWiNFO isn't up yet.** Start HWiNFO, then click **Check again** in that message (or the reload button beside the search box, labelled "Reload the sensor list"). **HWiNFO setup steps** there opens the setup checklist under Advanced, Connection.
+2. **On the Gadget source with nothing ticked**: the key shows **Start HWiNFO / not detected** while HWiNFO is running, because HWiNFO 8.48 creates the registry key only once a reading is ticked. In HWiNFO's sensor window, click **Configure Sensors**, open the **HWiNFO Gadget** tab, tick **Enable reporting to Gadget**, then tick **"Report value in Gadget"** for each value you want. **Tick sensors / in Gadget** means the key is there but holds no rows, which unticking everything can leave.
+3. **Data source is set to one provider only**, and that provider has no data (for example **Shared Memory only** after the free version's 12-hour expiry). The message says so, and its **Data source setting** button opens **Advanced → Connection**; set **Data source** back to **Auto**, or enable that provider in HWiNFO.
+4. **HWiNFO is running but publishes no readings.** The message says exactly that, with **HWiNFO setup steps**: enable Shared Memory Support, or tick readings for Gadget as in item 2.
+5. **Search filter too narrow.** The list then says "No readings match" with your search. Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 
-![The settings-panel sensor picker open, showing the search box, the ⟳ refresh button, and the list of readings grouped by source.]({{ '/assets/img/sensor-picker.png' | relative_url }})
+![The key's settings panel with its reading list open: the header with the live face, the theme line and chips, then "gpu" typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i's GPU/CPU current rails, then the RTX 4090), each row with its live value and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
 ## Only some of the readings I ticked in Gadget show up
 
 HWiNFO gives every reading you tick **Report value in Gadget** a numbered registry slot. A reading that stays ticked but is not being written, such as one disabled in the sensor window, keeps its number with nothing in the slot, so the numbering can carry permanent gaps. Unticking a reading leaves no gap: HWiNFO renumbers the rest. Plugin versions before 1.6.0 stopped reading at the first gap: with a hole early in the list only the readings before it reached the picker, the keys and the detail view, and a hole at the very first slot showed **Tick sensors / in Gadget** over a full registry. Since 1.6.0 the plugin reads every published slot. If you still see fewer readings than you ticked:
 
-1. **Update the plugin** to 1.6.0 or later, then click **⟳ refresh** in the picker.
+1. **Update the plugin** to 1.6.0 or later, then click the reload button beside the picker's search box ("Reload the sensor list").
 2. **Check the tick itself.** Only readings with **Report value in Gadget** ticked are written, and only while they are enabled in the sensor window.
 3. **The scan is bounded.** The plugin reads slots 0 to 1023, far above any set a person ticks by hand; a reading parked above that is not read.
 4. **Two ticked readings share a name** (1.7). HWiNFO reports some readings twice under one source name and label, for example a GPU fan once in RPM and once in percent, and a shift-click range ticks both. The registry has nothing else to tell them apart, so both are withheld while both are ticked; the other readings keep working and the plugin log names the two slots. Untick one of the two in HWiNFO, or give one a different label, and the other comes back on its own after two polls.
@@ -136,13 +137,13 @@ HWiNFO gives every reading you tick **Report value in Gadget** a numbered regist
 
 ## A reading shows the wrong unit
 
-Each key/dial has a per-key **Unit** checkbox: **"Show temperatures in °F."** It only affects `°C` readings. If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
+Each key/dial has a per-key **°F** checkbox (under **Temperature** in Display). It only affects `°C` readings. If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
 
-Byte quantities and transfer rates follow a separate, shared control: **Advanced → Shared defaults → Data units**, either **Decimal (KB, MB, GB, rates in Mbps)** or **Binary (KiB, MiB, GiB, rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (shared by all keys and dials)](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
+Byte quantities and transfer rates follow a separate, shared control: **Advanced → Shared defaults → Data units**, either **Decimal (KB, MB, GB; rates in Mbps)** or **Binary (KiB, MiB, GiB; rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (shared by all keys and dials)](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
 
 ## Thresholds (warn/critical) don't fire
 
-Three gotchas cause almost all of these:
+Check these three first:
 
 1. **Check the threshold unit.** The warn/critical fields compare the **live** reading. If you enabled **°F**, enter the threshold in °F (e.g. `176`), not °C (`80`). For byte and rate readings, use HWiNFO's original number and unit before **Data units** changes the display scale: `12000000 B/s` compares as `12000000` even when the key shows `96.0 Mbps`. See [Thresholds & alerts](thresholds-alerts.md#how-the-comparison-works).
 2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Alerts → Alert when the value drops to or below these numbers**.
@@ -158,11 +159,11 @@ Other notes:
 The yellow Stream Deck alert cue on a drill-down press means entry was refused, on purpose. In order of likelihood:
 
 - **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Everything else about the key still works.
-- **HWiNFO is not publishing data** and the detail list is set to *All readings from this sensor source* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only a *Custom sensor list* opens while HWiNFO is down.
+- **HWiNFO is not publishing data** and the detail list is set to *Every reading from this reading's sensor* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only *A custom list* opens while HWiNFO is down.
 - **The selected sensor is missing** from HWiNFO's current output, so its source cannot be identified. Reopen settings and pick it again.
 - **The filter pattern is empty** (*Readings matching a filter*): there is nothing to list until you type one. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
 
-If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put. The plugin quietly forgets the attempt after 30 seconds; accepting later than that returns you to where you were, and the next press opens the view directly (the profile is installed now, so there is no second prompt).
+If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put. The plugin drops the attempt after 30 seconds, without a message; accepting later than that returns you to where you were, and the next press opens the view directly (the profile is installed now, so there is no second prompt).
 
 ## The detail view says "No detail / selected"
 
@@ -171,18 +172,18 @@ The detail profile is visible but the plugin was restarted underneath it (plugin
 ## Dial gestures do nothing
 
 1. **You're on a plain Stream Deck, not a Stream Deck + or + XL.** The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL encoder (dial + touchscreen). Regular keys use the **Sensor Reading** action instead.
-2. **No sensor picked yet**: a fresh dial shows **"rotate to pick."** Rotate to select a reading, or pick one in the settings panel.
-3. **Turns specifically do nothing**: check whether **Ignore turns** is on, or the dial is **pinned** (the bottom line says "pinned"; unpin via the gesture or an HWiNFO Control key).
+2. **No sensor picked yet**: a fresh dial shows **HWiNFO** / **rotate to pick**. Turn the dial to select a reading, or pick one under **On the dial now** in the settings panel.
+3. **Turns specifically do nothing**: check whether **Ignore turns** is on, whether the dial is **pinned** (it shows "pinned" where it normally says "session"; unpin with the gesture or an HWiNFO Control key), whether its reading is missing (**Sensor missing / waiting** holds the saved pick until the sensor returns), and on Custom whether **Turn** is set to **Do nothing**. The line under **On the dial now** in the settings panel names what changes the reading on this dial, and the list under **Gestures** (Controls) says what each gesture does now.
 
-Dial gesture reference (Legacy preset, the default): **rotate** cycles your rotation set if you built one, otherwise the readings of the same sensor source · **push** resets session min/max/avg · **touch** cycles current/min/max/avg · **long touch** returns to the live value. The Elite and Custom presets remap these; see [Dial controls & presets](controls.md).
+Dial gesture reference (Legacy preset, the default): a **turn** cycles your rotation set if you built one, otherwise the readings of the same sensor source · **push** resets session min/max/avg · **touch** cycles current/min/max/avg · **long touch** returns to the live value. The Elite and Custom presets remap these; see [Dial controls & presets](controls.md).
 
 ## High memory, high CPU, or a stuck process
 
-The plugin runs one poller regardless of how many keys are visible, and is designed to idle when no keys are shown.
+The plugin runs one poller regardless of how many keys are visible, and stops polling when no Sensor Reading key or Sensor Dial is on screen (the log then says `Stopped (no visible actions)`).
 
-1. **Perceived high CPU.** Lower the poll rate: **Advanced → Connection → Read every** (default 1 second; options 250 ms–5 s). There's no benefit polling faster than HWiNFO's own update cycle (~2 s by default).
-2. **Process lingering after Stream Deck quits.** The plugin watches its parent and exits when Stream Deck dies; if you ever find an orphaned `plugin.js`/Node process, ending it is safe and Stream Deck respawns it on next launch. If it recurs, capture the log (below) and file an issue.
-3. **Memory climbing.** The plugin is memory-stable under long soaks in testing. If you observe real growth, note how many keys/dials are live and attach the log.
+1. **Perceived high CPU.** Read less often: **Advanced → Connection → Read every** (default 1 second; options 250 ms–5 s). Reading faster than HWiNFO's own update cycle (~2 s by default) re-reads the same numbers. On the Gadget source, tick only the readings you put on the deck: the scan cost grows with the ticked list (see [Data sources](data-sources.md#enabling-gadget-reporting)).
+2. **Process lingering after Stream Deck quits.** The plugin watches its parent and exits when Stream Deck dies. If you find an orphaned `plugin.js`/Node process, you can end it in Task Manager; Stream Deck starts the plugin again on its next launch. If it recurs, capture the log (below) and file an issue.
+3. **Memory climbing.** [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md) records the plugin's memory over the external soaks (`scripts/soak-monitor.mjs`) I run before releases. If you observe growth, note how many keys/dials are live and attach the log.
 
 ---
 
@@ -235,7 +236,7 @@ Run through this first; most problems resolve here:
 
 - [ ] **HWiNFO is running** and its **Sensors window is open**.
 - [ ] At least one interface is enabled: **Shared Memory Support** *or* **Gadget reporting** ("Report value in Gadget" on the sensors you need).
-- [ ] **Data source** (Advanced) is **Auto** unless you have a specific reason otherwise.
+- [ ] **Data source** (**Advanced → Connection**) is **Auto** unless you have a specific reason otherwise.
 - [ ] HWiNFO and Stream Deck are at the **same elevation** (both normal, or both admin).
 - [ ] **Stream Deck 6.9+**, **64-bit Windows 10+**.
 - [ ] You **re-picked the sensor** if it went missing after a hardware/driver change.
@@ -249,5 +250,5 @@ If it still fails, open an issue at the [project repository](https://github.com/
 4. **Stream Deck software version** and device model (regular, Stream Deck +, Stream Deck + XL).
 5. **Windows version**.
 6. **The relevant lines from the log** (`com.lawrensen.hwinfo.0.log`), especially any `HWiNFO unavailable […]` and the `Opened HWiNFO data source` lines.
-7. **The support report**: the Sensor Reading and Sensor Dial panels have a **Copy support report** button in their advanced section, and the HWiNFO Control panel has one under **Support**. It copies a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, action states; no sensor values, no sensor names, nothing uploaded). Paste it into the issue.
+7. **The support report**: the Sensor Reading and Sensor Dial panels have a **Copy support report** button under **Advanced → Support**, and the HWiNFO Control panel has one under **Advanced**. It copies a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, action states; no sensor values, no sensor names, nothing uploaded). Paste it into the issue.
 8. **Whether either HWiNFO or Stream Deck is running elevated.**

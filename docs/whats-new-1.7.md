@@ -3,40 +3,150 @@ title: What changed in 1.7
 nav_order: 1.5
 ---
 
-**1.7 combines the dial-color work with the reliability fixes.** This page
-says what that changes on your deck and what, if anything, you need to do.
+**1.7.0.0 redesigns the settings panels, adds individual dial colors and
+changes how sources, identities and history are handled.** Stored settings
+are unchanged. The tables below say where a change needs you to act; the
+[changelog](changelog.md) lists every change.
+
+## The settings panels
+
+The Sensor Reading, Sensor Dial and HWiNFO Control panels share one layout.
+On a key or dial, a header stays at the top while you scroll: the face
+exactly as the plugin last drew it, the reading's name and source, and the
+data state, in the face's own words when there is a problem:
+**Live · Shared Memory**, **Not updating for 42 s** or **Age unknown**.
+
+Under the header, the theme strip opens on a first visit and folds like
+the sections; folded, its line keeps the checked theme as a small chip in that theme's colors, beside where it comes from.
+Its first line names the theme
+the key draws and where it comes from, such as **Default (shared: Void)** with
+**Change** beside it. Eight chips follow: **Default** and the seven themes,
+each drawn in its own colors with its name on it. When a key's own theme
+differs from the shared one, **Make shared** takes Change's place: it makes
+that theme the shared theme and sets the key back to Default. See [Themes](themes.md).
+
+![The top of the key's settings panel: the header with the key's live face, the reading's name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper.]({{ '/assets/img/pi-theme-strip.png' | relative_url }})
+
+*Actual settings-panel capture using live HWiNFO readings in a mock Stream
+Deck host. This is not a photograph of the physical deck.*
+
+The sections follow: **Reading**, **Display**, **Alerts**, **Press**
+(**Controls** on a dial) and **Advanced**, which holds **Shared defaults**,
+**Connection**, **Support** and **Configuration documents**. The HWiNFO
+Control key has **Command** and **Advanced**.
+
+- **Folding.** Reading and Display start open. A folded section's title line
+  summarizes what it holds. A section you open or fold stays that way on the
+  next panel of the same kind (key, dial or Control key) while the plugin
+  runs; after a Stream Deck app restart the defaults come back. The two
+  chevron buttons at the top right of the header open or fold every section,
+  and so does Alt-click on a section title. Folding writes nothing to your
+  keys.
+- **Status and repairs.** When something needs fixing, a message sits right
+  under the header with the fix as a button: **Check again**, **HWiNFO setup
+  steps**, **Reload sensor list**, **Pick another reading**, or **Data source
+  setting** when **Data source** is set to one provider only. See
+  [Status screens](status-screens.md#in-the-settings-panel).
+- **Reading list.** The picker lists every reading; 1.6.0 stopped after 150
+  rows, so a later source such as the GPU only appeared when searched for.
+  Arrow keys browse, Enter picks, and Tab or a click elsewhere closes the list
+  without changing anything.
+- **Rotation on a dial.** Tick readings under **Readings to rotate through**.
+  The rotation shows as one list with the reading on the dial marked
+  **on dial**. Select a reading, then use **Earlier**, **Later**, **Rename** or
+  **Remove**; at a group's edge, Earlier and Later move it into the
+  neighboring group. **Split into groups**, **Add group** and **Merge back
+  into one set** manage [rotation groups](controls.md#rotation-groups).
+  Ticking a reading never changes the reading on the dial.
+- **Detail settings on a key.** With **A press** set to open details, the
+  Press section shows **Readings per tile**, **Title tile text**, **Also go
+  back from this key's own position** and **Details list**. See
+  [Sensor details](sensor-details.md).
+- **Second press.** Replacing the shared settings document, removing a
+  rotation group that holds readings, and a merge that drops group names or
+  joins two or more groups of readings each ask for a second press.
+- **Nothing written on open.** Opening a panel saves nothing, and an edit
+  changes only the field it touched. A stored choice this version does not
+  know shows as kept instead of being replaced.
+- **Keyboard and size.** Every control has a name and a visible focus ring,
+  fields and buttons are 28 px tall, small marks such as checkboxes have at
+  least a 24 px target, and the panels reflow at 320 px wide without
+  horizontal scrolling.
+- **Stream Deck app limits.** The app keeps the Escape key and most of its own
+  clicks from reaching a panel, so an open reading list also closes on a
+  second click in its box and when the panel loses focus. Text typed just
+  before you select another key is saved as the pointer leaves the panel.
+
+![The dial's settings panel: the header with the dial's face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and marked on dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title after a turn.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
+
+*Actual settings-panel capture using live HWiNFO readings in a mock Stream
+Deck host.*
+
+### Renamed labels
+
+Labels changed; the stored settings behind them did not.
+
+| Before 1.7 | In 1.7 | Where |
+| --- | --- | --- |
+| Deck default | **Default** | Theme chips, **Text color** |
+| Deck theme, Deck text, Type accents | **Theme**, **Text color**, **Accent colors** | Advanced > Shared defaults (marked **All keys and dials**) |
+| Poll every | **Read every** | Advanced > Connection |
+| Sensor | **Reading** (key), **On the dial now** (dial) | Reading |
+| Label | **Label on the key**, **Title on the dial** | Reading |
+| Label mode | **Title after a turn** | Reading (dial) |
+| Layout | **Readings on this key** | Reading (key) |
+| Show | **Value shown** | Display (key) |
+| Display (sparkline, bar, ring) | **Graph under the value** | Display (key) |
+| Bar min, Bar max | **Bar from**, **Bar to** | Display (dial) |
+| Direction | **Alert when the value drops to or below these numbers** | Alerts |
+| Controls, Rotate, Press+rotate | **Gestures**, **Turn**, **Pressed turn** | Controls (dial) |
+| Reset reach | **A stats reset clears** | Controls (dial) |
+| Press does | **A press** | Press (key) |
+| Detail contains | **Details list** | Press (key) |
+| Tile shows | **Readings per tile** | Press (key) |
+| Detail title | **Title tile text** | Press (key) |
+| Repeat Back under this key's own cell | **Also go back from this key's own position** | Press (key) |
+
+The **Text color** help says it colors the numbers and labels while graphs,
+bars and stat badges take the accent color, and the **Accent colors** help
+says which colors reach the numbers ([issue #31](https://github.com/slawrensen/hwinfo-streamdeck/issues/31)).
 
 ## What changes on your deck
 
 | Change | What you see | What you need to do |
 | --- | --- | --- |
-| Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Open a multi-row dial's **Display > Reading colors**. Choose a preset or set each color. |
+| Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Set the dial's **View** to an overview, then open **Display > Reading colors**. Choose a preset or set each color. |
 | Linked source selections | A saved reading, its name and its color can follow a switch between Shared Memory and Gadget. A pairing edit applies at once on every key, dial and tile. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
 | Gadget freshness | **Age unknown** replaces a claim that unchanged registry values are definitely stale. | Check HWiNFO and Gadget reporting. A steady value alone cannot prove the producer is running. |
 | Gadget history | Key and detail MIN/MAX/AVG modes show **N/A** instead of presenting the current value as history. | Use Current, or enable Shared Memory for HWiNFO history. Dials have separate local statistics. |
+| Gadget scan cost | The Gadget scan grows with the number of ticked readings: about 150 ms per poll with all 554 readings on my bench ticked ([PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md), 2026-09-20). This corrects the 1.6.0 notes, which said the cost did not depend on the selection. | Tick only the readings you put on the deck. |
+| Yes/No readings | A Yes/No reading shows **Yes** or **No**, as HWiNFO does, on keys, dials and tiles; 1.6.0 showed 0.00. Its Bar or Ring runs empty to full. | No change. Thresholds still compare 0 and 1. |
 | Ambiguous Shared Memory identities | Readings with the same stable identity, or without a sensor owner, stay missing while healthy readings continue. | A saved unique identity recovers when the producer repairs it. Older duplicate-suffixed or ownerless selections need reselection; see [the identity limits](data-sources.md#enabling-shared-memory). |
 | Shared Gadget names | Two ticked readings that share a source name and label are both withheld while both are ticked, instead of risking the wrong reading on a key. HWiNFO reports some readings twice under one name, such as a GPU fan in RPM and in percent, and a shift-click range ticks both. | Untick or relabel one of the two in HWiNFO. The other comes back on its own. |
 | Old Gadget selections | Most Gadget selections saved by 1.6.0 keep working through a checked alias of their old key. | Reselect a reading whose label reads exactly `Reading 0` to `Reading 1023`, whose source name or label contains any literal tilde (`~`), or whose old key carried the `~n` duplicate suffix. An old key that now matches two readings stays unresolved while ambiguous. See [the source guide](data-sources.md#enabling-gadget-reporting). |
 | Sparklines and local statistics | Subsecond changes can enter the graph. Observed data gaps and source, unit or type changes end the old history segment; a dial says **stats reset: data gap** once when live data returns. | No setup change. A fresh segment after a gap is expected. |
+| Units on the device | The Stream Deck app dropped the space before a unit on dual, triple and dial faces ("59.7°C"); it now draws it ("59.7 °C"). A three-row overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the screen edge. | None. |
 | Alerts and contrast | Built-in value, unit and numeric statistic colors meet a 4.5:1 authored contrast floor, and Dim keeps labels at least as readable as units. | Check your custom colors on the actual display. Individually chosen reading, quad cell and tile colors are kept as entered in Theme mode and only dimmed in Dim mode; a Custom Text color stays exact. |
 
 If you used the **1.6.92 color preview**, the color wells and presets are
-already familiar. The new work over that preview is source-link color
+already familiar; they now sit in the redesigned Display section. The new
+work over that preview is the settings-panel redesign, source-link color
 inheritance, the reliability behavior above, and the contrast and alert
-changes. Upgrading from **1.6.0** adds both the colors and reliability work.
+changes. Upgrading from **1.6.0** adds all of it.
 
 ## Set the colors you want
 
 **Signal** cycles through four hues. **Pairs** groups neighboring readings.
 **Uniform** uses one hue. You can then change any individual color. **Auto**
-removes that reading's override.
+removes that reading's override, and the **Automatic** preset clears the
+color of every reading in the list.
 
 ![Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
 *Production dial renderer with fixed sample readings and generated histories.
 The layouts and values are identical on both sides; only number colors change.*
 
-![The 1.7 dial Display section with the Signal preset and five individual reading colors.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+![The dial's Display section: Text color on Theme text, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host. This is not a photograph of the physical deck.*
@@ -75,6 +185,6 @@ source, unit or type changes, or a saved key that comes to stand for another mea
 Ordinary rotation still preserves the session and does not count unseen
 values as new samples.
 
-Regression tests cover those cases. They establish software behavior;
-physical readability and long-run stability are checked on hardware before
-a release ships, and the [hardware page](hardware.md) records those results.
+Regression tests cover those cases. They establish software behavior, not
+physical readability or long-run stability; the [hardware page](hardware.md)
+lists what ran on which device and when.

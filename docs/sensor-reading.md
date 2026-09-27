@@ -213,7 +213,7 @@ If the key cannot show a reading, it shows a two-line status message:
 
 | Key shows | Meaning / fix |
 | --- | --- |
-| **Start HWiNFO / not detected** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
+| **Start HWiNFO / not detected** | HWiNFO isn't publishing to the selected data source (in Auto, to neither). Start it with Shared Memory Support (or Gadget reporting) enabled, or check **Data source**. |
 | **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings. Auto can use Gadget when enabled; saved selections need explicit links to work across sources. |
 | **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |

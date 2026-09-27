@@ -15,7 +15,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 
 | Key shows | Dial shows | Meaning |
 | --- | --- | --- |
-| **Start HWiNFO** / not detected | Start HWiNFO / not detected | Nothing found on either interface. |
+| **Start HWiNFO** / not detected | Start HWiNFO / not detected | No data from the selected source; in Auto, from neither Shared Memory nor Gadget. |
 | **Source busy** / retrying | Source busy / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
 | **Not updating** / check sharing | No new data / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
@@ -36,10 +36,10 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 
 ## Keys show "Start HWiNFO"
 
-The plugin found HWiNFO on **neither** interface. In order of likelihood:
+The plugin found no data from the source it reads. With **Shared Memory only** or **Gadget registry only** under **Advanced > Connection > Data source**, it reads that one and never checks the other, so check that setting first. In **Auto** it found neither. In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
-2. **HWiNFO is running but publishing on neither interface.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit). Enabling reporting alone is not enough: HWiNFO writes nothing to the registry until a reading is ticked, so this screen stays. See [Data sources](data-sources.md).
+2. **HWiNFO is running but not publishing where the plugin reads.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit). Enabling reporting alone is not enough: HWiNFO writes nothing to the registry until a reading is ticked, so this screen stays. See [Data sources](data-sources.md).
 3. **HWiNFO exited or stopped publishing sensors.** Start it and check Shared Memory Support or Gadget reporting. Minimizing a window is different from exiting the application.
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It may not have published Shared Memory yet. The plugin retries on each poll.

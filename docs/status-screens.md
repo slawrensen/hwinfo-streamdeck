@@ -13,7 +13,7 @@ When a key or dial cannot show a reading, it shows a **status screen** instead o
 
 | Key shows | What it means | How to fix it |
 | --- | --- | --- |
-| **Start HWiNFO** / *not detected* | HWiNFO isn't running, or isn't publishing on either interface. | Start HWiNFO in Sensors-only mode with **Shared Memory Support** enabled; or, on the free version, enable **Gadget reporting** (no 12-hour limit) and tick the sensors you need. |
+| **Start HWiNFO** / *not detected* | HWiNFO isn't running, or isn't publishing to the selected data source (in Auto, to neither Shared Memory nor Gadget). | Start HWiNFO in Sensors-only mode with **Shared Memory Support** enabled; or, on the free version, enable **Gadget reporting** (no 12-hour limit) and tick the sensors you need. |
 | **Source busy** / *retrying* | The sensor source was busy or changed during a read. | The plugin retries automatically on the next poll. |
 | **Shared Memory** / *is off* | HWiNFO reports Shared Memory Support as disabled. | Re-enable it in HWiNFO **Settings**. On the free version it switches off after 12 hours. Auto can use Gadget when enabled; saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources. |
 | **Not updating** / *check sharing* | No new Shared Memory measurement evidence has been observed within the grace period. | Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |

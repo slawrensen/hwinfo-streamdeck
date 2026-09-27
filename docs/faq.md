@@ -210,7 +210,7 @@ They name the observed state and a next step. These are the 1.7 messages:
 
 | Key shows | Meaning / fix |
 | --- | --- |
-| `Start HWiNFO / not detected` | HWiNFO isn't publishing on either interface. Start it with Shared Memory or Gadget reporting on. |
+| `Start HWiNFO / not detected` | HWiNFO isn't publishing to the selected data source (in Auto, to neither). Start it with Shared Memory or Gadget reporting on, or check **Data source**. |
 | `Source busy / retrying` | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
 | `Not updating / check sharing` | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |

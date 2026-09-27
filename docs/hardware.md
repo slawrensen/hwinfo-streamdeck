@@ -35,7 +35,7 @@ The [sensor detail view](sensor-details.md) ships one bundled profile per deck t
 
 And the same claim as a photograph, not a render: my Stream Deck + XL running the validation page, 36 keys and six dial readouts live from HWiNFO (Sony A7 III, 85mm at f/2.5, developed once in Camera Raw; no compositing).
 
-![Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including pump RPM and CPU package power, and six metal knobs below.]({{ '/assets/img/plusxl-photo.jpg' | relative_url }})
+![Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including physical memory, DIMM temperatures and CPU package power, and six metal knobs below.]({{ '/assets/img/plusxl-photo.jpg' | relative_url }})
 
 ## Page swipe
 

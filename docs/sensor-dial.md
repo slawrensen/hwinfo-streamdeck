@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, View on Overview, three rows, Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d08 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.0.0-d09 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -194,7 +194,7 @@ When HWiNFO isn't delivering data, the touchscreen shows a short two-line messag
 
 | Touchscreen | Meaning / fix |
 | --- | --- |
-| **Start HWiNFO** / not detected | HWiNFO isn't publishing on either interface. Start it (Shared Memory Support or Gadget reporting). |
+| **Start HWiNFO** / not detected | HWiNFO isn't publishing to the selected data source (in Auto, to neither). Start it (Shared Memory Support or Gadget reporting), or check **Data source**. |
 | **Source busy** / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory off** / enable in HWiNFO | HWiNFO reports sharing disabled. Re-enable it, or rely on the Gadget fallback in Auto mode. |
 | **No new data** / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |

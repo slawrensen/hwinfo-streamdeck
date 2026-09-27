@@ -257,3 +257,22 @@ copy validator 0 warnings; pack validation and `streamdeck validate` pass.
 Archive `9913d94c...` (362,215 bytes, 47 members), installed by the bench
 route (every file hash-verified, 0 WARN or ERROR, settings unchanged but
 the auto-cycling dial's reading); soak from 2026-09-26 22:09 local.
+
+## d11 (2026-09-26 night): the external review's second pass
+
+The second pass (on d09 and d10; report private, like the first) found
+four product defects and one citation. All four reproduce on the d10 panel
+files; each has a check the d10 files fail (16 in all) and d11 passes.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX12 | must | Changing one detail cell's color or label rewrote that whole list normalized: entries this version cannot read became `""` or `null`, entries past the tile's size went, and a sibling `automaticColors` list could vanish (predates 1.7). | A cell edit in a tile that kept its size rewrites only the cells it changed; a resize still writes whole lists. | 2 lossless checks (color with its automatic flag, label). |
+| AX13 | must | A double click with clicks 470 or 650 ms apart (a Windows double-click time can be longer than 450 ms) confirmed Merge, a group's Remove, or Replace shared settings. | The second click of one gesture (`detail` 2 or more) never confirms; the 450 ms guard stays. | 6 no-write checks (3 buttons, 2 gaps) and 3 separate-click confirms. |
+| AX14 | should | A theme delivered between press and release of Make shared was shared without a fresh press. | A press records the key's theme choice at pointer or key down; a click whose choice moved does nothing. | 4 checks (key and dial, mouse and Space) and a plain Space control. |
+| AX15 | should | The late-share announcement named inherited JavaScript members for an unknown stored theme ("keeps function Object()..."). | Theme names come from this build's own list only; an unknown stored theme is said the way the line shows it: stored, unknown, draws Void. | 4 checks (`constructor`, `__proto__`, `toString`, `future-theme`) and a unit test. |
+| AX16 | nit | The journey piece cited the d06 density file for a figure computed from d07. | Cites d07. | 3,243 against 3,183 px. |
+
+d11 gates: panel suite 357 of 357 (exit 0, 263 s, no browser left);
+unit 1,356 of 1,356; lint, typecheck 0; copy validator 0 warnings; pack
+validation and `streamdeck validate` pass. Archive `0a6f13e2...`
+(363,041 bytes, 47 members).

@@ -1,38 +1,38 @@
 # Continuation
 
-## Now (2026-09-26 evening): d06 on the deck, soaking
+## Now (2026-09-26 night): d08 on the deck, soaking, committed
 
-- **Installed:** panel build `1.7.0.0-d06` (manifest 1.7.0.0), archive
-  `release/com.lawrensen.hwinfo.streamDeckPlugin` sha256
-  `a02d1836dedc421bdb745bc0982b96075d2893f3ec81cf77bda147fc0343d63d`,
-  plugin.js `36626410...`, hwsm.node unchanged. Bench route
-  (`%SCRATCH%\bench\tools\deploy.ps1`), 47 files hash-verified. Settings
-  snapshots before/after (`%SCRATCH%\bench\snaps\*-d06.json`): only an
-  auto-cycling dial's reading changed.
-- **Soak:** `node scripts/soak-monitor.mjs --interval 60 --duration 172800`,
-  pid 25880, CSV `release/soak-1.7.0.0-d06-20260926-1652.csv`, closes about
-  2026-09-28 16:52 local. Needs one HWiNFO restart, one Stream Deck restart
-  and one sleep/wake inside the window (runbook). No e2e suites during it.
-  Then: `node scripts/soak-monitor.mjs --summary <csv>` into PERF.md.
-- **What d06 adds over d04:** re-review fixes (y1), final audit fixes
-  (FA01..FA10, CA01..CA14), the Rotation heading spacing, and the foldable
-  theme band (design R2, owner-approved; record in `round3/themefold/`).
-  See the register's last section.
-- **Gates on d06:** panel e2e 289/289, persistence 646/646, unit 1351/1351,
-  design acceptance 70/70 on the product, axe 0 + own 0 in 62 runs, lint 0,
-  typecheck 0, copy validator OK, pack validation OK, streamdeck validate OK.
-  `npm run release:validate` not run (needs committed history).
-- **Docs:** three agents swept every page for 1.7.0.0; images recaptured on
-  d06 (`%SCRATCH%\docs-cap7`, copy list in `%SCRATCH%\copy_cap5.py` plus the
-  detail, picker and pi-theme-folded mappings).
-- **Release drafts:** kept with the private release docs, outside this repo.
+- **Committed, not pushed:** `3e229d3` (product), `4570ad5` (docs and
+  images), `bd2a28c` (this review record) on `claude/pi-density` over
+  `4bf09c0`. Private drafts committed locally in the private mirror
+  (`758e5b6`, `d23a9fe`), not pushed.
+- **Installed:** panel build `1.7.0.0-d08`, archive sha256
+  `aa71b32b4b7901301ab8e79d9bfb94b06145bd00f08436cc83912866eba6ac10`,
+  plugin.js `6fa1a5b8...`, by the bench route (47 files hash-verified;
+  settings snapshots unchanged except an auto-cycling dial).
+- **Soak:** monitor pid 169388, CSV
+  `release/soak-1.7.0.0-d08-20260926-1838.csv`, closes about 2026-09-28
+  18:39 local. The d06 (1.6 h) and d07 (10 min) windows were clean; the
+  d07 window includes the owner's own app restart at 18:29.
+- **d08 over d06:** Make shared on the theme line (five-lens review in
+  `round3/sharedtheme/`), the themes' defined order on hardware (the app
+  sorts message keys; the plugin sends `themeOrder`, the sim sorts keys),
+  the dial's Accent colors help, the Make shared audit fixes (MS01 to
+  MS06), and fold memory restored: a late fold answer applies until the
+  person acts, and the wait is 600 ms (answer measured about 318 ms after
+  connect in the app, through `hw-folds-*` performance marks).
+- **Gates on d08:** panel e2e 315/315, persistence 646/646, unit
+  1352/1352, lint 0, typecheck 0, copy validator OK; a11y 62 runs 0/0 and
+  density on d07 (d08 changes only the fold wait).
+- **Next:** the external adversarial review (prompt in the private
+  release docs, `EXTERNAL_REVIEW_PROMPT_1.7.md`; its report lands in
+  `round3/external/`), the soak summary into PERF.md, the owner's
+  eight-step hands-on check, then `npm run release:validate` from a clean
+  clone and the owner's merge, tag and publish.
 - **Open, unexplained:** across the d05 install three dials without auto
   cycle moved from the second to the first member of their two-reading
-  rotations. Plugin start writes no readingKey (READ: only steps call
-  `adoptReading`); not reproduced across the d06 install (they were already
-  on the first member). Watch for it at the next restart.
-- **Still owed:** the soak summary, the owner's eight-step hands-on check
-  (`round3/OWNER-CHECK.md`), commit/tag/publish (owner's).
+  rotations. Plugin start writes no readingKey (READ). Not seen since.
+- **Rollback:** `deploy.ps1 -From %USERPROFILE%\hwinfo-bench-backup\2026-09-26-0857-f01q\com.lawrensen.hwinfo.sdPlugin`.
 
 ## Round 3 (2026-09-26): execution state
 

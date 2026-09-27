@@ -1,6 +1,6 @@
 # Continuation
 
-## Now (2026-09-26, late): d11 on the deck after two external review passes
+## Now (2026-09-27): d12 on the deck after three external review passes
 
 - **External review:** a different AI model reviewed `f98c76f` / d08 end
   to end; verdict "do not ship d08". Its report, findings and my answer
@@ -12,18 +12,26 @@
 - **Pushed:** `claude/pi-density` on GitHub (d09 in `452932a`, `d241bea`,
   `5b7d6ed`, `c270e63`, `a2b12a4`; d10 after it); private mirror `main`
   with the review files and drafts.
-- **Installed:** panel build `1.7.0.0-d11`, archive sha256
-  `0a6f13e2df9851a26d972922bf1e762d6ec8592926ff06ec2a0edea07b971e8b`
-  (363,041 bytes, 47 members), plugin.js `6fa1a5b8...` (unchanged since
-  d08), by the bench route (47 files hash-verified, 0 WARN or ERROR after
-  restart, settings snapshot 0 changes).
-- **Soak:** monitor pid 49180, CSV
-  `release/soak-1.7.0.0-d11-20260926-2313.csv`, closes 2026-09-28 23:13
+- **Installed:** panel build `1.7.0.0-d12`, archive sha256
+  `223a4cefc51d5aec0a1e8ce1567117810be9e8ad59f2614695340b40f60daee1`
+  (364,894 bytes, 47 members), plugin.js `dd92f64f...` (changed: AX22
+  preview metadata, AX26 held-press guard), by the bench route (47 files
+  hash-verified, 0 WARN or ERROR after restart). Settings across the
+  install: only the dial at "SL Film 1.7" (Stream Deck + XL) Encoder 5,0,
+  Elite, six-reading rotation, no auto cycle, moved from rotation member 2
+  to member 5 (asked the owner whether he turned it; if not, this is the
+  d05 observation again).
+- **Soak:** monitor pid 44352, CSV
+  `release/soak-1.7.0.0-d12-20260927-1036.csv`, closes 2026-09-29 10:36
   local. It only counts if the machine stays up, with an HWiNFO restart,
-  an app restart and a sleep/wake inside. The d08 window ended after 8
-  samples when the PC bugchecked in the NVIDIA display driver (0xD1 in
-  nvlddmkm.sys, then a hard freeze); GPU resets date back to 09-14. The
-  d09 and d10 windows were stopped for the next build.
+  an app restart and a sleep/wake inside. The d11 window ran about 11 h
+  clean overnight (machine stable) before it was stopped for d12.
+- **d12 over d11:** the third review pass: AX17 to AX19 (structural detail
+  edits keep entries this build cannot read), AX20 (one press, one removal
+  panel-wide), AX21 (Make shared press record survives Tab), AX22 and
+  AX23 (own-key lookups, Back to current value), AX24 (quiet density
+  deliveries), AX25 (docs), AX26 (a held dial press cannot acquire a new
+  command). The 70-check runner now runs from the repo alone.
 - **d11 over d10:** the second review pass: AX12 (a cell edit keeps the
   tile's other entries), AX13 (a slow double click never confirms), AX14
   (a theme arriving mid-press makes Make shared stale), AX15 (unknown
@@ -37,7 +45,7 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 and d11 sections.
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10, d11 and d12 sections.
 - **Next:** the rest of the owner's hands-on check (step 8, the list keys,
   passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean

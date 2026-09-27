@@ -282,3 +282,33 @@ Alt+Home and Alt+End in a dial's rotation list on d11 in the Stream Deck
 app; each did its job and the app took none. With Delete (checked on d09),
 every list shortcut named in `aria-keyshortcuts` is confirmed on the real
 host. OWNER-CHECK step 8 passes.
+
+## d12 (2026-09-27): the external review's third pass
+
+The third pass (on d11; report private) hunted each earlier finding's class
+across the panel and the plugin and found ten items. Every product item
+reproduces on the d11 files; each has a check that the d11 panel files, or
+a copy with the fix removed, fail and d12 passes.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX17 | must | A whole-tile move rebuilt the plan from the active walk and dropped stored tiles no reading reaches (predates 1.7). | The rebuild keeps them after the moved tiles (tile grip and the ghost drop). | 1 panel check (keyboard grip move). |
+| AX18 | must | Renaming one tile pruned an untouched trailing tile that parsed as the default but stored entries past its cells or a label with spaces (predates 1.7). | A trailing tile storing data this build would not restate is never pruned. | 2 panel checks. |
+| AX19 | must | Removals, resizes and swaps rebuilt cells from the parsed values: entries this build cannot read became `""`/`null`, entries past the cells went, and on a swap they stayed in the old cell (the d11 fix covered same-size cell edits only). | Each reading's stored cell entries are captured from storage; a write gives a cell its reading's entry back while its value is unchanged, entries past a tile's cells keep their stored index, and a reading carrying such entries keeps an explicit tile. | 3 panel checks (remove, 4-to-1 resize, quad swap), exact stored frames. |
+| AX20 | must | Enter held on a detail reading's remove removed it and every reading after it. | One panel-wide rule: a key repeat on any control that removes, merges or replaces does nothing (replaces d10's rotation-only guard). | 1 panel check. |
+| AX21 | should | Tab (or any focus loss) mid-press cleared d11's Make shared press record, so a stale press shared again. | The record ends only with its own kind of release, after the click that release may fire. | 1 panel check. |
+| AX22 | should | Control command, gesture and detail-slot lookups, and the preview's theme metadata, read inherited JavaScript members; the slot panel threw on `constructor`. | Own keys only (`Object.hasOwn`) in the panel and in `buildPreview`. | Unit tests (model, slot panel, preview). |
+| AX23 | should | The Control summary called `backToCurrent`, a command the dial runs, unknown. | Named "Back to current value". | Unit test. |
+| AX24 | should | A Readings per tile value arriving from elsewhere was announced as the person's edit. | Only a change of the select in this panel is spoken. | 1 panel check (and FA06 still passes). |
+| AX25 | nit | The dual-layout docs said badges never cost label space. | A pinned row's badge shares its label line. | Renderer read. |
+| AX26 | must | A held dial press released after the panel changed its command or reset reach ran the new command (Pause/resume became "reset all dials"). | A settings change that alters a held press's command, target or reach consumes that press; an unchanged echo does not. Plugin-side (`src/actions/sensor-dial.ts`). | Unit test on the production handlers; fails with the guard removed. |
+
+The 70-check theme-band runner no longer depends on a temporary copy of
+d04: its band baseline (identical in the D08 to D11 records) is frozen in
+`themefold/baseline-d04.json`, and it runs from the repo alone.
+
+d12 gates: panel suite 366 of 366 (exit 0, 273 s, no browser left; the d11
+panel files fail the 9 new panel checks); unit 1,362 of 1,362; lint,
+typecheck 0; copy validator 0 warnings; pack validation and `streamdeck
+validate` pass. Archive `223a4cef...` (364,894 bytes, 47 members),
+plugin.js `dd92f64f93bad053...` (changed: AX22 preview metadata, AX26).

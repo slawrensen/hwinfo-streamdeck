@@ -1,28 +1,34 @@
 // Strengthened acceptance run (approval round, ADR04 and UXR01): the round
 // one checks with the weak ones replaced, plus near misses 1 to 6 px on
-// every side at seven widths, band budgets measured against d04 in the same
-// run, per-kind fold memory both ways, a late fold answer, the empty-key
+// every side at seven widths, band budgets against d04 (measured in every
+// recorded run, frozen in baseline-d04.json), per-kind fold memory both
+// ways, a late fold answer, the empty-key
 // paths, AX names across states, the mini chip's colors against the
 // checked chip, and first-line alignment of the fold row. Run it on R2
 // (should pass) and on R and B (should fail). Simulated host; owns only its
 // browser and sim ports.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
-const repo = "file:///C:/Users/stephen/git/hwinfo-pi-density/";
-const S = "C:/Users/stephen/AppData/Local/Temp/claude/C--Users-stephen-git-hwinfo-streamdeck/91b47c1b-9d80-49d5-bfea-6c93b12f0164/scratchpad";
+import { fileURLToPath, pathToFileURL } from "node:url";
+// Runs from the repo alone: the panel files come from VERIFY_DIR (default:
+// this checkout's plugin), the d04 band baseline from baseline-d04.json,
+// and screenshots and verify.json go to VERIFY_OUT (default: the temp
+// folder). Exits 1 when any check fails.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, "../../../..");
+const repo = pathToFileURL(root + path.sep).href;
 const variant = process.argv[2] ?? "R2";
-const out = `${S}/themefold/verify2-${variant}`;
+const out = path.join(process.env.VERIFY_OUT ?? path.join(os.tmpdir(), "hw-verify2"), `verify2-${variant}`);
 mkdirSync(out, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { launch } = await import(repo + "scripts/lib/cdp.mjs");
 const { PanelFoldMemory } = await import(repo + "src/panel-folds.ts");
-process.env.PI_SIM_PLUGIN_DIR = process.env.VERIFY_DIR ?? `${S}/themefold/proto-${variant}/com.lawrensen.hwinfo.sdPlugin`;
+process.env.PI_SIM_PLUGIN_DIR = process.env.VERIFY_DIR ?? path.join(root, "com.lawrensen.hwinfo.sdPlugin");
 const { startPiSim } = await import(repo + "scripts/lib/pi-sim.mjs");
-process.env.PI_SIM_PLUGIN_DIR = `${S}/r3-cand-d04/com.lawrensen.hwinfo.sdPlugin`;
-const { startPiSim: startBaseSim } = await import(repo + "scripts/lib/pi-sim.mjs?baseline=d04");
+const D04 = JSON.parse(readFileSync(path.join(here, "baseline-d04.json"), "utf8")).values;
 const BASE = Number(process.argv[3] ?? 34600);
 const sim = await startPiSim({ httpPort: BASE + 1, wsPort: BASE });
-const base = await startBaseSim({ httpPort: BASE + 11, wsPort: BASE + 10 });
 const b = await launch({ port: BASE + 2, width: 373, height: 410 });
 const results = [];
 const check = (name, ok, detail) => {
@@ -207,8 +213,8 @@ try {
 	for (const width of [373, 320, 298, 249, 213, 189, 160]) {
 		await b.viewport(width, 410, dprOf(width));
 		for (const fixture of ["key-configured", "dial-configured"]) {
-			await open(fixture, undefined, false, base);
-			const d04 = await b.evaluate(`({ reading: Math.round((document.getElementById("sec-reading").getBoundingClientRect().top + scrollY) * 10) / 10, band: Math.round(document.getElementById("look").getBoundingClientRect().height * 10) / 10 })`);
+			// Measured on d04 in every recorded run, frozen (baseline-d04.json).
+			const d04 = D04[`${width} ${fixture}`];
 			await open(fixture);
 			const o = await band();
 			await setFold(false);
@@ -431,7 +437,6 @@ try {
 	writeFileSync(path.join(out, "verify.json"), JSON.stringify(results, null, 1));
 	await b.close();
 	await sim.stop();
-	await base.stop();
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(failed === 0 ? `${variant}: ALL ${results.length} PASS` : `${variant}: ${failed} of ${results.length} FAIL`);

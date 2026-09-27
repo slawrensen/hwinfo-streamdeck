@@ -234,3 +234,26 @@ outlives it; `cdp.mjs` now stops the processes launched with its own
 throwaway profile and `pi-sim.mjs` drops live connections on stop, so runs
 no longer wait on a leftover browser until the watchdog (now 420 s, a hang
 guard; a solo run takes about 235 s).
+
+## d10 (2026-09-26 night): Delete checked on the real app
+
+The owner pressed Delete in a dial's rotation list on d09 in the Stream
+Deck app: it removed the selected reading and nothing else (R52's Delete
+part passes; F2 and the Alt keys are still in OWNER-CHECK step 8). So
+Delete is now advertised like the other list shortcuts (R37:
+`aria-keyshortcuts`, the Remove tooltip, the list's spoken help, the
+controls and dial docs). Found on the way: a held Delete, or Enter held on
+Remove, removed the selected reading and then every reading after it
+(3 to 0 in a probe); one press now removes one (two panel checks; a copy
+without the guard fails both). The owner's surprise at an emptied set (the
+overview then showed the reading on the dial and the next one of its
+sensor) was the designed fallback; the panel's empty note and the dial
+docs now say what an overview shows then.
+
+d10 gates: panel suite 337 of 337 (exit 0, 239 s, no browser left);
+persistence 646 of 646; the theme-band runner 70 of 70, exit 0
+(`themefold/acceptance/D10/`); unit 1,355 of 1,355; lint and typecheck 0;
+copy validator 0 warnings; pack validation and `streamdeck validate` pass.
+Archive `9913d94c...` (362,215 bytes, 47 members), installed by the bench
+route (every file hash-verified, 0 WARN or ERROR, settings unchanged but
+the auto-cycling dial's reading); soak from 2026-09-26 22:09 local.

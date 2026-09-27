@@ -53,6 +53,11 @@ on the hardware myself: the app was not mine to click.
    dial: only a character is deleted. Fail: the app deletes the action
    or the key, or a key does nothing. If Delete misbehaves, I remove
    that binding before release; the Remove button stays.
+   **Delete: done by the owner on d09 (2026-09-26).** Delete removed the
+   selected reading from the rotation list and nothing else; the dial and
+   its key stayed. (Emptying the list then ran the dial through every
+   reading of its sensor, as designed; the panel note and the docs now say
+   what an overview shows then.) F2 and the Alt keys are still to check.
 
 Rollback, if anything is wrong:
 

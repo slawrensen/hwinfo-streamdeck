@@ -1,6 +1,6 @@
 # Continuation
 
-## Now (2026-09-26, late): d09 on the deck after the external review
+## Now (2026-09-26, late): d10 on the deck after the external review
 
 - **External review:** a different AI model reviewed `f98c76f` / d08 end
   to end; verdict "do not ship d08". Its report, findings and my answer
@@ -9,27 +9,33 @@
   `findings.json`, `RESPONSE.md`), not in this repo. `RESPONSE.md` answers
   every finding
   (AX01 to AX11) with the fix and the check that proves it.
-- **Pushed:** `claude/pi-density` at `f98c76f` (the d08 commits) on
-  GitHub; private mirror `main` at `d23a9fe`. The d09 fixes are NOT
-  committed yet.
-- **Installed:** panel build `1.7.0.0-d09`, archive sha256
-  `82b2b856826bb646a48078dede3b2cb1fb14a3d1c4eefda3642c1e561760783e`
-  (362,033 bytes, 47 members), plugin.js `6fa1a5b8...` (unchanged: every
-  fix is panel-side), by the bench route (47 files hash-verified, 0 WARN or
-  ERROR after restart, settings snapshot: 0 changes).
-- **Soak:** monitor pid 61060, CSV
-  `release/soak-1.7.0.0-d09-20260926-2115.csv`, closes 2026-09-28 21:15
+- **Pushed:** `claude/pi-density` on GitHub (d09 in `452932a`, `d241bea`,
+  `5b7d6ed`, `c270e63`, `a2b12a4`; d10 after it); private mirror `main`
+  with the review files and drafts.
+- **Installed:** panel build `1.7.0.0-d10`, archive sha256
+  `9913d94c128b255506a19c0522bfc3a97909ac68ecf2a98c98f6078fd1c4a3ab`
+  (362,215 bytes, 47 members), plugin.js `6fa1a5b8...` (unchanged since
+  d08), by the bench route (47 files hash-verified, 0 WARN or ERROR after
+  restart; settings: only the auto-cycling dial's reading moved).
+- **Soak:** monitor pid 66092, CSV
+  `release/soak-1.7.0.0-d10-20260926-2209.csv`, closes 2026-09-28 22:09
   local. It only counts if the machine stays up, with an HWiNFO restart,
   an app restart and a sleep/wake inside. The d08 window ended after 8
   samples when the PC bugchecked in the NVIDIA display driver (0xD1 in
-  nvlddmkm.sys, then a hard freeze); GPU resets date back to 09-14.
+  nvlddmkm.sys, then a hard freeze); GPU resets date back to 09-14. The
+  d09 window (21:15 to 22:08) was stopped for d10.
+- **d10 over d09:** Delete advertised in the rotation list (the owner
+  checked it on the real app), one removal per press (a held Delete or a
+  held Enter on Remove emptied the list), and the empty-set note says what
+  an overview shows.
 - **d09 over d08:** AX02 (a late Make shared keeps a newer pick), AX03
   (focus counts as acting for late fold answers), AX04 (only the second
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates on d09:** `round3/REGISTER.md`, last section.
-- **Next:** the owner's eight-step hands-on check (R52 Delete included),
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 section.
+- **Next:** the owner's eight-step hands-on check (Delete done; F2 and the
+  Alt keys left in step 8),
   the soak summary into PERF.md, `npm run release:validate` from a clean
   clone on the final commit, the 70-check runner on the final archive,
   then the owner's merge, tag and publish.

@@ -23,18 +23,23 @@ Dials are optional: a Stream Deck + or Stream Deck + XL adds the [Sensor Dial](s
 
 ### Is this the official HWiNFO plugin? Is it affiliated with REALiX?
 
-No. It's an independent, MIT-licensed project, not affiliated with or endorsed by REALiX/HWiNFO. It's a ground-up TypeScript rewrite inspired by `shayne/hwinfo-streamdeck`, the original Go-based plugin (no code shared).
+No. It's an independent, MIT-licensed project, not affiliated with or endorsed by REALiX/HWiNFO. It's a ground-up TypeScript rewrite inspired by the original Go-based plugin by [@shayne](https://github.com/shayne) (no code shared).
 
 ## HWiNFO editions and the 12-hour limit
 
 ### Do I need HWiNFO Pro?
 
-**No.** The free version works. The only difference that affects this plugin:
+**It isn't required, but I recommend it** if HWiNFO runs longer than 12 hours at a stretch. The plugin works best on Shared Memory, and [HWiNFO Pro](https://www.hwinfo.com/licenses/) is the only edition that keeps Shared Memory on with no time limit.
 
-- **HWiNFO free**: Shared Memory Support auto-disables after **12 hours** of runtime. After that, in the default **Auto** mode the plugin falls back to the Gadget registry by itself (Gadget reporting has no time limit) and upgrades back to Shared Memory automatically if you re-enable it.
-- **HWiNFO Pro**: no 12-hour limit; Shared Memory stays on permanently, so you keep min/max/avg and full sensor coverage indefinitely without touching anything.
+- **HWiNFO free**: Shared Memory Support switches itself off after **12 hours** of runtime and stays off until you turn it back on. In the default **Auto** mode the plugin then falls back to the Gadget registry, if you enabled Gadget reporting.
+- **HWiNFO Pro**: no 12-hour limit. Shared Memory stays on, so keys keep every reading and HWiNFO's min/max/avg without you touching anything.
 
-If you never leave HWiNFO running longer than ~12 hours between restarts, free + Shared Memory is fully equivalent. If you run HWiNFO 24/7 and want min/max/avg to stay available, either buy Pro or enable **Gadget reporting** for the sensors you care about (see below).
+The Gadget registry works as a fallback, with real limits:
+
+- It carries only the readings you tick in HWiNFO, one at a time.
+- It has current values only. A key set to **Minimum**, **Maximum** or **Average** shows the current value.
+
+If you restart HWiNFO at least every 12 hours, the free version with Shared Memory gives the same result as Pro. Commercial use of HWiNFO needs a Pro license either way. I'm not affiliated with REALiX and earn nothing from the link.
 
 ### Why did my values freeze / stop updating after about 12 hours?
 
@@ -47,7 +52,7 @@ Fixes, cheapest first:
 
 1. In HWiNFO **Settings → Shared Memory Support**, toggle it back on (resets the 12-hour clock).
 2. Enable **Gadget reporting** on the sensors you use, so Auto mode has something to fall back to permanently.
-3. Buy HWiNFO Pro to remove the limit entirely.
+3. Buy [HWiNFO Pro](https://www.hwinfo.com/licenses/) to remove the limit entirely.
 
 > **Note:** The plugin considers data "stale" when HWiNFO's poll timestamp hasn't advanced for **15 seconds**, then shows the `Not updating` screen. So a frozen value shows up as a status screen within seconds, not as silently wrong numbers.
 
@@ -185,7 +190,7 @@ A GitHub-release install matches its published hash byte for byte. Reporting a s
 
 ### Can I use the free / portable HWiNFO?
 
-Yes to both. The **free** version works (with the 12-hour Shared Memory caveat above). The **portable** build also works identically, but only while its window is open. The portable build has no installer to add it to autostart, so:
+Yes to both. The **free** version works, with the 12-hour Shared Memory limit above; [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes it. The **portable** build also works identically, but only while its window is open. The portable build has no installer to add it to autostart, so:
 
 - Add HWiNFO to Windows autostart yourself if you want the deck populated at login.
 - Don't run portable HWiNFO from a folder that needs admin rights unless Stream Deck is also elevated (see the elevation question below).

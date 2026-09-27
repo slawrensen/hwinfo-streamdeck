@@ -1,331 +1,145 @@
-# HWiNFO Sensors for Stream Deck
-
 <p align="center">
-  <img src="docs/assets/img/themes-contact-sheet.png" width="900"
-       alt="HWiNFO Sensors on a Stream Deck: seven display themes across the top row (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), each key showing a live value, unit and sparkline; below them the aviation-style amber warn and red critical alert states; then a row showing what one key can hold (two, three and four readings, and the Bar and Ring gauges); and four Stream Deck + touchscreen faces at their true relative size, including both multi-row overviews">
+  <img src=".github/readme/hero.png" width="100%"
+       alt="A Stream Deck + XL layout drawn by the plugin with sample values: seven columns of keys in the seven themes showing CPU temperatures, core clocks, usage and voltages with sparklines; a column of two, three and four readings per key; a ring, two bars, an amber warn key and a red critical key; and six dial faces below, including two-row and three-row views">
 </p>
 
 <p align="center">
-  <em>Seven themes (top row) · aviation-style amber <strong>warn</strong> / red <strong>critical</strong> alerts · live sparklines · Stream&nbsp;Deck&nbsp;+ dials</em>
+  <em>Seven themes (one per column) · one to four readings per key · sparkline, bar and ring · amber <strong>warn</strong> / red <strong>critical</strong> alerts · Stream&nbsp;Deck&nbsp;+ dials in one, two or three rows</em>
+</p>
+
+<h1 align="center">HWiNFO Sensors for Stream Deck</h1>
+
+<p align="center">
+  <b>Live <a href="https://www.hwinfo.com">HWiNFO</a> readings on your Stream Deck keys and dials.</b><br>
+  Temperatures, clocks, fans, usage and power, with a sparkline, bar or ring and amber and red alerts.
 </p>
 
 <p align="center">
-  <a href="https://docs.slawrensen.com/hwinfo-streamdeck/"><img alt="Documentation" src="https://img.shields.io/badge/docs-live-2ea44f?style=flat-square"></a>
-  <a href="https://github.com/slawrensen/hwinfo-streamdeck/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/slawrensen/hwinfo-streamdeck?style=flat-square&color=blue"></a>
-  <a href="https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54"><img alt="Elgato Marketplace downloads" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmp-gateway.elgato.com%2Fproducts%3Fname%3DHWiNFO%2520Sensors&query=results%5B0%5D.download_count&suffix=%20downloads&logo=elgato&label=Marketplace&style=flat-square"></a>
-  <a href="https://docs.slawrensen.com/hwinfo-streamdeck/getting-started.html"><img alt="Windows x64" src="https://img.shields.io/badge/platform-Windows%20x64-0078d6?style=flat-square"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/slawrensen/hwinfo-streamdeck?style=flat-square"></a>
-  <a href="https://docs.slawrensen.com/hwinfo-streamdeck/faq.html#privacy"><img alt="No ads, no telemetry" src="https://img.shields.io/badge/ads%20%C2%B7%20telemetry-none-brightgreen?style=flat-square"></a>
+  <a href="https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54"><img alt="Get it on the Elgato Marketplace" src="https://img.shields.io/badge/Elgato%20Marketplace-Get%20it-e8940d?style=for-the-badge&logo=elgato&logoColor=white&labelColor=0d1117"></a>
+  <a href="https://docs.slawrensen.com/hwinfo-streamdeck/"><img alt="Documentation" src="https://img.shields.io/badge/Docs-Read%20the%20guide-30363d?style=for-the-badge&labelColor=0d1117"></a>
+  <a href="https://github.com/slawrensen/hwinfo-streamdeck/releases/latest"><img alt="Download the latest release" src="https://img.shields.io/github/v/release/slawrensen/hwinfo-streamdeck?style=for-the-badge&label=Download&logo=github&labelColor=0d1117&color=30363d"></a>
 </p>
 
-Live [HWiNFO](https://www.hwinfo.com) sensor readings on your Elgato Stream Deck:
-temperatures, clocks, fan speeds, usage, power and more. Keys show a value with
-optional warn/critical coloring and a sparkline, bar, or ring display; on the
-Stream Deck + and Stream Deck + XL the dials get a touchscreen readout with
-rotate-to-switch and session min/max. Seven display themes (per key or
-deck-wide) with adjustable text intensity keep the whole wall reading as one
-instrument.
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#keys">Keys</a> ·
+  <a href="#dials">Dials</a> ·
+  <a href="#themes-and-alerts">Themes and alerts</a> ·
+  <a href="#sensor-details">Sensor details</a> ·
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="#build-from-source">Build</a>
+</p>
 
-> **Windows only.** HWiNFO is a Windows application; this plugin reads its
-> shared-memory or Gadget-registry interface locally. No ads, no telemetry,
-> MIT licensed.
+## Install
 
-A ground-up TypeScript rewrite on the official Elgato SDK, inspired by
-[shayne/hwinfo-streamdeck](https://github.com/shayne/hwinfo-streamdeck),
-the original Go-based plugin (no code shared; see [NOTICE.md](NOTICE.md)).
+1. **Install** from the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54), or download the `.streamDeckPlugin` from [Releases](https://github.com/slawrensen/hwinfo-streamdeck/releases/latest).
+2. **Turn on sharing** in HWiNFO: *Settings → Shared Memory Support*.
+3. **Drag** *HWiNFO Sensors → Sensor Reading* onto a key and pick a reading.
 
-📖 **[Full documentation & FAQ →](https://docs.slawrensen.com/hwinfo-streamdeck/)**:
-step-by-step setup, every key and dial setting, themes, thresholds, data sources,
-status screens and troubleshooting. (The sections below are a condensed tour.)
+> [!NOTE]
+> Needs Windows 10 or later (x64), Stream Deck 6.9+ and HWiNFO. Free HWiNFO
+> switches Shared Memory off after 12 hours; if yours runs all day, I recommend
+> [HWiNFO Pro](https://www.hwinfo.com/licenses/), which has no limit.
 
-## Requirements
+**More:** [Getting started](https://docs.slawrensen.com/hwinfo-streamdeck/getting-started.html) · [Data sources](https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html)
 
-- Windows 10 or later (x64), Stream Deck software **6.9+**
-- [HWiNFO](https://www.hwinfo.com/download/) (installer or portable) publishing
-  data on either interface: **Shared Memory Support** (preferred) or **Gadget
-  reporting**. The plugin picks automatically and falls back on its own.
+## Keys
 
-## Quick start
+One reading with a sparkline, bar or ring, or up to four readings on one key.
 
-1. Install the plugin: from the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54),
-   or double-click the `.streamDeckPlugin` file from
-   [GitHub Releases](https://github.com/slawrensen/hwinfo-streamdeck/releases/latest).
-2. Start HWiNFO → **Settings**:
-   - ✅ **Shared Memory Support**
-   - recommended: ✅ **Sensors-only**, ✅ **Auto Start**, ✅ **Minimize Sensors on Startup**
-3. Drag **HWiNFO Sensors → Sensor Reading** onto a key and pick a sensor in the
-   searchable list. The list groups readings by source (CPU, GPU, drives, …) and
-   shows live values; type to filter.
+<img src=".github/readme/keys.png" width="100%" alt="Six key faces: one reading with a sparkline, a bar with warn and critical zones, and a ring; then two sensors on one key, three readings in rows, and four readings in a quad grid">
 
-## Data sources: Shared Memory vs. Gadget
+- Press to cycle current, MIN, MAX and AVG.
+- Labels size themselves to fit; decimals compact through k, M, G and T.
+- Temperatures in °C or °F; bytes in decimal or binary units.
 
-The plugin can read HWiNFO through two interfaces and picks automatically
-(*Advanced → Data source*; on dials the section is called *Dial gestures &
-advanced*):
+**More:** [Sensor Reading](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html)
 
-| | **Shared Memory** (preferred) | **Gadget registry** (fallback) |
-| --- | --- | --- |
-| Sensor coverage | everything HWiNFO measures | only sensors you tick in HWiNFO |
-| Min / max / average | ✅ | current value only |
-| Free version | auto-disables after **12 h** (Pro: unlimited) | ✅ no time limit |
-| Enable in HWiNFO | Settings → *Shared Memory Support* | *Configure Sensors* → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
+## Dials
 
-In **Auto** mode the plugin uses Shared Memory whenever it's available and
-silently falls back to the Gadget registry (e.g. after the free version's 12-hour
-timer), then upgrades back when Shared Memory returns. When running on the
-Gadget source, the settings panel shows a note, and min/max/avg modes display
-the current value.
+One reading or several on each Stream Deck + and + XL touchscreen segment, in any of the seven themes.
 
-HWiNFO gives every reading you tick a numbered registry slot and keeps that
-number reserved while the reading is unticked, so the Gadget list can carry
-gaps. Since 1.6.0 the plugin reads across them; earlier versions stopped at
-the first gap and showed only the readings before it.
+<img src=".github/readme/dials.png" width="100%" alt="Nine dial faces with sample values across all seven themes: Void with one CPU temperature reading, Ultraviolet with two power readings and trend lines, Forest with three fan rows, Midnight with three temperature rows, Ember with PSU power, Graphite with memory and CPU usage trends, Paper with a core clock, Graphite at a warn value with an amber bar, and Void at a critical value with a red bar">
 
-## Sensor Reading (keys)
+- **View**: one reading with a range bar, three compact rows, or two rows with big values and a trend line.
+- At warn and critical the bar turns amber or red; the rest of the face keeps its theme.
+- Rotate to move through the readings; the marked row follows and the list scrolls. Touch cycles stats; push resets the session.
+- An **HWiNFO Control** key steers a dial from a pedal, a Multi Action or another deck.
 
-| Setting | What it does |
+**More:** [Sensor Dial](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-dial.html) · [Controls](https://docs.slawrensen.com/hwinfo-streamdeck/controls.html)
+
+## Themes and alerts
+
+Seven themes, set per key or once for the whole deck.
+
+<img src=".github/readme/themes.png" width="100%" alt="The seven themes (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper) in two rows of keys: with type accents on, each graph takes its sensor type's color; with type accents off, rings, bars and multi-reading keys take each theme's own color. Below, the alert states: an amber warn key, a red critical key, dials whose bar turns amber or red, and a three-row dial whose alerting row turns amber">
+
+- At the warn threshold the key turns amber; at critical, red. Alert colors are the same on every theme.
+- *Alert when below* flips the comparison for fan RPM or free space.
+- Type accents (on by default) color the graph by sensor type; turn them off and each theme uses its own color.
+
+**More:** [Themes](https://docs.slawrensen.com/hwinfo-streamdeck/themes.html) · [Thresholds and alerts](https://docs.slawrensen.com/hwinfo-streamdeck/thresholds-alerts.html)
+
+## Sensor details
+
+A key press can open a full page of readings, then return.
+
+<img src=".github/readme/details.png" width="100%" alt="A detail page listing every reading of one HWiNFO sensor, with a Back key top left">
+
+- Show every reading from the pressed sensor, a list you build, or a filter such as `*gpu*fan*`.
+- Pack up to four readings per tile and page through long sources.
+- One editable profile ships per deck type, from Mini to + XL.
+
+**More:** [Sensor details](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html)
+
+## Troubleshooting
+
+When a key can't show a reading, it names the problem and the fix.
+
+<img src=".github/readme/status.png" width="100%" alt="Status screens: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, Sensor missing">
+
+<details>
+<summary>What each screen means</summary>
+
+| Key shows | Fix |
 | --- | --- |
-| **Sensor** | Searchable picker over every reading HWiNFO publishes, with a live preview. |
-| **Label** | Custom key label; defaults to the sensor's (renamed) label. Sizes itself to fit: short names render large, long names step down before they truncate. |
-| **Theme** | Preset gallery: this key only, or "Deck default" to follow the deck-wide theme. |
-| **Text** | Text intensity: deck default, theme, dim, or an exact custom color. |
-| **Show** | Current value, or HWiNFO's min / max / average since it started. |
-| **Layout** | One reading (default), two stacked readings with their own labels and stats, three compact rows with labels left and values right, or four in a 2x2 quad grid with per-cell colors or labels. |
-| **Decimals** | Auto (magnitude-based, compacts through k/M/G/T: 48 700 → `48.7k`) or fixed 0–3. Bytes and rates re-tier by the deck-wide **Data units** (decimal KB/MB/GB with Mbps rates, or binary KiB/MiB/GiB with MiB/s). |
-| **Unit** | Show temperatures in °F instead of °C. |
-| **Display** | Recent history as a sparkline, or the value in its range as a bar or ring, with amber/red threshold zones. History keeps collecting for readings that are off screen while a Sensor Reading key or Sensor Dial stays visible; with none visible, polling stops, and the line resumes where it left off when one returns. |
-| **Warn / Critical at** | Key turns amber / red at these values (in the displayed unit). |
-| **Direction** | "Alert when below" flips the comparison, for fan RPM, free space, etc. |
+| **Start HWiNFO** | Start HWiNFO with Shared Memory Support or Gadget reporting on. |
+| **HWiNFO busy** | Momentary; the plugin retries on the next poll. |
+| **Shared Memory off** | Turn it back on in HWiNFO Settings (the free version's 12-hour timer lands here), or enable Gadget reporting. |
+| **Tick sensors in Gadget** | In HWiNFO: *Configure Sensors → HWiNFO Gadget*, tick *Report value in Gadget* per reading. |
+| **Not updating** | Reopen HWiNFO's Sensors window; restart HWiNFO if it repeats. |
+| **Access denied** | Run HWiNFO and Stream Deck at the same privilege level. |
+| **Plugin damaged** | Reinstall the plugin; an antivirus often quarantined `bin/hwsm.node`. |
+| **Pick a sensor** / **Sensor missing** | Open the key's settings and pick the reading again. |
 
-**Pressing the key** cycles what's shown: current → MIN → MAX → AVG (the badge
-sits in a gap under the label, or on the row divider in a multi-reading
-layout). The warn/critical colors always track the *live* value.
+</details>
 
-**Or the press can drill down** (issue #5): set **Press does** to *Open sensor
-details* (or *Tap cycles; hold opens details*) and the press switches the deck
-to a bundled one-page detail view listing every reading of that sensor's
-HWiNFO source, a custom list you build, or everything matching a glob filter
-like `*4090*` or `*gpu*fan*` (live match count in the panel). By default the
-key you pressed also becomes a second Back inside the view when its cell
-maps onto the page; untick that per key to keep only the movable Back. The
-top-left Back tile is a normal
-Sensor Reading key with its press fixed to returning: configure its sensor and
-any layout (or leave it showing the sensor you drilled down from).
-Previous/Next page through long sources, and pressing a listed reading cycles
-its stat for that visit. A Tile shows setting packs two, three or four
-readings onto each tile using the same stacked, row and quad faces, and a
-custom list can group and dress its tiles one by one. Six editable profiles
-ship, one per deck type (Mini, 15-key, Neo, +, XL, + XL); the Stream Deck app
-asks to install the right one the first time you open details on a deck, and
-the page ships with every cell filled, so adding a key of your own means
-replacing one of those tiles, which sticks. This is a plugin-managed profile,
-not a native folder; details in
-[the docs](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html).
+**More:** [Status screens](https://docs.slawrensen.com/hwinfo-streamdeck/status-screens.html) · [Troubleshooting](https://docs.slawrensen.com/hwinfo-streamdeck/troubleshooting.html) · [FAQ](https://docs.slawrensen.com/hwinfo-streamdeck/faq.html)
 
-<p align="center">
-  <img src="docs/assets/img/multi-readouts.png" width="900"
-       alt="Multi-readout key and dial faces rendered by the plugin: CPU and GPU temperature stacked on one key, the same sensor as a min and max pair, a press-cycled pair showing MAX, a three-row key with labels left and values right, a quad grid key with four color-coded readings, and the dial overview and two-row views">
-</p>
-
-<p align="center">
-  <em>One key, your call: two stacked readings · three rows · a 2x2 quad grid · dial overview and two-row views</em>
-</p>
-
-## Sensor Dial (Stream Deck +)
-
-The touchscreen shows the label, live value, session ▼min/▲max and a range bar.
-
-<p align="center">
-  <img src="docs/assets/img/dials.png" width="440"
-       alt="A Stream Deck + dial face: CPU temperature with its live value, session min/max, and a range bar whose track marks the warn and critical zones in amber and red">
-</p>
-
-- **Rotate**: step through the rotation set ticked in the dial's settings, or
-  every reading of the picked sensor when the set is empty
-- **Push**: reset the session min/max/avg
-- **Touch**: cycle current / session-min / session-max / session-avg
-- **Long touch**: back to the current value
-- **Bar range**: fixed min/max for the bar, or automatic from the session
-  range; warn/critical thresholds mark amber and red zones on the track
-- **View**: one reading, or an overview of the rotation list: three compact
-  rows, or two rows with big values and a trend sparkline each; rotation moves
-  the marked row and scrolls the window
-
-Dials use the same themes as keys and take the same **Warn / Critical at**
-thresholds: the range bar's fill flips to the alert color while the rest of the
-face stays themed (the touchscreen slot is too small for a full field flip).
-
-<p align="center">
-  <img src="docs/assets/img/plusxl-dials.png" width="900"
-       alt="Six dial faces rendered at the Stream Deck + XL's encoder strip geometry: CPU temperature, GPU temperature, a pinned CPU fan, CPU power, CPU load, and a GPU hot spot at a forced critical value with a red range bar">
-</p>
-
-<p align="center">
-  <em>The Stream Deck + XL's six-dial strip: per-reading session ▼min/▲max, pin and pause, and a critical range bar</em>
-</p>
-
-## HWiNFO Control (keys)
-
-A third action drives Sensor Dials from a key: next or previous reading, next
-or previous sensor or group, cycle stat mode, show current / session min / max
-/ average, pause or resume the auto cycle, pin or unpin the reading, and reset
-session stats. Pause/resume and pin/unpin also exist as one-way commands, so a
-repeated press inside a Multi Action stays harmless.
-
-Targeting is explicit. Give a dial a **Link ID** in its settings (*Dial
-gestures & advanced*) and put the same name in the control key's **Target** to
-steer just that dial; an empty Target drives every dial. The key shows a tick
-when the command reached at least one matching dial and an alert icon when
-none matched. The target dial has to be on screen somewhere, on any connected
-deck, which is why this runs from a pedal, a G-key, a Multi Action step or a
-key on another deck rather than one that pages the dial away as you press it.
-Full command and targeting reference:
-[Dial controls & presets](https://docs.slawrensen.com/hwinfo-streamdeck/controls.html#the-hwinfo-control-key-action).
-
-## Themes
-
-Seven presets, chosen from a live gallery in any key's or dial's settings: per
-key, or once for the whole deck (*Advanced → Deck theme*). A per-key pick
-always wins over the deck-wide theme. To make a key follow the deck-wide
-setting, choose the gallery's dashed "Deck default" chip; the theme it
-resolves to shows in the chip's tooltip and the help line under the gallery
-(e.g. *currently Void*):
-
-| Preset | Look |
-| --- | --- |
-| **Void** *(default)* | True black: pixels off, only the data glows. |
-| **Graphite** | Near-black slate: the plugin's original look, retuned. Existing installs stay here after updating. |
-| **Ultraviolet** | Deep violet cast with lavender signal. |
-| **Midnight** | Blue-black with ice-blue signal. |
-| **Forest** | Green-black with spring-green signal. |
-| **Ember** | Amber-on-black monochrome, VFD nostalgia. |
-| **Paper** | High-contrast light theme (ink on warm paper) for bright rooms and low vision. |
-
-**Type accents** (*Advanced → Type accents*, on by default) color each key's
-sparkline, badge and dial bar by sensor type: temperature rose, fan cyan, power
-gold, clock green, load violet, network blue, memory magenta. Only the accent
-changes; label, value and unit keep the theme's luminance rhythm. Paper ignores
-type accents (accents are ink there by design).
-
-**Alerts override everything.** At the warn threshold the whole key flips to a
-bright amber field with black text; at critical, a red field with white text,
-aviation-style master caution/warning (on dials, the range bar flips to the
-same alert colors). The two alert palettes are global, never tinted per
-theme, so warn and crit stay unmistakable on any theme and with any
-color-vision deficiency.
-
-## The display system
-
-The faces follow a written display spec, and its rules ship as measured
-facts rather than taste:
-
-- **True black is the instrument.** The default theme's background is
-  `#000000`: OLED pixels off, only the data glows. Graphite, Ultraviolet,
-  Midnight, Forest and Ember keep background luminance low enough to read
-  as black with a cast at arm's length; Paper is the deliberate exception,
-  a light face for bright rooms.
-- **One bright element per key.** On the default theme the value sits at
-  21:1 contrast against the background, the label at 5.5:1, the unit at
-  4.2:1. The unit is the dimmest on purpose: position and magnitude
-  already say °C vs W, so it stays quiet and keeps the number's
-  silhouette crisp.
-- **The physics sets the sizes.** At a 60 cm desk distance a 15 mm key
-  subtends about 86 arc minutes, so one canvas pixel is roughly 0.6 of
-  one. Value digits (26 to 52 px by length) stay glanceable; the label is
-  sized for identification, not reading.
-- **Anchors never move.** Label baseline 32, value baseline 94, unit
-  baseline 114, sparkline ink capped at y=120, on every single-reading key,
-  with or without a sparkline: that is what makes a mixed wall read as one
-  instrument. The unit's corridor is measured, not eyeballed: 6.5 to
-  7.0 px of ink air up to the value and 5.9 down to the spark band, the
-  larger gap against the heavier neighbor.
-- **Real output only.** Every board image in this README and the docs is
-  drawn by the production renderers and regenerated by scripts, never a
-  mockup; the docs add real property-inspector captures and one photograph
-  of the plugin running on hardware. The geometry above is locked by the
-  test suite.
-
-## Key states you might see
-
-When HWiNFO isn't publishing or a key isn't set up, it shows a clean, OLED-black
-status screen that names the problem and its fix:
-
-<p align="center">
-  <img src="docs/assets/img/status-screens.png" width="820"
-       alt="The plugin's status screens rendered as clean OLED-black key faces, each with a two-line message: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, and Sensor missing">
-</p>
-
-| Key shows | Meaning / fix |
-| --- | --- |
-| **Start HWiNFO** | HWiNFO isn't publishing on either interface. Start it with Shared Memory Support (or Gadget reporting) enabled. |
-| **HWiNFO busy** | HWiNFO is running, but another reader held its shared memory at the instant the plugin connected. Momentary; the plugin retries on the next poll. |
-| **Shared Memory off** | HWiNFO reports sharing disabled. This is also where the free version's **12-hour timer** lands: it switches sharing off (HWiNFO Pro removes the limit). Re-enable it in HWiNFO Settings, or enable Gadget reporting; Auto mode falls back to it by itself. |
-| **Tick sensors in Gadget** | Gadget reporting is on but nothing is ticked, so the registry is empty. In HWiNFO's sensor window click **Configure Sensors**, open the **HWiNFO Gadget** tab and tick **Report value in Gadget** for each value you want on the deck. |
-| **Not updating** | Values frozen: HWiNFO's Sensors window was closed or HWiNFO stopped polling. Reopen the Sensors window; if it keeps happening, restart HWiNFO. |
-| **Plugin damaged** | The plugin's native bridge (`bin/hwsm.node`) is missing or was blocked from loading, often an antivirus quarantine. Reinstall the plugin; restarting HWiNFO cannot clear this one. |
-| **Access denied** | HWiNFO and Stream Deck run at different privilege levels. Run both elevated or both normal. |
-| **Pick a sensor** | No sensor selected yet. Open the key's settings. |
-| **Sensor missing** | The saved sensor isn't in HWiNFO's current output (hardware/driver change, or a renamed sensor profile). Pick it again. |
-
-More notes:
-
-- **Portable build**: works identically, but only while its window is open. Add
-  it to autostart yourself (no installer to do it for you), and don't run it
-  from a folder that requires admin rights unless Stream Deck is elevated too.
-- **Polling**: the plugin reads shared memory once per second by default
-  (configurable 250 ms–5 s under *Advanced*), one reader regardless of how many
-  keys are visible. HWiNFO itself updates on its own poll cycle (default 2 s).
-- Sensor identity is stored as HWiNFO's stable `sensor-id : instance :
-  reading-id`, so keys survive restarts and reordering, not as list positions.
-
-## Building from source
-
-Full contributor and agent guide (commands, structure, conventions): [AGENTS.md](AGENTS.md).
+## Build from source
 
 ```bash
-npm ci                   # Node 20+
-npm run build            # bundles to com.lawrensen.hwinfo.sdPlugin/bin/plugin.js
-npm run probe            # standalone smoke test: dumps live readings (-- --gadget forces the registry backend)
-npm run lint && npm run typecheck
-npm test                 # unit suites: themes, renderers, shared-memory decode, status screens, series, rotation, gestures, controls, stats, devices, diagnostics, replay (node:test)
-npm run e2e              # drives the built plugin over a mock Stream Deck WebSocket
-npm run e2e:resilience   # forces the shared-memory failure states (missing, frozen, DEAD, gone) via a synthetic provider
-npm run e2e:gadget       # exercises the Gadget-registry fallback via a synthetic HKCU key
-npm run contact-sheet -- out   # renders all 7 themes × normal/warn/crit + dials to out/contact-sheet.png
-npm run suite:full       # every suite + screenshot pipeline, fails on ANY leftover process
-npm run pack             # emits release/com.lawrensen.hwinfo.streamDeckPlugin
+npm ci                  # Node 20+
+npm run build           # bundles bin/plugin.js
+npm test                # unit suites (node:test)
+npm run e2e             # drives the built plugin over a mock Stream Deck
+npm run pack            # release/com.lawrensen.hwinfo.streamDeckPlugin
 ```
 
-Performance is tracked in [PERF.md](PERF.md); each entry names the harness
-that produced it (`node scripts/perf-report.mjs` for most: sizes, live
-process, parse bench; the e2e load test and `scripts/soak-monitor.mjs` for
-the rest).
+Dev loop: `streamdeck dev`, then `streamdeck link com.lawrensen.hwinfo.sdPlugin`
+and `npm run watch`. Every command, the project layout and the conventions are
+in [AGENTS.md](AGENTS.md). Performance numbers live in [PERF.md](PERF.md).
 
-Dev loop: `streamdeck dev` once, `streamdeck link com.lawrensen.hwinfo.sdPlugin`,
-then `npm run watch` (rebuilds and restarts the plugin on save).
+`bin/hwsm.node`, the native bridge to HWiNFO's shared memory, is unsigned.
+Every release from 1.4.0 on publishes its SHA-256 and the pack's; check a copy
+with `Get-FileHash <file> -Algorithm SHA256`. See [SECURITY.md](SECURITY.md).
 
-Native access goes through `hwsm` (`native/hwsm`), a small N-API addon this
-project builds with node-gyp, calling `OpenFileMappingW`/`MapViewOfFile` on
-`Global\HWiNFO_SENS_SM2`; strides and offsets are read from the live header,
-never hardcoded, so newer HWiNFO layouts (e.g. the UTF-8 label extensions)
-decode correctly. It is a capability API: JavaScript gets opaque session
-objects and never a handle, pointer or generic Win32 call. Every read holds
-HWiNFO's consistency mutex, and there is no unguarded fallback, so a mapping
-published without a reachable mutex is treated as HWiNFO still starting up
-rather than read anyway.
+## Credits and license
 
-`bin/hwsm.node` is **unsigned** (no Authenticode certificate), so the check
-an antivirus can't do is yours to run: every GitHub release from 1.4.0 on
-publishes the addon's SHA-256 and the pack's. Verify a download or an installed copy with
-`Get-FileHash <file> -Algorithm SHA256` in PowerShell and compare it with
-the release notes; details and the disclosure policy are in
-[SECURITY.md](SECURITY.md).
-
-## License
-
-[MIT](LICENSE): free software, no ads, no telemetry. Credits in
-[NOTICE.md](NOTICE.md): HWiNFO (REALiX), the original plugin by
-[@shayne](https://github.com/shayne), sdpi-components.
+[MIT](LICENSE). Free, no ads, no telemetry. The original idea came from the
+Go plugin by [@shayne](https://github.com/shayne); this is a ground-up
+TypeScript rewrite on the official Elgato SDK and shares no code with it.
+Full credits in [NOTICE.md](NOTICE.md).
 
 Not affiliated with, endorsed by, or sponsored by REALiX, s.r.o. or Elgato.
 "HWiNFO" is a trademark of REALiX, s.r.o.; "Stream Deck" and "Elgato" are

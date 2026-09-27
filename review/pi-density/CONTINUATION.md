@@ -1,38 +1,44 @@
 # Continuation
 
-## Now (2026-09-26 night): d08 on the deck, soaking, committed
+## Now (2026-09-26, late): d09 on the deck after the external review
 
-- **Committed, not pushed:** `3e229d3` (product), `4570ad5` (docs and
-  images), `bd2a28c` (this review record) on `claude/pi-density` over
-  `4bf09c0`. Private drafts committed locally in the private mirror
-  (`758e5b6`, `d23a9fe`), not pushed.
-- **Installed:** panel build `1.7.0.0-d08`, archive sha256
-  `aa71b32b4b7901301ab8e79d9bfb94b06145bd00f08436cc83912866eba6ac10`,
-  plugin.js `6fa1a5b8...`, by the bench route (47 files hash-verified;
-  settings snapshots unchanged except an auto-cycling dial).
-- **Soak:** monitor pid 169388, CSV
-  `release/soak-1.7.0.0-d08-20260926-1838.csv`, closes about 2026-09-28
-  18:39 local. The d06 (1.6 h) and d07 (10 min) windows were clean; the
-  d07 window includes the owner's own app restart at 18:29.
-- **d08 over d06:** Make shared on the theme line (five-lens review in
-  `round3/sharedtheme/`), the themes' defined order on hardware (the app
-  sorts message keys; the plugin sends `themeOrder`, the sim sorts keys),
-  the dial's Accent colors help, the Make shared audit fixes (MS01 to
-  MS06), and fold memory restored: a late fold answer applies until the
-  person acts, and the wait is 600 ms (answer measured about 318 ms after
-  connect in the app, through `hw-folds-*` performance marks).
-- **Gates on d08:** panel e2e 315/315, persistence 646/646, unit
-  1352/1352, lint 0, typecheck 0, copy validator OK; a11y 62 runs 0/0 and
-  density on d07 (d08 changes only the fold wait).
-- **Next:** the external adversarial review (prompt in the private
-  release docs, `EXTERNAL_REVIEW_PROMPT_1.7.md`; its report lands in
-  `round3/external/`), the soak summary into PERF.md, the owner's
-  eight-step hands-on check, then `npm run release:validate` from a clean
-  clone and the owner's merge, tag and publish.
+- **External review:** a different AI model reviewed `f98c76f` / d08 end
+  to end; verdict "do not ship d08". Its report, findings and my answer
+  to every finding live in the private release docs
+  (`docs/release/external-review-1.7/`: `ASTRA-REVIEW.md`,
+  `findings.json`, `RESPONSE.md`), not in this repo. `RESPONSE.md` answers
+  every finding
+  (AX01 to AX11) with the fix and the check that proves it.
+- **Pushed:** `claude/pi-density` at `f98c76f` (the d08 commits) on
+  GitHub; private mirror `main` at `d23a9fe`. The d09 fixes are NOT
+  committed yet.
+- **Installed:** panel build `1.7.0.0-d09`, archive sha256
+  `82b2b856826bb646a48078dede3b2cb1fb14a3d1c4eefda3642c1e561760783e`
+  (362,033 bytes, 47 members), plugin.js `6fa1a5b8...` (unchanged: every
+  fix is panel-side), by the bench route (47 files hash-verified, 0 WARN or
+  ERROR after restart, settings snapshot: 0 changes).
+- **Soak:** monitor pid 61060, CSV
+  `release/soak-1.7.0.0-d09-20260926-2115.csv`, closes 2026-09-28 21:15
+  local. It only counts if the machine stays up, with an HWiNFO restart,
+  an app restart and a sleep/wake inside. The d08 window ended after 8
+  samples when the PC bugchecked in the NVIDIA display driver (0xD1 in
+  nvlddmkm.sys, then a hard freeze); GPU resets date back to 09-14.
+- **d09 over d08:** AX02 (a late Make shared keeps a newer pick), AX03
+  (focus counts as acting for late fold answers), AX04 (only the second
+  click of a double click is swallowed), AX07 (a known stored shared theme
+  is read first; globals redraw), AX05 test holes, AX06 runner exit code,
+  AX08 to AX11 copy, the runbook's release:validate stages.
+- **Gates on d09:** `round3/REGISTER.md`, last section.
+- **Next:** the owner's eight-step hands-on check (R52 Delete included),
+  the soak summary into PERF.md, `npm run release:validate` from a clean
+  clone on the final commit, the 70-check runner on the final archive,
+  then the owner's merge, tag and publish.
 - **Open, unexplained:** across the d05 install three dials without auto
   cycle moved from the second to the first member of their two-reading
-  rotations. Plugin start writes no readingKey (READ). Not seen since.
-- **Rollback:** `deploy.ps1 -From %USERPROFILE%\hwinfo-bench-backup\2026-09-26-0857-f01q\com.lawrensen.hwinfo.sdPlugin`.
+  rotations. The external review read the dial code (no cold write of
+  readingKey) and could not explain it either. Not seen since.
+- **Rollback:** `deploy.ps1 -From %USERPROFILE%\hwinfo-bench-backup\2026-09-26-0857-f01q\com.lawrensen.hwinfo.sdPlugin`
+  (the pushed d08 bytes can also be rebuilt from `f98c76f`).
 
 ## Round 3 (2026-09-26): execution state
 

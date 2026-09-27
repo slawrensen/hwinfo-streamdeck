@@ -197,3 +197,38 @@ density-d06.json. Installed on the deck by the bench route (archive
 a02d1836..., 47 files hash-verified); 48-hour soak monitor started
 2026-09-26 16:52 local, CSV `release/soak-1.7.0.0-d06-20260926-1652.csv`.
 
+## External review and d09 (2026-09-26 night)
+
+A different AI model reviewed `f98c76f` / d08 end to end with the prompt
+in the private release docs; its report, its findings and the answer to
+each finding (the fix and the check that proves it) stay in the private
+release docs (`docs/release/external-review-1.7/`). Verdict: do not ship d08. Two must-fix product defects
+(AX02, a Make shared that finished late overwrote a newer pick; AX05's
+test holes) and a runner that hid a failure (AX06) are fixed in d09, with
+the should-fix items (AX03, AX04, AX07) and the copy corrections (AX08 to
+AX11). AX01 (soak, owner check, clean-clone qualification) stays open: the
+d08 soak ended after 8 samples when the machine bugchecked in the NVIDIA
+display driver.
+
+Every new product check was run against the d08 panel files and fails
+there (10 checks), and against two deliberately broken copies (confirmed
+Merge as a no-op fails 4 checks; a label edit that writes twice fails 1).
+One persistence check changed its setup, not its assertions: its "Paper
+deck" had a stored Void shared theme under a plugin answer of Paper, a
+state the plugin cannot reach once a known stored theme is read first
+(AX07); it now stores Paper for that check and Void again after it.
+
+d09 gates (simulated host unless stated): panel suite 334 of 334 (exit 0,
+235 s, no browser left; the d08 panel files fail the 10 new race checks, a
+Merge no-op copy fails 4, a double-write copy fails 1); persistence 646 of
+646; the theme-band runner 70 of 70 with exit 0 (`themefold/acceptance/D09/`;
+d08 69 of 70, exit 1, `acceptance/D08/`); unit 1,352 of 1,352; lint and
+typecheck 0; copy validator 0 warnings; pack validation and `streamdeck
+validate` pass. Archive `82b2b856...` (362,033 bytes, 47 members),
+installed on the deck by the bench route with every file hash-verified,
+0 WARN or ERROR, settings unchanged; soak from 2026-09-26 21:15 local.
+Teardown: on Windows the spawned chrome.exe can hand off to a browser that
+outlives it; `cdp.mjs` now stops the processes launched with its own
+throwaway profile and `pi-sim.mjs` drops live connections on stop, so runs
+no longer wait on a leftover browser until the watchdog (now 420 s, a hang
+guard; a solo run takes about 235 s).

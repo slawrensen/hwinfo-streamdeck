@@ -435,4 +435,4 @@ try {
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(failed === 0 ? `${variant}: ALL ${results.length} PASS` : `${variant}: ${failed} of ${results.length} FAIL`);
-process.exit(0);
+process.exit(failed === 0 ? 0 : 1);

@@ -141,6 +141,11 @@ try {
 			}
 			clip = fallback;
 		}
+		// The clip is in page coordinates. The header is pinned (sticky), so a
+		// page left scrolled would paint it at the scroll offset, over whatever
+		// sits there (the theme strip); at the top it is where it belongs.
+		await evaluate("window.scrollTo(0, 0)");
+		await sleep(100);
 		const shot = await cdp("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: clip.y, width: 400, height: clip.h, scale: 1 } });
 		writeFileSync(path.join(outDir, name), Buffer.from(shot.data, "base64"));
 		captureCount++;
@@ -179,12 +184,16 @@ try {
 	log("navigating: sensor-reading");
 	await cdp("Page.navigate", { url: `${BASE}/sensor-reading.html` });
 	await sleep(8000); // real time: plugin ticks + sensor tree + themes payload
-	// Advanced open (deck theme, accents, source, poll rate, support report)
-	// and the viewport fitted, so the capture shows the whole panel.
-	expectOk("Advanced details", await evaluate(`(() => {
-		const adv = document.querySelector('details[data-fold="advanced"]');
-		if (!adv) return "missing";
-		adv.open = true;
+	// Every section and every Advanced group open (the "How ..." notes stay
+	// folded) and the viewport fitted, so the capture shows the whole panel:
+	// docs use this one image for the full panel and for the Alerts fields.
+	// The folds as they were come back after the Advanced shot below, so the
+	// later full-height layout shots keep the panel's own open set.
+	expectOk("sections and groups open", await evaluate(`(() => {
+		const folds = [...document.querySelectorAll("details.hw-sec[id], details.hw-sub[id]")];
+		if (!folds.some((d) => d.dataset.fold === "advanced")) return "missing";
+		window.__captureFolds = folds.map((d) => [d.id, d.open]);
+		for (const d of folds) d.open = true;
 		return "ok";
 	})()`));
 	await sleep(400);
@@ -204,15 +213,51 @@ try {
 	}
 	if (!fed()) throw new Error(`the key PI never showed a live reading (header ${JSON.stringify(live.state)}, face ${JSON.stringify(live.face)}); refusing to capture a panel the plugin has not fed`);
 	await capture("pi-settings.png");
-	// The Advanced fold on its own, from its summary to the Config help line:
-	// the deck-wide groups (Deck defaults, Connection, Support) and the
-	// 1.6.0 Config wells with their Copy and Apply buttons, at the panel's
-	// real width. Feeds docs/assets/img/pi-live-key-advanced.png.
+	// The header and the theme band under it, open: the chips, the name of
+	// what is drawn and where Default comes from. Feeds
+	// docs/assets/img/pi-theme-strip.png.
+	await captureClipped("pi-theme-strip.png", await evaluate(`(() => {
+		const look = document.getElementById("sec-theme");
+		if (!look) return "missing";
+		return { y: 0, h: Math.ceil(look.getBoundingClientRect().bottom + window.scrollY + 2) };
+	})()`));
+	// The same band folded: its row keeps the checked chip in its own
+	// colors and where it comes from, and Reading follows directly. A
+	// script toggle, so nothing is remembered. Feeds
+	// docs/assets/img/pi-theme-folded.png.
+	await captureClipped("pi-theme-folded.png", await evaluate(`(() => {
+		const band = document.getElementById("sec-theme");
+		const reading = document.querySelector("#sec-reading > summary");
+		if (!band || !reading) return "missing";
+		band.open = false;
+		return { y: 0, h: Math.ceil(reading.getBoundingClientRect().bottom + window.scrollY + 2) };
+	})()`));
+	await evaluate(`document.getElementById("sec-theme").open = true`);
+	// A theme picked for this key: Make shared takes Change's place. The
+	// pick goes to the harness's own settings and is put back after. Feeds
+	// docs/assets/img/pi-theme-share.png.
+	await evaluate(`document.querySelector('#theme-gallery .hw-theme[data-theme="ember"]').click()`);
+	await sleep(400);
+	await captureClipped("pi-theme-share.png", await evaluate(`(() => {
+		const look = document.getElementById("sec-theme");
+		if (!look || document.getElementById("theme-share").hidden) return "missing";
+		return { y: 0, h: Math.ceil(look.getBoundingClientRect().bottom + window.scrollY + 2) };
+	})()`));
+	await evaluate(`document.querySelector('#theme-gallery .hw-theme[data-theme=""]').click()`);
+	await sleep(400);
+	// The Advanced fold on its own with its four groups open, from its summary
+	// to the Configuration documents help line: Shared defaults, Connection,
+	// Support and the Config wells with their Copy and Apply buttons, at the
+	// panel's real width. Feeds docs/assets/img/pi-live-key-advanced.png.
 	await captureClipped("pi-key-advanced.png", await evaluate(`(() => {
 		const adv = document.querySelector('details[data-fold="advanced"]');
 		if (!adv) return "missing";
 		const r = adv.getBoundingClientRect();
 		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 6)), h: Math.ceil(r.height + 16) };
+	})()`));
+	expectOk("folds restored", await evaluate(`(() => {
+		for (const [id, open] of window.__captureFolds ?? []) { const d = document.getElementById(id); if (d) d.open = open; }
+		return "ok";
 	})()`));
 	await viewport(880);
 
@@ -288,10 +333,12 @@ try {
 		const sel = document.querySelector('[data-setting="pressBehavior"]');
 		const block = document.getElementById("detail-config");
 		if (!sel || !block) return "missing";
-		const items = [sel.closest(".hw-field") ?? sel, block];
+		// From the Press section's own title line, so the heading is whole.
+		const head = sel.closest("details")?.querySelector("summary");
+		const items = [head ?? sel.closest(".hw-field") ?? sel, block];
 		const top = Math.min(...items.map((el) => el.getBoundingClientRect().top)) + window.scrollY;
 		const bottom = Math.max(...items.map((el) => el.getBoundingClientRect().bottom)) + window.scrollY;
-		return { y: Math.max(0, Math.floor(top - 26)), h: Math.ceil(bottom - top + 38) };
+		return { y: Math.max(0, Math.floor(top - 2)), h: Math.ceil(bottom - top + 14) };
 	})()`));
 
 	// ---- key PI: the Second Back checkbox, ticked by default (1.6.0) ----
@@ -453,7 +500,7 @@ try {
 	expectOk("third label reads as a normal label in triple", await evaluate(`(() => {
 		const input = document.getElementById("third-label");
 		if (!input) return "missing";
-		return input.placeholder === "The reading's own name" ? "ok" : input.placeholder;
+		return input.placeholder === "Own name" ? "ok" : input.placeholder;
 	})()`));
 	await evaluate(`(() => { const el = document.getElementById("picker3-search"); el.focus(); el.value = "gpu clock"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
@@ -480,7 +527,7 @@ try {
 	expectOk("third label reads as a micro-label in quad", await evaluate(`(() => {
 		const input = document.getElementById("third-label");
 		if (!input) return "missing";
-		return input.placeholder === "Short name; 4 characters show" ? "ok" : input.placeholder;
+		return input.placeholder === "4 chars max" ? "ok" : input.placeholder;
 	})()`));
 	await evaluate(`(() => { const el = document.getElementById("picker4-search"); el.focus(); el.value = "pump"; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(700);
@@ -547,42 +594,39 @@ try {
 	await sleep(600);
 	await capture("pi-dial-rotation.png");
 
-	// ---- dial PI: chip rename, mid-edit ----
-	// Two chips carry custom names, the third is open in its inline input:
-	// renamed chips and the edit affordance readable in one shot. Renames go
-	// through the production path (click .hw-set-name, then change) rather
-	// than writing settings, so the capture proves the interaction the docs
+	// ---- dial PI: rename, mid-edit ----
+	// Two readings carry custom names, the third is open in the rename field
+	// under the rotation list's toolbar: renamed readings and the edit
+	// affordance readable in one shot. Renames go through the production path
+	// (select the reading in the list, press Rename, then change) rather than
+	// writing settings, so the capture proves the interaction the docs
 	// describe instead of illustrating it.
-	// Two things this has to get right, both learned the hard way:
-	//
-	// Index the CHIP, not the name span. An open rename replaces its chip's
-	// span with an input, so a span-indexed lookup silently shifts onto the
-	// next chip and renames the wrong reading.
 	//
 	// Commit, then blur, then dispatch focusout by hand. renderRotationSet()
 	// deliberately defers while a name field is focused (pi-common.js: a
-	// settings echo must not clobber typing), and restores the chip on
+	// settings echo must not clobber typing), and drops the rename field on
 	// focusout. In the real panel Enter blurs and the browser fires focusout;
 	// under headless the document never holds focus, so blur() moves
-	// activeElement without dispatching the event and the chip would stay an
-	// input forever. Same handler, same result, just not relying on a focus
-	// event a headless page does not send.
+	// activeElement without dispatching the event and the field would stay
+	// forever. Same handler, same result, just not relying on a focus event a
+	// headless page does not send.
 	const openChipRename = async (index, what) => {
 		expectOk(what, await evaluate(`(() => {
 			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
 			if (!chip) return "missing chip";
-			const el = chip.querySelector(".hw-set-name");
-			if (!el) return "already open";
-			el.click();
-			return "ok";
+			chip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+			chip.click();
+			const rename = document.querySelector('#rotation-set .hw-set-tools button[data-tool="rename"]');
+			if (!rename) return "no Rename in the toolbar";
+			rename.click();
+			return document.getElementById("rot-rename") ? "ok" : "no rename field";
 		})()`));
 		await sleep(250);
 	};
 	const renameChip = async (index, name) => {
 		await openChipRename(index, `chip ${index} name`);
 		expectOk(`chip ${index} rename commit`, await evaluate(`(() => {
-			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
-			const input = chip && chip.querySelector("input.hw-chip-rename");
+			const input = document.getElementById("rot-rename");
 			if (!input) return "missing";
 			input.value = ${JSON.stringify(name)};
 			input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -594,7 +638,7 @@ try {
 		expectOk(`chip ${index} shows "${name}"`, await evaluate(`(() => {
 			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
 			const el = chip && chip.querySelector(".hw-set-name");
-			if (!el) return "still an input";
+			if (!el) return "missing";
 			return el.textContent === ${JSON.stringify(name)} ? "ok" : el.textContent;
 		})()`));
 	};
@@ -604,8 +648,7 @@ try {
 	// is in one click after reading the bullet this shot sits under.
 	await openChipRename(2, "third chip opened for rename");
 	expectOk("rename input focused", await evaluate(`(() => {
-		const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[2];
-		const input = chip && chip.querySelector("input.hw-chip-rename");
+		const input = document.getElementById("rot-rename");
 		if (!input) return "missing";
 		input.value = "Pump";
 		input.focus();
@@ -759,12 +802,12 @@ try {
 	await sleep(400);
 
 	// ---- dial PI: the Advanced section (shared defaults, connection,
-	// support and the configuration documents), whole.
+	// support and the configuration documents), whole, its four groups open.
 	// Feeds docs/assets/img/pi-live-dial-advanced.png.
 	await setSelect("controlPreset", "elite");
 	await sleep(900);
 	await viewport(2400);
-	await evaluate(`(() => { for (const d of document.querySelectorAll("details.hw-sec")) d.open = false; const g = document.querySelector('details[data-fold="advanced"]'); g.open = true; g.scrollIntoView({ block: "start" }); return "ok"; })()`);
+	await evaluate(`(() => { for (const d of document.querySelectorAll("details.hw-sec")) d.open = false; const g = document.querySelector('details[data-fold="advanced"]'); g.open = true; for (const s of g.querySelectorAll("details.hw-sub")) s.open = true; g.scrollIntoView({ block: "start" }); return "ok"; })()`);
 	await sleep(300);
 	await captureClipped("pi-dial-advanced.png", await evaluate(`(() => {
 		const g = document.querySelector('details[data-fold="advanced"]');

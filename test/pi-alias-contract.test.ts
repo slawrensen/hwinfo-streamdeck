@@ -197,6 +197,21 @@ class FakeElement {
 		node.parent = p;
 		this.parent = null;
 	}
+	remove(): void {
+		this.parent?.removeChild(this);
+	}
+	/** Inserts `node` right after this element (the rotation toolbar moves this way). */
+	after(node: FakeElement): void {
+		const p = this.parent;
+		if (p === null) return;
+		node.parent?.removeChild(node);
+		p.children.splice(p.children.indexOf(this) + 1, 0, node);
+		node.parent = p;
+	}
+	get nextElementSibling(): FakeElement | null {
+		const p = this.parent;
+		return p === null ? null : (p.children[p.children.indexOf(this) + 1] ?? null);
+	}
 	contains(node: unknown): boolean {
 		let n = node as FakeElement | null;
 		while (n !== null) {
@@ -588,7 +603,7 @@ describe("remaining PI review regressions", () => {
 			m.feed({ event: "themes", ...config, effectiveDeckTheme: "paper" });
 			await m.flush();
 			assert.equal(m.el("text-color").value, resolvePalette(config, effectiveThemeFor({ theme }), null, "normal").value.toLowerCase(), theme);
-			assert.equal(m.el("theme-gallery").children[0]!.title, "Default: follows the shared theme (Paper)");
+			assert.equal(m.el("theme-gallery").children[0]!.getAttribute("aria-label"), "Default: follow the shared theme, currently Paper");
 			assert.equal(m.store.theme, theme, "salvage does not rewrite the setting");
 			assert.equal(m.writes.length, 0);
 			m.echo("theme", "");
@@ -604,7 +619,7 @@ describe("remaining PI review regressions", () => {
 		m.feed({ event: "themes", ...loadThemes(), effectiveDeckTheme: "constructor" });
 		await m.flush();
 		assert.equal(m.el("text-color").value, loadThemes().themes.void!.value.toLowerCase());
-		assert.equal(m.el("theme-gallery").children[0]!.title, "Default: follows the shared theme (Void)");
+		assert.equal(m.el("theme-gallery").children[0]!.getAttribute("aria-label"), "Default: follow the shared theme, currently Void");
 		assert.equal(m.writes.length, 0);
 	});
 
@@ -1089,7 +1104,10 @@ describe("a color saved under the dormant endpoint while the rows are keyed by t
 	it("Auto clears the color under every key of that reading and leaves unrelated entries alone", () => {
 		colorRow(m, G[1]).auto.fire("click");
 		assert.deepEqual(m.lastWrite("readingColors"), { dormant: "#ABCDEF", future: { keep: "unknown" } });
-		assert.equal(colorRow(m, G[1]).well.value, "#FFFFFF");
+		// An automatic well shows the color the dial draws for the row: the
+		// resolved theme's value color (Void's white here), not a fixed white
+		// (round 3, R39).
+		assert.equal(colorRow(m, G[1]).well.value.toLowerCase(), "#ffffff");
 		assert.equal(colorRow(m, G[1]).auto.disabled, true);
 		assert.equal(m.el("reading-color-preset").value, "automatic");
 		assert.notEqual(paint(m.store, status)[1], "#FF7E8E", "the face no longer paints it");
@@ -1106,8 +1124,17 @@ describe("a color saved under the dormant endpoint while the rows are keyed by t
 		choosePreset(m, "automatic");
 		assert.deepEqual(m.lastWrite("readingColors"), { dormant: "#ABCDEF", future: { keep: "unknown" } });
 		assert.equal(m.el("reading-color-preset").value, "automatic");
-		assert.ok(colorRows(m).every((r) => r.well.value === "#FFFFFF"));
+		assert.ok(colorRows(m).every((r) => r.well.value.toLowerCase() === "#ffffff"));
 		assert.notEqual(paint(m.store, status)[1], "#FF7E8E", "Automatic cleared what the face rendered");
+	});
+
+	it("automatic wells show the resolved theme's value color, and follow a shared theme change", async () => {
+		const themes = loadThemes();
+		const writesBefore = m.writes.length;
+		m.feed({ event: "themes", ...themes, effectiveDeckTheme: "paper" });
+		await m.flush();
+		assert.ok(colorRows(m).every((r) => r.well.value === themes.themes.paper!.value.toLowerCase()), JSON.stringify(colorRows(m).map((r) => r.well.value)));
+		assert.equal(m.writes.length, writesBefore, "display only: nothing is written");
 	});
 });
 

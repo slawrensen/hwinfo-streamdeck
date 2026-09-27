@@ -6,13 +6,16 @@
 //   npx tsx scripts/pi-lab.mjs capture <outDir> [--widths 320,480] [--only a,b] [--inject <url>] [--dpr 2]
 //   npx tsx scripts/pi-lab.mjs tasks <out.json>
 //   npx tsx scripts/pi-lab.mjs perf <out.json> [--runs 3]
-//   npx tsx scripts/pi-lab.mjs a11y <out.json> [--widths 400,320]  (AXE_CORE=<path to axe.min.js> adds axe-core)
+//   npx tsx scripts/pi-lab.mjs a11y <out.json> [--widths 400,320] [--height 800]  (AXE_CORE=<path to axe.min.js> adds axe-core)
+//   npx tsx scripts/pi-lab.mjs density <out.json> [--sizes 380x720,378x410] [--shots <dir>]
+//   Any command above takes --study b|c|palette-A..E; PI_LAB_PORT_BASE runs labs side by side.
 //   npx tsx scripts/pi-lab.mjs faces <out.png>        (device-face contact sheet)
 //
 // Owned processes only: the Chromium this script launches and its own
 // servers on fixed lab ports; nothing else is ever stopped.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { launch } from "./lib/cdp.mjs";
 import { scaledSnapshot } from "./lib/pi-fixtures.mjs";
@@ -24,16 +27,24 @@ const opt = (name, fallback) => {
 	return i >= 0 ? rest[i + 1] : fallback;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const PORTS = { ws: 29310, http: 29311, debug: 29312 };
+// PI_LAB_PORT_BASE lets two labs run side by side (each owns base..base+2).
+const PORT_BASE = Number(process.env.PI_LAB_PORT_BASE ?? "") || 29310;
+const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1, debug: PORT_BASE + 2 };
 
 // Layout studies (scripts/pi-studies): served under /__study/ and injected
 // into the real panel. Never part of the plugin package.
 const study = opt("study", "");
-const studyDir = path.join(path.dirname(new URL(import.meta.url).pathname), "pi-studies");
+const studyDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "pi-studies");
 const studyRoutes = Object.fromEntries(
-	["study-b.css", "study-c.css", "study.js"].map((file) => [`/__study/${file}`, () => ({ type: file.endsWith(".css") ? "text/css" : "text/javascript", body: readFileSync(path.join(studyDir, file)) })])
+	["study-b.css", "study-c.css", "study.js", "palette.css", "palette.js"].map((file) => [`/__study/${file}`, () => ({ type: file.endsWith(".css") ? "text/css" : "text/javascript", body: readFileSync(path.join(studyDir, file)) })])
 );
-const studyInject = study === "" || study === "a" ? "" : `&inject=${encodeURIComponent(`/__study/study-${study}.css`)}&inject=${encodeURIComponent(`/__study/study.js?${study}`)}`;
+// --study b|c: the F01 layout studies; --study palette-A..E: the density
+// pass's palette-placement studies (scripts/pi-studies/palette.js).
+const studyInject = study === "" || study === "a"
+	? ""
+	: study.startsWith("palette-")
+		? `&inject=${encodeURIComponent("/__study/palette.css")}&inject=${encodeURIComponent(`/__study/palette.js?${study.slice(8)}`)}`
+		: `&inject=${encodeURIComponent(`/__study/study-${study}.css`)}&inject=${encodeURIComponent(`/__study/study.js?${study}`)}`;
 
 /** Waits until the panel has its data: the build stamp, the tree, and
  * (on sensor panels) a preview. Bounded; a panel that never settles is
@@ -278,20 +289,21 @@ async function perf() {
 async function a11y() {
 	const axePath = process.env.AXE_CORE ?? "";
 	const axeSource = axePath === "" ? null : readFileSync(axePath, "utf8");
-	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
+	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
 	const widths = opt("widths", "400").split(",").map(Number);
-	const browser = await launch({ port: PORTS.debug, width: widths[0], height: 800 });
+	const height = Number(opt("height", "800")) || 800;
+	const browser = await launch({ port: PORTS.debug, width: widths[0], height });
 	const report = [];
 	try {
 		let current = widths[0];
 		for (const [width, [fixture, label, step]] of widths.flatMap((w) => STATES.map((st) => [w, st]))) {
 			if (label === "picker-typed") continue;
 			if (width !== current) {
-				await browser.viewport(width, 800, 1);
+				await browser.viewport(width, height, 1);
 				current = width;
 			}
 			sim.setFixture(fixture);
-			await browser.goto(sim.url(fixture));
+			await browser.goto(sim.url(fixture, studyInject));
 			await settle(browser);
 			if (typeof step === "string") await browser.evaluate(step);
 			await sleep(300);
@@ -449,7 +461,184 @@ async function faces() {
 	console.log(`faces ${out} (${tiles.length} faces)`);
 }
 
-const commands = { capture, tasks, perf, a11y, sheet, faces };
+// --- density: height, header cost and keyboard routes ----------------------
+//   pi-lab.mjs density <out.json> [--sizes 380x720,320x560] [--shots <dir>]
+// For each fixture and fold state: the CONTENT height (the body's own box,
+// so a capture's blank padding below a short panel never counts), the
+// pinned header's height, horizontal overflow, and whether the header is
+// pinned at that viewport. For each task: the real keyboard route from a
+// page with nothing focused (Tab presses, plus one Enter per closed
+// section on the way, the way a keyboard user opens it), where the target
+// starts, and whether it sits on the first screen. Folds start at the
+// panel's defaults (a fresh plugin memory per page). Simulated host, sample
+// data: an expert walkthrough by script, not a human study.
+const DENSITY_STATES = [
+	["key-empty", "default"],
+	["key-configured", "default"],
+	["key-configured", "all-open"],
+	["key-configured", "all-folded"],
+	["key-dense", "default"],
+	["key-dense", "all-open"],
+	["key-triple", "default"],
+	["key-details", "all-open"],
+	["key-back", "default"],
+	["key-missing", "default"],
+	["key-stale", "default"],
+	["key-unavailable", "default"],
+	["dial-configured", "default"],
+	["dial-configured", "all-open"],
+	["dial-configured", "all-folded"],
+	["dial-groups", "default"],
+	["dial-groups", "all-open"],
+	["dial-custom-gestures", "all-open"],
+	["dial-missing", "default"],
+	["dial-unavailable", "default"],
+	["control-default", "default"],
+	["control-reset", "all-open"],
+	["slot-reading", "default"]
+];
+const DENSITY_TASKS = [
+	["T1", "key-empty", "Pick a reading", "#picker-search"],
+	["T2", "key-configured", "Theme gallery", "#theme-gallery"],
+	["T2", "dial-configured", "Theme gallery (dial)", "#theme-gallery"],
+	["T2", "key-configured", "Text color (this key)", "#f-text"],
+	["T2", "key-configured", "Decimals", "#f-decimals"],
+	["T3", "key-configured", "Readings on this key", "#f-layout"],
+	["T3", "key-dense", "Reading 4 picker", "#picker4-search"],
+	["T4", "key-configured", "Warn threshold", "#f-warn"],
+	["T5", "dial-configured", "Rotation search", "#pickerr-search"],
+	["T5", "dial-groups", "Rotation search (groups)", "#pickerr-search"],
+	["T5", "dial-groups", "Rotation list (reorder)", "#rotation-set [role=listbox], #rotation-set .hw-chip-move:not(:disabled)"],
+	["T6", "key-configured", "Press behavior", "#f-press"],
+	["T6", "dial-configured", "Dial gestures preset", "#f-preset"],
+	["T7", "key-missing", "Recovery action", "#reading-status button"],
+	["T7", "key-unavailable", "Recovery action", "#reading-status button"],
+	["T8", "key-configured", "Shared theme", "#shared-theme"],
+	["T9", "key-configured", "This key's config document", "#config-key"]
+];
+
+async function density() {
+	const sizes = opt("sizes", "380x720").split(",").map((s) => s.split("x").map(Number));
+	const shots = opt("shots", "");
+	if (shots !== "") mkdirSync(shots, { recursive: true });
+	const { PanelFoldMemory } = await import("../src/panel-folds.ts");
+	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
+	const browser = await launch({ port: PORTS.debug, width: sizes[0][0], height: sizes[0][1] });
+	const states = [];
+	const tasks = [];
+	const openPage = async (fixture) => {
+		sim.folds = new PanelFoldMemory();
+		sim.setFixture(fixture);
+		await browser.goto(sim.url(fixture, studyInject));
+		await settle(browser);
+		sim.pushPreview();
+		await sleep(300);
+	};
+	const measure = `(() => {
+		const body = document.body.getBoundingClientRect();
+		const head = document.getElementById("hw-head");
+		const pinned = head !== null && getComputedStyle(head).position === "sticky";
+		const sections = [...document.querySelectorAll("details.hw-sec")].filter((d) => !d.hidden).map((d) => ({ id: d.id, open: d.open, height: Math.round(d.getBoundingClientRect().height), summary: d.querySelector(":scope > summary")?.getBoundingClientRect().height ?? 0 }));
+		// The theme gallery: where it starts, whether a closed disclosure
+		// hides it, whether it is on screen at load, and whether it stays on
+		// screen once the page is scrolled to its end (a pinned palette).
+		const g = document.getElementById("theme-gallery");
+		const palette = g === null ? null : (() => {
+			const r = g.getBoundingClientRect();
+			let folded = false;
+			for (let n = g.parentElement; n; n = n.parentElement) if (n.tagName === "DETAILS" && !n.open) folded = true;
+			const top = Math.round(r.top + window.scrollY);
+			const atLoad = !folded && r.top >= 0 && r.bottom <= window.innerHeight;
+			const y = window.scrollY;
+			window.scrollTo(0, document.documentElement.scrollHeight);
+			const e = g.getBoundingClientRect();
+			const afterScroll = !folded && e.top >= 0 && e.bottom <= window.innerHeight && document.documentElement.scrollHeight > window.innerHeight;
+			window.scrollTo(0, y);
+			return { top, height: Math.round(r.height), folded, onScreenAtLoad: atLoad, onScreenAtEnd: afterScroll };
+		})();
+		const pinnedRegion = [...document.querySelectorAll("body > *")].find((el) => getComputedStyle(el).position === "sticky") ?? null;
+		return {
+			palette,
+			pinnedHeight: pinnedRegion === null ? 0 : Math.round(pinnedRegion.getBoundingClientRect().height),
+			height: Math.ceil(body.height + parseFloat(getComputedStyle(document.body).marginTop) + parseFloat(getComputedStyle(document.body).marginBottom)),
+			headerHeight: head === null ? 0 : Math.round(head.getBoundingClientRect().height),
+			pinned,
+			overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+			sections,
+			build: window.__hwPiVersion ?? null
+		};
+	})()`;
+	try {
+		for (const [width, height] of sizes) {
+			await browser.viewport(width, height, 1);
+			for (const [fixture, label] of DENSITY_STATES) {
+				await openPage(fixture);
+				if (label === "all-open") await browser.evaluate(OPEN_ALL);
+				if (label === "all-folded") await browser.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = false; })`);
+				await sleep(250);
+				const m = await browser.evaluate(measure);
+				states.push({ fixture, state: label, width, viewportHeight: height, ...m, writes: sim.writes.length + sim.globalWrites.length });
+				if (shots !== "") writeFileSync(path.join(shots, `${fixture}--${label}--${width}x${height}.png`), await browser.screenshot({ full: true }));
+				console.log(`${fixture} ${label} @${width}x${height}: ${m.height}px (header ${m.headerHeight}${m.pinned ? " pinned" : ""}, overflowX ${m.overflowX})`);
+			}
+			for (const [task, fixture, what, selector] of DENSITY_TASKS) {
+				await openPage(fixture);
+				// A defined start: nothing focused, scrolled to the top.
+				await browser.evaluate(`document.activeElement?.blur(); window.scrollTo(0, 0)`);
+				const where = await browser.evaluate(`(() => {
+					const t = document.querySelector(${JSON.stringify(selector)});
+					if (t === null) return null;
+					let folds = 0;
+					for (let n = t.parentElement; n; n = n.parentElement) if (n.tagName === "DETAILS" && !n.open) folds++;
+					const hidden = t.closest("[hidden]") !== null;
+					return { folds, hidden, top: Math.round(t.getBoundingClientRect().top + window.scrollY) };
+				})()`);
+				if (where === null || where.hidden) {
+					tasks.push({ task, fixture, what, width, viewportHeight: height, found: false });
+					console.log(`${task} ${what} @${width}x${height}: target absent`);
+					continue;
+				}
+				const probe = `(() => {
+					const t = document.querySelector(${JSON.stringify(selector)});
+					let a = document.activeElement;
+					while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+					if (a === null || a === document.body) return "none";
+					const inTarget = (() => { for (let n = a; n; n = n.parentNode ?? n.host) if (n === t) return true; return false; })();
+					if (inTarget) return "target";
+					if (a.tagName === "SUMMARY") { const d = a.parentElement; if (d.tagName === "DETAILS" && !d.open && d.contains(t)) return "fold"; }
+					return "other";
+				})()`;
+				let tabs = 0;
+				let enters = 0;
+				let reached = false;
+				for (let i = 0; i < 160; i++) {
+					await browser.key("Tab");
+					tabs++;
+					const at = await browser.evaluate(probe);
+					if (at === "target") {
+						reached = true;
+						break;
+					}
+					if (at === "fold") {
+						await browser.key("Enter");
+						enters++;
+						await sleep(60);
+					}
+				}
+				const after = await browser.evaluate(`(() => { const t = document.querySelector(${JSON.stringify(selector)}); const r = t.getBoundingClientRect(); const head = document.getElementById("hw-head"); const hb = head !== null && getComputedStyle(head).position === "sticky" ? head.getBoundingClientRect().bottom : 0; return { visibleTop: Math.round(r.top), coveredByHeader: r.top < hb - 1 && r.bottom > 0 }; })()`);
+				const row = { task, fixture, what, width, viewportHeight: height, found: true, tabs: reached ? tabs : null, enters, keystrokes: reached ? tabs + enters : null, foldsToOpen: where.folds, top: where.top, onFirstScreen: where.folds === 0 && where.top < height, pointerClicks: where.folds + 1, scrollToReach: Math.max(0, where.top - height + 40), focusedCoveredByHeader: after.coveredByHeader };
+				tasks.push(row);
+				console.log(`${task} ${what} @${width}x${height}: ${reached ? `${tabs} Tab + ${enters} Enter` : "NOT REACHED"}, folds ${where.folds}, top ${where.top}${row.onFirstScreen ? " (first screen)" : ""}`);
+			}
+		}
+	} finally {
+		await browser.close();
+		await sim.stop();
+	}
+	writeFileSync(out, JSON.stringify({ method: "Simulated host (scripts/lib/pi-sim.mjs), sample data, headless Chromium on this machine. Heights are the body's content box (no capture padding). Keyboard routes start with nothing focused at the top; each closed section on the way costs one Enter. Folds start at the panel defaults.", panels: process.env.PI_SIM_PLUGIN_DIR ?? "checkout", study: study === "" ? null : study, host: `${process.platform} ${process.arch} node ${process.version}`, states, tasks }, null, "\t"));
+}
+
+const commands = { capture, tasks, perf, a11y, sheet, faces, density };
 if (commands[cmd] === undefined || out === undefined) {
 	console.error("usage: tsx scripts/pi-lab.mjs capture|tasks|perf|a11y <out> [options]");
 	process.exit(2);

@@ -100,6 +100,15 @@ type PreviewPayload = {
 	};
 	/** True when a reading is selected but absent from the current snapshot. */
 	missing: boolean;
+	/** Present (true) while the poller rides out a transient source failure
+	 * on the last values: the state still reads ok or stale, but nothing new
+	 * is being read, so the panel must not call it live. */
+	holding?: true;
+	/** Shared Memory only, while stale: how long no new producer evidence has
+	 * arrived, in whole seconds' worth of milliseconds (the evidence clock
+	 * the face's own hint counts). Gadget has no producer clock, so it never
+	 * carries one. */
+	staleForMs?: number;
 	/** The action context this preview describes. The panel drops a payload
 	 * naming another context, so a late reply can never paint action A's
 	 * face into action B's panel after a quick switch. */
@@ -140,6 +149,8 @@ export type PreviewExtras = {
 	context?: string;
 	kind?: "key" | "dial";
 	face?: string;
+	/** The poller's hold (see PreviewPayload.holding). */
+	holding?: boolean;
 };
 
 /**
@@ -151,7 +162,11 @@ export type PreviewExtras = {
  * invalid values there made the "Deck default" chip lie).
  */
 export function buildThemesPayload(): JsonValue {
-	return JSON.parse(JSON.stringify({ event: "themes", effectiveDeckTheme: getDeckTheme(), ...loadThemes() })) as JsonValue;
+	const config = loadThemes();
+	// The Stream Deck app re-serializes plugin-to-panel messages with object
+	// keys sorted, so the themes object reaches the panel alphabetized; the
+	// defined order travels as a list, which keeps its order.
+	return JSON.parse(JSON.stringify({ event: "themes", effectiveDeckTheme: getDeckTheme(), ...config, themeOrder: Object.keys(config.themes) })) as JsonValue;
 }
 
 /**
@@ -241,6 +256,16 @@ export function buildPreview(status: PollerStatus, settings: PreviewSettings | u
 	}
 	if (status.state !== "unavailable") {
 		payload.source = status.source;
+		if (extras.holding === true) {
+			payload.holding = true;
+		}
+	}
+	if (status.state === "stale" && status.source === "shared-memory") {
+		// Whole seconds rounded exactly like the hint's count
+		// (statusSentence), so both change on the same tick: a finer or
+		// differently rounded value would send the panel extra previews
+		// that tell it nothing new.
+		payload.staleForMs = Math.round(status.staleForMs / 1000) * 1000;
 	}
 	if (settings !== undefined) {
 		payload.effective = effectiveOf(settings, extras.kind, undefined);
@@ -408,7 +433,7 @@ export function pushPreviewToPi(status: PollerStatus, manifestId: string | undef
 		lastPanelFace = { context: piAction.id, face: current, preview: "" };
 	}
 	const kind = alertsRecolor ? "key" : "dial";
-	const preview = buildPreview(status, state?.settings, alertsRecolor, { context: piAction.id, kind, face: changed ? current : undefined });
+	const preview = buildPreview(status, state?.settings, alertsRecolor, { context: piAction.id, kind, face: changed ? current : undefined, holding: poller.isHolding() });
 	const body = JSON.stringify(preview);
 	if (body === lastPanelFace.preview) {
 		return; // nothing new for the panel this tick

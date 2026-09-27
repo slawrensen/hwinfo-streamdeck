@@ -6,7 +6,7 @@
    answer and the button used to sit there disabled forever, looking broken.
    That is the one condition this button exists to diagnose (issue #17), so a
    request that goes unanswered now says so. */
-/* global SDPIComponents */
+/* global SDPIComponents, hwShell */
 (() => {
 	"use strict";
 
@@ -18,13 +18,23 @@
 	const RESTORE_MS = 2000;
 	let waiting = null;
 
+	// The outcome is spoken once through the panel's polite region (the
+	// label alone changes for two seconds and is announced nowhere). The
+	// shell says nothing on a channel's first message, so it is primed.
+	// The shell is the page's global hwShell (hw is local to the other
+	// panel scripts, so it is not visible here).
+	const shell = typeof hwShell !== "undefined" ? hwShell : null;
+	const speak = shell !== null ? (text) => shell.announce("support", text, { repeat: true }) : () => {};
+	shell?.announce("support", "");
+
 	function finish(text) {
 		if (waiting !== null) {
 			clearTimeout(waiting);
 			waiting = null;
 		}
-		supportEl.disabled = false;
+		supportEl.removeAttribute("aria-disabled");
 		supportEl.textContent = text;
+		speak(text);
 		setTimeout(() => {
 			supportEl.textContent = LABEL;
 		}, RESTORE_MS);
@@ -35,19 +45,26 @@
 			await navigator.clipboard.writeText(text);
 			return true;
 		} catch {
+			// The fallback selects a scratch field, which takes focus; focus
+			// goes back where it was once the copy is done.
+			const back = document.activeElement;
 			const scratch = document.createElement("textarea");
 			scratch.value = text;
 			document.body.appendChild(scratch);
 			scratch.select();
 			const ok = document.execCommand("copy");
 			scratch.remove();
+			if (back instanceof HTMLElement) back.focus({ preventScroll: true });
 			return ok;
 		}
 	}
 
 	supportEl.addEventListener("click", () => {
 		if (waiting !== null) return;
-		supportEl.disabled = true;
+		// aria-disabled, not disabled: a disabled button drops keyboard focus
+		// to the page while the plugin answers. The guard above stops a
+		// second request.
+		supportEl.setAttribute("aria-disabled", "true");
 		waiting = setTimeout(() => {
 			waiting = null;
 			finish("Plugin not responding");

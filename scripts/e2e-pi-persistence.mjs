@@ -2297,7 +2297,9 @@ try {
 		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } });
 		document.getElementById("config-deck-apply").click();
 	})()`);
-	await sleep(400);
+	// Past the 450 ms double-click guard (round 3, R09): a second press that
+	// close to arming only keeps it armed, so a double click never replaces.
+	await sleep(600);
 	check("config: the shared document's first click only arms (no write)", globalWrites.length === globalsBeforeArm, `${globalWrites.length - globalsBeforeArm} writes`);
 	await evaluate(`document.getElementById("config-deck-apply").click()`);
 	await sleep(700);
@@ -2509,7 +2511,9 @@ try {
 	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
 	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "Off (row value turns amber)", String(dialTruth.warnPlaceholder));
-	check("dial: the rotation help states how the order is set", String(dialTruth.rotationHelp).includes("the arrows set their order"), String(dialTruth.rotationHelp));
+	// The order is set on the list's toolbar (Earlier, Later), one Tab stop
+	// after the search, no longer by arrows on every chip.
+	check("dial: the rotation help states how the order is set", String(dialTruth.rotationHelp).includes("Earlier and Later set their order"), String(dialTruth.rotationHelp));
 	// A native checkbox in the Display section (1.7's sdpi toggle, ported).
 	const colorToggle = `document.getElementById('sensor-value-colors-toggle')`;
 	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
@@ -2740,6 +2744,10 @@ try {
 		const fold = document.querySelector('details[data-fold="advanced"]');
 		if (!fold) return "missing";
 		fold.open = true;
+		// The link sits in Advanced's Connection group, the way a person
+		// reaches it: open that group too.
+		const connection = document.getElementById("sec-connection");
+		if (connection) connection.open = true;
 		return "ok";
 	})()`)).result?.value === "ok");
 	await sleep(500);
@@ -2917,10 +2925,10 @@ try {
 	toPi({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });
 	await sleep(500);
-	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Default: follows the shared theme (Void)"`)).result?.value === true);
+	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Void"`)).result?.value === true);
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "paper" });
 	await sleep(500);
-	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Default: follows the shared theme (Paper)"`)).result?.value === true);
+	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Paper"`)).result?.value === true);
 
 	// Hold the real socket reply while the user edits each config textarea.
 	// This races the production async fill path, with no helper extraction.

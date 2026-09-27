@@ -9,6 +9,10 @@
    faces, unchanged. */
 
 :root {
+	/* Native checkboxes, radios, scrollbars and select popups paint for the
+	   dark panel they sit on, not as the brightest marks on it (round 3,
+	   R41; Chromium 81+, the app's QtWebEngine is Chromium 130). */
+	color-scheme: dark;
 	--hw-font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
 	--hw-mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
 	--hw-size: 12px;
@@ -38,6 +42,14 @@
 	--hw-s3: 12px;
 	--hw-s4: 16px;
 	--hw-radius: 4px;
+	/* Density: one outer gutter, one related-field gap, one field height, one
+	   section-row height and one target floor, used everywhere below. Heights
+	   are minimums: text that wraps (zoom, a long translation) grows them. */
+	--hw-gutter: var(--hw-s3);
+	--hw-gap: var(--hw-s2);
+	--hw-field-h: 28px;
+	--hw-row-h: 30px;
+	--hw-target: 24px;
 }
 
 html,
@@ -61,6 +73,13 @@ body {
 	outline-offset: 1px;
 }
 
+/* Full-width rows draw their focus ring inside, or the panel edge clips
+   it to two lines that read like the section rules. */
+.hw-sec > summary:focus-visible,
+.hw-sub > summary:focus-visible {
+	outline-offset: -2px;
+}
+
 [hidden] {
 	display: none !important;
 }
@@ -80,41 +99,37 @@ body {
 	display: flex;
 	gap: var(--hw-s3);
 	align-items: center;
-	padding: var(--hw-s3) var(--hw-s3) var(--hw-s2);
+	padding: var(--hw-s2) var(--hw-gutter);
 	border-bottom: 1px solid var(--hw-rule);
 }
 
-.hw-head[data-kind="dial"] {
-	flex-wrap: wrap;
-}
-
-/* The dial's face sits beside its text at the app's panel width (373 CSS
-   px with the scrollbar, bench 2026-09-23): 176 + 12 + 140 fits, and the
-   header stays about as tall as the face instead of stacking to twice
-   that. A panel too narrow for both wraps the text under the face. */
+/* The dial's face always sits beside its text, never above it: at the
+   app's panel width (373 CSS px with the scrollbar, bench 2026-09-23) at
+   its full 176 px, narrower on a narrower panel (down to 112 px at 320),
+   so the header stays about as tall as the face and can stay pinned. */
 .hw-head[data-kind="dial"] .hw-head-text {
-	flex-basis: 140px;
+	flex: 1 1 140px;
 }
 
-/* On a tall panel the face stays in view while you edit below it (the
-   preview-led study's one clear win). A short panel scrolls it away. The
-   shell measures the header into --hw-head-h, so scroll padding (and the
-   sticky "Add readings" dock) clear it at any width; a header that would
-   take more than a third of the panel (a wrapped dial header) is not
-   pinned at all (data-pin-off). */
-@media (min-height: 560px) {
-	html[data-pin]:not([data-pin-off]) {
-		--hw-sticky-top: var(--hw-head-h, 118px);
-		scroll-padding-top: calc(var(--hw-head-h, 118px) + 8px);
-	}
+/* The face stays in view while you edit below it, the one region that is
+   pinned. The app's own panel is 410 CSS px tall (bench 2026-09-23), so
+   the header pins at any height; the shell measures it into --hw-head-h
+   for scroll padding (a focused field never lands under it) and the
+   sticky "Add readings" dock, and a header that would take more than a
+   third of the panel (very long names on a very short panel) is not
+   pinned at all (data-pin-off) rather than covering the form. */
+html[data-pin]:not([data-pin-off]) {
+	--hw-sticky-top: var(--hw-head-h, 90px);
+	scroll-padding-top: calc(var(--hw-head-h, 90px) + 8px);
+	scroll-padding-bottom: 8px;
+}
 
-	html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
-		position: sticky;
-		top: 0;
-		z-index: 60;
-		background: var(--hw-bg);
-		box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.6);
-	}
+html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
+	position: sticky;
+	top: 0;
+	z-index: 60;
+	background: var(--hw-bg);
+	box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.6);
 }
 
 .hw-face {
@@ -141,16 +156,10 @@ body {
 }
 
 .hw-head[data-kind="dial"] .hw-face img {
-	width: 176px;
+	width: clamp(112px, calc(100vw - 196px), 176px);
 	height: auto;
 	aspect-ratio: 2 / 1;
-	max-width: 100%;
 	border-radius: 6px;
-}
-
-.hw-face figcaption {
-	color: var(--hw-muted);
-	font-size: var(--hw-size-sm);
 }
 
 .hw-head-text {
@@ -158,9 +167,32 @@ body {
 	min-width: 0;
 }
 
+/* At 200% zoom (the app's 378 px panel is then 189 CSS px wide) the column
+   beside the face would be a word or two wide: the text takes its own row
+   under the face instead, and the dial face shows whole. */
+@media (max-width: 239px) {
+	.hw-head {
+		flex-wrap: wrap;
+	}
+
+	.hw-head-text {
+		flex-basis: 100%;
+	}
+
+	.hw-head[data-kind="dial"] .hw-face {
+		flex: none;
+	}
+}
+
 .hw-head-text p {
 	margin: 0;
 	overflow-wrap: anywhere;
+}
+
+/* The state line's age counts up; fixed-width digits keep it from
+   jittering the line it sits on. */
+.hw-state {
+	font-variant-numeric: tabular-nums;
 }
 
 .hw-head-kind {
@@ -197,23 +229,39 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-folds {
+	position: relative; /* above a reading name that wraps under the pair */
+	z-index: 1;
 	flex: none;
 	display: flex;
 	gap: 2px;
-	margin: -4px -6px -4px 0;
+	margin: -6px -6px -6px 0;
 }
 
 .hw-folds button {
 	display: grid;
 	place-items: center;
-	width: 24px;
-	height: 24px;
+	width: var(--hw-field-h);
+	height: var(--hw-field-h);
 	padding: 0;
 	background: none;
 	border: 1px solid transparent;
 	border-radius: var(--hw-radius);
 	color: var(--hw-muted);
 	cursor: pointer;
+}
+
+/* Under 200 px (a 320 px panel at 200% zoom) the column beside the face
+   is about 52 px: the pair steps down to the 24 px floor to stay inside. */
+@media (max-width: 199px) {
+	.hw-folds button {
+		width: var(--hw-target);
+		height: var(--hw-target);
+	}
+
+	.hw-folds svg {
+		width: 16px;
+		height: 16px;
+	}
 }
 
 .hw-folds button:hover {
@@ -234,12 +282,15 @@ html[data-folds-pending] .hw-sec > summary::before {
 	cursor: default;
 }
 
+/* Lucide's chevrons-up-down / chevrons-down-up (NOTICE.md) with Lucide's
+   own stroke treatment. Drawn at 18 px, their 2-unit stroke lands at 1.5
+   px, the weight of the header's other lines. */
 .hw-folds svg {
-	width: 16px;
-	height: 16px;
+	width: 18px;
+	height: 18px;
 	fill: none;
 	stroke: currentColor;
-	stroke-width: 1.5;
+	stroke-width: 2;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 }
@@ -296,8 +347,226 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-lede {
-	margin: var(--hw-s2) var(--hw-s3) 0;
+	margin: var(--hw-s2) var(--hw-gutter) 0;
 	color: var(--hw-muted);
+}
+
+.hw-sec-body > .hw-lede {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+body[data-kind="control"] > .hw-lede {
+	margin: 0;
+	padding: var(--hw-s2) var(--hw-gutter);
+	border-bottom: 1px solid var(--hw-rule);
+}
+
+/* The data-status block under the header (see the panels' markup). */
+.hw-status-top:not([data-tone=""]) {
+	margin: var(--hw-s2) var(--hw-gutter) 0;
+}
+
+/* --- the look band: the palette, first under the face ---------------------- */
+
+/* One line names what is drawn and where it comes from ("Theme  Default
+   (shared: Void)  Change" or "Theme  Ember (set on this key)"), and the
+   eight themes sit under it as named chips (each a small key face in its
+   own palette with the theme's name written in that palette's text
+   color). Every name stays on screen, so no theme is known only by
+   hover. */
+.hw-look {
+	padding: 6px var(--hw-gutter) var(--hw-s2);
+	border-bottom: 1px solid var(--hw-rule);
+}
+
+.hw-look-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px var(--hw-s2);
+}
+
+.hw-look-name {
+	display: flex;
+	flex: 1 1 100%;
+	flex-direction: row;
+	align-items: baseline;
+	gap: 6px;
+	min-width: 0;
+	margin: 0;
+}
+
+.hw-look-name .hw-label {
+	flex: none;
+	margin: 0;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-look-current {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 600;
+}
+
+.hw-look-current .hw-look-scope {
+	color: var(--hw-muted);
+	font-weight: 400;
+}
+
+/* Change follows the line, outside its ellipsis, so its 24 px hit area and
+   focus ring are never clipped. On an explicit pick it keeps its place
+   unseen: the line and the chips under it stay where they are. */
+.hw-look-change {
+	flex: none;
+}
+
+.hw-look-change-off {
+	visibility: hidden;
+}
+
+/* Too narrow for the whole line (zoomed): the label and Change share the
+   first row and the name wraps under them inside two reserved lines, so
+   every pick keeps one height and the resolved theme is never cut. */
+@media (max-width: 311px) {
+	.hw-look-name {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas: "label change" "current current";
+		row-gap: 1px;
+	}
+
+	.hw-look-name .hw-label {
+		grid-area: label;
+	}
+
+	.hw-look-change {
+		grid-area: change;
+	}
+
+	.hw-look-current {
+		grid-area: current;
+		min-height: 2lh;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+}
+
+.hw-look > .hw-help {
+	margin-top: 3px;
+}
+
+/* Four to a row: two rows of about 83 x 32 px chips on the app's 373 px
+   panel, still four at 315 px (a 320 px panel with its scrollbar), two
+   below 300 px (zoomed). Each chip's face is the whole target; the name
+   sits on it, so the palette and its name read as one thing. */
+.hw-look .hw-themes {
+	display: grid;
+	flex: 1 1 100%;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 6px;
+	min-width: 0;
+}
+
+.hw-look .hw-theme {
+	justify-content: center;
+	width: auto;
+	min-width: 0;
+	min-height: 32px;
+	padding: 0;
+}
+
+/* Focus sits outside the checked ring with a gap, so both read. */
+.hw-look .hw-theme:focus-visible {
+	outline-offset: 3px;
+}
+
+.hw-look .hw-theme-face {
+	gap: 4px;
+	width: 100%;
+	height: 30px;
+	padding: 0 6px;
+	border-radius: 5px;
+}
+
+.hw-look .hw-theme-value,
+.hw-look .hw-theme-deck .hw-theme-value {
+	display: block;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.hw-look .hw-theme-spark {
+	left: 8px;
+	right: 8px;
+	bottom: 3px;
+}
+
+/* Default: the link mark before its word, in the palette it follows. */
+.hw-look .hw-theme-badge {
+	flex: none;
+	order: -1;
+	width: 14px;
+	height: 14px;
+	background: none;
+}
+
+.hw-look .hw-theme-badge svg {
+	width: 12px;
+	height: 12px;
+}
+
+@media (max-width: 359px) {
+	.hw-look .hw-theme-face {
+		gap: 3px;
+		padding: 0 3px;
+	}
+
+	.hw-look .hw-theme-value,
+	.hw-look .hw-theme-deck .hw-theme-value {
+		font-size: 11px;
+	}
+}
+
+@media (max-width: 299px) {
+	.hw-look .hw-themes {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+/* A 320 px panel at 200% zoom: 65 px chips still hold "Default" whole
+   after its mark. */
+@media (max-width: 199px) {
+	.hw-look .hw-theme-face {
+		gap: 2px;
+		padding: 0 2px;
+	}
+
+	.hw-look .hw-theme-badge {
+		width: 12px;
+	}
+
+	.hw-look .hw-theme-badge svg {
+		width: 10px;
+		height: 10px;
+	}
+}
+
+.hw-look .hw-theme-name {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
 
 /* --- sections: independent disclosures with an effective summary ------ */
@@ -306,38 +575,79 @@ html[data-folds-pending] .hw-sec > summary::before {
 	border-bottom: 1px solid var(--hw-rule);
 }
 
-.hw-sec > summary {
+.hw-sec > summary,
+.hw-sub > summary {
 	display: flex;
 	align-items: baseline;
 	flex-wrap: wrap;
 	gap: 2px var(--hw-s2);
-	padding: 8px var(--hw-s3) 8px 28px;
+	box-sizing: border-box;
+	min-height: var(--hw-row-h);
+	padding: 6px var(--hw-gutter) 6px 28px;
 	cursor: pointer;
 	list-style: none;
 	position: relative;
 }
 
-.hw-sec > summary::-webkit-details-marker {
+.hw-sec > summary::-webkit-details-marker,
+.hw-sub > summary::-webkit-details-marker {
 	display: none;
 }
 
-.hw-sec > summary::before {
+.hw-sec > summary::before,
+.hw-sub > summary::before {
 	content: "";
 	position: absolute;
 	left: 12px;
-	top: 13px;
+	top: 10px;
 	border: 5px solid transparent;
 	border-left-color: var(--hw-muted);
 	border-right-width: 0;
 	transition: transform 0.12s;
 }
 
-.hw-sec[open] > summary::before {
+.hw-sec[open] > summary::before,
+.hw-sub[open] > summary::before {
 	transform: rotate(90deg);
 }
 
-.hw-sec > summary:hover {
+.hw-sec > summary:hover,
+.hw-sub > summary:hover {
 	background: var(--hw-raised);
+}
+
+/* A section's summary line states its effective result while it is
+   folded; open, the controls say it themselves, so the line steps aside
+   (the controls keep every error and scope mark in view). */
+.hw-sec[open] > summary > .hw-sec-sum,
+.hw-sub[open] > summary > .hw-sec-sum {
+	display: none;
+}
+
+/* A disclosure inside Advanced: the same row, one step in, no rule. */
+.hw-sub {
+	margin: 0 calc(-1 * var(--hw-gutter));
+}
+
+.hw-sub > summary {
+	padding-left: 40px;
+}
+
+.hw-sub > summary::before {
+	left: 24px;
+}
+
+.hw-sub-title {
+	font-weight: 600;
+	color: var(--hw-text);
+}
+
+.hw-sub-body {
+	padding: 0 var(--hw-gutter) var(--hw-s2) 24px;
+}
+
+.hw-sub > summary .hw-scope {
+	margin-left: 0;
 }
 
 .hw-sec-title {
@@ -355,7 +665,52 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-sec-body {
-	padding: 0 var(--hw-s3) var(--hw-s3);
+	padding: 0 var(--hw-gutter) var(--hw-s3);
+}
+
+/* Optional explanation, one keyboard-operable step away. Never used for
+   units, scope, alert consequences, retention or errors: those stay in
+   view next to their control. */
+.hw-how {
+	margin-top: var(--hw-s1);
+}
+
+.hw-how > summary,
+.hw-inline-help > summary {
+	list-style: none;
+	gap: 6px;
+}
+
+.hw-how > summary::-webkit-details-marker,
+.hw-inline-help > summary::-webkit-details-marker {
+	display: none;
+}
+
+.hw-how > summary::before,
+.hw-inline-help > summary::before {
+	content: "";
+	border: 4px solid transparent;
+	border-left-color: currentColor;
+	border-right-width: 0;
+	transition: transform 0.12s;
+}
+
+.hw-how[open] > summary::before,
+.hw-inline-help[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.hw-how > summary {
+	display: inline-flex;
+	align-items: center;
+	min-height: var(--hw-target);
+	color: var(--hw-link);
+	font-size: var(--hw-size-sm);
+	cursor: pointer;
+}
+
+.hw-how > .hw-help {
+	margin-top: var(--hw-s1);
 }
 
 /* A labeled group inside a section. */
@@ -366,14 +721,20 @@ html[data-folds-pending] .hw-sec > summary::before {
 	min-width: 0;
 }
 
-.hw-group-box > legend,
-.hw-sub {
+.hw-group-box > legend {
 	padding: 0;
-	margin: 0 0 var(--hw-s1);
+	margin: 0;
 	color: var(--hw-muted);
 	font-size: var(--hw-size-sm);
 	font-weight: 600;
 	letter-spacing: 0.02em;
+}
+
+/* The group's heading sits against what it heads (4 px) and apart from
+   what came before (the box's 12 px): a legend spaced equally both ways
+   floats and reads as belonging to neither. */
+.hw-group-box > .hw-field-first {
+	margin-top: var(--hw-s1);
 }
 
 .hw-scope {
@@ -398,14 +759,55 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-field > label,
 .hw-label {
 	display: block;
-	margin-bottom: 3px;
+	margin-bottom: 2px;
 	color: var(--hw-text);
 }
 
+/* Related short fields share a row where both fit and stack where they do
+   not (a narrow panel, a long translation, zoom): never a fixed label
+   column. */
 .hw-row2 {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-	gap: 0 var(--hw-s2);
+	grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+	gap: 0 var(--hw-gap);
+}
+
+/* Value shown, Decimals and the unit switch: two selects and a checkbox. */
+.hw-row3 {
+	display: grid;
+	grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+	gap: 0 var(--hw-gap);
+	align-items: end;
+}
+
+@media (max-width: 299px) {
+	.hw-row3 {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+}
+
+.hw-row3 .hw-field > .hw-check {
+	display: flex;
+	gap: var(--hw-s1);
+	align-items: center;
+	height: var(--hw-field-h);
+	min-height: 0;
+	margin: 0;
+	padding: 0 2px;
+}
+
+/* A reading slot: its picker and its short label on one line. */
+.hw-slot-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 108px;
+	gap: 0 var(--hw-gap);
+	align-items: start;
+}
+
+@media (max-width: 299px) {
+	.hw-slot-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 .hw-field select,
@@ -415,7 +817,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 	box-sizing: border-box;
 	width: 100%;
 	min-width: 0;
-	min-height: 28px;
+	min-height: var(--hw-field-h);
 	margin: 0;
 	padding: 4px 8px;
 	background: var(--hw-field);
@@ -458,15 +860,18 @@ html[data-folds-pending] .hw-sec > summary::before {
 	display: flex;
 	align-items: flex-start;
 	gap: var(--hw-s2);
-	margin-top: var(--hw-s2);
+	min-height: var(--hw-target);
+	margin-top: var(--hw-s1);
+	padding-top: 4px;
+	box-sizing: border-box;
 	cursor: pointer;
 }
 
 .hw-check input {
 	flex: none;
-	width: 16px;
-	height: 16px;
-	margin: 1px 0 0;
+	width: 18px;
+	height: 18px;
+	margin: 0;
 	accent-color: var(--hw-select-bg);
 }
 
@@ -506,6 +911,14 @@ html[data-folds-pending] .hw-sec > summary::before {
 	box-shadow: inset 3px 0 0 var(--hw-danger-text);
 }
 
+/* The Back tile's role note: neutral information, inset like the status
+   blocks (the lede's full-width margin loses to it). */
+.hw-hint.hw-lede {
+	margin: var(--hw-s2) var(--hw-gutter) 0;
+	background: var(--hw-info-bg);
+	box-shadow: none;
+}
+
 .hw-sr-only {
 	position: absolute;
 	width: 1px;
@@ -535,15 +948,27 @@ html[data-folds-pending] .hw-sec > summary::before {
 	margin-bottom: 0;
 }
 
+/* The answer to Check again: always in the region (empty takes no space),
+   so filling it is what gets read out. */
+.hw-status p.hw-status-ack {
+	margin: var(--hw-s1) 0 0;
+}
+
+.hw-status p.hw-status-ack:empty {
+	margin: 0;
+}
+
 /* --- buttons ------------------------------------------------------------- */
 
+/* Every standard control is one height, the field's (28 px): buttons sit
+   level with the selects and inputs beside them. */
 .hw-btn,
 .hw-config-row button,
 .hw-reading-colors button,
 .hw-set-actions button,
 .hw-support {
-	min-height: 26px;
-	padding: 3px 10px;
+	min-height: var(--hw-field-h);
+	padding: 4px 10px;
 	background: var(--hw-field);
 	border: 1px solid var(--hw-edge);
 	border-radius: var(--hw-radius);
@@ -574,8 +999,12 @@ html[data-folds-pending] .hw-sec > summary::before {
 	border-color: var(--hw-danger-text);
 }
 
+/* A text action ("Change" after a sentence) keeps its place in the line
+   and gains a 24 px hit area: the padding is paid back by an equal
+   negative margin, so nothing around it moves. */
 .hw-link {
-	padding: 0;
+	padding: 4px 2px;
+	margin: -4px -2px;
 	background: none;
 	border: none;
 	color: var(--hw-link);
@@ -624,6 +1053,10 @@ html[data-folds-pending] .hw-sec > summary::before {
 	color: var(--hw-placeholder);
 }
 
+.hw-picker > input:not(:focus) {
+	text-overflow: ellipsis;
+}
+
 .hw-picker > input.missing::placeholder {
 	color: var(--hw-warn-text);
 }
@@ -643,13 +1076,32 @@ html[data-folds-pending] .hw-sec > summary::before {
 	background: var(--hw-field-hover);
 }
 
+/* Reload draws Lucide's rotate-cw at the fold pair's stroke, one icon
+   language with the header (round 3, R49). */
+.hw-picker > button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hw-picker > button svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
 .hw-picker-list {
 	position: absolute;
 	top: 100%;
 	left: 0;
 	right: 0;
 	z-index: 50;
-	max-height: 300px;
+	/* A short panel (the app's is 410 px) keeps the list inside it. */
+	max-height: min(300px, 55vh);
 	margin-top: 2px;
 	overflow-y: auto;
 	overscroll-behavior: contain;
@@ -662,7 +1114,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-picker-list.hw-inline {
 	position: static;
 	flex-basis: 100%;
-	max-height: 240px;
+	max-height: min(240px, 38vh);
 	box-shadow: none;
 }
 
@@ -770,6 +1222,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 .hw-group-add {
 	flex: none;
+	min-height: var(--hw-target);
 	padding: 0 6px;
 	background: none;
 	border: 1px solid var(--hw-edge);
@@ -799,7 +1252,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 	align-items: center;
 	gap: 2px;
 	max-width: 100%;
-	min-height: 26px;
+	min-height: var(--hw-field-h);
 	padding: 1px 2px 1px 8px;
 	background: var(--hw-field);
 	border: 1px solid #555;
@@ -811,6 +1264,19 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-set-chip.missing {
 	color: var(--hw-warn-text);
 	border-style: dashed;
+}
+
+/* Zoomed: a chip that carries a pill ("on dial", "missing", a sensor tag)
+   lets its pills drop under the name rather than squeeze the name to a
+   letter or two (round 3, re-review VY03). */
+@media (max-width: 239px) {
+	.hw-set-chip:has(> .hw-chip-badge) {
+		flex-wrap: wrap;
+	}
+
+	.hw-set-chip:has(> .hw-chip-badge) > .hw-set-name {
+		min-width: 6ch;
+	}
 }
 
 /* The reading on the dial right now: a fill plus a text badge, so the
@@ -826,6 +1292,14 @@ html[data-folds-pending] .hw-sec > summary::before {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	max-width: 170px;
+}
+
+/* "on dial" and "missing" are the non-color marks: they never
+   shrink or clip; the name beside them does. */
+.hw-set-chip > .hw-chip-badge {
+	flex: none;
+	overflow: visible;
+	margin-left: 2px;
 }
 
 .hw-set-name {
@@ -849,11 +1323,13 @@ html[data-folds-pending] .hw-sec > summary::before {
 	font-style: italic;
 }
 
+/* "on dial": the smallest words in the panel, still at the swatch faces'
+   11 px, in a pill that fits the 28 px chip. */
 .hw-chip-badge {
-	padding: 0 4px;
+	padding: 0 5px;
 	border: 1px solid currentColor;
-	border-radius: 7px;
-	font-size: 10px;
+	border-radius: 8px;
+	font-size: 11px;
 }
 
 .hw-chip-rename {
@@ -865,8 +1341,8 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-group-remove,
 .hw-detail-move,
 .hw-chip-move {
-	min-width: 22px;
-	min-height: 22px;
+	min-width: var(--hw-target);
+	min-height: var(--hw-target);
 	padding: 0 4px;
 	background: none;
 	border: none;
@@ -876,6 +1352,44 @@ html[data-folds-pending] .hw-sec > summary::before {
 	font-size: 12px;
 	line-height: 1;
 	cursor: pointer;
+}
+
+/* A group's remove sits beside its 28 px name field: one height. */
+.hw-group-remove {
+	min-width: var(--hw-field-h);
+	min-height: var(--hw-field-h);
+}
+
+/* Armed (a second press removes or merges): the button says what will go,
+   in words, in the danger style the Replace button uses. */
+.hw-group-remove[data-armed="true"],
+.hw-set-actions button[data-armed="true"] {
+	background: var(--hw-danger-bg);
+	border: 1px solid var(--hw-danger-text);
+	color: var(--hw-text);
+}
+
+.hw-group-remove[data-armed="true"]:hover,
+.hw-set-actions button[data-armed="true"]:hover {
+	background: var(--hw-danger-bg);
+}
+
+.hw-support[aria-disabled="true"] {
+	color: var(--hw-muted);
+	cursor: default;
+}
+
+.hw-group-remove[data-armed="true"] {
+	flex: 0 1 auto;
+	padding: 2px 8px;
+	font-size: var(--hw-size-sm);
+	line-height: 1.25;
+}
+
+/* A detail cell's name is its rename control: it takes the chip's full
+   24 px line, not just its text's height. */
+.hw-set-chip > .hw-set-name[role="button"] {
+	line-height: var(--hw-target);
 }
 
 .hw-set-chip.current .hw-set-remove,
@@ -916,10 +1430,20 @@ html[data-folds-pending] .hw-sec > summary::before {
 	margin-top: 0;
 }
 
+/* The group radio: an 18 px mark in a 24 px hit area (its label). */
+.hw-collector-hit {
+	display: grid;
+	flex: none;
+	place-items: center;
+	width: var(--hw-target);
+	height: var(--hw-target);
+	cursor: pointer;
+}
+
 .hw-collector {
 	flex: none;
-	width: 16px;
-	height: 16px;
+	width: 18px;
+	height: 18px;
 	margin: 0;
 	accent-color: var(--hw-select-bg);
 	cursor: pointer;
@@ -929,12 +1453,12 @@ html[data-folds-pending] .hw-sec > summary::before {
 	flex: 1 1 0;
 	width: 0;
 	min-width: 0;
-	min-height: 24px;
+	min-height: var(--hw-field-h);
 	box-sizing: border-box;
-	padding: 2px 6px;
+	padding: 4px 8px;
 	background: var(--hw-field);
 	border: 1px solid var(--hw-edge);
-	border-radius: 3px;
+	border-radius: var(--hw-radius);
 	color: var(--hw-text);
 	font: inherit;
 }
@@ -951,6 +1475,165 @@ html[data-folds-pending] .hw-sec > summary::before {
 	flex-wrap: wrap;
 	gap: var(--hw-s1);
 	padding: 2px 0 2px 20px;
+}
+
+/* The rotation editor: each list is one listbox (one Tab stop), its
+   members wrap as chips; the selected member wears a ring, the reading on
+   the dial a fill and a text badge, so neither rests on color alone. */
+.hw-set-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--hw-s1);
+	flex-basis: 100%;
+	min-width: 0;
+	padding: 2px;
+	border-radius: var(--hw-radius);
+}
+
+.hw-set-list .hw-set-chip {
+	padding: 1px 8px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.hw-set-list .hw-set-chip[aria-selected="true"] {
+	box-shadow: inset 0 0 0 2px var(--hw-text);
+}
+
+.hw-set-list:focus-visible .hw-set-chip[aria-selected="true"] {
+	box-shadow: inset 0 0 0 2px var(--hw-focus);
+}
+
+.hw-set-list .hw-set-chip.current[aria-selected="true"] {
+	box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+/* On the dial AND missing: the warning wins the fill; the badge still
+   says "on dial". */
+.hw-set-chip.current.missing {
+	background: var(--hw-warn-bg);
+	border-color: var(--hw-warn-text);
+	border-style: dashed;
+	color: var(--hw-warn-text);
+}
+
+.hw-set-list .hw-set-chip > .hw-set-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 190px;
+	cursor: inherit;
+}
+
+.hw-set-list .hw-set-chip > .hw-set-name:hover {
+	text-decoration: none;
+}
+
+.hw-set-chips .hw-set-list,
+.hw-set > .hw-set-list + .hw-set-tools {
+	margin-top: 0;
+}
+
+.hw-group-head + .hw-set-list,
+.hw-group-head + .hw-set-list + .hw-set-tools {
+	padding-left: 28px;
+}
+
+/* A grouped list's toolbar slot: as tall as the toolbar whether or not
+   it holds it, so moving the toolbar between groups moves nothing. */
+.hw-set-tools-slot {
+	flex-basis: 100%;
+	min-width: 0;
+	min-height: var(--hw-tools-h, calc(var(--hw-field-h) + 6px));
+	padding-left: 28px;
+}
+
+.hw-set-tools-slot > .hw-set-tools {
+	padding-left: 0;
+}
+
+/* The empty slot's hint: one quiet line centered where the toolbar's
+   buttons would sit, gone as soon as the toolbar moves in. */
+.hw-set-tools-hint {
+	display: block;
+	overflow: hidden;
+	padding: 2px 0 var(--hw-s1);
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	line-height: var(--hw-field-h);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hw-set-tools-slot:has(> .hw-set-tools) > .hw-set-tools-hint {
+	display: none;
+}
+
+/* One toolbar for the selected member: Earlier, Later, Rename, Remove. */
+.hw-set-tools {
+	display: flex;
+	flex-wrap: wrap;
+	flex-basis: 100%;
+	gap: var(--hw-s1);
+	margin: 2px 0 var(--hw-s1);
+}
+
+.hw-set-tools button {
+	min-height: var(--hw-field-h);
+	padding: 1px 8px;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.hw-set-tools button:hover {
+	background: var(--hw-field-hover);
+}
+
+.hw-set-tools button[aria-disabled="true"] {
+	color: var(--hw-muted);
+	border-color: var(--hw-rule);
+	background: none;
+	cursor: default;
+}
+
+.hw-rename-row {
+	flex-basis: 100%;
+	margin-top: 0;
+}
+
+.hw-rename-row input {
+	width: 100%;
+}
+
+/* What the dial's gestures do now, from the plugin's resolved scheme. */
+.hw-gestures {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 1px var(--hw-s2);
+	margin: var(--hw-s1) 0 0;
+	font-size: var(--hw-size-sm);
+}
+
+.hw-gestures:empty {
+	display: none;
+}
+
+.hw-gestures dt {
+	color: var(--hw-muted);
+}
+
+.hw-gestures dd {
+	margin: 0;
+	color: var(--hw-text);
+}
+
+.hw-gestures dd.off {
+	color: var(--hw-muted);
+	font-style: italic;
 }
 
 /* A small disclosure inside a section (the HWiNFO setup steps). */
@@ -973,35 +1656,46 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 /* --- theme gallery ------------------------------------------------------ */
 
+/* Every theme stays named and visible: a swatch drawn in its palette with
+   the name beside it, four to a row at the app's width (two rows for the
+   eight choices), three at 320 px. */
 .hw-themes {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-	gap: 6px;
+	grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+	gap: 4px;
 }
 
 .hw-theme {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	align-items: center;
-	gap: 3px;
+	gap: 4px;
 	min-width: 0;
-	padding: 2px;
+	min-height: 28px;
+	padding: 1px;
 	background: none;
-	border: none;
+	border: 1px solid transparent;
 	border-radius: var(--hw-radius);
 	color: var(--hw-muted);
 	font: inherit;
+	text-align: left;
 	cursor: pointer;
+}
+
+.hw-theme:hover {
+	background: var(--hw-raised);
+	border-color: var(--hw-rule);
 }
 
 .hw-theme-face {
 	position: relative;
 	display: flex;
+	flex: none;
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	width: 100%;
-	height: 34px;
+	width: 24px;
+	height: 22px;
 	overflow: hidden;
 	border: 1px solid #1f1f1f;
 	border-radius: var(--hw-radius);
@@ -1009,7 +1703,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 .hw-theme[aria-checked="true"] .hw-theme-face,
 .hw-theme.selected .hw-theme-face {
-	outline: 2px solid var(--hw-focus);
+	outline: 2px solid var(--hw-text);
 	outline-offset: 1px;
 }
 
@@ -1019,13 +1713,12 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-theme-deck .hw-theme-face {
-	border: 2px dashed var(--hw-link);
+	border: 2px dashed var(--hw-muted);
 }
 
+/* The Default chip follows the shared palette: its swatch shows that
+   palette under a link mark (no sample number), and a dashed frame. */
 .hw-theme-badge {
-	position: absolute;
-	top: 2px;
-	left: 2px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -1044,22 +1737,26 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-theme-value {
-	font-size: 13px;
+	font-size: 10px;
 	font-weight: 700;
 	line-height: 1;
 }
 
+.hw-theme-deck .hw-theme-value {
+	display: none;
+}
+
 .hw-theme-spark {
 	position: absolute;
-	left: 4px;
-	right: 4px;
-	bottom: 4px;
+	left: 3px;
+	right: 3px;
+	bottom: 2px;
 	height: 2px;
 	border-radius: 1px;
 }
 
 .hw-theme-name {
-	max-width: 100%;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1083,11 +1780,20 @@ html[data-folds-pending] .hw-sec > summary::before {
    sets clear. */
 .hw-reading-colors {
 	max-height: 220px;
+	padding-inline: 3px;
 	overflow-y: auto;
 }
 
 .hw-reading-colors .hw-quad-colors {
 	margin-bottom: 4px;
+}
+
+/* Auto is already in effect: the button reads as unavailable. */
+.hw-reading-colors button:disabled {
+	background: none;
+	border-color: var(--hw-rule);
+	color: var(--hw-muted);
+	cursor: default;
 }
 
 .hw-reading-colors label {
@@ -1102,7 +1808,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-color {
 	flex: 0 0 32px;
 	width: 32px;
-	height: 26px;
+	height: var(--hw-field-h);
 	padding: 1px;
 	background: var(--hw-field);
 	border: 1px solid var(--hw-edge);
@@ -1132,7 +1838,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 .hw-config textarea {
 	box-sizing: border-box;
 	width: 100%;
-	min-height: 120px;
+	min-height: 96px;
 	padding: 6px;
 	resize: vertical;
 	background: #1c1f24;
@@ -1147,6 +1853,9 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 /* --- custom detail list (tile editor) ----------------------------------- */
 
+/* The tile editor speaks the panel's own tokens (field, edge, text,
+   muted, link), the rotation editor's dialect (round 3, R40). */
+
 .hw-tile {
 	display: inline-flex;
 	flex-wrap: wrap;
@@ -1155,24 +1864,24 @@ html[data-folds-pending] .hw-sec > summary::before {
 	max-width: 100%;
 	margin: 2px 4px 2px 0;
 	padding: 2px 3px;
-	border: 1px solid #56606c;
+	border: 1px solid var(--hw-edge);
 	border-radius: 6px;
 	box-sizing: border-box;
 }
 
 .hw-tile.planned {
-	border-color: #6d7a8a;
-	background: #262b31;
+	border-color: var(--hw-muted);
+	background: var(--hw-raised);
 }
 
 .hw-tile-size,
 .hw-tile-abc {
-	min-height: 22px;
+	min-height: var(--hw-target);
 	padding: 2px 6px;
-	background: #2c313a;
-	border: 1px solid #56606c;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
 	border-radius: 4px;
-	color: #dde3ea;
+	color: var(--hw-text);
 	font: inherit;
 	font-size: 11px;
 	cursor: pointer;
@@ -1180,13 +1889,13 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 .hw-tile-size:hover,
 .hw-tile-abc:hover {
-	background: #3a4250;
+	background: var(--hw-field-hover);
 }
 
 .hw-tile-color {
-	flex: 0 0 22px;
-	width: 22px;
-	height: 20px;
+	flex: 0 0 24px;
+	width: 24px;
+	height: 24px;
 	padding: 0;
 	background: none;
 	border: none;
@@ -1194,32 +1903,32 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-add {
-	min-width: 22px;
-	min-height: 22px;
+	min-width: var(--hw-target);
+	min-height: var(--hw-target);
 	padding: 2px 6px;
-	background: #2c313a;
+	background: var(--hw-field);
 	border: 1px dashed transparent;
 	border-radius: 4px;
-	color: #dde3ea;
+	color: var(--hw-text);
 	font: inherit;
 	line-height: 1;
 	cursor: pointer;
 }
 
 .hw-add:hover {
-	background: #3a4250;
+	background: var(--hw-field-hover);
 }
 
 .hw-add.lit {
 	background: none;
-	border-color: #4cc2ff;
+	border-color: var(--hw-link);
 	color: var(--hw-link);
 }
 
 .hw-add.armed {
 	background: var(--hw-select-bg);
-	border-color: #4cc2ff;
-	color: #fff;
+	border-color: var(--hw-link);
+	color: var(--hw-select-text);
 }
 
 .hw-tile.ghost {
@@ -1248,6 +1957,15 @@ html[data-folds-pending] .hw-sec > summary::before {
 	box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
 }
 
+/* On a short panel (the app's is 410 px) a pinned search row plus the
+   pinned header would cover the tile list it fills: it scrolls instead. */
+@media (max-height: 599px) {
+	#detail-custom.picking #detail-add-dock {
+		position: static;
+		box-shadow: none;
+	}
+}
+
 #detail-custom.picking #detail-list .hw-set-chip,
 #detail-custom.picking #detail-list .hw-add {
 	scroll-margin-top: 290px;
@@ -1261,16 +1979,16 @@ html[data-folds-pending] .hw-sec > summary::before {
 
 .hw-set-chip.drop-before,
 .hw-tile.drop-before {
-	box-shadow: -3px 0 0 0 #4cc2ff;
+	box-shadow: -3px 0 0 0 var(--hw-link);
 }
 
 .hw-set-chip.drop-after,
 .hw-tile.drop-after {
-	box-shadow: 3px 0 0 0 #4cc2ff;
+	box-shadow: 3px 0 0 0 var(--hw-link);
 }
 
 .hw-tile.drop-append {
-	border-color: #4cc2ff;
+	border-color: var(--hw-link);
 }
 
 .hw-tile-grip {
@@ -1281,7 +1999,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 	min-height: 24px;
 	padding: 0 3px;
 	box-sizing: border-box;
-	color: #9aa3ae;
+	color: var(--hw-muted);
 	font-size: 12px;
 	line-height: 1;
 	cursor: grab;
@@ -1293,16 +2011,304 @@ html[data-folds-pending] .hw-sec > summary::before {
 }
 
 .hw-tile.drop-append .hw-add {
-	border-color: #4cc2ff;
-	color: #4cc2ff;
+	border-color: var(--hw-link);
+	color: var(--hw-link);
+}
+
+/* Windows High Contrast: shadows and fills vanish, so the marks that
+   carry state switch to outlines in system colors, and theme swatches
+   keep their real colors (they ARE the content). */
+@media (forced-colors: active) {
+	.hw-set-list .hw-set-chip[aria-selected="true"],
+	.hw-row.active,
+	.hw-theme[aria-checked="true"] .hw-theme-face {
+		outline: 2px solid Highlight;
+		outline-offset: -2px;
+	}
+
+	/* The reading on the dial: a dashed frame, so it never reads as the
+	   selection (which alone wears Highlight). */
+	.hw-set-chip.current {
+		border: 2px dashed CanvasText;
+	}
+
+	.hw-set-tools button[aria-disabled="true"],
+	.hw-folds button[aria-disabled="true"] {
+		color: GrayText;
+		border-color: GrayText;
+	}
+
+	.hw-theme-face,
+	.hw-face img,
+	.hw-color,
+	.hw-quad-colors input[type="color"] {
+		forced-color-adjust: none;
+	}
+
+	.hw-state::before {
+		forced-color-adjust: none;
+		background: CanvasText;
+	}
+
+	/* The disclosure triangles are drawn with borders: color the one side
+	   that shows and leave the box unfilled, or it becomes a bar. */
+	.hw-sec > summary::before,
+	.hw-sub > summary::before {
+		forced-color-adjust: none;
+		border-left-color: CanvasText;
+	}
+
+	.hw-how > summary::before,
+	.hw-inline-help > summary::before {
+		forced-color-adjust: none;
+		border-top-color: transparent;
+		border-bottom-color: transparent;
+		border-left-color: LinkText;
+	}
+
+	/* The saved reading keeps its mark once the list highlight moves. */
+	.hw-row.selected,
+	.hw-row[aria-selected="true"] {
+		forced-color-adjust: none;
+		background: SelectedItem;
+		color: SelectedItemText;
+	}
+
+	.hw-status:not([data-tone=""]),
+	.hw-hint {
+		border: 1px solid CanvasText;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.hw-sec > summary::before {
+	.hw-sec > summary::before,
+	.hw-sub > summary::before,
+	.hw-how > summary::before,
+	.hw-inline-help > summary::before {
 		transition: none;
 	}
 
 	.hw-set-chip.landed {
 		animation: none;
+	}
+}
+
+/* --- the theme band as a fold row -------------------------------------------
+   The band folds like every section (owner, 2026-09-26). Its theme line is
+   the summary; folded, the checked chip stands in for the name. Design R2,
+   reviewed in two rounds (review/pi-density/round3/themefold); the ids in
+   the comments are the reviewers' findings. */
+
+/* The folded chip: the grid chip's anatomy at 24 px, the accent stripe
+   clear of the word (VT03, PT03). */
+.hw-look-mini {
+	display: none;
+	flex: none;
+}
+.hw-mini-wrap {
+	display: inline-flex;
+}
+details .hw-look-mini .hw-theme-face {
+	position: relative;
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	box-sizing: border-box;
+	width: auto;
+	min-width: 72px;
+	height: 24px;
+	padding: 0 8px 4px;
+	overflow: hidden;
+	border: 1px solid #1f1f1f;
+	border-radius: 5px;
+}
+details .hw-look-mini .hw-theme-deck .hw-theme-face {
+	border: 2px dashed;
+}
+details .hw-look-mini .hw-theme-value,
+details .hw-look-mini .hw-theme-deck .hw-theme-value {
+	display: block;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+details .hw-look-mini .hw-theme-spark {
+	position: absolute;
+	left: 8px;
+	right: 8px;
+	bottom: 2px;
+	height: 2px;
+	border-radius: 1px;
+}
+details .hw-look-mini .hw-theme-badge {
+	display: flex;
+	order: -1;
+	width: 14px;
+	height: 14px;
+	background: none;
+}
+details .hw-look-mini .hw-theme-badge svg {
+	width: 12px;
+	height: 12px;
+}
+@media (max-width: 199px) {
+	details .hw-look-mini .hw-theme-face {
+		min-width: 64px;
+		padding: 0 4px 4px;
+	}
+}
+
+/* The fold row: one section row (VT04), a section title (VT01), the
+   name regular and the scope muted (VT02), 8 px after the title (VT08),
+   never ellipsized (VT07). */
+details.hw-look-fold {
+	position: relative;
+	padding: 0 0 var(--hw-s2);
+}
+details.hw-look-fold:not([open]) {
+	padding-bottom: 0;
+}
+details.hw-look-fold > summary.hw-look-name {
+	flex-wrap: nowrap;
+	align-items: center;
+	column-gap: var(--hw-s2);
+	min-height: var(--hw-row-h);
+	margin: 0;
+	padding: 3px var(--hw-gutter) 3px 28px;
+}
+details.hw-look-fold > summary.hw-look-name::before {
+	top: 10px;
+}
+details.hw-look-fold > summary.hw-look-name > .hw-label {
+	color: var(--hw-text);
+	font-size: 13px;
+	font-weight: 600;
+}
+details.hw-look-fold > summary.hw-look-name .hw-look-current {
+	overflow: visible;
+	font-weight: 400;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+/* Open, the row ends before Change, so a near miss on Change never folds
+   the band and the row's focus ring never encloses Change (AT01, PT01,
+   VT05). */
+details.hw-look-fold[open] > summary.hw-look-name {
+	margin-right: 68px;
+	padding-right: 0;
+}
+/* Make shared is wider than Change (72 against 44.5 px): the open row ends
+   8 px before it at 312 px and wider. Below that the fold row takes its
+   narrow layout, where the link has its own line (sharedtheme round, X1;
+   "Ultraviolet (set on this dial)" needs 308 px beside the wider slot). */
+@media (min-width: 312px) {
+	details.hw-look-fold.hw-share-on[open] > summary.hw-look-name {
+		margin-right: 90px;
+	}
+}
+details.hw-look-fold .hw-look-change {
+	position: absolute;
+	top: 2.6px;
+	right: calc(var(--hw-gutter) - 2px);
+	margin: 0;
+	z-index: 1;
+}
+details.hw-look-fold > .hw-look-row {
+	padding: 2px var(--hw-gutter) 0;
+}
+details.hw-look-fold > .hw-help {
+	margin: 3px var(--hw-gutter) 0;
+}
+
+/* Folded, the chip takes the name's place; the scope stays. */
+details.hw-look-fold:not([open]) .hw-look-mini {
+	display: inline-flex;
+}
+details.hw-look-fold.hw-mini-none .hw-look-mini {
+	display: none;
+}
+details.hw-look-fold:not([open]):not(.hw-mini-none) #theme-current > span:first-child {
+	display: none;
+}
+
+/* On a key with no reading, the folded row keeps the one fact the band
+   adds: the theme does not show on the key yet (BT02, AT02, AT04, VT09). */
+.hw-look-note {
+	display: none;
+}
+details.hw-look-fold:not([open]) > summary.hw-look-name {
+	flex-wrap: wrap;
+	row-gap: 0;
+}
+details.hw-look-fold:not([open]) > summary.hw-look-name > .hw-look-note.shown {
+	display: block;
+	flex: 1 1 100%;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+/* Zoomed: Change leaves the row for its own line under it, right-aligned
+   (AT02), and open, the name takes its own full-width row inside two
+   reserved lines, so every pick keeps one height (the longest name,
+   "Default (shared: Ultraviolet)", needs two at 160 px). Folded, the
+   chip sits beside the title and the scope wraps under it. */
+@media (max-width: 311px) {
+	details.hw-look-fold > summary.hw-look-name {
+		display: flex;
+		flex-wrap: wrap;
+		row-gap: 2px;
+	}
+	details.hw-look-fold[open] > summary.hw-look-name {
+		margin-right: 0;
+		padding-right: var(--hw-gutter);
+	}
+	details.hw-look-fold .hw-look-change {
+		position: static;
+		display: block;
+		width: max-content;
+		margin: 0 -2px 2px auto;
+	}
+	details.hw-look-fold[open] > summary.hw-look-name .hw-look-current {
+		flex: 1 1 100%;
+		min-height: 2lh;
+	}
+	details.hw-look-fold:not([open]) > summary.hw-look-name .hw-look-current {
+		flex: 1 1 60px;
+		min-height: 0;
+	}
+}
+
+/* Approval round (R2). The fold row aligns on its first line: the title's
+   line box is the chip's 24 px, so the first flex line always centers on
+   the marker, and a line that does not fit beside the title wraps whole
+   onto the next flex line (UXR01). */
+details.hw-look-fold > summary.hw-look-name {
+	flex-wrap: wrap;
+}
+details.hw-look-fold > summary.hw-look-name > .hw-label {
+	line-height: 24px;
+}
+@media (max-width: 311px) {
+	details.hw-look-fold:not([open]) > summary.hw-look-name .hw-look-current {
+		flex: 0 1 auto;
+	}
+	details.hw-look-fold[open] > summary.hw-look-name > .hw-label {
+		line-height: inherit;
+	}
+	details.hw-look-fold[open] > summary.hw-look-name::before {
+		top: 7px;
+	}
+	/* 6 px of dead space between the open row and Change, so a press just
+	   above Change never folds the band: the row's bottom padding becomes
+	   Change's top margin, 1 px taller in all (ADR01, A1R01). */
+	details.hw-look-fold[open] > summary.hw-look-name {
+		padding-bottom: 0;
+	}
+	details.hw-look-fold .hw-look-change {
+		margin: 4px -2px 2px auto;
 	}
 }

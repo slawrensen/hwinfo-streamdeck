@@ -42,6 +42,7 @@ self.hwShell = (() => {
 		preview: null,
 		face: "",
 		tree: null,
+		treeAt: 0,
 		writes: 0,
 		globalWrites: 0,
 		heardFromPlugin: false,
@@ -102,6 +103,7 @@ self.hwShell = (() => {
 			emit("preview", p);
 		} else if (p.event === "sensorTree") {
 			state.tree = p;
+			state.treeAt = Date.now();
 			emit("tree", p);
 		}
 		scheduleRender();
@@ -174,14 +176,19 @@ self.hwShell = (() => {
 	/** Thresholds and ranges: the runtime reads "70,5" as 70.5 and ignores
 	 * anything else. The text is saved as typed (nothing is lost); the
 	 * field says what will ignore it. */
-	function validateNumber(el) {
+	function validateNumber(el, typed = false) {
 		const raw = el.value.trim();
 		const ok = raw === "" || Number.isFinite(Number(raw.replace(",", ".")));
 		const err = document.getElementById(`${el.id}-error`);
+		const wasInvalid = el.getAttribute("aria-invalid") === "true";
 		el.setAttribute("aria-invalid", ok ? "false" : "true");
 		if (err !== null) {
 			err.hidden = ok;
 			err.textContent = ok ? "" : `Not a number. ${el.dataset.ignoredBy ?? "Alerts"} ignore${el.dataset.ignoredBy === undefined ? "" : "s"} this field until it is one.`;
+			// Said once when typing makes the field invalid (the message is
+			// linked by aria-describedby, which nothing speaks while typing);
+			// never on load and never per keystroke.
+			if (typed && !ok && !wasInvalid) announce("validate", err.textContent, { repeat: true });
 		}
 	}
 
@@ -224,7 +231,7 @@ self.hwShell = (() => {
 				schedule();
 			});
 			el.addEventListener("input", () => {
-				if (el.dataset.validate === "number") validateNumber(el);
+				if (el.dataset.validate === "number") validateNumber(el, true);
 				if (composing) return;
 				schedule();
 			});
@@ -238,9 +245,12 @@ self.hwShell = (() => {
 
 	for (const el of document.querySelectorAll("[data-setting]")) bindControl(el);
 
-	/** Re-reads every bound control from the store (after a wholesale apply). */
-	function resyncBound() {
-		for (const { el, get } of bound) get().then((value) => showValue(el, value));
+	/** Re-reads bound controls from the store (after a wholesale apply):
+	 * every one, or only those bound to the named settings. */
+	function resyncBound(settings) {
+		for (const { el, setting, get } of bound) {
+			if (settings === undefined || settings.includes(setting)) get().then((value) => showValue(el, value));
+		}
 	}
 	on("settings", (ev) => {
 		if (ev.origin === "echo") resyncBound();
@@ -264,14 +274,24 @@ self.hwShell = (() => {
 	// everything open. The panels' HTML starts with data-folds-pending, so
 	// the sections are hidden from the very first paint until the plugin
 	// answers; a remembered fold never flashes the defaults first. The wait
-	// is capped at 300 ms after the panel connects (the answer is one local
-	// round trip), and at 1.5 s overall for a plugin that never connects.
-	const sections = Array.from(document.querySelectorAll("details.hw-sec[id]"));
+	// is capped at 600 ms after the panel connects (the round trip measured
+	// about 320 ms in the Stream Deck app on the owner's deck, 2026-09-26),
+	// and at 1.5 s overall for a plugin that never connects.
+	// The groups inside Advanced (details.hw-sub) fold and are remembered
+	// the same way; "How this works" help is not a section and is neither.
+	const sections = Array.from(document.querySelectorAll("details.hw-sec[id], details.hw-sub[id]"));
 	const folds = {};
 	const keepFolds = () => client.send("sendToPlugin", { event: "setPanelFolds", kind, folds });
 	// A section a person toggled on this page keeps that state even if the
 	// plugin's answer arrives after the toggle.
 	const touched = new Set();
+	// Whether the person has pressed, typed or scrolled in this panel yet.
+	let personActed = false;
+	for (const type of ["pointerdown", "keydown", "wheel"]) {
+		document.addEventListener(type, () => {
+			personActed = true;
+		}, { capture: true, passive: true, once: true });
+	}
 	const foldsReady = (why) => {
 		if (!document.documentElement.hasAttribute("data-folds-pending")) return;
 		document.documentElement.removeAttribute("data-folds-pending");
@@ -283,7 +303,7 @@ self.hwShell = (() => {
 		client.getConnectionInfo().then(() => {
 			performance.mark("hw-connected");
 			client.send("sendToPlugin", { event: "getPanelFolds", kind });
-			setTimeout(() => foldsReady("timeout"), 300);
+			setTimeout(() => foldsReady("timeout"), 600);
 		});
 	}
 	client.sendToPropertyInspector.subscribe((ev) => {
@@ -292,8 +312,18 @@ self.hwShell = (() => {
 		for (const [id, open] of Object.entries(p.folds)) {
 			if (typeof open === "boolean" && !touched.has(id)) folds[id] = open;
 		}
+		// On the Stream Deck app the answer can land after the panel shows
+		// (hardware, 2026-09-26: shown at the then 300 ms cap, answer 17 ms
+		// later). It
+		// still applies until the person presses, types or scrolls; after
+		// that it only opens sections, never folds one under them (ADR05).
+		// The memory itself is untouched either way.
+		const showing = !document.documentElement.hasAttribute("data-folds-pending");
+		if (showing) performance.mark("hw-folds-late");
 		for (const section of sections) {
-			if (typeof folds[section.id] === "boolean") section.open = folds[section.id];
+			if (typeof folds[section.id] !== "boolean") continue;
+			if (showing && personActed && !folds[section.id]) continue;
+			section.open = folds[section.id];
 		}
 		foldsReady("answer");
 	});
@@ -314,7 +344,7 @@ self.hwShell = (() => {
 	};
 	let toggledByPerson = null;
 	document.addEventListener("click", (ev) => {
-		const summary = ev.target instanceof Element ? ev.target.closest("details.hw-sec[id] > summary") : null;
+		const summary = ev.target instanceof Element ? ev.target.closest("details.hw-sec[id] > summary, details.hw-sub[id] > summary") : null;
 		if (summary === null) return;
 		const section = summary.parentElement;
 		if (ev.altKey) {
@@ -368,6 +398,80 @@ self.hwShell = (() => {
 		});
 	}
 
+	// --- a press that lands where the panel just scrolled --------------------
+	// When the panel itself moves the page under a resting pointer (a reading
+	// list brought into view as it opens, a reveal), whatever slid under the
+	// pointer must not take the next press: the second press of a double
+	// click would pick or tick a reading the person never aimed at. For half
+	// a second after such a scroll, a press within 4 px of where the pointer
+	// rested is swallowed; moving the pointer ends the guard at once.
+	// Keyboard input is never affected (round 3, re-review VY01, PY01, AY01).
+	const pointer = { x: -1, y: -1 };
+	let panelScroll = null; // { at, x, y }
+	document.addEventListener("pointermove", (ev) => {
+		pointer.x = ev.clientX;
+		pointer.y = ev.clientY;
+		if (panelScroll !== null && Math.hypot(ev.clientX - panelScroll.x, ev.clientY - panelScroll.y) >= 4) panelScroll = null;
+	}, true);
+	function markPanelScroll() {
+		panelScroll = { at: Date.now(), x: pointer.x, y: pointer.y };
+	}
+	const staleAt = (ev) => {
+		if (panelScroll === null) return false;
+		if (Date.now() - panelScroll.at > 500) {
+			panelScroll = null;
+			return false;
+		}
+		return Math.hypot(ev.clientX - panelScroll.x, ev.clientY - panelScroll.y) < 4;
+	};
+	const swallow = (ev) => {
+		ev.preventDefault();
+		ev.stopImmediatePropagation();
+	};
+	// One verdict per press, taken at its pointerdown: a press that began
+	// inside the window stays swallowed through its click, even when the
+	// click lands after the half second (re-review audit FA03).
+	let pressStale = null;
+	document.addEventListener("pointerdown", (ev) => {
+		pressStale = staleAt(ev);
+		if (pressStale) swallow(ev);
+	}, true);
+	// A tap moves no pointer before it presses: its position is where the
+	// next press is measured from (FA04). Registered after the verdict.
+	document.addEventListener("pointerdown", (ev) => {
+		pointer.x = ev.clientX;
+		pointer.y = ev.clientY;
+	}, true);
+	// The release is left alone: the opening press's own mouseup selects the
+	// search text, and no row acts on a release.
+	document.addEventListener("mousedown", (ev) => {
+		if (pressStale ?? staleAt(ev)) swallow(ev);
+	}, true);
+	document.addEventListener("click", (ev) => {
+		if (ev.detail === 0) return; // a keyboard activation
+		const stale = pressStale ?? staleAt(ev);
+		pressStale = null;
+		if (stale) swallow(ev);
+	}, true);
+
+	// An armed button (remove a group, Merge, Replace shared settings) asks
+	// for a second, fresh press. A held Enter or Space repeats its keydown
+	// every few tens of ms after about half a second, which would outlast the
+	// double-press guard and confirm without the person pressing again: a
+	// repeated key never activates an armed button (round 3, re-review PY02,
+	// AY01).
+	document.addEventListener(
+		"keydown",
+		(ev) => {
+			if (!ev.repeat || (ev.key !== "Enter" && ev.key !== " ")) return;
+			if (ev.target instanceof HTMLElement && ev.target.dataset.armed === "true") {
+				ev.preventDefault();
+				ev.stopImmediatePropagation();
+			}
+		},
+		true
+	);
+
 	// --- disclosure: open a section and bring a target into view ----------------
 	/** Opens every closed disclosure around `target`, scrolls it into view and
 	 * focuses it (or its first focusable). A UI move, never a write. */
@@ -379,7 +483,19 @@ self.hwShell = (() => {
 		for (let n = el; n !== null; n = n.parentElement) {
 			if (n.tagName === "DETAILS" && !n.open) n.open = true;
 		}
-		el.scrollIntoView({ block: "center" });
+		// A reading picker opens its list on focus: its field goes just under
+		// the pinned header, so the list opens below it on screen instead
+		// of under the fold (round 3, R17). Anything else is centered.
+		const pickerField = el.closest(".hw-picker")?.closest(".hw-field") ?? null;
+		if (pickerField !== null) {
+			const root = document.documentElement;
+			const head = root.hasAttribute("data-pin") && !root.hasAttribute("data-pin-off") ? document.querySelector(".hw-head[data-pin]") : null;
+			const pinned = head === null ? 0 : head.getBoundingClientRect().bottom;
+			window.scrollBy({ top: pickerField.getBoundingClientRect().top - pinned - 8, behavior: "instant" });
+		} else {
+			el.scrollIntoView({ block: "center" });
+		}
+		markPanelScroll();
 		const focusable = el.matches("input,select,textarea,button,summary,[tabindex]") ? el : el.querySelector("summary,input,select,textarea,button,[tabindex]");
 		focusable?.focus({ preventScroll: true });
 	}
@@ -425,6 +541,16 @@ self.hwShell = (() => {
 	 * Gadget cannot measure freshness, so it never claims the data stopped. */
 	const staleFace = (p) => (p.source === "gadget" ? "Age unknown" : kind === "dial" ? "No new data" : "Not updating");
 
+	/** A stale Shared Memory age in words, from the plugin's evidence clock
+	 * (whole seconds). Coarser as it grows, so a long outage repaints the
+	 * header once a minute instead of every second. */
+	function ageText(ms) {
+		const s = Math.floor(ms / 1000);
+		if (s < 60) return `${s} s`;
+		const m = Math.floor(s / 60);
+		return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+	}
+
 	/** The data state in one word and a tone; never "Live" unless it is. */
 	function dataState() {
 		const p = state.preview;
@@ -435,10 +561,25 @@ self.hwShell = (() => {
 			return waited && !state.heardFromPlugin ? { text: "The plugin is not responding", tone: "danger" } : { text: "Connecting to the plugin", tone: "muted" };
 		}
 		if (p.state === "unavailable") return { text: "No HWiNFO data", tone: "danger" };
-		if (!configured) return { text: "No reading selected", tone: "muted" };
+		// The heading already says no reading is picked; the state line says
+		// whether there is HWiNFO data to pick from.
+		if (!configured) {
+			if (p.holding === true) return { text: "Reopening HWiNFO's source", tone: "warn" };
+			if (p.state === "stale") return { text: p.source === "gadget" ? "HWiNFO data age unknown" : "HWiNFO data not updating", tone: "warn" };
+			return { text: `HWiNFO ready · ${p.source === "gadget" ? "Gadget registry" : "Shared Memory"}`, tone: "muted" };
+		}
 		if (p.missing === true) return { text: "Saved reading not found", tone: "warn" };
-		if (p.state === "stale") return { text: staleFace(p), tone: "warn" };
+		// The poller is riding out a source reopen on the last values: the
+		// state still reads as before, but nothing new is being read.
+		if (p.holding === true) return { text: `Reopening source · ${kind === "dial" ? "dial" : "key"} unchanged`, tone: "warn" };
+		if (p.state === "stale") return { text: typeof p.staleForMs === "number" ? `${staleFace(p)} for ${ageText(p.staleForMs)}` : staleFace(p), tone: "warn" };
 		return { text: p.source === "gadget" ? "Live · Gadget registry" : "Live · Shared Memory", tone: "ok" };
+	}
+
+	/** A data source forced to one provider, in the Connection select's words. */
+	function forcedSource() {
+		const src = state.globals.source;
+		return src === "gadget" ? "Gadget registry only" : src === "shared-memory" ? "Shared Memory only" : null;
 	}
 
 	/** The words a face SVG draws, in document order. Parsed as inert XML
@@ -465,12 +606,21 @@ self.hwShell = (() => {
 	announcer.setAttribute("aria-live", "polite");
 	document.body.appendChild(announcer);
 	const lastSaid = new Map();
-	function announce(channel, text) {
+	/** `repeat`: say it even when it equals the channel's last words (a
+	 * second identical move is a new event); the region text alternates a
+	 * trailing no-break space so the change is still a change. `quiet`:
+	 * only record the words (a redraw nobody asked for), so the next change
+	 * a person makes is measured against what is on screen, and said. */
+	function announce(channel, text, { repeat = false, quiet = false } = {}) {
 		const had = lastSaid.has(channel);
 		const before = lastSaid.get(channel);
 		lastSaid.set(channel, text);
-		if (had && before !== text) announcer.textContent = text;
+		if (!had || quiet) return;
+		if (before !== text) announcer.textContent = text;
+		else if (repeat) announcer.textContent = announcer.textContent === text ? `${text}\u00a0` : text;
 	}
+	announce("validate", ""); // primed: a field's first typo is said
+	announce("check", ""); // primed: a Check again that fixes the problem is said
 
 	// The pinned header's real height, for scroll padding and the sticky
 	// dock; a header taller than a third of the panel is not pinned.
@@ -494,7 +644,13 @@ self.hwShell = (() => {
 		const configured = typeof s.readingKey === "string" && s.readingKey !== "";
 		const found = configured ? labelOf(s.readingKey) : null;
 		const reading = p?.reading ?? (found === null ? null : { label: found.label, source: found.source });
-		const custom = typeof s.label === "string" && s.label.trim() !== "" ? s.label.trim() : null;
+		// The dial's title precedence: its own label, then the name the
+		// rotation gives this reading, then HWiNFO's label. The header leads
+		// with what the dial shows and keeps HWiNFO's name on the source line
+		// (round 3, R43).
+		const label = typeof s.label === "string" && s.label.trim() !== "" ? s.label.trim() : null;
+		const named = kind === "dial" && configured && isDoc(s.rotationNames) && typeof s.rotationNames[s.readingKey] === "string" && s.rotationNames[s.readingKey].trim() !== "" ? s.rotationNames[s.readingKey].trim() : null;
+		const custom = label ?? named;
 		setText(document.getElementById("head-reading"), !configured ? "No reading selected" : reading !== null ? (custom ?? reading.label) : (custom ?? "Saved reading"));
 		setText(
 			document.getElementById("head-source"),
@@ -538,8 +694,23 @@ self.hwShell = (() => {
 			lines = ["The HWiNFO Sensors plugin is not answering this panel. Settings you change here are still saved; restarting the Stream Deck app restarts the plugin."];
 		} else if (p !== null && p.state === "unavailable") {
 			tone = "danger";
-			lines = [p.hint || "HWiNFO data is unavailable.", configured ? "Your reading and every setting stay saved. Display settings can still be changed; they apply when data returns." : "Readings appear here once HWiNFO publishes data."];
-			actions = [["retry", "Retry now"], ["setup", "HWiNFO setup steps"]];
+			lines = [p.hint || "HWiNFO data is unavailable."];
+			// A source forced to one provider never tries the other, which
+			// the generic hint cannot know: say so and point at the setting.
+			const forced = forcedSource();
+			if (forced !== null) {
+				lines.push(
+					state.globals.source === "gadget"
+						? "Data source is set to Gadget registry only, so Shared Memory is never read, even when enabled. Auto tries Shared Memory first, then Gadget."
+						: "Data source is set to Shared Memory only, so the Gadget registry is never read. Auto falls back to Gadget."
+				);
+			}
+			lines.push(configured ? "Your reading and every setting stay saved. Display settings can still be changed; they apply when data returns." : "Readings appear under Reading once HWiNFO publishes data.");
+			actions = [["retry", "Check again"], ["setup", "HWiNFO setup steps"]];
+			if (forced !== null) actions.push(["source", "Data source setting"]);
+		} else if (p !== null && configured && p.missing !== true && p.holding === true) {
+			tone = "warn";
+			lines = [`The plugin is reopening HWiNFO's data source (a sensor layout change, an HWiNFO restart or a busy source). The ${kind === "dial" ? "dial" : "key"} stays as it was for up to 15 s after the last new data, then shows live values or the problem. Your reading and settings are unchanged.`];
 		} else if (p !== null && ((configured && p.missing === true) || p.state === "stale")) {
 			// A missing reading and a stale source are separate facts, and a
 			// stale snapshot can carry both: each gets its own lines.
@@ -547,10 +718,9 @@ self.hwShell = (() => {
 			const missing = configured && p.missing === true;
 			if (missing) {
 				lines.push(
-					`The saved reading is not in HWiNFO's current sensor list${tree !== null && Array.isArray(tree.groups) && tree.groups.length === 0 ? " (HWiNFO publishes no readings right now)" : ""}. It stays saved with its label and colors, and shows again if HWiNFO publishes it (for example after a sensor wakes or HWiNFO restarts).`,
-					"To use a different reading instead, pick one above."
+					`The saved reading is not in HWiNFO's current sensor list${tree !== null && Array.isArray(tree.groups) && tree.groups.length === 0 ? " (HWiNFO publishes no readings right now)" : ""}. It stays saved with its label and colors, and shows again if HWiNFO publishes it (for example after a sensor wakes or HWiNFO restarts).`
 				);
-				actions.push(["retry", "Reload sensor list"]);
+				actions.push(["retry", "Reload sensor list"], ["pick", "Pick another reading"]);
 			}
 			if (p.state === "stale") {
 				// The words follow the plugin's evidence-based status. Gadget's
@@ -564,18 +734,26 @@ self.hwShell = (() => {
 						: "No new Shared Memory measurements are arriving. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads."
 				);
 				if (!missing) lines.push(`The ${kind === "dial" ? "dial" : "key"} shows "${staleFace(p)}" until new data arrives. Your reading and settings are unchanged.`);
-				if (!missing) actions.push(["retry", "Retry now"]);
+				if (!missing) actions.push(["retry", "Check again"]);
 			}
 		} else if (tree !== null && tree.state === "ok" && Array.isArray(tree.groups) && tree.groups.length === 0) {
 			tone = "warn";
 			lines = ["HWiNFO is running but publishes no readings."];
 			actions = [["setup", "HWiNFO setup steps"]];
 		} else if (p !== null && p.state === "ok" && p.source === "gadget" && p.hint) {
+			// One line on every healthy Gadget panel; the plugin's whole
+			// account sits under Advanced > Connection (#source-now). A
+			// withheld-reading note asks the person to act, so when the
+			// plugin sends one the whole hint stays here (round 3, R11).
 			tone = "info";
-			lines = [p.hint];
+			lines = [/withheld/.test(p.hint) ? p.hint : "Gadget registry: current values only, no min, max or average."];
 		}
+		renderSourceNow(p);
 		const signature = JSON.stringify([tone, lines, actions]);
-		if (box.dataset.signature === signature) return;
+		if (box.dataset.signature === signature) {
+			answerCheck(box, tone);
+			return;
+		}
 		box.dataset.signature = signature;
 		box.dataset.tone = tone;
 		// The region (role=status, polite) stays in the page; it changes only
@@ -601,18 +779,70 @@ self.hwShell = (() => {
 			}
 			frag.appendChild(row);
 		}
+		if (actions.some(([action]) => action === "retry")) {
+			const ack = document.createElement("p");
+			ack.className = "hw-status-ack";
+			frag.appendChild(ack);
+		}
+		const hadFocus = box.contains(document.activeElement);
 		box.replaceChildren(frag);
 		if (focusedAction !== undefined) box.querySelector(`[data-status-action="${focusedAction}"]`)?.focus({ preventScroll: true });
+		// The press that fixed the problem is answered too: the region
+		// empties, so the panel says so once and keeps focus on a control
+		// that stays (round 3, re-review AY06).
+		if (tone === "" && (checkAskedAt !== 0 || hadFocus)) {
+			checkAskedAt = 0;
+			const picked = typeof state.settings?.readingKey === "string" && state.settings.readingKey !== "";
+			announce("check", picked ? "HWiNFO answered: the reading is live again." : "HWiNFO is answering again.", { repeat: true });
+			if (hadFocus && !box.contains(document.activeElement)) document.querySelector("#sec-reading > summary, details.hw-sec > summary")?.focus({ preventScroll: true });
+		}
+		answerCheck(box, tone);
+	}
+
+	// Check again and Reload sensor list ask the plugin for a fresh answer.
+	// When the answer is the same problem, one line in the status region
+	// says it came back and when, so a press is never met with silence;
+	// only that line's text changes, so only it is read out (round 3, R20).
+	let checkAskedAt = 0;
+	let checkAskedFor = ""; // the status the person saw when they pressed
+	function answerCheck(box, tone) {
+		if (checkAskedAt === 0 || state.treeAt < checkAskedAt) return;
+		checkAskedAt = 0;
+		const ack = box.querySelector(".hw-status-ack");
+		// A different answer speaks for itself (the block was rebuilt).
+		if (ack === null || tone === "" || box.dataset.signature !== checkAskedFor) return;
+		const ms = hwModel.pollIntervalOf(state.globals.pollIntervalMs);
+		const every = ms >= 1000 ? `${ms / 1000} s` : `${ms} ms`;
+		const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+		ack.textContent = `Checked again at ${at}: no change yet. The plugin also reads HWiNFO every ${every} on its own.`;
+	}
+
+	// Advanced > Connection carries the plugin's whole account of a
+	// healthy Gadget source, the status line's "More".
+	function renderSourceNow(p) {
+		const el = document.getElementById("source-now");
+		if (el === null) return;
+		const text = p !== null && p.state === "ok" && p.source === "gadget" && p.hint ? p.hint : "";
+		if (el.textContent !== text) el.textContent = text;
+		el.hidden = text === "";
 	}
 	document.addEventListener("click", (ev) => {
 		const button = ev.target instanceof Element ? ev.target.closest("[data-status-action]") : null;
 		if (button === null) return;
 		if (button.dataset.statusAction === "retry") {
+			checkAskedAt = Date.now();
+			checkAskedFor = document.getElementById("reading-status")?.dataset.signature ?? "";
+			// The previous answer stays until the new one replaces it in
+			// place, so the block does not bounce on every press.
 			emit("retry");
 			client.send("sendToPlugin", { event: "getSensorTree" });
 			client.send("sendToPlugin", { event: "getPreview" });
 		} else if (button.dataset.statusAction === "setup") {
 			reveal("setup-help");
+		} else if (button.dataset.statusAction === "source") {
+			reveal("shared-source");
+		} else if (button.dataset.statusAction === "pick") {
+			reveal("picker-search");
 		}
 	});
 
@@ -641,6 +871,7 @@ self.hwShell = (() => {
 		on,
 		emit,
 		reveal,
+		markPanelScroll,
 		labelOf: (key) => labelOf(key)?.label ?? null,
 		summary: (section, fn) => {
 			summaries.set(section, fn);
@@ -648,6 +879,10 @@ self.hwShell = (() => {
 		},
 		scheduleRender,
 		resyncBound,
+		// Text the panel commits itself (rotation and group names, detail
+		// cell labels) joins the same leave flush as the bound fields.
+		addLeaveFlush: (flush) => pendingFlushes.add(flush),
+		dropLeaveFlush: (flush) => pendingFlushes.delete(flush),
 		announce,
 		model: hwModel
 	};

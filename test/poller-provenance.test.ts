@@ -49,6 +49,7 @@ type Subject = {
 	subscribeSeries(key: string): void;
 	getSeries(key: string): readonly number[] | undefined;
 	getStatus(): PollerStatus;
+	isHolding(): boolean;
 	diagnostics(): { state: string; source?: string; reason?: string; sampleAgeMs: number | null };
 };
 const isolated = (): Subject => new (poller.constructor as unknown as { new (): Subject })();
@@ -642,9 +643,30 @@ describe("the transient hold is bounded by the held observation, never by proces
 		const held = subject.getStatus();
 		assert.equal(held.state, "stale", "the value stays on the key through a one-tick collision");
 		if (held.state === "stale") assert.equal(held.snapshot, cold);
+		assert.equal(subject.isHolding(), true, "the settings panel is told the values are held, not read");
 		now += STALE + 1_000;
 		subject.tick();
 		assert.equal(subject.getStatus().state, "unavailable", "a failure that outlives the window still surfaces");
+		assert.equal(subject.isHolding(), false, "an unavailable source is not a hold");
+	});
+
+	it("the hold ends the moment a read lands again", () => {
+		const subject = isolated();
+		now = 200_000;
+		const cold = snap("g:GPU:Temperature", 50, 0, { freshnessRevision: 0 });
+		let read: () => SensorSnapshot | null = () => cold;
+		subject.openProvider = () => provider("gadget", () => read());
+		subject.setSourceMode("gadget");
+		subject.tick();
+		assert.equal(subject.isHolding(), false);
+		read = () => { throw new HwinfoError("busy", "synthetic scan collision"); };
+		now += 1_000;
+		subject.tick();
+		assert.equal(subject.isHolding(), true);
+		read = () => cold;
+		now += 1_000;
+		subject.tick();
+		assert.equal(subject.isHolding(), false, "a landed read is no longer a hold");
 	});
 });
 

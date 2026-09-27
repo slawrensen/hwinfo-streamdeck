@@ -19,8 +19,12 @@ type Model = {
 	alertsSummary(kind: string, settings: Settings, preview: unknown): string;
 	keyInteractionSummary(settings: Settings, detailsSupported?: boolean | null): string;
 	dialInteractionSummary(settings: Settings, preview: unknown): string;
+	groupsActive(settings: Settings): boolean;
+	gestureWords(command: string, settings: Settings): string;
 	controlSummary(settings: Settings): { command: string; target: string };
 	advancedSummary(globals: Settings): string;
+	sharedDefaultsSummary(globals: Settings, resolvedTheme?: string): string;
+	connectionSummary(globals: Settings): string;
 	splitKeyList(raw: unknown, cap?: number): { known: string[]; kept: unknown[]; keptAt: number[] };
 	mergeKept(known: unknown[], kept: unknown[], keptAt: number[]): unknown[];
 	patchEntry(raw: unknown, base: unknown, current: Record<string, unknown>, fields: string[]): Record<string, unknown>;
@@ -77,10 +81,20 @@ describe("reading summary", () => {
 
 describe("display summary", () => {
 	it("marks inherited choices as shared and own choices without the mark", () => {
+		// The theme is not summarized here: it sits in the always-open band
+		// above the sections (palette study, review/pi-density).
 		const shared = model.displaySummary("key", {}, {}, { effective: effective({ text: { mode: "dim", applied: "dim", own: false, color: null, dimSecondary: false } }) });
-		assert.equal(shared, "Current value · auto decimals · Void (shared) · dimmed text (shared)");
+		assert.equal(shared, "Current value · auto decimals · dimmed text (shared)");
 		const own = model.displaySummary("key", { statMode: "max", decimals: "1" }, {}, { effective: effective({ theme: { id: "ember", drawn: "ember", own: true, unknown: false }, text: { mode: "custom", applied: "custom", own: true, color: "#8A2B2B", dimSecondary: true } }) });
-		assert.equal(own, "Maximum · 1 decimals · Ember · custom text #8A2B2B");
+		assert.equal(own, "Maximum · 1 decimals · custom text #8A2B2B");
+	});
+	it("names °F and the graph a one-reading key draws, the panel's rule for the stored mode", () => {
+		assert.equal(model.displaySummary("key", { fahrenheit: true, displayMode: "bar" }, {}, null), "Current value · auto decimals · shared text · °F · bar");
+		// The legacy sparkline flag counts when no valid mode is stored.
+		assert.equal(model.displaySummary("key", { sparkline: true, displayMode: "junk" }, {}, null), "Current value · auto decimals · shared text · sparkline");
+		// Several readings draw no graph strip, whatever is stored.
+		assert.equal(model.displaySummary("key", { keyLayout: "dual", displayMode: "ring" }, {}, null), "Current value · auto decimals · shared text");
+		assert.equal(model.displaySummary("key", { displayMode: "ring" }, {}, { effective: { layout: { chosen: "quad", drawn: "quad" } } }), "Current value · auto decimals · shared text");
 	});
 	it("reports what is drawn when Custom has no valid color", () => {
 		const text = model.displaySummary("key", { textMode: "custom", textColor: "red" }, {}, { effective: effective({ text: { mode: "custom", applied: "theme", own: true, color: null, dimSecondary: false } }) });
@@ -90,7 +104,7 @@ describe("display summary", () => {
 		assert.match(model.displaySummary("dial", { dialView: "tworow" }, {}, null), /^Overview, two rows · auto decimals/);
 	});
 	it("says only what is stored when the plugin has not answered", () => {
-		assert.equal(model.displaySummary("key", { theme: "paper" }, {}, null), "Current value · auto decimals · Paper · shared text");
+		assert.equal(model.displaySummary("key", { theme: "paper" }, {}, null), "Current value · auto decimals · shared text");
 	});
 });
 
@@ -129,17 +143,41 @@ describe("interaction summaries", () => {
 	it("does not promise details the runtime will not open", () => {
 		assert.equal(model.keyInteractionSummary({ pressBehavior: "open-details" }, false), "Press would open details, but this deck has none");
 		assert.equal(model.keyInteractionSummary({ pressBehavior: "open-details", detailMode: "filter", detailFilter: "  " }, true), "Press opens nothing until the filter is set");
-		assert.equal(model.keyInteractionSummary({ pressBehavior: "open-details" }, null), "Press opens details: this sensor's source");
+		assert.equal(model.keyInteractionSummary({ pressBehavior: "open-details" }, null), "Press opens details: this reading's sensor"); // round 3, R32: "sensor" is HWiNFO's group, "source" the data provider
 	});
 	it("reads the dial's resolved scheme and names a dead tap", () => {
 		const controls = { preset: "custom", rotate: "step", pressedRotate: "step", shortPress: "pin", longPress: "resetStats", tap: "cycleStat", touchHold: "backToCurrent", touchZones: "two", switchesGroups: false };
-		assert.equal(model.dialInteractionSummary({ autoCycleMs: "30000" }, { effective: { controls } }), "Custom: turn cycles readings · push pins the reading · touch sides switch readings · auto cycle 30 s");
+		assert.equal(model.dialInteractionSummary({ autoCycleMs: "30000" }, { effective: { controls } }), "Custom: turn cycles readings · push pins or unpins the reading · touch sides switch readings · auto cycle 30 s");
 		assert.equal(model.dialInteractionSummary({ rotationDisabled: true }, null), "Legacy controls · turns ignored");
 	});
 	it("names three touch zones and a pause with nothing to pause", () => {
 		const controls = { preset: "elite", rotate: "step", pressedRotate: "stepGroup", shortPress: "pauseResume", longPress: "resetStats", tap: "cycleStat", touchHold: "backToCurrent", touchZones: "three", switchesGroups: true };
-		assert.equal(model.dialInteractionSummary({}, { effective: { controls } }), "Elite: turn cycles readings · push pauses the auto cycle (auto cycle is off) · touch sides switch readings, center tap cycles the stat");
-		assert.equal(model.dialInteractionSummary({ autoCycleMs: "90000" }, { effective: { controls } }), "Elite: turn cycles readings · push pauses the auto cycle · touch sides switch readings, center tap cycles the stat · auto cycle 90 s");
+		// Round 3, R30: Elite's pressed turn is named (it differs from a plain
+		// turn), resolved to what it does on this dial: no groups in effect,
+		// so it switches sensor.
+		assert.equal(model.dialInteractionSummary({}, { effective: { controls } }), "Elite: turn cycles readings · pressed turn switches sensor · push pauses or resumes the auto cycle (auto cycle is off) · touch sides switch readings, center tap cycles the stat");
+		assert.equal(model.dialInteractionSummary({ autoCycleMs: "90000" }, { effective: { controls } }), "Elite: turn cycles readings · pressed turn switches sensor · push pauses or resumes the auto cycle · touch sides switch readings, center tap cycles the stat · auto cycle 90 s");
+	});
+	it("names a reset that reaches past this reading on whichever push does it (round 3, re-review PY03)", () => {
+		const legacy = { preset: "legacy", rotate: "step", pressedRotate: "step", shortPress: "resetStats", longPress: "resetStats", tap: "cycleStat", touchHold: "none", touchZones: "off", switchesGroups: false };
+		assert.equal(model.dialInteractionSummary({ resetScope: "all" }, { effective: { controls: legacy } }), "Legacy: turn cycles readings · push resets session stats (every dial, everywhere) · tap cycles the stat");
+		assert.equal(model.dialInteractionSummary({}, { effective: { controls: legacy } }), "Legacy: turn cycles readings · push resets session stats · tap cycles the stat");
+		const elite = { preset: "elite", rotate: "step", pressedRotate: "stepGroup", shortPress: "pauseResume", longPress: "resetStats", tap: "cycleStat", touchHold: "backToCurrent", touchZones: "off", switchesGroups: true };
+		assert.equal(model.dialInteractionSummary({ resetScope: "set" }, { effective: { controls: elite } }), "Elite: turn cycles readings · pressed turn switches sensor · push pauses or resumes the auto cycle · long push resets session stats (whole rotation set) · tap cycles the stat");
+		assert.doesNotMatch(model.dialInteractionSummary({}, { effective: { controls: elite } }), /long push/);
+	});
+	it("resolves Switch sensor or group by the groups in effect, and leaves out a pressed turn that matches the turn", () => {
+		const controls = { preset: "elite", rotate: "step", pressedRotate: "stepGroup", shortPress: "pin", longPress: "resetStats", tap: "cycleStat", touchHold: "backToCurrent", touchZones: "off", switchesGroups: true };
+		const two = [{ name: "A", keys: ["a"] }, { name: "B", keys: ["b"] }];
+		assert.match(model.dialInteractionSummary({ rotationGroups: two }, { effective: { controls } }), / · pressed turn switches group · /);
+		// One group holding readings (the other empty, or only repeating a
+		// claimed key) is not in effect: the runtime switches sensor.
+		assert.match(model.dialInteractionSummary({ rotationGroups: [{ name: "A", keys: ["a"] }, { name: "B", keys: [] }] }, { effective: { controls } }), / · pressed turn switches sensor · /);
+		assert.match(model.dialInteractionSummary({ rotationGroups: [{ name: "A", keys: ["a"] }, { name: "B", keys: ["a"] }] }, { effective: { controls } }), / · pressed turn switches sensor · /);
+		assert.doesNotMatch(model.dialInteractionSummary({}, { effective: { controls: { ...controls, pressedRotate: "step" } } }), /pressed turn/);
+		assert.doesNotMatch(model.dialInteractionSummary({ rotationDisabled: true }, { effective: { controls } }), /pressed turn/);
+		assert.equal(model.groupsActive({ rotationGroups: two }), true);
+		assert.equal(model.groupsActive({ rotationGroups: "junk" }), false);
 	});
 	it("follows the Control action's rules for command and target", () => {
 		assert.deepEqual(model.controlSummary({}), { command: "Next reading", target: "every dial" });
@@ -148,14 +186,32 @@ describe("interaction summaries", () => {
 		assert.match(model.controlSummary({ command: "warp" }).command, /^Unknown command/);
 	});
 	it("summarizes the shared connection choices", () => {
-		assert.equal(model.advancedSummary({}), "Auto source · poll 1 s · decimal data units");
-		assert.equal(model.advancedSummary({ source: "gadget", pollIntervalMs: "250", dataUnits: "binary" }), "Gadget only · poll 250 ms · binary data units");
+		// "read every", the words of the control it summarizes (Read every).
+		assert.equal(model.advancedSummary({}), "Auto source · read every 1 s · decimal data units");
+		assert.equal(model.advancedSummary({ source: "gadget", pollIntervalMs: "250", dataUnits: "binary" }), "Gadget only · read every 250 ms · binary data units");
 		// The interval reads as the runtime parses it (parsePollInterval), not
 		// only as the menu offers it.
-		for (const [raw, shown] of [["2000", "poll 2 s"], [5000, "poll 5 s"], [1500, "poll 1.5 s"], ["100", "poll 250 ms"], [90_000, "poll 60 s"], ["", "poll 250 ms"], ["fast", "poll 1 s"], [null, "poll 1 s"]] as const) {
+		for (const [raw, shown] of [["2000", "read every 2 s"], [5000, "read every 5 s"], [1500, "read every 1.5 s"], ["100", "read every 250 ms"], [90_000, "read every 60 s"], ["", "read every 250 ms"], ["fast", "read every 1 s"], [null, "read every 1 s"]] as const) {
 			assert.equal(model.advancedSummary({ pollIntervalMs: raw } as Settings), `Auto source · ${shown} · decimal data units`, String(raw));
-			assert.equal(`poll ${((ms) => (ms >= 1000 ? `${ms / 1000} s` : `${ms} ms`))(parsePollInterval(raw))}`, shown, `runtime agrees for ${String(raw)}`);
+			assert.equal(`read every ${((ms) => (ms >= 1000 ? `${ms / 1000} s` : `${ms} ms`))(parsePollInterval(raw))}`, shown, `runtime agrees for ${String(raw)}`);
 		}
+	});
+	it("summarizes the folded Advanced groups with the runtime's defaults and parse", () => {
+		// Shared defaults: absent fields read as the runtime's defaults
+		// (Void, theme text, accents by sensor type, decimal units).
+		assert.equal(model.sharedDefaultsSummary({}), "Void · theme text · accents by type · decimal data units");
+		assert.equal(model.sharedDefaultsSummary({ theme: "paper", textMode: "dim", typeAccents: "off", dataUnits: "binary" }), "Paper · dimmed text · theme accent · binary data units");
+		// A stored id this version does not know draws the spec default.
+		assert.equal(model.sharedDefaultsSummary({ theme: "neon" }).split(" · ")[0], "Void");
+		// With no shared theme stored, the plugin's resolved answer (legacy
+		// migration included) is what Default draws, so the summary names it.
+		assert.equal(model.sharedDefaultsSummary({}, "ember").split(" · ")[0], "Ember");
+		assert.equal(model.sharedDefaultsSummary({ theme: "paper" }, "paper").split(" · ")[0], "Paper");
+		assert.equal(model.sharedDefaultsSummary({}, "not-a-theme").split(" · ")[0], "Void");
+		// Connection: the interval as parsePollInterval reads it.
+		assert.equal(model.connectionSummary({}), "Auto source · read every 1 s");
+		assert.equal(model.connectionSummary({ source: "shared-memory", pollIntervalMs: "250" }), "Shared Memory only · read every 250 ms");
+		assert.equal(model.connectionSummary({ source: "gadget", pollIntervalMs: 90_000 }), `Gadget only · read every ${parsePollInterval(90_000) / 1000} s`);
 	});
 });
 

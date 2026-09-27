@@ -28,8 +28,8 @@ self.hwModel = (() => {
 		stepGroup: "switches sensor or group",
 		cycleStat: "cycles the stat",
 		backToCurrent: "returns to the current value",
-		pauseResume: "pauses the auto cycle",
-		pin: "pins the reading",
+		pauseResume: "pauses or resumes the auto cycle",
+		pin: "pins or unpins the reading",
 		resetStats: "resets session stats"
 	};
 	const nonEmpty = (v) => typeof v === "string" && v !== "";
@@ -112,7 +112,9 @@ self.hwModel = (() => {
 		return `${LAYOUT_NAMES[chosen]} · ${picked} picked`;
 	}
 
-	/** Display: stat, decimals, theme and text, with where each comes from. */
+	/** Display: text color, stat or view, decimals, °F and the key's graph,
+	 * with where each comes from. The theme is not here: it sits in the
+	 * band above the sections, whose folded row shows the checked chip. */
 	function displaySummary(kind, settings, globals, preview) {
 		const parts = [];
 		if (kind === "key") parts.push(STAT[isStat(settings.statMode) ? settings.statMode : "current"]);
@@ -120,13 +122,6 @@ self.hwModel = (() => {
 		const d = settings.decimals;
 		parts.push(d === "0" || d === "1" || d === "2" || d === "3" ? `${d} decimals` : "auto decimals");
 		const eff = preview?.effective;
-		if (eff?.theme !== undefined) {
-			parts.push(`${themeName(eff.theme.drawn)}${eff.theme.own ? "" : " (shared)"}`);
-		} else if (nonEmpty(settings.theme)) {
-			parts.push(themeName(settings.theme));
-		} else {
-			parts.push("shared theme");
-		}
 		if (eff?.text !== undefined) {
 			const t = eff.text;
 			const label = t.applied === "custom" ? `custom text ${t.color}` : t.applied === "dim" ? "dimmed text" : "theme text";
@@ -134,6 +129,13 @@ self.hwModel = (() => {
 		} else {
 			const m = settings.textMode;
 			parts.push(m === "theme" || m === "dim" || m === "custom" ? TEXT_NAMES[m].toLowerCase() : "shared text");
+		}
+		if (settings.fahrenheit === true) parts.push("°F");
+		// The key's graph strip draws on the one-reading layout only; the
+		// stored mode wins, else the legacy sparkline flag (the panel's rule).
+		if (kind === "key" && (preview?.effective?.layout?.drawn ?? storedKeyLayout(settings)) === "single") {
+			const mode = ["none", "sparkline", "bar", "ring"].includes(settings.displayMode) ? settings.displayMode : settings.sparkline === true ? "sparkline" : "none";
+			if (mode !== "none") parts.push(mode === "bar" ? "bar" : mode === "ring" ? "ring" : "sparkline");
 		}
 		return parts.join(" · ");
 	}
@@ -185,8 +187,37 @@ self.hwModel = (() => {
 				? `custom list of ${Array.isArray(settings.detailKeys) ? new Set(settings.detailKeys.filter(nonEmpty)).size : 0}`
 				: mode === "filter"
 					? `filter ${typeof settings.detailFilter === "string" && settings.detailFilter.trim() !== "" ? `"${settings.detailFilter.trim().slice(0, 24)}"` : "(empty)"}`
-					: "this sensor's source";
+					: "this reading's sensor";
 		return press === "open-details" ? `Press opens details: ${what}` : `Tap cycles; hold opens details: ${what}`;
+	}
+
+	/** Whether rotation groups are in effect: two or more groups that hold
+	 * a reading key, the rule the runtime's rotationGroupsOf applies (a key
+	 * claimed by an earlier group does not count again). */
+	function groupsActive(settings) {
+		const raw = settings.rotationGroups;
+		if (!Array.isArray(raw)) return false;
+		const claimed = new Set();
+		let holding = 0;
+		for (const entry of raw) {
+			if (typeof entry !== "object" || entry === null || Array.isArray(entry) || !Array.isArray(entry.keys)) continue;
+			let any = false;
+			for (const key of entry.keys) {
+				if (typeof key === "string" && key.trim() !== "" && !claimed.has(key)) {
+					claimed.add(key);
+					any = true;
+				}
+			}
+			if (any) holding++;
+		}
+		return holding >= 2;
+	}
+
+	/** A gesture's command in words, with "Switch sensor or group" resolved
+	 * to what it does on this dial now. */
+	function gestureWords(command, settings) {
+		if (command === "stepGroup") return groupsActive(settings) ? "switches group" : "switches sensor";
+		return GESTURE[command] ?? "does nothing";
 	}
 
 	/** Dial gestures from the plugin's resolved scheme; stored preset otherwise. */
@@ -201,10 +232,21 @@ self.hwModel = (() => {
 			return [`${p.charAt(0).toUpperCase()}${p.slice(1)} controls`, bump, cycle].filter(Boolean).join(" · ");
 		}
 		const name = `${c.preset.charAt(0).toUpperCase()}${c.preset.slice(1)}`;
-		const turn = settings.rotationDisabled === true ? "turns ignored" : `turn ${GESTURE[c.rotate]}`;
-		const tap = c.touchZones === "two" ? "touch sides switch readings" : c.touchZones === "three" ? `touch sides switch readings, center tap ${GESTURE[c.tap]}` : `tap ${GESTURE[c.tap]}`;
-		const push = `push ${GESTURE[c.shortPress]}${c.shortPress === "pauseResume" && cycle === "" ? " (auto cycle is off)" : ""}`;
-		return [`${name}: ${turn}`, push, tap, cycle].filter(Boolean).join(" · ");
+		const say = (command) => gestureWords(command, settings);
+		const turn = settings.rotationDisabled === true ? "turns ignored" : `turn ${say(c.rotate)}`;
+		// The pressed turn is Elite's group switch: named when it does
+		// something different from a plain turn (round 3, R30).
+		const pressed = settings.rotationDisabled !== true && c.pressedRotate !== c.rotate && c.pressedRotate !== "none" ? `pressed turn ${say(c.pressedRotate)}` : "";
+		const tap = c.touchZones === "two" ? "touch sides switch readings" : c.touchZones === "three" ? `touch sides switch readings, center tap ${say(c.tap)}` : `tap ${say(c.tap)}`;
+		// A reset that reaches past this reading is named with its reach on
+		// whichever push does it, even Elite's long push, which the line
+		// otherwise leaves out: a destructive reach never hides in a fold
+		// (round 3, re-review PY03). The pause clause's note gives way to it.
+		const reach = settings.resetScope === "all" ? " (every dial, everywhere)" : settings.resetScope === "set" ? " (whole rotation set)" : "";
+		const pushSays = (command) => `${say(command)}${command === "resetStats" ? reach : ""}`;
+		const push = `push ${pushSays(c.shortPress)}${c.shortPress === "pauseResume" && cycle === "" && reach === "" ? " (auto cycle is off)" : ""}`;
+		const longPush = reach !== "" && c.preset !== "legacy" && c.longPress === "resetStats" && c.shortPress !== "resetStats" ? `long push ${pushSays(c.longPress)}` : "";
+		return [`${name}: ${turn}`, pressed, push, longPush, tap, cycle].filter(Boolean).join(" · ");
 	}
 
 	function controlSummary(settings) {
@@ -244,11 +286,31 @@ self.hwModel = (() => {
 		return Number.isFinite(n) ? Math.min(60_000, Math.max(250, Math.round(n))) : 1000;
 	}
 
+	/** Shared defaults, folded: what a key or dial set to Default draws.
+	 * `resolvedTheme` is the plugin's answer (effectiveDeckTheme, which
+	 * includes the legacy migration when no shared theme is stored); without
+	 * it, a stored id this version does not know draws the spec default. */
+	function sharedDefaultsSummary(globals, resolvedTheme) {
+		const id = typeof resolvedTheme === "string" && Object.hasOwn(THEME_NAMES, resolvedTheme) ? resolvedTheme : Object.hasOwn(THEME_NAMES, globals.theme) ? globals.theme : "void";
+		const theme = themeName(id);
+		const text = globals.textMode === "dim" ? "dimmed text" : globals.textMode === "custom" ? "custom text" : "theme text";
+		const accents = globals.typeAccents === "off" ? "theme accent" : "accents by type";
+		const units = globals.dataUnits === "binary" ? "binary data units" : "decimal data units";
+		return `${theme} · ${text} · ${accents} · ${units}`;
+	}
+
+	/** Connection, folded: the source mode and the read interval. */
+	function connectionSummary(globals) {
+		const src = globals.source === "shared-memory" ? "Shared Memory only" : globals.source === "gadget" ? "Gadget only" : "Auto source";
+		const ms = pollIntervalOf(globals.pollIntervalMs);
+		return `${src} · read every ${ms >= 1000 ? `${ms / 1000} s` : `${ms} ms`}`;
+	}
+
 	/** Advanced: the shared, plugin-wide choices (global settings). */
 	function advancedSummary(globals) {
 		const src = globals.source === "shared-memory" ? "Shared Memory only" : globals.source === "gadget" ? "Gadget only" : "Auto source";
 		const ms = pollIntervalOf(globals.pollIntervalMs);
-		const poll = ms >= 1000 ? `poll ${ms / 1000} s` : `poll ${ms} ms`;
+		const poll = ms >= 1000 ? `read every ${ms / 1000} s` : `read every ${ms} ms`;
 		const units = globals.dataUnits === "binary" ? "binary data units" : "decimal data units";
 		return `${src} · ${poll} · ${units}`;
 	}
@@ -336,8 +398,13 @@ self.hwModel = (() => {
 		alertsSummary,
 		keyInteractionSummary,
 		dialInteractionSummary,
+		groupsActive,
+		gestureWords,
+		pollIntervalOf,
 		controlSummary,
 		advancedSummary,
+		sharedDefaultsSummary,
+		connectionSummary,
 		thresholdText,
 		splitKeyList,
 		mergeKept,

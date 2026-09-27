@@ -125,6 +125,8 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 				PageDown: { code: "PageDown", keyCode: 34 },
 				PageUp: { code: "PageUp", keyCode: 33 },
 				Backspace: { code: "Backspace", keyCode: 8 },
+				Delete: { code: "Delete", keyCode: 46 },
+				F2: { code: "F2", keyCode: 113 },
 				" ": { code: "Space", keyCode: 32, text: " " }
 			};
 			const info = named[key] ?? { code: `Key${key.toUpperCase()}`, keyCode: key.toUpperCase().charCodeAt(0), text: key };
@@ -146,6 +148,13 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 			await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
 			await send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x, y: box.y, button: "left", clickCount: 1 });
 			await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x, y: box.y, button: "left", clickCount: 1 });
+		},
+		/** Moves the real (trusted) pointer to the center of the first
+		 * element matching `selector`, without pressing. */
+		async hover(selector) {
+			const box = await client.evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return null; el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+			if (box === null) throw new Error(`hover: nothing matches ${selector}`);
+			await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
 		},
 		async close() {
 			try {

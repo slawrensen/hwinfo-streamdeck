@@ -16,7 +16,7 @@ import { describe, it } from "node:test";
 
 import { compose } from "../src/actions/sensor-reading";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
-import { buildPreview } from "../src/pi-protocol";
+import { buildPreview, buildThemesPayload } from "../src/pi-protocol";
 import type { PollerStatus } from "../src/poller";
 import { drawnKeyLayout } from "../src/ui/key-layout";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
@@ -69,6 +69,26 @@ describe("data state truthfulness", () => {
 		assert.equal(p.missing, false);
 		// 1.7 words the hint by evidence: how long no new measurement arrived.
 		assert.match(p.hint, /No new Shared Memory measurement evidence for 42s/);
+	});
+	it("a stale Shared Memory source carries its evidence age in whole seconds; nothing else does", () => {
+		// Rounded like the hint's own count, so the two never change on
+		// different ticks (one preview per second of age, not two).
+		const at = (ms: number) => buildPreview({ ...stale, staleForMs: ms }, { readingKey: "cpu:0:0" }, true, { kind: "key" });
+		assert.equal(at(42_900).staleForMs, 43_000);
+		assert.equal(at(42_400).staleForMs, 42_000);
+		for (const ms of [42_400, 42_499, 42_500, 42_900, 43_499]) {
+			assert.match(at(ms).hint, new RegExp(`for ${(at(ms).staleForMs ?? 0) / 1000}s`), `hint and age agree at ${ms} ms`);
+		}
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { kind: "key" }).staleForMs, undefined);
+		assert.equal(buildPreview(down, { readingKey: "cpu:0:0" }, true, { kind: "key" }).staleForMs, undefined);
+		// Gadget has no producer clock: its staleness is "age unknown", never a number.
+		assert.equal(buildPreview({ ...stale, source: "gadget" }, { readingKey: "cpu:0:0" }, true, { kind: "key" }).staleForMs, undefined);
+	});
+	it("a held source says it is held; an unavailable one never carries the flag", () => {
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { kind: "key", holding: true }).holding, true);
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { kind: "key", holding: false }).holding, undefined);
+		assert.equal(buildPreview(ok, { readingKey: "cpu:0:0" }, true, { kind: "key" }).holding, undefined);
+		assert.equal(buildPreview(down, { readingKey: "cpu:0:0" }, true, { kind: "key", holding: true }).holding, undefined);
 	});
 	it("a reading absent from a healthy snapshot is missing", () => {
 		assert.equal(buildPreview(ok, { readingKey: "gone:0:0" }, true, { kind: "key" }).missing, true);
@@ -157,4 +177,16 @@ describe("drawnKeyLayout is compose()'s gate", () => {
 			}
 		});
 	}
+});
+
+describe("themes payload order", () => {
+	// The Stream Deck app sorts object keys when it relays a plugin's message
+	// to the panel (hardware, 2026-09-26), so the chips' order cannot come
+	// from the themes object: the payload carries it as a list.
+	it("names every theme once, in themes.json's order", () => {
+		const payload = buildThemesPayload() as { themes: Record<string, unknown>; themeOrder: string[] };
+		assert.deepEqual(payload.themeOrder, Object.keys(loadThemes().themes));
+		assert.deepEqual([...payload.themeOrder].sort(), Object.keys(payload.themes).sort());
+		assert.deepEqual(payload.themeOrder, ["void", "graphite", "ultraviolet", "midnight", "forest", "ember", "paper"]);
+	});
 });

@@ -5,20 +5,19 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-f01q" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d08" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
 			<figure class="hw-face" id="face" hidden>
 				<img id="face-img" alt="" width="200" height="100" />
-				<figcaption>On the dial now</figcaption>
 			</figure>
 			<div class="hw-head-text">
 				<div class="hw-head-top">
 					<p class="hw-head-kind" id="head-kind">Sensor Dial</p>
 					<div class="hw-folds" id="hw-folds" role="toolbar" aria-label="Sections">
-						<button type="button" data-folds="open" aria-label="Open all sections" title="Open all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 6 8 2.75 12.25 6M3.75 10 8 13.25 12.25 10" /></svg></button>
-						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.75 2.75 8 6 12.25 2.75M3.75 13.25 8 10 12.25 13.25" /></svg></button>
+						<button type="button" data-folds="open" aria-label="Open all sections" title="Open all sections (or Alt-click a section title)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg></button>
+						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 20 5-5 5 5" /><path d="m7 4 5 5 5-5" /></svg></button>
 					</div>
 				</div>
 				<p class="hw-head-reading" id="head-reading">No reading selected</p>
@@ -27,6 +26,32 @@
 			</div>
 		</header>
 
+		<!-- What is wrong with the data or the saved reading, and its repair,
+		     right under the header's state line: above the palette, and in
+		     view even when Reading is folded. Empty (no space) when all is well. -->
+		<div class="hw-status hw-status-top" id="reading-status" role="status" aria-live="polite" aria-atomic="false" data-tone=""></div>
+
+		<!-- The palette, first under the face, folds like every section and
+		     opens on a first visit. Its theme line is the fold row: folded,
+		     the checked theme's chip in its own colors stands in for the
+		     name and the scope stays, so what is drawn and where it comes
+		     from stay on screen (owner, 2026-09-26; design R2 in
+		     review/pi-density/round3/themefold). Change sits outside the
+		     row, so a near miss never folds the band. On a theme picked for this
+		     key or dial, Make shared takes Change's place: it makes that theme
+		     the shared one and sets this key back to Default (owner, 2026-09-26;
+		     five-reviewer round in review/pi-density/round3/sharedtheme). -->
+		<details class="hw-sec hw-look hw-look-fold" id="sec-theme" open>
+			<summary class="hw-look-name"><span class="hw-label" id="theme-label">Theme</span><span class="hw-look-mini" id="theme-mini"></span><span class="hw-look-current" id="theme-current"></span><span class="hw-look-note" id="theme-note"></span></summary>
+			<div class="hw-look-row">
+				<button type="button" class="hw-link hw-look-change" id="theme-change" data-reveal="shared-theme" aria-label="Change the shared theme" hidden>Change</button>
+				<button type="button" class="hw-link hw-look-change" id="theme-share" hidden>Make shared</button>
+				<div class="hw-themes" id="theme-gallery" role="radiogroup" aria-labelledby="theme-label" aria-describedby="theme-desc theme-help"></div>
+				<span class="hw-sr-only" id="theme-desc" hidden></span>
+			</div>
+			<p class="hw-help" id="theme-help"></p>
+		</details>
+
 		<details class="hw-sec" id="sec-reading" open>
 			<summary><span class="hw-sec-title">Reading</span><span class="hw-sec-sum" data-summary="reading"></span></summary>
 			<div class="hw-sec-body">
@@ -34,26 +59,26 @@
 					<label id="picker-label" for="picker-search">On the dial now</label>
 					<div class="hw-picker" data-hw-picker="primary">
 						<input id="picker-search" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="picker-list" aria-describedby="picker-help" placeholder="Search readings" autocomplete="off" spellcheck="false" />
-						<button id="picker-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list">⟳</button>
+						<button id="picker-refresh" type="button" aria-label="Reload the sensor list" title="Reload the sensor list"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg></button>
 						<div class="hw-picker-list" id="picker-list" role="listbox" aria-labelledby="picker-label" hidden></div>
 					</div>
-					<p class="hw-help" id="picker-help">Turning the dial changes this too.<span class="hw-sr-only"> Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything.</span></p>
+					<p class="hw-help" id="picker-help"><span id="picker-moves">Turning the dial changes this too.</span><span class="hw-sr-only"> Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything.</span></p>
 				</div>
-				<div class="hw-status" id="reading-status" role="status" aria-live="polite" data-tone=""></div>
 
-				<fieldset class="hw-group-box">
+				<fieldset class="hw-group-box" id="rotation-box">
 					<legend id="rotation-label">Rotation</legend>
-					<div class="hw-set" id="rotation-set" role="group" aria-labelledby="rotation-label"></div>
-					<div class="hw-field">
+					<div class="hw-field hw-field-first">
 						<label id="pickerr-label" for="pickerr-search">Readings to rotate through</label>
 						<div class="hw-picker">
 							<input id="pickerr-search" type="text" aria-controls="pickerr-list" aria-describedby="pickerr-help" placeholder="Search readings to tick" autocomplete="off" spellcheck="false" />
 							<div class="hw-picker-list hw-inline" id="pickerr-list" role="group" aria-labelledby="pickerr-label" hidden></div>
 						</div>
-						<p class="hw-help" id="pickerr-help">Ticking adds a reading; it never changes what is on the dial now. On each reading, the arrows set their order.<span class="hw-sr-only"> Down Arrow moves into the list, arrows move inside it, Tab leaves it.</span></p>
+						<p class="hw-help" id="pickerr-help">Ticking adds a reading; it never changes what is on the dial now.<span id="pickerr-order-help"> Select one in the list below, then Earlier and Later set their order.</span><span class="hw-sr-only"> Down Arrow moves into the search results, arrows move inside them, Tab leaves them.</span></p>
 					</div>
+					<div class="hw-set" id="rotation-set"></div>
+					<p class="hw-help" id="rotation-outside" hidden></p>
+					<p class="hw-sr-only" id="rotation-keys-help">Arrow keys select a reading; the toolbar after the list moves, renames or removes it. Alt with an arrow moves it, into the next group past a group's edge; Alt+Home and Alt+End move it to either end; F2 renames it.</p>
 					<p class="hw-help" id="rotation-help" hidden></p>
-					<p class="hw-help" id="groups-preset-help" hidden>Rotation groups need a gesture that can switch groups, and this dial's control map has none. Set Controls to Elite, or map a gesture to "Switch sensor or group" in Custom.</p>
 				</fieldset>
 
 				<div class="hw-row2">
@@ -76,12 +101,49 @@
 			<summary><span class="hw-sec-title">Display</span><span class="hw-sec-sum" data-summary="display"></span></summary>
 			<div class="hw-sec-body">
 				<div class="hw-field">
+					<label for="f-text">Text color</label>
+					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
+						<option value="">Default</option>
+						<option value="theme">Theme text</option>
+						<option value="dim">Dimmed</option>
+						<option value="custom">Custom color</option>
+					</select>
+					<p class="hw-help" id="text-help">Numbers and labels. The bar and selection marks use the accent color; in an overview, a row in alert shows its value in the alert color.</p>
+				</div>
+				<div id="text-custom" hidden>
+					<div class="hw-field">
+						<label for="text-color">Custom text color</label>
+						<div class="hw-swatch-row">
+							<input type="color" class="hw-color" id="text-color" />
+							<code id="text-color-code" aria-hidden="true"></code>
+						</div>
+					</div>
+					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
+				</div>
+
+				<div class="hw-field">
 					<label for="f-view">View</label>
 					<select id="f-view" data-setting="dialView" data-default="single">
 						<option value="single">One reading</option>
 						<option value="tworow">Overview, two rows (big values and trend)</option>
 						<option value="overview">Overview, three rows</option>
 					</select>
+				</div>
+				<div class="hw-row3">
+					<div class="hw-field">
+						<label for="f-decimals">Decimals</label>
+						<select id="f-decimals" data-setting="decimals" data-default="auto">
+							<option value="auto">Auto</option>
+							<option value="0">0</option>
+							<option value="1">1</option>
+							<option value="2">2</option>
+							<option value="3">3</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<span class="hw-label" aria-hidden="true">Temperature</span>
+						<label class="hw-check"><input type="checkbox" data-setting="fahrenheit" aria-label="Show temperatures in °F" /><span>°F</span></label>
+					</div>
 				</div>
 				<div id="overview-rows" hidden>
 					<div class="hw-field">
@@ -109,11 +171,10 @@
 							</div>
 						</div>
 					</div>
-					<p class="hw-help">Overviews list what rotation moves through: the rotation set, the active group, or the picked sensor's readings. Three rows mark the reading on the dial with a thumb on the left rail; two rows trade a row for big values and a trend line.</p>
 				</div>
 				<div id="sensor-value-colors" hidden>
-					<label class="hw-check"><input type="checkbox" id="sensor-value-colors-toggle" /><span>Color numbers by sensor type</span></label>
-					<p class="hw-help">Off by default; needs Text color on Theme text or Dimmed, with Accent colors by sensor type. A valid custom text color overrides it, alerts keep priority, and Paper and unknown sensor types keep normal text.</p>
+					<label class="hw-check"><input type="checkbox" id="sensor-value-colors-toggle" aria-describedby="sensor-colors-help" /><span>Color numbers by sensor type</span></label>
+					<p class="hw-help" id="sensor-colors-help">Needs Text color on Theme text or Dimmed and Accent colors by sensor type. A valid custom text color overrides it; alerts keep priority.</p>
 					<div class="hw-field">
 						<label for="reading-color-preset">Reading colors</label>
 						<div class="hw-quad-colors">
@@ -127,48 +188,6 @@
 						</div>
 					</div>
 					<div id="reading-color-list" class="hw-reading-colors" role="group" aria-label="Number color for each reading"></div>
-					<p class="hw-help">A color for each reading, independent of type accents, that follows it through rotation. A custom text color overrides these colors and Dimmed dims them; alerts keep priority and graphs stay unchanged.</p>
-				</div>
-
-				<div class="hw-row2">
-					<div class="hw-field">
-						<label for="f-decimals">Decimals</label>
-						<select id="f-decimals" data-setting="decimals" data-default="auto">
-							<option value="auto">Auto</option>
-							<option value="0">0</option>
-							<option value="1">1</option>
-							<option value="2">2</option>
-							<option value="3">3</option>
-						</select>
-					</div>
-				</div>
-				<label class="hw-check"><input type="checkbox" data-setting="fahrenheit" /><span>Show temperatures in °F</span></label>
-
-				<div class="hw-field">
-					<span class="hw-label" id="theme-label">Theme</span>
-					<div class="hw-themes" id="theme-gallery" role="radiogroup" aria-labelledby="theme-label"></div>
-					<p class="hw-help" id="theme-help">Pick a theme for this dial, or Default to follow the shared theme.</p>
-				</div>
-
-				<div class="hw-field">
-					<label for="f-text">Text color</label>
-					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
-						<option value="">Default</option>
-						<option value="theme">Theme text</option>
-						<option value="dim">Dimmed</option>
-						<option value="custom">Custom color</option>
-					</select>
-					<p class="hw-help" id="text-help">Colors the numbers and labels. An alerting value keeps its warn or critical color. The bar and selection marks take the accent color instead.</p>
-				</div>
-				<div id="text-custom" hidden>
-					<div class="hw-field">
-						<label for="text-color">Custom text color</label>
-						<div class="hw-swatch-row">
-							<input type="color" class="hw-color" id="text-color" />
-							<code id="text-color-code" aria-hidden="true"></code>
-						</div>
-					</div>
-					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
 				</div>
 
 				<div id="bar-range">
@@ -184,8 +203,14 @@
 							<p class="hw-error" id="f-bar-max-error" hidden></p>
 						</div>
 					</div>
-					<p class="hw-help" id="bar-help">One-reading view only. Blank ends follow the session low and high.</p>
+					<p class="hw-help" id="bar-help">Blank ends follow the session low and high.</p>
 				</div>
+
+				<details class="hw-how">
+					<summary>How Display works</summary>
+					<p class="hw-help">Overviews list what rotation moves through: the rotation set, the active group, or the picked sensor's readings. Three rows mark the reading on the dial with a thumb on the left rail; two rows trade a row for big values and a trend line. The bar range applies to the one-reading view.</p>
+					<p class="hw-help">Color numbers by sensor type is off by default; Paper and unknown sensor types keep normal text. Reading colors give each reading its own number color, independent of type accents, that follows it through rotation. A custom text color overrides them and Dimmed dims them; alerts keep priority and graphs stay unchanged.</p>
+				</details>
 			</div>
 		</details>
 
@@ -206,7 +231,7 @@
 				</div>
 				<label class="hw-check"><input type="checkbox" data-setting="alertBelow" /><span>Alert when the value drops to or below these numbers (for fans and clocks)</span></label>
 				<label class="hw-check"><input type="checkbox" data-setting="alertInterrupt" /><span>Auto cycle jumps to a critical reading in the rotation and holds there while it stays critical</span></label>
-				<p class="hw-help" id="alerts-help">Use the live reading's number, in °F when °F is on; for bytes and rates, HWiNFO's original number and unit, before Data units rescales them. Thresholds apply only to readings in the unit that was on the dial when you set them, so a temperature limit never fires on a fan. The dial stays themed; the bar, or an overview row's value, takes the alert color.</p>
+				<p class="hw-help" id="alerts-help">Warn, Critical and the bar ends apply only to readings in the unit that was on the dial when you last changed any of them, so a temperature limit never fires on a fan. The dial stays themed; the bar, or an overview row's value, takes the alert color. Alerts check the current value in the reading's own unit (°F when °F is on); for bytes and rates that is HWiNFO's number and unit, which the dial may show rescaled.</p>
 			</div>
 		</details>
 
@@ -215,15 +240,14 @@
 			<div class="hw-sec-body">
 				<div class="hw-field">
 					<label for="f-preset">Gestures</label>
-					<select id="f-preset" data-setting="controlPreset" data-default="legacy" aria-describedby="preset-help">
+					<select id="f-preset" data-setting="controlPreset" data-default="legacy" aria-describedby="controls-now">
 						<option value="legacy">Legacy (default)</option>
 						<option value="elite">Elite</option>
 						<option value="custom">Custom</option>
 					</select>
-					<p class="hw-help" id="preset-help">Legacy: turn cycles readings (pressed or not), push resets session stats, touch cycles the stat, long touch returns to the current value. Elite: turn cycles readings in the rotation, pressed turn jumps to the next group (or sensor), short push pauses the auto cycle, long push resets stats.</p>
 				</div>
+				<dl class="hw-gestures" id="controls-now" aria-label="What the dial does now"></dl>
 				<div id="controls-custom" hidden>
-					<p class="hw-help">Switching from Elite to Custom copies the Elite map into the choices below, so you change only the gesture you want different.</p>
 					<div class="hw-row2">
 						<div class="hw-field">
 							<label for="g-rotate">Turn</label>
@@ -328,126 +352,143 @@
 					<input id="f-link" type="text" data-setting="linkId" placeholder="Optional name" aria-describedby="link-help" autocomplete="off" spellcheck="false" />
 					<p class="hw-help" id="link-help">HWiNFO Control keys whose Target is this name steer this dial, from any key, pedal or Multi Action.</p>
 				</div>
+				<details class="hw-how">
+					<summary>How the presets work</summary>
+					<p class="hw-help" id="preset-help">Legacy: turn cycles readings (pressed or not), push resets session stats, touch cycles the stat, long touch returns to the current value. Elite: turn cycles readings in the rotation, pressed turn jumps to the next group (or sensor), short push pauses the auto cycle, long push resets stats. Switching from Elite to Custom copies the Elite map into the choices, so you change only the gesture you want different.</p>
+				</details>
 			</div>
 		</details>
 
 		<details class="hw-sec" id="sec-advanced" data-fold="advanced">
 			<summary><span class="hw-sec-title">Advanced</span><span class="hw-sec-sum" data-summary="advanced"></span></summary>
 			<div class="hw-sec-body">
-				<fieldset class="hw-group-box" id="shared-defaults">
-					<legend>Shared defaults <span class="hw-scope">All keys and dials</span></legend>
-					<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. Keys and dials with their own choice keep it.</p>
-					<div class="hw-field">
-						<label for="shared-theme">Theme</label>
-						<select id="shared-theme" data-setting="theme" data-global data-default="void">
-							<option value="void">Void</option>
-							<option value="graphite">Graphite</option>
-							<option value="ultraviolet">Ultraviolet</option>
-							<option value="midnight">Midnight</option>
-							<option value="forest">Forest</option>
-							<option value="ember">Ember</option>
-							<option value="paper">Paper</option>
-						</select>
-					</div>
-					<div class="hw-field">
-						<label for="shared-text">Text color</label>
-						<select id="shared-text" data-setting="textMode" data-global data-default="theme">
-							<option value="theme">Theme text</option>
-							<option value="dim">Dimmed</option>
-							<option value="custom">Custom color</option>
-						</select>
-					</div>
-					<div id="deck-text-custom" hidden>
-						<div class="hw-field">
-							<label for="deck-text-color">Shared custom text color</label>
-							<div class="hw-swatch-row">
-								<input type="color" class="hw-color" id="deck-text-color" />
-								<code id="deck-text-color-code" aria-hidden="true"></code>
+				<details class="hw-sub" id="sec-shared">
+					<summary><span class="hw-sub-title">Shared defaults</span><span class="hw-scope">All keys and dials</span><span class="hw-sec-sum" data-summary="shared"></span></summary>
+					<div class="hw-sub-body" id="shared-defaults">
+						<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. A key or dial with its own choice keeps it.</p>
+						<div class="hw-row2">
+							<div class="hw-field">
+								<label for="shared-theme">Theme</label>
+								<select id="shared-theme" data-setting="theme" data-global data-default="void">
+									<option value="void">Void</option>
+									<option value="graphite">Graphite</option>
+									<option value="ultraviolet">Ultraviolet</option>
+									<option value="midnight">Midnight</option>
+									<option value="forest">Forest</option>
+									<option value="ember">Ember</option>
+									<option value="paper">Paper</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="shared-text">Text color</label>
+								<select id="shared-text" data-setting="textMode" data-global data-default="theme">
+									<option value="theme">Theme text</option>
+									<option value="dim">Dimmed</option>
+									<option value="custom">Custom color</option>
+								</select>
 							</div>
 						</div>
-						<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
-					</div>
-					<div class="hw-field">
-						<label for="shared-accents">Accent colors</label>
-						<select id="shared-accents" data-setting="typeAccents" data-global data-default="on" aria-describedby="accents-help">
-							<option value="on">By sensor type</option>
-							<option value="off">Theme accent everywhere</option>
-						</select>
-						<p class="hw-help" id="accents-help">Accents color graphs, bars and selection marks, never the numbers (Text color does that). Paper keeps its own accent.</p>
-					</div>
-					<div class="hw-field">
-						<label for="shared-units">Data units</label>
-						<select id="shared-units" data-setting="dataUnits" data-global data-default="decimal">
-							<option value="decimal">Decimal (KB, MB, GB; rates in Mbps)</option>
-							<option value="binary">Binary (KiB, MiB, GiB; rates in MiB/s)</option>
-						</select>
-					</div>
-				</fieldset>
-
-				<fieldset class="hw-group-box">
-					<legend>Connection <span class="hw-scope">All keys and dials</span></legend>
-					<div class="hw-field">
-						<label for="shared-source">Data source</label>
-						<select id="shared-source" data-setting="source" data-global data-default="auto">
-							<option value="auto">Auto (Shared Memory, else Gadget)</option>
-							<option value="shared-memory">Shared Memory only</option>
-							<option value="gadget">Gadget registry only</option>
-						</select>
-					</div>
-					<p class="hw-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
-					<div class="hw-field">
-						<label for="shared-poll">Read every</label>
-						<select id="shared-poll" data-setting="pollIntervalMs" data-global data-default="1000">
-							<option value="250">250 ms</option>
-							<option value="500">500 ms</option>
-							<option value="1000">1 second</option>
-							<option value="2000">2 seconds</option>
-							<option value="5000">5 seconds</option>
-						</select>
-					</div>
-					<details class="hw-inline-help" id="setup-help">
-						<summary>HWiNFO setup steps</summary>
-						<ol class="hw-help">
-							<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
-							<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
-							<li>Pick a reading under Reading.</li>
-						</ol>
-					</details>
-				</fieldset>
-
-				<fieldset class="hw-group-box">
-					<legend>Support</legend>
-					<div class="hw-actions"><button class="hw-support" id="support-report" type="button" aria-describedby="support-help">Copy support report</button></div>
-					<p class="hw-help" id="support-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard. Nothing is uploaded.</p>
-				</fieldset>
-
-				<fieldset class="hw-group-box">
-					<legend>Configuration documents</legend>
-					<div class="hw-field hw-config">
-						<label for="config-key">This dial's settings</label>
-						<textarea id="config-key" spellcheck="false" autocomplete="off"></textarea>
-						<div class="hw-config-row">
-							<button id="config-key-copy" type="button" aria-label="Copy this dial's settings">Copy</button>
-							<button id="config-key-apply" type="button">Replace this dial's settings</button>
+						<div id="deck-text-custom" hidden>
+							<div class="hw-field">
+								<label for="deck-text-color">Shared custom text color</label>
+								<div class="hw-swatch-row">
+									<input type="color" class="hw-color" id="deck-text-color" />
+									<code id="deck-text-color-code" aria-hidden="true"></code>
+								</div>
+							</div>
+							<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
+						</div>
+						<div class="hw-field">
+							<label for="shared-accents">Accent colors</label>
+							<select id="shared-accents" data-setting="typeAccents" data-global data-default="on" aria-describedby="accents-help">
+								<option value="on">By sensor type</option>
+								<option value="off">Theme accent everywhere</option>
+							</select>
+							<p class="hw-help" id="accents-help">Accents color graphs, bars and selection marks; numbers follow Text color unless Color numbers by sensor type is on under Display. Paper keeps its own accent.</p>
+						</div>
+						<div class="hw-field">
+							<label for="shared-units">Data units</label>
+							<select id="shared-units" data-setting="dataUnits" data-global data-default="decimal">
+								<option value="decimal">Decimal (KB, MB, GB; rates in Mbps)</option>
+								<option value="binary">Binary (KiB, MiB, GiB; rates in MiB/s)</option>
+							</select>
 						</div>
 					</div>
-					<div class="hw-field hw-config">
-						<label for="config-deck">Shared settings <span class="hw-scope">All keys and dials</span></label>
-						<textarea id="config-deck" spellcheck="false" autocomplete="off"></textarea>
-						<div class="hw-config-row">
-							<button id="config-deck-copy" type="button" aria-label="Copy shared settings">Copy</button>
-							<button id="config-deck-apply" type="button">Replace shared settings</button>
+				</details>
+
+				<details class="hw-sub" id="sec-connection">
+					<summary><span class="hw-sub-title">Connection</span><span class="hw-scope">All keys and dials</span><span class="hw-sec-sum" data-summary="connection"></span></summary>
+					<div class="hw-sub-body">
+						<div class="hw-field">
+							<label for="shared-source">Data source</label>
+							<select id="shared-source" data-setting="source" data-global data-default="auto" aria-describedby="source-help">
+								<option value="auto">Auto (Shared Memory, else Gadget)</option>
+								<option value="shared-memory">Shared Memory only</option>
+								<option value="gadget">Gadget registry only</option>
+							</select>
 						</div>
+						<div class="hw-row2">
+							<div class="hw-field">
+								<label for="shared-poll">Read every</label>
+								<select id="shared-poll" data-setting="pollIntervalMs" data-global data-default="1000">
+									<option value="250">250 ms</option>
+									<option value="500">500 ms</option>
+									<option value="1000">1 second</option>
+									<option value="2000">2 seconds</option>
+									<option value="5000">5 seconds</option>
+								</select>
+							</div>
+						</div>
+						<p class="hw-help" id="source-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
+						<p class="hw-help" id="source-now" hidden></p>
+						<details class="hw-inline-help" id="setup-help">
+							<summary>HWiNFO setup steps</summary>
+							<ol class="hw-help">
+								<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
+								<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
+								<li>Pick a reading under Reading.</li>
+							</ol>
+						</details>
 					</div>
-					<div class="hw-status" id="config-note" aria-live="polite" hidden></div>
-					<p class="hw-help">The exact settings as JSON. Copy one to back a dial up; paste a saved document and Replace to restore or clone it. Replace swaps the whole document, reloads this panel, and keeps fields this version does not know. Replacing shared settings changes every HWiNFO key and dial and asks for a second click.</p>
-				</fieldset>
+				</details>
+
+				<details class="hw-sub" id="sec-support">
+					<summary><span class="hw-sub-title">Support</span></summary>
+					<div class="hw-sub-body">
+						<div class="hw-actions"><button class="hw-support" id="support-report" type="button" aria-describedby="support-help">Copy support report</button></div>
+						<p class="hw-help" id="support-help">Copies a redacted diagnostics report (devices, data source, action states; no sensor values, no names) to the clipboard. Nothing is uploaded.</p>
+					</div>
+				</details>
+
+				<details class="hw-sub" id="sec-config">
+					<summary><span class="hw-sub-title">Configuration documents</span></summary>
+					<div class="hw-sub-body">
+						<div class="hw-field hw-config">
+							<label for="config-key">This dial's settings</label>
+							<textarea id="config-key" spellcheck="false" autocomplete="off"></textarea>
+							<div class="hw-config-row">
+								<button id="config-key-copy" type="button" aria-label="Copy this dial's settings">Copy</button>
+								<button id="config-key-apply" type="button">Replace this dial's settings</button>
+							</div>
+						</div>
+						<div class="hw-field hw-config">
+							<label for="config-deck">Shared settings <span class="hw-scope">All keys and dials</span></label>
+							<textarea id="config-deck" spellcheck="false" autocomplete="off"></textarea>
+							<div class="hw-config-row">
+								<button id="config-deck-copy" type="button" aria-label="Copy shared settings">Copy</button>
+								<button id="config-deck-apply" type="button">Replace shared settings</button>
+							</div>
+						</div>
+						<div class="hw-status" id="config-note" aria-live="polite" hidden></div>
+						<p class="hw-help">The exact settings as JSON: Copy one to back a dial up, paste a saved one and Replace to restore or clone it. Replace swaps the whole document, reloads this panel and keeps fields this version does not know. Replacing shared settings changes every HWiNFO key and dial and asks for a second click.</p>
+					</div>
+				</details>
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.0.0-f01q"></script>
-		<script src="pi-shell.js?v=1.7.0.0-f01q"></script>
-		<script src="pi-common.js?v=1.7.0.0-f01q"></script>
-		<script src="pi-control.js?v=1.7.0.0-f01q"></script>
+		<script src="pi-model.js?v=1.7.0.0-d08"></script>
+		<script src="pi-shell.js?v=1.7.0.0-d08"></script>
+		<script src="pi-common.js?v=1.7.0.0-d08"></script>
+		<script src="pi-control.js?v=1.7.0.0-d08"></script>
 	</body>
 </html>

@@ -33,7 +33,9 @@ import { frozenHistory, sampleSnapshot, scenarios } from "./pi-fixtures.mjs";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // PI_SIM_PLUGIN_DIR serves another checkout's panels (a baseline worktree)
 // against this build's plugin side, for before/after measurements.
-const pluginDir = process.env.PI_SIM_PLUGIN_DIR ?? path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+// Resolved, so a forward-slash Windows path still passes the served-file
+// containment check below.
+const pluginDir = path.resolve(process.env.PI_SIM_PLUGIN_DIR ?? path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin"));
 
 export const PAGES = {
 	"sensor-reading.html": { action: "com.lawrensen.hwinfo.reading", controller: "Keypad", kind: "key" },
@@ -49,6 +51,9 @@ function statusFor(data, snapshot) {
 	if (data === "unavailable") return { state: "unavailable", reason: "not-running", message: "HWiNFO is not running (simulated)." };
 	if (data === "stale") return { state: "stale", snapshot, source: "shared-memory", staleForMs: 42_000 };
 	if (data === "gadget") return { state: "ok", snapshot, source: "gadget" };
+	// The poller riding out a source reopen: the status is still the last ok
+	// one, and the preview says it is held (pushPreview below).
+	if (data === "holding") return { state: "ok", snapshot, source: "shared-memory" };
 	return { state: "ok", snapshot, source: "shared-memory" };
 }
 
@@ -68,6 +73,9 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		toPiLog: [],
 		/** Reply latency for sendToPlugin requests (ms), for race suites. */
 		replyDelayMs: 0,
+		/** Extra latency for the remembered-folds answer alone (ms), so a
+		 * late fold answer can be tested while every other reply is prompt. */
+		foldsDelayMs: 0,
 		stats: new SessionStatsStore(),
 		/** The plugin's in-memory fold memory; a fresh sim is a fresh plugin. */
 		folds: new PanelFoldMemory(),
@@ -101,10 +109,15 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		}
 		return undefined;
 	};
+	// The Stream Deck app re-serializes a plugin's message to its panel and
+	// sorts every object's keys (observed on hardware 2026-09-26: the themes
+	// object arrived alphabetized). The sim does the same, so a panel that
+	// leans on key order fails here first.
+	const sortedKeys = (value) => (Array.isArray(value) ? value.map(sortedKeys) : value !== null && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortedKeys(value[k])])) : value);
 	const toPi = (payload) => {
 		if (sim.piWs === null) return;
 		sim.toPiLog.push(payload);
-		sim.piWs.send(JSON.stringify({ event: "sendToPropertyInspector", action: PAGES[sim.page].action, context: sim.context, payload }));
+		sim.piWs.send(JSON.stringify({ event: "sendToPropertyInspector", action: PAGES[sim.page].action, context: sim.context, payload: sortedKeys(payload) }));
 	};
 	/** The plugin's preview push, through the production builder. The
 	 * face rides along when the builder accepts one (the redesigned
@@ -112,7 +125,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	sim.pushPreview = () => {
 		const kind = PAGES[sim.page]?.kind;
 		if (kind !== "key" && kind !== "dial") return;
-		toPi(buildPreview(status(), sim.settings, kind === "key", { context: sim.context, face: face(), kind }));
+		toPi(buildPreview(status(), sim.settings, kind === "key", { context: sim.context, face: face(), kind, holding: sim.data === "holding" }));
 	};
 	sim.face = face;
 	sim.status = status;
@@ -189,7 +202,10 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 							const kind = panelKindOf(msg.payload?.kind);
 							if (kind === undefined) return;
 							if (event === "setPanelFolds") sim.folds.set(kind, msg.payload?.folds);
-							else toPi({ event: "panelFolds", kind, folds: sim.folds.get(kind) });
+							else if (sim.foldsDelayMs > 0) {
+								const folds = sim.folds.get(kind);
+								setTimeout(() => toPi({ event: "panelFolds", kind, folds }), sim.foldsDelayMs);
+							} else toPi({ event: "panelFolds", kind, folds: sim.folds.get(kind) });
 						}
 					};
 					if (sim.replyDelayMs > 0) setTimeout(reply, sim.replyDelayMs);

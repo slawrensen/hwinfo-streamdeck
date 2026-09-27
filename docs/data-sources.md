@@ -18,6 +18,8 @@ The plugin reads HWiNFO through one of two local interfaces. It picks the best o
 
 Shared Memory is richer in every way except licensing: on the free version it switches itself off after 12 hours of runtime. The Gadget registry has none of that time pressure but only carries the current value of the specific readings you ticked, with no historical min/max/avg.
 
+> **Recommendation:** if HWiNFO runs around the clock, I recommend [HWiNFO Pro](https://www.hwinfo.com/licenses/). It keeps Shared Memory on with no time limit, so the plugin never has to fall back to the Gadget registry. More in the [FAQ](faq.md#do-i-need-hwinfo-pro).
+
 > **Note:** Because the Gadget source has no historical stats, a key set to **Show: Minimum / Maximum / Average** displays the current value while reading from it. When a key is on the Gadget source, the settings panel shows a small note explaining this.
 
 ### Enabling Shared Memory

@@ -117,7 +117,17 @@ fixes in one release.
 - A raw value that overflows to infinity is unavailable everywhere it is
   compared, not only where it is drawn: it no longer paints a key critical,
   colors a dial row with the alert color, or holds an alert-aware auto
-  cycle on the reading, while the face shows no value.
+  cycle on the reading, while the face shows no value. A data reading that
+  only overflows once converted to bytes shows the same unavailable mark in
+  its own unit instead of "Infinity".
+- A key or dial held down while its settings change does nothing when
+  released: the press ends, and the next press uses the new settings.
+  Before, a held press could run the command the new settings named, such
+  as resetting every dial.
+- Auto cycle keeps its interval when the Windows clock is corrected, and a
+  hand-edited interval that is not a number or text (true, a list) reads as
+  off instead of cycling. A threshold typed while HWiNFO is away applies to
+  the reading it was typed for, even if the dial moves before data returns.
 - A newly accepted source keeps its own sample age. Switching from recent
   Gadget values to an old Shared Memory sample no longer makes that sample
   appear live.

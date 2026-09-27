@@ -110,11 +110,13 @@ export function formatValue(value: number, decimals: DecimalsSetting): string {
 }
 
 /**
- * Formats a value for one 72 px quad-grid cell: at most 4 glyphs, ever. The
+ * Formats a value for one 72 px quad-grid cell: at most 4 glyphs through
+ * ±9999T, which covers every HWiNFO reading. The
  * shared decimals setting is the starting precision ("auto" starts from
  * formatValue's magnitude rule); decimals drop first, then the magnitude
  * compacts through k/M/G/T, so 48700 reads "49k" instead of overflowing the
- * cell. The sign counts as a glyph.
+ * cell. The sign counts as a glyph. Past ±9999T the text runs longer and
+ * the renderer truncates it at 7 code points.
  */
 export function formatQuadValue(value: number, decimals: DecimalsSetting): string {
 	if (!Number.isFinite(value)) {
@@ -142,7 +144,8 @@ export function formatQuadValue(value: number, decimals: DecimalsSetting): strin
 			}
 		}
 	}
-	// Past ±9999T, which no HWiNFO reading approaches: clamp, never overflow.
+	// Past ±9999T, which no HWiNFO reading approaches: no tier fits, so the
+	// T-scaled text runs long and the renderer truncates it.
 	return `${Math.round(value / 1_000_000_000_000)}T`;
 }
 

@@ -395,3 +395,17 @@ describe("fitTextLadder (largest safe size, ellipsis only at the floor)", () => 
 		assert.ok(Math.abs(estimateKeyTextWidth("…", 12) - 8.3) < 1e-9);
 	});
 });
+
+describe("normalization overflow (external review AX44)", () => {
+	it("a finite data reading that overflows once normalized shows the placeholder in its source unit", () => {
+		for (const value of [Number.MAX_VALUE, -Number.MAX_VALUE]) {
+			for (const unit of ["MB", "TB", "MiB/s", "Mbps"]) {
+				for (const dataUnits of ["decimal", "binary"] as const) {
+					for (const format of [formatMeasurement, formatQuadMeasurement]) {
+						assert.deepEqual(format(value, unit, { decimals: "auto", fahrenheit: false, dataUnits }), { valueText: "\u2014", unitText: unit }, `${format.name} ${value} ${unit} ${dataUnits}`);
+					}
+				}
+			}
+		}
+	});
+});

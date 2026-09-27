@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d12";
+	const PI_BUILD = "1.7.0.0-d13";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -258,7 +258,7 @@
 		if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
 		const names = {};
 		for (const [key, name] of Object.entries(value)) {
-			if (typeof name === "string" && name.trim() !== "") names[key] = name;
+			if (typeof name === "string" && name.trim() !== "") model.setOwn(names, key, name);
 		}
 		return names;
 	}
@@ -883,7 +883,10 @@
 		remove.title = "Remove this group (its readings leave the rotation)";
 		remove.setAttribute("aria-label", `Remove group ${index + 1}; its readings leave the rotation`);
 		remove.textContent = "×";
-		remove.dataset.armId = `remove:${index}:${group.keys.join("|")}`;
+		// The whole stored group names the arm, so a changed name, reading or
+		// kept entry disarms it; a joined string let two different groups
+		// share one (external review AX30). Key order is not a change.
+		remove.dataset.armId = model.sortedJson(["remove", index, serializeGroup(group)]);
 		applyArm(remove);
 		head.append(hit, name, remove);
 		return head;
@@ -968,7 +971,6 @@
 		const moves = (command) => command === "step" || command === "stepGroup";
 		const s = st.settings;
 		const turnsOff = s.rotationDisabled === true;
-		const ms = typeof s.autoCycleMs === "string" && s.autoCycleMs !== "" ? Number(s.autoCycleMs) : NaN;
 		const words = [];
 		if (!turnsOff && moves(c.rotate)) words.push("turns");
 		if (!turnsOff && moves(c.pressedRotate) && c.pressedRotate !== c.rotate) words.push("pressed turns");
@@ -976,7 +978,7 @@
 		if (c.touchZones !== "off") words.push("the strip's sides");
 		else if (moves(c.tap)) words.push("taps");
 		if (moves(c.touchHold)) words.push("long touches");
-		if (Number.isInteger(ms) && ms > 0) words.push("auto cycle");
+		if (model.autoCycleMsOf(s) !== null) words.push("auto cycle");
 		return { words, turnsOff };
 	}
 
@@ -1109,7 +1111,7 @@
 			);
 			const actions = setActions([["add", "Add group"], ["merge", "Merge back into one set"]]);
 			const merge = actions.querySelector('button[data-set-action="merge"]');
-			merge.dataset.armId = `merge:${rotationGroups.map((g) => `${g.name}=${g.keys.join("|")}`).join(";")}`;
+			merge.dataset.armId = model.sortedJson(["merge", rotationGroups.map(serializeGroup), rotationGroupsKept]);
 			applyArm(merge);
 			frag.appendChild(actions);
 		}
@@ -1236,6 +1238,9 @@
 	const DETAIL_TILES_MAX = 128; // mirrors detailTilesOf's own cap, distinct in the parser
 	let detailKeys = [];
 	let detailSourceKeys = [];
+	// Each adopted key's stored spelling (a pasted friendly name, spacing):
+	// a write keeps it for every key it did not add (external review AX37).
+	let detailKeyRaw = new Map();
 	// This key's own sensor: the runtime shows it on the Back tile and
 	// filters it out of the list, so the panel must refuse to add it and
 	// must park an adopted copy (hand-edited, or the opener re-picked onto
@@ -1359,11 +1364,14 @@
 				return cellParsed(tile, field, i);
 			});
 			if (stored !== null) {
-				const tailStart = Math.max(tile.size, tile.base?.size ?? 0);
+				const tailStart = Math.max(tile.size, tile.dormantFrom ?? tile.base?.size ?? 0);
 				if (stored.length > tailStart) {
 					for (let j = tile.size; j < tailStart; j++) values.push(CELL_NEUTRAL[field]);
 					values.push(...stored.slice(tailStart));
 				}
+				// A stored list shorter than the cells stays that short: the
+				// missing entries already read as neutral (AX33).
+				while (values.length > stored.length && values[values.length - 1] === CELL_NEUTRAL[field]) values.pop();
 			}
 			out[field] = values;
 		}
@@ -1386,8 +1394,8 @@
 	});
 	function adoptDetailUniform(value) {
 		const next = value === 2 || value === "2" ? 2 : value === 3 || value === "3" ? 3 : value === 4 || value === "4" ? 4 : 1;
-		// followSetting polls every 400 ms: a no-op tick must not rebuild
-		// #detail-list under an in-flight chip drag or landing flash.
+		// A repeated value must not rebuild #detail-list under an in-flight
+		// chip drag or landing flash.
 		if (next === detailUniform) return;
 		const edited = detailDensityEdited;
 		detailDensityEdited = false;
@@ -1434,6 +1442,11 @@
 		const listed = detailSourceKeys.filter((k) => !isDetailPrimary(k));
 		let head = 0;
 		for (const tile of detailSourceTiles) {
+			// Cells no reading fills as stored are dormant: their entries stay
+			// stored when the tile later shrinks to its readings (AX29). A cell
+			// whose reading moves away is not dormant; its entries travel.
+			const filled = Math.max(0, Math.min(tile.size, listed.length - head));
+			tile.dormantFrom = filled < tile.size ? filled : undefined;
 			const raw = tile.raw;
 			if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
 				for (let i = 0; i < tile.size && head + i < listed.length; i++) {
@@ -1536,17 +1549,27 @@
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
-		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base }));
+		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base, dormantFrom: t.dormantFrom }));
+	}
+
+	/** Taking a cell out of a tile whose dormant cells are still among its
+	 * cells shifts them down, so their stored entries no longer sit at their
+	 * stored index: the tile falls back to its stored size for the tail
+	 * (a dormant tail kept at dormantFrom would be written twice). */
+	function dropDormant(tile) {
+		if (tile.size > (tile.dormantFrom ?? Infinity)) tile.dormantFrom = undefined;
 	}
 
 	/** A walk tile's spec at exactly the cells it fills, always a fresh
 	 * copy: a fill tile becomes an explicit default entry, and a partial
 	 * trailing spec sheds the cells it does not fill (a partial spec
-	 * anywhere but the tail would swallow the next tile's head). */
+	 * anywhere but the tail would swallow the next tile's head). Cells no
+	 * reading filled when the plan was read keep their stored entries past
+	 * the new size (dormantFrom, external review AX29). */
 	function occupancySpec(tile, occupied) {
 		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
 		const size = Math.min(spec.size, occupied);
-		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base };
+		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base, dormantFrom: spec.dormantFrom };
 	}
 
 	/** Extends the plan with default entries (at the uniform fill size,
@@ -1602,7 +1625,7 @@
 			return serializeTile(tile, keys);
 		});
 		detailTilesStage[1]([...serialized, ...detailTilesKept]);
-		detailBinding[1](model.mergeKept(detailKeys, detailKeysKept, detailKeysKeptAt));
+		detailBinding[1](model.mergeKept(detailKeys.map((key) => detailKeyRaw.get(key) ?? key), detailKeysKept, detailKeysKeptAt));
 		// A person's edit: its note (the count, the cap) is spoken, like the
 		// rotation's; opening the panel or a sensor list arriving stays quiet.
 		speakingNotes(renderDetailList);
@@ -1658,8 +1681,8 @@
 		const carriesData = (t, i) => {
 			const r = t.raw;
 			if (r !== null && typeof r === "object" && !Array.isArray(r)) {
-				const cells = Math.max(t.size, t.base?.size ?? 0);
-				if (CELL_FIELDS.some((field) => Array.isArray(r[field]) && r[field].length > cells)) return true;
+				const cells = Math.max(t.size, t.dormantFrom ?? t.base?.size ?? 0);
+				if (CELL_FIELDS.some((field) => Array.isArray(r[field]) && r[field].slice(cells).some((v) => v !== CELL_NEUTRAL[field]))) return true;
 			}
 			return listed.slice(heads[i], heads[i] + t.size).some(cellCarriesData);
 		};
@@ -1690,6 +1713,7 @@
 		const known = [];
 		const kept = [];
 		const keptAt = [];
+		detailKeyRaw = new Map();
 		(Array.isArray(value) ? value : []).forEach((entry, index) => {
 			const key = typeof entry === "string" ? bareKey(entry) : "";
 			if (typeof entry === "string" && key !== "" && seen.has(key)) return;
@@ -1700,6 +1724,7 @@
 			}
 			seen.add(key);
 			known.push(key);
+			detailKeyRaw.set(key, entry);
 		});
 		detailSourceKeys = known;
 		detailKeysKept = kept;
@@ -1713,8 +1738,8 @@
 
 	function adoptDetailPrimary(value) {
 		const next = typeof value === "string" ? value : "";
-		// Same no-op guard as adoptDetailUniform: the 400 ms follow poll
-		// re-delivers the unchanged key forever.
+		// Same no-op guard as adoptDetailUniform: a settings echo re-delivers
+		// the unchanged key.
 		if (next === detailPrimaryKey) return;
 		detailPrimaryKey = next;
 		projectDetailState();
@@ -2003,6 +2028,7 @@
 					detailArm = { tileIdx: detailArm.tileIdx - 1 };
 				}
 			} else {
+				dropDormant(next[tileIdx]);
 				next[tileIdx].size -= 1;
 				next[tileIdx].labels.splice(cell, 1);
 				next[tileIdx].colors.splice(cell, 1);
@@ -2010,6 +2036,7 @@
 			}
 		}
 		detailKeys = detailKeys.filter((k) => k !== key);
+		detailKeyRaw.delete(key); // a key added back later is written bare
 		if (next !== null) {
 			writeDetailTiles(next);
 		} else {
@@ -2170,6 +2197,7 @@
 			next.splice(fromTileIdx, 1);
 			dissolved = true;
 		} else {
+			dropDormant(next[fromTileIdx]);
 			next[fromTileIdx].size -= 1;
 			next[fromTileIdx].labels.splice(cell, 1);
 			next[fromTileIdx].colors.splice(cell, 1);
@@ -3568,11 +3596,20 @@
 			["gestureTouchHold", "backToCurrent"]
 		];
 		const gestureBindings = ELITE_MAP.map(([setting]) => useSettings(setting, () => {}, null));
-		const seedFromElite = () =>
+		// Documents that arrived from outside the panel. A seed belongs to the
+		// document the person picked Custom in: one that arrived since (a
+		// replaced or newer document) gets no Elite fields (external review
+		// AX34).
+		let received = 0;
+		hw.on("settings", (ev) => {
+			if (ev.origin === "echo") received += 1;
+		});
+		const seedFromElite = (pickedAt) =>
 			Promise.all(
 				ELITE_MAP.map(([, command], index) => {
 					const [getGesture, setGesture] = gestureBindings[index];
 					return getGesture().then((value) => {
+						if (received !== pickedAt) return;
 						if (typeof value === "string" && value !== "") return; // user-set: keep
 						setGesture(command);
 					});
@@ -3607,7 +3644,8 @@
 			"change",
 			(ev) => {
 				if (ev.target !== presetEl || presetEl === null) return;
-				if (shownPreset === "elite" && presetOf(presetEl.value) === "custom") setTimeout(seedFromElite, 0);
+				const pickedAt = received;
+				if (shownPreset === "elite" && presetOf(presetEl.value) === "custom") setTimeout(() => seedFromElite(pickedAt), 0);
 			},
 			true
 		);
@@ -3632,8 +3670,7 @@
 			const s = st.settings;
 			const rows = [];
 			if (c !== undefined) {
-				const ms = typeof s.autoCycleMs === "string" && s.autoCycleMs !== "" ? Number(s.autoCycleMs) : NaN;
-				const cycling = Number.isInteger(ms) && ms > 0;
+				const cycling = model.autoCycleMsOf(s) !== null;
 				const reach = s.resetScope === "all" ? " (every dial, everywhere)" : s.resetScope === "set" ? " (the whole rotation set)" : "";
 				const say = (cmd) => `${model.gestureWords(cmd, s)}${cmd === "pauseResume" && !cycling ? " (auto cycle is off)" : ""}${cmd === "resetStats" ? reach : ""}`;
 				const turnsOff = s.rotationDisabled === true;
@@ -4016,8 +4053,7 @@
 			});
 			// Same commit boundary as quad wells: no writes per drag frame.
 			well.addEventListener("change", () => {
-				const next = withoutReadingColor(readingColors, key);
-				next[key] = well.value;
+				const next = model.setOwn(withoutReadingColor(readingColors, key), key, well.value);
 				readingColorBinding[1](next);
 				adoptReadingColors(next);
 			});
@@ -4034,10 +4070,11 @@
 			// Every listed reading loses its entries under every key it has,
 			// then a preset writes the row key: one explicit entry per
 			// measurement, and Automatic clears exactly what the dial paints.
-			let next = { ...readingColors };
+			// One copy of the map, edited in place (MS01).
+			const next = { ...readingColors };
 			readingColorKeys().forEach((key, index) => {
-				next = withoutReadingColor(next, key);
-				if (preset !== "automatic") next[key] = COLOR_PRESETS[preset][index % 4];
+				for (const k of readingKeysOf(key)) delete next[k];
+				if (preset !== "automatic") model.setOwn(next, key, COLOR_PRESETS[preset][index % 4]);
 			});
 			readingColorBinding[1](next);
 			adoptReadingColors(next);
@@ -4386,15 +4423,17 @@
 	// A press remembers the key's theme choice it started on: a theme that
 	// arrives between press and release makes that press stale, and it
 	// shares nothing until a fresh press (external review AX14).
-	// The record ends only with its own kind of release, after the click that
+	// The record ends only with its own release, after the click that
 	// release may fire: focus leaving (Tab) or another key mid-press ends
 	// nothing, since the press can still click and is still stale (AX21).
-	let sharePress = null; // { choice, kind: "pointer" | "key" }
+	// "Its own" is the exact key: releasing Enter never ends a held Space
+	// press (AX36).
+	let sharePress = null; // { choice, kind: "pointer" | " " | "Enter" }
 	themeShareEl?.addEventListener("pointerdown", () => {
 		sharePress = { choice: themeChoice, kind: "pointer" };
 	});
 	themeShareEl?.addEventListener("keydown", (ev) => {
-		if (!ev.repeat && (ev.key === " " || ev.key === "Enter")) sharePress = { choice: themeChoice, kind: "key" };
+		if (!ev.repeat && (ev.key === " " || ev.key === "Enter")) sharePress = { choice: themeChoice, kind: ev.key };
 	});
 	themeShareEl?.addEventListener("pointercancel", () => {
 		if (sharePress?.kind === "pointer") sharePress = null;
@@ -4408,7 +4447,7 @@
 	};
 	document.addEventListener("pointerup", () => endSharePress("pointer"), true);
 	document.addEventListener("keyup", (ev) => {
-		if (ev.key === " " || ev.key === "Enter") endSharePress("key");
+		if (ev.key === " " || ev.key === "Enter") endSharePress(ev.key);
 	}, true);
 	hw.announce("theme-share", ""); // primed: the first Make shared is said
 	themeShareEl?.addEventListener("click", async (ev) => {
@@ -4992,7 +5031,7 @@
 				rotationNamesRaw = model.patchNames(rotationNamesRaw, k, "");
 			}
 			if (name !== "") {
-				rotationNames[key] = name;
+				model.setOwn(rotationNames, key, name);
 				rotationNamesRaw = model.patchNames(rotationNamesRaw, key, name);
 			}
 			namesBinding[1](rotationNamesRaw);
@@ -5202,6 +5241,7 @@
 			// No timer: the spoken confirmation alone takes about as long as
 			// the old five-second window, so a screen reader user missed it.
 			let armedAt = 0;
+			let armedValue = ""; // the document the arm was for
 			// Leaving the button or editing the well disarms, and the note
 			// then says nothing happened, so no stale "press again" stays
 			// behind (round 3, R09).
@@ -5233,8 +5273,11 @@
 				// press within 450 ms of arming, or the second click of a double
 				// click however slow (AX13), is ignored, so a double click only
 				// arms.
-				if (confirmFirst && armedAt === 0) {
+				// A document that changed since the arm, even without typing (a
+				// refill), is a new first press: the arm names one exact text.
+				if (confirmFirst && (armedAt === 0 || el.value !== armedValue)) {
 					armedAt = Date.now();
+					armedValue = el.value;
 					if (button !== null) {
 						button.dataset.armed = "true";
 						button.textContent = "Press again to replace for all keys and dials";

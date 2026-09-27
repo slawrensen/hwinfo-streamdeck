@@ -663,8 +663,8 @@ const QUAD_LABEL_MAX = 4;
  * 14 px would graze the lens crop on the outer cells. */
 const QUAD_LABEL_SIZES = [14, 12] as const;
 const QUAD_LABEL_BUDGET = 50;
-/** Values ellipsize here; the quad formatter caps at 4 glyphs, so any longer
- * text is a defensive path, and 7 glyphs at the ramp's 14 px still fit the
+/** Values ellipsize here; the quad formatter keeps readings through ±9999T
+ * within 4 glyphs, so longer text only comes from beyond that range, and 7 glyphs at the ramp's 14 px still fit the
  * 72 px cell. */
 const QUAD_VALUE_MAX = 7;
 
@@ -683,8 +683,8 @@ export function quadIdentityOf(chosen: string | null | undefined, slot: number):
 }
 
 /**
- * Quad-cell value size by character count. The quad formatter caps values
- * at 4 glyphs, where the base size holds (26 px, or 24 px when a micro-label
+ * Quad-cell value size by character count. The quad formatter keeps
+ * readings through ±9999T within 4 glyphs, where the base size holds (26 px, or 24 px when a micro-label
  * shares the cell); anything longer steps down 4 px per extra glyph rather
  * than overflow a 72 px cell, never below the 12 px legibility floor.
  */

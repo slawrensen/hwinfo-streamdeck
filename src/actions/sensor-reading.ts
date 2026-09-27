@@ -153,6 +153,11 @@ function quadColorsOf(settings: ReadingSettings): readonly QuadIdentity[] {
 	});
 }
 
+/** JSON with every object's keys sorted: equal for equal documents. */
+function sortedJson(value: unknown): string {
+	return JSON.stringify(value, (_, v: unknown) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
+}
+
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
 export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	private readonly instances = new Map<string, InstanceState>();
@@ -190,6 +195,9 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		// sparkline history (now owned by the poller) is never dropped.
 		streamDeck.logger.debug(`Key appeared on ${ev.action.device.name}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
 		const existing = this.instances.get(ev.action.id);
+		// A replayed appear ends any press armed before it (external review
+		// AX27): its release or hold would act on the replacement settings.
+		this.presses.cancel(ev.action.id);
 		const firstSighting = existing === undefined;
 		if (firstSighting) {
 			poller.retain();
@@ -255,12 +263,15 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 			}
 			state.subscribedKey = nextSub;
 		}
-		state.settings = ev.payload.settings;
-		if (detailRoleOf(state.settings) === "back") {
-			// A visible key that became a Back tile mid-press must not
-			// resolve its armed tap/hold session under the new role.
+		// A held key keeps the document it was pressed under. Any change
+		// consumes the press (a Back role, another reading, behavior or
+		// detail target would otherwise resolve under the new settings,
+		// external review AX27); an unchanged echo leaves it armed, whatever
+		// its key order (the app sorts keys, the plugin's own writes do not).
+		if (sortedJson(state.settings) !== sortedJson(ev.payload.settings)) {
 			this.presses.cancel(ev.action.id);
 		}
+		state.settings = ev.payload.settings;
 		this.renderAll(poller.getStatus(), ev.action.id);
 		// The panel sees an edit's result at once, not on the next tick.
 		this.pushPanelPreview(poller.getStatus());

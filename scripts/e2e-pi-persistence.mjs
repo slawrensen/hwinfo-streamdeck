@@ -514,24 +514,48 @@ try {
 		ws.once("error", reject);
 	});
 	let seq = 0;
+	let loadGeneration = 0;
 	const pending = new Map();
 	ws.on("message", (data) => {
 		const msg = JSON.parse(data.toString());
+		if (msg.method === "Page.loadEventFired") loadGeneration++;
 		if (msg.id !== undefined && pending.has(msg.id)) {
 			pending.get(msg.id)(msg);
 			pending.delete(msg.id);
 		}
 	});
-	const cdp = (method, params = {}) =>
+	const sendCdp = (method, params = {}) =>
 		new Promise((resolve, reject) => {
 			const id = ++seq;
 			pending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)));
 			ws.send(JSON.stringify({ id, method, params }));
 		});
+	const cdp = async (method, params = {}) => {
+		const generation = loadGeneration;
+		const result = await sendCdp(method, params);
+		if (method === "Page.navigate") {
+			const deadline = performance.now() + 3500;
+			while (loadGeneration === generation && performance.now() < deadline) await sleep(25);
+			if (loadGeneration === generation) throw new Error("Panel navigation did not load");
+		}
+		return result;
+	};
 	const evaluate = (expression) => cdp("Runtime.evaluate", { expression, returnByValue: true });
 	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
 	await cdp("Page.enable");
 
+	// A panel is settled once its document loaded, it connected, the sensor
+	// tree arrived and no fold state is pending: startup waits for that, up
+	// to the 3.5 s it once always slept, instead of always sleeping (MS03).
+	const settlePanel = async () => {
+		const deadline = performance.now() + 3500;
+		for (;;) {
+			const r = await evaluate('document.readyState === "complete" && !!window.__hwPanel?.context && window.__hwPanel?.tree != null && !document.documentElement.hasAttribute("data-folds-pending")');
+			if (r.result?.value === true) return;
+			if (performance.now() >= deadline) throw new Error("Panel did not settle within 3500 ms");
+			await sleep(25);
+		}
+	};
 	const deepEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 	/** The invariant after one edit: at least one new write arrived, the
 	 * edited field landed, and the marker + unknown blob rode through. */
@@ -602,7 +626,7 @@ try {
 	// ---- run 1: the marked Back tile ------------------------------------
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/back`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500); // load + register + the 400 ms visibility polls
+	await settlePanel(); // load + register + the 400 ms visibility polls
 
 	check("opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const vis = await evaluate(`JSON.stringify({
@@ -738,7 +762,7 @@ try {
 	// ---- run 2: an ordinary key stays the stock panel --------------------
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 
 	check("ordinary key: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const plainVis = await evaluate(`JSON.stringify({
@@ -841,7 +865,7 @@ try {
 	// or the uniform fill built it.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("grouped: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	// The boot sensorTree echo runs every picker's showSelection; the
 	// collector's HTML resting text must survive it (placeholder ownership).
@@ -1204,7 +1228,7 @@ try {
 	// density 4, so the walk is a dressed quad plus a full fill quad.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg L: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 
 	// L1: an in-tile chip drop reorders the cells AND their dressing: the
@@ -1477,7 +1501,7 @@ try {
 	// color. Seeded fresh so the leg reads as its own story.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg M: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const wornColors = async () =>
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[0].querySelectorAll(".hw-set-chip")).map((c) => [c.dataset.key, c.querySelector(".hw-tile-color")?.value ?? null, c.querySelector(".hw-set-name")?.textContent]))`)).result?.value;
@@ -1552,7 +1576,7 @@ try {
 	// where the walk cannot reach it. Seeded fresh, same bench tile.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg N: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const legNTail = JSON.parse(
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")).map((t) => t.querySelectorAll(".hw-set-chip").length))`)).result?.value ?? "[]"
@@ -1589,7 +1613,7 @@ try {
 	// tile the NEW walk holds the reading in.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg J: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const tileSizesNow = `JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`;
 	const densityBefore = (await evaluate(tileSizesNow)).result?.value;
@@ -1624,7 +1648,7 @@ try {
 	// then landed somewhere the panel never showed.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg J2: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("leg J2: armed tile 4's +", (await clickAdd("3")) === "ok");
 	await sleep(400);
@@ -1889,7 +1913,7 @@ try {
 	// list note names the cap; freeing one slot lands the same tick.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/cap`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("cap: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const capNote = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
 	check("cap: the list note names the cap", String(capNote).includes("That is the cap"), String(capNote));
@@ -1959,7 +1983,7 @@ try {
 	// chips wear renames and colors the deck never renders.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/salvage`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("salvage: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const salvage = JSON.parse(
 		(await evaluate(`JSON.stringify({
@@ -1981,7 +2005,7 @@ try {
 	// the parked chip's removal leave the plan untouched.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("adopted: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const adopted = JSON.parse(
 		(await evaluate(`JSON.stringify((() => {
@@ -2074,7 +2098,7 @@ try {
 	// off to whatever reading grows into that slot later.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg O: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	mark = writes.length;
 	check("leg O: dragged the tail reading onto the head tile", (await dragDrop("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:1"]', "left")) === "ok");
@@ -2102,7 +2126,7 @@ try {
 	// place.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/repick`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("repick: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("repick: no chip wears the Back-tile mark yet", (await evaluate(`Array.from(document.querySelectorAll("#detail-list .hw-set-name")).every((n) => !(n.textContent ?? "").includes("(Back tile)"))`)).result?.value === true);
 	const repickGates = async () =>
@@ -2183,7 +2207,7 @@ try {
 	// per-field store adopts the wholesale write.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("config: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("config: opened the Advanced fold", (await evaluate(`(() => {
 		const fold = document.querySelector('details[data-fold="advanced"]');
@@ -2424,7 +2448,7 @@ try {
 	};
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg R: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	// Phase 1, the abandon path: open a rename, change nothing, press another
 	// chip's remove. The focusout repaint must not eat that press.
@@ -2456,7 +2480,7 @@ try {
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	store.settings = { ...store.settings, theme: "paper", detailKeys: store.settings.detailKeys.slice(0, 4), detailTiles: [{ size: 4, cellLabels: false }] };
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("automatic detail colors: opening wrote nothing", writes.length === 0);
 	mark = writes.length;
 	check("automatic detail colors: moved the first chip with a real mouse", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="1"]')) === "ok");
@@ -2469,7 +2493,7 @@ try {
 	const automaticPlan = structuredClone(frame.detailTiles);
 	mark = writes.length;
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("automatic detail colors: reload preserves provenance without writing", writes.length === mark && deepEqual(store.settings.detailTiles, automaticPlan));
 	// Choosing even the same raw hue must turn off automatic correction for
 	// that cell alone. Native wells dispatch change on a committed choice.
@@ -2498,7 +2522,7 @@ try {
 	// must say both; a zero-write open stays law on this PI too.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/dial`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("dial: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const dialTruth = JSON.parse(
 		(await evaluate(`JSON.stringify({
@@ -2527,7 +2551,7 @@ try {
 	await waitDom("dial: two-row restores the checked option", `!document.getElementById('sensor-value-colors').hidden && ${colorToggle}.checked`, 2000);
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	check("dial: reopening writes nothing", writes.length === mark);
 	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
 	await evaluate(`${colorToggle}.click()`);
@@ -2536,7 +2560,7 @@ try {
 	store.settings.sensorValueColors = "true";
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	await waitDom("dial: malformed boolean displays off", `!${colorToggle}.checked`, 2000);
 	check("dial: malformed setting is not rewritten on opening", writes.length === mark && store.settings.sensorValueColors === "true");
 	await setSelect("dialView", "overview");
@@ -2567,7 +2591,7 @@ try {
 	store.settings.rotationKeys = [...colorKeys].reverse();
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	check("dial: reopen and reordered readings write nothing", writes.length === mark);
 	await waitDom("dial: custom well survives reopening and reordering", `document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').value === '#123abc'`, 2000);
 	await evaluate(`document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').parentElement.querySelector('button').click()`);
@@ -2585,7 +2609,7 @@ try {
 	// cut keys in the config document.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/gadget`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("gadget: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const gadgetChips = JSON.parse(
 		(await evaluate(`JSON.stringify([...document.querySelectorAll("#detail-list .hw-set-chip")].map((c) => ({ key: c.dataset.key ?? null, missing: c.classList.contains("missing"), text: c.textContent.trim().slice(0, 40) })))`)).result?.value ?? "[]"
@@ -2646,7 +2670,7 @@ try {
 	// tick is exactly one write and no set ever holds both endpoints.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/linked`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("linked: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const linkedTruth = JSON.parse(
 		(await evaluate(`JSON.stringify({
@@ -2739,7 +2763,7 @@ try {
 	await cdp("Network.setBlockedURLs", { urls: ["*docs.slawrensen.com*"] });
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("link: opened the Advanced fold", (await evaluate(`(() => {
 		const fold = document.querySelector('details[data-fold="advanced"]');
 		if (!fold) return "missing";
@@ -2838,7 +2862,7 @@ try {
 	// answered does not list the key.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/down`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("down: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	// The panel's words for the three answers a saved key can get: found
 	// nowhere in a snapshot HWiNFO answered, kept while no tree can answer,
@@ -2883,7 +2907,7 @@ try {
 	const staleGadgetSeed = structuredClone(store.settings);
 	const staleGlobalMark = globalWrites.length;
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	const gadgetUp = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
 	check("stale Gadget: a current tree marks only the absent selection", gadgetUp.missing === true && deepEqual(gadgetUp.chips, [false, false, true]), JSON.stringify(gadgetUp));
 	const staleHint = "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support.";

@@ -110,3 +110,23 @@ describe("release workflow privilege boundary", () => {
 		assert.equal(workflow.match(/\$\{\{ github.ref_name \}\}/g)?.length, 1);
 	});
 });
+
+describe("the shipped NOTICE carries every bundled license (external review AX32)", () => {
+	// What rollup bundles into bin/plugin.js (measured: @elgato/streamdeck,
+	// @elgato/utils, @elgato/schemas, ws, tslib) plus the Lit code inside the
+	// vendored sdpi-components.js. Each license text must ship whole.
+	const flat = (text: string): string => text.replace(/\s+/g, " ").trim();
+	const notice = flat(readFileSync(join(ROOT, "NOTICE.md"), "utf8"));
+	for (const file of ["@elgato/streamdeck/LICENSE", "@elgato/utils/LICENSE", "@elgato/schemas/LICENSE", "ws/LICENSE", "tslib/LICENSE.txt"]) {
+		it(`${file.split("/").slice(0, -1).join("/")}: its copyright and license text ship whole`, () => {
+			assert.ok(notice.includes(flat(readFileSync(join(ROOT, "node_modules", file), "utf8"))));
+		});
+	}
+	it("Lit, inside sdpi-components: its copyright and the three BSD conditions ship", () => {
+		const header = readFileSync(join(ROOT, "com.lawrensen.hwinfo.sdPlugin/ui/sdpi-components.js"), "utf8").slice(0, 400);
+		assert.match(header, /Lit, Copyright 2019 Google LLC, SPDX-License-Identifier: BSD-3-Clause/);
+		for (const phrase of ["Copyright 2019 Google LLC", "Redistributions of source code must retain the above copyright notice", "Redistributions in binary form must reproduce the above copyright notice", "Neither the name of the copyright holder nor the names of its contributors"]) {
+			assert.ok(notice.includes(phrase), phrase);
+		}
+	});
+});

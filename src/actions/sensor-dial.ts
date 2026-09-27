@@ -23,6 +23,7 @@
 import streamDeck, { action, SingletonAction, type DialAction, type DialDownEvent, type DialRotateEvent, type DialUpEvent, type DidReceiveSettingsEvent, type SendToPluginEvent, type TouchTapEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
+import { monotonicNow } from "../clock";
 import { registerDialCommandHandler, type ControlCommandId, type DialControlCommand } from "../commands";
 import { parseResetScope, resolveControls, schemeCanSwitchGroups, triggerDescriptions, type ControlScheme, type GestureCommandId, type ResetScope } from "../controls";
 import { deviceCapabilities, tapCanvasWidth } from "../devices";
@@ -152,7 +153,8 @@ export type InstanceState = {
 	/** Ephemeral display mode; reset to "current" on long touch. */
 	statMode: StatMode;
 	lastFeedback: string;
-	/** Next autocycle due time (epoch ms); null re-arms on the next tick. */
+	/** Next autocycle due time (monotonicNow, so a wall-clock correction never
+	 * moves it, AX43); null re-arms on the next tick. */
 	nextCycleAt: number | null;
 	cyclePaused: boolean;
 	/** Pinned: selection cannot change (turns, taps, autocycle) until unpinned. */
@@ -164,6 +166,9 @@ export type InstanceState = {
 	deviceId: string;
 	/** A threshold edit is waiting for a resolvable reading to stamp its unit. */
 	pendingAlertUnitStamp: boolean;
+	/** The reading on screen when that edit landed: the stamp takes its
+	 * unit even if the selection moves before data returns (AX28). */
+	pendingAlertUnitKey?: string;
 	/** A stale or unavailable tick ended this dial's sessions; the first live
 	 * frame afterwards says so once, so a collapsed min/max is explained. */
 	gapReset?: boolean;
@@ -230,7 +235,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		// poller idle (nothing visible) the sweep never runs, and a return
 		// hours later must not resurrect stale pause/pin/stats state.
 		const hiddenEntry = this.hidden.get(ev.action.id);
-		const restored = replayed ?? (hiddenEntry !== undefined && Date.now() - hiddenEntry.at <= HIDDEN_STATE_TTL_MS ? hiddenEntry.state : undefined);
+		const restored = replayed ?? (hiddenEntry !== undefined && monotonicNow() - hiddenEntry.at <= HIDDEN_STATE_TTL_MS ? hiddenEntry.state : undefined);
 		this.hidden.delete(ev.action.id);
 		if (replayed === undefined) {
 			poller.retain();
@@ -255,6 +260,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			overlayTimer: null,
 			deviceId: ev.action.device.id,
 			pendingAlertUnitStamp: restored?.pendingAlertUnitStamp ?? false,
+			pendingAlertUnitKey: restored?.pendingAlertUnitKey,
 			// A gap that ended this dial's sessions while it was hidden, or
 			// before a replayed appear, is still owed its one explanation.
 			gapReset: restored?.gapReset ?? false,
@@ -297,7 +303,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		}
 		state.overlay = null;
 		state.lastFeedback = ""; // the strip may be repainted by others meanwhile
-		this.hidden.set(ev.action.id, { at: Date.now(), state });
+		this.hidden.set(ev.action.id, { at: monotonicNow(), state });
 		if (this.hidden.size > HIDDEN_STATE_CAP) {
 			const oldest = this.hidden.keys().next().value;
 			if (oldest !== undefined) {
@@ -334,6 +340,11 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (thresholdsChanged && ev.action.isDial()) {
 			state.settings = { ...state.settings, alertUnit: undefined };
 			state.pendingAlertUnitStamp = [state.settings.warnValue, state.settings.critValue, state.settings.barMin, state.settings.barMax].some((v) => parseThreshold(v) !== undefined);
+			// Only a reading actually on screen anchors the stamp: one the
+			// dial showed as missing leaves it to the next reading chosen.
+			const onScreen = readingKeyOf(state.settings);
+			const seen = poller.getStatus();
+			state.pendingAlertUnitKey = onScreen !== undefined && (seen.state === "unavailable" || seen.snapshot.byKey.has(onScreen)) ? onScreen : undefined;
 			void ev.action.setSettings(state.settings);
 			this.stampAlertUnit(ev.action, state);
 		}
@@ -590,7 +601,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 
 	private onPollerTick(status: PollerStatus): void {
 		if (status.state === "ok") {
-			const now = Date.now();
+			const now = monotonicNow();
 			// Stats accumulate for the selected reading and every rotation-set
 			// member, visible or hidden, so rotating (back) to a member shows
 			// its true session, and hidden members keep alert coverage. The
@@ -603,7 +614,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 					state.gapReset = false;
 					this.showOverlay(state, sessionResetMessage("gap"));
 				}
-				this.sampleStats(state, status.snapshot, status.source);
+				// Visible dials are sampled once, by renderAll below (MS02).
 				this.syncRowSeries(state, status.snapshot);
 			}
 			// Completes a unit stamp whose threshold edit landed while the
@@ -740,8 +751,10 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 					state.nextCycleAt = now + interval;
 					continue;
 				}
-				// adoptReading leaves nextCycleAt null; the next tick re-arms
-				// a full interval out.
+				// The outgoing reading takes this tick's sample before the move;
+				// renderAll samples the new selection. adoptReading leaves
+				// nextCycleAt null; the next tick re-arms a full interval out.
+				this.sampleStats(state, status.snapshot, status.source);
 				void this.adoptReading(act, state, target.key);
 			}
 		}
@@ -770,7 +783,8 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 
 	/**
 	 * Stamps the unit the thresholds/bar range apply to, from the reading on
-	 * screen when the user edited them (the pending flag is set only there).
+	 * screen when the user edited them (the pending flag and key are set only
+	 * there; with no reading selected yet, the first one chosen).
 	 * Settings that predate unit scoping are never stamped uninvited: they
 	 * keep the old apply-everywhere behavior until the next threshold edit,
 	 * because guessing their unit from whatever reading happens to be
@@ -787,12 +801,13 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (status.state === "unavailable") {
 			return; // stamped by a later tick, once the reading resolves
 		}
-		const key = readingKeyOf(state.settings);
+		const key = state.pendingAlertUnitKey ?? readingKeyOf(state.settings);
 		const reading = key === undefined ? undefined : status.snapshot.byKey.get(key);
 		if (reading === undefined) {
 			return;
 		}
 		state.pendingAlertUnitStamp = false;
+		state.pendingAlertUnitKey = undefined;
 		state.settings = { ...state.settings, alertUnit: reading.unit };
 		void action.setSettings(state.settings);
 	}
@@ -818,7 +833,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		// will be discarded at restore, so counting it as "reached" would
 		// show the control key a false ok tick.
 		if (!SELECTION_COMMANDS.has(command.command)) {
-			const now = Date.now();
+			const now = monotonicNow();
 			for (const [id, entry] of this.hidden) {
 				if (now - entry.at > HIDDEN_STATE_TTL_MS) {
 					this.hidden.delete(id);
@@ -906,7 +921,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 	}
 
 	private showOverlay(state: InstanceState, text: string): void {
-		state.overlay = { text, until: Date.now() + OVERLAY_MS };
+		state.overlay = { text, until: monotonicNow() + OVERLAY_MS };
 		if (state.overlayTimer !== null) {
 			clearTimeout(state.overlayTimer);
 		}
@@ -1020,9 +1035,11 @@ function matchesTarget(target: string, settings: DialSettings): boolean {
 	return target === "" || (typeof settings.linkId === "string" && settings.linkId.trim() === target);
 }
 
-/** The PI writes "off" or a millisecond count; anything else means off too. */
-function parseAutoCycleMs(raw: string | undefined): number | null {
-	const ms = raw !== undefined && raw !== "" ? Number(raw) : NaN;
+/** The PI writes "off" or a millisecond count; anything else means off
+ * too. Only a string or number counts: settings are untyped JSON, and a
+ * boolean or array coerces to a number while an object can throw (AX31). */
+function parseAutoCycleMs(raw: unknown): number | null {
+	const ms = (typeof raw === "string" && raw !== "") || typeof raw === "number" ? Number(raw) : NaN;
 	return Number.isInteger(ms) && ms > 0 ? ms : null;
 }
 
@@ -1114,7 +1131,7 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 	const stateTag = state.pinned ? "pinned" : state.cyclePaused && parseAutoCycleMs(settings.autoCycleMs) !== null ? "cycle paused" : "session";
 	const minText = formatStat(stats.min, reading.unit, measureOpts);
 	const maxText = formatStat(stats.max, reading.unit, measureOpts);
-	const statsLine = overlay !== null && overlay.until > Date.now() ? overlay.text : isDataUnit(reading.unit) ? `▼${minText} ▲${maxText} ${stateTag}` : `▼ ${minText}   ▲ ${maxText}   ${stateTag}`;
+	const statsLine = overlay !== null && overlay.until > monotonicNow() ? overlay.text : isDataUnit(reading.unit) ? `▼${minText} ▲${maxText} ${stateTag}` : `▼ ${minText}   ▲ ${maxText}   ${stateTag}`;
 	return renderDial({
 		title: label,
 		valueText: shown.valueText,
@@ -1153,7 +1170,9 @@ function rotationNamesOf(settings: DialSettings): Record<string, string> | undef
 	let names: Record<string, string> | undefined;
 	for (const [key, value] of Object.entries(raw)) {
 		if (typeof value === "string" && value.trim() !== "") {
-			(names ??= {})[key] = value.trim();
+			// No prototype: a saved key like "__proto__" is an entry, not the
+			// prototype setter (external review AX35).
+			(names ??= Object.create(null) as Record<string, string>)[key] = value.trim();
 		}
 	}
 	return names;
@@ -1236,7 +1255,7 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 	const stateTag = state.pinned ? "pinned" : state.cyclePaused && parseAutoCycleMs(settings.autoCycleMs) !== null ? "cycle paused" : badge !== "" || deduped.prefix !== "" ? "" : "session";
 	const tags = [badge, stateTag].filter((part) => part !== "").join(" · ");
 	const overlay = state.overlay;
-	const overlayActive = overlay !== null && overlay.until > Date.now();
+	const overlayActive = overlay !== null && overlay.until > monotonicNow();
 	if (rowCount === 2) {
 		// The two-row face keeps the single footer line: the stripped shared
 		// prefix TRAILS it so the renderer's fitting may shorten the context

@@ -19,7 +19,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
-import { cleanupBrowser } from "./process-ownership.mjs";
+import { browserDebuggerPort, cleanupBrowser } from "./process-ownership.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -32,32 +32,66 @@ export function chromePath() {
 	throw new Error("No Chromium found: set CHROME to a Chrome or Chromium binary.");
 }
 
-/** Launches Chromium on `port` and resolves a connected client. */
-export async function launch({ port, width = 400, height = 900, scale = 1 }) {
+/** Launches Chromium on a free port and resolves a connected client. */
+export async function launch({ width = 400, height = 900, scale = 1 } = {}) {
 	const profile = mkdtempSync(path.join(os.tmpdir(), "hw-pi-lab-"));
-	const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--hide-scrollbars", "--font-render-hinting=none", "about:blank"];
+	const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--hide-scrollbars", "--font-render-hinting=none", "about:blank"];
 	if (process.platform === "linux" && process.getuid?.() === 0) args.unshift("--no-sandbox");
 	const startedAt = new Date().toISOString();
 	const proc = spawn(chromePath(), args, { stdio: "ignore" });
+	/** Stops this launch's browser and removes its profile. */
+	const stopBrowser = async () => {
+		await new Promise((resolve) => {
+			if (proc.exitCode !== null) return resolve();
+			proc.once("exit", resolve);
+			proc.kill("SIGTERM");
+			setTimeout(() => {
+				if (proc.exitCode === null) proc.kill("SIGKILL");
+			}, 3000).unref();
+			// A process that cannot be ended never holds the run open.
+			setTimeout(resolve, 5000).unref();
+		});
+		if (process.platform === "win32") {
+			try {
+				cleanupBrowser(profile, startedAt);
+			} catch {
+				/* best effort: a leftover is reported by the caller's own sweep */
+			}
+		}
+		try {
+			rmSync(profile, { recursive: true, force: true });
+		} catch {
+			/* a straggling renderer may still hold a file; the OS temp sweep owns it */
+		}
+	};
+	// Port zero: Chromium binds a free port and names it in this launch's own
+	// profile, so the debugger found is always this browser (external review
+	// AX40). Another browser on a fixed port, or a stale run, can never be
+	// driven or reported as evidence.
 	let target = null;
 	for (let i = 0; i < 60 && target === null; i++) {
 		await sleep(250);
 		try {
-			const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+			const list = await (await fetch(`http://127.0.0.1:${browserDebuggerPort(profile)}/json/list`)).json();
 			target = list.find((t) => t.type === "page") ?? null;
 		} catch {
 			/* debugger not up yet */
 		}
 	}
 	if (target === null) {
-		proc.kill("SIGKILL");
+		await stopBrowser();
 		throw new Error("chromium debugger never came up");
 	}
 	const ws = new WebSocket(target.webSocketDebuggerUrl, { maxPayload: 256 * 1024 * 1024 });
-	await new Promise((resolve, reject) => {
-		ws.once("open", resolve);
-		ws.once("error", reject);
-	});
+	try {
+		await new Promise((resolve, reject) => {
+			ws.once("open", resolve);
+			ws.once("error", reject);
+		});
+	} catch (error) {
+		await stopBrowser(); // a launch that fails never leaves its browser behind
+		throw error;
+	}
 	let seq = 0;
 	const pending = new Map();
 	const listeners = new Map();
@@ -76,10 +110,15 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 			pending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)));
 			ws.send(JSON.stringify({ id, method, params }));
 		});
+	/** Subscribes to a CDP event; returns the unsubscribe. */
 	const on = (method, fn) => {
 		const list = listeners.get(method) ?? [];
 		list.push(fn);
 		listeners.set(method, list);
+		return () => {
+			const at = list.indexOf(fn);
+			if (at >= 0) list.splice(at, 1);
+		};
 	};
 
 	const client = {
@@ -97,12 +136,20 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 			return res.result?.value;
 		},
 		async goto(url) {
+			// Each navigation drops its listener and deadline once settled, so
+			// neither accumulates across a suite's hundreds of navigations.
+			let off = () => {};
+			let deadline;
 			const loaded = new Promise((resolve) => {
-				const done = () => resolve();
-				on("Page.loadEventFired", done);
+				off = on("Page.loadEventFired", resolve);
 			});
-			await send("Page.navigate", { url });
-			await Promise.race([loaded, sleep(10000)]);
+			try {
+				await send("Page.navigate", { url });
+				await Promise.race([loaded, new Promise((resolve) => (deadline = setTimeout(resolve, 10000)))]);
+			} finally {
+				off();
+				clearTimeout(deadline);
+			}
 		},
 		/** PNG of the page; `full` captures the whole scroll height. */
 		async screenshot({ full = true } = {}) {
@@ -167,39 +214,23 @@ export async function launch({ port, width = 400, height = 900, scale = 1 }) {
 			} catch {
 				/* already closed */
 			}
-			await new Promise((resolve) => {
-				if (proc.exitCode !== null) return resolve();
-				proc.once("exit", resolve);
-				proc.kill("SIGTERM");
-				setTimeout(() => {
-					if (proc.exitCode === null) proc.kill("SIGKILL");
-				}, 3000).unref();
-				// A process that cannot be ended never holds the run open.
-				setTimeout(resolve, 5000).unref();
-			});
-			if (process.platform === "win32") {
-				try {
-					cleanupBrowser(profile, startedAt);
-				} catch {
-					/* best effort: a leftover is reported by the caller's own sweep */
-				}
-			}
-			try {
-				rmSync(profile, { recursive: true, force: true });
-			} catch {
-				/* a straggling renderer may still hold a file; the OS temp sweep owns it */
-			}
+			await stopBrowser();
 		},
 		pid: proc.pid
 	};
-	await send("Page.enable");
-	await send("Runtime.enable");
-	// A property inspector the person is using is a focused page. Headless
-	// Chromium on Windows is not, and there a scripted focus() moves
-	// activeElement without firing focus events, so a combobox that opens
-	// on focus never opens. Emulating focus makes the page behave like the
-	// focused panel it stands in for.
-	await send("Emulation.setFocusEmulationEnabled", { enabled: true });
-	await client.viewport(width, height, scale);
+	try {
+		await send("Page.enable");
+		await send("Runtime.enable");
+		// A property inspector the person is using is a focused page. Headless
+		// Chromium on Windows is not, and there a scripted focus() moves
+		// activeElement without firing focus events, so a combobox that opens
+		// on focus never opens. Emulating focus makes the page behave like the
+		// focused panel it stands in for.
+		await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+		await client.viewport(width, height, scale);
+	} catch (error) {
+		await client.close();
+		throw error;
+	}
 	return client;
 }

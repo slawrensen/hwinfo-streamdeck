@@ -457,6 +457,51 @@ describe("parseSnapshot — malformed input", () => {
 		assert.throws(() => parseSnapshot(buf), (e: unknown) => e instanceof HwinfoError && e.reason === "invalid");
 	});
 
+	// External review AX38: a direct caller gets the typed error for every
+	// truncated or out-of-bounds layout, never a RangeError, and nothing is
+	// allocated from a count the buffer cannot hold.
+	const invalid = (e: unknown): boolean => e instanceof HwinfoError && e.reason === "invalid";
+	it("rejects every buffer shorter than the header", () => {
+		for (let n = 0; n < HEADER_SIZE; n++) {
+			assert.throws(() => new SnapshotParser().parse(Buffer.alloc(n)), invalid, `${n} bytes`);
+		}
+	});
+
+	it("rejects sections that run past the buffer, and counts past the native bound", () => {
+		const whole = compose([CPU], [TEMP]);
+		assert.throws(() => parseSnapshot(whole.subarray(0, whole.length - 1)), invalid, "entry section cut short");
+		const count = Buffer.from(whole);
+		count.writeUInt32LE(0xffffffff, HEADER.entryElementCount);
+		assert.throws(() => parseSnapshot(count), invalid, "huge entry count");
+		const inside = Buffer.from(whole);
+		inside.writeUInt32LE(8, HEADER.sensorSectionOffset);
+		assert.throws(() => parseSnapshot(inside), invalid, "sensor section inside the header");
+	});
+
+	it("an empty section may sit anywhere, as the native reader allows", () => {
+		const empty = compose([], []);
+		empty.writeUInt32LE(0, HEADER.sensorSectionOffset);
+		empty.writeUInt32LE(0, HEADER.entrySectionOffset);
+		assert.equal(parseSnapshot(empty).readings.length, 0);
+	});
+
+	it("a count past the native bound is refused even when the buffer could hold it", () => {
+		const one = compose([CPU], [TEMP]);
+		const count = 100_001;
+		const big = Buffer.alloc(one.length + (count - 1) * ENTRY_CLASSIC_SIZE);
+		one.copy(big);
+		big.writeUInt32LE(count, HEADER.entryElementCount);
+		assert.throws(() => parseSnapshot(big), invalid);
+	});
+
+	it("a cached skeleton never reads a shorter buffer on the fast path", () => {
+		const whole = compose([CPU], [TEMP]);
+		const parser = new SnapshotParser();
+		parser.parse(whole);
+		assert.throws(() => parser.parse(Buffer.from(whole.subarray(0, whole.length - 8))), invalid);
+		assert.equal(parser.parse(whole).readings.length, 1, "the whole buffer still decodes");
+	});
+
 	it("garbage label bytes decode without throwing (lossy, never fatal)", () => {
 		const buf = compose([CPU], [TEMP], { utf8: true });
 		// Invalid UTF-8 in the label tail must not break the decode.

@@ -220,12 +220,20 @@ self.hwModel = (() => {
 		return typeof command === "string" && Object.hasOwn(GESTURE, command) ? GESTURE[command] : "does nothing";
 	}
 
+	/** The auto-cycle interval the dial runs, or null for off: the plugin's
+	 * parseAutoCycleMs exactly (a string or number that is a positive
+	 * integer millisecond count; a boolean or array is off, AX31). */
+	function autoCycleMsOf(settings) {
+		const raw = settings.autoCycleMs;
+		const ms = (typeof raw === "string" && raw !== "") || typeof raw === "number" ? Number(raw) : NaN;
+		return Number.isInteger(ms) && ms > 0 ? ms : null;
+	}
+
 	/** Dial gestures from the plugin's resolved scheme; stored preset otherwise. */
 	function dialInteractionSummary(settings, preview) {
 		const c = preview?.effective?.controls;
-		// parseAutoCycleMs: any positive integer millisecond count runs.
-		const ms = typeof settings.autoCycleMs === "string" && settings.autoCycleMs !== "" ? Number(settings.autoCycleMs) : NaN;
-		const cycle = Number.isInteger(ms) && ms > 0 ? `auto cycle ${ms % 60000 === 0 ? `${ms / 60000} min` : `${ms / 1000} s`}` : "";
+		const ms = autoCycleMsOf(settings);
+		const cycle = ms !== null ? `auto cycle ${ms % 60000 === 0 ? `${ms / 60000} min` : `${ms / 1000} s`}` : "";
 		const bump = settings.rotationDisabled === true ? "turns ignored" : "";
 		if (c === undefined) {
 			const p = settings.controlPreset === "elite" || settings.controlPreset === "custom" ? settings.controlPreset : "legacy";
@@ -369,12 +377,26 @@ self.hwModel = (() => {
 		return out;
 	}
 
+	/** JSON with every object's keys sorted: equal for equal documents in
+	 * whatever order a delivery wrote their keys. */
+	function sortedJson(value) {
+		return JSON.stringify(value, (_, v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
+	}
+
+	/** Sets one entry as an own property whatever the key's spelling: a
+	 * stored key like "__proto__" would otherwise reach the prototype
+	 * setter and store nothing (external review AX35). */
+	function setOwn(obj, key, value) {
+		Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
+		return obj;
+	}
+
 	/** A name map with one entry set (or removed on empty); junk entries
 	 * the parser skipped ride along untouched. */
 	function patchNames(raw, key, name) {
 		const out = isPlainObject(raw) ? { ...raw } : {};
 		if (name === "") delete out[key];
-		else out[key] = name;
+		else setOwn(out, key, name);
 		return out;
 	}
 
@@ -415,6 +437,9 @@ self.hwModel = (() => {
 		patchEntry,
 		patchNames,
 		patchColors,
+		setOwn,
+		sortedJson,
+		autoCycleMsOf,
 		same,
 		LAYOUT_NAMES,
 		VIEW_NAMES,

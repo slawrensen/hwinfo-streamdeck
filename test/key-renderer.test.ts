@@ -798,12 +798,20 @@ describe("quad value shrink ramp and formatter", () => {
 		assert.match(renderQuad({ cells: [quadCell({ valueText: "-9999" }), null, null, null] }), /<text x="36" y="40" [^>]*font-size="22"/);
 	});
 
-	it("value text past 7 code points ellipsizes (defensive; the formatter caps at 4)", () => {
+	it("value text past 7 code points ellipsizes, which is where values beyond ±9999T land", () => {
 		const svg = renderQuad({ cells: [quadCell({ valueText: "123456789", unitText: "" }), null, null, null] });
 		assert.match(svg, />123456…</);
+		// The formatter has no tier past T (external review AX45), so the
+		// largest finite readings run long and the renderer truncates them.
+		for (const [value, shown] of [[Number.MAX_VALUE, "1.7976…"], [-Number.MAX_VALUE, "-1.797…"]] as const) {
+			const text = formatQuadValue(value, "auto");
+			assert.ok(Array.from(text).length > 7, text);
+			const svg = renderQuad({ cells: [quadCell({ valueText: text, unitText: "" }), null, null, null] });
+			assert.equal(svg.match(/<text x="36" y="40"[^>]*>([^<]*)</)?.[1], shown);
+		}
 	});
 
-	it("formatQuadValue caps every magnitude at 4 glyphs", () => {
+	it("formatQuadValue keeps every magnitude through ±9999T at 4 glyphs", () => {
 		const CASES: Array<[number, "auto" | "0" | "1" | "2" | "3", string]> = [
 			[7, "auto", "7.00"],
 			[56.34, "auto", "56.3"],

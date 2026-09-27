@@ -31,20 +31,24 @@ import { PanelFoldMemory } from "../src/panel-folds.ts";
 const failures = [];
 const check = makeCheck((name) => failures.push(name));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-// PI_PANELS_PORT_BASE moves the three ports, so a second copy (a control
+// PI_PANELS_PORT_BASE moves the simulator's two ports (the browser picks its
+// own debugger port), so a second copy (a control
 // run against other panel files through PI_SIM_PLUGIN_DIR) can run beside.
 const PORT_BASE = Number(process.env.PI_PANELS_PORT_BASE ?? 29320);
-const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1, debug: PORT_BASE + 2 };
+const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1 };
 
 const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
-const b = await launch({ port: PORTS.debug, width: 400, height: 900 });
+const b = await launch({ width: 400, height: 900 });
 const pageErrors = [];
 b.on("Runtime.exceptionThrown", (p) => pageErrors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
 // A hang guard, not a speed check: a normal run takes about four minutes
 // (it ran 214 s against the earlier 300 s guard before the external
 // review's race checks were added), so the guard sits well above that.
-const watchdog = setTimeout(() => {
+const watchdog = setTimeout(async () => {
 	console.error("[e2e-pi-panels] watchdog: 420 s elapsed, aborting");
+	// The owned browser and the simulated host go first, never left behind
+	// by the early exit (external review AX41); a stuck close waits 10 s at most.
+	await Promise.race([Promise.allSettled([b.close(), sim.stop()]), sleep(10_000)]);
 	process.exit(2);
 }, 420_000);
 watchdog.unref();
@@ -298,6 +302,53 @@ try {
 			await sleep(400);
 			check(`lossless: renaming the first tile keeps an untouched trailing tile holding ${what}`, sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 1, labels: ["EDITED"] }, trailing]), tilesOut());
 		}
+		// A partial tile moved ahead shrinks to the cells its readings fill,
+		// and its dormant cells' entries stay stored past the new size
+		// (external review AX29).
+		const partial = { size: 4, labels: ["B", " d1 ", " d2 ", " d3 "], colors: ["#112233", { future: 1 }, "bad", "#aabbcc"] };
+		await open("key-details", { settings: { ...detailFx, detailKeys: [k[0], k[1]], detailTiles: [{ size: 1 }, structuredClone(partial)] } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		await b.evaluate(`document.querySelector('#detail-list .hw-tile-grip[data-tile="1"]').focus()`);
+		await b.key("ArrowUp");
+		await sleep(400);
+		check("lossless: a partial tile moved ahead keeps its dormant cells' entries past its new size", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...partial, size: 1 }]) && same(lastWrite()?.detailKeys, [k[1], k[0]]), tilesOut());
+		// An unrelated edit keeps short stored lists short (AX33) and every
+		// key's stored spelling, pasted name and spacing included (AX37).
+		const spelled = [` ${k[0]}  CPU temperature `, k[1]];
+		await open("key-details", { settings: { ...detailFx, detailKeys: [...spelled], detailTiles: [{ size: 2, labels: ["A", "B"], colors: [], automaticColors: [] }] } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-name").click()`);
+		await sleep(150);
+		await b.evaluate(`(() => { const i = document.querySelector("#detail-list .hw-cell-rename"); i.value = "NEW"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+		await sleep(400);
+		check("lossless: renaming one cell leaves empty stored color lists empty", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 2, labels: ["NEW", "B"], colors: [], automaticColors: [] }]), tilesOut());
+		check("lossless: renaming one cell keeps every key's stored spelling", same(lastWrite()?.detailKeys, spelled), tilesOut());
+		// A key removed and ticked back is a new addition: written bare.
+		await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-remove").click()`);
+		await sleep(300);
+		await b.evaluate(`document.getElementById("pickerd-search").focus()`);
+		await sleep(300);
+		await b.evaluate(`document.querySelector('#pickerd-list [data-key="${k[0]}"]').click()`);
+		await sleep(400);
+		check("details: a key removed and added back is written bare, not with its old spelling", same(lastWrite()?.detailKeys, [k[1], k[0]]), tilesOut());
+		// Removing a reading from a tile whose empty cells still hold stored
+		// entries shifts those cells: nothing is written twice (review of d13).
+		await open("key-details", { settings: { ...detailFx, detailKeys: [k[0], k[1]], detailTiles: [{ size: 4, labels: ["B", "C", "d2", "d3"], colors: ["#111111", "#222222", "#333333", "#444444"] }] } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-remove").click()`);
+		await sleep(400);
+		check("lossless: removing a reading from a partial tile writes each stored entry once", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 3, labels: ["C", "d2", "d3"], colors: ["#222222", "#333333", "#444444"] }]), tilesOut());
+		// A partial tile cycled down to the fill size, storing only blank
+		// entries, restates the fill and is pruned (review of d13).
+		await open("key-details", { settings: { ...detailFx, detailKeys: [k[0], k[1]], detailTiles: [{ size: 1, labels: ["A"] }, { size: 4, labels: ["", "", "", ""], colors: [null, null, null, null], cellLabels: true }] } });
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		await b.evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="1"]').click()`);
+		await sleep(400);
+		check("details: a blank partial tile cycled to the fill size is pruned", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 1, labels: ["A"] }]), tilesOut());
 	}
 	// One press removes one reading from a detail list too (external review
 	// AX20): Enter held on a chip's remove used to empty the list.
@@ -351,6 +402,99 @@ try {
 				check(`${name}: a separate click after the double click confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 			}
 		}
+	}
+	// An arm names the whole stored group or set: a changed reading list
+	// whose keys join to the same text, or a rename alone, disarms, and the
+	// next press only arms for what is there now (external review AX30).
+	const collide = [
+		["group Remove, reading list", "#rotation-set .hw-group-remove", [{ name: "Old", keys: ["a|b"] }, { name: "Two", keys: ["z"] }], [{ name: "Old", keys: ["a", "b"] }, { name: "Two", keys: ["z"] }]],
+		["group Remove, rename", "#rotation-set .hw-group-remove", [{ name: "Old", keys: ["a"] }, { name: "Two", keys: ["z"] }], [{ name: "New", keys: ["a"] }, { name: "Two", keys: ["z"] }]],
+		["Merge, reading list", '#rotation-set [data-set-action="merge"]', [{ name: "A", keys: ["x|y"] }, { name: "B", keys: ["z"] }], [{ name: "A", keys: ["x", "y"] }, { name: "B", keys: ["z"] }]]
+	];
+	for (const [what, sel, before, after] of collide) {
+		const doc = (groups) => ({ readingKey: "z", controlPreset: "elite", rotationKeys: groups.flatMap((g) => g.keys), rotationGroups: groups });
+		await open("dial-groups", { settings: doc(before) });
+		await b.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = true; })`);
+		await b.click(sel);
+		await sleep(550);
+		sim.pushSettings(doc(after));
+		await sleep(250);
+		const armedAfterDelivery = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
+		await b.click(sel);
+		await sleep(250);
+		const armedAfterPress = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
+		check(`${what}: a changed group drops the arm, and the next press only arms`, armedAfterDelivery !== "true" && armedAfterPress === "true" && sim.writes.length === 0, JSON.stringify({ armedAfterDelivery, armedAfterPress, ...writes() }));
+	}
+	// The same group delivered with its keys in another order is no change:
+	// the arm stays and the next press confirms.
+	{
+		const groups = [{ name: "Old", keys: ["a"] }, { name: "Two", keys: ["z"] }];
+		const doc = (g) => ({ readingKey: "z", controlPreset: "elite", rotationKeys: ["a", "z"], rotationGroups: g });
+		await open("dial-groups", { settings: doc(groups) });
+		await b.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = true; })`);
+		await b.click("#rotation-set .hw-group-remove");
+		await sleep(550);
+		sim.pushSettings(doc(groups.map((g) => ({ keys: g.keys, name: g.name }))));
+		await sleep(250);
+		const kept = await b.evaluate(`document.querySelector("#rotation-set .hw-group-remove")?.dataset.armed ?? null`);
+		check("group Remove: the same group delivered with its keys reordered keeps the arm", kept === "true" && sim.writes.length === 0, JSON.stringify({ kept, ...writes() }));
+	}
+	// The shared Apply arm names one document: a well whose text changed
+	// since the arm, even without typing, is a new first press.
+	await open("key-configured");
+	await b.evaluate(`(() => { document.querySelectorAll("details").forEach((d) => { d.open = true; }); const t = document.getElementById("config-deck"); t.value = JSON.stringify({ theme: "paper" }); t.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+	await sleep(150);
+	await b.click("#config-deck-apply");
+	await sleep(550);
+	await b.evaluate(`document.getElementById("config-deck").value = JSON.stringify({ theme: "ember" })`);
+	await b.click("#config-deck-apply");
+	await sleep(250);
+	check("Replace shared settings: a document changed since the arm only arms again", sim.globalWrites.length === 0 && (await b.evaluate(`document.getElementById("config-deck-apply").dataset.armed`)) === "true", JSON.stringify(writes()));
+
+	// A queued Elite-to-Custom seed belongs to the document the person
+	// picked Custom in: a newer document arriving first gets no Elite
+	// fields (external review AX34).
+	await open("dial-groups");
+	await b.evaluate(`(() => {
+		window.__seeds = [];
+		const real = window.setTimeout;
+		window.__realSetTimeout = real;
+		window.setTimeout = (fn, ms, ...args) => (ms === 0 && (fn.name === "seedFromElite" || String(fn).includes("seedFromElite")) ? (window.__seeds.push(fn), 0) : real(fn, ms, ...args));
+		const s = document.getElementById("f-preset");
+		s.value = "custom";
+		s.dispatchEvent(new Event("change", { bubbles: true }));
+	})()`);
+	await sleep(150);
+	const newer = { readingKey: sim.settings.readingKey, controlPreset: "legacy", future: { keep: "newer document" } };
+	sim.pushSettings(newer);
+	await sleep(250);
+	const beforeSeed = sim.writes.length;
+	const queued = await b.evaluate(`(() => { window.setTimeout = window.__realSetTimeout; for (const fn of window.__seeds) fn(); return window.__seeds.length; })()`);
+	await sleep(400);
+	check("preset: a seed queued before a newer document arrived writes nothing into it", queued === 1 && sim.writes.length === beforeSeed && !("gestureShortPress" in sim.settings), JSON.stringify({ queued, seeds: sim.writes.length - beforeSeed, settings: sim.settings }));
+
+	// A stored key spelled like a JavaScript built-in still gets its own
+	// name and color entries (external review AX35).
+	await open("dial-configured", { settings: { readingKey: "__proto__", rotationKeys: ["__proto__", "a"] } });
+	await b.evaluate(`(() => { document.querySelectorAll("details").forEach((d) => { d.open = true; }); document.querySelector("#rotation-set [role=option]").click(); document.querySelector('#rotation-set [data-tool="rename"]').click(); })()`);
+	await sleep(150);
+	await b.evaluate(`(() => { const i = document.querySelector(".hw-chip-rename"); i.value = "My reading"; i.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	await sleep(300);
+	const protoName = lastWrite()?.rotationNames;
+	await b.evaluate(`(() => { const c = document.getElementById("reading-color-0"); c.value = "#123456"; c.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	await sleep(300);
+	const protoColor = lastWrite()?.readingColors;
+	check("a reading stored as __proto__ keeps its own name and color", protoName !== undefined && Object.hasOwn(protoName, "__proto__") && protoName.__proto__ === "My reading" && protoColor !== undefined && Object.hasOwn(protoColor, "__proto__") && protoColor.__proto__ === "#123456", JSON.stringify({ protoName, protoColor, ...writes() }));
+
+	// Auto cycle is described exactly as the dial runs it (AX31): a string
+	// or number interval runs; a boolean or list is off.
+	for (const [raw, runs] of [["5000", true], [5000, true], [true, false], [[5000], false]]) {
+		await open("dial-configured", { settings: { ...sim.fixtures["dial-configured"].settings, controlPreset: "elite", autoCycleMs: raw } });
+		const said = await b.evaluate(`document.querySelector('[data-summary="interaction"]')?.textContent ?? ""`);
+		check(`auto cycle ${JSON.stringify(raw)}: the summary says ${runs ? "it runs" : "nothing about it"}`, said.includes("auto cycle 5 s") === runs, said);
+		const moves = await b.evaluate(`document.getElementById("picker-moves")?.textContent ?? ""`);
+		const now = await b.evaluate(`document.getElementById("controls-now")?.textContent ?? ""`);
+		check(`auto cycle ${JSON.stringify(raw)}: the moves line and the controls list agree`, moves.includes("auto cycle") === runs && now.includes("(auto cycle is off)") === !runs, JSON.stringify({ moves, now }));
 	}
 
 	// Elite to Custom seeds the Elite map on the person's pick and shows it
@@ -1538,6 +1682,23 @@ try {
 		await sleep(400);
 		const tabbed = await ms();
 		check("Make shared: Tab between press and release keeps the press stale; nothing is shared and Forest stays", sim.writes.length === 0 && sim.globalWrites.length === 0 && tabbed.checked === "forest", JSON.stringify({ ...writes(), checked: tabbed.checked }));
+		// Only the press's own key ends it (external review AX36): Enter
+		// released elsewhere while Space is still held on Make shared.
+		sim.folds = new PanelFoldMemory();
+		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
+		const ENTER = { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 };
+		await b.evaluate(`document.getElementById("picker-search").focus()`);
+		await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...ENTER, text: "\r" });
+		await b.evaluate(`document.getElementById("theme-share").focus()`);
+		await b.send("Input.dispatchKeyEvent", { type: "keyDown", ...SPACE, text: " " });
+		sim.pushSettings({ ...sim.settings, theme: "forest" });
+		await sleep(80);
+		await b.send("Input.dispatchKeyEvent", { type: "keyUp", ...ENTER });
+		await sleep(20);
+		await b.send("Input.dispatchKeyEvent", { type: "keyUp", ...SPACE });
+		await sleep(400);
+		const crossed = await ms();
+		check("Make shared: releasing Enter elsewhere keeps a held Space press stale; nothing is shared and Forest stays", sim.writes.length === 0 && sim.globalWrites.length === 0 && crossed.checked === "forest", JSON.stringify({ ...writes(), checked: crossed.checked }));
 		sim.folds = new PanelFoldMemory();
 		await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, theme: "ember" } });
 		await b.evaluate(`document.getElementById("theme-share").focus()`);
@@ -1858,7 +2019,7 @@ try {
 	await b.type("reading 4999");
 	await sleep(200);
 	const narrowed = await b.evaluate(`Array.from(document.querySelectorAll("#picker-list [role=option]:not([hidden])")).map((o) => o.dataset.key)`);
-	check("scale: typing narrows to the matching rows and keeps the last one reachable", narrowed.length === 1, JSON.stringify(narrowed));
+	check("scale: typing narrows to the matching rows and keeps the last one reachable", same(narrowed, [big.readings.at(-1).key]), JSON.stringify(narrowed));
 	await b.key("Escape");
 	check("scale: the deep saved reading is selected and in view on open", reach.selected === deep && reach.visible, JSON.stringify(reach));
 	await b.key("End");

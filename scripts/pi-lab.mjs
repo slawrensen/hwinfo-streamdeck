@@ -27,9 +27,10 @@ const opt = (name, fallback) => {
 	return i >= 0 ? rest[i + 1] : fallback;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// PI_LAB_PORT_BASE lets two labs run side by side (each owns base..base+2).
+// PI_LAB_PORT_BASE lets two labs run side by side (each owns base and
+// base+1; the browser picks its own debugger port).
 const PORT_BASE = Number(process.env.PI_LAB_PORT_BASE ?? "") || 29310;
-const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1, debug: PORT_BASE + 2 };
+const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1 };
 
 // Layout studies (scripts/pi-studies): served under /__study/ and injected
 // into the real panel. Never part of the plugin package.
@@ -108,7 +109,7 @@ async function capture() {
 	const inject = opt("inject", "");
 	mkdirSync(out, { recursive: true });
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
-	const browser = await launch({ port: PORTS.debug, width: widths[0], height: 800 });
+	const browser = await launch({ width: widths[0], height: 800 });
 	const manifest = [];
 	const pageErrors = [];
 	browser.on("Runtime.exceptionThrown", (p) => pageErrors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
@@ -177,7 +178,7 @@ const TASKS = [
 
 async function tasks() {
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
-	const browser = await launch({ port: PORTS.debug, width: 400, height: 800 });
+	const browser = await launch({ width: 400, height: 800 });
 	const rows = [];
 	try {
 		for (const width of [320, 480]) {
@@ -226,7 +227,7 @@ async function perf() {
 	const runs = Number(opt("runs", "3"));
 	const sizes = [0, 1, 500, 5000];
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
-	const browser = await launch({ port: PORTS.debug, width: 400, height: 800 });
+	const browser = await launch({ width: 400, height: 800 });
 	const results = [];
 	try {
 		for (const size of sizes) {
@@ -292,7 +293,7 @@ async function a11y() {
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
 	const widths = opt("widths", "400").split(",").map(Number);
 	const height = Number(opt("height", "800")) || 800;
-	const browser = await launch({ port: PORTS.debug, width: widths[0], height });
+	const browser = await launch({ width: widths[0], height });
 	const report = [];
 	try {
 		let current = widths[0];
@@ -523,7 +524,7 @@ async function density() {
 	if (shots !== "") mkdirSync(shots, { recursive: true });
 	const { PanelFoldMemory } = await import("../src/panel-folds.ts");
 	const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws, extraRoutes: studyRoutes });
-	const browser = await launch({ port: PORTS.debug, width: sizes[0][0], height: sizes[0][1] });
+	const browser = await launch({ width: sizes[0][0], height: sizes[0][1] });
 	const states = [];
 	const tasks = [];
 	const openPage = async (fixture) => {

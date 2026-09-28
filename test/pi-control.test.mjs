@@ -3,7 +3,7 @@
  * vm with a fake clipboard and a hand-driven clock. Only the first answer
  * to the pending request copies, and an answer, timer or clipboard write
  * left over from an earlier request never settles a later one (external
- * review AX63).
+ * review AX63) or copies over it through the fallback (AX69).
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -21,6 +21,16 @@ function button() {
 	const clips = [];
 	const requests = [];
 	const pendingCopies = [];
+	let fallbacks = 0;
+	let execOk = true;
+	const created = [];
+	const focused = [];
+	class HTMLElement {
+		focus() {
+			focused.push(this);
+		}
+	}
+	const before = new HTMLElement();
 	const el = {
 		textContent: LABEL,
 		attributes: {},
@@ -38,8 +48,25 @@ function button() {
 	const context = {
 		SDPIComponents: { streamDeckClient: { send: (...args) => requests.push(args), sendToPropertyInspector: { subscribe: (fn) => (subscriber = fn) } } },
 		hwShell: { announce() {} },
-		document: { getElementById: () => el },
-		navigator: { clipboard: { writeText: (text) => new Promise((resolve) => pendingCopies.push(() => (clips.push(text), resolve()))) } },
+		document: {
+			getElementById: () => el,
+			activeElement: before,
+			body: { appendChild() {} },
+			// Selecting the scratch field focuses it, as in a browser.
+			createElement: () => {
+				const scratch = { value: "", removed: false, select: () => (context.document.activeElement = scratch), remove: () => (scratch.removed = true) };
+				created.push(scratch);
+				return scratch;
+			},
+			// The fallback copy: whatever the focused scratch field holds.
+			execCommand: () => (fallbacks++, execOk && clips.push(context.document.activeElement.value), execOk)
+		},
+		HTMLElement,
+		navigator: {
+			clipboard: {
+				writeText: (text) => new Promise((resolve, reject) => pendingCopies.push({ text, finish: (ok) => (ok ? (clips.push(text), resolve()) : reject(new Error("denied"))) }))
+			}
+		},
 		setTimeout: (fn, ms) => (timers.set(++nextTimer, { at: now + ms, fn }), nextTimer),
 		clearTimeout: (id) => timers.delete(id),
 		Math
@@ -53,9 +80,21 @@ function button() {
 		lastId: () => requests.at(-1)?.[1].requestId,
 		requests: () => requests,
 		reply: (report, requestId) => subscriber({ payload: { event: "supportReport", report, requestId } }),
+		fallbacks: () => fallbacks,
+		created: () => created,
+		focused: () => focused,
+		before,
+		failCopyCommand: () => (execOk = false),
 		// Lets every clipboard write finish, then its continuation run.
 		copyDone: async () => {
-			for (const done of pendingCopies.splice(0)) done();
+			for (const copy of pendingCopies.splice(0)) copy.finish(true);
+			await new Promise((resolve) => setImmediate(resolve));
+		},
+		// Finishes or fails the one clipboard write of this text.
+		settle: async (text, ok) => {
+			const index = pendingCopies.findIndex((copy) => copy.text === text);
+			assert.ok(index >= 0, `no clipboard write of ${text} is pending`);
+			pendingCopies.splice(index, 1)[0].finish(ok);
 			await new Promise((resolve) => setImmediate(resolve));
 		},
 		advance: (ms) => {
@@ -69,6 +108,98 @@ function button() {
 }
 
 describe("the support-report button answers only its own request, once", () => {
+	it("the newer outcome keeps its full two seconds", async () => {
+		const b = button();
+		b.click();
+		b.reply("OLD", b.lastId());
+		await b.copyDone();
+		b.advance(1000);
+		b.click();
+		b.reply("NEW", b.lastId());
+		await b.copyDone();
+		b.advance(1001); // the first outcome's restore time has passed
+		assert.equal(b.el.textContent, "Copied to clipboard");
+		b.advance(999);
+		assert.equal(b.el.textContent, LABEL);
+	});
+
+	it("a late copy's outcome keeps its full two seconds", async () => {
+		const b = button();
+		b.click();
+		b.reply("REPORT", b.lastId());
+		b.advance(3001);
+		assert.equal(b.el.textContent, "Copy failed");
+		b.advance(1000);
+		await b.copyDone();
+		assert.equal(b.el.textContent, "Copied to clipboard");
+		b.advance(1001); // the deadline outcome's restore time has passed
+		assert.equal(b.el.textContent, "Copied to clipboard");
+		b.advance(999);
+		assert.equal(b.el.textContent, LABEL);
+	});
+
+	it("a clipboard that refuses the write falls back to a copy command", async () => {
+		const b = button();
+		b.click();
+		b.reply("REPORT", b.lastId());
+		await b.settle("REPORT", false);
+		assert.deepEqual(b.clips, ["REPORT"]);
+		assert.equal(b.fallbacks(), 1);
+		assert.equal(b.created()[0].removed, true, "the scratch field is gone");
+		assert.deepEqual(b.focused(), [b.before], "focus is back where it was");
+		assert.equal(b.el.textContent, "Copied to clipboard");
+	});
+
+	it("a failed copy command says so", async () => {
+		const b = button();
+		b.failCopyCommand();
+		b.click();
+		b.reply("REPORT", b.lastId());
+		await b.settle("REPORT", false);
+		assert.deepEqual(b.clips, []);
+		assert.equal(b.el.textContent, "Copy failed");
+	});
+
+	it("an older request's refused write does nothing while a newer one waits", async () => {
+		const b = button();
+		b.click();
+		b.reply("OLD", b.lastId());
+		b.advance(3001);
+		b.click();
+		await b.settle("OLD", false);
+		assert.equal(b.created().length, 0, "no scratch field, so focus never moves");
+		assert.deepEqual(b.clips, []);
+		assert.equal(b.busy(), true);
+		b.reply("NEW", b.lastId());
+		await b.copyDone();
+		assert.deepEqual(b.clips, ["NEW"]);
+	});
+
+	it("a refused write that lands after the deadline still falls back when no newer request started", async () => {
+		const b = button();
+		b.click();
+		b.reply("REPORT", b.lastId());
+		b.advance(3001);
+		assert.equal(b.el.textContent, "Copy failed");
+		await b.settle("REPORT", false);
+		assert.deepEqual(b.clips, ["REPORT"]);
+		assert.equal(b.el.textContent, "Copied to clipboard");
+	});
+
+	it("an older request's refused write copies nothing over a newer report", async () => {
+		const b = button();
+		b.click();
+		b.reply("OLD", b.lastId());
+		b.advance(3001); // the answer came, the copy did not finish
+		b.click();
+		b.reply("NEW", b.lastId());
+		await b.settle("NEW", true);
+		await b.settle("OLD", false);
+		assert.deepEqual(b.clips, ["NEW"]);
+		assert.equal(b.fallbacks(), 0);
+		assert.equal(b.el.textContent, "Copied to clipboard");
+	});
+
 	it("a normal request copies once and says so, then the label comes back", async () => {
 		const b = button();
 		b.click();

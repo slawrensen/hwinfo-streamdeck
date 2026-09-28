@@ -46,11 +46,14 @@
 		}, RESTORE_MS);
 	}
 
-	async function copyText(text) {
+	async function copyText(text, request) {
 		try {
 			await navigator.clipboard.writeText(text);
 			return true;
 		} catch {
+			// A newer request owns the clipboard now: an older write that
+			// failed late copies nothing (external review AX69).
+			if (latest !== request) return false;
 			// The fallback selects a scratch field, which takes focus; focus
 			// goes back where it was once the copy is done.
 			const back = document.activeElement;
@@ -69,8 +72,8 @@
 		if (pending !== null) return;
 		// aria-disabled, not disabled: a disabled button drops keyboard focus
 		// to the page while the plugin answers. The guard above stops a
-		// second request.
-		clearTimeout(restoring);
+		// second request. A restore still due from the last outcome writes
+		// the label shown here, and finish() cancels it.
 		supportEl.textContent = LABEL;
 		supportEl.setAttribute("aria-disabled", "true");
 		const request = { id: Math.random().toString(36).slice(2), answered: false };
@@ -87,9 +90,10 @@
 		if (request === null || request.answered || p.requestId !== request.id) return;
 		request.answered = true;
 		// A copy that lands after the deadline still corrects the outcome,
-		// unless a newer request has started since.
-		copyText(p.report).then((ok) => {
-			if (pending === request || (pending === null && latest === request)) finish(ok ? "Copied to clipboard" : "Copy failed");
+		// unless a newer request has started since (pending is always null
+		// or the latest request).
+		copyText(p.report, request).then((ok) => {
+			if (latest === request) finish(ok ? "Copied to clipboard" : "Copy failed");
 		});
 	});
 })();

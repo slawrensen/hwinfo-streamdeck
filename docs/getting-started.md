@@ -17,7 +17,7 @@ In the actions list, open **HWiNFO Sensors** and drag **Sensor Reading** onto an
 
 With a readable source, the key shows **Pick a sensor / in settings** on a black background. The settings panel opens below the canvas. If the key shows a source error instead, follow [Status screens](status-screens.md).
 
-> **First run?** If HWiNFO isn't publishing yet, the message under the panel's header says so and offers **HWiNFO setup steps**, which opens the three steps (kept under *Advanced → Connection*): install and start HWiNFO in Sensors-only mode, enable **Shared Memory Support** (or, on the free version, open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want; no 12-hour limit), then pick a reading. **Check again** asks the plugin for a fresh answer and, if nothing changed, says when that answer came back; the plugin also keeps reading HWiNFO on its own. What each message means: [Status screens](status-screens.md#in-the-settings-panel).
+> **First run?** If HWiNFO isn't publishing yet, the message under the panel's header says so and offers **HWiNFO setup steps**, which opens the steps under *Advanced → Connection*: **Shared Memory Support** (the free version switches it off after 12 hours) or **HWiNFO Gadget** reporting, which has no time limit. **Check again** asks the plugin for a fresh answer; the plugin also keeps reading HWiNFO on its own. What each message means: [Status screens](status-screens.md#in-the-settings-panel).
 
 ## 3. Pick a reading
 

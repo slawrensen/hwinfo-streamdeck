@@ -150,7 +150,8 @@ fixes in one release.
   tile is edited, and a hand-edited command or shared theme that is not
   text no longer stops a panel summary from drawing.
 - Copy support report copies only the report it asked for, once: a late,
-  repeated or unrequested answer no longer replaces the clipboard.
+  repeated or unrequested answer, or an earlier copy that failed late, no
+  longer replaces the clipboard.
 - Shared settings changed just as the plugin starts are kept: the plugin
   no longer applies or writes back an older copy that reached it first.
 - Group jumps skip a confirmed alias of the current reading so the next

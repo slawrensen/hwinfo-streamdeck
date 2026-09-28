@@ -130,11 +130,16 @@ fixes in one release.
   colors a dial row with the alert color, or holds an alert-aware auto
   cycle on the reading, while the face shows no value. A data reading that
   only overflows once converted to bytes shows the same unavailable mark in
-  its own unit instead of "Infinity".
+  its own unit instead of "Infinity". A dial's session AVG stays a number
+  when readings are large enough to overflow their running total.
 - A key, dial or HWiNFO Control key held down while its settings change
   does nothing when released: the press ends, and the next press uses the
   new settings. Before, a held press could run the command the new
-  settings named, such as resetting every dial.
+  settings named, such as resetting every dial. The press also stays over
+  when the Stream Deck app repeats the key-down or replays the key's
+  appearance while it is held. A key set to open details on a hold opens
+  them when held past half a second, even if a busy or waking PC delivers
+  the release before the hold is noticed.
 - Auto cycle keeps its interval when the Windows clock is corrected, and so
   do the detail view's Back (a second press right after the first is still
   one hop) and the settings panel's second-press confirmations. A
@@ -151,7 +156,14 @@ fixes in one release.
   old duplicate-suffixed or ownerless keys need reselection after repair.
 - Invalid theme names fall back safely. The settings panel refreshes its
   picker after source recovery or a provider change, preserves Config drafts
-  while settings replies are pending, and retains unknown Config fields.
+  while settings replies are pending, and retains unknown Config fields. A
+  detail tile setting this version cannot read stays as stored when the
+  tile is edited, and a hand-edited command or shared theme that is not
+  text no longer stops a panel summary from drawing.
+- Copy support report copies only the report it asked for, once: a late,
+  repeated or unrequested answer no longer replaces the clipboard.
+- Shared settings changed just as the plugin starts are kept: the plugin
+  no longer applies or writes back an older copy that reached it first.
 - Group jumps skip a confirmed alias of the current reading so the next
   distinct reading in the target group remains reachable.
 - The plugin log quotes names that come from HWiNFO or the Stream Deck app,

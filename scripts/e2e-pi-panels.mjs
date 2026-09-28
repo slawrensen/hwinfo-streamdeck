@@ -294,6 +294,16 @@ try {
 	await b.evaluate(`document.querySelectorAll('#detail-list .hw-set-chip')[1].querySelector('.hw-detail-move[data-move="-1"]').click()`);
 	await sleep(400);
 	check("lossless: swapping two cells of a four-reading tile moves each reading's stored entries with it", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, labels: [{ future: "label" }, " A ", "C", "D", "TAIL"], colors: [{ future: "color" }, "#112233", "#334455", "#445566", "#ABCDEF"], automaticColors: [{ future: "automatic" }, true, false, false, true] }]) && same(lastWrite()?.detailKeys?.slice(0, 2), [detailFx.detailKeys[1], detailFx.detailKeys[0]]), tilesOut());
+	// A cell field stored in a shape this build cannot read stays as stored
+	// through an edit that does not write it: the Abc toggle, clicked with
+	// the mouse (external review AX58).
+	await open("key-details", { settings: { ...detailFx, detailTiles: [{ size: 4, labels: { future: "keep" }, unknown: 42 }] } });
+	await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+	await sleep(150);
+	await b.evaluate(`document.querySelector('#detail-list .hw-tile-abc[data-tile="0"]').scrollIntoView({ block: "center" })`);
+	await b.click('#detail-list .hw-tile-abc[data-tile="0"]');
+	await sleep(400);
+	check("lossless: the Abc toggle leaves a cell field this build cannot read as stored", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ size: 4, labels: { future: "keep" }, unknown: 42, cellLabels: false }]), tilesOut());
 	{
 		const k = detailFx.detailKeys;
 		const dormant = [{ size: 1, labels: ["A"] }, { size: 1, labels: ["B"] }, { size: 1, labels: ["DORMANT"], future: { keep: 1 } }];
@@ -1149,6 +1159,26 @@ try {
 		await sleep(300);
 		const redrawn = await chips();
 		check("themes: a good message after them still draws", redrawn.some((c) => c.startsWith(`${good.defaultTheme}|`) && c.includes("rgb(1, 2, 3)")), JSON.stringify(redrawn));
+	}
+	// With no shared theme stored, the gallery names the plugin's resolved
+	// deck theme: one that is not a string is ignored whole, and a good one
+	// after it still names its theme (external review AX60).
+	{
+		await open("key-empty");
+		const good = JSON.parse(JSON.stringify(buildThemesPayload()));
+		const current = () => b.evaluate(`document.getElementById("theme-current")?.textContent ?? ""`);
+		const before = await current();
+		const errorsBefore = pageErrors.length;
+		for (const effectiveDeckTheme of [{ toString: null }, { toString: 0, valueOf: 0 }, 17, null]) sim.sendToPi({ ...good, effectiveDeckTheme });
+		await sleep(300);
+		const kept = await current();
+		check("themes: a resolved deck theme that is not a string is ignored whole, with no page error", before !== "" && kept === before && pageErrors.length === errorsBefore, JSON.stringify({ before, kept, errors: pageErrors.slice(errorsBefore) }));
+		const other = Object.keys(good.themes).find((id) => id !== good.effectiveDeckTheme);
+		const otherName = await b.evaluate(`hwModel.themeName(${JSON.stringify(other)})`);
+		sim.sendToPi({ ...good, effectiveDeckTheme: other });
+		await sleep(300);
+		const after = await current();
+		check("themes: a good resolved deck theme after them is named", after.includes(otherName) && !before.includes(otherName), JSON.stringify({ before, after, otherName }));
 	}
 
 	// ---- round 3: what the rotation editor says about its members -----------

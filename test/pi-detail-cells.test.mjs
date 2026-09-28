@@ -74,6 +74,50 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
 const ids = (list) => plain(list ?? []).map((v) => (v !== null && typeof v === "object" ? Number(v.id.slice(1)) : v));
 const tokens = (doc, field) => plain(doc.detailTiles).flatMap((t) => (t[field] ?? []).filter((v) => v !== null && typeof v === "object").map((v) => v.id)).sort();
 
+// A cell field stored in a shape this build cannot read (not a list) stays
+// exactly as stored through edits that do not write it, with or without a
+// reload between them; an edit of that field may replace it (external
+// review AX58).
+describe("an unreadable cell field survives edits that do not write it", () => {
+	const shapes = [null, 17, "future", { future: [" x ", false] }];
+	for (const field of FIELDS) {
+		for (const shape of shapes) {
+			it(`${field} stored as ${JSON.stringify(shape)}: the Abc toggle leaves it alone`, () => {
+				const stored = { detailKeys: ["a", "b"], detailTiles: [{ size: 2, labels: ["A", "B"], colors: ["#123456", "#234567"], automaticColors: [false, false], [field]: shape, unknown: { keep: 1 } }], futureTop: [" y "] };
+				editor(stored).editTile(0, (t) => (t.cellLabels = false));
+				assert.deepEqual(plain(stored.detailTiles[0][field]), shape);
+				assert.equal(stored.detailTiles[0].cellLabels, false);
+				editor(stored).editTile(0, (t) => (t.cellLabels = true)); // after a reload
+				assert.deepEqual(plain(stored.detailTiles[0][field]), shape);
+				assert.deepEqual(plain(stored.detailTiles[0].unknown), { keep: 1 });
+				assert.deepEqual(stored.futureTop, [" y "]);
+			});
+		}
+	}
+	// Removing, resizing or moving cells writes nothing into such a field
+	// while every cell still reads as neutral (review of d15). A move inside
+	// a four-reading tile is left out for colors: it writes the identity
+	// color each moved chip showed, on purpose.
+	for (const field of ["labels", "colors"]) {
+		for (const [name, run] of [
+			["a removal", (c) => c.removeDetailKey("c")],
+			["a resize", (c) => c.resize(0)],
+			...(field === "labels" ? [["a move", (c) => c.moveDetailKey("d", 0)]] : [])
+		]) {
+			it(`${field} stored as an object: ${name} leaves it alone`, () => {
+				const stored = { detailKeys: ["a", "b", "c", "d"], detailTiles: [{ size: 4, [field]: { future: "keep" } }] };
+				run(editor(stored));
+				assert.deepEqual(plain(stored.detailTiles[0][field]), { future: "keep" });
+			});
+		}
+	}
+	it("an edit of that field writes it as a list", () => {
+		const stored = { detailKeys: ["a", "b"], detailTiles: [{ size: 2, labels: { future: "keep" } }] };
+		editor(stored).editDetailCell("b", (t, i) => (t.labels[i] = "Two"));
+		assert.deepEqual(plain(stored.detailTiles[0].labels), ["", "Two"]);
+	});
+});
+
 describe("structural detail edits keep every stored cell entry in its place", () => {
 	const cases = [
 		{ name: "a reading removed from a partial tile takes only its own entries; the dormant ones move up", doc: { detailKeys: [" a name ", "\tb named "], detailTiles: [tile(4, [1, 2, 3, 4])] }, run: (c) => c.removeDetailKey("a"), cells: [2, 3, 4] },

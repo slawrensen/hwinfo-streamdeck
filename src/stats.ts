@@ -18,6 +18,8 @@ export type SessionStats = {
 	max: number;
 	sum: number;
 	count: number;
+	/** The mean, kept only once finite samples overflow `sum`. */
+	mean?: number;
 };
 
 export type SessionResetReason = "source" | "unit" | "type" | "binding" | "gap";
@@ -100,7 +102,18 @@ export class SessionStatsStore {
 		}
 		stats.min = Math.min(stats.min, value);
 		stats.max = Math.max(stats.max, value);
-		stats.sum += value;
+		// Finite samples can still overflow the sum (1e308 twice), which
+		// would lose AVG for the rest of the session. From then on the mean
+		// is kept by steps that cannot overflow: the difference of two
+		// same-sign values, or a weighted sum of opposite signs (external
+		// review AX64). Ordinary sums keep their exact results.
+		const sum = stats.sum + value;
+		if (stats.mean !== undefined || !Number.isFinite(sum)) {
+			const mean = stats.mean ?? stats.sum / stats.count;
+			const count = stats.count + 1;
+			stats.mean = Math.sign(mean) === Math.sign(value) ? mean + (value - mean) / count : mean * (stats.count / count) + value / count;
+		}
+		stats.sum = sum;
 		stats.count++;
 	}
 

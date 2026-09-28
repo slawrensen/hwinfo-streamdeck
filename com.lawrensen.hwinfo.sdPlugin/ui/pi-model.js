@@ -281,7 +281,8 @@ self.hwModel = (() => {
 		// Own names only: a stored "constructor" is an unknown command, not
 		// Object (external review AX22).
 		const name = typeof id === "string" && Object.hasOwn(COMMANDS, id) ? COMMANDS[id] : undefined;
-		if (name === undefined) return { command: `Unknown command "${String(id)}": the key shows an alert`, target: "" };
+		// A stored object is shown as JSON: String() throws on some (AX59).
+		if (name === undefined) return { command: `Unknown command "${typeof id === "string" ? id : JSON.stringify(id)}": the key shows an alert`, target: "" };
 		const scope = settings.resetScope === "set" || settings.resetScope === "all" ? settings.resetScope : "current";
 		const target = typeof settings.target === "string" ? settings.target.trim() : "";
 		if (id === "resetStats" && scope === "all") return { command: name, target: "every dial on every Stream Deck (Target ignored)" };
@@ -303,7 +304,7 @@ self.hwModel = (() => {
 	 * legacy migration); without it, a stored id this version does not know
 	 * draws the spec default. */
 	function sharedDefaultsSummary(globals, resolvedTheme) {
-		const id = typeof resolvedTheme === "string" && Object.hasOwn(THEME_NAMES, resolvedTheme) ? resolvedTheme : Object.hasOwn(THEME_NAMES, globals.theme) ? globals.theme : "void";
+		const id = typeof resolvedTheme === "string" && Object.hasOwn(THEME_NAMES, resolvedTheme) ? resolvedTheme : typeof globals.theme === "string" && Object.hasOwn(THEME_NAMES, globals.theme) ? globals.theme : "void";
 		const theme = themeName(id);
 		const text = globals.textMode === "dim" ? "dimmed text" : globals.textMode === "custom" ? "custom text" : "theme text";
 		const accents = globals.typeAccents === "off" ? "theme accent" : "accents by type";

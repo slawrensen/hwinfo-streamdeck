@@ -17,6 +17,12 @@
 	const ANSWER_MS = 3000;
 	const RESTORE_MS = 2000;
 	let waiting = null;
+	// The pending request, by id. Only its first answer copies, and an
+	// answer, timer or clipboard write left over from an earlier request
+	// never settles a later one (external review AX63).
+	let pending = null;
+	let latest = null;
+	let restoring = null;
 
 	// The outcome is spoken once through the panel's polite region (the
 	// label alone changes for two seconds and is announced nowhere). The
@@ -28,14 +34,14 @@
 	shell?.announce("support", "");
 
 	function finish(text) {
-		if (waiting !== null) {
-			clearTimeout(waiting);
-			waiting = null;
-		}
+		clearTimeout(waiting);
+		waiting = null;
+		pending = null;
 		supportEl.removeAttribute("aria-disabled");
 		supportEl.textContent = text;
 		speak(text);
-		setTimeout(() => {
+		clearTimeout(restoring);
+		restoring = setTimeout(() => {
 			supportEl.textContent = LABEL;
 		}, RESTORE_MS);
 	}
@@ -60,23 +66,30 @@
 	}
 
 	supportEl.addEventListener("click", () => {
-		if (waiting !== null) return;
+		if (pending !== null) return;
 		// aria-disabled, not disabled: a disabled button drops keyboard focus
 		// to the page while the plugin answers. The guard above stops a
 		// second request.
+		clearTimeout(restoring);
+		supportEl.textContent = LABEL;
 		supportEl.setAttribute("aria-disabled", "true");
-		waiting = setTimeout(() => {
-			waiting = null;
-			finish("Plugin not responding");
-		}, ANSWER_MS);
-		streamDeckClient.send("sendToPlugin", { event: "getSupportReport" });
+		const request = { id: Math.random().toString(36).slice(2), answered: false };
+		pending = request;
+		latest = request;
+		waiting = setTimeout(() => finish(request.answered ? "Copy failed" : "Plugin not responding"), ANSWER_MS);
+		streamDeckClient.send("sendToPlugin", { event: "getSupportReport", requestId: request.id });
 	});
 
 	streamDeckClient.sendToPropertyInspector.subscribe((ev) => {
 		const p = ev && ev.payload;
 		if (!p || typeof p !== "object" || p.event !== "supportReport" || typeof p.report !== "string") return;
+		const request = pending;
+		if (request === null || request.answered || p.requestId !== request.id) return;
+		request.answered = true;
+		// A copy that lands after the deadline still corrects the outcome,
+		// unless a newer request has started since.
 		copyText(p.report).then((ok) => {
-			finish(ok ? "Copied to clipboard" : "Copy failed");
+			if (pending === request || (pending === null && latest === request)) finish(ok ? "Copied to clipboard" : "Copy failed");
 		});
 	});
 })();

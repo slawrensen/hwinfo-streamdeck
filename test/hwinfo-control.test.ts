@@ -172,6 +172,59 @@ describe("a held Control key fires under the settings it was pressed with", () =
 		assert.equal(c.sent.length, 2);
 	});
 
+	// A repeated down (replayed events) is the same press: it keeps the
+	// record it finds, so a consumed press stays consumed through its
+	// release (external review AX57).
+	it("a repeated down keeps the press it repeats, consumed or not", async () => {
+		for (const repeats of [1, 2, 100]) {
+			for (const boundary of ["settings", "release carries other settings", "replayed appear"] as const) {
+				const c = control();
+				c.appear(NEXT);
+				c.down(NEXT);
+				if (boundary === "settings") c.received(RESET_ALL);
+				if (boundary === "replayed appear") c.appear(RESET_ALL);
+				for (let i = 0; i < repeats; i++) c.down(RESET_ALL);
+				await c.up(RESET_ALL);
+				assert.deepEqual(c.sent, [], `${boundary}, ${repeats} repeated down(s)`);
+				c.down(RESET_ALL);
+				await c.up(RESET_ALL);
+				assert.deepEqual(c.sent, [{ command: "resetStats", target: "", scope: "all" }], `${boundary}: the next press fires once`);
+			}
+			const echo = control();
+			echo.appear(NEXT);
+			echo.down(NEXT);
+			for (let i = 0; i < repeats; i++) echo.down(NEXT);
+			await echo.up(NEXT);
+			assert.equal(echo.sent.length, 1, "a press that nothing consumed, repeated, still fires once");
+		}
+	});
+
+	// A key that disappears mid-press never gets that release while away:
+	// the next down is a new press, as on a dial, and a release that reaches
+	// the key after it returns, with no down since, stays consumed.
+	it("after a key leaves mid-press, a lone release is consumed and the next press is new", async () => {
+		const c = control();
+		c.appear(NEXT);
+		c.down(NEXT);
+		c.disappear(NEXT);
+		c.appear(RESET_ALL);
+		await c.up(RESET_ALL);
+		assert.deepEqual(c.sent, [], "the held press's own release, after the key came back");
+		c.down(NEXT);
+		c.disappear(NEXT);
+		c.appear(NEXT); // released while away: the app never delivers that release
+		c.down(NEXT);
+		await c.up(NEXT);
+		assert.deepEqual(c.sent, [{ command: "next", target: "safe", scope: "current" }], "the first press after the key came back works");
+		c.down(NEXT);
+		c.disappear(NEXT);
+		c.received(RESET_ALL); // edited while away
+		c.appear(RESET_ALL);
+		c.down(RESET_ALL);
+		await c.up(RESET_ALL);
+		assert.deepEqual(c.sent.at(-1), { command: "resetStats", target: "", scope: "all" }, "a settings change while away does not swallow the next press");
+	});
+
 	it("a release with no press seen fires once, as a Multi Action or Key Logic step delivers it", async () => {
 		const c = control();
 		c.appear(NEXT);

@@ -30,6 +30,9 @@ describe("dial press replay through the production action", () => {
 		onDialDown(event: Down): Promise<void>;
 		onDialUp(event: Up): Promise<void>;
 		onDidReceiveSettings(event: Received): void;
+		onWillAppear(event: Parameters<SensorDialAction["onWillAppear"]>[0]): void;
+		onDialRotate(event: Parameters<SensorDialAction["onDialRotate"]>[0]): Promise<void>;
+		executeCommand(action: unknown, state: InstanceState, command: string, ticks: number): Promise<void>;
 	};
 	function fixture() {
 		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
@@ -53,6 +56,12 @@ describe("dial press replay through the production action", () => {
 			down: (afterMs = 0) => { eventAt += afterMs; return action.onDialDown(down); },
 			up: (afterMs = 0) => { eventAt += afterMs; return action.onDialUp(up); },
 			receive: (settings: InstanceState["settings"]) => action.onDidReceiveSettings({ action: { id: "ctx", isDial: () => true, setSettings: async () => {} }, payload: { settings } } as unknown as Received),
+			appear: (settings: InstanceState["settings"]) => action.onWillAppear({ action: { id: "ctx", device: { id: "fixture", name: "Fixture" }, isDial: () => false }, payload: { settings } } as unknown as Parameters<SensorDialAction["onWillAppear"]>[0]),
+			action,
+			rotate: (pressed: boolean, afterMs = 0) => {
+				eventAt += afterMs;
+				return action.onDialRotate({ action: { id: "ctx" }, payload: { ticks: 1, pressed } } as unknown as Parameters<SensorDialAction["onDialRotate"]>[0]);
+			},
 			close: () => { if (state.overlayTimer !== null) clearTimeout(state.overlayTimer); getStatus.mock.restore(); now.mock.restore(); }
 		};
 	}
@@ -113,6 +122,63 @@ describe("dial press replay through the production action", () => {
 			await f.up(100);
 			assert.equal(f.state.cyclePaused, true, "a new Elite press, including a duplicate down, toggles once on release");
 		} finally { f.close(); }
+	});
+	// A replayed appear consumes a held press through its release, a
+	// repeated down included, the way a settings change does (external
+	// review AX68); the next press after the release is new.
+	it("a replayed appear consumes a held press, repeated downs included", async () => {
+		for (const change of ["new command", "unchanged"] as const) {
+			for (const repeats of [0, 1, 2]) {
+				const f = fixture();
+				const retain = mock.method(poller, "retain", () => {});
+				const commands: string[] = [];
+				f.action.executeCommand = async (_action, state, command) => void commands.push(`${command}/${String(state.settings.resetScope ?? "current")}`);
+				try {
+					const settings = { ...f.state.settings, controlPreset: "custom", gestureShortPress: "pauseResume", gestureLongPress: "pauseResume" };
+					f.state.settings = settings;
+					await f.down();
+					f.appear(change === "unchanged" ? { ...settings } : { ...settings, gestureShortPress: "resetStats", gestureLongPress: "resetStats", resetScope: "all" });
+					for (let i = 0; i < repeats; i++) await f.down(10);
+					await f.up(100);
+					assert.deepEqual(commands, [], `${change}, ${repeats} repeated down(s): the held press runs nothing`);
+					await f.down(100);
+					await f.up(100);
+					assert.deepEqual(commands, [change === "unchanged" ? "pauseResume/current" : "resetStats/all"], "a fresh press runs once, under the current settings");
+				} finally {
+					retain.mock.restore();
+					f.close();
+				}
+			}
+		}
+	});
+	// A press kept through a replayed appear may have lost its release in
+	// the replay: a turn the app reports as not pressed ends it, so plain
+	// turns stay plain and the next press is new (review of d15).
+	it("a press kept through a replayed appear ends at the first turn the app reports as not pressed", async () => {
+		const f = fixture();
+		const retain = mock.method(poller, "retain", () => {});
+		const commands: string[] = [];
+		f.action.executeCommand = async (_action, _state, command, ticks) => void commands.push(ticks === 0 ? command : `${command}(${ticks})`);
+		try {
+			const settings = { ...f.state.settings, controlPreset: "elite" };
+			f.state.settings = settings;
+			await f.down();
+			f.appear({ ...settings });
+			for (let i = 0; i < 3; i++) await f.rotate(false, 50);
+			await f.down(100);
+			await f.up(2000);
+			await f.rotate(false, 50);
+			assert.deepEqual(commands, ["step(1)", "step(1)", "step(1)", "resetStats", "step(1)"]);
+			commands.length = 0;
+			await f.down(100);
+			f.appear({ ...settings });
+			await f.rotate(true, 50); // still held: a pressed turn stays pressed
+			await f.up(100);
+			assert.deepEqual(commands, ["stepGroup(1)"], "a held press kept through the replay, turned while held, runs nothing on release");
+		} finally {
+			retain.mock.restore();
+			f.close();
+		}
 	});
 	it("a repeated Elite down retains the original long-press boundary", async () => {
 		const f = fixture();
@@ -757,6 +823,33 @@ describe("refutation: historical and local statistics", () => {
 });
 
 describe("measurement truth through production renderers", () => {
+	// A member's name is an own, non-empty string under the key it shows as,
+	// else under a confirmed alias, trimmed; the diagnostics count only such
+	// names (external review MS07 kept each of these).
+	it("a dial draws a member's name from its alias when its own entry is not a name", () => {
+		const linked: Reading = { ...reading, linkedKeys: [link.sharedMemory, link.gadget] };
+		const status = { state: "ok", source: "shared-memory", snapshot: snapshot(linked) } as const;
+		const face = (rotationNames: unknown): string => composeDialSvg({ settings: { readingKey: linked.key, rotationNames }, stats: new SessionStatsStore(), statMode: "current", overlay: null, pinned: false, cyclePaused: false } as unknown as Parameters<typeof composeDialSvg>[0], status);
+		assert.match(face({ [link.sharedMemory]: 5, [link.gadget]: "  Named  " }), />Named</);
+		assert.match(face({ [link.sharedMemory]: "  Own  ", [link.gadget]: "Named" }), />Own</);
+		assert.match(face({ [link.sharedMemory]: " ", [link.gadget]: 7 }), />Temperature</);
+		assert.match(face(JSON.parse(`{"__proto__":"x","${link.sharedMemory}":"Kept"}`)), />Kept</);
+		const action = Object.create(SensorDialAction.prototype) as { instances: Map<string, unknown>; hidden: Map<string, unknown>; diagnostics(): { visible: Array<{ rotationNames: number }> } };
+		action.instances = new Map([["ctx", { settings: { readingKey: linked.key, rotationNames: { a: 5, b: "  Named  ", c: " ", d: "Two" } }, stats: new SessionStatsStore(), statMode: "current", cyclePaused: false, pinned: false, deviceId: "d" }]]);
+		action.hidden = new Map();
+		assert.equal(action.diagnostics().visible[0]?.rotationNames, 2);
+	});
+
+	it("a dial's AVG stays the session average when finite samples overflow the sum (external review AX64)", () => {
+		const huge: Reading = { ...reading, unit: "W", value: 1e308, valueMin: 0, valueMax: 1e308, valueAvg: 1 };
+		const status = { state: "ok", source: "shared-memory", snapshot: snapshot(huge) } as const;
+		const stats = new SessionStatsStore();
+		for (let i = 0; i < 3; i++) stats.sample(huge.key, 1e308);
+		const valueText = (statMode: "avg" | "max"): string | undefined => composeDialSvg({ settings: { readingKey: huge.key }, stats, statMode, overlay: null, pinned: false, cyclePaused: false } as unknown as Parameters<typeof composeDialSvg>[0], status).match(/>([^<]+)</g)?.[1];
+		assert.ok(valueText("max") !== undefined);
+		assert.equal(valueText("avg"), valueText("max"), "every sample was 1e308, so AVG draws what MAX draws");
+	});
+
 	it("45 to 65 to 50 Gadget values stay unavailable under every historical key/detail layout", () => {
 		const config = loadThemes();
 		const ctx: DetailFaceContext = { config, deckThemeId: config.defaultTheme, typeAccents: false, measure: { decimals: "auto", fahrenheit: false, dataUnits: "decimal" }, text: effectiveTextFor({}) };
@@ -814,6 +907,7 @@ describe("a held key keeps the document it was pressed under (external review AX
 		pushPanelPreview(): void;
 		openDetails(id: string): Promise<void>;
 		cycleStat(id: string): Promise<void>;
+		detailNavigator: { leave(deviceId: string): Promise<void> };
 		onKeyDown(ev: { action: Handle }): Promise<void>;
 		onKeyUp(ev: { action: Handle }): void;
 		onDidReceiveSettings(ev: { action: Handle; payload: { settings: ReadingSettings } }): void;
@@ -837,6 +931,7 @@ describe("a held key keeps the document it was pressed under (external review AX
 		const record = (outcome: string) => async (id: string): Promise<void> => void outcomes.push({ outcome, readingKey: action.instances.get(id)?.settings.readingKey });
 		action.openDetails = record("hold");
 		action.cycleStat = record("tap");
+		action.detailNavigator = { leave: async () => void outcomes.push({ outcome: "back", readingKey: action.instances.get("ctx")?.settings.readingKey }) };
 		// The production dispatch, with the hold timer under the test's hand.
 		const timers = new Map<number, () => void>();
 		let next = 0;
@@ -885,6 +980,55 @@ describe("a held key keeps the document it was pressed under (external review AX
 			}
 		}
 	}
+	// A repeated down (replayed events) belongs to the press already held,
+	// consumed or not: it must not act under the replacement settings, nor
+	// arm a second hold (external review AX67).
+	const repeated: Record<string, ReadingSettings> = { reading: { ...initial, readingKey: "b:0:1" }, behavior: { ...initial, pressBehavior: "cycle-stat" }, back: { ...initial, detailRole: "back" } as ReadingSettings, echo: { ...initial } };
+	for (const route of ["settings", "replayed appear"] as const) {
+		for (const [name, settings] of Object.entries(repeated)) {
+			for (const repeats of [1, 2]) {
+				const keeps = route === "settings" && name === "echo";
+				it(`${route}, ${name}, ${repeats} repeated down(s): ${keeps ? "the press still resolves once" : "nothing runs until a new press"}`, async () => {
+					const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+					const subscribe = mock.method(poller, "subscribeSeries", () => {});
+					try {
+						const f = fixture();
+						await f.action.onKeyDown({ action: f.handle });
+						if (route === "settings") f.action.onDidReceiveSettings({ action: f.handle, payload: { settings } });
+						else f.action.onWillAppear({ action: f.handle, payload: { settings } });
+						for (let i = 0; i < repeats; i++) await f.action.onKeyDown({ action: f.handle });
+						f.action.onKeyUp({ action: f.handle });
+						if (keeps) {
+							assert.deepEqual(f.outcomes, [{ outcome: "tap", readingKey: "a:0:1" }]);
+							return;
+						}
+						assert.deepEqual(f.outcomes, [], "nothing runs under the replacement settings");
+						await f.action.onKeyDown({ action: f.handle });
+						f.hold();
+						f.action.onKeyUp({ action: f.handle });
+						assert.equal(f.outcomes.length, 1, "the next press runs once, under the new settings");
+					} finally {
+						getStatus.mock.restore();
+						subscribe.mock.restore();
+					}
+				});
+			}
+		}
+	}
+	it("a down repeated after the hold fired cannot fire a second hold", async () => {
+		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+		try {
+			const f = fixture();
+			await f.action.onKeyDown({ action: f.handle });
+			f.hold();
+			await f.action.onKeyDown({ action: f.handle });
+			f.hold();
+			f.action.onKeyUp({ action: f.handle });
+			assert.deepEqual(f.outcomes, [{ outcome: "hold", readingKey: "a:0:1" }]);
+		} finally {
+			getStatus.mock.restore();
+		}
+	});
 });
 
 describe("dial settings edge cases through the production action", () => {

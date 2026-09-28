@@ -8,6 +8,7 @@
  */
 import streamDeck from "@elgato/streamdeck";
 
+import { readGlobalSettings } from "../global-settings";
 import type { DecimalsSetting } from "./format";
 import { parseDataUnitsPref, type DataUnitsPref, type MeasureOptions } from "./measure";
 import { effectiveTextSettings, parseTextSettings, type TextSettings } from "./text-colors";
@@ -128,7 +129,9 @@ export function decideLegacyDefault(hasExistingConfig: boolean): void {
 
 async function persistTheme(theme: string): Promise<void> {
 	try {
-		const globals = await streamDeck.settings.getGlobalSettings();
+		// The latest document, not the reply: one delivered behind it must
+		// not be written over with the older one (external review AX61).
+		const globals = await readGlobalSettings();
 		// Async race guard: if a PI wrote a theme while we awaited, the user's
 		// explicit choice wins — never clobber it with the migration result.
 		if (typeof globals.theme === "string" && globals.theme !== "") {

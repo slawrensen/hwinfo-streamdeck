@@ -105,6 +105,39 @@ describe("deriveCapabilities", () => {
 	});
 });
 
+// Host input is untyped at runtime: only an own, whole, non-negative number
+// names a model (external review AX66).
+describe("deriveCapabilities with malformed types", () => {
+	it("inherited names, strings, objects and non-integers are unknown devices, never coerced", () => {
+		const odd: unknown[] = ["__proto__", "constructor", "toString", "13", "", null, [], { toString: null }, { toString: 0, valueOf: 0 }, -1, 0.5, Number.NaN, Infinity, -Infinity, true];
+		for (const type of odd) {
+			const caps = deriveCapabilities({ type: type as number, columns: 5, rows: 3 });
+			assert.equal(caps.known, false, JSON.stringify(type));
+			assert.equal(caps.type, undefined);
+			assert.equal(caps.model, "Unknown device");
+			assert.equal(caps.kind, "keys", "a key grid still draws");
+		}
+	});
+
+	it("a grid that is not whole non-negative numbers reads as no keys, never coerced", () => {
+		for (const columns of ["5", null, { toString: null }, -1, 2.5, Number.NaN]) {
+			const caps = deriveCapabilities({ type: 13, columns: columns as number, rows: 4 });
+			assert.equal(caps.columns, 0, JSON.stringify(columns));
+			assert.equal(caps.keys, 0);
+			assert.equal(caps.kind, "dials", "the + XL still has its dials");
+		}
+	});
+
+	it("every numeric type and grid derives as before", () => {
+		for (let type = 0; type < 32; type++) {
+			const caps = deriveCapabilities({ type, columns: 0, rows: 0 });
+			assert.equal(caps.type, type);
+			assert.equal(caps.model === `Unknown device (type ${type})`, !caps.known, `type ${type}`);
+		}
+		assert.equal(deriveCapabilities({ type: 13, columns: 9, rows: 4 }).model, "Stream Deck + XL");
+	});
+});
+
 describe("tapCanvasWidth", () => {
 	it("uses the touch segment width, falling back to the SDK's 200", () => {
 		assert.equal(tapCanvasWidth(deriveCapabilities({ type: 13, columns: 9, rows: 4 })), 200);

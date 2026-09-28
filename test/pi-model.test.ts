@@ -185,6 +185,11 @@ describe("interaction summaries", () => {
 		assert.deepEqual(model.controlSummary({ command: "resetStats", resetScope: "all", target: "x" }), { command: "Reset session stats", target: "every dial on every Stream Deck (Target ignored)" });
 		assert.deepEqual(model.controlSummary({ command: "resetStats", target: " cpu " }), { command: "Reset session stats, current reading", target: 'dials with Link ID "cpu"' });
 		assert.match(model.controlSummary({ command: "warp" }).command, /^Unknown command/);
+		// A stored object is named as JSON, never coerced: some objects have
+		// no string form and threw mid-render (external review AX59).
+		for (const command of [{ toString: null }, { toString: 0, valueOf: 0 }, [1], null, 17]) {
+			assert.deepEqual(model.controlSummary({ command } as Settings), { command: `Unknown command "${JSON.stringify(command)}": the key shows an alert`, target: "" });
+		}
 	});
 	it("summarizes the shared connection choices", () => {
 		// "read every", the words of the control it summarizes (Read every).
@@ -209,6 +214,10 @@ describe("interaction summaries", () => {
 		assert.equal(model.sharedDefaultsSummary({}, "ember").split(" · ")[0], "Ember");
 		assert.equal(model.sharedDefaultsSummary({ theme: "paper" }, "paper").split(" · ")[0], "Paper");
 		assert.equal(model.sharedDefaultsSummary({}, "not-a-theme").split(" · ")[0], "Void");
+		// A stored object is no theme, and never coerced (AX59).
+		for (const theme of [{ toString: null }, { toString: 0, valueOf: 0 }, ["paper"]]) {
+			assert.equal(model.sharedDefaultsSummary({ theme } as Settings).split(" · ")[0], "Void", JSON.stringify(theme));
+		}
 		// Connection: the interval as parsePollInterval reads it.
 		assert.equal(model.connectionSummary({}), "Auto source · read every 1 s");
 		assert.equal(model.connectionSummary({ source: "shared-memory", pollIntervalMs: "250" }), "Shared Memory only · read every 250 ms");

@@ -225,7 +225,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 						if (event === "getSensorTree") toPi(buildSensorTree(status()));
 						else if (event === "getThemes") toPi(JSON.parse(JSON.stringify(buildThemesPayload())));
 						else if (event === "getDetailSupport") toPi({ event: "detailSupport", supported: true, model: "Stream Deck +" });
-						else if (event === "getSupportReport") toPi({ event: "supportReport", report: "(simulated support report)" });
+						else if (event === "getSupportReport") toPi({ event: "supportReport", requestId: msg.payload.requestId, report: "(simulated support report)" });
 						else if (event === "getPreview") sim.pushPreview();
 						else if (event === "getPanelFolds" || event === "setPanelFolds") {
 							const kind = panelKindOf(msg.payload?.kind);

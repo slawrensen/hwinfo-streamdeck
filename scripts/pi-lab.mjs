@@ -13,6 +13,9 @@
 //
 // Owned processes only: the Chromium this script launches and its own
 // servers on fixed lab ports; nothing else is ever stopped.
+// A failed run exits nonzero, whatever the SDK logger does (AX65); see the
+// dispatch at the end for a failure after the lab's servers are up.
+import "./lib/script-failures.mjs";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -644,4 +647,9 @@ if (commands[cmd] === undefined || out === undefined) {
 	console.error("usage: tsx scripts/pi-lab.mjs capture|tasks|perf|a11y <out> [options]");
 	process.exit(2);
 }
-await commands[cmd]();
+// A failure after the simulator started (a browser that never comes up)
+// would otherwise leave its servers holding the process open.
+await commands[cmd]().catch((error) => {
+	console.error(error);
+	process.exit(1);
+});

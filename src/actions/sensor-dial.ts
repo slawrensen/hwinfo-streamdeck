@@ -160,6 +160,10 @@ export type InstanceState = {
 	/** Pinned: selection cannot change (turns, taps, autocycle) until unpinned. */
 	pinned: boolean;
 	gesture: GestureState;
+	/** The held press was kept through a replayed appear (AX68). Its release
+	 * may have been lost in the replay, so a turn the app reports as not
+	 * pressed ends it instead of routing as a pressed turn. */
+	replayedPress?: boolean;
 	/** Transient on-device hint ("cycle paused"); cleared at `until`. */
 	overlay: { text: string; until: number } | null;
 	overlayTimer: NodeJS.Timeout | null;
@@ -239,6 +243,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (restored !== undefined && restored.overlayTimer !== null) {
 			clearTimeout(restored.overlayTimer);
 		}
+		const keepsPress = replayed !== undefined && replayed.gesture.downAt !== null;
 		const state: InstanceState = {
 			settings: ev.payload.settings,
 			stats: restored?.stats ?? new SessionStatsStore(),
@@ -250,7 +255,11 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			nextCycleAt: null,
 			cyclePaused: restored?.cyclePaused ?? false,
 			pinned: restored?.pinned ?? false,
-			gesture: IDLE_GESTURE,
+			// A replayed appear consumes a held press through its release,
+			// repeated downs included (external review AX68); a dial that
+			// disappeared dropped its press on the way out.
+			gesture: keepsPress ? { downAt: replayed.gesture.downAt, rotatedWhileDown: true } : IDLE_GESTURE,
+			replayedPress: keepsPress,
 			overlay: null,
 			overlayTimer: null,
 			deviceId: ev.action.device.id,
@@ -355,6 +364,10 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		if (state === undefined) {
 			return;
 		}
+		if (state.replayedPress === true && !ev.payload.pressed) {
+			state.gesture = IDLE_GESTURE;
+			state.replayedPress = false;
+		}
 		const scheme = resolveControls(state.settings);
 		const routed = routeGesture(state.gesture, { kind: "dialRotate", at: performance.now(), ticks: ev.payload.ticks, pressed: ev.payload.pressed }, scheme.touchZones);
 		this.traceGesture("dialRotate", ev.action.id, state, routed.state, { ticks: ev.payload.ticks, pressed: ev.payload.pressed });
@@ -405,6 +418,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		const routed = routeGesture(state.gesture, { kind: "dialUp", at: performance.now() }, scheme.touchZones);
 		this.traceGesture("dialUp", ev.action.id, state, routed.state, {});
 		state.gesture = routed.state;
+		state.replayedPress = false;
 		if (routed.gesture === null || scheme.pushTiming !== "release") {
 			return;
 		}
@@ -982,7 +996,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			rotationSet: rotationKeysOf(state.settings)?.length ?? 0,
 			// Counts only: group and reading names carry user text, like keys.
 			rotationGroups: rotationGroupsOf(state.settings.rotationGroups)?.length ?? 0,
-			rotationNames: Object.keys(rotationNamesOf(state.settings) ?? {}).length,
+			rotationNames: Object.values(rotationNamesOf(state.settings) ?? {}).filter((value) => typeof value === "string" && value.trim() !== "").length,
 			autoCycleMs: parseAutoCycleMs(state.settings.autoCycleMs),
 			cyclePaused: state.cyclePaused,
 			pinned: state.pinned,
@@ -1129,31 +1143,27 @@ function customLabelOf(settings: DialSettings): string | undefined {
 
 /** A reading's per-member name: saved under the key it shows as, else under
  *  a confirmed alias of it, the same walk the reading colors take, so a
- *  renamed reading keeps its name on whichever provider is live. */
-function readingNameOf(names: Record<string, string> | undefined, reading: Pick<Reading, "key" | "linkedKeys">): string | undefined {
+ *  renamed reading keeps its name on whichever provider is live. Settings
+ *  are untyped JSON: only an own, non-empty string counts (the PI's chip
+ *  rename writes them), so "__proto__" or "constructor" is an entry like
+ *  any other (external review AX35) and anything else is no name. */
+function readingNameOf(names: Record<string, unknown> | undefined, reading: Pick<Reading, "key" | "linkedKeys">): string | undefined {
 	if (names === undefined) return undefined;
 	for (const key of [reading.key, ...(reading.linkedKeys ?? [])]) {
-		if (Object.hasOwn(names, key)) return names[key];
+		const value = Object.hasOwn(names, key) ? names[key] : undefined;
+		if (typeof value === "string" && value.trim() !== "") return value.trim();
 	}
 	return undefined;
 }
 
-/** Settings are untyped JSON: keep non-empty string names under string keys
- *  (the PI's chip rename writes them); anything else degrades to no names. */
-function rotationNamesOf(settings: DialSettings): Record<string, string> | undefined {
+/** The stored name map as it is: readingNameOf checks only the names a
+ *  face draws, so no tick rebuilds the whole map (external review MS07). */
+function rotationNamesOf(settings: DialSettings): Record<string, unknown> | undefined {
 	const raw: unknown = settings.rotationNames;
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
 		return undefined;
 	}
-	let names: Record<string, string> | undefined;
-	for (const [key, value] of Object.entries(raw)) {
-		if (typeof value === "string" && value.trim() !== "") {
-			// No prototype: a saved key like "__proto__" is an entry, not the
-			// prototype setter (external review AX35).
-			(names ??= Object.create(null) as Record<string, string>)[key] = value.trim();
-		}
-	}
-	return names;
+	return raw as Record<string, unknown>;
 }
 
 /**
@@ -1267,5 +1277,5 @@ function rowStatValue(live: number, stats: SessionStats | undefined, mode: StatM
 	if (stats === undefined || mode === "current") {
 		return live;
 	}
-	return mode === "min" ? stats.min : mode === "max" ? stats.max : stats.sum / stats.count;
+	return mode === "min" ? stats.min : mode === "max" ? stats.max : (stats.mean ?? stats.sum / stats.count);
 }

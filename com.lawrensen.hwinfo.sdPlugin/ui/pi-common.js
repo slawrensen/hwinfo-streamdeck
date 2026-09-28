@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d14";
+	const PI_BUILD = "1.7.0.0-d15";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -1366,7 +1366,16 @@
 			const stored = rawIsObject && Array.isArray(tile.raw[field]) ? tile.raw[field] : null;
 			const carried = Array.from({ length: tile.size }, (_, i) => carriedEntry(keys[i], field, i));
 			const carriesData = carried.some((cell) => cell !== undefined && cell.raw !== cell.parsed);
-			if (out[field] === undefined && stored === null && !carriesData) continue;
+			// A field stored absent, or in a shape this build cannot read,
+			// stays as stored unless an edit wrote it or a reading brings its
+			// own entries into it. Removing, resizing or moving cells writes
+			// nothing into it while every cell still reads as neutral
+			// (external review AX58).
+			if (stored === null && !carriesData) {
+				const neutral = tile.raw !== undefined && Object.hasOwn(tile.raw, field) && Array.from({ length: tile.size }, (_, i) => cellParsed(tile, field, i)).every((v) => v === CELL_NEUTRAL[field]);
+				if (neutral) out[field] = tile.raw[field];
+				if (neutral || out[field] === tile.raw?.[field]) continue;
+			}
 			const values = carried.map((cell, i) => (cell === undefined ? cellParsed(tile, field, i) : cell.raw));
 			let last = dormant.length;
 			while (last > tile.size && dormant[last - 1]?.[field] === undefined) last--;
@@ -3622,12 +3631,6 @@
 		get().then(apply);
 		hw.on("settings", () => get().then(apply));
 	};
-	const followGlobal = (setting, apply) => {
-		const [get] = useGlobalSettings(setting, apply, null);
-		get().then(apply);
-		hw.on("globals", () => get().then(apply));
-	};
-
 	const setPlaceholder = (el, hint) => {
 		if (el !== null && el.placeholder !== hint) el.placeholder = hint;
 	};
@@ -4168,6 +4171,9 @@
 		const themes = p.themes;
 		if (themes === null || typeof themes !== "object" || Array.isArray(themes)) return false;
 		if (typeof p.defaultTheme !== "string" || !Object.hasOwn(themes, p.defaultTheme) || Object.hasOwn(themes, "")) return false;
+		// Absent is fine (the default stands); anything but a string would
+		// throw where the gallery looks it up (external review AX60).
+		if (p.effectiveDeckTheme !== undefined && typeof p.effectiveDeckTheme !== "string") return false;
 		const hex = (value) => typeof value === "string" && HEX_COLOR.test(value);
 		return Object.values(themes).every((palette) => palette !== null && typeof palette === "object" && hex(palette.bg) && hex(palette.value) && hex(palette.accent) && (palette.label === undefined || hex(palette.label)));
 	}

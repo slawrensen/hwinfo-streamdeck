@@ -191,9 +191,11 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		// sparkline history (now owned by the poller) is never dropped.
 		streamDeck.logger.debug(`Key appeared on ${JSON.stringify(ev.action.device.name)}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
 		const existing = this.instances.get(ev.action.id);
-		// A replayed appear ends any press armed before it (external review
-		// AX27): its release or hold would act on the replacement settings.
-		this.presses.cancel(ev.action.id);
+		// A replayed appear consumes any press armed before it (external
+		// review AX27): its release or hold would act on the replacement
+		// settings. The press stays held until its release, so a repeated
+		// down cannot start it again (AX67).
+		this.presses.consume(ev.action.id);
 		const firstSighting = existing === undefined;
 		if (firstSighting) {
 			poller.retain();
@@ -265,7 +267,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		// external review AX27); an unchanged echo leaves it armed, whatever
 		// its key order (the app sorts keys, the plugin's own writes do not).
 		if (sortedJson(state.settings) !== sortedJson(ev.payload.settings)) {
-			this.presses.cancel(ev.action.id);
+			this.presses.consume(ev.action.id);
 		}
 		state.settings = ev.payload.settings;
 		this.renderAll(poller.getStatus(), ev.action.id);
@@ -289,11 +291,20 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		if (state === undefined) {
 			return;
 		}
+		// A repeated down (replayed events) belongs to the press already
+		// held, which settings or a replayed appear may have consumed; it
+		// must not act under the replacement settings (external review AX67).
+		// The behaviors that act on key down (cycle-stat, open-details, Back)
+		// keep no press record, so a repeated down acts again, as in every
+		// earlier build: a record there would swallow the first press after
+		// a lost release.
+		if (this.presses.isDown(ev.action.id)) {
+			return;
+		}
 		if (detailRoleOf(state.settings) === "back") {
-			// Any stale tap/hold session dies first so its timer can never
-			// fire a ghost hold; the navigator stays the only authority for
+			// No session is held here (the guard above), so no timer can fire
+			// a ghost hold; the navigator stays the only authority for
 			// profile navigation (device-scoped, debounced).
-			this.presses.cancel(ev.action.id);
 			await this.detailNavigator.leave(ev.action.device.id);
 			return;
 		}

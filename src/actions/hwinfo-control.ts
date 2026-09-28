@@ -56,6 +56,9 @@ function buildSuccessImage(): string | undefined {
 }
 
 const SUCCESS_IMAGE = buildSuccessImage();
+
+/** A press whose key disappeared before its release (see `presses`). */
+const LEFT = Symbol("left");
 const SUCCESS_BADGE_MS = 700;
 
 /** Persisted settings (written by the PI; all optional). */
@@ -77,11 +80,15 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	/** By context id: Stream Deck can replay willAppear without a disappear. */
 	private readonly visible = new Set<string>();
 	/** The settings each held key was pressed under (sorted JSON), or null
-	 * once the press was consumed by a changed document, a replayed appear
-	 * or a disappearance. Commands fire on release, so a press begun
-	 * as "Next reading" must not release as "Reset every dial" (external
-	 * review AX46, the Control sibling of AX27). */
-	private readonly presses = new Map<string, string | null>();
+	 * once the press was consumed by a changed document or a replayed
+	 * appear, or LEFT once the key disappeared mid-press. Commands fire on
+	 * release, so a press begun as "Next reading" must not release as
+	 * "Reset every dial" (external review AX46, the Control sibling of
+	 * AX27). A repeated down keeps the record it finds, consumed or not
+	 * (AX57). A key that left cannot receive its release while away, so its
+	 * next down is a new press, as on a dial; a release that reaches it
+	 * after it returns, with no down since, is still consumed. */
+	private readonly presses = new Map<string, string | null | typeof LEFT>();
 	/** Pending badge reverts by context id, so repeats re-arm cleanly. */
 	private readonly badgeTimers = new Map<string, NodeJS.Timeout>();
 	/** The key each pending badge is painted on. willDisappear carries only
@@ -100,7 +107,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 
 	override onWillAppear(ev: WillAppearEvent<ControlActionSettings>): void {
 		this.visible.add(ev.action.id);
-		if (this.presses.has(ev.action.id)) this.presses.set(ev.action.id, null);
+		if (typeof this.presses.get(ev.action.id) === "string") this.presses.set(ev.action.id, null);
 		streamDeck.logger.debug(`Control key appeared on ${JSON.stringify(ev.action.device.name)} (${ev.action.id})`);
 		if (this.restoreOwed.delete(ev.action.id)) {
 			// No argument restores the manifest image.
@@ -118,7 +125,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	 */
 	override onWillDisappear(ev: WillDisappearEvent<ControlActionSettings>): void {
 		this.visible.delete(ev.action.id);
-		if (this.presses.has(ev.action.id)) this.presses.set(ev.action.id, null);
+		if (this.presses.has(ev.action.id)) this.presses.set(ev.action.id, LEFT);
 		const timer = this.badgeTimers.get(ev.action.id);
 		if (timer !== undefined) {
 			clearTimeout(timer);
@@ -157,7 +164,8 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	}
 
 	override onKeyDown(ev: KeyDownEvent<ControlActionSettings>): void {
-		this.presses.set(ev.action.id, sortedJson(ev.payload.settings));
+		const held = this.presses.get(ev.action.id);
+		if (held === undefined || held === LEFT) this.presses.set(ev.action.id, sortedJson(ev.payload.settings));
 	}
 
 	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<ControlActionSettings>): void {
@@ -171,7 +179,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 		// or Key Logic step may deliver the release alone.
 		const pressed = this.presses.get(ev.action.id);
 		this.presses.delete(ev.action.id);
-		if (pressed === null || (pressed !== undefined && pressed !== sortedJson(ev.payload.settings))) return;
+		if (pressed === null || pressed === LEFT || (pressed !== undefined && pressed !== sortedJson(ev.payload.settings))) return;
 		const settings = ev.payload.settings;
 		// Honor the panel: its Command select shows "Next reading" until the
 		// user picks something, so an unset command is "next", not an error.
@@ -205,7 +213,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 			return;
 		}
 		if (payload.event === "getSupportReport") {
-			void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload());
+			void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload(payload.requestId));
 		}
 	}
 }

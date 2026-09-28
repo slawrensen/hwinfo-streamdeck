@@ -185,11 +185,14 @@ export function buildDetailSupportPayload(): JsonValue {
 	};
 }
 
-/** The redacted support report, for the PI's "Copy support report" button. */
-export function buildSupportReportPayload(): JsonValue {
+/** The redacted support report, for the PI's "Copy support report" button.
+ *  The panel's request id comes back with it, so the panel copies only the
+ *  answer to its own pending request (external review AX63). */
+export function buildSupportReportPayload(requestId?: unknown): JsonValue {
 	const info = streamDeck.info;
 	return {
 		event: "supportReport",
+		...(typeof requestId === "string" ? { requestId } : {}),
 		report: buildSupportReport({
 			pluginVersion: info.plugin.version,
 			appVersion: info.application.version,
@@ -390,7 +393,7 @@ export function handlePiRequest(payload: JsonValue): void {
 	} else if (payload.event === "getThemes") {
 		void streamDeck.ui.sendToPropertyInspector(buildThemesPayload());
 	} else if (payload.event === "getSupportReport") {
-		void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload());
+		void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload(payload.requestId));
 	} else if (payload.event === "getDetailSupport") {
 		void streamDeck.ui.sendToPropertyInspector(buildDetailSupportPayload());
 	} else if (payload.event === "getPanelFolds" || payload.event === "setPanelFolds") {

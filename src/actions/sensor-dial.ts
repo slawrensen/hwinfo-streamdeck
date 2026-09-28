@@ -172,11 +172,6 @@ export type InstanceState = {
 	/** A stale or unavailable tick ended this dial's sessions; the first live
 	 * frame afterwards says so once, so a collapsed min/max is explained. */
 	gapReset?: boolean;
-	/** Readings this instance holds poller series subscriptions for (the
-	 * two-row view's sparklines); synced each tick, released on disappear.
-	 * Not restored across hiding: poller subscriptions are permanent for the
-	 * process, so the rings stay warm and the first tick back resubscribes. */
-	rowSeries: Set<string>;
 };
 
 /** How long a hidden dial's state (stats, pause, pin) is kept for its return. */
@@ -223,7 +218,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 	}
 
 	override onWillAppear(ev: WillAppearEvent<DialSettings>): void {
-		streamDeck.logger.debug(`Dial appeared on ${ev.action.device.name}${ev.action.isDial() ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
+		streamDeck.logger.debug(`Dial appeared on ${JSON.stringify(ev.action.device.name)}${ev.action.isDial() ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
 		this.traceLifecycle("willAppear", ev.action.id, ev.action.device.id);
 		// Stream Deck can replay willAppear for a context without an intervening
 		// willDisappear (reconnect, wake): retain only on the first sighting.
@@ -263,8 +258,7 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 			pendingAlertUnitKey: restored?.pendingAlertUnitKey,
 			// A gap that ended this dial's sessions while it was hidden, or
 			// before a replayed appear, is still owed its one explanation.
-			gapReset: restored?.gapReset ?? false,
-			rowSeries: new Set()
+			gapReset: restored?.gapReset ?? false
 		};
 		this.instances.set(ev.action.id, state);
 		if (ev.action.isDial()) {
@@ -293,7 +287,6 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 		// The rows' rings stay tracked in the poller: history keeps
 		// collecting off-screen while the poller stays alive, so the two-row
 		// view resumes its lines on return.
-		state.rowSeries.clear();
 		// A press cannot span a disappearance; drop any half-tracked gesture
 		// and its overlay timer, then park the state for the action's return.
 		state.gesture = routeGesture(state.gesture, { kind: "detach" }, "off").state;
@@ -685,34 +678,19 @@ export class SensorDialAction extends SingletonAction<DialSettings> {
 	}
 
 	/**
-	 * Keeps the poller series subscriptions matched to the two-row view's
-	 * visible rows (they feed the row sparklines). Poller rings live for the
-	 * process once subscribed, so a row scrolling away and back keeps its
-	 * history as long as polling stayed alive in between.
+	 * Subscribes the two-row view's visible rows to poller series (they feed
+	 * the row sparklines). The poller keeps each ring for the process and
+	 * ignores a repeat subscription, so a row scrolling away and back keeps
+	 * its history and nothing here needs tracking (external review MS05).
 	 */
 	private syncRowSeries(state: InstanceState, snapshot: SensorSnapshot): void {
-		const desired = new Set<string>();
-		if (dialViewOf(state.settings) === "tworow") {
-			const key = readingKeyOf(state.settings);
-			const reading = key === undefined ? undefined : snapshot.byKey.get(key);
-			if (reading !== undefined) {
-				const list = stepListOf(state.settings, key, rotationGroupsOf(state.settings.rotationGroups), snapshot);
-				for (const member of overviewWindow(list.length === 0 ? [reading] : list, key, 2).rows) {
-					desired.add(member.key);
-				}
-			}
-		}
-		for (const key of [...state.rowSeries]) {
-			if (!desired.has(key)) {
-				// Off the visible window now; its ring stays warm in the poller.
-				state.rowSeries.delete(key);
-			}
-		}
-		for (const key of desired) {
-			if (!state.rowSeries.has(key)) {
-				poller.subscribeSeries(key);
-				state.rowSeries.add(key);
-			}
+		if (dialViewOf(state.settings) !== "tworow") return;
+		const key = readingKeyOf(state.settings);
+		const reading = key === undefined ? undefined : snapshot.byKey.get(key);
+		if (reading === undefined) return;
+		const list = stepListOf(state.settings, key, rotationGroupsOf(state.settings.rotationGroups), snapshot);
+		for (const member of overviewWindow(list.length === 0 ? [reading] : list, key, 2).rows) {
+			poller.subscribeSeries(member.key);
 		}
 	}
 

@@ -80,7 +80,7 @@ self.hwShell = (() => {
 	});
 	client.getConnectionInfo().then((info) => {
 		state.context = info?.actionInfo?.context ?? "";
-		state.connectedAt = Date.now();
+		state.connectedAt = performance.now();
 		// Sensor panels ask once for the current face; the plugin also sends
 		// one with every tick, so this only shortens the first wait.
 		if (kind === "key" || kind === "dial") client.send("sendToPlugin", { event: "getPreview" });
@@ -103,7 +103,7 @@ self.hwShell = (() => {
 			emit("preview", p);
 		} else if (p.event === "sensorTree") {
 			state.tree = p;
-			state.treeAt = Date.now();
+			state.treeAt = performance.now();
 			emit("tree", p);
 		}
 		scheduleRender();
@@ -420,11 +420,11 @@ self.hwShell = (() => {
 		if (panelScroll !== null && Math.hypot(ev.clientX - panelScroll.x, ev.clientY - panelScroll.y) >= 4) panelScroll = null;
 	}, true);
 	function markPanelScroll() {
-		panelScroll = { at: Date.now(), x: pointer.x, y: pointer.y };
+		panelScroll = { at: performance.now(), x: pointer.x, y: pointer.y };
 	}
 	const staleAt = (ev) => {
 		if (panelScroll === null) return false;
-		if (Date.now() - panelScroll.at > 500) {
+		if (performance.now() - panelScroll.at > 500) {
 			panelScroll = null;
 			return false;
 		}
@@ -563,7 +563,7 @@ self.hwShell = (() => {
 		const s = state.settings;
 		const configured = typeof s.readingKey === "string" && s.readingKey !== "";
 		if (p === null) {
-			const waited = state.connectedAt > 0 && Date.now() - state.connectedAt > 3000;
+			const waited = state.connectedAt > 0 && performance.now() - state.connectedAt > 3000;
 			return waited && !state.heardFromPlugin ? { text: "The plugin is not responding", tone: "danger" } : { text: "Connecting to the plugin", tone: "muted" };
 		}
 		if (p.state === "unavailable") return { text: "No HWiNFO data", tone: "danger" };
@@ -695,7 +695,7 @@ self.hwShell = (() => {
 		let tone = "";
 		let lines = [];
 		let actions = [];
-		if (p === null && state.connectedAt > 0 && Date.now() - state.connectedAt > 3000 && !state.heardFromPlugin) {
+		if (p === null && state.connectedAt > 0 && performance.now() - state.connectedAt > 3000 && !state.heardFromPlugin) {
 			tone = "danger";
 			lines = ["The HWiNFO Sensors plugin is not answering this panel. Settings you change here are still saved; restarting the Stream Deck app restarts the plugin."];
 		} else if (p !== null && p.state === "unavailable") {
@@ -836,7 +836,7 @@ self.hwShell = (() => {
 		const button = ev.target instanceof Element ? ev.target.closest("[data-status-action]") : null;
 		if (button === null) return;
 		if (button.dataset.statusAction === "retry") {
-			checkAskedAt = Date.now();
+			checkAskedAt = performance.now();
 			checkAskedFor = document.getElementById("reading-status")?.dataset.signature ?? "";
 			// The previous answer stays until the new one replaces it in
 			// place, so the block does not bounce on every press.

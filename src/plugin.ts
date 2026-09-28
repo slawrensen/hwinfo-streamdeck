@@ -186,7 +186,8 @@ streamDeck.actions.registerAction(new HwinfoControlAction());
 streamDeck.actions.registerAction(new DetailSlotAction(detailController));
 
 // One line per deck so support logs say exactly what hardware was involved.
-const describeDevice = (d: Pick<Device, "name" | "type" | "size">): string => `${d.name} (${DeviceType[d.type] ?? `type ${d.type}`}, ${d.size.columns}x${d.size.rows})`;
+// The name is the person's own text: quoted, so it stays on its log line.
+const describeDevice = (d: Pick<Device, "name" | "type" | "size">): string => `${JSON.stringify(d.name)} (${DeviceType[d.type] ?? `type ${d.type}`}, ${d.size.columns}x${d.size.rows})`;
 const ingestDevice = (d: Pick<Device, "id" | "type" | "size">): void => {
 	deviceCapabilities.ingest(d.id, { type: d.type, columns: d.size.columns, rows: d.size.rows });
 };

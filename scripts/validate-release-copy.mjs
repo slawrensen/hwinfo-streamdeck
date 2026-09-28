@@ -67,6 +67,7 @@ const BANNED = [
 	{ re: /\beffortless(?:ly)?\b/i, why: '"effortless" claim' },
 	{ re: /\bunparalleled\b/i, why: '"unparalleled" claim' },
 	{ re: /\b(?:take|takes|taking)\b[^.!?\n]{0,80}\bto the next level\b/i, why: '"take it to the next level" claim' },
+	{ re: /\b(?:takes?|taking|took)\s+(?:just\s+|only\s+|mere\s+|a\s+few\s+|a\s+matter\s+of\s+)?seconds\b|\b(?:ready|done|set\s*up|running|installed|configured)\s+(?:in|within)\s+(?:just\s+|only\s+|mere\s+|a\s+few\s+|a\s+matter\s+of\s+)?seconds\b|\bmatter\s+of\s+seconds\b/i, why: '"takes seconds" claim with no measurement behind it' },
 ];
 
 function checkCopy(rel, { emDashOnly = false } = {}) {
@@ -95,7 +96,9 @@ const PROSE_FILES = [
 	"PERF.md",
 	"SECURITY.md",
 	"native/hwsm/TESTING.md",
-	...mdFilesUnder("docs").filter((f) => !f.replaceAll("\\", "/").endsWith(RULES_DOC.slice(5))),
+	// External review reports quote the copy they flag; they are records,
+	// not release copy.
+	...mdFilesUnder("docs").filter((f) => !f.replaceAll("\\", "/").endsWith(RULES_DOC.slice(5)) && !f.replaceAll("\\", "/").includes("docs/release/external-review")),
 	"docs/_config.yml",
 	`${SD}/manifest.json`,
 	`${SD}/ui/sensor-reading.html`,
@@ -105,6 +108,11 @@ const PROSE_FILES = [
 ];
 for (const f of PROSE_FILES) checkCopy(f);
 checkCopy(RULES_DOC, { emDashOnly: true });
+
+// Text the Marketplace images carry: a PNG cannot be read here, so the
+// generator that bakes in their headlines and captions is checked as copy,
+// whole (external review AX55).
+checkCopy("scripts/marketplace-shots.mjs");
 
 // Runtime strings users see on keys, dials and the settings panel. Em-dash
 // check only: identifiers like unlock() would false-positive the word list.

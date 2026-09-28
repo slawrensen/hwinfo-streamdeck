@@ -178,6 +178,15 @@ describe("soak log tail across a rotation", () => {
 		assert.deepEqual(poll(), { warn: 0, error: 0, note: "" });
 	});
 
+	it("counts a line by its level column, not by a level word in its message", (t) => {
+		const { dir, append } = logDir(t);
+		append(0, INFO);
+		const poll = makeLogTail(dir);
+		poll();
+		append(0, '2026-09-18T00:00:13.000Z INFO  Device known: "ERROR deck" (StreamDeck, 5x3)\n2026-09-18T00:00:14.000Z INFO  Key appeared on "WARN pad" (ctx)\n' + WARN);
+		assert.deepEqual(poll(), { warn: 1, error: 0, note: "" });
+	});
+
 	it("counts the lines written between the last poll and the rotation", (t) => {
 		const { dir, append, rotate } = logDir(t);
 		append(0, INFO);

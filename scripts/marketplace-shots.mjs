@@ -33,7 +33,7 @@ const dialCaption = sensorValueColors
 const provider = SharedMemoryProvider.open();
 const snapshot = provider.read();
 if (snapshot === null) {
-	throw new Error("shared memory mid-update — rerun");
+	throw new Error("shared memory mid-update; rerun");
 }
 const byKey = (key) => {
 	const r = snapshot.byKey.get(key);
@@ -199,7 +199,7 @@ const multi = {
 
 // ---------- shot 1: hero ----------
 async function hero() {
-	// An "under load" scenario — every face is still drawn by the real renderer.
+	// An "under load" scenario: every face is still drawn by the real renderer.
 	// The wall deliberately MIXES layouts: gallery slot 1 is the only image
 	// many people look at, and a grid of single readings would sell the
 	// commodity claim instead of the product. A dual, a triple and a quad sit
@@ -607,7 +607,7 @@ async function settings(piDir) {
 	const captionY = 908;
 
 	const chrome = [
-		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">Set up in seconds.</text>`,
+		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">The settings panel, live.</text>`,
 		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">The real settings panel, not a mockup: search with live values, stack up to four, aim a drill-down key.</text>`
 	];
 	const composites = [];
@@ -634,7 +634,7 @@ async function settings(piDir) {
 // ---------- thumbnail (dedicated 1920×960 listing card) ----------
 async function thumbnail() {
 	// Purpose-built per the guidelines: depicts real functionality with large
-	// legible text — one row of real key faces + a real dial slot.
+	// legible text: one row of real key faces + a real dial slot.
 	const KEY = 220;
 	const GAP = 18;
 	// One single, one alerting, then the three multi-reading layouts: the card

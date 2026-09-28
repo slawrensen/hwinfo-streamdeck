@@ -120,11 +120,13 @@ fixes in one release.
   cycle on the reading, while the face shows no value. A data reading that
   only overflows once converted to bytes shows the same unavailable mark in
   its own unit instead of "Infinity".
-- A key or dial held down while its settings change does nothing when
-  released: the press ends, and the next press uses the new settings.
-  Before, a held press could run the command the new settings named, such
-  as resetting every dial.
-- Auto cycle keeps its interval when the Windows clock is corrected, and a
+- A key, dial or HWiNFO Control key held down while its settings change
+  does nothing when released: the press ends, and the next press uses the
+  new settings. Before, a held press could run the command the new
+  settings named, such as resetting every dial.
+- Auto cycle keeps its interval when the Windows clock is corrected, and so
+  do the detail view's Back (a second press right after the first is still
+  one hop) and the settings panel's second-press confirmations. A
   hand-edited interval that is not a number or text (true, a list) reads as
   off instead of cycling. A threshold typed while HWiNFO is away applies to
   the reading it was typed for, even if the dial moves before data returns.
@@ -141,6 +143,8 @@ fixes in one release.
   while settings replies are pending, and retains unknown Config fields.
 - Group jumps skip a confirmed alias of the current reading so the next
   distinct reading in the target group remains reachable.
+- The plugin log quotes names that come from HWiNFO or the Stream Deck app,
+  so a name with a line break in it stays on its own log line.
 - Two-row and three-row dials can color each reading's number separately.
   Display adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading

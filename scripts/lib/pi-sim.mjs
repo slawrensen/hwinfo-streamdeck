@@ -250,10 +250,14 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	let ticker = null;
 	if (tickMs > 0) ticker = setInterval(() => sim.pushPreview(), tickMs);
 
+	// Fixture text is data: "<" and the two JavaScript line separators are
+	// escaped, so a "</script>" inside a label cannot end this inline script
+	// and run what follows it (external review AX52).
+	const scriptLiteral = (value) => JSON.stringify(JSON.stringify(value)).replace(/<|\u2028|\u2029/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 	const bootstrap = () => {
 		const page = PAGES[sim.page];
 		const actionInfo = { action: page.action, context: sim.context, device: "dev1", payload: { settings: sim.settings, coordinates: { column: 0, row: 0 }, controller: page.controller } };
-		return `<script>window.addEventListener("load",()=>{if(typeof connectElgatoStreamDeckSocket==="function")connectElgatoStreamDeckSocket(String(${wsPort}),"pi-ctx","registerPropertyInspector",${JSON.stringify(JSON.stringify(info))},${JSON.stringify(JSON.stringify(actionInfo))});});</script>`;
+		return `<script>window.addEventListener("load",()=>{if(typeof connectElgatoStreamDeckSocket==="function")connectElgatoStreamDeckSocket(String(${wsPort}),"pi-ctx","registerPropertyInspector",${scriptLiteral(info)},${scriptLiteral(actionInfo)});});</script>`;
 	};
 
 	const server = createServer((req, res) => {
@@ -278,7 +282,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 				const fx = url.searchParams.get("fx") ?? (sim.page !== path.basename(file) ? (DEFAULTS[path.basename(file)] ?? null) : null);
 				if (fx !== null && sim.fixture !== fx) sim.setFixture(fx);
 				const inject = [bootstrap(), ...(url.searchParams.getAll("inject").map((src) => (src.split("?")[0].endsWith(".css") ? `<link rel="stylesheet" href="${src}">` : `<script defer src="${src}"></script>`)))].join("");
-				body = Buffer.from(body.toString("utf8").replace("</head>", `${inject}</head>`));
+				body = Buffer.from(body.toString("utf8").replace("</head>", () => `${inject}</head>`));
 			}
 			res.writeHead(200, { "content-type": MIME[path.extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }).end(body);
 		} catch {

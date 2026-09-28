@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d13";
+	const PI_BUILD = "1.7.0.0-d14";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -750,8 +750,8 @@
 		const id = button.dataset.armId;
 		// The second (or third) click of one multi-click gesture only waits,
 		// whatever the system's double-click time (external review AX13).
-		if (rotationArm !== null && rotationArm.id === id) return detail > 1 || Date.now() - rotationArm.at < 450 ? "wait" : "confirm";
-		rotationArm = { id, at: Date.now(), text: armedText, label: `${armedText} ${armedLabel}` };
+		if (rotationArm !== null && rotationArm.id === id) return detail > 1 || performance.now() - rotationArm.at < 450 ? "wait" : "confirm";
+		rotationArm = { id, at: performance.now(), text: armedText, label: `${armedText} ${armedLabel}` };
 		applyArm(button);
 		hw.announce("rotation-order", spoken, { repeat: true });
 		return "armed";
@@ -1283,6 +1283,14 @@
 	// Entries past the parser's cap, kept exactly as stored behind every write.
 	let detailTilesKept = [];
 
+	/** One stored cell as this build reads it: the parser's per-field
+	 * salvage (detailTilesOf), shared by the plan's reader and a reading
+	 * taking over a dormant cell. */
+	function parseCell(label, color, automatic) {
+		const hue = typeof color === "string" && HEX_COLOR.test(color) ? color : null;
+		return { labels: typeof label === "string" ? label.trim() : "", colors: hue, automaticColors: hue !== null && automatic === true };
+	}
+
 	function adoptDetailTiles(value) {
 		// Mirror the plugin parser (detailTilesOf): per-entry, per-field
 		// salvage, so the panel always shows what the runtime would build.
@@ -1306,9 +1314,10 @@
 					const colors = [];
 					const automaticColors = [];
 					for (let i = 0; i < size; i++) {
-						labels.push(typeof rawLabels[i] === "string" ? rawLabels[i].trim() : "");
-						colors.push(typeof rawColors[i] === "string" && HEX_COLOR.test(rawColors[i]) ? rawColors[i] : null);
-						automaticColors.push(colors[i] !== null && rawAutomatic[i] === true);
+						const cell = parseCell(rawLabels[i], rawColors[i], rawAutomatic[i]);
+						labels.push(cell.labels);
+						colors.push(cell.colors);
+						automaticColors.push(cell.automaticColors);
 					}
 					const tile = { size, labels, colors, cellLabels: raw.cellLabels !== false, automaticColors };
 					return { ...tile, raw: entry, base: { size, labels: [...labels], colors: [...colors], cellLabels: tile.cellLabels, automaticColors: storedAutomatic(automaticColors) } };
@@ -1323,9 +1332,10 @@
 	 * list, a cell takes back its reading's stored entry while that
 	 * reading's value is unchanged (so an entry this build cannot read, or a
 	 * label with spaces, moves with its reading through removals, resizes,
-	 * swaps and drags), and entries past the tile's cells stay at the index
-	 * they were stored at (external review AX12, AX19). `keys` are the
-	 * readings in the tile's cells, in order. */
+	 * swaps and drags). Entries no reading wears (dormant cells, and entries
+	 * stored past the tile's cells) are written back as stored, in the order
+	 * the structural edits left them (external review AX12, AX19, AX47).
+	 * `keys` are the readings in the tile's cells, in order. */
 	function serializeTile(tile, keys = []) {
 		const current = { size: tile.size, labels: [...tile.labels], colors: [...tile.colors], cellLabels: tile.cellLabels, automaticColors: storedAutomatic(tile.automaticColors) };
 		const rawIsObject = tile.raw !== null && typeof tile.raw === "object" && !Array.isArray(tile.raw);
@@ -1341,7 +1351,9 @@
 		// stored as an automatic hue. For a reading whose stored color this
 		// build cannot read, the stored entry travels instead.
 		const wornDefault = (i) => tile.automaticColors[i] === true && QUAD_DEFAULT_COLORS.includes(tile.colors[i]);
+		const dormant = tile.dormantCells ?? [];
 		const carriedEntry = (key, field, i) => {
+			if (key === undefined) return dormant[i]?.[field];
 			const entry = detailCellRaw.get(key);
 			const cell = entry?.[field];
 			if (cell === undefined) return undefined;
@@ -1352,26 +1364,21 @@
 		};
 		for (const field of CELL_FIELDS) {
 			const stored = rawIsObject && Array.isArray(tile.raw[field]) ? tile.raw[field] : null;
-			const carried = Array.from({ length: tile.size }, (_, i) => (keys[i] === undefined ? undefined : carriedEntry(keys[i], field, i)));
+			const carried = Array.from({ length: tile.size }, (_, i) => carriedEntry(keys[i], field, i));
 			const carriesData = carried.some((cell) => cell !== undefined && cell.raw !== cell.parsed);
 			if (out[field] === undefined && stored === null && !carriesData) continue;
-			// A cell no reading fills (a dormant tile's) keeps its stored entry
-			// while its value is unchanged: no reading can be misplaced there.
-			const baseParsed = (i) => (field === "automaticColors" ? tile.base?.automaticColors?.[i] === true : tile.base?.[field]?.[i]);
-			const values = carried.map((cell, i) => {
-				if (cell !== undefined) return cell.raw;
-				if (keys[i] === undefined && stored !== null && i < stored.length && baseParsed(i) === cellParsed(tile, field, i)) return stored[i];
-				return cellParsed(tile, field, i);
-			});
+			const values = carried.map((cell, i) => (cell === undefined ? cellParsed(tile, field, i) : cell.raw));
+			let last = dormant.length;
+			while (last > tile.size && dormant[last - 1]?.[field] === undefined) last--;
+			for (let i = tile.size; i < last; i++) values.push(dormant[i]?.[field] === undefined ? CELL_NEUTRAL[field] : dormant[i][field].raw);
 			if (stored !== null) {
-				const tailStart = Math.max(tile.size, tile.dormantFrom ?? tile.base?.size ?? 0);
-				if (stored.length > tailStart) {
-					for (let j = tile.size; j < tailStart; j++) values.push(CELL_NEUTRAL[field]);
-					values.push(...stored.slice(tailStart));
-				}
-				// A stored list shorter than the cells stays that short: the
-				// missing entries already read as neutral (AX33).
-				while (values.length > stored.length && values[values.length - 1] === CELL_NEUTRAL[field]) values.pop();
+				// A stored list shorter than the cells stays that short: a
+				// missing entry already reads as neutral (AX33). Its end moves
+				// with the structural edits (AX47), and a reading whose entry
+				// was stored keeps an explicit slot.
+				const end = tile.storedLengths?.[field] ?? stored.length;
+				const stores = (i) => (i < tile.size && keys[i] !== undefined ? detailCellRaw.get(keys[i])?.[field] : dormant[i]?.[field]) !== undefined;
+				while (values.length > end && values[values.length - 1] === CELL_NEUTRAL[field] && !stores(values.length - 1)) values.pop();
 			}
 			out[field] = values;
 		}
@@ -1442,19 +1449,24 @@
 		const listed = detailSourceKeys.filter((k) => !isDetailPrimary(k));
 		let head = 0;
 		for (const tile of detailSourceTiles) {
-			// Cells no reading fills as stored are dormant: their entries stay
-			// stored when the tile later shrinks to its readings (AX29). A cell
-			// whose reading moves away is not dormant; its entries travel.
+			// Cells no reading fills as stored are dormant, and so are entries
+			// stored past the tile's cells. Their entries follow the cells
+			// through every removal and insertion, past the tile's size too,
+			// until a reading lands in one (AX29, AX47). A cell whose reading
+			// moves away is not dormant; its entries travel with the reading.
 			const filled = Math.max(0, Math.min(tile.size, listed.length - head));
-			tile.dormantFrom = filled < tile.size ? filled : undefined;
+			tile.dormantCells = [];
 			const raw = tile.raw;
 			if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
-				for (let i = 0; i < tile.size && head + i < listed.length; i++) {
+				tile.storedLengths = Object.fromEntries(CELL_FIELDS.map((field) => [field, Array.isArray(raw[field]) ? raw[field].length : 0]));
+				const length = Math.max(tile.size, ...CELL_FIELDS.map((field) => (Array.isArray(raw[field]) ? raw[field].length : 0)));
+				for (let i = 0; i < length; i++) {
 					const entry = {};
 					for (const field of CELL_FIELDS) {
 						if (Array.isArray(raw[field]) && i < raw[field].length) entry[field] = { raw: raw[field][i], parsed: cellParsed(tile, field, i) };
 					}
-					detailCellRaw.set(listed[head + i], entry);
+					if (i < filled) detailCellRaw.set(listed[head + i], entry);
+					else if (Object.keys(entry).length > 0) tile.dormantCells[i] = entry;
 				}
 			}
 			head += tile.size;
@@ -1488,7 +1500,7 @@
 			detailTiles = detailTiles.flatMap((spec) => {
 				const cells = Array.from({ length: spec.size }, (_, i) => i).filter((i) => source[head + i] === undefined || kept.has(source[head + i]));
 				head += spec.size;
-				return cells.length === 0 ? [] : [{ size: cells.length, labels: cells.map((i) => spec.labels[i]), colors: cells.map((i) => spec.colors[i]), cellLabels: spec.cellLabels, automaticColors: cells.map((i) => spec.automaticColors[i]), raw: spec.raw, base: spec.base }];
+				return cells.length === 0 ? [] : [{ size: cells.length, labels: cells.map((i) => spec.labels[i]), colors: cells.map((i) => spec.colors[i]), cellLabels: spec.cellLabels, automaticColors: cells.map((i) => spec.automaticColors[i]), raw: spec.raw, base: spec.base, dormantCells: [...cells.map((i) => spec.dormantCells?.[i]), ...(spec.dormantCells?.slice(spec.size) ?? [])], storedLengths: spec.storedLengths === undefined ? undefined : Object.fromEntries(CELL_FIELDS.map((field) => [field, spec.storedLengths[field] - Array.from({ length: spec.size }, (_, i) => i).filter((i) => !cells.includes(i) && i < spec.storedLengths[field]).length])) }];
 			});
 		}
 		if (before !== JSON.stringify([detailKeys, detailTiles.map((t) => t.size)])) {
@@ -1549,15 +1561,19 @@
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
-		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base, dormantFrom: t.dormantFrom }));
+		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base, dormantCells: t.dormantCells?.slice(), storedLengths: t.storedLengths === undefined ? undefined : { ...t.storedLengths } }));
 	}
 
-	/** Taking a cell out of a tile whose dormant cells are still among its
-	 * cells shifts them down, so their stored entries no longer sit at their
-	 * stored index: the tile falls back to its stored size for the tail
-	 * (a dormant tail kept at dormantFrom would be written twice). */
-	function dropDormant(tile) {
-		if (tile.size > (tile.dormantFrom ?? Infinity)) tile.dormantFrom = undefined;
+	/** A structural edit at `cell` of a tile: a removal (delta -1) or an
+	 * insertion (+1). Its dormant entries and the end of each stored list
+	 * move with the cells after it (external review AX47). */
+	function spliceStored(tile, cell, delta) {
+		if (delta < 0) tile.dormantCells?.splice(cell, 1);
+		else tile.dormantCells?.splice(cell, 0, undefined);
+		if (tile.storedLengths === undefined) return;
+		for (const field of CELL_FIELDS) {
+			if (cell < tile.storedLengths[field]) tile.storedLengths[field] += delta;
+		}
 	}
 
 	/** A walk tile's spec at exactly the cells it fills, always a fresh
@@ -1565,11 +1581,11 @@
 	 * trailing spec sheds the cells it does not fill (a partial spec
 	 * anywhere but the tail would swallow the next tile's head). Cells no
 	 * reading filled when the plan was read keep their stored entries past
-	 * the new size (dormantFrom, external review AX29). */
+	 * the new size (dormantCells, external review AX29). */
 	function occupancySpec(tile, occupied) {
 		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
 		const size = Math.min(spec.size, occupied);
-		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base, dormantFrom: spec.dormantFrom };
+		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base, dormantCells: spec.dormantCells?.slice(), storedLengths: spec.storedLengths === undefined ? undefined : { ...spec.storedLengths } };
 	}
 
 	/** Extends the plan with default entries (at the uniform fill size,
@@ -1607,6 +1623,39 @@
 	 * carrying BOTH fields. Solo edits re-assert the other field for free,
 	 * which also self-heals a store that went stale. */
 	function writeDetailState() {
+		// A reading that lands in a dormant cell (a pick, or a resize that
+		// flows one in) takes the cell over. An entry holding nothing just
+		// gives up its slot. A reading bringing entries it wears here keeps
+		// them, and the dormant entry moves one cell on. Otherwise the reading
+		// wears the stored entry, as the deck draws that cell, and owns it
+		// from here: written once, at the reading. Pushing every entry on
+		// wrote readable ones twice and grew the lists on each refill
+		// (external review AX47, review of d14).
+		const listed = listedDetailKeys();
+		let at = 0;
+		for (const tile of detailTiles) {
+			for (let i = 0; i < tile.size && at + i < listed.length; i++) {
+				const entry = tile.dormantCells?.[i];
+				if (entry === undefined) continue;
+				if (CELL_FIELDS.every((field) => entry[field] === undefined || entry[field].raw === CELL_NEUTRAL[field])) {
+					tile.dormantCells[i] = undefined;
+					continue;
+				}
+				const own = detailCellRaw.get(listed[at + i]);
+				if (own !== undefined && CELL_FIELDS.some((field) => own[field] !== undefined && own[field].raw !== CELL_NEUTRAL[field] && own[field].parsed === cellParsed(tile, field, i))) {
+					spliceStored(tile, i, 1);
+					continue;
+				}
+				const shown = parseCell(entry.labels?.raw, entry.colors?.raw, entry.automaticColors?.raw);
+				for (const field of CELL_FIELDS) {
+					tile[field][i] = shown[field];
+					if (entry[field] !== undefined) entry[field].parsed = shown[field];
+				}
+				detailCellRaw.set(listed[at + i], entry);
+				tile.dormantCells[i] = undefined;
+			}
+			at += tile.size;
+		}
 		// An explicit edit accepts the shown layout. Update both source
 		// copies before publishing so a later tree cannot resurrect it.
 		detailSourceKeys = [...detailKeys];
@@ -1617,7 +1666,6 @@
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
-		const listed = listedDetailKeys();
 		let head = 0;
 		const serialized = detailTiles.map((tile) => {
 			const keys = listed.slice(head, head + tile.size);
@@ -1679,11 +1727,7 @@
 			next.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true, automaticColors: Array.from({ length: detailUniform }, () => false) });
 		}
 		const carriesData = (t, i) => {
-			const r = t.raw;
-			if (r !== null && typeof r === "object" && !Array.isArray(r)) {
-				const cells = Math.max(t.size, t.dormantFrom ?? t.base?.size ?? 0);
-				if (CELL_FIELDS.some((field) => Array.isArray(r[field]) && r[field].slice(cells).some((v) => v !== CELL_NEUTRAL[field]))) return true;
-			}
+			if (t.dormantCells?.some((cell) => CELL_FIELDS.some((field) => cell?.[field] !== undefined && cell[field].raw !== CELL_NEUTRAL[field]))) return true;
 			return listed.slice(heads[i], heads[i] + t.size).some(cellCarriesData);
 		};
 		while (next.length > 0 && isDefault(next[next.length - 1]) && !carriesData(next[next.length - 1], next.length - 1)) {
@@ -1921,8 +1965,16 @@
 	// A repaint queued by a person's edit still speaks its note when it runs.
 	let detailQueuedSpeaks = false;
 	let detailPressTimer = 0;
+	// The press's one release listener: the ceiling takes it down too, so
+	// presses whose release never reached the window cannot pile listeners
+	// up (external review AX56).
+	function queueDetailRelease() {
+		clearTimeout(detailPressTimer);
+		detailPressTimer = setTimeout(releaseDetailPress, 0);
+	}
 	function releaseDetailPress() {
 		clearTimeout(detailPressTimer);
+		window.removeEventListener("mouseup", queueDetailRelease);
 		detailPressing = false;
 		if (!detailRenderQueued) return;
 		detailRenderQueued = false;
@@ -2028,7 +2080,7 @@
 					detailArm = { tileIdx: detailArm.tileIdx - 1 };
 				}
 			} else {
-				dropDormant(next[tileIdx]);
+				spliceStored(next[tileIdx], cell, -1);
 				next[tileIdx].size -= 1;
 				next[tileIdx].labels.splice(cell, 1);
 				next[tileIdx].colors.splice(cell, 1);
@@ -2197,7 +2249,7 @@
 			next.splice(fromTileIdx, 1);
 			dissolved = true;
 		} else {
-			dropDormant(next[fromTileIdx]);
+			spliceStored(next[fromTileIdx], cell, -1);
 			next[fromTileIdx].size -= 1;
 			next[fromTileIdx].labels.splice(cell, 1);
 			next[fromTileIdx].colors.splice(cell, 1);
@@ -2226,6 +2278,7 @@
 			const spare = occupiedOf(target) < target.size;
 			if (tileTakesCell(target)) {
 				if (!spare) next[targetAt].size += 1;
+				spliceStored(next[targetAt], cellInTarget, 1);
 				next[targetAt].labels.splice(cellInTarget, 0, dressing.label);
 				next[targetAt].colors.splice(cellInTarget, 0, carried(occupiedOf(target) + 1));
 				next[targetAt].automaticColors.splice(cellInTarget, 0, automatic(occupiedOf(target) + 1));
@@ -4105,6 +4158,20 @@
 	// the key or dial re-renders at once and the header shows its new face.
 
 	let themesConfig = null; // { defaultTheme, effectiveDeckTheme, themes: { id: { bg, ... } }, themeOrder }
+	/** A themes message the gallery can draw: a default among its themes,
+	 * none named "" (that id is the Default chip's), and every palette
+	 * carrying hex colors for what a chip paints (the label color frames
+	 * only the Default chip, so it may be absent).
+	 * Anything else is ignored and the last good gallery stays (external
+	 * review AX51). */
+	function drawableThemes(p) {
+		const themes = p.themes;
+		if (themes === null || typeof themes !== "object" || Array.isArray(themes)) return false;
+		if (typeof p.defaultTheme !== "string" || !Object.hasOwn(themes, p.defaultTheme) || Object.hasOwn(themes, "")) return false;
+		const hex = (value) => typeof value === "string" && HEX_COLOR.test(value);
+		return Object.values(themes).every((palette) => palette !== null && typeof palette === "object" && hex(palette.bg) && hex(palette.value) && hex(palette.accent) && (palette.label === undefined || hex(palette.label)));
+	}
+
 	/** The themes in their defined order. The app delivers the themes object
 	 * with its keys sorted, so the order comes from the payload's list; any
 	 * theme the list does not name follows in the object's order. */
@@ -4584,6 +4651,7 @@
 		const p = ev && ev.payload;
 		if (!p || typeof p !== "object") return;
 		if (p.event === "themes") {
+			if (!drawableThemes(p)) return;
 			themesConfig = p;
 			renderGallery();
 			syncSharedThemeDefault();
@@ -4829,7 +4897,7 @@
 			// been dispatched; the ceiling covers a release the window never
 			// sees (a drag out of the webview), so nothing strands the repaint.
 			detailPressTimer = setTimeout(releaseDetailPress, 500);
-			window.addEventListener("mouseup", () => setTimeout(releaseDetailPress, 0), { once: true });
+			window.addEventListener("mouseup", queueDetailRelease, { once: true });
 		});
 		// Cell-rename commit and teardown, byte-parallel to the rotation
 		// chips: change writes once, blur without an edit restores the span,
@@ -5276,7 +5344,7 @@
 				// A document that changed since the arm, even without typing (a
 				// refill), is a new first press: the arm names one exact text.
 				if (confirmFirst && (armedAt === 0 || el.value !== armedValue)) {
-					armedAt = Date.now();
+					armedAt = performance.now();
 					armedValue = el.value;
 					if (button !== null) {
 						button.dataset.armed = "true";
@@ -5285,7 +5353,7 @@
 					say("This replaces the shared settings every HWiNFO key and dial uses. Press again to confirm.");
 					return;
 				}
-				if (confirmFirst && (ev.detail > 1 || Date.now() - armedAt < 450)) return;
+				if (confirmFirst && (ev.detail > 1 || performance.now() - armedAt < 450)) return;
 				disarm(true);
 				// Names come off here, whether this build wrote them or a person
 				// typed them: what lands in settings is keys alone. A document

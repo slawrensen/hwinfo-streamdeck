@@ -103,6 +103,21 @@ describe("packed-archive gate", () => {
 		assert.ok(run(Buffer.alloc(0)).failures.length > 0);
 	});
 
+	it("reads a ZIP64 member that expands past the size of the whole archive", () => {
+		// Compression can make the archive smaller than one member: the
+		// expanded size is bounded by what a Buffer holds, not by the archive
+		// (external review AX54). Offsets and compressed sizes stay bounded.
+		for (const length of [1000, 1_000_000]) {
+			const data = Buffer.alloc(length, 32);
+			const zip = writeZip([{ name: "compressible.js", data, zip64: true }]);
+			assert.ok(zip.length < length, `the ${length}-byte member packs smaller than itself`);
+			const { entries, problems } = listZip(zip);
+			assert.deepEqual(problems, []);
+			assert.equal(entries.length, 1);
+			assert.ok(readZipEntry(zip, entries[0]).equals(data));
+		}
+	});
+
 	it("reads ZIP64 per-entry sizes the packer writes and refuses a marked size it does not carry", () => {
 		// Sizes marked 0xFFFFFFFF and carried in the 0x0001 field, as the CLI
 		// writes them: the field is parsed, the sizes come out right, every

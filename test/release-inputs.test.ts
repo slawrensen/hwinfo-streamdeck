@@ -113,20 +113,105 @@ describe("release workflow privilege boundary", () => {
 
 describe("the shipped NOTICE carries every bundled license (external review AX32)", () => {
 	// What rollup bundles into bin/plugin.js (measured: @elgato/streamdeck,
-	// @elgato/utils, @elgato/schemas, ws, tslib) plus the Lit code inside the
-	// vendored sdpi-components.js. Each license text must ship whole.
+	// @elgato/utils, @elgato/schemas, ws, tslib), the Lit code inside the
+	// vendored sdpi-components.js, and the icon path data copied from Lucide
+	// and Feather into the panels. Each license ships whole, under its own
+	// top-level heading, once, and visible: the file is read as the section
+	// list it renders to, so a deleted, demoted, doubled or commented-out
+	// license fails (external review AX53).
 	const flat = (text: string): string => text.replace(/\s+/g, " ").trim();
-	const notice = flat(readFileSync(join(ROOT, "NOTICE.md"), "utf8"));
-	for (const file of ["@elgato/streamdeck/LICENSE", "@elgato/utils/LICENSE", "@elgato/schemas/LICENSE", "ws/LICENSE", "tslib/LICENSE.txt"]) {
-		it(`${file.split("/").slice(0, -1).join("/")}: its copyright and license text ship whole`, () => {
-			assert.ok(notice.includes(flat(readFileSync(join(ROOT, "node_modules", file), "utf8"))));
+	const raw = readFileSync(join(ROOT, "NOTICE.md"), "utf8");
+	const headings: string[] = [];
+	const sections = new Map<string, string>();
+	for (const part of raw.split(/^## /m).slice(1)) {
+		const heading = part.slice(0, part.indexOf("\n"));
+		headings.push(heading);
+		sections.set(heading, flat(part.slice(heading.length + 1)));
+	}
+	const read = (file: string): string => readFileSync(join(ROOT, "node_modules", file), "utf8");
+	const sdk = read("@elgato/streamdeck/LICENSE");
+	const mitTerms = sdk.slice(sdk.indexOf("Permission is hereby granted"));
+	const header = readFileSync(join(ROOT, "com.lawrensen.hwinfo.sdPlugin/ui/sdpi-components.js"), "utf8").slice(0, 400);
+
+	it("lists each license once, as a top-level section, with nothing hidden", () => {
+		assert.deepEqual(headings, [
+			"Lucide license (ISC)",
+			"Feather license (MIT), for the `link` icon",
+			"Elgato Stream Deck SDK and @elgato/utils license (MIT)",
+			"@elgato/schemas license (MIT)",
+			"sdpi-components license (MIT)",
+			"Lit license (BSD-3-Clause), bundled in sdpi-components",
+			"ws license (MIT)",
+			"tslib license (0BSD)"
+		]);
+		assert.doesNotMatch(raw, /<!--/, "an HTML comment would hide text from the rendered NOTICE");
+	});
+	for (const [heading, files] of [
+		["Elgato Stream Deck SDK and @elgato/utils license (MIT)", ["@elgato/streamdeck/LICENSE", "@elgato/utils/LICENSE"]],
+		["@elgato/schemas license (MIT)", ["@elgato/schemas/LICENSE"]],
+		["ws license (MIT)", ["ws/LICENSE"]],
+		["tslib license (0BSD)", ["tslib/LICENSE.txt"]]
+	] as const) {
+		it(`${files.map((f) => f.split("/").slice(0, -1).join("/")).join(" and ")}: the section is exactly the package's license file`, () => {
+			for (const file of files) assert.equal(sections.get(heading), flat(read(file)), file);
 		});
 	}
-	it("Lit, inside sdpi-components: its copyright and the three BSD conditions ship", () => {
-		const header = readFileSync(join(ROOT, "com.lawrensen.hwinfo.sdPlugin/ui/sdpi-components.js"), "utf8").slice(0, 400);
+	it("sdpi-components: its copyright and the complete MIT license", () => {
+		assert.match(header, /sdpi-components v[\d.]+, Copyright Corsair Memory Inc\. and other contributors/);
+		assert.ok(mitTerms.length > 900, "the MIT terms were found in the SDK's license");
+		assert.equal(sections.get("sdpi-components license (MIT)"), flat(`Copyright Corsair Memory Inc. and other contributors\n\n${mitTerms}`));
+	});
+	it("Feather, for the link icon: its copyright and the complete MIT license", () => {
+		assert.equal(sections.get("Feather license (MIT), for the `link` icon"), flat(`Copyright (c) 2013-present Cole Bemis\n\n${mitTerms}`));
+	});
+	it("Lucide: its copyright and the complete ISC license", () => {
+		assert.equal(
+			sections.get("Lucide license (ISC)"),
+			flat(`Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.`)
+		);
+	});
+	it("Lit, inside sdpi-components: its copyright, the three conditions and the disclaimer", () => {
 		assert.match(header, /Lit, Copyright 2019 Google LLC, SPDX-License-Identifier: BSD-3-Clause/);
-		for (const phrase of ["Copyright 2019 Google LLC", "Redistributions of source code must retain the above copyright notice", "Redistributions in binary form must reproduce the above copyright notice", "Neither the name of the copyright holder nor the names of its contributors"]) {
-			assert.ok(notice.includes(phrase), phrase);
-		}
+		assert.equal(
+			sections.get("Lit license (BSD-3-Clause), bundled in sdpi-components"),
+			flat(`Copyright 2019 Google LLC
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`)
+		);
 	});
 });

@@ -32,7 +32,7 @@ describe("dial press replay through the production action", () => {
 		onDidReceiveSettings(event: Received): void;
 	};
 	function fixture() {
-		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		// Call the real handlers and reset command; replace only the SDK render
 		// sink, tracing, acquisition and clock boundaries. No native source is
 		// opened, and host scheduling cannot turn a short press into a hold.
@@ -140,7 +140,7 @@ describe("readability through production action composition", () => {
 				for (const level of ["normal", "warn", "crit"] as const) {
 					const state: InstanceState = {
 						settings: { readingKey: reading.key, dialView, theme, textMode: "dim", warnValue: level === "normal" ? "50" : "30", critValue: level === "crit" ? "35" : "60", alertUnit: "°C" },
-						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false
 					};
 					const svg = composeDialSvg(state, { state: "ok", source: "shared-memory", snapshot: snapshot() });
 					const value = svg.match(/<text[^>]*font-weight="700" fill="(#[A-Fa-f0-9]{6})">40(?:\.0)?(?:<tspan|<\/text>)/);
@@ -189,7 +189,7 @@ describe("an alert changes colors and nothing else: no severity mark, no text mo
 	function dial(dialView: string, level: keyof typeof THRESHOLDS): string {
 		const state: InstanceState = {
 			settings: { readingKey: hot.key, rotationKeys: [hot.key, calm.key], dialView, theme: "void", alertUnit: "°C", ...THRESHOLDS[level] },
-			stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+			stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false
 		};
 		return composeDialSvg(state, ok, () => [1, 2, 3, 2, 4]);
 	}
@@ -304,7 +304,7 @@ describe("dial appearance synchronizes history before its first frame", () => {
 		// makes the new snapshot available before the state is restored.
 		applyGlobalThemeSettings({ theme: "void" });
 		const settings = Object.freeze({ readingKey: reading.key, dialView, label: "My CPU", decimals: "1" as const });
-		const previous: DialState = { settings, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "old frame", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const previous: DialState = { settings, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "old frame", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		previous.stats.observe({ ...reading, value: 45 }, snapshot({ ...reading, value: 45 }), "shared-memory");
 		const action = Object.create(SensorDialAction.prototype) as Lifecycle;
 		action.instances = new Map(retained === "replayed" ? [["ctx", previous]] : []);
@@ -384,7 +384,7 @@ describe("dial appearance synchronizes history before its first frame", () => {
 describe("a data gap ends dial sessions and says so once on the first live frame", () => {
 	type Tick = { instances: Map<string, InstanceState>; hidden: Map<string, { at: number; state: InstanceState }>; renderAll(): void; onPollerTick(status: PollerStatus): void };
 	function dial(): { action: Tick; state: InstanceState } {
-		const state: InstanceState = { settings: { readingKey: reading.key }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: InstanceState = { settings: { readingKey: reading.key }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		const action = Object.create(SensorDialAction.prototype) as Tick;
 		action.instances = new Map([["ctx", state]]);
 		action.hidden = new Map();
@@ -511,7 +511,7 @@ describe("dial selection validates retained history before rendering", () => {
 	function fixture() {
 		const second = { ...reading, key: "f0001234:0:1000002", id: 2, value: 70 };
 		const complete = (current: Reading, pollTime = 3): SensorSnapshot => ({ ...snapshot(current, pollTime), readings: [current, second], byKey: new Map([[current.key, current], [second.key, second]]) });
-		const state: DialState = { settings: { readingKey: reading.key, decimals: "1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: DialState = { settings: { readingKey: reading.key, decimals: "1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		const action = Object.create(SensorDialAction.prototype) as Selection;
 		action.instances = new Map([["ctx", state]]);
 		action.hidden = new Map();
@@ -785,7 +785,7 @@ describe("measurement truth through production renderers", () => {
 		// a poller or registering live SDK listeners.
 		const action = Object.create(SensorDialAction.prototype) as DialSeam;
 		for (const dialView of ["single", "overview", "tworow"]) {
-			const state: DialState = { settings: { readingKey: reading.key, dialView }, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set() };
+			const state: DialState = { settings: { readingKey: reading.key, dialView }, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false };
 			try {
 				const celsius = { ...reading, value: 45 };
 				action.sampleStats(state, snapshot(celsius), "shared-memory");
@@ -907,7 +907,7 @@ describe("dial settings edge cases through the production action", () => {
 	const live: PollerStatus = { state: "ok", source: "shared-memory", snapshot: { ...snapshot(temp), readings: [temp, fan], byKey: new Map([[temp.key, temp], [fan.key, fan]]) } };
 	const away: PollerStatus = { state: "unavailable", reason: "not-running", message: "fixture" };
 	function dial(settings: InstanceState["settings"]) {
-		const state: InstanceState = { settings, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: InstanceState = { settings, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		const action = Object.create(SensorDialAction.prototype) as DialBoundary;
 		action.instances = new Map([["d", state]]);
 		action.hidden = new Map();

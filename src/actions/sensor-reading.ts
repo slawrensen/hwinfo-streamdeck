@@ -14,6 +14,7 @@ import type { DetailNavigator, DeviceDetailState } from "../detail/navigation";
 import { deviceCapabilities } from "../devices";
 import { buildThemesPayload, forgetPanelFace, handlePiRequest, pushPreviewToPi } from "../pi-protocol";
 import { poller, type PollerStatus } from "../poller";
+import { sortedJson } from "../sorted-json";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
 import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, readingStatBadge, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
@@ -153,11 +154,6 @@ function quadColorsOf(settings: ReadingSettings): readonly QuadIdentity[] {
 	});
 }
 
-/** JSON with every object's keys sorted: equal for equal documents. */
-function sortedJson(value: unknown): string {
-	return JSON.stringify(value, (_, v: unknown) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
-}
-
 @action({ UUID: "com.lawrensen.hwinfo.reading" })
 export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 	private readonly instances = new Map<string, InstanceState>();
@@ -193,7 +189,7 @@ export class SensorReadingAction extends SingletonAction<ReadingSettings> {
 		// willDisappear (reconnect, wake) — retain + subscribe only on the first
 		// sighting, and carry the existing subscription across a replay so the
 		// sparkline history (now owned by the poller) is never dropped.
-		streamDeck.logger.debug(`Key appeared on ${ev.action.device.name}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
+		streamDeck.logger.debug(`Key appeared on ${JSON.stringify(ev.action.device.name)}${ev.action.isKey() && ev.action.coordinates !== undefined ? ` at ${ev.action.coordinates.column},${ev.action.coordinates.row}` : ""} (${ev.action.id})`);
 		const existing = this.instances.get(ev.action.id);
 		// A replayed appear ends any press armed before it (external review
 		// AX27): its release or hold would act on the replacement settings.

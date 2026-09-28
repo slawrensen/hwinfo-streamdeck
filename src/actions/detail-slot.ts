@@ -41,7 +41,7 @@ export class DetailSlotAction extends SingletonAction<DetailSlotSettings> {
 		const cell = act.isKey() && act.coordinates !== undefined ? { column: act.coordinates.column, row: act.coordinates.row } : null;
 		// The support-log evidence channel for detail surfaces (key renders
 		// never reach the event trace), mirroring the reading key's line.
-		streamDeck.logger.debug(`Detail slot appeared on ${act.device.name}${cell === null ? "" : ` at ${cell.column},${cell.row}`} (${JSON.stringify(ev.payload.settings)})`);
+		streamDeck.logger.debug(`Detail slot appeared on ${JSON.stringify(act.device.name)}${cell === null ? "" : ` at ${cell.column},${cell.row}`} (${JSON.stringify(ev.payload.settings)})`);
 		this.controller.registerSlot(act.id, act.device.id, ev.payload.settings, cell, {
 			setImage: (svg: string): void => {
 				void act.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);

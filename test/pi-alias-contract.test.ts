@@ -472,7 +472,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		},
 		performance,
 		location: { reload() {} },
-		addEventListener() {}
+		addEventListener() {},
+		removeEventListener() {}
 	};
 	sandbox.window = sandbox;
 	sandbox.self = sandbox;

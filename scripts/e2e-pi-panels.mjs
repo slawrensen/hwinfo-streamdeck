@@ -27,6 +27,7 @@ import { makeCheck, sleep } from "./lib/e2e-common.mjs";
 import { FUTURE_BLOB, sampleSnapshot, scaledSnapshot } from "./lib/pi-fixtures.mjs";
 import { startPiSim } from "./lib/pi-sim.mjs";
 import { PanelFoldMemory } from "../src/panel-folds.ts";
+import { buildThemesPayload } from "../src/pi-protocol.ts";
 
 const failures = [];
 const check = makeCheck((name) => failures.push(name));
@@ -60,7 +61,15 @@ async function open(fixture, overrides) {
 		if (await b.evaluate(`document.readyState === "complete" && (window.__hwPanel === undefined || window.__hwPanel.context !== "" || document.body.dataset.kind === "slot")`)) break;
 		await sleep(50);
 	}
-	await sleep(600);
+	// Ready, not a fixed pause (external review MS06): a slot or Control
+	// panel names itself, a reading panel holds its context and sensor tree,
+	// and the stored folds are applied; two frames let layout settle.
+	const deadline = performance.now() + 3500;
+	while (!(await b.evaluate(`document.readyState === "complete" && (document.body.dataset.kind === "slot" || document.body.dataset.kind === "control" || (!!window.__hwPanel?.context && window.__hwPanel?.tree != null)) && !document.documentElement.hasAttribute("data-folds-pending")`))) {
+		if (performance.now() >= deadline) throw new Error(`${fixture}: the panel was not ready within 3500 ms`);
+		await sleep(25);
+	}
+	await b.evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
 }
 const writes = () => ({ settings: sim.writes.length, globals: sim.globalWrites.length });
 const noWrites = (name) => check(`${name}: no writes`, sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify(writes()));
@@ -266,14 +275,17 @@ try {
 
 	// Structural edits keep what this version cannot read (external review
 	// AX17 to AX19): a cell's stored entries move with its reading through
-	// removals, resizes and swaps; entries past a tile's cells stay at their
-	// stored index; stored tiles no reading reaches, and trailing tiles
-	// holding such entries, stay stored.
+	// removals, resizes and swaps; stored tiles no reading reaches, and
+	// trailing tiles holding such entries, stay stored. A tile's cell lists
+	// are one sequence: removing a cell moves every later entry up one,
+	// entries stored past the cells included, so none is written twice or
+	// left behind a filler (external review AX47 replaced the d12 rule that
+	// kept entries past the cells at their stored index).
 	const tilesOut = () => JSON.stringify({ ...writes(), tiles: lastWrite()?.detailTiles, keys: lastWrite()?.detailKeys });
 	await openTile();
 	await b.evaluate(`document.querySelectorAll("#detail-list .hw-set-chip .hw-set-remove")[3].click()`);
 	await sleep(400);
-	check("lossless: removing a tile's fourth reading keeps the other cells' stored entries and the entries past the cells", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, size: 3, labels: [" A ", { future: "label" }, "C", "", "TAIL"], colors: ["#112233", { future: "color" }, "#334455", null, "#ABCDEF"], automaticColors: [true, { future: "automatic" }, false, false, true] }]), tilesOut());
+	check("lossless: removing a tile's fourth reading keeps the other cells' stored entries, and the entry past the cells moves up one", sim.writes.length === 1 && same(lastWrite()?.detailTiles, [{ ...TILE, size: 3, labels: [" A ", { future: "label" }, "C", "TAIL"], colors: ["#112233", { future: "color" }, "#334455", "#ABCDEF"], automaticColors: [true, { future: "automatic" }, false, true] }]), tilesOut());
 	await openTile();
 	await b.evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="0"]').click()`);
 	await sleep(400);
@@ -401,6 +413,37 @@ try {
 				await singleClick(p);
 				check(`${name}: a separate click after the double click confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 			}
+		}
+	}
+	// Elapsed time, not the wall clock, times the confirm window and the
+	// scroll guard: a clock corrected an hour either way between two presses
+	// neither confirms early nor refuses late (external review AX48).
+	for (const [name, fixture, sel, count] of armCases) {
+		for (const [jump, gap, confirms] of [[3600000, 100, false], [-3600000, 600, true]]) {
+			await open(fixture);
+			if (fixture === "key-configured") {
+				await b.evaluate(`(() => { document.querySelectorAll("details").forEach((d) => { d.open = true; }); const t = document.getElementById("config-deck"); t.value = JSON.stringify({ theme: "paper" }); t.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+				await sleep(150);
+			}
+			await b.click(sel);
+			await b.evaluate(`(() => { const real = Date.now; Date.now = () => real() + ${jump}; })()`);
+			await sleep(gap);
+			await b.click(sel);
+			await sleep(250);
+			check(`${name}: a clock set an hour ${jump > 0 ? "on" : "back"} between the presses ${confirms ? "still confirms 600 ms later" : "does not confirm 100 ms later"}`, count() === (confirms ? 1 : 0), JSON.stringify({ writes: count() }));
+		}
+	}
+	{
+		await open("key-configured");
+		await b.evaluate(`(() => { const d = document.createElement("div"); d.style.cssText = "position:fixed;left:10px;top:10px;width:40px;height:40px;z-index:99999"; d.addEventListener("click", () => { window.__probeClicks++; }); document.body.appendChild(d); window.__realNow = Date.now; })()`);
+		for (const [jump, gap, lands] of [[3600000, 100, false], [-3600000, 600, true]]) {
+			await b.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 30, y: 30 });
+			await b.evaluate(`(() => { window.__probeClicks = 0; const real = window.__realNow; hwShell.markPanelScroll(); Date.now = () => real() + ${jump}; })()`);
+			await sleep(gap);
+			for (const type of ["mousePressed", "mouseReleased"]) await b.send("Input.dispatchMouseEvent", { type, x: 30, y: 30, button: "left", clickCount: 1 });
+			await sleep(100);
+			const clicks = await b.evaluate("window.__probeClicks");
+			check(`scroll guard: a clock set an hour ${jump > 0 ? "on does not cut the half second short (a still press 100 ms later is swallowed)" : "back does not stretch the half second (a still press 600 ms later lands)"}`, clicks === (lands ? 1 : 0), JSON.stringify({ clicks }));
 		}
 	}
 	// An arm names the whole stored group or set: a changed reading list
@@ -1037,6 +1080,76 @@ try {
 	check("theme gallery: an unknown stored theme checks no chip, Default holds the Tab stop, nothing is written", same(unknownStops, [""]) && (await b.evaluate(`document.querySelectorAll('#theme-gallery [aria-checked="true"]').length`)) === 0 && sim.writes.length === 0, JSON.stringify(unknownStops));
 	const unknownBand = await b.evaluate(`({ current: document.getElementById("theme-current").textContent, help: document.getElementById("theme-help").textContent })`);
 	check("theme band: an unknown stored theme is named with what it draws, and the help says it is kept", unknownBand.current === '"neon-future" (unknown; draws Void)' && unknownBand.help === "This version does not know that theme; the key keeps it stored until you pick one.", JSON.stringify(unknownBand));
+
+	// The simulator hands fixture text to the panel as data: a label holding
+	// a closing script tag and the two JavaScript line separators runs
+	// nothing and arrives exactly (external review AX52).
+	{
+		const label = "</script><script>window.__injected = 1</script>\u2028\u2029 <!-- $$ $& $` $' end";
+		const errorsBefore = pageErrors.length;
+		let seen;
+		try {
+			await open("key-configured", { settings: { ...sim.fixtures["key-configured"].settings, label } });
+			seen = await b.evaluate(`({ injected: window.__injected ?? null, label: window.__hwPanel?.settings?.label ?? null, context: window.__hwPanel?.context ?? "" })`);
+		} catch (err) {
+			seen = { error: String(err) };
+		}
+		check("simulator: fixture text reaches the panel as data, exactly, and runs nothing", seen.injected === null && seen.label === label && seen.context !== "" && pageErrors.length === errorsBefore, JSON.stringify({ ...seen, errors: pageErrors.slice(errorsBefore) }));
+	}
+
+	// Presses whose release never reached the window leave no release
+	// listener behind once the half-second ceiling passes (external review
+	// AX56); the list still answers a normal press afterwards.
+	{
+		await open("key-details");
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		const left = await b.evaluate(`(async () => {
+			const held = new Set();
+			const add = window.addEventListener.bind(window);
+			const remove = window.removeEventListener.bind(window);
+			window.addEventListener = (type, fn, opts) => { if (type === "mouseup") held.add(fn); return add(type, fn, opts); };
+			window.removeEventListener = (type, fn, opts) => { if (type === "mouseup") held.delete(fn); return remove(type, fn, opts); };
+			const chip = document.querySelector("#detail-list .hw-set-chip");
+			for (let i = 0; i < 10; i++) chip.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+			await new Promise((resolve) => setTimeout(resolve, 600));
+			return held.size;
+		})()`);
+		await b.evaluate(`document.querySelector("#detail-list .hw-set-chip .hw-set-remove").scrollIntoView({ block: "center" })`);
+		await b.click("#detail-list .hw-set-chip .hw-set-remove");
+		await sleep(400);
+		check("details: ten presses whose release never came leave no release listener, and the next press still edits once", left === 0 && sim.writes.length === 1, JSON.stringify({ left, ...writes() }));
+	}
+
+	// A themes message the gallery cannot draw is ignored whole: no page
+	// error, the last good chips stay, and a good message after it still
+	// draws (external review AX51).
+	{
+		await open("key-configured");
+		const chips = () => b.evaluate(`[...document.querySelectorAll("#theme-gallery .hw-theme")].map((c) => c.dataset.theme + "|" + c.querySelector(".hw-theme-face").style.background)`);
+		const before = await chips();
+		const errorsBefore = pageErrors.length;
+		const good = JSON.parse(JSON.stringify(buildThemesPayload()));
+		const voidTheme = good.themes[good.defaultTheme];
+		const bad = [
+			{ ...good, themes: { [good.defaultTheme]: null }, themeOrder: [good.defaultTheme] },
+			{ ...good, defaultTheme: "absent" },
+			{ ...good, defaultTheme: "__proto__" },
+			{ ...good, themes: [voidTheme] },
+			{ ...good, themes: null },
+			{ ...good, themes: { "": voidTheme, ...good.themes } },
+			{ ...good, themes: { ...good.themes, [good.defaultTheme]: { ...voidTheme, bg: 7 } } },
+			{ ...good, themes: { ...good.themes, [good.defaultTheme]: { ...voidTheme, bg: "url(https://example.invalid/x.png)" } } }
+		];
+		for (const payload of bad) sim.sendToPi(payload);
+		await sleep(300);
+		const kept = await chips();
+		check("themes: a message the gallery cannot draw is ignored whole, with no page error", before.length > 1 && same(kept, before) && pageErrors.length === errorsBefore, JSON.stringify({ kept: kept.length, before: before.length, errors: pageErrors.slice(errorsBefore) }));
+		sim.sendToPi({ ...good, themes: { ...good.themes, [good.defaultTheme]: { ...voidTheme, bg: "#010203" } } });
+		await sleep(300);
+		const redrawn = await chips();
+		check("themes: a good message after them still draws", redrawn.some((c) => c.startsWith(`${good.defaultTheme}|`) && c.includes("rgb(1, 2, 3)")), JSON.stringify(redrawn));
+	}
 
 	// ---- round 3: what the rotation editor says about its members -----------
 	{

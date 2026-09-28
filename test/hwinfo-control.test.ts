@@ -7,9 +7,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { KeyAction, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import type { DidReceiveSettingsEvent, KeyAction, KeyDownEvent, KeyUpEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
 
 import { HwinfoControlAction, type ControlActionSettings } from "../src/actions/hwinfo-control";
+import { registerDialCommandHandler, type DialControlCommand } from "../src/commands";
 
 /** The private seam under test: the badge arm path and its timer store. */
 type BadgeSeam = {
@@ -94,5 +95,88 @@ describe("HwinfoControlAction success badge", () => {
 		appear(action, live.key); // Stream Deck can replay willAppear without a disappear
 		assert.deepEqual(live.images, ["badge"]);
 		clearTimeout(seam.badgeTimers.get("ctx-live"));
+	});
+});
+
+// Commands fire on release. A press begun under one document must not
+// release under another: "Next reading" held while the panel switches the
+// key to "Reset session stats, every dial" used to reset every dial
+// (external review AX46, the Control sibling of AX27).
+describe("a held Control key fires under the settings it was pressed with", () => {
+	const NEXT = { command: "next", target: "safe", resetScope: "current" };
+	const RESET_ALL = { command: "resetStats", target: "safe", resetScope: "all" };
+	function control() {
+		const sent: DialControlCommand[] = [];
+		registerDialCommandHandler((command) => {
+			sent.push(command);
+			return 1;
+		});
+		const action = new HwinfoControlAction();
+		// Only the badge painter is replaced; the press record, dispatch and
+		// every handler are the production ones.
+		(action as unknown as { showSuccess(): void }).showSuccess = () => {};
+		const key = { id: "control", device: { id: "d", name: "Fake" }, isInMultiAction: () => false, setImage: () => Promise.resolve(), showAlert: () => Promise.resolve(), showOk: () => Promise.resolve() };
+		const ev = (settings: ControlActionSettings) => ({ action: key, payload: { settings } }) as unknown;
+		return {
+			sent,
+			appear: (settings: ControlActionSettings) => action.onWillAppear(ev(settings) as WillAppearEvent<ControlActionSettings>),
+			disappear: (settings: ControlActionSettings) => action.onWillDisappear({ action: { id: key.id, device: key.device }, payload: { settings } } as unknown as WillDisappearEvent<ControlActionSettings>),
+			down: (settings: ControlActionSettings) => action.onKeyDown(ev(settings) as KeyDownEvent<ControlActionSettings>),
+			received: (settings: ControlActionSettings) => action.onDidReceiveSettings(ev(settings) as DidReceiveSettingsEvent<ControlActionSettings>),
+			up: (settings: ControlActionSettings) => action.onKeyUp(ev(settings) as KeyUpEvent<ControlActionSettings>)
+		};
+	}
+
+	it("a changed document consumes the press, whatever it is changed to", async () => {
+		const c = control();
+		c.appear(NEXT);
+		c.down(NEXT);
+		c.received(RESET_ALL);
+		await c.up(RESET_ALL);
+		assert.deepEqual(c.sent, [], "the release must not reset every dial");
+		c.down(NEXT);
+		c.received(RESET_ALL);
+		c.received(NEXT);
+		await c.up(NEXT);
+		assert.deepEqual(c.sent, [], "a document changed and changed back still consumed the press");
+		c.down(NEXT);
+		await c.up(RESET_ALL);
+		assert.deepEqual(c.sent, [], "a release carrying other settings than its press does not fire, even with no settings event between");
+	});
+
+	it("a replayed appear or a disappearance consumes the press", async () => {
+		const c = control();
+		c.appear(NEXT);
+		c.down(NEXT);
+		c.appear(NEXT);
+		await c.up(NEXT);
+		c.down(NEXT);
+		c.disappear(NEXT);
+		await c.up(NEXT);
+		assert.deepEqual(c.sent, []);
+	});
+
+	it("an unchanged echo, in any key order, keeps the press; the next press fires once", async () => {
+		const c = control();
+		c.appear(NEXT);
+		c.down(NEXT);
+		c.received({ resetScope: "current", target: "safe", command: "next" });
+		await c.up(NEXT);
+		assert.deepEqual(c.sent, [{ command: "next", target: "safe", scope: "current" }]);
+		c.down(NEXT);
+		c.received(RESET_ALL);
+		await c.up(RESET_ALL);
+		c.down(RESET_ALL);
+		await c.up(RESET_ALL);
+		assert.deepEqual(c.sent.at(-1), { command: "resetStats", target: "", scope: "all" }, "a fresh press after a consumed one fires under its own settings");
+		assert.equal(c.sent.length, 2);
+	});
+
+	it("a release with no press seen fires once, as a Multi Action or Key Logic step delivers it", async () => {
+		const c = control();
+		c.appear(NEXT);
+		await c.up(NEXT);
+		await c.up(NEXT);
+		assert.equal(c.sent.length, 2, "each lone release is one step");
 	});
 });

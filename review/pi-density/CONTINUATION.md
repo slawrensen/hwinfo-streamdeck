@@ -1,31 +1,37 @@
 # Continuation
 
-## Now (2026-09-27): d15 on the deck after six external review passes
+## Now (2026-09-28): d16 on the deck after seven external review passes
 
 - **External review:** a different AI model has reviewed the candidate
-  six times (d08, d09 and d10, d11, d12, d13, d14). Its reports, findings
-  and my answer to every finding live in the private release docs
+  seven times (d08, d09 and d10, d11 to d15). Its reports, findings and my
+  answer to every finding live in the private release docs
   (`docs/release/external-review-1.7/`, one folder per pass, and
-  `RESPONSE.md`, which answers AX01 to AX68 and MS01 to MS08 with the fix
-  and the check that proves it), not in this repo. The seventh pass runs
-  on d15 and is meant to close the release: it finishes the testing the
-  sixth left open, checks the release steps, and proposes improvements.
+  `RESPONSE.md`, which answers AX01 to AX71, MS01 to MS09 and IX01 to IX03
+  with the fix and the check that proves it), not in this repo. The
+  seventh pass found no blocker; what remains on the software side is its
+  testing gate (75 families not yet reached, no class swept dry twice),
+  which the eighth pass on d16 is for.
 - **Pushed:** `claude/pi-density` on GitHub; private mirror `main` with the
   review files and drafts.
-- **Installed:** panel build `1.7.0.0-d15`, archive sha256
-  `e0a16a923d2e40394ed885abf475de764d0d344f1e617e9871696b696dc75641`
-  (369,551 bytes, 47 members), plugin.js `0d0b4ef4...`, by the bench route
-  from the archive's own bytes (47 files hash-verified, 0 WARN or ERROR
-  after restart). Settings across the install: only the "SL Film 1.7"
-  dial at Encoder 5,0 changed, and it has auto cycle on (5 s): it steps on
-  its own between any two snapshots, so this is not a finding. The d14
-  install is backed up at
-  `%USERPROFILE%\hwinfo-bench-backup\2026-09-27-d14-installed`.
-- **Soak:** monitor pid 53772, CSV
-  `release/soak-1.7.0.0-d15-20260927-2315.csv`, closes 2026-09-29 23:15
+- **Installed:** panel build `1.7.0.0-d16`, archive sha256
+  `86b9f309936529bf062ae3797ea8e10685cab081e79ecf161dca813bfd6c462d`
+  (369,666 bytes, 47 members), plugin.js `0d0b4ef4...` (the same
+  as d15), by the bench route from the archive's own bytes
+  (47 files hash-verified, 0 WARN or ERROR after restart; settings across the install: only the auto-cycling dial at Encoder 5,0 changed, as on every install). The d15 install is backed up at
+  `%USERPROFILE%\hwinfo-bench-backup\2026-09-28-d15-installed`.
+- **Soak:** monitor pid 77008, CSV
+  `release/soak-1.7.0.0-d16-20260928-0144.csv`, closes 2026-09-30 01:44
   local. It only counts if the machine stays up, with an HWiNFO restart,
-  an app restart and a sleep/wake inside. The d14 window (pid 54144) was
-  stopped at 23:14 for d15.
+  an app restart and a sleep/wake inside. The d15 window (pid 53772) was
+  stopped after about two hours, with no required event inside it yet,
+  for d16.
+- **d16 over d15:** the seventh review pass: AX69 (an older support-report
+  request's refused clipboard write no longer copies its report over a
+  newer one), AX70 (a test that sees the restore timer's cancellation),
+  AX71 (the dial capture's caption names its build, and a test holds it
+  to the capture record); the Getting started "First run?" paragraph
+  shortened. Panel files, tests and docs only; the plugin process runs the
+  same bytes as d15.
 - **d15 over d14:** the sixth review pass: AX57, AX67 and AX68 (a repeated
   down keeps a held press, consumed or not, on the Control key, the key
   and the dial; a Control key that left mid-press takes its next down as a
@@ -86,7 +92,7 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d15 sections.
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d16 sections.
 - **Next:** the rest of the owner's hands-on check (step 8, the list keys,
   passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean

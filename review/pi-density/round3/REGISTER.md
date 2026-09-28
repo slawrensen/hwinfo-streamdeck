@@ -478,3 +478,42 @@ auto-cycling dial at Encoder 5,0 changed. The d14 soak (pid 54144) was
 stopped; the 48-hour soak restarted on d15, CSV
 `release/soak-1.7.0.0-d15-20260927-2315.csv`, closing 2026-09-29 23:15
 local.
+
+## d16 (2026-09-28): the external review's seventh pass
+
+The seventh pass (on d15; report private) found three items, AX69 to
+AX71, proposed one simplification, MS09, and three improvements, IX01 to
+IX03. All were checked against the code first. The three findings are
+fixed; MS09 is declined for 1.7.0 and IX03 deferred to after it (reasons
+in the private answer); IX01 (the private Marketplace drafts) and IX02
+are adopted in my own wording. Two independent reviews of the first d16
+found no must-fix; they found a timer cancellation the new test missed,
+an ordering and fallback details no test saw, and three unclear sentences
+in the copy. All are fixed below. d16 changes panel files, tests and docs
+only: `src/**`, `bin/plugin.js`, `hwsm.node` and the manifest are
+byte-identical to d15.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX71 | must | The caption under the dial Reading colors capture named panel build d12; the image had been retaken on d13, d14 and d15. | The caption names the build of the capture, now d16 (the new panel files required a retake). | A provenance test reads the build from the capture record and requires the page to name exactly that build, once (fails on d15's caption). |
+| AX69 | should | After an older support-report request's clipboard write outlived its deadline and a newer request started, the older write's refusal ran the copy-command fallback: it moved focus and put the older report on the clipboard. | A refused write does nothing through the fallback once a newer request has started. The completion check is now the one predicate it was equivalent to. | 5 unit tests on the shipped script: the stale fallback with the newer request finished and still waiting (both fail on d15); the current request's fallback, its scratch field and focus; a failed copy command; a late refusal with no newer request, which still falls back. Twelve mutants, all killed. |
+| AX70 | should | The support-report tests passed with the restore-timer cancellation removed. | Two lifetime tests: the newer outcome, and an outcome that follows a late copy, each keep their two seconds. The click's own cancel was redundant (the stray restore writes the label the click shows, and the outcome cancels it) and is removed. | Removing the outcome's cancel, alone or with the click's, fails a test. |
+| IX02 | | The Getting started "First run?" paragraph repeated the whole Gadget setup inside a parenthesis. | Shortened to what the panel offers and why a free user picks Gadget (728 to 501 characters). | Copy validator. |
+
+d16 gates: panel suite 403 of 403 and persistence 646 of 646 on the final
+d16; theme-band runner 70 of 70, run from the repo and again on the
+extracted archive, whose own bytes also passed the panel suite 403 of
+403; unit 1,506 of 1,506; native 169 of 169; lint and typecheck 0; copy
+validator 0 warnings. Archive `86b9f309936529bf...` (369,666 bytes, 47
+members): against d15's archive only the six panel files differ;
+plugin.js `0d0b4ef4cdfa6d46...`, hwsm.node and the manifest are
+unchanged.
+
+Installed 2026-09-28 01:43 local from the archive's own bytes (47 files
+hash-verified, 0 WARN or ERROR after restart); settings across the
+install: only the auto-cycling dial at Encoder 5,0 changed. The d15 soak
+(pid 53772) was stopped after 2 h 28 min with no required event inside it
+(one sample, at 08:18Z, counted a second plugin process: the docs
+capture's own run of the bundle, about a minute long); the 48-hour soak
+restarted on d16, CSV `release/soak-1.7.0.0-d16-20260928-0144.csv`,
+closing 2026-09-30 01:44 local.

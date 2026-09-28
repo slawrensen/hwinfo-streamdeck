@@ -369,3 +369,58 @@ After install, `81d449c`: the persistence suite removes its throwaway
 browser profile once its browser is gone (every run had left one in the
 temp folder); 646 of 646 again. Test harness only; the installed bytes
 are unchanged.
+
+## d14 (2026-09-27): the external review's fifth pass
+
+The fifth pass (on d13; report private) found eleven items, AX46 to AX56,
+and proposed two simplifications, MS05 and MS06. All were checked against
+the code first and all are fixed or adopted. Three independent reviews of
+the first d14 then tried to break the fixes; they found a defect in the
+AX47 fix as proposed, a native test the notice change broke, holes in the
+new license and copy checks and in the simulator, and a soak counter that
+read the wrong column. All are fixed below.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX46 | must | A HWiNFO Control key held while its settings changed fired the new command on release, such as a reset of every dial; a replayed appear or a disappearance did not end the press either (predates 1.6). | The key records its settings document (sorted keys) at key down; a changed document, a release carrying other settings, a replayed appear or a disappearance consumes the press. A release with no key down seen still fires, as a Multi Action or Key Logic step delivers it. | 4 unit tests on the production handlers; the d13 source fails 3 (the fourth covers the unchanged lone release). |
+| AX47 | must | Removing a reading from a partial tile, or dropping a chip into one, misplaced or dropped stored entries of the cells no reading fills. | Each tile tracks the entries of the cells no reading fills, and where each stored list ends, cell by cell through every removal and insertion, and writes them back past its size. A reading that lands in such a cell (a pick, or a resize that flows one in) wears that entry, as the deck draws it, and owns it from then on; one bringing entries it wears there keeps them and the stored entry moves one cell on (see below). | A new unit test runs the production editor in a vm: 16 cases and a seeded walk of 2,500+ edits with reloads; the d13 file fails 10 of 17. The review's harness: 14,483 structural steps and 8,400 raw checks, 0 failures (two of its scenarios assume the other landing rule; see below). |
+| AX48 | should | The panel's second-press confirmations and its stale-pointer guard ran on the wall clock: a clock correction could confirm early or swallow presses for an hour. | Every panel deadline uses `performance.now()`. | 8 panel checks jump the clock an hour each way between presses. |
+| AX49 | should | The detail view's Back debounce and blackout ran on the wall clock (predates 1.6). | The navigator's default clock is monotonic. | 3 unit tests on the production default; the old default fails 2. |
+| AX50 | should | A sensor name holding a line break wrote what read as a separate log entry. | HWiNFO text in Gadget notices, and device names in log lines, are JSON-quoted. | 2 unit tests on the production provider; the d13 source fails both. The native test that expected the unquoted notice was updated. |
+| AX51 | should | A malformed themes message threw in the panel and left a stale gallery. | The message is ignored unless it names a default among its themes, no theme uses the Default chip's empty id, and every palette carries hex colors for what a chip paints. | 2 panel checks (8 malformed messages, then a good one). |
+| AX52 | should | The test simulator ran script text from fixture settings. | Its inline bootstrap escapes `<` and the two line separators, and the page is spliced with a function so `$` patterns stay text. | 1 panel check. |
+| AX53 | should | The license test passed with the Lit disclaimer or the whole sdpi license deleted. | The test reads NOTICE as the sections it renders to: exactly the eight license headings, once each, no HTML comment, each section equal to its full text. | Nine mutants (each license deleted, a commented-out license, a demoted heading, a doubled section, the Lit disclaimer) all fail. |
+| AX54 | should | The archive reader refused a valid ZIP64 member larger than the archive. | An expanded size is bounded by what a Buffer holds. | 1 unit test (1,000 and 1,000,000 bytes); the d13 reader fails it. |
+| AX55 | should | The Marketplace image generator claimed setup takes seconds. | New headline; the copy validator checks the image generator as copy, whole, and bars "takes seconds" claims. | The validator flags the old headline and a caption, and runs on Node 20. The committed shot 4 image is regenerated before the 1.7 gallery upload (release step). |
+| AX56 | nit | Presses whose release never reached the window each left a listener behind. | One named listener, removed at the ceiling. | 1 panel check. |
+| Soak | | The soak monitor counted WARN or ERROR anywhere in a log line (found by the review of d14). | It reads the level column. | 1 unit test; the old pattern fails it. |
+| MS05 | | Each two-row dial tracked its row subscriptions in a set the poller already keeps. | Removed; the poller's own guard stands. | Unit suite; the review's 300-checkpoint differential. |
+| MS06 | | The panel suite slept 600 ms after every open. | It waits for a ready panel, 3.5 s at most. | 400 of 400 in 171 s (the review measured 293.6 s for d13's 388 checks with the sleep). |
+
+Two rules were decided here (AX47). First, a tile's cell lists are one
+sequence: a removal moves every later entry up one and an insertion
+pushes them on, entries stored past the cells included. d12 kept those at
+their stored index while earlier cells shifted, which needed filler
+entries and let the d13 duplicate happen; the d12 panel check was
+rewritten to the new rule, with the reason beside it. Second, a reading
+that lands in a cell no reading filled takes that cell's stored entry over
+instead of pushing it on. The review proposed pushing; with readable
+labels that wrote the label twice (`["A","B","C","D"]` plus a pick became
+`["A","B","B","C","D"]`), and with the panel reopened between size-cycler
+presses it grew the stored lists on every round. Taking over matches
+what the deck draws and what every earlier build showed, and a full round
+of the size cycler comes back to the plan it started from. A tile whose
+last reading leaves is still dropped with everything it stored.
+
+d14 gates: panel suite 400 of 400 in 171 s (the d13 panel files fail
+exactly the 11 new and changed panel checks); persistence 646 of 646 in
+131 s; theme-band runner 70 of 70, run from the repo and again on the
+extracted archive; unit 1,432 of 1,432; native 169 of 169; lint and
+typecheck 0; copy validator 0 warnings (65 files). Archive
+`a83ff60ebfb49634...` (368,597 bytes, 47 members), plugin.js
+`d37987a6ab0bf334...`, hwsm.node unchanged. Installed 2026-09-27 19:13
+local from the archive's own bytes (47 files hash-verified, 0 WARN or
+ERROR); settings across the install: only the auto-cycling dial at Encoder
+5,0 changed. The d13 soak (pid 67908) was stopped; the 48-hour soak
+restarted on d14, CSV `release/soak-1.7.0.0-d14-20260927-1913.csv`,
+closing 2026-09-29 19:13 local.

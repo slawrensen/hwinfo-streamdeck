@@ -1,30 +1,45 @@
 # Continuation
 
-## Now (2026-09-27): d14 on the deck after five external review passes
+## Now (2026-09-27): d15 on the deck after six external review passes
 
 - **External review:** a different AI model has reviewed the candidate
-  five times (d08, d09 and d10, d11, d12, d13). Its reports, findings and
-  my answer to every finding live in the private release docs
+  six times (d08, d09 and d10, d11, d12, d13, d14). Its reports, findings
+  and my answer to every finding live in the private release docs
   (`docs/release/external-review-1.7/`, one folder per pass, and
-  `RESPONSE.md`, which answers AX01 to AX56 and MS01 to MS06 with the fix
-  and the check that proves it), not in this repo. The sixth pass runs on
-  d14.
+  `RESPONSE.md`, which answers AX01 to AX68 and MS01 to MS08 with the fix
+  and the check that proves it), not in this repo. The seventh pass runs
+  on d15 and is meant to close the release: it finishes the testing the
+  sixth left open, checks the release steps, and proposes improvements.
 - **Pushed:** `claude/pi-density` on GitHub; private mirror `main` with the
   review files and drafts.
-- **Installed:** panel build `1.7.0.0-d14`, archive sha256
-  `a83ff60ebfb4963409bdb8a25d6cb63b48b654152b5803ff9cda765c3b89332d`
-  (368,597 bytes, 47 members), plugin.js `d37987a6...`, by the bench route
+- **Installed:** panel build `1.7.0.0-d15`, archive sha256
+  `e0a16a923d2e40394ed885abf475de764d0d344f1e617e9871696b696dc75641`
+  (369,551 bytes, 47 members), plugin.js `0d0b4ef4...`, by the bench route
   from the archive's own bytes (47 files hash-verified, 0 WARN or ERROR
   after restart). Settings across the install: only the "SL Film 1.7"
   dial at Encoder 5,0 changed, and it has auto cycle on (5 s): it steps on
-  its own between any two snapshots, so this is not a finding. The d13
+  its own between any two snapshots, so this is not a finding. The d14
   install is backed up at
-  `%USERPROFILE%\hwinfo-bench-backup\2026-09-27-d13-installed`.
-- **Soak:** monitor pid 54144, CSV
-  `release/soak-1.7.0.0-d14-20260927-1913.csv`, closes 2026-09-29 19:13
+  `%USERPROFILE%\hwinfo-bench-backup\2026-09-27-d14-installed`.
+- **Soak:** monitor pid 53772, CSV
+  `release/soak-1.7.0.0-d15-20260927-2315.csv`, closes 2026-09-29 23:15
   local. It only counts if the machine stays up, with an HWiNFO restart,
-  an app restart and a sleep/wake inside. The d13 window (pid 67908) was
-  stopped at 19:13 for d14.
+  an app restart and a sleep/wake inside. The d14 window (pid 54144) was
+  stopped at 23:14 for d15.
+- **d15 over d14:** the sixth review pass: AX57, AX67 and AX68 (a repeated
+  down keeps a held press, consumed or not, on the Control key, the key
+  and the dial; a Control key that left mid-press takes its next down as a
+  new press), AX58 (a tile's cell field this build cannot read stays as
+  stored through edits that do not write it), AX59 and AX60 (malformed
+  command, shared theme and themes messages), AX61 (global settings: the
+  latest document wins over an older reply), AX62 (a detail hold decided
+  by the time held), AX63 (support report answers bound to their
+  request), AX64 (an overflowing session sum keeps AVG), AX65 (pi-lab
+  failures exit 1), AX66 (device lookups by own whole numbers); MS07 (no
+  per-tick name map) and MS08 (a dead helper). Three independent reviews
+  of the first d15 found an AX58 variant, a late copy left on "Copy
+  failed", a dial that kept a replayed press whose release was lost, a lab
+  hang and seven fixes no test could see; all fixed before install.
 - **d14 over d13:** the fifth review pass: AX46 (a held Control key is
   consumed by changed settings, a replayed appear or a disappearance),
   AX47 (detail tiles track the entries of cells no reading fills, and each
@@ -71,7 +86,7 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d14 sections.
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d15 sections.
 - **Next:** the rest of the owner's hands-on check (step 8, the list keys,
   passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean

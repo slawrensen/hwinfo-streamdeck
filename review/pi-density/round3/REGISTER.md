@@ -424,3 +424,57 @@ ERROR); settings across the install: only the auto-cycling dial at Encoder
 5,0 changed. The d13 soak (pid 67908) was stopped; the 48-hour soak
 restarted on d14, CSV `release/soak-1.7.0.0-d14-20260927-1913.csv`,
 closing 2026-09-29 19:13 local.
+
+## d15 (2026-09-27): the external review's sixth pass
+
+The sixth pass (on d14; report private) found twelve items, AX57 to AX68,
+and proposed two simplifications, MS07 and MS08. All were checked against
+the code first; all are fixed or adopted, one with a deliberate
+difference (AX57, below). Three independent reviews of the first d15 then
+tried to break the fixes. They found no must-fix; they found a variant of
+AX58 (removals, resizes and moves), a copy that finished after its
+deadline and stayed on "Copy failed", a dial that kept a replayed press
+whose release was lost, a lab run that hung when its browser never
+started, and seven fixes no test could see. All are fixed below.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX57 | must | A repeated key down re-armed a HWiNFO Control press that changed settings or a replayed appear had consumed, so its release ran the new command (an incomplete AX46). | A repeated down keeps the record it finds. A key that disappears mid-press is marked as left: its release cannot reach it while away, so the first down after it returns is a new press, and a release that reaches it with no down since is consumed. | 2 unit tests on the production handlers; the repeated-down matrix fails on d14, and the second guards the new-press rule, including a settings change while the key is away. |
+| AX58 | must | An edit that did not write a tile's cell field (the Abc toggle, and, found by the review of d15, a removal, a resize or a move) replaced a field stored in a shape this build cannot read with a list of blanks. | Such a field stays as stored unless an edit writes it, a reading brings its own entries into it, or a cell now reads as something other than blank. | 18 unit tests over the production editor (17 fail on d14; the other checks that an edit of the field still writes it) and a panel check with a real mouse click (fails on the d14 panel files). |
+| AX59 | should | A stored command or shared theme that is an object without a string form threw while the panel drew its summary. | Neither is coerced: an unknown command is shown as JSON, and only a string names a shared theme. | Unit assertions for both summaries (fail on d14). |
+| AX60 | should | A themes message with an effectiveDeckTheme that is not a string passed the AX51 guard and threw in the gallery. | The guard rejects it; absent is still fine. | 2 panel checks on a key with no shared theme (four malformed values, then a good one that is named); the first fails on the d14 panel files. |
+| AX61 | must | Two global-settings documents arriving in one socket read let the theme migration write the older one back over the newer, and startup apply the older one again. | A listener registered on import keeps the latest document delivered; a read returns it when a delivery arrived during the read, the migration writes onto it, and startup no longer applies the reply again (the delivery listener already did). | 5 tests through the real SDK connection and ws frames and a structural check that plugin.ts applies settings only in its listener; 5 of the 6 fail on d14 (one reply still migrates on both). |
+| AX62 | should | A detail hold released after its threshold, before its timer ran (a busy or waking PC), became a tap. | The release is classified by the time held as well as by the timer. | 2 unit tests: 0, 499, 500, 501, 600 ms and one hour, with the late timer checked silent (fails on d14), and a late release after a hold or a consume adds nothing. |
+| AX63 | should | Copy support report copied unrequested, late and duplicate answers, and an old timer or clipboard write could settle a newer request. | Each request carries an id that the plugin echoes; only the first answer to the pending request copies; a new request cancels the old label restore; a copy that lands after the deadline still corrects the label. | 9 tests on the shipped script in a vm and on both plugin entry points (7 fail on d14), and the panel suite's normal copy. |
+| AX64 | should | Finite samples could overflow a dial's session sum, and AVG stayed infinite for the session. | After an overflow the mean is kept by steps that cannot overflow; ordinary sums are unchanged. | 3 unit tests: the overflow streams with 200 seeded runs and the rendered AVG fail on d14; ordinary sums keep their exact state. |
+| AX65 | should | pi-lab exited 0 with no report when AXE_CORE named a missing file, and (found by the review of d15) hung when its browser never started. | It imports the scripts' failure monitor, and a failed command exits 1. | 1 subprocess test (fails on d14); the browser case exits 1 after 17 s, where d14 hung (measured once; a permanent test would add 16 s to the unit suite). |
+| AX66 | should | Device lookup treated inherited names ("constructor") as known models and threw on some objects; the grid was coerced the same way. | Only an own, whole, non-negative number names a model or a grid size; the log line quotes a type that is not a number. | 3 unit tests (2 fail on d14; the third shows every numeric type derives as before). |
+| AX67 | must | A repeated key down after changed settings or a replayed appear acted under the new settings, and a repeated down after a hold could fire a second hold. | The press engine keeps a held press through repeated downs; changed settings or a replayed appear consume it until release instead of ending it. | 15 unit tests on the production key action and 2 on the engine, all failing on d14 (2 echo controls pass on both). |
+| AX68 | must | A replayed dial appear during a press reset the gesture, so a repeated down started a new press under the new settings. | A replayed appear keeps the held press, consumed; a turn the app reports as not pressed ends it, since its release may have been lost in the replay (review of d15: otherwise plain turns acted as pressed turns). | 2 unit tests (the first fails on d14; the second fails without the turn rule). |
+| MS07 | | Every dial rebuilt its whole name map on every tick. | The raw map is read; only the names drawn are checked. | The review's 288-case differential hash is identical on d14 and d15; 13 to 14 % less time per tick and about 25 % fewer sampled bytes in its bench; a unit test pins the lookup rules it keeps. |
+| MS08 | | An uncalled panel helper. | Removed. | Panel suite. |
+
+The press engine's contract changed on purpose (AX67): a repeated key
+down with no release between used to replace the session, which reset
+its deadline; it is now the same press. The test that pinned the old
+contract was rewritten to guard what the generation check is still for, a
+cancelled session's timer, now with a clock so it can fail.
+
+AX57 differs from the review's proposal on purpose. Keeping every record
+through a disappearance would swallow the first real press after a page
+switch or a device disconnect mid-press: the app never delivers the
+release of a press whose key went away. The dial already worked this
+way.
+
+d15 gates: panel suite 403 of 403 (the d14 panel files fail exactly the
+two new checks); persistence 646 of 646 in 130 s; theme-band runner 70 of
+70, run from the repo and again on the extracted archive; unit 1,498 of
+1,498; native 169 of 169; lint and typecheck 0; copy validator 0
+warnings. Archive `e0a16a923d2e4039...` (369,551 bytes, 47 members),
+plugin.js `0d0b4ef4cdfa6d46...`, hwsm.node unchanged. Installed
+2026-09-27 23:14 local from the archive's own bytes (47 files
+hash-verified, 0 WARN or ERROR); settings across the install: only the
+auto-cycling dial at Encoder 5,0 changed. The d14 soak (pid 54144) was
+stopped; the 48-hour soak restarted on d15, CSV
+`release/soak-1.7.0.0-d15-20260927-2315.csv`, closing 2026-09-29 23:15
+local.

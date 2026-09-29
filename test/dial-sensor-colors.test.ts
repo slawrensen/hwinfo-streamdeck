@@ -484,6 +484,23 @@ it("Live value uses the actual row spelling when a selection and its rotation ro
 	}
 });
 
+// Each row shows the chosen statistic of its own session: MIN the lowest,
+// MAX the highest, AVG the mean, Current the live value.
+it("overview and two-row rows show the chosen session statistic, each row its own", () => {
+	const expected = {
+		overview: { current: ["71.4", "76.2", "2850"], min: ["51.0", "48.0", "2565"], max: ["79.0", "82.0", "2900"], avg: ["65.4", "67.4", "2758"] },
+		tworow: { current: ["316", "98.0"], min: ["64.5", "12.0"], max: ["349", "100"], avg: ["241", "70.6"] }
+	};
+	for (const view of ["overview", "tworow"] as const) {
+		for (const mode of ["current", "min", "max", "avg"] as const) {
+			const fixture = dialGalleryFixture(view);
+			fixture.state.statMode = mode;
+			const shown = [...compose(fixture).matchAll(/font-weight="700" fill="[^"]+">([^<]+)<\/text>/g)].map((m) => m[1]);
+			assert.deepEqual(shown, expected[view][mode], `${view} ${mode}`);
+		}
+	}
+});
+
 it("Live value keeps live alert precedence, native-unit scoping and Fahrenheit while the dial shows a session statistic", () => {
 	for (const view of ["tworow", "overview"] as const) {
 		const fixture = dialGalleryFixture("overview", true);

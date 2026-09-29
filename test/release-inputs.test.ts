@@ -79,6 +79,26 @@ describe("release input gate", () => {
 	});
 });
 
+// The Marketplace images carry text a PNG check cannot read, so the copy
+// gate reads their generator as copy (external review AX55). Run over a
+// fixture tree: only the generator's line is asserted here.
+describe("release copy gate", () => {
+	it("checks the Marketplace image generator's text as copy", () => {
+		const root = mkdtempSync(join(tmpdir(), "hwinfo-release-copy-"));
+		try {
+			mkdirSync(join(root, "scripts"));
+			mkdirSync(join(root, "docs"));
+			cpSync(join(ROOT, "scripts/validate-release-copy.mjs"), join(root, "scripts/validate-release-copy.mjs"));
+			writeFileSync(join(root, "package.json"), JSON.stringify({ version: "1.0.0" }));
+			writeFileSync(join(root, "scripts/marketplace-shots.mjs"), 'const headline = "Effortless readings";\n');
+			const result = spawnSync(process.execPath, [join(root, "scripts/validate-release-copy.mjs")], { encoding: "utf8" });
+			assert.match(result.stderr, /FAIL {2}scripts\/marketplace-shots\.mjs:1 {2}"effortless" claim/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
 describe("ci workflow privilege boundary", () => {
 	it("runs dependency installs and native builds under a read-only token", () => {
 		const workflow = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");

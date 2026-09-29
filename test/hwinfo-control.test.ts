@@ -232,4 +232,16 @@ describe("a held Control key fires under the settings it was pressed with", () =
 		await c.up(NEXT);
 		assert.equal(c.sent.length, 2, "each lone release is one step");
 	});
+
+	// Only a press held on the way out is marked as left: a key that went
+	// away with nothing held still fires the lone release a Multi Action or
+	// Key Logic step delivers after it returns.
+	it("a key that left with no press held fires a lone release after it returns", async () => {
+		const c = control();
+		c.appear(NEXT);
+		c.disappear(NEXT);
+		c.appear(NEXT);
+		await c.up(NEXT);
+		assert.deepEqual(c.sent, [{ command: "next", target: "safe", scope: "current" }]);
+	});
 });

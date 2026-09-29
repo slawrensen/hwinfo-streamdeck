@@ -36,6 +36,18 @@ describe("SessionStatsStore", () => {
 		}
 	});
 
+	// Past the overflow, a sample of the mean's own sign moves the mean by
+	// their difference, so a steady stream averages to exactly its value
+	// and never leaves its own [min, max].
+	it("a steady stream whose sum overflows averages to exactly its value", () => {
+		const streams: Array<[number, number]> = [[Number.MAX_VALUE, 3], [1.5e308, 10], [-1.5e308, 10]];
+		for (const [value, count] of streams) {
+			const store = new SessionStatsStore();
+			for (let i = 0; i < count; i++) store.sample("r", value);
+			assert.equal(store.get("r")!.mean, value, `${count} samples of ${value}`);
+		}
+	});
+
 	it("an ordinary sum keeps its exact state: no mean field", () => {
 		const store = new SessionStatsStore();
 		for (const value of [0.1, 0.2, 0.3]) store.sample("r", value);

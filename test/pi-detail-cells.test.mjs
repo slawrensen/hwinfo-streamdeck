@@ -32,8 +32,9 @@ function slice(start, end) {
 }
 
 /** The detail editor over `doc`, writing back into it the way the app
- * stores a panel's setSettings. `resize(i)` is the tile size cycler. */
-function editor(doc) {
+ * stores a panel's setSettings. `resize(i)` is the tile size cycler.
+ * `treeEntryOf` stands in for the sensor tree: aliases of one reading. */
+function editor(doc, treeEntryOf = () => null) {
 	const context = {
 		document: { getElementById: () => ({ addEventListener() {} }) },
 		model: modelScope.hwModel,
@@ -48,7 +49,7 @@ function editor(doc) {
 		disarmDetailAim() {},
 		updateFilterCount() {},
 		speakingNotes: (fn) => fn(),
-		treeEntryOf: () => null,
+		treeEntryOf,
 		sameReading: (a, b) => a === b,
 		useSettings: (field) => [() => doc[field], (value) => (doc[field] = value)]
 	};
@@ -262,5 +263,38 @@ describe("structural detail edits keep every stored cell entry in its place", ()
 			}
 		}
 		assert.ok(steps > 2500, `the walk ran ${steps} edits`);
+	});
+});
+
+// Readable entries, one edit each, with the stored tiles written out whole.
+// The rules: a short stored list stays short (AX33) and its end moves with
+// the cells (AX47); an entry holding nothing gives up its slot; a reading
+// that lands in a dormant cell wears that cell's entries, and no other
+// reading does.
+describe("readable entries through single structural edits", () => {
+	// "a~2" names the same reading as "a": the list hides it as a duplicate.
+	const aliases = (key) => (key.includes("~") ? { reading: { key: key.split("~")[0] } } : null);
+	const cases = [
+		{ name: "a chip inserted past the end of a short list leaves it short", doc: { detailKeys: ["a", "b", "c"], detailTiles: [{ size: 2, labels: [] }, { size: 1 }] }, run: (c) => c.moveDetailChip("c", "a", true), tiles: [{ size: 3, labels: [], colors: [null, null, null] }] },
+		{ name: "a parked chip leaves a list a removal shortened short", doc: { detailKeys: ["a", "b", "c", "d"], detailTiles: [{ size: 3, labels: ["A", "B"] }, { size: 1, labels: ["D"] }] }, run: (c) => (c.removeDetailKey("a"), c.moveDetailChip("d", null)), tiles: [{ size: 2, labels: ["B"], colors: [null, null] }, { size: 1, labels: ["D"], colors: [null], cellLabels: true }] },
+		{ name: "a hidden duplicate's cell leaves the short list short", doc: { detailKeys: ["a", "a~1", "c"], detailTiles: [{ size: 3, labels: ["A", "B"] }] }, run: (c) => c.editTile(0, (t) => (t.cellLabels = false)), tiles: [{ size: 2, labels: ["A"], colors: [null, null], cellLabels: false }] },
+		{ name: "a blank dormant entry a pick lands on gives up its slot when the pick moves on", doc: { detailKeys: ["a", "b"], detailTiles: [{ size: 1, labels: ["A"] }, { size: 2, labels: ["", ""] }] }, run: (c) => (c.addDetailKey("c"), c.moveDetailChip("c", "a", true)), tiles: [{ size: 2, labels: ["A"], colors: [null, null] }] },
+		{ name: "a blank dormant entry a pick lands on gives up its slot when a resize moves the pick on", doc: { detailKeys: ["a"], detailTiles: [{ size: 2, labels: ["A", ""] }] }, run: (c) => (c.addDetailKey("b"), c.resize(0), c.resize(0), c.resize(0)), tiles: [{ size: 1, labels: ["A"], colors: [null] }] },
+		{ name: "a reading a resize flows into a dormant cell wears its label", doc: { detailKeys: ["a", "b"], detailTiles: [{ size: 1, labels: ["A", "B"] }] }, run: (c) => c.resize(0), tiles: [{ size: 2, labels: ["A", "B"], colors: [null, null] }] },
+		{ name: "a pick landing in a later tile's dormant cell takes that cell's entry, and its neighbor keeps its own", doc: { detailKeys: ["a", "b"], detailTiles: [{ size: 1 }, { size: 2, labels: [" b ", " C "] }] }, run: (c) => c.addDetailKey("c"), tiles: [{ size: 1 }, { size: 2, labels: [" b ", " C "] }] },
+		{ name: "a chip moved out of a tile moves the entry stored past its cells up", doc: { detailKeys: ["a", "b", "c"], detailTiles: [{ size: 2, labels: ["A", "B", "X"] }, { size: 1, labels: ["C"] }] }, run: (c) => c.moveDetailChip("a", "c", true), tiles: [{ size: 1, labels: ["B", "X"], colors: [null] }, { size: 2, labels: ["C", "A"], colors: [null, null] }] },
+		{ name: "a chip inserted into a partial tile pushes a dormant entry on, never wears it", doc: { detailKeys: ["a", "x", "b"], detailTiles: [{ size: 2 }, { size: 3, labels: ["B", "D"] }] }, run: (c) => c.moveDetailChip("a", "b", true), tiles: [{ size: 1, labels: [""], colors: [null] }, { size: 3, labels: ["B", "", "D"] }] }
+	];
+	for (const { name, doc, run, tiles } of cases) {
+		it(name, () => {
+			const stored = structuredClone(doc);
+			run(editor(stored, aliases));
+			assert.deepEqual(plain(stored.detailTiles), tiles);
+		});
+	}
+
+	it("a stored tile that is not an object does not stop the list hiding a duplicate", () => {
+		const c = editor({ detailKeys: ["a", "b", "a~2"], detailTiles: [5] }, aliases);
+		assert.deepEqual(plain(c.listedDetailKeys()), ["a", "b"]);
 	});
 });

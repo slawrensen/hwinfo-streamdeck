@@ -180,6 +180,35 @@ describe("dial press replay through the production action", () => {
 			f.close();
 		}
 	});
+	// Only a press kept through a replay ends at an unpressed turn. A press
+	// the dial saw go down stays pressed through one (the tracked down backs
+	// up the app's flag), also once a replayed press has ended.
+	it("an unpressed turn inside a press the dial saw go down is a pressed turn", async () => {
+		for (const before of ["no replay", "a replayed press ended by a turn", "a replayed press ended by its release"] as const) {
+			const f = fixture();
+			const retain = mock.method(poller, "retain", () => {});
+			const commands: string[] = [];
+			f.action.executeCommand = async (_action, _state, command, ticks) => void commands.push(ticks === 0 ? command : `${command}(${ticks})`);
+			try {
+				const settings = { ...f.state.settings, controlPreset: "elite" };
+				f.state.settings = settings;
+				if (before !== "no replay") {
+					await f.down();
+					f.appear({ ...settings });
+					if (before === "a replayed press ended by a turn") await f.rotate(false, 50);
+					else await f.up(100);
+				}
+				commands.length = 0;
+				await f.down(100);
+				await f.rotate(false, 50);
+				await f.up(100);
+				assert.deepEqual(commands, ["stepGroup(1)"], before);
+			} finally {
+				retain.mock.restore();
+				f.close();
+			}
+		}
+	});
 	it("a repeated Elite down retains the original long-press boundary", async () => {
 		const f = fixture();
 		try {
@@ -894,6 +923,35 @@ describe("measurement truth through production renderers", () => {
 			} finally {
 				if (state.overlayTimer !== null) clearTimeout(state.overlayTimer);
 			}
+		}
+	});
+	// The two-row view draws each row's trend from the poller's series: each
+	// tick subscribes exactly the rows on screen, and nothing for the other
+	// views or for a selection the snapshot lacks (external review MS05).
+	it("the two-row view subscribes the series of exactly the rows it shows", () => {
+		const set = ["fixture:0:1", "fixture:0:2", "fixture:0:3"];
+		const rows = set.map((key, i) => ({ ...reading, key, id: i + 1, label: `Row ${i + 1}` }));
+		const shown: SensorSnapshot = { pollTime: 1, valueRevision: 1, version: 1, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "GPU" }], readings: rows, byKey: new Map(rows.map((r) => [r.key, r])) };
+		const action = Object.create(SensorDialAction.prototype) as { syncRowSeries(state: InstanceState, snapshot: SensorSnapshot): void };
+		const subscribed: string[] = [];
+		const subscribe = mock.method(poller, "subscribeSeries", (key: string) => void subscribed.push(key));
+		try {
+			const cases: Array<[InstanceState["settings"], string[]]> = [
+				[{ dialView: "tworow", readingKey: set[0], rotationKeys: set }, [set[0]!, set[1]!]],
+				[{ dialView: "tworow", readingKey: set[2], rotationKeys: set }, [set[1]!, set[2]!]],
+				[{ dialView: "tworow", readingKey: set[1], rotationKeys: ["gone:0:9"] }, [set[1]!]],
+				[{ dialView: "tworow", readingKey: "gone:0:9", rotationKeys: set }, []],
+				[{ dialView: "tworow", rotationKeys: set }, []],
+				[{ dialView: "overview", readingKey: set[0], rotationKeys: set }, []],
+				[{ readingKey: set[0], rotationKeys: set }, []]
+			];
+			for (const [settings, expected] of cases) {
+				subscribed.length = 0;
+				action.syncRowSeries({ settings } as InstanceState, shown);
+				assert.deepEqual(subscribed, expected, JSON.stringify(settings));
+			}
+		} finally {
+			subscribe.mock.restore();
 		}
 	});
 });

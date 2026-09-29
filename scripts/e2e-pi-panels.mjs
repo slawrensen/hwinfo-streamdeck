@@ -1195,6 +1195,33 @@ try {
 		check("details: ten presses whose release never came leave no release listener, and the next press still edits once", left === 0 && sim.writes.length === 1, JSON.stringify({ left, ...writes() }));
 	}
 
+	// A release takes its press's half-second ceiling down with it, so a
+	// quick press cannot end the press after it: an edit made inside the
+	// second press repaints on that press's own release, not before.
+	{
+		await open("key-details");
+		await b.evaluate(`document.getElementById("sec-interaction").open = true`);
+		await sleep(150);
+		const seen = await b.evaluate(`(async () => {
+			const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+			const list = document.getElementById("detail-list");
+			const note = () => list.querySelector(".hw-set-note")?.textContent ?? "";
+			list.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+			window.dispatchEvent(new MouseEvent("mouseup"));
+			await wait(300);
+			const before = note();
+			const remove = list.querySelector(".hw-set-chip .hw-set-remove");
+			remove.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, detail: 1 }));
+			remove.click();
+			await wait(350);
+			const held = note();
+			window.dispatchEvent(new MouseEvent("mouseup"));
+			await wait(100);
+			return { before, held, released: note() };
+		})()`);
+		check("details: a quick press's ceiling does not end the press after it; that press's edit repaints on its own release", seen.before !== "" && seen.held === seen.before && seen.released !== seen.before && sim.writes.length === 1, JSON.stringify({ ...seen, ...writes() }));
+	}
+
 	// A themes message the gallery cannot draw is ignored whole: no page
 	// error, the last good chips stay, and a good message after it still
 	// draws (external review AX51).

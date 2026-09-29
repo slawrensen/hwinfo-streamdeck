@@ -4,6 +4,7 @@
 // directory. The real release archive is held to the real staging directory
 // by scripts/qualify.mjs (the archive stage), never by the unit run.
 import assert from "node:assert/strict";
+import { constants as bufferConstants } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -116,6 +117,23 @@ describe("packed-archive gate", () => {
 			assert.equal(entries.length, 1);
 			assert.ok(readZipEntry(zip, entries[0]).equals(data));
 		}
+	});
+
+	// Each ZIP64 size has its own bound: an expanded size what a Buffer
+	// can hold, a compressed size the archive itself. A claim past its
+	// bound is refused and named (external review AX54).
+	it("refuses a ZIP64 size past its bound and names the bound", () => {
+		const zip = writeZip([{ name: "a.js", data: Buffer.from("x"), zip64: true }]);
+		const field = zip.lastIndexOf(Buffer.from([0x01, 0x00, 0x10, 0x00]));
+		const claim = (offset, value) => {
+			const bytes = Buffer.from(zip);
+			bytes.writeBigUInt64LE(value, field + 4 + offset);
+			return listZip(bytes).problems;
+		};
+		const huge = BigInt(bufferConstants.MAX_LENGTH) + 1n;
+		assert.ok(claim(0, huge).includes(`central directory entry 0 claims uncompressedSize ${huge} beyond what a Buffer can hold`), claim(0, huge).join("\n"));
+		const past = BigInt(zip.length) + 1n;
+		assert.ok(claim(8, past).includes(`central directory entry 0 claims compressedSize ${past} beyond the archive`), claim(8, past).join("\n"));
 	});
 
 	it("reads ZIP64 per-entry sizes the packer writes and refuses a marked size it does not carry", () => {

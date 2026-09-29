@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d16";
+	const PI_BUILD = "1.7.0.0-d17";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -2883,8 +2883,15 @@
 		// never filter the list.
 		let searchTyped = false;
 		let activeKey = ""; // the highlighted option (combobox only)
+		// One id per reading key, numbered as keys appear: an encoded key
+		// could throw (a lone surrogate) or collide ("Core 0" and "Core_200")
+		// (external review AX75, AX76).
 		const pickerId = `p${++optionSeq}`;
-		const optionId = (key) => `${pickerId}-${encodeURIComponent(key).replace(/%/g, "_")}`;
+		const optionIds = new Map();
+		const optionId = (key) => {
+			if (!optionIds.has(key)) optionIds.set(key, `${pickerId}-${optionIds.size}`);
+			return optionIds.get(key);
+		};
 
 		// Immediate (non-debounced) persistence; third arg null disables debounce.
 		// A picker without a `setting` binds nothing: its rows feed `onTick`.
@@ -3988,8 +3995,10 @@
 		};
 		const [getQuadColors, writeQuadColors] = useSettings("quadColors", applyQuadColors, null);
 		quadPresetEl.addEventListener("change", () => {
+			// "Custom" is a display state, not a preset; a name the table only
+			// inherits is none either (external review AX74).
+			if (!Object.hasOwn(QUAD_PRESETS, quadPresetEl.value)) return;
 			const preset = QUAD_PRESETS[quadPresetEl.value];
-			if (preset === undefined) return; // "Custom" is a display state, not a preset
 			quadColors = [...preset];
 			// A preset sets the four cells; anything stored past them stays.
 			quadColorsRaw = model.patchColors(quadColorsRaw, { 0: preset[0], 1: preset[1], 2: preset[2], 3: preset[3] }, QUAD_DEFAULT_COLORS);
@@ -5271,11 +5280,14 @@
 		const fillWell = async (el) => {
 			const request = {};
 			fills.set(el, request);
-			// Asymmetric client shapes: getSettings resolves the payload
-			// envelope, getGlobalSettings resolves the bare settings object.
+			// The shell's copy is the newest document the panel has seen or
+			// written, once the panel is connected (the key's) or the first
+			// shared document has arrived. Asking the app again would hand
+			// its answer to every control, and a late answer rolled them
+			// back to an older document (external review AX77).
 			// Every reading key goes out wearing its friendly name; apply
 			// takes the names back off, so nothing stale is ever stored.
-			const doc = el === configKeyEl ? (await streamDeckClient.getSettings())?.settings : await streamDeckClient.getGlobalSettings();
+			const doc = el === configKeyEl ? (await streamDeckClient.getConnectionInfo(), hw.state.settings) : (await hw.globalsReady, hw.state.globals);
 			// A late reply cannot replace a draft or a newer read of this well.
 			if (dirty.has(el) || fills.get(el) !== request) return;
 			el.value = canonical(el === configKeyEl ? mapReadingKeys(doc, namedKey) : doc);
@@ -5288,13 +5300,22 @@
 		const fill = async () => {
 			await Promise.all([configKeyEl, configDeckEl].filter((el) => !dirty.has(el)).map(fillWell));
 		};
-		// Filling is a read; it happens when a fold around the wells opens
-		// (Advanced, or its Configuration documents group), never a write.
+		// Filling writes nothing; it happens when a fold around the wells
+		// opens (Advanced, or its Configuration documents group), and an
+		// untouched well follows every change to its document, so Replace
+		// never writes back the document of the moment it was filled
+		// (review of d17).
 		for (const fold of [document.querySelector('details[data-fold="advanced"]'), document.getElementById("sec-config")]) {
 			fold?.addEventListener("toggle", () => {
 				if (fold.open) fill();
 			});
 		}
+		hw.on("settings", () => {
+			if (!dirty.has(configKeyEl)) fillWell(configKeyEl);
+		});
+		hw.on("globals", () => {
+			if (!dirty.has(configDeckEl)) fillWell(configDeckEl);
+		});
 		const copy = (el) => async () => {
 			if (!dirty.has(el)) {
 				await fillWell(el);

@@ -72,7 +72,12 @@ self.hwShell = (() => {
 		state.settings = doc;
 		emit("settings", { origin: "echo" });
 	});
+	// Settled by the first shared document the host sends (sdpi asks for it
+	// once, at load), so a reader can wait for it instead of asking again.
+	let heardGlobals;
+	const globalsReady = new Promise((resolve) => (heardGlobals = resolve));
 	client.didReceiveGlobalSettings.subscribe((ev) => {
+		heardGlobals();
 		const doc = ev?.payload?.settings;
 		if (!isDoc(doc)) return;
 		state.globals = doc;
@@ -477,6 +482,37 @@ self.hwShell = (() => {
 		},
 		true
 	);
+	// A pointer press confirms only if it began on the button while it was
+	// armed: a mouse held down while Enter or Space arms it would otherwise
+	// confirm on its old release (external review AX72). Leaving the button
+	// mid-press drops its arm, so an arm made after that is newer than the
+	// press. Keys need no note: Enter clicks on its own press, its repeats
+	// are refused above, and arming ends a Space pressed before it.
+	let pressStart = null; // { button, armed } of the latest pointer press
+	document.addEventListener(
+		"pointerdown",
+		(ev) => {
+			const button = ev.target instanceof Element ? ev.target.closest("button") : null;
+			pressStart = button === null ? null : { button, armed: button.dataset.armed === "true" };
+		},
+		true
+	);
+	document.addEventListener(
+		"focusout",
+		(ev) => {
+			if (pressStart !== null && pressStart.button === ev.target) pressStart.armed = false;
+		},
+		true
+	);
+	document.addEventListener(
+		"click",
+		(ev) => {
+			if (ev.detail === 0 || pressStart === null) return;
+			const button = ev.target instanceof Element ? ev.target.closest("button") : null;
+			if (button === pressStart.button && button.dataset.armed === "true" && !pressStart.armed) swallow(ev);
+		},
+		true
+	);
 
 	// --- disclosure: open a section and bring a target into view ----------------
 	/** Opens every closed disclosure around `target`, scrolls it into view and
@@ -873,6 +909,7 @@ self.hwShell = (() => {
 
 	return {
 		state,
+		globalsReady,
 		kind,
 		on,
 		emit,

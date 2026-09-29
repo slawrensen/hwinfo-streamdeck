@@ -38,7 +38,14 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const PORT_BASE = Number(process.env.PI_PANELS_PORT_BASE ?? 29320);
 const PORTS = { ws: PORT_BASE, http: PORT_BASE + 1 };
 
-const sim = await startPiSim({ httpPort: PORTS.http, wsPort: PORTS.ws });
+const sim = await startPiSim({
+	httpPort: PORTS.http,
+	wsPort: PORTS.ws,
+	// Holds the app's connect call for 3 s, for a panel opened before it.
+	extraRoutes: {
+		"/__e2e/slow-connect.js": () => ({ type: "text/javascript", body: "(() => { const f = window.connectElgatoStreamDeckSocket; window.connectElgatoStreamDeckSocket = (...a) => setTimeout(() => f(...a), 3000); })();" })
+	}
+});
 const b = await launch({ width: 400, height: 900 });
 const pageErrors = [];
 b.on("Runtime.exceptionThrown", (p) => pageErrors.push(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text));
@@ -423,6 +430,63 @@ try {
 				await singleClick(p);
 				check(`${name}: a separate click after the double click confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 			}
+		}
+	}
+	// The press that confirms must begin on the armed button: a mouse held
+	// down while Enter or Space arms it does not confirm on its release, and
+	// a fresh click then does; a press begun under an arm that was dropped
+	// (focus left and came back) does not confirm the next arm (external
+	// review AX72, review of d17).
+	const openArm = async (fixture, sel) => {
+		await open(fixture);
+		if (fixture === "key-configured") {
+			await b.evaluate(`(() => { document.querySelectorAll("details").forEach((d) => { d.open = true; }); const t = document.getElementById("config-deck"); t.value = JSON.stringify({ theme: "paper" }); t.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+			await sleep(150);
+		}
+		return b.evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: "center" }); e.focus({ preventScroll: true }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+	};
+	const mouse = (type, p) => b.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }) });
+	for (const [name, fixture, sel, count] of armCases) {
+		for (const key of ["Enter", " "]) {
+			const p = await openArm(fixture, sel);
+			await mouse("mouseMoved", p);
+			await mouse("mousePressed", p);
+			await b.key(key);
+			await sleep(650);
+			await mouse("mouseReleased", p);
+			await sleep(250);
+			const armed = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
+			check(`${name}: a mouse held while ${key === " " ? "Space" : key} arms it does not confirm on its release`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
+			await singleClick(p);
+			check(`${name}: a fresh click after that (${key === " " ? "Space" : key}) confirms once`, count() === 1, JSON.stringify({ writes: count() }));
+		}
+		{
+			const p = await openArm(fixture, sel);
+			await b.key("Enter");
+			await sleep(600);
+			await mouse("mouseMoved", p);
+			await mouse("mousePressed", p);
+			await b.key("Tab");
+			await b.key("Tab", { shift: true });
+			await b.key("Enter");
+			await sleep(650);
+			await mouse("mouseReleased", p);
+			await sleep(250);
+			check(`${name}: a press begun under an arm focus then dropped does not confirm the next arm`, count() === 0, JSON.stringify({ writes: count() }));
+		}
+		{
+			// A screen reader activates with a click and no key events; an
+			// Enter whose keyup never arrived (focus left the window) must
+			// not stop it confirming.
+			await openArm(fixture, sel);
+			await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+			await b.evaluate(`document.activeElement?.blur()`);
+			await sleep(100);
+			for (let i = 0; i < 2; i++) {
+				await b.evaluate(`document.querySelector(${JSON.stringify(sel)}).click()`);
+				await sleep(650);
+			}
+			check(`${name}: a screen reader's second activation confirms after a lost Enter keyup`, count() === 1, JSON.stringify({ writes: count() }));
 		}
 	}
 	// Elapsed time, not the wall clock, times the confirm window and the
@@ -2143,6 +2207,97 @@ try {
 	}
 	await open("control-default");
 	check("parity: the Control panel shows no face and no fake value", (await b.evaluate(`document.getElementById("face-img") === null && !/\\d+(\\.\\d+)?\\s?°/.test(document.body.innerText)`)) === true);
+
+	// ---- seventh-pass follow-ups (external review pass 8) --------------------
+	// A quad color preset name the table only inherits is ignored, not
+	// thrown on (AX74).
+	{
+		await open("key-configured");
+		const errorsBefore = pageErrors.length;
+		const writesBefore = sim.writes.length;
+		await b.evaluate(`(() => { const s = document.getElementById("quad-color-preset"); for (const name of ["__proto__", "constructor", "toString"]) { const o = document.createElement("option"); o.value = name; o.textContent = name; s.appendChild(o); s.value = name; s.dispatchEvent(new Event("change")); } })()`);
+		await sleep(200);
+		check("quad colors: a preset name the table only inherits writes nothing and throws nothing", pageErrors.length === errorsBefore && sim.writes.length === writesBefore, JSON.stringify({ errors: pageErrors.slice(errorsBefore), writes: sim.writes.length - writesBefore }));
+	}
+	// Picker rows carry one id per reading key: a key holding a lone
+	// surrogate no longer stops the list, and "Core 0" and "Core_200" no
+	// longer share one, so the row a screen reader is pointed at is the
+	// highlighted one (AX75, AX76).
+	{
+		const snap = sampleSnapshot();
+		const index = snap.sensors.length;
+		snap.sensors.push({ index, id: 0xabc, instance: 0, name: "Gadget CPU" });
+		for (const [key, label] of [["g:CPU|Core 0", "Core 0"], ["g:CPU|Core_200", "Core_200"], ["g:\ud800|x", "Lone x"]]) {
+			const r = { key, type: 1, sensorIndex: index, id: snap.readings.length, label, unit: "°C", value: 40, valueMin: 40, valueMax: 40, valueAvg: 40 };
+			snap.readings.push(r);
+			snap.byKey.set(key, r);
+		}
+		const errorsBefore = pageErrors.length;
+		await open("key-empty", { snapshot: snap });
+		await sleep(300);
+		await b.evaluate(`document.getElementById("picker-search").focus()`);
+		await sleep(300);
+		await b.type("gadget core");
+		await sleep(200);
+		let rows;
+		for (let i = 0; i < 4; i++) {
+			await b.key("ArrowDown");
+			rows = await b.evaluate(`(() => { const s = document.getElementById("picker-search"); const ref = document.getElementById(s.getAttribute("aria-activedescendant") ?? ""); const all = Array.from(document.querySelectorAll("#picker-list .hw-row[role=option]")); return { rows: all.length, ids: new Set(all.map((r) => r.id)).size, lone: all.some((r) => r.dataset.key === "g:\\ud800|x"), active: document.querySelector("#picker-list .hw-row.active")?.dataset.key ?? null, named: ref?.dataset.key ?? null }; })()`);
+			if (rows.active === "g:CPU|Core_200") break;
+		}
+		check("picker: every row has its own id, a lone surrogate included, and the row named active is the highlighted one", rows.ids === rows.rows && rows.lone && rows.active === "g:CPU|Core_200" && rows.named === rows.active && pageErrors.length === errorsBefore, JSON.stringify({ ...rows, errors: pageErrors.slice(errorsBefore) }));
+		await b.key("Escape");
+	}
+	// The Config wells fill from the panel's own newest documents: opening
+	// them asks the host for nothing, so no late answer can roll the
+	// controls back to an older document (AX77). A shared document still on
+	// its way when they open is asked for, and fills its well when it lands.
+	{
+		// Counted from page load (opening a fixture clears the log): sdpi's
+		// own one read of the shared document at load is the only one.
+		const reads = () => sim.piMessages.filter((m) => m.event === "getSettings" || m.event === "getGlobalSettings").map((m) => m.event);
+		await open("dial-groups");
+		await b.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = true; })`);
+		await sleep(300);
+		const wells = await b.evaluate(`({ key: document.getElementById("config-key").value, deck: document.getElementById("config-deck").value })`);
+		const keyDoc = JSON.parse(wells.key || "null");
+		const deckDoc = JSON.parse(wells.deck || "null");
+		check("Config: opening the wells asks the host for no document, and they show the panel's own", same(reads(), ["getGlobalSettings"]) && Array.isArray(keyDoc?.rotationGroups) && keyDoc.rotationGroups.length === sim.settings.rotationGroups.length && same(Object.keys(deckDoc ?? {}).sort(), Object.keys(sim.globals).sort()), JSON.stringify({ reads: reads(), groups: keyDoc?.rotationGroups?.length ?? null, deck: Object.keys(deckDoc ?? {}) }));
+		// An untouched well follows an edit made elsewhere in the panel, so
+		// Replace never writes back the document of the moment it filled.
+		await b.evaluate(`(() => { const s = document.getElementById("f-decimals"); s.value = "2"; s.dispatchEvent(new Event("change")); })()`);
+		await sleep(300);
+		const followed = JSON.parse((await b.evaluate(`document.getElementById("config-key").value`)) || "null");
+		check("Config: an untouched key well shows an edit made elsewhere in the panel", followed?.decimals === "2" && sim.settings.decimals === "2", JSON.stringify({ well: followed?.decimals ?? null, host: sim.settings.decimals ?? null }));
+		for (const draft of [null, JSON.stringify({ draft: "typed while the answer was on its way" })]) {
+			sim.holdGlobalsReplies = true;
+			await open("key-configured");
+			await b.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = true; })`);
+			await sleep(300);
+			const waiting = await b.evaluate(`document.getElementById("config-deck").value`);
+			const heldReads = reads();
+			if (draft !== null) await b.evaluate(`(() => { const el = document.getElementById("config-deck"); el.value = ${JSON.stringify(draft)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+			sim.releaseGlobals();
+			await sleep(300);
+			const shown = await b.evaluate(`document.getElementById("config-deck").value`);
+			if (draft === null) {
+				const landed = JSON.parse(shown || "null");
+				check("Config: a shared document still on its way when the wells open fills its well when it lands, with no second read", waiting === "" && same(heldReads, ["getGlobalSettings"]) && same(Object.keys(landed ?? {}).sort(), Object.keys(sim.globals).sort()), JSON.stringify({ waiting, heldReads, landed: Object.keys(landed ?? {}) }));
+			} else check("Config: a draft typed while that answer was on its way stays when it lands", waiting === "" && shown === draft, JSON.stringify({ waiting, shown }));
+		}
+		// Wells opened before the panel connects stay empty until it does,
+		// then show the document: never "{}", which Replace would write.
+		sim.setFixture("key-configured");
+		await b.goto(sim.url("key-configured", `&inject=${encodeURIComponent("/__e2e/slow-connect.js")}`));
+		await sleep(1700);
+		await b.evaluate(`document.querySelectorAll("details").forEach((d) => { d.open = true; })`);
+		await sleep(150);
+		const beforeConnect = await b.evaluate(`document.getElementById("config-key").value`);
+		for (let i = 0; i < 100 && !(await b.evaluate(`!!window.__hwPanel?.context`)); i++) await sleep(50);
+		await sleep(400);
+		const afterConnect = JSON.parse((await b.evaluate(`document.getElementById("config-key").value`)) || "null");
+		check("Config: a key well opened before the panel connects stays empty, then shows the document", beforeConnect === "" && typeof afterConnect?.readingKey === "string", JSON.stringify({ beforeConnect, after: Object.keys(afterConnect ?? {}) }));
+	}
 
 	// ---- scale: 5,000 readings, deep selection ------------------------------
 	const big = scaledSnapshot(5000);

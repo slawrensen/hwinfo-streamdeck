@@ -363,6 +363,8 @@ type Mounted = {
 	flush(): Promise<void>;
 	/** Simulates the app echoing didReceiveSettings for one field. */
 	echo(name: string, value: unknown): void;
+	/** Simulates a shared-settings change made outside this panel. */
+	echoGlobal(name: string, value: unknown): void;
 	/** The last write of one field, by value. */
 	lastWrite(name: string): unknown;
 };
@@ -404,13 +406,22 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 	const applied: unknown[] = [];
 	const sent: { event: string; payload: unknown }[] = [];
 	const clipboard = { text: "" };
-	const useStore = (target: Record<string, unknown>) => (name: string, cb?: (v: unknown) => void) => {
+	// A store saves its WHOLE document through the client, as sdpi's does,
+	// so the shell sees every save; only Apply's documents count as applied.
+	let storeSaving = false;
+	const useStore = (target: Record<string, unknown>, save: (docValue: Record<string, unknown>) => void) => (name: string, cb?: (v: unknown) => void) => {
 		if (cb !== undefined) (subs.get(name) ?? subs.set(name, []).get(name)!).push(cb);
 		return [
 			() => Promise.resolve(target[name]),
 			(v: unknown) => {
 				target[name] = v;
 				writes.push({ name, value: plain(v) });
+				storeSaving = true;
+				try {
+					save({ ...target });
+				} finally {
+					storeSaving = false;
+				}
 			}
 		];
 	};
@@ -424,8 +435,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		for (const cb of subscribers) cb({ payload: { settings: { ...target } } });
 	};
 	const SDPIComponents = {
-		useSettings: useStore(store),
-		useGlobalSettings: useStore(globalStore),
+		useSettings: useStore(store, (docValue) => SDPIComponents.streamDeckClient.setSettings(docValue)),
+		useGlobalSettings: useStore(globalStore, (docValue) => SDPIComponents.streamDeckClient.setGlobalSettings(docValue)),
 		streamDeckClient: {
 			send: (event: string, payload: unknown) => sent.push({ event, payload }),
 			sendToPropertyInspector: {
@@ -439,9 +450,9 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			getSettings: async () => ({ settings: replies?.settings === undefined ? store : await replies.settings() }),
 			getGlobalSettings: async () => replies?.globals === undefined ? globalStore : await replies.globals(),
 			setSettings: (docValue: unknown) => {
-				applied.push(plain(docValue));
+				if (!storeSaving) applied.push(plain(docValue));
 			},
-			setGlobalSettings: () => {}
+			setGlobalSettings: (() => {}) as (docValue: unknown) => void
 		}
 	};
 	const intervals: (() => void)[] = [];
@@ -508,6 +519,10 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			store[name] = value;
 			for (const cb of subs.get(name) ?? []) cb(value);
 			deliver(settingsSubscribers, store);
+		},
+		echoGlobal: (name, value) => {
+			globalStore[name] = value;
+			deliver(globalSubscribers, globalStore);
 		},
 		lastWrite: (name) => writes.filter((w) => w.name === name).at(-1)?.value
 	};
@@ -661,7 +676,7 @@ describe("remaining PI review regressions", () => {
 	});
 
 	for (const scope of ["key", "deck"] as const) {
-		it(`a delayed ${scope} config read cannot overwrite a draft typed while waiting`, async () => {
+		it(`a draft typed right after a ${scope} Copy stays`, async () => {
 			let answer: (value: Record<string, unknown>) => void = () => {};
 			const reply = new Promise<Record<string, unknown>>((resolve) => { answer = resolve; });
 			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: () => reply } : { globals: () => reply });
@@ -678,20 +693,26 @@ describe("remaining PI review regressions", () => {
 			assert.equal(m.writes.length, 0);
 		});
 
-		it(`out-of-order ${scope} config reads keep the newest reply`, async () => {
-			const answers: ((value: Record<string, unknown>) => void)[] = [];
-			const read = (): Promise<Record<string, unknown>> => new Promise((resolve) => { answers.push(resolve); });
-			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: read } : { globals: read });
+		// Contract changed on purpose (external review AX77): a Copy used to
+		// read its document from the host, and the host's answer reached
+		// every control, so a late one rolled the panel back. It now shows
+		// the newest document the panel holds and asks the host for none.
+		it(`a ${scope} Copy shows the newest document the panel holds and asks the host for none`, async () => {
+			let reads = 0;
+			const read = async (): Promise<Record<string, unknown>> => {
+				reads++;
+				return { old: true };
+			};
+			const m = mountPanel("dial", { theme: "void" }, { theme: "void" }, scope === "key" ? { settings: read } : { globals: read });
+			await m.flush();
+			if (scope === "key") m.echo("theme", "paper");
+			else m.echoGlobal("theme", "paper");
 			await m.flush();
 			m.el(`config-${scope}-copy`).fire("click");
-			m.el(`config-${scope}-copy`).fire("click");
-			assert.equal(answers.length, 2);
-			answers[1]!({ newest: true });
 			await m.flush();
-			answers[0]!({ old: true });
-			await m.flush();
-			assert.deepEqual(JSON.parse(m.el(`config-${scope}`).value), { newest: true });
-			assert.deepEqual(JSON.parse(m.clipboard.text), { newest: true });
+			assert.equal(reads, 0, "the well asked the host for nothing");
+			assert.equal(JSON.parse(m.el(`config-${scope}`).value).theme, "paper");
+			assert.equal(JSON.parse(m.clipboard.text).theme, "paper");
 			assert.equal(m.writes.length, 0);
 		});
 	}

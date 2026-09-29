@@ -74,7 +74,9 @@ fixes in one release.
   version does not know shows as kept rather than silently replaced.
   Replacing the shared settings document, removing a rotation group
   that holds readings and a merge that drops group names or folds two
-  or more groups of readings into one each ask for a second press; a quick double click only arms them.
+  or more groups of readings into one each ask for a second, separate
+  press: a quick double click only arms them, and so does a mouse button
+  already held down when Enter arms them.
 - The reading picker is built once per sensor list and filtered in
   place, and stays responsive on a 5,000-reading tree (PERF.md). It follows the
   combobox pattern: arrow keys browse, Enter picks, Tab or a click
@@ -155,8 +157,11 @@ fixes in one release.
   with a fresh history segment. Saved selections are never rewritten;
   old duplicate-suffixed or ownerless keys need reselection after repair.
 - Invalid theme names fall back safely. The settings panel refreshes its
-  picker after source recovery or a provider change, preserves Config drafts
-  while settings replies are pending, and retains unknown Config fields. A
+  picker after source recovery or a provider change, preserves Config
+  drafts, fills the Config documents from the settings it already holds (a
+  slow reply to a fresh read could put an older document back into the
+  panel), and retains unknown Config fields. A reading name holding a
+  malformed character no longer empties the picker. A
   detail tile setting this version cannot read stays as stored when the
   tile is edited, and a hand-edited command or shared theme that is not
   text no longer stops a panel summary from drawing.

@@ -2973,8 +2973,11 @@ try {
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "void" });
 	await sleep(200);
 
-	// Hold the real socket reply while the user edits each config textarea.
-	// This races the production async fill path, with no helper extraction.
+	// The Config wells fill from the panel's own documents (external review
+	// AX77): a Copy asks the host for nothing, so no reply can land over a
+	// draft typed right after it. (This used to hold the host's reply and
+	// race it; the one fill that still reads, the shared document before
+	// its first answer, is raced in the panel suite.)
 	await evaluate(`document.querySelector('details[data-fold="advanced"]').open = true`);
 	await sleep(350);
 	const configWriteMark = writes.length;
@@ -2983,15 +2986,15 @@ try {
 		deferConfigReplies = true;
 		await evaluate(`document.getElementById("config-${scope}-copy").click()`);
 		for (let attempt = 0; configReplies.length === 0 && attempt < 20; attempt++) await sleep(50);
-		check(`delayed ${scope} config requested a socket reply`, configReplies.length > 0);
+		check(`${scope} config Copy asks the host for no document`, configReplies.length === 0, `${configReplies.length} reads`);
 		const draft = JSON.stringify({ draft: scope, readingLinks: [{ keep: "typing" }] });
 		await evaluate(`(() => { const el = document.getElementById("config-${scope}"); el.value = ${JSON.stringify(draft)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 		deferConfigReplies = false;
 		for (const reply of configReplies.splice(0)) reply();
 		await sleep(200);
-		check(`delayed ${scope} config preserves the typed draft`, (await evaluate(`document.getElementById("config-${scope}").value`)).result?.value === draft);
+		check(`${scope} config keeps a draft typed after Copy`, (await evaluate(`document.getElementById("config-${scope}").value`)).result?.value === draft);
 	}
-	check("delayed config reads write no settings", writes.length === configWriteMark && globalWrites.length === configGlobalMark);
+	check("config Copy and drafts write no settings", writes.length === configWriteMark && globalWrites.length === configGlobalMark);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

@@ -1,30 +1,41 @@
 # Continuation
 
-## Now (2026-09-28): d16 on the deck after seven external review passes
+## Now (2026-09-28): d17 on the deck after eight external review passes
 
 - **External review:** a different AI model has reviewed the candidate
-  seven times (d08, d09 and d10, d11 to d15). Its reports, findings and my
+  eight times (d08, d09 and d10, d11 to d16). Its reports, findings and my
   answer to every finding live in the private release docs
   (`docs/release/external-review-1.7/`, one folder per pass, and
-  `RESPONSE.md`, which answers AX01 to AX71, MS01 to MS09 and IX01 to IX03
+  `RESPONSE.md`, which answers AX01 to AX77, MS01 to MS09 and IX01 to IX03
   with the fix and the check that proves it), not in this repo. The
-  seventh pass found no blocker; what remains on the software side is its
-  testing gate (75 families not yet reached, no class swept dry twice),
-  which the eighth pass on d16 is for.
+  eighth pass swept classes 1 to 10 dry twice and found no blocker or
+  must-fix. What remains on the software side is class 11 (tests that
+  cannot fail), now a finite run, and fresh sweeps of the four classes d17
+  touched; the ninth pass on d17 is for those.
 - **Pushed:** `claude/pi-density` on GitHub; private mirror `main` with the
   review files and drafts.
-- **Installed:** panel build `1.7.0.0-d16`, archive sha256
-  `86b9f309936529bf062ae3797ea8e10685cab081e79ecf161dca813bfd6c462d`
-  (369,666 bytes, 47 members), plugin.js `0d0b4ef4...` (the same
-  as d15), by the bench route from the archive's own bytes
-  (47 files hash-verified, 0 WARN or ERROR after restart; settings across the install: only the auto-cycling dial at Encoder 5,0 changed, as on every install). The d15 install is backed up at
+- **Installed:** panel build `1.7.0.0-d17`, archive sha256
+  `903e8f1f693f940985a4794685a03e03bb4721d57f82ad3d8ac6e2b3b3af0679`
+  (370,396 bytes, 47 members), plugin.js `0d0b4ef4...` (the same as d15
+  and d16). The six changed panel files were copied into the installed
+  plugin without stopping it, so the soak's plugin process kept running
+  (all 47 members hash-verified in the install; settings across the
+  install: only the auto-cycling dial at Encoder 5,0 changed, as on every
+  install). The d16 panel files are the d16 archive, and the d15 install
+  is backed up at
   `%USERPROFILE%\hwinfo-bench-backup\2026-09-28-d15-installed`.
 - **Soak:** monitor pid 77008, CSV
   `release/soak-1.7.0.0-d16-20260928-0144.csv`, closes 2026-09-30 01:44
-  local. It only counts if the machine stays up, with an HWiNFO restart,
-  an app restart and a sleep/wake inside. The d15 window (pid 53772) was
-  stopped after about two hours, with no required event inside it yet,
-  for d16.
+  local, on the plugin process bytes d16 and d17 share. The owner's
+  HWiNFO restart is inside it (21:51 to 21:55Z on 2026-09-28); an app
+  restart and a sleep/wake are still owed.
+- **d17 over d16:** the eighth review pass: AX72 (a press confirms an armed
+  removal only if it began on the button while armed), AX74 (inherited
+  quad preset names ignored), AX75 and AX76 (picker option ids numbered,
+  not encoded), AX77 (the Config wells fill from the panel's own newest
+  documents and follow every change, so no late read rolls the panel back
+  and Replace never writes back an older document); tests for the 34
+  class 11 gaps. Panel files, tests and docs only.
 - **d16 over d15:** the seventh review pass: AX69 (an older support-report
   request's refused clipboard write no longer copies its report over a
   newer one), AX70 (a test that sees the restore timer's cancellation),
@@ -92,7 +103,7 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d16 sections.
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d17 sections.
 - **Next:** the rest of the owner's hands-on check (step 8, the list keys,
   passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean

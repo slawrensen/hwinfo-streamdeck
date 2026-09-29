@@ -517,3 +517,59 @@ install: only the auto-cycling dial at Encoder 5,0 changed. The d15 soak
 capture's own run of the bundle, about a minute long); the 48-hour soak
 restarted on d16, CSV `release/soak-1.7.0.0-d16-20260928-0144.csv`,
 closing 2026-09-30 01:44 local.
+
+## d17 (2026-09-28): the external review's eighth pass
+
+The eighth pass (on d16; report private) swept classes 1 to 10 dry twice.
+It found five should-fixes, AX72 and AX74 to AX77, and one nit, AX73. It
+also listed 69 small code changes that the tests it assigned did not
+notice (class 11). All were checked against the code first.
+
+- The five should-fixes are fixed.
+- AX73 is deferred to after 1.7.0: no input reaches it, and its fix would
+  change the bundle during the soak.
+- The class 11 list was triaged against the full suites.
+
+Two independent reviews of the first d17 found no must-fix. They found that
+the first cut's note of key presses went stale after a lost keyup, so a
+screen reader could no longer confirm; that a key well filled before the
+panel connected showed `{}` for Replace to write; that the shared well's
+fallback read could still roll the panel back; and, older (since d13),
+that Replace on an untouched well wrote back the document it was filled
+with. All are fixed below. d17 changes panel files, tests and docs only: `src/**`,
+`bin/plugin.js`, `hwsm.node` and the manifest are byte-identical to d15.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX72 | should | A mouse button held down on an armed removal (remove a group, Merge, Replace shared settings) while Enter or Space armed it confirmed on its old release. | A pointer press confirms only if it began on the button while it was armed, and focus leaving the button mid-press drops the press's arm. Keys need no note. | 18 panel checks, 6 per button: a mouse held while Enter or Space arms it does not confirm on its release, and a fresh click then confirms once; a press begun under an arm that focus then dropped does not confirm the next arm (all of these fail on d16); a screen reader's activation still confirms after a lost Enter keyup (fails on the first d17). |
+| AX74 | should | A quad color preset option named after an inherited property (`__proto__`, `constructor`) threw. | Only the preset table's own names apply. | A panel check (fails on d16). |
+| AX75, AX76 | should | A reading key holding a lone surrogate emptied the picker, and "Core 0" and "Core_200" shared an option id, so the row named to screen readers was not the highlighted one. | Each picker numbers its option ids as keys appear. | A panel check (fails on d16). |
+| AX77 | should | Opening or copying a Config document read it from the app. The app's reply goes to every control, so a reply that arrived after an edit rolled the panel back, and the next edit saved the older document. | Both wells fill from the panel's own newest documents: the key's once the panel is connected, the shared one once its first answer arrives. An untouched well follows every change to its document (review of d17: since d13, Replace on an untouched well wrote back the document it was filled with). | 5 panel checks: no read at open; an untouched well shows an edit made elsewhere; a shared document on its way fills its well with no second read (these three fail on d16); a draft typed meanwhile stays; a well opened before the panel connects stays empty, then shows the document (fails without the wait). 2 unit tests replace the out-of-order read tests. |
+| Class 11 | | Of 69 code changes the pass's assigned tests did not notice, 17 fail the panel or persistence suites, 34 changed behavior with no check to see it, and 18 change nothing observable. | A test or check for each of the 34 (17 unit tests, 1 panel check). | Each fails with its change and passes without it. The 18 (10 equivalent, 5 that only touch a debug log line, 3 redundant) are listed with reasons in the private answer, for the ninth pass to check. The 3 redundant pieces stay until after 1.7.0. |
+
+Contracts changed on purpose (AX77). Two persistence checks and two unit
+tests asserted that Copy reads its document from the app (and that the
+newest of two out-of-order answers wins), and that read is what AX77
+removes. They now assert that Copy asks the app for nothing and shows the
+newest document the panel holds. The draft checks next to them are
+unchanged. The unit harness in `test/pi-alias-contract.test.ts` now saves
+every store write through the client, as sdpi does, so the shell sees it.
+
+d17 gates: unit 1,523 of 1,523; panel suite 429 of 429, and the d16 panel
+files fail exactly the new AX72 and AX74 to AX77 checks; persistence 646
+of 646; theme-band runner 70 of 70, from the repo and again on the
+extracted archive, whose own bytes also passed the panel suite (428 of
+428, before the class 11 check was added); native 169 of 169; lint and
+typecheck 0; copy validator 0 warnings. Archive `903e8f1f693f9409...`
+(370,396 bytes, 47 members): against d16's only the six panel files
+differ; plugin.js `0d0b4ef4cdfa6d46...`, hwsm.node and the manifest are
+unchanged.
+
+Installed 2026-09-28 17:19 local by copying the six changed panel files
+into the installed plugin without stopping it (plugin pid 89580 before and
+after; all 47 archive members hash-verified in the install); settings
+across the install: only the auto-cycling dial at Encoder 5,0 changed. The
+soak started on d16 (pid 77008, closing 2026-09-30 01:44 local) keeps
+running on the same plugin process bytes, with the owner's HWiNFO restart
+(21:51 to 21:55Z) already inside it. One sample, at 23:50Z, counted a
+second plugin process: the docs capture's own run of the bundle.

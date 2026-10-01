@@ -1,11 +1,16 @@
 // Device capability derivation: one fixture per hardware family the plugin
 // can meet, plus the unknown-future-device fallback. The table must never
 // gate live events, so these tests only assert derived facts (grid, encoder
-// count, touch geometry, kind), not behavior.
+// count, touch geometry, kind), not behavior. The plugin's own device
+// boundary (describing a device and ingesting its events) is held at the end.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
+import { DeviceType } from "@elgato/schemas/streamdeck/plugins";
 
-import { deriveCapabilities, tapCanvasWidth, TOUCH_SEGMENT } from "../src/devices";
+import { deriveCapabilities, deviceCapabilities, tapCanvasWidth, TOUCH_SEGMENT } from "../src/devices";
 
 describe("deriveCapabilities", () => {
 	it("Stream Deck + XL: 9x4 keys, six encoders, 200x100 touch segments", () => {
@@ -144,5 +149,45 @@ describe("tapCanvasWidth", () => {
 		// An unlisted/unknown device can still surprise us with a tap.
 		assert.equal(tapCanvasWidth(deriveCapabilities({ type: 10, columns: 16, rows: 2 })), 200);
 		assert.equal(tapCanvasWidth(deriveCapabilities({})), 200);
+	});
+});
+
+// Execute only the two device-boundary declarations, never the plugin entry
+// point. The real derivation and registry remain in use behind this boundary.
+describe("the plugin device boundary", () => {
+	const source = readFileSync(new URL("../src/plugin.ts", import.meta.url), "utf8");
+	const ast = ts.createSourceFile("plugin.ts", source, ts.ScriptTarget.Latest, true);
+	const declarations = ast.statements.filter((statement) => ts.isVariableStatement(statement)
+		&& statement.declarationList.declarations.some((declaration) => ts.isIdentifier(declaration.name)
+			&& ["describeDevice", "ingestDevice"].includes(declaration.name.text)));
+	assert.equal(declarations.length, 2, "both production device-boundary declarations must be present");
+	const compiled = ts.transpileModule(declarations.map((statement) => statement.getText(ast)).join("\n"), {
+		compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+	}).outputText;
+	const boundary = runInNewContext(`${compiled}\n({ describeDevice, ingestDevice });`, {
+		deriveCapabilities, deviceCapabilities, DeviceType
+	}) as { describeDevice(device: unknown): string; ingestDevice(device: unknown): void };
+
+	it("stores the reported model and grid and replaces them on a later device event", () => {
+		const id = "plugin-boundary-test";
+		boundary.ingestDevice({ id, type: 7, size: { columns: 4, rows: 2 } });
+		assert.equal(deviceCapabilities.get(id).model, "Stream Deck +");
+		assert.equal(deviceCapabilities.get(id).keys, 8);
+		assert.equal(deviceCapabilities.get(id).encoders, 4);
+		boundary.ingestDevice({ id, type: 13, size: { columns: 9, rows: 4 } });
+		assert.equal(deviceCapabilities.get(id).model, "Stream Deck + XL");
+		assert.equal(deviceCapabilities.get(id).keys, 36);
+		assert.equal(deviceCapabilities.get(id).encoders, 6);
+	});
+
+	it("describes known and future numeric types without losing the name or grid", () => {
+		assert.equal(boundary.describeDevice({ name: "Desk\nA", type: 13, size: { columns: 9, rows: 4 } }), '"Desk\\nA" (StreamDeckPlusXL, 9x4)');
+		assert.equal(boundary.describeDevice({ name: "Future", type: 99, size: { columns: 6, rows: 6 } }), '"Future" (type 99, 6x6)');
+	});
+
+	it("quotes malformed type values without coercion or inherited enum lookup", () => {
+		for (const type of ["StreamDeckPlusXL", "constructor", { toString: null }]) {
+			assert.equal(boundary.describeDevice({ name: "Desk", type, size: { columns: 5, rows: 3 } }), `"Desk" (type ${JSON.stringify(type)}, 5x3)`);
+		}
 	});
 });

@@ -489,6 +489,47 @@ try {
 			check(`${name}: a screen reader's second activation confirms after a lost Enter keyup`, count() === 1, JSON.stringify({ writes: count() }));
 		}
 	}
+	// Each pointer keeps its own start, and a click reads only the start of
+	// the pointer that made it: a mouse held from before the arm does not
+	// confirm after a touch began on the armed button (lifted or cancelled),
+	// nor after a second mouse button, whose press sends no pointerup for
+	// the first; the touch itself began armed and confirms once (external
+	// review AX79, review of d18).
+	const touch = (type, p) => b.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchStart" ? [{ x: p.x, y: p.y, id: 41 }] : [] });
+	const buttons = (type, button, held, p) => b.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button, buttons: held, clickCount: 1 });
+	for (const [name, fixture, sel, count] of armCases) {
+		for (const second of ["touch", "cancelled touch", "right button"]) {
+			const p = await openArm(fixture, sel);
+			await mouse("mouseMoved", p);
+			await buttons("mousePressed", "left", 1, p);
+			await b.key("Enter");
+			await sleep(650);
+			if (second === "right button") {
+				await buttons("mousePressed", "right", 3, p);
+				await buttons("mouseReleased", "left", 2, p);
+			} else {
+				await touch("touchStart", p);
+				if (second === "cancelled touch") await touch("touchCancel", p);
+				await buttons("mouseReleased", "left", 0, p);
+			}
+			await sleep(250);
+			const armed = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
+			const after = second === "right button" ? "the right button was pressed too" : `a ${second} began on the armed button`;
+			check(`${name}: a mouse held from before the arm does not confirm after ${after}`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
+			if (second === "touch") {
+				await touch("touchEnd", p);
+				await sleep(300);
+				check(`${name}: the touch that began on the armed button confirms once`, count() === 1, JSON.stringify({ writes: count() }));
+				continue;
+			}
+			if (second === "right button") {
+				await buttons("mouseReleased", "right", 0, p);
+				await sleep(150);
+			}
+			await singleClick(p);
+			check(`${name}: a fresh click after the ${second} confirms once`, count() === 1, JSON.stringify({ writes: count() }));
+		}
+	}
 	// Elapsed time, not the wall clock, times the confirm window and the
 	// scroll guard: a clock corrected an hour either way between two presses
 	// neither confirms early nor refuses late (external review AX48).
@@ -717,6 +758,7 @@ try {
 	check("keyboard: Enter commits exactly the highlighted reading", typeof chosen === "string" && lastWrite()?.readingKey === chosen && sim.writes.length === 1, JSON.stringify({ wrote: lastWrite()?.readingKey, chosen }));
 	const pickedBand = await bandOf();
 	check("theme band: the first reading picked clears that help line but keeps its slot, so the picker does not move", pickedBand.help === "" && pickedBand.readingTop === emptyBand.readingTop, JSON.stringify({ emptyBand, pickedBand }));
+
 
 	// ---- pointer dismissal: the app keeps Escape and most of its clicks -----
 	// Stream Deck 7.4.2 never delivers Escape to a panel, and a click on its
@@ -2350,6 +2392,9 @@ try {
 	await b.key("End");
 	for (let i = 0; i < 3; i++) await b.key("PageDown");
 	check("scale: the list opened and browsed without a write", sim.writes.length === 0);
+	// A listener that throws can leave every check around it passing: any
+	// page error anywhere in the run fails here (external review AX83).
+	check("run: no page errors anywhere", pageErrors.length === 0, pageErrors.slice(0, 3).join(" | "));
 } catch (err) {
 	console.error("e2e-pi-panels crashed:", err);
 	failures.push(`crash: ${err?.message ?? err}`);

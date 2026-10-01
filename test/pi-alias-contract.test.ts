@@ -9,9 +9,11 @@
  * reverse) the editor must name, tick and color the same way, and it may
  * never rewrite a saved key to do so. The config document half drives
  * Copy and Apply through their own buttons on the same file, and the
- * identity table at the end runs the extracted bareKey, namedKey and
- * mapReadingKeys helpers verbatim over every whitespace edge a Gadget
- * label can carry.
+ * identity table runs the extracted bareKey, namedKey and mapReadingKeys
+ * helpers verbatim over every whitespace edge a Gadget label can carry.
+ * After it come the checks the external review's class 11 asked for: the
+ * shell's pointer-start notes run alone, the Config wells, picker option
+ * ids and the no-answer status.
  *
  * The panel header and status block (pi-shell.js) are read where 1.7 read
  * its Live value line: the header names the reading and its data state,
@@ -1522,5 +1524,214 @@ describe("bareKey, namedKey and mapReadingKeys as shipped", () => {
 	it("list adoption (value.map(bareKey)) keeps stored Gadget keys byte for byte", () => {
 		const stored = ["g:GPU:Temperature ", "g:GPU:Temperature ", HEX];
 		assert.deepEqual(stored.map((k) => bareKey(k)), stored);
+	});
+});
+
+// The pointer-start notes run alone over a stand-in document, so a guard
+// that throws on an event the panel suites never send, or a note one pointer
+// lends another, fails here (external review AX79, AX83).
+describe("the shell's pointer-start notes", () => {
+	type PointerNote = { target: unknown; detail?: number; pointerId?: number };
+	const mountNotes = () => {
+		const source = PI_PRELUDE.find((part) => part.name === "pi-shell.js")!.source;
+		const start = source.indexOf("	// A pointer press confirms only if it began on the button");
+		const end = source.indexOf("	// --- disclosure:", start);
+		assert.ok(start > 0 && end > start, "the block's comment markers moved");
+		/** closest("button") is the element itself for a button, else the button it sits in. */
+		class Element {
+			dataset: Record<string, string> = {};
+			constructor(
+				private readonly isButton = false,
+				private readonly parent: Element | null = null
+			) {}
+			closest(): Element | null {
+				return this.isButton ? this : this.parent;
+			}
+		}
+		const listeners = new Map<string, ((event: PointerNote) => void)[]>();
+		const document = {
+			addEventListener: (type: string, listener: (event: PointerNote) => void) => listeners.set(type, [...(listeners.get(type) ?? []), listener])
+		};
+		const panel = {
+			swallowed: 0,
+			document,
+			background: new Element(),
+			/** A button, and the element inside it (its label text) that a press can land on. */
+			button: () => {
+				const button = new Element(true);
+				return { button, inside: new Element(false, button) };
+			},
+			// As on a real document, an event no listener takes does nothing.
+			fire: (type: string, event: PointerNote) => {
+				for (const listener of listeners.get(type) ?? []) listener(event);
+			}
+		};
+		vm.runInNewContext(source.slice(start, end), { document, Element, swallow: () => panel.swallowed++ });
+		return panel;
+	};
+
+	it("a background press, a document-targeted event and an unknown pointer never throw", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		assert.doesNotThrow(() => p.fire("pointerdown", { target: p.document, pointerId: 1 }));
+		assert.doesNotThrow(() => p.fire("pointerdown", { target: p.background, pointerId: 2 }));
+		assert.doesNotThrow(() => p.fire("focusout", { target: button }));
+		assert.doesNotThrow(() => p.fire("click", { target: inside, detail: 0, pointerId: -1 }));
+		p.fire("pointerdown", { target: inside, pointerId: 3 });
+		assert.doesNotThrow(() => p.fire("click", { target: p.document, detail: 1, pointerId: 3 }));
+		assert.doesNotThrow(() => p.fire("click", { target: inside, detail: 1, pointerId: 9 }));
+		assert.equal(p.swallowed, 0);
+	});
+
+	// Chromium gives a keyboard or screen reader click pointerId -1, which no
+	// note has; a click with detail 0 is not judged whatever id it carries.
+	it("a click-only activation is not judged by a pointer's note", () => {
+		for (const pointerId of [-1, 1]) {
+			const p = mountNotes();
+			const { button, inside } = p.button();
+			p.fire("pointerdown", { target: inside, pointerId: 1 });
+			button.dataset.armed = "true";
+			p.fire("click", { target: inside, detail: 0, pointerId });
+			assert.equal(p.swallowed, 0, `pointerId ${pointerId}`);
+		}
+	});
+
+	it("each pointer keeps its own start: a touch on the armed button lends a held mouse nothing", () => {
+		for (const cancelled of [false, true]) {
+			const p = mountNotes();
+			const { button, inside } = p.button();
+			p.fire("pointerdown", { target: inside, pointerId: 1 });
+			button.dataset.armed = "true";
+			p.fire("pointerdown", { target: button, pointerId: 2 });
+			if (cancelled) p.fire("pointercancel", { target: button, pointerId: 2 });
+			p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+			assert.equal(p.swallowed, 1, "the mouse began before the arm");
+			if (cancelled) continue;
+			p.fire("click", { target: button, detail: 1, pointerId: 2 });
+			assert.equal(p.swallowed, 1, "the touch began on the armed button");
+		}
+	});
+
+	it("a click reads only its own pointer's note, in either order", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("pointerdown", { target: inside, pointerId: 2 });
+		p.fire("click", { target: inside, detail: 1, pointerId: 2 });
+		assert.equal(p.swallowed, 0, "the touch's click, first, began armed");
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1, "the mouse's click, second, began unarmed");
+	});
+
+	// A second mouse button pressed while the first is held sends no
+	// pointerup for the first: its click comes with no lift in between.
+	it("a click with no lift before it (a second mouse button held) is judged by its press", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1);
+	});
+
+	it("a note judges one click only", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1);
+	});
+
+	it("a press begun off every button leaves no note from an earlier press", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		p.fire("pointerdown", { target: p.background, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 0);
+	});
+
+	it("focus leaving the pressed button drops its arm; focus leaving another element does not", () => {
+		const p = mountNotes();
+		const pressed = p.button();
+		const other = p.button();
+		pressed.button.dataset.armed = "true";
+		p.fire("pointerdown", { target: pressed.inside, pointerId: 1 });
+		p.fire("focusout", { target: other.button });
+		p.fire("click", { target: pressed.inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 0, "another element's focus left");
+		p.fire("pointerdown", { target: pressed.inside, pointerId: 1 });
+		p.fire("focusout", { target: pressed.button });
+		p.fire("click", { target: pressed.inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1, "the pressed button's focus left");
+	});
+});
+
+// An untouched Config well follows every later document on its own; the
+// older tests read it after Copy, which refills it (external review AX81).
+describe("Config wells follow the panel's documents", () => {
+	it("an untouched shared Config well follows later documents without another Copy", async () => {
+		const m = mountPanel("dial", {}, { theme: "void", future: { keep: 1 } });
+		await m.flush();
+		m.el("config-deck-copy").fire("click");
+		await m.flush();
+		assert.equal(JSON.parse(m.el("config-deck").value).theme, "void");
+		m.echoGlobal("theme", "paper");
+		await m.flush();
+		assert.deepEqual(JSON.parse(m.el("config-deck").value), { theme: "paper", future: { keep: 1 } });
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("dirty key and shared Config wells keep their exact drafts through later documents", async () => {
+		const m = mountPanel("dial", { theme: "void" }, { theme: "void" });
+		await m.flush();
+		for (const scope of ["key", "deck"]) {
+			m.el(`config-${scope}`).value = '{ "draft" : true }';
+			m.el(`config-${scope}`).fire("input");
+		}
+		m.echo("theme", "paper");
+		m.echoGlobal("theme", "paper");
+		await m.flush();
+		for (const scope of ["key", "deck"]) assert.equal(m.el(`config-${scope}`).value, '{ "draft" : true }');
+		assert.equal(m.writes.length, 0);
+	});
+});
+
+// Option ids are numbered once per key: a tree delivered again renumbers
+// nothing (external review AX80).
+describe("picker option ids", () => {
+	it("picker ids stay distinct and stable when the same sensor tree arrives again", async () => {
+		const status = linkedStatus();
+		const m = await openPanel("dial", { readingKey: SM[0] }, status);
+		m.el("picker-search").fire("focus");
+		const before = pickerRows(m).map((row) => ({ key: row.dataset.key, id: row.id }));
+		assert.ok(before.length >= 3);
+		m.feed(buildSensorTree(status));
+		await m.flush();
+		const after = pickerRows(m).map((row) => ({ key: row.dataset.key, id: row.id }));
+		assert.equal(new Set(after.map((row) => row.id)).size, after.length);
+		assert.deepEqual(after, before);
+		assert.equal(m.writes.length, 0);
+	});
+});
+
+// A panel that hears nothing from the plugin says so (external review AX82).
+// The shell renders again 3.2 s after connecting (pi-shell.js, the
+// setTimeout(scheduleRender, 3200) in the connect handler), so this test
+// waits that long in real time.
+describe("the no-answer status", () => {
+	const PAST_THE_NO_ANSWER_RENDER_MS = 3300;
+	it("a connected panel without a plugin reply explains the failure after the wait", async () => {
+		const m = mountPanel("reading", {});
+		await m.flush();
+		assert.equal(m.el("reading-status").children.length, 0);
+		await new Promise((resolve) => setTimeout(resolve, PAST_THE_NO_ANSWER_RENDER_MS));
+		await m.flush();
+		assert.match(m.el("reading-status").children.map((child) => child.textContent).join(" "), /plugin is not answering this panel/);
+		assert.equal(m.writes.length, 0);
 	});
 });

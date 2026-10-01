@@ -298,3 +298,21 @@ describe("readable entries through single structural edits", () => {
 		assert.deepEqual(plain(c.listedDetailKeys()), ["a", "b"]);
 	});
 });
+
+// A move that rebuilds a quad into new tiles rebuilds each entry the way
+// patchEntry wrote it, and that includes a stored false automatic flag
+// beside a color this build cannot read (external review AX78).
+describe("entries rebuilt through two moves", () => {
+	it("keeps a stored false automatic flag when an unreadable color moves through a quad into a new tile", () => {
+		const stored = { detailKeys: ["a", "b", "c", "d", "e"], detailTiles: [{ size: 4, colors: [null, null, { future: "kept" }], automaticColors: [null, null, false] }] };
+		const c = editor(stored);
+		c.moveDetailKey("e", 0);
+		c.moveDetailKey("d", 0);
+		assert.deepEqual(plain(stored.detailKeys), ["d", "e", "a", "b", "c"]);
+		// c's entry (the third cell) moves whole into the new single tile,
+		// once: nothing of it is left behind in the quad.
+		assert.equal(stored.detailTiles.length, 2);
+		assert.deepEqual(plain(stored.detailTiles[1]), { size: 1, labels: [""], colors: [{ future: "kept" }], cellLabels: true, automaticColors: [false] });
+		assert.equal(JSON.stringify(stored.detailTiles).split('"future"').length - 1, 1, "c's color is stored once");
+	});
+});

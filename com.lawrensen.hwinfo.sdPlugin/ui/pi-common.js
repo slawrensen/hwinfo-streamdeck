@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d18";
+	const PI_BUILD = "1.7.0.0-d19";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -2900,7 +2900,11 @@
 			: useSettings(
 					config.setting,
 					(value) => {
+						const previous = selectedKey;
 						selectedKey = typeof value === "string" ? value : "";
+						// A dial turn (or autocycle) carries the outline along unless
+						// the person moved it with the keys: one row reads as chosen.
+						if (listOpen && !searchTyped && activeKey === previous) activeKey = selectedKey;
 						showSelection();
 						renderList();
 						config.onSelectionEcho?.(); // chip highlight follows the move
@@ -2975,12 +2979,15 @@
 			return Array.from(listEl.querySelectorAll(".hw-row:not([hidden])"));
 		}
 
+		// The row wearing the outline, tracked by element: a close, a typed
+		// filter or a dial turn moves activeKey without a repaint, and clearing
+		// by the previous key left one stale outline per move.
+		let activeEl = null;
 		function setActive(key, scroll = true) {
-			const previous = activeKey;
 			activeKey = key;
-			const prevRow = built?.byKey.get(previous);
-			if (prevRow !== undefined) prevRow.el.classList.remove("active");
 			const found = built?.byKey.get(key)?.el ?? null;
+			if (activeEl !== null && activeEl !== found) activeEl.classList.remove("active");
+			activeEl = found;
 			if (found !== null) found.classList.add("active");
 			if (combobox) {
 				if (found !== null) searchEl.setAttribute("aria-activedescendant", found.id);
@@ -3223,7 +3230,7 @@
 			listEl.hidden = true;
 			if (combobox) searchEl.setAttribute("aria-expanded", "false");
 			searchEl.removeAttribute("aria-activedescendant");
-			activeKey = "";
+			setActive("", false);
 			showSelection();
 			if (was) config.onOpenChange?.(false);
 		}

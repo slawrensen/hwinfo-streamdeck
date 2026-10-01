@@ -759,6 +759,37 @@ try {
 	const pickedBand = await bandOf();
 	check("theme band: the first reading picked clears that help line but keeps its slot, so the picker does not move", pickedBand.help === "" && pickedBand.readingTop === emptyBand.readingTop, JSON.stringify({ emptyBand, pickedBand }));
 
+	// ---- one outlined row: the highlight never stays behind ----------------
+	// Bench 2026-09-30: a cycling dial's list showed five outlined rows, one
+	// left behind by every close after the saved reading had moved.
+	const marks = () => b.evaluate(`({ active: Array.from(document.querySelectorAll("#picker-list .hw-row.active"), (r) => r.dataset.key), selected: Array.from(document.querySelectorAll("#picker-list .hw-row.selected"), (r) => r.dataset.key) })`);
+	const oneMark = (m, key) => m.active.length === 1 && m.selected.length === 1 && m.active[0] === m.selected[0] && (key === undefined || m.active[0] === key);
+	await open("dial-configured");
+	await b.click("#picker-search");
+	await sleep(150);
+	await b.key("ArrowDown");
+	await b.key("ArrowDown");
+	await b.click("#picker-search"); // the second click closes, nothing chosen
+	await sleep(150);
+	await b.click("#picker-search");
+	await sleep(150);
+	let seen = await marks();
+	check("highlight: an outline moved and then closed does not stay on the next open", oneMark(seen), JSON.stringify(seen));
+	const turnedTo = await b.evaluate(`Array.from(document.querySelectorAll("#picker-list .hw-row:not(.selected)"), (r) => r.dataset.key)[3]`);
+	sim.settings = { ...sim.settings, readingKey: turnedTo };
+	sim.piWs.send(JSON.stringify({ event: "didReceiveSettings", action: "com.lawrensen.hwinfo.dial", context: sim.context, device: "dev1", payload: { settings: sim.settings } }));
+	await sleep(300);
+	seen = await marks();
+	check("highlight: a dial turn while the list is open moves the outline with the saved reading", oneMark(seen, turnedTo), JSON.stringify({ seen, turnedTo }));
+	noWrites("highlight: browsing and a dial turn's echo");
+	await b.key("ArrowDown");
+	await b.key("Enter");
+	await sleep(200);
+	const enteredKey = lastWrite()?.readingKey;
+	await b.click("#picker-search");
+	await sleep(150);
+	seen = await marks();
+	check("highlight: after a pick, the reopened list outlines only the new reading", sim.writes.length === 1 && typeof enteredKey === "string" && enteredKey !== turnedTo && oneMark(seen, enteredKey), JSON.stringify({ seen, enteredKey, writes: sim.writes.length }));
 
 	// ---- pointer dismissal: the app keeps Escape and most of its clicks -----
 	// Stream Deck 7.4.2 never delivers Escape to a panel, and a click on its

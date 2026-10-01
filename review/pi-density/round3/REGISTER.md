@@ -663,3 +663,68 @@ the commit holds the bytes the deck ran), `c3e47b8` (d18's tests),
 `a672a3a` (d19 and its checks), `535d312` (the capture) and this record.
 `claude/f01-on-1.7` (PR #39) takes the branch by fast-forward; no bump,
 tag or release.
+
+## d20 (2026-10-01): the last product change; review closed
+
+On 2026-09-30 the owner asked whether the candidate was locked in and how
+much of the added testing earns its keep. Six independent reviewers
+looked: unit-test value, browser-check value, whether a tenth external
+pass is worth it, a skeptic of the d17 to d19 product changes, and one
+refuter for each test audit. Their files are in the private release docs
+(`docs/release/external-review-1.7/test-audit-2026-09-30/`).
+
+- **Review closed (owner's call: "no more hunting").** Must-fix findings
+  per external pass ran 3, 2, 5, 6, 2, 5, 1, 0, 0; the last two passes
+  found tests to add, not product defects. There is no tenth pass, and
+  the class 11 gate (every changed line broken one at a time until two
+  runs come back dry) is retired: each fix adds lines, so it cannot
+  converge. From here a product change gets the unit, panel and
+  persistence suites and two independent reviews of its diff.
+- **The gap that mattered** was not more review but running what exists:
+  the built-plugin protocol harness (`npm run e2e`) had failed since d14,
+  when AX50 put quotes around outside text in log lines and its two
+  device checks still expected the bare name. The plugin was right; the
+  checks are fixed. All nine runtime e2e suites pass on the shipping
+  bundle under the app's own Node 20.20.0 (harness 105 checks, drill-down,
+  socket close, resilience, Gadget, native edge, dead fallback, reading
+  links 96 checks, load), run 05:38 to 05:47Z on 10-01 inside the d19
+  soak; the soak recorded no event in those minutes.
+- **Test value:** cost is upkeep and review time, not run time (unit
+  1,543 tests in 27 s; panel suite 209 s, three quarters of it added in
+  this cycle; persistence 132 s). After refutation, about 22 panel checks
+  (16 s) are safe to cut, three fixed-sleep sections can wait on
+  conditions instead (about 18 s), and some unit groups can merge; the
+  pruning waits for after 1.7.0. The two audits each cut checks because
+  the other suite held them; applied together they would have left the
+  second-mouse-button case (a real d18 regression) and others with no
+  check. Only the unit suite runs in CI, so where a behavior is held
+  twice, the unit test is the one to keep.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| OW02 (skeptic review of d17 to d19) | should | Since d17 an untouched Config well refilled on every change to its document, even while it had focus. An auto-cycling dial writes its settings every few seconds, so a caret placed in "This dial's settings" jumped to the end before the person typed. | An untouched well holds still while it has focus and catches up when focus moves elsewhere in the panel; Copy and Replace both refresh an untouched well first, so neither uses an older document. Replace reads its press's `detail` and time before that refresh, so the double-press guards see the press itself. | 1 panel check (caret at 10 stays at 10 through a plugin write; d19's panel files fail it with the caret at 833, the end) and 1 unit test (holds while focused, catches up on blur, Replace writes the current document; fails on d19). |
+
+The two reviews of the d20 diff found no product defect. They found that
+five persistence legs and one panel check set a well's text from script
+without the `input` event every real edit fires, so the refill on
+Replace (and, before d20, the fold's own refill) had been replacing the
+document the check meant to test; one of those checks set a JSON string
+rather than an object and so had never tested its own document. All now
+fire `input` and test what they say. One gap is accepted and written in
+the code: a well focused when the whole window loses focus catches up
+only when focus moves inside the panel again (display only).
+
+d20 changes `ui/pi-common.js` and the build token in the four panels,
+tests, three test scripts and the docs capture only: `src/**`,
+`bin/plugin.js` (`0d0b4ef4...`), `hwsm.node` and the manifest are
+byte-identical to d15 to d19.
+
+d20 gates: unit 1,544 of 1,544; panel suite 453 of 453 (d19's panel files
+fail exactly the new caret check); persistence 646 of 646; the nine
+runtime e2e suites as above; lint and typecheck 0; copy validator 0
+warnings. Archive `c5aed2e5775a568d...` (370,927 bytes, 47 members):
+against d19's only the five panel files differ, and its panel files are
+byte-identical to those the suites ran. Installed 2026-10-01 00:00 local
+by the panel hot copy (plugin pid 24328 before and after; all 47 members
+hash-verified; 0 settings changes). The docs capture was retaken on d20
+(07:00:36 to 07:00:52Z, inside the d19 soak).

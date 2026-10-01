@@ -1,52 +1,45 @@
 # Continuation
 
-## Now (2026-09-30): d19 on the deck after nine external review passes
+## Now (2026-10-01): d20, review closed, ship-ready on the software side
 
+- **Review closed (owner's call, 2026-09-30: "no more hunting").** Nine
+  external passes (must-fix per pass 3, 2, 5, 6, 2, 5, 1, 0, 0); no tenth
+  pass, and the class 11 gate is retired. Code freeze: a later product
+  change gets the unit, panel and persistence suites plus two independent
+  reviews of its diff, nothing more. REGISTER, d20 has the reasons and
+  the test-value audit; its files are private
+  (`docs/release/external-review-1.7/test-audit-2026-09-30/`). Pruning
+  the tests waits for after 1.7.0. Rule for new tests: add one only when
+  it fails for input the real app, HWiNFO or a person's own edits can
+  produce and the failure would show or reach their settings; one browser
+  check per code path; no fixed sleeps; where a behavior is held twice,
+  keep the unit test (only it runs in CI).
+- **d20 over d19:** the last product change: an untouched Config well
+  holds still while it has focus (an auto-cycling dial's writes threw the
+  caret to the end), and Replace refreshes an untouched well first, as
+  Copy does. The built-plugin harness's two device checks (stale since
+  d14) are fixed; all nine runtime e2e suites pass on the shipping bundle
+  under the app's Node 20.20.0.
+- **Installed:** panel build `1.7.0.0-d20`, archive sha256
+  `c5aed2e5775a568d141b5e3bfe71bd6a6d3d07709370b88a72c579de4e3a9f7c`
+  (370,927 bytes, 47 members), plugin.js `0d0b4ef4...` (unchanged since
+  d15), by the panel hot copy at 2026-10-01 00:00 local (plugin pid 24328
+  untouched, 0 settings changes). Rollback: the same hot copy from the d19
+  extract in `%TEMP%\hw-d19-archive`.
+- **Soak:** monitor pid 44260, CSV
+  `release/soak-1.7.0.0-d19-20260930-2227.csv`, closes 2026-10-02 22:27
+  local, on the plugin bytes every build since d15 shares. Owed inside
+  it: a HWiNFO restart, an app restart and a sleep/wake. Then
+  `node scripts/soak-monitor.mjs --summary <csv>` into PERF.md (exclude
+  05:38 to 05:47Z and 07:00:36 to 07:00:52Z on 10-01: local e2e runs and
+  the docs capture).
+- **Owed before the tag (owner):** the soak events above; OWNER-CHECK
+  steps 1 to 7; the release pack installed through the app's installer
+  over a restored 1.6.0 install, settings snapshot unchanged; CI green on
+  PR #39; the CHANGELOG publication date; the tag.
 - **d19 over d18:** the owner's report OW01 (REGISTER, d19): the reading
   picker left one outlined row behind per close after the saved reading
-  moved, five on a cycling dial. One outline now, and a dial turn carries
-  it. Installed 20:45 local by the panel hot copy (archive `e53ae5f9...`,
-  370,720 bytes; plugin pid 24328 untouched); the d18 extract in
-  `%TEMP%\hw-d18-archive` is the rollback. The d17 soak ended at about
-  7.4 h at the owner's clean shutdown (19:37); a new 48 h soak on these
-  plugin bytes is owed. The tenth review pass now runs on d19 (one more
-  panel change over d18). The bullets below are the d18 state.
-- **Committed and joined to the release (owner's word, 2026-09-30):** d18
-  and d19 committed on `claude/pi-density` (d18's panel files staged from
-  its archive, so that commit holds the bytes the deck ran), pushed, and
-  `claude/f01-on-1.7` (PR #39, the combined 1.7.0 into
-  `codex/release-1.7.0`) fast-forwarded to it, so #39 now carries the
-  whole density pass. No version bump, tag, merge or release.
-
-- **External review:** a different AI model has reviewed the candidate
-  nine times (d08, d09 and d10, d11 to d17). Its reports, findings and my
-  answer to every finding live in the private release docs
-  (`docs/release/external-review-1.7/`, one folder per pass, and
-  `RESPONSE.md`, which answers AX01 to AX87, MS01 to MS09 and IX01 to IX03
-  with the fix and the check that proves it), not in this repo. The ninth
-  pass found no blocker or must-fix: one panel should-fix (AX79) and nine
-  tests that could not fail, all answered in d18. What remains on the
-  software side is class 11 run dry twice on d18; the tenth pass is for
-  that.
-- **Pushed:** `claude/pi-density` on GitHub at d17 (`8eba7a9`); d18 is NOT
-  committed yet (superseded: see the bullet above). Private mirror `main`
-  holds the review files up to pass 8.
-- **Installed:** panel build `1.7.0.0-d18`, archive sha256
-  `a4f2835d7acca2b75cee233ce57a11d86ba60756b409f973046b0eebe76ac6bf`
-  (370,559 bytes, 47 members), plugin.js `0d0b4ef4...` (the same as d15
-  to d17). The six changed panel files were copied into the installed
-  plugin without stopping it (plugin pid 18676 before and after; all 47
-  members hash-verified; 0 settings changes across the install). The d17
-  archive and its extract are in `%TEMP%\hw-d17-archive` (rollback: the
-  same hot copy from that extract).
-- **Soak:** the d16 soak ended at 30.0 h when the PC was restarted from the
-  Start menu (07:42 local, 2026-09-29), with the owner's HWiNFO restart
-  and an app restart inside it; clean (REGISTER, d18). A new 48 h soak
-  runs on the same plugin bytes: monitor pid 43776, CSV
-  `release/soak-1.7.0.0-d17-20260930-1212.csv`, closes 2026-10-02 12:12
-  local. Owed inside it: a HWiNFO restart, an app restart and a
-  sleep/wake. The PC bugchecked (0xD1) at 08:46 local on 09-30, before
-  it started.
+  moved; one outline now, and a dial turn carries it.
 - **d18 over d17:** the ninth review pass: AX79 (each pointer keeps its own
   press note, read only by its own click, so a touch, a pen or a second
   mouse button cannot lend a held mouse the armed start); tests for AX78
@@ -127,9 +120,9 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d18 sections.
-- **Next:** the tenth review pass on d18 (class 11 dry twice), the rest of
-  the owner's hands-on check (step 8, the list keys, passed on d11),
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d20 sections.
+- **Next:** the owner's steps in the Now section above (step 8 of the
+  hands-on check, the list keys, passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean
   clone on the final commit, the 70-check runner on the final archive,
   then the owner's merge, tag and publish.

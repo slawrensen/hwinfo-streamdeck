@@ -488,28 +488,37 @@ self.hwShell = (() => {
 	// mid-press drops its arm, so an arm made after that is newer than the
 	// press. Keys need no note: Enter clicks on its own press, its repeats
 	// are refused above, and arming ends a Space pressed before it.
-	let pressStart = null; // { button, armed } of the latest pointer press
+	// Each pointer keeps its own note from its press to its click, and a
+	// click reads only the note of the pointer that made it (the click's
+	// pointerId): a touch, a pen or a second mouse button pressed while a
+	// mouse is held cannot lend the mouse its start (external review AX79).
+	const pressStarts = new Map(); // pointerId -> { button, armed }
 	document.addEventListener(
 		"pointerdown",
 		(ev) => {
 			const button = ev.target instanceof Element ? ev.target.closest("button") : null;
-			pressStart = button === null ? null : { button, armed: button.dataset.armed === "true" };
+			if (button === null) pressStarts.delete(ev.pointerId);
+			else pressStarts.set(ev.pointerId, { button, armed: button.dataset.armed === "true" });
 		},
 		true
 	);
+	document.addEventListener("pointercancel", (ev) => pressStarts.delete(ev.pointerId), true);
 	document.addEventListener(
 		"focusout",
 		(ev) => {
-			if (pressStart !== null && pressStart.button === ev.target) pressStart.armed = false;
+			for (const start of pressStarts.values()) if (start.button === ev.target) start.armed = false;
 		},
 		true
 	);
 	document.addEventListener(
 		"click",
 		(ev) => {
-			if (ev.detail === 0 || pressStart === null) return;
+			if (ev.detail === 0) return;
+			const start = pressStarts.get(ev.pointerId);
+			pressStarts.delete(ev.pointerId);
+			if (start === undefined) return;
 			const button = ev.target instanceof Element ? ev.target.closest("button") : null;
-			if (button === pressStart.button && button.dataset.armed === "true" && !pressStart.armed) swallow(ev);
+			if (button === start.button && button.dataset.armed === "true" && !start.armed) swallow(ev);
 		},
 		true
 	);

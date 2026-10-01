@@ -1,34 +1,58 @@
 # Continuation
 
-## Now (2026-09-28): d17 on the deck after eight external review passes
+## Now (2026-09-30): d19 on the deck after nine external review passes
+
+- **d19 over d18:** the owner's report OW01 (REGISTER, d19): the reading
+  picker left one outlined row behind per close after the saved reading
+  moved, five on a cycling dial. One outline now, and a dial turn carries
+  it. Installed 20:45 local by the panel hot copy (archive `e53ae5f9...`,
+  370,720 bytes; plugin pid 24328 untouched); the d18 extract in
+  `%TEMP%\hw-d18-archive` is the rollback. The d17 soak ended at about
+  7.4 h at the owner's clean shutdown (19:37); a new 48 h soak on these
+  plugin bytes is owed. The tenth review pass now runs on d19 (one more
+  panel change over d18). The bullets below are the d18 state.
+- **Committed and joined to the release (owner's word, 2026-09-30):** d18
+  and d19 committed on `claude/pi-density` (d18's panel files staged from
+  its archive, so that commit holds the bytes the deck ran), pushed, and
+  `claude/f01-on-1.7` (PR #39, the combined 1.7.0 into
+  `codex/release-1.7.0`) fast-forwarded to it, so #39 now carries the
+  whole density pass. No version bump, tag, merge or release.
 
 - **External review:** a different AI model has reviewed the candidate
-  eight times (d08, d09 and d10, d11 to d16). Its reports, findings and my
+  nine times (d08, d09 and d10, d11 to d17). Its reports, findings and my
   answer to every finding live in the private release docs
   (`docs/release/external-review-1.7/`, one folder per pass, and
-  `RESPONSE.md`, which answers AX01 to AX77, MS01 to MS09 and IX01 to IX03
-  with the fix and the check that proves it), not in this repo. The
-  eighth pass swept classes 1 to 10 dry twice and found no blocker or
-  must-fix. What remains on the software side is class 11 (tests that
-  cannot fail), now a finite run, and fresh sweeps of the four classes d17
-  touched; the ninth pass on d17 is for those.
-- **Pushed:** `claude/pi-density` on GitHub; private mirror `main` with the
-  review files and drafts.
-- **Installed:** panel build `1.7.0.0-d17`, archive sha256
-  `903e8f1f693f940985a4794685a03e03bb4721d57f82ad3d8ac6e2b3b3af0679`
-  (370,396 bytes, 47 members), plugin.js `0d0b4ef4...` (the same as d15
-  and d16). The six changed panel files were copied into the installed
-  plugin without stopping it, so the soak's plugin process kept running
-  (all 47 members hash-verified in the install; settings across the
-  install: only the auto-cycling dial at Encoder 5,0 changed, as on every
-  install). The d16 panel files are the d16 archive, and the d15 install
-  is backed up at
-  `%USERPROFILE%\hwinfo-bench-backup\2026-09-28-d15-installed`.
-- **Soak:** monitor pid 77008, CSV
-  `release/soak-1.7.0.0-d16-20260928-0144.csv`, closes 2026-09-30 01:44
-  local, on the plugin process bytes d16 and d17 share. The owner's
-  HWiNFO restart is inside it (21:51 to 21:55Z on 2026-09-28); an app
-  restart and a sleep/wake are still owed.
+  `RESPONSE.md`, which answers AX01 to AX87, MS01 to MS09 and IX01 to IX03
+  with the fix and the check that proves it), not in this repo. The ninth
+  pass found no blocker or must-fix: one panel should-fix (AX79) and nine
+  tests that could not fail, all answered in d18. What remains on the
+  software side is class 11 run dry twice on d18; the tenth pass is for
+  that.
+- **Pushed:** `claude/pi-density` on GitHub at d17 (`8eba7a9`); d18 is NOT
+  committed yet (superseded: see the bullet above). Private mirror `main`
+  holds the review files up to pass 8.
+- **Installed:** panel build `1.7.0.0-d18`, archive sha256
+  `a4f2835d7acca2b75cee233ce57a11d86ba60756b409f973046b0eebe76ac6bf`
+  (370,559 bytes, 47 members), plugin.js `0d0b4ef4...` (the same as d15
+  to d17). The six changed panel files were copied into the installed
+  plugin without stopping it (plugin pid 18676 before and after; all 47
+  members hash-verified; 0 settings changes across the install). The d17
+  archive and its extract are in `%TEMP%\hw-d17-archive` (rollback: the
+  same hot copy from that extract).
+- **Soak:** the d16 soak ended at 30.0 h when the PC was restarted from the
+  Start menu (07:42 local, 2026-09-29), with the owner's HWiNFO restart
+  and an app restart inside it; clean (REGISTER, d18). A new 48 h soak
+  runs on the same plugin bytes: monitor pid 43776, CSV
+  `release/soak-1.7.0.0-d17-20260930-1212.csv`, closes 2026-10-02 12:12
+  local. Owed inside it: a HWiNFO restart, an app restart and a
+  sleep/wake. The PC bugchecked (0xD1) at 08:46 local on 09-30, before
+  it started.
+- **d18 over d17:** the ninth review pass: AX79 (each pointer keeps its own
+  press note, read only by its own click, so a touch, a pen or a second
+  mouse button cannot lend a held mouse the armed start); tests for AX78
+  and AX80 to AX87, one per change no check noticed; the panel suite fails
+  on any page error in its run. Panel files, tests, one test script and
+  the docs capture only.
 - **d17 over d16:** the eighth review pass: AX72 (a press confirms an armed
   removal only if it began on the button while armed), AX74 (inherited
   quad preset names ignored), AX75 and AX76 (picker option ids numbered,
@@ -103,9 +127,9 @@
   click of a double click is swallowed), AX07 (a known stored shared theme
   is read first; globals redraw), AX05 test holes, AX06 runner exit code,
   AX08 to AX11 copy, the runbook's release:validate stages.
-- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d17 sections.
-- **Next:** the rest of the owner's hands-on check (step 8, the list keys,
-  passed on d11),
+- **Gates:** `round3/REGISTER.md`, the d09 gates and the d10 to d18 sections.
+- **Next:** the tenth review pass on d18 (class 11 dry twice), the rest of
+  the owner's hands-on check (step 8, the list keys, passed on d11),
   the soak summary into PERF.md, `npm run release:validate` from a clean
   clone on the final commit, the 70-check runner on the final archive,
   then the owner's merge, tag and publish.

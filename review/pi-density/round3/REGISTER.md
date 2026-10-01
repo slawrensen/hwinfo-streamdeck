@@ -573,3 +573,93 @@ soak started on d16 (pid 77008, closing 2026-09-30 01:44 local) keeps
 running on the same plugin process bytes, with the owner's HWiNFO restart
 (21:51 to 21:55Z) already inside it. One sample, at 23:50Z, counted a
 second plugin process: the docs capture's own run of the bundle.
+
+## d18 (2026-09-30): the external review's ninth pass
+
+The ninth pass (on d17; report private) swept classes 2 to 5 twice and
+classes 1 and 6 to 10 once more, with no new blocker or must-fix, and ran
+class 11 as a finite set: every condition and statement on the lines
+changed since `fe115d0`, 345 entries, each against the full unit command
+and, for panel changes, both browser suites. Twice. It found ten
+should-fixes, AX78 to AX87: one in the panel (AX79) and nine tests that
+cannot fail, which between them account for all 22 changes no check
+noticed. Each was checked against the code first.
+
+Two independent reviews of the first d18 found that its AX79 fix, as
+proposed, let a mouse press held from before the arm confirm when a second
+mouse button was pressed (a second button sends no `pointerup` for the
+first; d17 refused this), and tightened five of the proposed tests. All
+fixed below. d18 changes panel files, tests, one test script and the docs
+capture only: `src/**`, `bin/plugin.js`, `hwsm.node` and the manifest are
+byte-identical to d15, d16 and d17.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| AX79 | should | The AX72 note was one for all pointers: a touch or pen pressed on the armed button while a mouse was held from before the arm replaced the mouse's start, so the mouse's release confirmed. Cancelling the touch did not help. | Each pointer keeps its own note from its press to its click, and a click reads only its own pointer's note (the click's `pointerId`; a keyboard click carries -1 and is never judged). | 18 panel checks, 6 per button: a mouse held from before the arm does not confirm after a touch began on the armed button, after a touch began and was cancelled, or after the right button was pressed too; the touch then confirms once, or a fresh click does. The touch checks fail on d17's panel files; the right-button checks fail on the first d18 cut. 8 unit tests run the block alone. |
+| AX78, AX80 to AX87 | should | Tests that could not fail: a stored false automatic flag through two moves; picker ids on a tree delivered twice; an untouched shared Config well following later documents (the old tests read it after Copy, which refills it); the no-answer status; the pointer guards on events the suites never send; a coordinate-less detail slot; Gadget notices outside the native suite; the plugin's device boundary; pi-lab's failure monitor for a callback that throws outside its command. | A test for each, as proposed, tightened by the review of d18 (AX78 holds the whole new tile; AX84 uses `mock.method`; AX87's preload handles the exception itself; AX83 rewritten for the new notes, with a stand-in document that keeps every listener and a `closest` that is the button itself). The panel suite now fails on a page error anywhere in its run, not only in its first stage. | Each of the 22 changes fails its test on a scratch copy and each test passes without it. The 19 one-at-a-time changes to the rewritten pointer block are each noticed except the `pointercancel` listener, which only frees memory. |
+
+Written list for the tenth pass (private answer): the ninth pass's list,
+less m146, with m063's reason corrected, the band-height control recorded
+as a measurement inside its allowance, and the `pointercancel` listener
+added. Left for after 1.7.0 with AX73: exporting the device boundary from
+`devices.ts` (the AX86 test reads it out of `plugin.ts` meanwhile), and the
+double-click guard's single note, which a mouse and a touch pressed
+together within half a second of a panel scroll can get past.
+
+d18 gates: unit 1,543 of 1,543; panel suite 448 of 448, and the d17 panel
+files fail exactly the six new touch checks, the first d18 cut exactly the
+three new right-button checks; persistence 646 of 646; theme-band runner
+70 of 70, from the repo and again on the extracted archive, whose own bytes
+also passed the panel suite (448 of 448); native 169 of 169; lint and
+typecheck 0; copy validator 0 warnings. The docs capture was retaken on
+d18 (19:47:35 to 19:47:52Z, inside the new soak: a second plugin process
+for those seconds). Archive `a4f2835d7acca2b7...` (370,559 bytes, 47
+members): against d17's only the six panel files differ; plugin.js
+`0d0b4ef4cdfa6d46...`, hwsm.node and the manifest are unchanged.
+
+The d16 soak ended at 30.0 h (1,800 samples) when the PC was restarted from
+the Start menu at 07:42 local on 2026-09-29. Inside it: the owner's HWiNFO
+restart (21:51 to 21:55Z on 09-28) and an app restart (14:16 to 14:17Z on
+09-29). Plugin RSS slope -0.29 MB/30 min on the longest same-PID run,
+private bytes +0.02 MB/30 min, CPU 0.20%, 3 WARN and 0 ERROR lines (a
+detail entry refused mid-switch, one busy mutex, the HWiNFO quit). A new
+48 h soak started 2026-09-30 12:12 local on the same plugin bytes (monitor
+pid 43776, CSV `release/soak-1.7.0.0-d17-20260930-1212.csv`, closes
+2026-10-02 12:12). The PC bugchecked (0xD1) at 08:46 local on 09-30,
+between the two soaks.
+
+## d19 (2026-09-30): one outlined row in the reading picker
+
+Owner report on d18 (screenshot, a cycling dial on the Stream Deck + XL):
+the reading picker's open list showed five outlined rows where one reading
+is chosen. Measured on d18's panel files before the fix: two outlines after
+one open, move, close and reopen, and one more after every later pick.
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| OW01 | must | `setActive` cleared the outline only from the row under the previous key, while a close, a typed filter and a reopen reset that key without touching the row. Every close after the saved reading had moved (a pick, a dial turn, autocycle) left the old row outlined for as long as the panel stayed open. A dial turn with the list open also left the outline behind on the old reading while the fill moved. | The outlined row is tracked by element and cleared whatever key it was set under; a close goes through `setActive`. A settings echo that moves the saved reading carries the outline with it unless the person moved it with the keys or is typing a filter. | 4 panel checks on `dial-configured` (move then close then reopen, a dial turn's echo with the list open, no writes, a pick then reopen): exactly one outlined row and it is the saved one. d18's panel files fail 3 of them (the no-writes check passes on both). |
+
+d19 changes `ui/pi-common.js` and the build token in the four panels,
+the panel suite, and the docs capture only: `src/**`, `bin/plugin.js`
+(`0d0b4ef4...`), `hwsm.node` and the manifest are byte-identical to d15 to
+d18.
+
+d19 gates: unit 1,543 of 1,543; panel suite 452 of 452, from the repo and
+again on the extracted archive; persistence 646 of 646; lint and typecheck
+0; copy validator 0 warnings. Archive `e53ae5f91a9675ec...` (370,720 bytes,
+47 members): against d18's only the five panel files differ. Installed
+2026-09-30 20:45 local by the panel hot copy (plugin pid 24328 before and
+after, all 47 members hash-verified). The docs capture was retaken on d19
+(03:45:59 to 03:46:14Z on 10-01; no soak was running).
+
+The d17 soak (pid 43776) ended at about 7.4 h: the owner shut the PC down
+with shutdown.exe at 19:37 local on 09-30 (event 1074, a clean shutdown,
+not a bugcheck); the monitor did not survive the restart (boot 20:04). The
+plugin now runs as pid 24328 (started 20:05). A new 48 h soak is owed.
+
+Committed 2026-09-30 on the owner's word, with d18 (never committed
+before): `e7f4ee2` (d18's panel files, staged from the d18 archive, so
+the commit holds the bytes the deck ran), `c3e47b8` (d18's tests),
+`a672a3a` (d19 and its checks), `535d312` (the capture) and this record.
+`claude/f01-on-1.7` (PR #39) takes the branch by fast-forward; no bump,
+tag or release.

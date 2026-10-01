@@ -1699,6 +1699,35 @@ describe("Config wells follow the panel's documents", () => {
 		for (const scope of ["key", "deck"]) assert.equal(m.el(`config-${scope}`).value, '{ "draft" : true }');
 		assert.equal(m.writes.length, 0);
 	});
+
+	// An auto-cycling dial changes its document every few seconds: a well
+	// someone has clicked into holds still (a refill throws the caret to the
+	// end), catches up when focus leaves, and Replace on it writes the
+	// current document, never the one shown when it was focused.
+	it("a focused untouched well holds still, catches up on blur, and Replace writes the current document", async () => {
+		const m = mountPanel("dial", { theme: "void" });
+		await m.flush();
+		const well = m.el("config-key");
+		m.echo("theme", "ember");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "ember", "an unfocused well follows");
+		well.focus();
+		m.echo("theme", "paper");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "ember", "a focused well holds still");
+		well.blur();
+		well.fire("blur");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "paper", "it catches up when focus leaves");
+		well.focus();
+		m.echo("theme", "forest");
+		await m.flush();
+		const before = m.applied.length;
+		m.el("config-key-apply").fire("click");
+		await m.flush();
+		assert.equal(m.applied.length, before + 1);
+		assert.equal((m.applied.at(-1) as Record<string, unknown>).theme, "forest", "Replace refreshed the untouched well first");
+	});
 });
 
 // Option ids are numbered once per key: a tree delivered again renumbers

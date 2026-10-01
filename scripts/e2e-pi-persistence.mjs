@@ -2258,12 +2258,14 @@ try {
 	mark = writes.length;
 	await evaluate(`(() => {
 		document.getElementById("config-key").value = "{nope";
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(400);
 	check("config: garbage is refused by name", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value).startsWith("Refused: not JSON"), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 	await evaluate(`(() => {
 		document.getElementById("config-key").value = "[1,2]";
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(400);
@@ -2273,6 +2275,7 @@ try {
 	await evaluate(`(() => {
 		const doc = ${JSON.stringify(JSON.stringify({ detailKeys: ["bench:0:0", "bench:0:2"], detailMode: "custom", detailTiles: [{ size: 2, labels: ["A", "B"], colors: [null, null], cellLabels: true }], futureBlob: FUTURE_BLOB, label: "Restored", pressBehavior: "open-details", readingKey: "cpu:0:0", cfgBlob: { keep: "yes" } }))};
 		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
@@ -2311,6 +2314,7 @@ try {
 			})
 		)};
 		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
@@ -2327,6 +2331,7 @@ try {
 	const globalsBeforeArm = globalWrites.length;
 	await evaluate(`(() => {
 		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } });
+		document.getElementById("config-deck").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-deck-apply").click();
 	})()`);
 	// Past the 450 ms double-click guard (round 3, R09): a second press that

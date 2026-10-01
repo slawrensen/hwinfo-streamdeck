@@ -1162,7 +1162,7 @@ try {
 	// person leaves the button (no five-second window), and a double press
 	// only arms.
 	await open("key-configured");
-	await b.evaluate(`(() => { document.getElementById("sec-advanced").open = true; document.getElementById("sec-config").open = true; document.getElementById("config-deck").value = JSON.stringify(${JSON.stringify(JSON.stringify({ theme: "void", typeAccents: "on" }))}); document.getElementById("config-deck-apply").scrollIntoView({ block: "center" }); })()`);
+	await b.evaluate(`(() => { document.getElementById("sec-advanced").open = true; document.getElementById("sec-config").open = true; document.getElementById("config-deck").value = ${JSON.stringify(JSON.stringify({ theme: "void", typeAccents: "on" }))}; document.getElementById("config-deck-apply").scrollIntoView({ block: "center" }); document.getElementById("config-deck").dispatchEvent(new Event("input", { bubbles: true })); })()`);
 	await sleep(150);
 	await b.click("#config-deck-apply");
 	await sleep(60);
@@ -2369,6 +2369,17 @@ try {
 		await sleep(300);
 		const followed = JSON.parse((await b.evaluate(`document.getElementById("config-key").value`)) || "null");
 		check("Config: an untouched key well shows an edit made elsewhere in the panel", followed?.decimals === "2" && sim.settings.decimals === "2", JSON.stringify({ well: followed?.decimals ?? null, host: sim.settings.decimals ?? null }));
+		// A well someone clicked into holds still while the plugin writes the
+		// document (an auto-cycling dial does every few seconds): the caret
+		// stays where it was put, and the well catches up when focus leaves.
+		await b.evaluate(`(() => { const w = document.getElementById("config-key"); w.focus(); w.setSelectionRange(10, 10); })()`);
+		sim.pushSettings({ ...sim.settings, decimals: "1" });
+		await sleep(300);
+		const held = await b.evaluate(`(() => { const w = document.getElementById("config-key"); return { decimals: JSON.parse(w.value).decimals, caret: w.selectionStart, arrived: window.__hwPanel.settings.decimals }; })()`);
+		await b.evaluate(`document.getElementById("config-key-copy").focus()`);
+		await sleep(300);
+		const caughtUp = JSON.parse((await b.evaluate(`document.getElementById("config-key").value`)) || "null");
+		check("Config: a focused key well keeps its caret through a plugin write, and catches up when focus leaves", held.arrived === "1" && held.decimals === "2" && held.caret === 10 && caughtUp?.decimals === "1", JSON.stringify({ held, caughtUp: caughtUp?.decimals ?? null }));
 		for (const draft of [null, JSON.stringify({ draft: "typed while the answer was on its way" })]) {
 			sim.holdGlobalsReplies = true;
 			await open("key-configured");

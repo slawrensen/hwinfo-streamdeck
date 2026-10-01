@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d19";
+	const PI_BUILD = "1.7.0.0-d20";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -5317,12 +5317,19 @@
 				if (fold.open) fill();
 			});
 		}
-		hw.on("settings", () => {
-			if (!dirty.has(configKeyEl)) fillWell(configKeyEl);
-		});
-		hw.on("globals", () => {
-			if (!dirty.has(configDeckEl)) fillWell(configDeckEl);
-		});
+		// Not while the well has focus, though: a refill puts the caret at the
+		// end, and an auto-cycling dial changes its document every few
+		// seconds, so text typed after placing the cursor landed at the end.
+		// The well catches up when focus moves elsewhere in the panel (leaving
+		// the whole window keeps it on the well, so it waits for that), and
+		// Copy and Replace refresh an untouched well first, so neither ever
+		// uses an older document.
+		const follow = (el) => {
+			if (!dirty.has(el) && document.activeElement !== el) fillWell(el);
+		};
+		hw.on("settings", () => follow(configKeyEl));
+		hw.on("globals", () => follow(configDeckEl));
+		for (const well of [configKeyEl, configDeckEl]) well.addEventListener("blur", () => follow(well));
 		const copy = (el) => async () => {
 			if (!dirty.has(el)) {
 				await fillWell(el);
@@ -5358,7 +5365,10 @@
 			};
 			button?.addEventListener("blur", () => disarm());
 			el.addEventListener("input", () => disarm());
-			return (ev) => {
+			return async (ev) => {
+				const detail = ev.detail;
+				const pressedAt = performance.now();
+				if (!dirty.has(el)) await fillWell(el);
 				let doc;
 				try {
 					doc = JSON.parse(el.value);
@@ -5387,7 +5397,7 @@
 					say("This replaces the shared settings every HWiNFO key and dial uses. Press again to confirm.");
 					return;
 				}
-				if (confirmFirst && (ev.detail > 1 || performance.now() - armedAt < 450)) return;
+				if (confirmFirst && (detail > 1 || pressedAt - armedAt < 450)) return;
 				disarm(true);
 				// Names come off here, whether this build wrote them or a person
 				// typed them: what lands in settings is keys alone. A document

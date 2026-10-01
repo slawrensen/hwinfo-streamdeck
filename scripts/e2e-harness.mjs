@@ -1162,8 +1162,9 @@ async function finish() {
 
 	// Device registry: the + XL mock must resolve to its named type, proving
 	// the plugin understands DeviceType 13 (hardware-verified 2026-07-09).
-	check("device registry names the + XL", loggedThisRun("Harness + XL (StreamDeckPlusXL, 9x4)"));
-	check("device registry names the +", loggedThisRun("Harness Plus (StreamDeckPlus, 4x2)"));
+	// The log quotes the device name, which comes from outside (AX50, d14).
+	check("device registry names the + XL", loggedThisRun('"Harness + XL" (StreamDeckPlusXL, 9x4)'));
+	check("device registry names the +", loggedThisRun('"Harness Plus" (StreamDeckPlus, 4x2)'));
 
 	// The SDK clamps trace to info outside a debug launch; asking for trace
 	// must land on debug (never LESS detail than asked) and log the fallback.

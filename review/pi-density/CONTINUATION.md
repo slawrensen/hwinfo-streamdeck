@@ -49,10 +49,14 @@
 - **Not installed.** The deck runs d20 until the soak closes.
 - **Soak:** app restart 05:00Z and HWiNFO restart 08:54:48Z on 10-02 are
   in the CSV (the plugin held, warned once at 11 s and reopened at
-  08:55:08Z). A sleep/wake is still owed before 22:27 local. Exclusions
+  08:55:08Z). Sleep/wake: 19:39:10 to 19:39:18Z by the system log (8 s,
+  so the 60 s CSV shows no gap); both decks reconnected at 19:39:45Z and
+  19:39:48Z, the source reopened at 19:39:47Z, no warning, plugin pid
+  49804 unchanged, and the owner saw the deck come back. Every soak event
+  is in; the window closes 22:27 local. Exclusions
   to add (local runs inside the soak, 10-02): 08:31 to 08:47Z, 09:00 to
   09:20Z, 16:41 to 16:53Z and 17:03 to 17:14Z.
-- **Owed before the tag (owner):** the sleep/wake and the soak summary;
+- **Owed before the tag (owner):** the soak summary after 22:27;
   a decision that the d19 soak covers the shipping bytes (the soak ran
   plugin.js `0d0b4ef4`; the delta is faces, theme colors, Control panel
   routing, two panel labels, icons and text, with native and poller

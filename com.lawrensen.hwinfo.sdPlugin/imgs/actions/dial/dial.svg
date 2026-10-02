@@ -2,9 +2,9 @@
 	<!-- Mirrors the real touchscreen layout from dial-renderer: title, value,
 	     session range bar. No gauge; the plugin never draws one. -->
 	<rect width="72" height="72" fill="#000000"/>
-	<text x="6" y="16" text-anchor="start" font-family="Segoe UI" font-size="9" font-weight="600" fill="#7A8393">HWiNFO</text>
-	<text x="6" y="42" text-anchor="start" font-family="Segoe UI" font-size="22" font-weight="700" fill="#FFFFFF">62&#176;C</text>
+	<text x="6" y="16" text-anchor="start" font-family="Tahoma" font-size="9" font-weight="600" fill="#7A8393">HWiNFO</text>
+	<text x="6" y="42" text-anchor="start" font-family="Tahoma" font-size="22" font-weight="700" fill="#FFFFFF">62&#176;C</text>
 	<rect x="6" y="52" width="60" height="6" rx="3" fill="#161A21"/>
 	<rect x="6" y="52" width="38" height="6" rx="3" fill="#4CC2FF"/>
-	<text x="6" y="68" text-anchor="start" font-family="Segoe UI" font-size="8" font-weight="600" fill="#667082">&#9660;41  &#9650;64</text>
+	<text x="6" y="68" text-anchor="start" font-family="Tahoma" font-size="8" font-weight="600" fill="#667082">&#9660;41  &#9650;64</text>
 </svg>

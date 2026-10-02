@@ -308,8 +308,9 @@ self.hwModel = (() => {
 		const theme = themeName(id);
 		const text = globals.textMode === "dim" ? "dimmed text" : globals.textMode === "custom" ? "custom text" : "theme text";
 		const accents = globals.typeAccents === "off" ? "theme accent" : "accents by type";
+		const font = globals.textFont === "segoe-ui" ? "Segoe UI" : "Tahoma";
 		const units = globals.dataUnits === "binary" ? "binary data units" : "decimal data units";
-		return `${theme} · ${text} · ${accents} · ${units}`;
+		return `${theme} · ${text} · ${font} · ${accents} · ${units}`;
 	}
 
 	/** Connection, folded: the source mode and the read interval. */

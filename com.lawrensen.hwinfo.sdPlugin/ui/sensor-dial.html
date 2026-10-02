@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d21" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d22" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
@@ -399,6 +399,14 @@
 							<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
 						</div>
 						<div class="hw-field">
+							<label for="shared-font">Text font</label>
+							<select id="shared-font" data-setting="textFont" data-global data-default="tahoma" aria-describedby="font-help">
+								<option value="tahoma">Tahoma</option>
+								<option value="segoe-ui">Segoe UI</option>
+							</select>
+							<p class="hw-help" id="font-help">Tahoma is the bold font keys and dials have always drawn. Segoe UI matches Windows and this panel: lighter and narrower, so long labels fit more often.</p>
+						</div>
+						<div class="hw-field">
 							<label for="shared-accents">Accent colors</label>
 							<select id="shared-accents" data-setting="typeAccents" data-global data-default="on" aria-describedby="accents-help">
 								<option value="on">By sensor type</option>
@@ -486,9 +494,9 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.0.0-d21"></script>
-		<script src="pi-shell.js?v=1.7.0.0-d21"></script>
-		<script src="pi-common.js?v=1.7.0.0-d21"></script>
-		<script src="pi-control.js?v=1.7.0.0-d21"></script>
+		<script src="pi-model.js?v=1.7.0.0-d22"></script>
+		<script src="pi-shell.js?v=1.7.0.0-d22"></script>
+		<script src="pi-common.js?v=1.7.0.0-d22"></script>
+		<script src="pi-control.js?v=1.7.0.0-d22"></script>
 	</body>
 </html>

@@ -5,8 +5,9 @@
  * restart inside the view). Reading slots and the Back tile reuse the
  * ordinary reading renderer; these tiles are the only new furniture.
  */
-import { wrapLabelTwoLines } from "./format";
-import { escapeXml, FONT, renderStatusKey, svgOpen } from "./key-renderer";
+import { wrapLabelTwoLines, wrapLabelTwoLinesPx } from "./format";
+import { isTahoma } from "./face-font";
+import { escapeXml, fontFamily, renderStatusKey, svgOpen } from "./key-renderer";
 import { mixToward, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -21,12 +22,12 @@ export interface DetailTitleKeyOptions {
 /** The title/page tile: the group name over the visible slot range. */
 export function renderDetailTitleKey(opts: DetailTitleKeyOptions): string {
 	const parts = svgOpen(144, 144, opts.palette.bg);
-	const lines = wrapLabelTwoLines(opts.title, 14, 14);
+	const lines = isTahoma() ? wrapLabelTwoLinesPx(opts.title, 16, 120, 120) : wrapLabelTwoLines(opts.title, 14, 14);
 	const single = lines.length === 1;
 	for (let i = 0; i < lines.length; i++) {
-		parts.push(`<text x="72" y="${single ? 56 : 44 + i * 24}" text-anchor="middle" font-family="${FONT}" font-size="16" font-weight="600" fill="${opts.text.label}">${escapeXml(lines[i] as string)}</text>`);
+		parts.push(`<text x="72" y="${single ? 56 : 44 + i * 24}" text-anchor="middle" font-family="${fontFamily()}" font-size="16" font-weight="600" fill="${opts.text.label}">${escapeXml(lines[i] as string)}</text>`);
 	}
-	parts.push(`<text x="72" y="110" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="600" fill="${opts.text.unit}">${escapeXml(opts.rangeText)}</text>`);
+	parts.push(`<text x="72" y="110" text-anchor="middle" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${opts.text.unit}">${escapeXml(opts.rangeText)}</text>`);
 	parts.push("</svg>");
 	return parts.join("");
 }
@@ -61,7 +62,7 @@ export function renderDetailIdleKey(): string {
 export function renderDetailIdleBackKey(): string {
 	const parts = svgOpen(144, 144, "#000000");
 	parts.push(`<polyline points="80,28 56,50 80,72" fill="none" stroke="#4cc2ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`);
-	parts.push(`<text x="72" y="104" text-anchor="middle" font-family="${FONT}" font-size="19" font-weight="600" fill="#d6d9de">Back</text>`);
+	parts.push(`<text x="72" y="104" text-anchor="middle" font-family="${fontFamily()}" font-size="19" font-weight="600" fill="#d6d9de">Back</text>`);
 	parts.push("</svg>");
 	return parts.join("");
 }

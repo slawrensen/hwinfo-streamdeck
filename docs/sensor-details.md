@@ -57,7 +57,7 @@ Keys without a saved **A press** choice continue to cycle statistics.
 
 ## The detail page
 
-![A 15-key detail page rendered by the plugin from live HWiNFO data, with Also go back from this key's own position unticked by hand so the page holds one Back only: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 AMD Ryzen 9 9950X over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
+![A 15-key detail page rendered by the plugin from live HWiNFO data, with Also go back from this key's own position unticked by hand so the page holds one Back only: the CPU temperature opener as the top-left Back tile with a small return arrow in its lower-left corner, a title tile reading CPU number 0 and the processor name cut to AMD Ryzen with an ellipsis, over the range 1-11 of 71, a dimmed Previous chevron, a bright Next chevron, and eleven live CPU temperature tiles, one of them badged MAX.]({{ '/assets/img/detail-view.png' | relative_url }})
 
 Every detail page has these controls:
 
@@ -72,11 +72,11 @@ Every detail page has these controls:
 
 With **Readings per tile** at four the same page carries 40 readings: ten quad tiles around the two Back tiles, each cell with a short label, the title counting readings rather than tiles, and one tile showing the MAX badge after a press.
 
-![The same 15-key detail page with Readings per tile set to four: the CPU temperature opener on the top-left Back tile and again on the center cell as the second Back, the title reading CPU number 0 AMD Ryzen 9 9950X over the range 1-40 of 71, and ten quad tiles each carrying four live CPU readings with short per-cell labels such as CPU, CORE, L3 and VDDC, one of them badged MAX.]({{ '/assets/img/detail-dense-view.png' | relative_url }})
+![The same 15-key detail page with Readings per tile set to four: the CPU temperature opener on the top-left Back tile and again on the center cell as the second Back, the title reading CPU number 0 and AMD Ryzen cut with an ellipsis, over the range 1-40 of 71, and ten quad tiles each carrying four live CPU readings with short per-cell labels such as CPU, CORE, L3 and VDDC, one of them badged MAX.]({{ '/assets/img/detail-dense-view.png' | relative_url }})
 
 A hand-grouped custom list mixes sizes on one page: here a single, a stacked pair with its own cell labels, a three-row tile, a quad with chosen cell colors, a bare-values quad, and the rest of the list flowing on at two per tile.
 
-![A 15-key detail page for a hand-grouped custom list titled Mixed bench over the range 1-24 of 24: a single CPU package power tile, a stacked pair labelled Load and GPU with a MAX badge, a three-row tile of GPU hot spot, CPU fan and pump readings, a quad with blue, red, green and yellow cell labels, a bare-values quad showing four color-coded temperatures without labels, five two-reading tiles of CCD core temperatures, and the CPU temperature opener on the top-left Back tile and again on the center cell.]({{ '/assets/img/detail-mixed-view.png' | relative_url }})
+![A 15-key detail page for a hand-grouped custom list titled Mixed bench over the range 1-24 of 24: a single CPU package power tile, a stacked pair labelled Load and GPU with a MAX badge, a three-row tile of GPU memory junction, CPU fan and pump readings with their labels cut short beside the values, a quad with blue, red, green and yellow cell labels, a bare-values quad showing four color-coded temperatures without labels, five two-reading tiles of CCD core temperatures, and the CPU temperature opener on the top-left Back tile and again on the center cell.]({{ '/assets/img/detail-mixed-view.png' | relative_url }})
 
 If HWiNFO stops publishing while the view is open, the tiles show the same status screens as ordinary keys and recover on their own; Back keeps working throughout. If a listed reading disappears (custom mode), its tile shows **Sensor missing** in place, and the others do not shift.
 
@@ -97,9 +97,9 @@ The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one c
 2. **One wildcard anchors the whole pattern.** The moment a pattern contains `*` or `?`, the automatic wrapping is off and the pattern must cover the entire combined text. `core*clock` matches nothing, because the text starts with the sensor name, not with "core"; `*core*clock*` is the form you want.
 3. **Spaces are literal.** Multi-word plain text works only when the words sit adjacent in the name: `gpu fan` finds the GPU fans, but `core clock` finds nothing because the cores are named `Core 0 Clock`. Span the gap with a star: `*core*clock*`.
 
-![Part of the Press section of the settings panel, from the note about installing the bundled detail view down: Readings per tile at One, an empty Title tile text field, an unticked Also go back from this key's own position, and Details list set to Readings matching a filter; the Filter field holds the pattern star 4090 star, a live hint under it reads Matches 79 readings right now, then the help text on how patterns match and the How the detail view works link.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
+![Part of the Press section of the settings panel, from the note about installing the bundled detail view down: Readings per tile at One, an empty Title tile text field, an unticked Also go back from this key's own position, and Details list set to Readings matching a filter; the Filter field holds the pattern star GPU star, a live hint under it reads Matches 93 readings right now, then the help text on how patterns match and the How the detail view works link.]({{ '/assets/img/detail-filter-panel.png' | relative_url }})
 
-Patterns I run on my own bench (512 readings across 21 sensors), with their live match counts:
+Patterns I ran on my bench in July 2026, when it held an RTX 4090 (512 readings across 21 sensors), with their match counts then:
 
 | Pattern | Matches | What it gathers |
 | --- | ---: | --- |

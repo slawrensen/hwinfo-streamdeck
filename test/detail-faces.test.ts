@@ -18,6 +18,12 @@ import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/typ
 import { contrast } from "./wcag";
 import { beforeInlineGap } from "./inline-gap";
 
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+
 function reading(key: string, value: number, unit = "°C", label = key): Reading {
 	return { key, type: unit === "W" ? SensorType.Power : SensorType.Temperature, sensorIndex: 0, id: 0, label, unit, value, valueMin: value - 10, valueMax: value + 10, valueAvg: value };
 }
@@ -392,7 +398,14 @@ describe("dense tile goldens", () => {
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(asOf160(svg, 3, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		// October 2026 (1.7): Segoe UI Bold draws every digit 6.9 px wide, so the
+		// first row's value is priced 2.9 px wider and its label steps 13 to 12
+		// px to stay clear. Exactly those two strings move; they go back here.
+		const before = svg
+			.replace('font-size="12" font-weight="600" fill="#7A8393">CPU Power<', 'font-size="13" font-weight="600" fill="#7A8393">CPU Power<')
+			.replace('<rect x="81.2" y="0" width="58.8" height="47"', '<rect x="84.1" y="0" width="55.9" height="47"');
+		assert.notEqual(before, svg, "the bold digit re-pricing must still be what this face draws");
+		assert.equal(golden(asOf160(before, 3, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
 	});
 
 	it("quad chunk with the shared badge", () => {

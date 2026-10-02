@@ -133,7 +133,10 @@ const K = {
 	cpuLoad: "f0000300:0:7000021",
 	memLoad: "f0000301:0:8000005",
 	gpuTemp: "e0002000:0:1000000",
-	gpuHot: "e0002000:0:1000005",
+	// The bench GPU (an RTX 5080 since September 2026) reports no hot spot;
+	// its memory junction stands in (same unit and type). Faces that force a
+	// sample value keep the "GPU Hot Spot" label most GPUs show.
+	gpuHot: "e0002000:0:1000004",
 	gpuPower: "e0002000:0:5000000",
 	gpuLoad: "e0002000:0:7000000",
 	vram: "e0002000:0:80000fc",
@@ -461,7 +464,11 @@ async function multiKeys() {
 // the detail view's own face renderers from a live group.
 async function drilldown() {
 	const primary = byKey(K.gpuTemp);
-	const group = resolveDetailGroup(snapshot, { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" });
+	const group = resolveDetailGroup(snapshot, { readingKey: primary.key, detailMode: "filter", detailFilter: "*5080*", detailTitle: "GPU" });
+	// A stale filter (the bench GPU changed) drew an empty page; refuse it.
+	if (group.keys.length === 0) {
+		throw new Error("the drill-down filter *5080* matches no reading on this bench");
+	}
 	if (group === null) {
 		throw new Error("drilldown shot: the filter resolved nothing");
 	}
@@ -478,7 +485,7 @@ async function drilldown() {
 		deviceId: "marketing",
 		pageSize: profile.layout.readings.length,
 		primaryKey: primary.key,
-		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" },
+		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*5080*", detailTitle: "GPU" },
 		presentation: {},
 		group,
 		offset: 0,
@@ -517,9 +524,9 @@ async function drilldown() {
 		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">A key can open a page of related readings, with paging and a way back. Each key decides its own group.</text>`,
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">press</text>`,
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">any Sensor Reading key</text>`,
-		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *4090*, paged</text>`,
+		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *5080*, paged</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">or one source, or a list you order by hand</text>`,
-		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D2 + RTX 5080</text>`
 	];
 	// The arrow between the two, on the shared centre line.
 	const arrowY = openerY + OPEN_KEY / 2;

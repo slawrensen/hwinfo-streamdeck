@@ -1,5 +1,6 @@
 /** Value formatting, unit conversion and stat-mode selection. */
 import type { Reading } from "../hwinfo/types";
+import { faceFont, isTahoma } from "./face-font";
 
 export type StatMode = "current" | "min" | "max" | "avg";
 export type DecimalsSetting = "auto" | "0" | "1" | "2" | "3";
@@ -232,6 +233,9 @@ export function truncateLabel(label: string, max: number): string {
  * than one full of caps, instead of both being cut at a flat count.
  */
 export function estimateFooterWidth(text: string): number {
+	// Tahoma prices footers with its measured table; the classes below are
+	// Segoe UI's.
+	if (isTahoma()) return estimateKeyTextWidth(text, 12);
 	let width = 0;
 	for (const ch of text) {
 		if (ch === "▼" || ch === "▲") {
@@ -283,38 +287,10 @@ function isWideGlyph(code: number): boolean {
 	);
 }
 
-/**
- * Measured Segoe UI Semibold advances at the 12 px basis (2026-07-21,
- * rasterized string differencing at 8× density), each value rounded UP to
- * 0.05 so a sum only over-prices. Replaces the glyph-class averages, which
- * erred both ways: narrow glyphs over-priced (t 6.1 vs 4.35) cut names that
- * fit ("Total CPU Usage"), and M/W/… under-priced (… 7 vs 9.8) let floor
- * cuts poke past their budget.
- */
-const KEY_GLYPH_ADVANCE_12: Readonly<Record<string, number>> = {
-	A: 8.1, B: 7.25, C: 7.15, D: 8.65, E: 6.25, F: 6.05, G: 8.4, H: 8.85, I: 3.5, J: 4.45, K: 7.35, L: 5.9, M: 11.1,
-	N: 9.25, O: 9.1, P: 7.05, Q: 9.1, R: 7.5, S: 6.55, T: 6.9, U: 8.45, V: 7.7, W: 11.6, X: 7.45, Y: 6.95, Z: 7.05,
-	a: 6.3, b: 7.25, c: 5.65, d: 7.25, e: 6.4, f: 4.15, g: 7.25, h: 7.0, i: 3.15, j: 3.35, k: 6.3, l: 3.15, m: 10.65,
-	n: 7.0, o: 7.2, p: 7.25, q: 7.25, r: 4.45, s: 5.2, t: 4.35, u: 7.0, v: 6.1, w: 9.1, x: 6.05, y: 6.1, z: 5.6,
-	"0": 6.7, "1": 4.85, "2": 6.7, "3": 6.7, "4": 6.95, "5": 6.7, "6": 6.7, "7": 6.45, "8": 6.7, "9": 6.7,
-	" ": 3.3, "(": 4.0, ")": 4.0, "/": 5.0, ".": 2.9, ",": 2.9, "'": 3.1, ":": 2.9, ";": 2.9, "!": 3.65, "|": 3.35,
-	"%": 10.1, "°": 4.55, "…": 9.8, "#": 7.1, "+": 8.35, "-": 4.85, _: 5.0, "&": 8.6, "=": 8.35, "~": 8.35, "*": 5.25,
-	"[": 4.0, "]": 4.0, "<": 8.35, ">": 8.35, '"': 5.25, "?": 5.35, "@": 11.5
-};
-
-/** Unmapped non-wide glyphs (µ, Ω, §, …) take a near-worst measured advance:
- * overestimating keeps an odd custom name inside the face. */
-const KEY_GLYPH_DEFAULT_12 = 9.1;
-
-/** The table sums advance boxes; the face constraint is on INK, which sits
- * inside the box by the terminal side bearings. This credit (12 px basis,
- * scales with size) makes estimates track rasterized ink within +4/−2.5 px
- * at 16 px on the measured corpus — without it, "Total CPU Usage" (ink
- * 118.4, inside the 120 band) prices at 121 and wrongly ellipsizes. */
-const TERMINAL_BEARING_CREDIT_12 = 1.5;
-
+/** One glyph's advance at the 12 px basis, from the deck's face font
+ * (face-font.ts holds the measured tables). */
 function keyGlyphWidth12(ch: string): number {
-	const mapped = KEY_GLYPH_ADVANCE_12[ch];
+	const mapped = faceFont().advance12[ch];
 	if (mapped !== undefined) {
 		return mapped;
 	}
@@ -322,16 +298,13 @@ function keyGlyphWidth12(ch: string): number {
 	if (isWideGlyph(ch.codePointAt(0) as number)) {
 		return 12;
 	}
-	return KEY_GLYPH_DEFAULT_12;
+	return faceFont().unmapped12;
 }
 
-/** Bold strokes (weight 700) run a touch wider than the 600 the table is
- * calibrated for; measured 1.0413 on a mixed corpus string, kept at a flat
- * 1.04 (the credit above absorbs the hairline). */
-const BOLD_WIDTH_FACTOR = 1.04;
 
 export type TextFitOptions = {
-	/** Glyph weight the caller will render; the table assumes 600. */
+	/** Glyph weight the caller will render; the face font's table is at its
+	 * label weight. */
 	fontWeight?: 600 | 700;
 	/** SVG letter-spacing in px, applied per inter-glyph gap at every size. */
 	letterSpacing?: number;
@@ -348,18 +321,24 @@ export type TextFitOptions = {
  * spend their whole pixel budget.
  */
 export function estimateKeyTextWidth(text: string, fontSize: number, options?: TextFitOptions): number {
+	const font = faceFont();
+	const bold = options?.fontWeight === 700;
+	// A bold face may draw its digits wider than the table's narrow ones; the
+	// floor is divided back out so the bold factor below restores it.
+	const digitFloor = bold && font.boldDigit12 !== undefined ? font.boldDigit12 / font.boldFactor : 0;
 	let width = 0;
 	let count = 0;
 	for (const ch of text) {
-		width += keyGlyphWidth12(ch);
+		const advance = keyGlyphWidth12(ch);
+		width += ch >= "0" && ch <= "9" ? Math.max(advance, digitFloor) : advance;
 		count++;
 	}
 	if (count > 0) {
-		width -= TERMINAL_BEARING_CREDIT_12;
+		width -= font.bearingCredit12;
 	}
 	width = (width * fontSize) / 12;
-	if (options?.fontWeight === 700) {
-		width *= BOLD_WIDTH_FACTOR;
+	if (bold) {
+		width *= font.boldFactor;
 	}
 	return width + Math.max(0, count - 1) * (options?.letterSpacing ?? 0);
 }
@@ -459,6 +438,26 @@ export function wrapLabelTwoLines(label: string, line1Max: number, line2Max: num
 	}
 	const rest = words.slice(index).join(" ");
 	return rest === "" ? [line1] : [line1, truncateLabel(rest, line2Max)];
+}
+
+/** wrapLabelTwoLines by measured width instead of code points, for Tahoma,
+ * whose glyphs run 12 to 19 % wider than the counts assume. */
+export function wrapLabelTwoLinesPx(label: string, size: number, line1Px: number, line2Px: number): string[] {
+	const text = label.trim();
+	const fits = (s: string, px: number): boolean => estimateKeyTextWidth(s, size) <= px;
+	if (fits(text, line1Px)) return [text];
+	const words = text.split(" ").filter((w) => w !== "");
+	let line1 = "";
+	let index = 0;
+	while (index < words.length) {
+		const candidate = line1 === "" ? (words[index] as string) : `${line1} ${words[index] as string}`;
+		if (!fits(candidate, line1Px)) break;
+		line1 = candidate;
+		index++;
+	}
+	if (line1 === "") return [fitTextLadder(text, line1Px, [size]).text];
+	const rest = words.slice(index).join(" ");
+	return rest === "" ? [line1] : [line1, fitTextLadder(rest, line2Px, [size]).text];
 }
 
 /**

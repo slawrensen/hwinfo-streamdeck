@@ -34,6 +34,12 @@ import {
 import { resolveTextColors } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 

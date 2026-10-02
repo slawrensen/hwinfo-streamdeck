@@ -303,13 +303,19 @@ fixes in one release.
   replaces them while it is set. Moving readings in a custom detail list
   keeps automatic colors adjusted for the theme instead of turning them
   into chosen colors.
-- Keys, dials and detail tiles draw in Segoe UI on the device, the font
-  every layout is measured for. The plugin named a font list, which the
-  Stream Deck app's SVG renderer reads as one unknown name, so it drew
-  Tahoma, about a tenth wider: on hardware long labels ran into their
-  values, and a three-row key could glue a label to its number. The
-  settings panel's header already showed Segoe UI, so the face now
-  matches it. Faces look slightly lighter than before.
+- Keys, dials and detail tiles keep the Tahoma Bold they have always
+  drawn on the device, now named outright and measured. Earlier versions
+  named a font list, which the Stream Deck app's SVG renderer reads as one
+  unknown name, so it drew Tahoma while every layout was measured for the
+  narrower Segoe UI: on hardware a three-row label could run into its
+  value and a long status line off the key. Labels now shorten or step
+  down a size instead, and titles keep their 1.6.0 sizes.
+- New **Text font** setting under Advanced, Shared defaults: Tahoma (the
+  default) or Segoe UI, the font of Windows and the settings panel,
+  lighter and narrower, so long labels fit more often. It applies to every
+  Sensor Reading key, Sensor Dial and detail tile (the HWiNFO Control key
+  keeps its fixed Tahoma icon); an install without the setting keeps
+  Tahoma.
 - A two-reading key keeps its value whole when a reading's unit is long:
   the unit is shortened instead of pushing the number's first digits off
   the key, and units that fit are unchanged.

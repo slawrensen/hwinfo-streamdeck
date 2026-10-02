@@ -117,7 +117,7 @@ The settings-panel sensor list is populated live from whatever source is active.
 4. **HWiNFO is running but publishes no readings.** The message says exactly that, with **HWiNFO setup steps**: enable Shared Memory Support, or tick readings for Gadget as in item 2.
 5. **Search filter too narrow.** The list then says "No readings match" with your search. Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 
-![The key's settings panel with its reading list open: the header with the live face, the theme line and chips, then "gpu" typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i's GPU/CPU current rails, then the RTX 4090), each row with its live value and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
+![The key's settings panel with its reading list open: the header with the live face, the theme line and chips, then "gpu" typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i's GPU/CPU current rails, then the RTX 5080), each row with its live value and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
 
 ## Only some of the readings I ticked in Gadget show up
 

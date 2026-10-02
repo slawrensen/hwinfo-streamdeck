@@ -205,8 +205,8 @@ describe("interaction summaries", () => {
 	it("summarizes the folded Advanced groups with the runtime's defaults and parse", () => {
 		// Shared defaults: absent fields read as the runtime's defaults
 		// (Void, theme text, accents by sensor type, decimal units).
-		assert.equal(model.sharedDefaultsSummary({}), "Void · theme text · accents by type · decimal data units");
-		assert.equal(model.sharedDefaultsSummary({ theme: "paper", textMode: "dim", typeAccents: "off", dataUnits: "binary" }), "Paper · dimmed text · theme accent · binary data units");
+		assert.equal(model.sharedDefaultsSummary({}), "Void · theme text · Tahoma · accents by type · decimal data units");
+		assert.equal(model.sharedDefaultsSummary({ theme: "paper", textMode: "dim", typeAccents: "off", dataUnits: "binary", textFont: "segoe-ui" }), "Paper · dimmed text · Segoe UI · theme accent · binary data units");
 		// A stored id this version does not know draws the spec default.
 		assert.equal(model.sharedDefaultsSummary({ theme: "neon" }).split(" · ")[0], "Void");
 		// With no shared theme stored, the plugin's resolved answer (legacy

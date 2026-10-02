@@ -9,8 +9,9 @@
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
  */
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, truncateLabel, wrapLabelTwoLines } from "./format";
-import { barSegment, escapeXml, FONT, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
+import { cappedUnit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesPx } from "./format";
+import { faceFont, isTahoma } from "./face-font";
+import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -49,11 +50,6 @@ const WIDE = { labelX: 12, valueRight: 168, unitLeft: 172, unitRight: 197, lineL
  * columns left, ~110 px of room). */
 const WIDE_LADDER = [20, 18, 16, 14, 13, 12] as const;
 const WIDE_VALUE_ROOM = 110;
-/** Flat 700-weight width estimate, 0.6 px per glyph per font px (the same
- * factor the previous per-tier table encoded: 9.6/16 = 7.8/13 = 7.2/12).
- * The engine cannot be asked to measure; the end anchor makes alignment
- * exact regardless, and estimate error only moves the label budget. */
-const WIDE_VALUE_CHAR = 0.6;
 /** Gap between a row's label run and its value's booked start. Thin on
  * purpose: labels fill all the way to their own row's value, because the
  * bg mask and the value paint after (over) the label, so the value owns
@@ -82,9 +78,19 @@ export const FOOTER_PX = 188;
  * Returns the chosen size and the estimated width the column books.
  */
 /** One value's booked column width at `size`: the even-quantized character
- * count (the flicker damping above) times the flat char factor. */
+ * count (the flicker damping above) times the face font's flat 700-weight
+ * char factor (Segoe UI 0.6, the previous per-tier table's 9.6/16 = 7.8/13 =
+ * 7.2/12; Tahoma 0.64). The end anchor makes alignment exact regardless, and
+ * estimate error only moves the label budget. */
 function wideValueWidth(text: string, size: number): number {
-	return Math.ceil(Array.from(text).length / 2) * 2 * WIDE_VALUE_CHAR * size;
+	const count = Array.from(text).length;
+	if (isTahoma()) {
+		// Tahoma books the measured bold width, padded by one digit when the
+		// count is odd: the same flicker damping, without pricing "." like a
+		// digit, which cut labels 1.6.0 drew whole ("COMMITTED").
+		return estimateKeyTextWidth(text, size, { fontWeight: 700 }) + (count % 2 === 1 ? estimateKeyTextWidth("0", size, { fontWeight: 700 }) : 0);
+	}
+	return Math.ceil(count / 2) * 2 * faceFont().valueEm * size;
 }
 
 export function wideValueFit(values: readonly string[]): { size: number; maxW: number } {
@@ -163,11 +169,11 @@ function wideContextLine(baseline: number, contextText: string, statsText: strin
 			// estimateFooterWidth is 12/600-calibrated; scale for the 13 px try.
 			const size = estimateFooterWidth(contextText) * (13 / 12) <= maxW ? 13 : 12;
 			const text = size === 13 ? contextText : fitFooter(contextText, maxW);
-			out += `<text x="${WIDE.lineLeft}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="${size}" font-weight="600" fill="${colors.label}">${escapeXml(text)}</text>`;
+			out += `<text x="${WIDE.lineLeft}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${size}" font-weight="600" fill="${colors.label}">${escapeXml(text)}</text>`;
 		}
 	}
 	if (stats !== "") {
-		out += `<text x="${WIDE.lineRight}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="12" font-weight="600" fill="${colors.unit}">${escapeXml(stats)}</text>`;
+		out += `<text x="${WIDE.lineRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${colors.unit}">${escapeXml(stats)}</text>`;
 	}
 	return out;
 }
@@ -223,17 +229,21 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// the real guarantee: the mask and the value draw after the label,
 		// so a hot estimate ends up under the value, never over it.
 		const labelRight = valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
-		const label = fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - WIDE.labelX) * 0.94));
+		// Tahoma prices the label's own 0.4 letter-spacing with its measured
+		// table instead of holding back a flat 6 %.
+		const label = isTahoma()
+			? fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { letterSpacing: 0.4 }).text
+			: fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - WIDE.labelX) * 0.94));
 		parts.push(
-			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" letter-spacing="0.4" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
+			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" letter-spacing="0.4" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
 			// Bg-colored insurance between the label run and this row's value:
 			// invisible (rows sit on plain bg), and renderer-proof where the
 			// label estimate ran hot (clipPath is unproven on this engine).
 			`<rect x="${labelRight.toFixed(1)}" y="${bandTop}" width="${(200 - labelRight).toFixed(1)}" height="${g.bandH}" fill="${palette.bg}"/>`,
-			`<text x="${valueRight}" y="${baseline}" text-anchor="end" font-family="${FONT}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
+			`<text x="${valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
 		);
 		if (row.unitText !== "") {
-			parts.push(`<text x="${unitLeft}" y="${baseline}" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
+			parts.push(`<text x="${unitLeft}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
 	});
 	parts.push(wideContextLine(g.lineBaseline, opts.contextText, opts.statsText, text));
@@ -323,10 +333,20 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	});
 	// Shared table columns, like the three-row view: widest unit, then the
 	// widest value, place the anchors every row uses.
-	const maxUnitW = Math.max(0, ...rows.map((row) => (row.unitText === "" ? 0 : Array.from(row.unitText).length * EST_UNIT_CHAR)));
+	const maxUnitW = Math.max(0, ...rows.map((row) => (row.unitText === "" ? 0 : isTahoma() ? Math.ceil(estimateKeyTextWidth(row.unitText, 13)) : Array.from(row.unitText).length * EST_UNIT_CHAR)));
 	const unitX = RIGHT_EDGE - maxUnitW;
 	const valueEndX = maxUnitW === 0 ? RIGHT_EDGE : unitX - VALUE_UNIT_GAP;
-	const maxValueW = Math.max(0, ...rows.map((row) => Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size]));
+	// Tahoma books measured bold widths (one digit of flicker damping on odd
+	// counts), so the second label line is sized to the room the value
+	// really leaves.
+	const maxValueW = Math.max(
+		0,
+		...rows.map((row) =>
+			isTahoma()
+				? estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }) + (Array.from(row.valueText).length % 2 === 1 ? estimateKeyTextWidth("0", row.size, { fontWeight: 700 }) : 0)
+				: Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size]
+		)
+	);
 	const valueStartEst = valueEndX - maxValueW;
 	const line2Max = Math.max(ROW_LABEL_MIN, Math.floor((valueStartEst - 20) / EST_LABEL_CHAR));
 	const parts: string[] = svgOpen(200, 100, palette.bg);
@@ -339,7 +359,10 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 				`<rect x="2" y="${top + 4}" width="4" height="32" rx="2" fill="${palette.accent}"/>`
 			);
 		}
-		const lines = wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
+		// Tahoma: a second line only where the value leaves it readable room;
+		// otherwise one cut line, and line 2 goes to the trend.
+		const room2 = valueStartEst - 20;
+		const lines = isTahoma() ? (room2 >= 40 ? wrapLabelTwoLinesPx(row.label, 13, 180, room2) : [fitTextLadder(row.label, 180, [13]).text]) : wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
 		// The label token marks the selected row; the unit token paints the
 		// other. The selected row sits on the track, where the face label
 		// can read dimmer than the row's own unit (Dim lifts units to the
@@ -348,11 +371,11 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 		// already passes (every theme in Theme mode) keeps its bytes.
 		const labelColor = row.selected ? (row.selectedLabelColor ?? noDimmerThan(text.label, row.unitColor ?? text.unit, rowBg)) : text.unit;
 		parts.push(
-			`<text x="12" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[0] as string)}</text>`
+			`<text x="12" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[0] as string)}</text>`
 		);
 		if (lines.length > 1) {
 			parts.push(
-				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[1] as string)}</text>`
+				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[1] as string)}</text>`
 			);
 		} else if (row.history !== undefined) {
 			// The freed line hosts the trend: self-normalized over its own
@@ -369,14 +392,14 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 			// or sparkline that ran long is clipped renderer-proof, while the
 			// full-width label line above stays untouched.
 			`<rect x="${(valueStartEst - 4).toFixed(1)}" y="${top + 18}" width="${(204 - valueStartEst).toFixed(1)}" height="${TWO_ROW.height - 18}" fill="${rowBg}"/>`,
-			`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${FONT}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
+			`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
 		);
 		if (row.unitText !== "") {
-			parts.push(`<text x="${unitX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${FONT}" font-size="13" font-weight="600" fill="${row.unitColor ?? text.unit}">${escapeXml(row.unitText)}</text>`);
+			parts.push(`<text x="${unitX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${row.unitColor ?? text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
 	});
 	if (opts.footerText !== "") {
-		parts.push(`<text x="6" y="96" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(fitFooter(opts.footerText, FOOTER_PX))}</text>`);
+		parts.push(`<text x="6" y="96" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(fitFooter(opts.footerText, FOOTER_PX))}</text>`);
 	}
 	parts.push("</svg>");
 	return parts.join("");
@@ -413,18 +436,30 @@ function dialZoneSvg(zone: DrawnZone): string {
 	return barSegment(x, w, BAR.y, BAR.h, BAR.r, zone.color, zone.from <= 0, zone.to >= 1);
 }
 
+/** Tahoma: the single dial keeps the char-count tier unless the measured
+ * value plus its inline unit would run past x=194. */
+function tahomaDialValueSize(value: string, unit: string): 34 | 24 | 17 {
+	const tier = valueFontSize(value);
+	for (const s of [34, 24, 17] as const) {
+		if (s > tier) continue;
+		const w = estimateKeyTextWidth(value, s, { fontWeight: 700 }) + (unit === "" ? 0 : 6 + estimateKeyTextWidth(unit, 17));
+		if (w <= 182) return s;
+	}
+	return 17;
+}
+
 export function renderDial(opts: DialRenderOptions): string {
 	const { palette, barColor } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const parts: string[] = [
 		...svgOpen(200, 100, palette.bg),
-		`<text x="12" y="24" text-anchor="start" font-family="${FONT}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(truncateLabel(opts.title, TITLE_MAX))}</text>`
+		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitTextLadder(opts.title, 176, [18]).text : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
 	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${inlineGap(17)}${escapeXml(opts.unitText)}</tspan>` : "";
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
-	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${isTahoma() ? tahomaDialValueSize(valueText, opts.unitText) : valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
-		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${FONT}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(opts.statsText)}</text>`);
+		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? fitFooter(opts.statsText, 182) : opts.statsText)}</text>`);
 	}
 	parts.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" fill="${palette.track}"/>`);
 	for (const zone of opts.zones ?? []) {

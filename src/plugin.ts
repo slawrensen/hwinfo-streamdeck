@@ -34,6 +34,9 @@ type GlobalSettings = {
 	textDimSecondary?: boolean;
 	/** Data-unit preference: "decimal" (default) | "binary". */
 	dataUnits?: string;
+	/** Text font on every face: "tahoma" (default, also when absent or
+	 * unknown) | "segoe-ui". */
+	textFont?: string;
 };
 
 // Diagnostic knob for support and hardware bring-up; defaults stay quiet.

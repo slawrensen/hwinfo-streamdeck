@@ -12,9 +12,18 @@ import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
 import { poller, type PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
 import { convertUnit, readingStatBadge, statValue } from "../src/ui/format";
-import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings as applyDeckSettings, effectiveTextFor } from "../src/ui/theme-store";
 import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+// Every deck write here keeps Segoe UI, so a settings object without
+// textFont (which means Tahoma) cannot switch the font under these goldens.
+const applyGlobalThemeSettings = (settings: Parameters<typeof applyDeckSettings>[0]): void => applyDeckSettings({ textFont: "segoe-ui", ...settings });
 
 describe("dial press replay through the production action", () => {
 	type Down = Parameters<SensorDialAction["onDialDown"]>[0];

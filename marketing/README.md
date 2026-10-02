@@ -2,8 +2,11 @@
 
 The Elgato Marketplace listing images for HWiNFO Sensors. The boards use
 production renderers with sample scenarios, live HWiNFO inputs and generated
-histories. They are sample-data renders, not physical screenshots.
-`shot-2-hardware.png` is the photograph of the plugin on real hardware.
+histories. They are sample-data renders, not physical screenshots. Their
+faces draw in Tahoma, the default Text font, as the device does (before 1.7
+the renders drew Segoe UI while the device drew Tahoma).
+`shot-2-hardware.png` is the photograph of the plugin on real hardware,
+taken in July 2026 on an earlier version, in Tahoma.
 Multi-row dials now go through the runtime action composer, including its
 formatting, settings and color precedence.
 
@@ -83,7 +86,7 @@ skips the other boards, though loading the script still needs HWiNFO Shared
 Memory with the readings named in `K` (the CPU temperature and pump rows). On a machine without an
 RTX 4090, set `PI_CAPTURE_FILTER` (for example `*GPU*`) for the capture's
 filter step. The 1.7 shot 4 was built this way on 2026-10-02 from panel
-build 1.7.0.0-d21 with the filter `*GPU*`.
+build 1.7.0.0-d22 with the filter `*GPU*`.
 
 Shot 2 wraps the real-hardware photograph in the standard board chrome:
 

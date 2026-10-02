@@ -10,10 +10,19 @@ import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { buildPreview } from "../src/pi-protocol";
 import { stepReading } from "../src/rotation";
 import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-colors";
-import { applyGlobalThemeSettings } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings as applyDeckSettings } from "../src/ui/theme-store";
 import { alertValueColor, classifyTypeAccent, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
 import { beforeInlineGap } from "./inline-gap";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+// Every deck write here keeps Segoe UI, so a settings object without
+// textFont (which means Tahoma) cannot switch the font under these goldens.
+const applyGlobalThemeSettings = (settings: Parameters<typeof applyDeckSettings>[0]): void => applyDeckSettings({ textFont: "segoe-ui", ...settings });
 
 const config = loadThemes();
 type Fixture = ReturnType<typeof dialGalleryFixture>;

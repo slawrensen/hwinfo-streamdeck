@@ -8,6 +8,12 @@ import { describe, it } from "node:test";
 import { estimateKeyTextWidth, fitTextLadder, formatQuadValue, formatValue } from "../src/ui/format";
 import { formatMeasurement, formatQuadMeasurement, formatStat, isDataUnit, parseDataUnit, parseDataUnitsPref, type MeasureOptions } from "../src/ui/measure";
 
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+
 const DEC: MeasureOptions = { decimals: "auto", fahrenheit: false, dataUnits: "decimal" };
 const BIN: MeasureOptions = { decimals: "auto", fahrenheit: false, dataUnits: "binary" };
 

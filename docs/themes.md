@@ -87,6 +87,15 @@ The setting recolors **text only**. Backgrounds, theme and type accents, sparkli
 
 1.7 adds [individual reading colors](sensor-dial.md#reading-colors) to two-row and three-row dials. Use **Text color: Theme text** for exact chosen hues, or **Dimmed** to dim them; a valid **Custom color** retains priority. Individual colors work with **Accent colors: Theme accent everywhere**, so you can color numbers while keeping your existing graph colors. These controls also appeared in the issue #31 preview and are absent from 1.6.0.
 
+## Text font
+
+*Advanced → Shared defaults → Text font* sets the font of every Sensor Reading key, Sensor Dial and detail tile, on every Stream Deck (the HWiNFO Control key keeps its fixed Tahoma icon):
+
+- **Tahoma** *(the default)*: the bold font every release has drawn on the device. Numbers and labels are heavy and wide, so long labels shorten sooner.
+- **Segoe UI**: the font of Windows and of the settings panel. It is lighter and narrower, so long labels fit more often.
+
+Each font is measured for its own widths, so neither runs a label into its value. The header of the settings panel draws the face in the font you pick.
+
 ## Type accents
 
 **Type accents** (*Advanced → Shared defaults → Accent colors: By sensor type*, **on by default**) color the accent on each key and dial by the sensor's type: the sparkline's line and end dot, the Bar and Ring gauge fills, the MIN/MAX/AVG badge in its gap under the title, and on a dial the range bar fill or the overview's selection bar. With default number-color settings, labels, values and units keep their **Text color** styling.

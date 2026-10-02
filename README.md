@@ -84,6 +84,7 @@ Seven themes, set per key or once for the whole deck.
 - At the warn threshold the key turns amber; at critical, red. Alert colors are the same on every theme.
 - **Alert when the value drops to or below these numbers** flips the comparison for fan RPM or free space.
 - **Accent colors** (By sensor type, the default) color the graph by sensor type; choose *Theme accent everywhere* and each theme uses its own color.
+- **Text font** sets the font on every reading key, dial and detail tile: Tahoma, the default and the look every release has drawn, or Segoe UI, lighter and narrower.
 
 **More:** [Themes](https://docs.slawrensen.com/hwinfo-streamdeck/themes.html) · [Thresholds and alerts](https://docs.slawrensen.com/hwinfo-streamdeck/thresholds-alerts.html)
 

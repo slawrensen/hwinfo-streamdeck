@@ -22,9 +22,18 @@ import { describe, it } from "node:test";
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey } from "../src/ui/key-renderer";
 import { resolveTextColors, themeTextColors } from "../src/ui/text-colors";
-import { applyGlobalThemeSettings, effectiveThemeFor, getDeckTheme } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings as applyDeckSettings, effectiveThemeFor, getDeckTheme } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { beforeInlineGap, gapSitesIn } from "./inline-gap";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+// Every deck write here keeps Segoe UI, so a settings object without
+// textFont (which means Tahoma) cannot switch the font under these goldens.
+const applyGlobalThemeSettings = (settings: Parameters<typeof applyDeckSettings>[0]): void => applyDeckSettings({ textFont: "segoe-ui", ...settings });
 
 const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
 // Retain the historical artifacts. Authorize only these foreground changes,

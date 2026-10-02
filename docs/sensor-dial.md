@@ -9,7 +9,7 @@ The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream De
 
 It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
 
-![A Sensor Dial face as the plugin renders it: CPU Temp at 54.8 °C, the session low 54.5 and high 76.3, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
+![A Sensor Dial face as the plugin renders it: CPU Temp at 64.5 °C, the session low 51.1 and high 73.5, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
 
 ## The touchscreen readout
 
@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d21 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.0.0-d22 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -208,6 +208,6 @@ Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** wi
 
 ## Advanced (shared by all keys and dials)
 
-The dial's **Advanced** section holds the same four groups as the key panel, each folding on its own. The two shared ones are marked **All keys and dials**: **Shared defaults** (Theme, Text color, Accent colors, Data units) and **Connection** (**Data source**, **Read every**, the reading-links note and the **HWiNFO setup steps** checklist). They apply to the whole plugin rather than to this dial alone; they're documented in [Data sources](data-sources.md), [Themes](themes.md), and the key page's [Advanced section](sensor-reading.md#advanced-shared-by-all-keys-and-dials). **Support** holds the **Copy support report** button. **Configuration documents** shows this dial's settings and the shared settings as JSON, with **Copy**, **Replace this dial's settings** and **Replace shared settings**; they behave exactly as described on the key page, including the second click that replacing shared settings asks for.
+The dial's **Advanced** section holds the same four groups as the key panel, each folding on its own. The two shared ones are marked **All keys and dials**: **Shared defaults** (Theme, Text color, Text font, Accent colors, Data units) and **Connection** (**Data source**, **Read every**, the reading-links note and the **HWiNFO setup steps** checklist). They apply to the whole plugin rather than to this dial alone; they're documented in [Data sources](data-sources.md), [Themes](themes.md), and the key page's [Advanced section](sensor-reading.md#advanced-shared-by-all-keys-and-dials). **Support** holds the **Copy support report** button. **Configuration documents** shows this dial's settings and the shared settings as JSON, with **Copy**, **Replace this dial's settings** and **Replace shared settings**; they behave exactly as described on the key page, including the second click that replacing shared settings asks for.
 
-![The dial's Advanced section at the panel's real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This dial's settings and Shared settings wells, their Copy buttons and the Replace this dial's settings and Replace shared settings buttons.]({{ '/assets/img/pi-live-dial-advanced.png' | relative_url }})
+![The dial's Advanced section at the panel's real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Text font, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This dial's settings and Shared settings wells, their Copy buttons and the Replace this dial's settings and Replace shared settings buttons.]({{ '/assets/img/pi-live-dial-advanced.png' | relative_url }})

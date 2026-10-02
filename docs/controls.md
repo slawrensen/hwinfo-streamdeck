@@ -38,7 +38,7 @@ Build them in the dial's settings panel. **Split into groups** under the rotatio
 
 Removing a group that holds readings, and a merge that would drop a group name or fold two or more groups of readings into one, ask for a second press: the first press arms the button, which then says what goes (for example **Remove GPU and its 2 readings?**), and a quick double click only arms it. An empty group goes at once.
 
-![The rotation split into two named groups, with the search above them labelled Readings for GPU. Overview holds CPU, GPU and Pump, with CPU marked on dial and selected and the Earlier, Later, Rename and Remove toolbar under it; GPU holds GPU Hot Spot Temperature and GPU Clock, its radio marked so ticks land there, with the dimmed hint "Select one to move, rename or remove it" under it. Each group has a name field and a × button. Below: the note "2 groups. Rotation needs two or more readings in a group to move inside it.", the Add group and Merge back into one set buttons, and the line "New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name."]({{ '/assets/img/pi-dial-groups.png' | relative_url }})
+![The rotation split into two named groups, with the search above them labelled Readings for GPU. Overview holds CPU, GPU and Pump, with CPU marked on dial and selected and the Earlier, Later, Rename and Remove toolbar under it; GPU holds GPU Memory Junction Temperature and GPU Clock, its radio marked so ticks land there, with the dimmed hint "Select one to move, rename or remove it" under it. Each group has a name field and a × button. Below: the note "2 groups. Rotation needs two or more readings in a group to move inside it.", the Add group and Merge back into one set buttons, and the line "New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name."]({{ '/assets/img/pi-dial-groups.png' | relative_url }})
 
 How groups behave:
 
@@ -61,7 +61,7 @@ Off by default, and only on Elite and Custom: the **Touch zones** select appears
 
 Pause and pin survive page switches and profile changes for up to 30 minutes off screen (the plugin parks the state of the 64 most recently hidden dials; past either bound a returning dial starts fresh). They also reset when the Stream Deck app restarts.
 
-![Three dial faces rendered by the plugin: CPU Temp with "pinned" in place of "session" on its stats line, Pump with "cycle paused" there, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds.]({{ '/assets/img/dial-states.png' | relative_url }})
+![Three dial faces rendered by the plugin: CPU Temp with "pinned" in place of "session" on its stats line, Pump with its "cycle paused" tag cut to "cycle pau…" there, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds.]({{ '/assets/img/dial-states.png' | relative_url }})
 
 ## Session stats are per reading
 

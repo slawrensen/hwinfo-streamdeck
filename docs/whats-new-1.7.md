@@ -123,7 +123,7 @@ says which colors reach the numbers ([issue #31](https://github.com/slawrensen/h
 
 | Change | What you see | What you need to do |
 | --- | --- | --- |
-| Face font | Keys, dials and tiles draw in Segoe UI on the device, as the settings panel's header already shows. Before 1.7 the app drew them in Tahoma, about a tenth wider than the layout is measured for, so long labels could run into their values. | No change. |
+| Text font | Keys, dials and tiles keep Tahoma Bold, the font every release drew on the device, now measured for it, so labels shorten instead of running into their values. **Text font** under Advanced > Shared defaults switches reading keys, dials and detail tiles to Segoe UI, lighter and narrower. | No change; pick Segoe UI if you prefer it. |
 | Individual dial colors | Two CPU/GPU temperature readings can have different number colors, even though both are temperatures. | Set the dial's **View** to an overview, then open **Display > Reading colors**. Choose a preset or set each color. |
 | Linked source selections | A saved reading, its name and its color can follow a switch between Shared Memory and Gadget. A pairing edit applies at once on every key, dial and tile. | Configure an [explicit source link](data-sources.md#link-readings-across-providers). Similar names are never paired automatically. |
 | Gadget freshness | **Age unknown** replaces a claim that unchanged registry values are definitely stale. | Check HWiNFO and Gadget reporting. A steady value alone cannot prove the producer is running. |

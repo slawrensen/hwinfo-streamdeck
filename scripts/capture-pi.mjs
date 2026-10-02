@@ -709,7 +709,7 @@ try {
 	};
 	await nameGroup(0, "Overview");
 	await sleep(300);
-	for (const query of ["gpu hot", "gpu clock"]) {
+	for (const query of ["gpu memory junction", "gpu clock"]) {
 		await evaluate(`(() => { const el = document.getElementById("pickerr-search"); el.focus(); el.value = ${JSON.stringify(query)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 		await sleep(700);
 		await evaluate(`document.querySelector('#pickerr-list .hw-row:not([hidden]) input.hw-tick:not(:checked)')?.click()`);

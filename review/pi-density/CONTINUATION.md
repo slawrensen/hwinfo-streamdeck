@@ -47,7 +47,7 @@
   change. ui/ changed after those runtime suites (label, description,
   token); the panel and persistence suites cover it.
 - **Installed and upgrade-tested 2026-10-02 (owner's go, soak cut).**
-  Full backup first: `%USERPROFILE%\hwinfo-bench-backup6-10-02-1403-pre-upgrade`
+  Full backup first: `%USERPROFILE%\hwinfo-bench-backup\2026-10-02-1403-pre-upgrade`
   (8,726 files of `%APPDATA%\Elgato\StreamDeck`, the app's registry key,
   the d20 plugin's 47 hashes). The published v1.6.0 package (57fdf219,
   verified) went on as a clean folder at 21:04:20Z (43 files exact, 0 WARN

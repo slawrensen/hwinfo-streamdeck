@@ -9,6 +9,7 @@ import { estimateKeyTextWidth, formatQuadValue } from "../src/ui/format";
 import {
 	dualValueFontSize,
 	escapeXml,
+	INLINE_GAP_PX,
 	KEY_TEXT_LADDERS,
 	QUAD_DEFAULT_COLORS,
 	quadIdentityOf,
@@ -1152,5 +1153,31 @@ describe("quadIdentityOf", () => {
 		assert.deepEqual(quadIdentityOf("#123456", 0), { color: "#123456", chosen: true });
 		assert.deepEqual(quadIdentityOf(null, 1), { color: QUAD_DEFAULT_COLORS[1], chosen: false });
 		assert.deepEqual(quadIdentityOf(undefined, 3), { color: QUAD_DEFAULT_COLORS[3], chosen: false });
+	});
+});
+
+// A dual row's value and unit center as one chunk: a long custom unit used
+// to push the value's first digits off the key, so "1234 requests/sec" read
+// as "234 requests/s" on the device (a different number).
+describe("dual rows never cut the value for a long unit", () => {
+	const valueLine = (svg: string, y: number): { value: string; unit: string } => {
+		const m = new RegExp(`<text x="72" y="${y}"[^>]*>([^<]*)(?:<tspan[^>]*>\u2002([^<]*)</tspan>)?</text>`).exec(svg);
+		assert.ok(m !== null, `no value line at y=${y}`);
+		return { value: m[1] as string, unit: m[2] ?? "" };
+	};
+	it("keeps the value whole and shortens only a unit that would leave the band", () => {
+		for (const [value, unit] of [["1234", "requests/sec"], ["3000", "packets/second"], ["12.0", "transactions"]] as const) {
+			const line = valueLine(renderDualKey({ top: dualRow({ valueText: value, unitText: unit }), bottom: dualRow({}), palette: VOID }), 56);
+			assert.equal(line.value, value);
+			assert.ok(line.unit.length < unit.length, `${unit} is shortened`);
+			assert.ok(line.unit === "" || line.unit.endsWith("…"), line.unit);
+			const width = estimateKeyTextWidth(line.value, dualValueFontSize(line.value), { fontWeight: 700 }) + (line.unit === "" ? 0 : INLINE_GAP_PX + estimateKeyTextWidth(line.unit, 14));
+			assert.ok(width <= 120, `${value} ${line.unit} is ${width.toFixed(1)} px wide, past the 120 px band`);
+		}
+	});
+	it("leaves units that fit exactly as they were", () => {
+		for (const [value, unit] of [["56.3", "°C"], ["60", "frames"], ["1023", "MiB/s"], ["1785", "RPM"]] as const) {
+			assert.deepEqual(valueLine(renderDualKey({ top: dualRow({ valueText: value, unitText: unit }), bottom: dualRow({}), palette: VOID }), 56), { value, unit });
+		}
 	});
 });

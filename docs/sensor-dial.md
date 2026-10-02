@@ -43,7 +43,7 @@ Three things keep the short labels readable:
 
   For example, rename two `SPD Hub Temperature` readings to `DIMM 1` and `DIMM 2` for display. This does not change HWiNFO's names, so it does not separate two Gadget readings that share a name.
 
-See the [current rendered dial examples](#reading-colors) below. Older gallery images may show number colors that stable 1.6 could not produce through its settings.
+See the [current rendered dial examples](#reading-colors) below.
 
 The overview does not get its own list to manage. It shows exactly what rotation already steps through, in the same order:
 
@@ -57,7 +57,7 @@ A few details specific to the view:
 
 - The range bar and the big value belong to the single view; the overview trades them for the extra rows. **Bar from** / **Bar to** are hidden in the settings panel and not used while an overview is active; their values stay saved.
 - **Warn / Critical** still apply (unit-scoped as always): a row whose reading trips a threshold shows its value in the alert color, and the alert-aware auto cycle can pull the selection (and so the window) to it.
-- A **Title on the dial** renames the marked row only (and clears on rotation unless **Title after a turn** is set to **Stays for this dial**); names given with **Rename** stay with each reading instead.
+- A **Title on the dial** renames the marked row only (and clears when the dial moves on to another reading unless **Title when the dial moves on** is set to **Stays for this dial**); names given with **Rename** stay with each reading instead.
 - Values truncate at 12 characters and keep the shared **Decimals** setting; units truncate at 4 characters on the three-row face and 5 on the two-row face.
 - With fewer than three readings in reach, the overview lists what there is; the status faces (HWiNFO down, no selection, sensor missing) are the same as the single view's.
 
@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d20 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.0.0-d21 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -117,7 +117,7 @@ Three settings control what rotation can reach:
 
   ![The top of the dial's settings panel: the header with the dial face beside CPU (Tctl/Tdie) and Live · Shared Memory, the theme strip on Default (shared: Void), On the dial now with the line "Turns and pressed turns change this too.", and a rotation of three readings from three sensors (CPU (Tctl/Tdie), marked on dial and selected, GPU Temperature and PUMP SYS1) with the Earlier, Later, Rename and Remove toolbar and Split into groups below it, then the title fields and the start of Display.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
 - **Ignore turns.** A checkbox under Controls that makes the dial ignore rotation entirely, so a bump against the deck can never move you off the reading you chose. Push, touch, and the settings panel still work.
-- **Auto cycle.** A select under Controls that steps to the next reading in the rotation set (or the picked sensor's readings) on a timer, from every 5 seconds to every 5 minutes. It runs even while turns are ignored, which makes a hands-off tour of your picked readings: build a set, ignore turns, set a cycle time. A manual turn restarts the timer, and each step clears the custom title just like a manual turn (unless **Title after a turn** is set to **Stays for this dial**). Timing rides the poll interval (**Read every**), so a step can land up to one read late. Ticking **Auto cycle jumps to a critical reading** (under Alerts) makes the cycle alert-aware: it holds instead of rotating away while the shown reading is critical, and its next step goes to a critical member of the set instead of the next one in order. Left unticked (the default), alerts do not steer the cycle; see [Dial controls & presets](controls.md#thresholds-and-mixed-units).
+- **Auto cycle.** A select under Controls that steps to the next reading in the rotation set (or the picked sensor's readings) on a timer, from every 5 seconds to every 5 minutes. It runs even while turns are ignored, which makes a hands-off tour of your picked readings: build a set, ignore turns, set a cycle time. A manual turn restarts the timer, and each step clears the custom title just like a manual turn (unless **Title when the dial moves on** is set to **Stays for this dial**). Timing rides the poll interval (**Read every**), so a step can land up to one read late. Ticking **Auto cycle jumps to a critical reading** (under Alerts) makes the cycle alert-aware: it holds instead of rotating away while the shown reading is critical, and its next step goes to a critical member of the set instead of the next one in order. Left unticked (the default), alerts do not steer the cycle; see [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
 Rotation also protects your selection when HWiNFO temporarily stops publishing the saved sensor (a restart, a device dropout): turns are ignored until the sensor returns, instead of jumping to an unrelated reading.
 
@@ -149,7 +149,7 @@ Reading and Display start open; each folded section's title line summarizes what
 | Reading | **On the dial now** | Searchable picker over every reading HWiNFO publishes, with live values; the button beside it reloads the sensor list. The line under it names what else changes the reading on this dial, from the dial's control map, for example *Turns and pressed turns change this too.* Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything. |
 | Reading | **Readings to rotate through** | The **Rotation** group sits right under **On the dial now**: first a search whose results tick readings in or out (ticking never changes what is on the dial now), then the ticked readings in rotation order as one list, the one on the dial marked **on dial**, so you can watch it move as the dial turns, and one HWiNFO no longer lists marked **missing**. Select a reading and use the toolbar under the list: **Earlier**, **Later**, **Rename**, **Remove**. The list is one Tab stop; arrow keys select and Delete removes. Empty means every reading of the picked sensor: an overview then shows the reading on the dial and the ones after it in HWiNFO's list. Can be split into named [rotation groups](controls.md#rotation-groups). |
 | Reading | **Title on the dial** | Custom title; blank falls back to the reading's own (renamed) label. |
-| Reading | **Title after a turn** | **Clears** (default): a custom title clears when rotation moves to another reading. **Stays for this dial** keeps it as a fixed title. |
+| Reading | **Title when the dial moves on** | **Clears** (default): a custom title clears whenever the dial moves on to another reading, by a turn, a press or touch set to step, a Control key or the auto cycle; picking a reading in the settings panel keeps it. **Stays for this dial** keeps it as a fixed title. |
 | Display | **Text color** | **Default** (follows the shared Text color and names it, for example *Default (shared: Theme text)*), **Theme text**, **Dimmed**, or **Custom color** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
 | Display | **View** | **One reading** (default), or an [overview](#overview-view) of the rotation list: **Overview, two rows (big values and trend)** or **Overview, three rows**. |
 | Display | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the shared **Data units** preference instead. |

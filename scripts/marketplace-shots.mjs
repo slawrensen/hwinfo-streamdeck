@@ -4,7 +4,10 @@
 // Multi-row dials use the runtime action composer and fixed sample data.
 // Emits gallery boards; shot 2 is the photograph from shot2-hardware.mjs.
 // and a dedicated thumbnail.png.
-// Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir]
+// Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir] [--only-settings]
+// --only-settings renders shot 4 alone, from the panel captures. Loading the
+// script still opens HWiNFO Shared Memory and resolves two readings named in
+// K (the CPU temperature and the pump), so those must exist.
 import "./lib/script-failures.mjs";
 import path from "node:path";
 import sharp from "sharp";
@@ -688,6 +691,16 @@ async function thumbnail() {
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "thumbnail.png"));
 }
 
+const piDir = process.argv[3]?.startsWith("--") ? undefined : process.argv[3];
+const onlySettings = process.argv.includes("--only-settings");
+if (onlySettings && piDir === undefined) {
+	throw new Error("--only-settings needs a capture directory from scripts/capture-pi.mjs");
+}
+if (onlySettings) {
+	await settings(piDir);
+	console.log(`Rendered shot 4 (${W}x${H}) to ${outDir}/`);
+	process.exit(0);
+}
 await hero();
 await themes();
 await dials();
@@ -695,7 +708,6 @@ await multiKeys();
 await dialViews();
 await drilldown();
 await thumbnail();
-const piDir = process.argv[3]?.startsWith("--") ? undefined : process.argv[3];
 if (piDir !== undefined) {
 	await settings(piDir);
 	console.log(`Rendered thumbnail + shots 1, 3, 4, 5 (${W}x${H}) to ${outDir}/`);

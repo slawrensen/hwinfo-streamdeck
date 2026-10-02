@@ -10,9 +10,8 @@ This plugin is free software (MIT licensed) with **no ads and no telemetry**.
   from the publicly documented field layout of the HWiNFO shared-memory interface
   (header magic, section offsets/sizes taken from the live header at runtime). No
   third-party source code was copied.
-- UX inspiration: **shayne/hwinfo-streamdeck**, the original Go-based HWiNFO
-  Stream Deck plugin, <https://github.com/shayne/hwinfo-streamdeck> (since
-  transferred to a new maintainer and active again as of July 2026).
+- Original idea: the first HWiNFO Stream Deck plugin, written in Go by
+  **@shayne** (<https://github.com/shayne>).
   This project is a ground-up rewrite on the official Elgato SDK and shares no code with it.
 - Built with the official **Elgato Stream Deck SDK** (`@elgato/streamdeck`,
   with its `@elgato/utils` and `@elgato/schemas`, MIT, Corsair Memory Inc.,

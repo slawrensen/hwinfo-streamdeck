@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d20";
+	const PI_BUILD = "1.7.0.0-d21";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 

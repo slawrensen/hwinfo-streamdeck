@@ -116,7 +116,7 @@ fixes in one release.
   "Deck default" is now Default; the deck theme, deck text and type
   accents are Theme, Text color and Accent colors under Advanced,
   Shared defaults (marked "All keys and dials"); Poll every is Read
-  every; Label mode is Title after a turn; Reset reach is A stats reset
+  every; Label mode is Title when the dial moves on; Reset reach is A stats reset
   clears; Press does is A press; Detail contains is Details list; Tile
   shows is Readings per tile; and "Repeat Back under this key's own
   cell" is "Also go back from this key's own position". The Text
@@ -157,10 +157,10 @@ fixes in one release.
   with a fresh history segment. Saved selections are never rewritten;
   old duplicate-suffixed or ownerless keys need reselection after repair.
 - Invalid theme names fall back safely. The settings panel refreshes its
-  picker after source recovery or a provider change, preserves Config
-  drafts, fills the Config documents from the settings it already holds (a
-  slow reply to a fresh read could put an older document back into the
-  panel), and retains unknown Config fields. A reading name holding a
+  picker after source recovery or a provider change, preserves drafts in
+  the Configuration documents, fills them from the settings it already
+  holds (a slow reply to a fresh read could put an older document back
+  into the panel), and retains unknown fields in them. A reading name holding a
   malformed character no longer empties the picker. A
   detail tile setting this version cannot read stays as stored when the
   tile is edited, and a hand-edited command or shared theme that is not
@@ -186,8 +186,8 @@ fixes in one release.
   withheld while both are ticked, instead of being numbered in encounter
   order. HWiNFO reports some readings twice under one name (a GPU fan once
   in RPM and once in percent, for example), and a shift-click range ticks
-  both. Untick or relabel one of the two in HWiNFO and the other comes
-  back on its own after two polls. Nothing is written to disk and nothing
+  both. In HWiNFO, untick or relabel the one your key should not show,
+  and the other comes back on its own after two polls. Nothing is written to disk and nothing
   is remembered after a plugin restart. HWiNFO rewrites its Gadget rows
   one at a time after a tick or untick, so a name seen on two rows for the
   first time skips that one poll like any torn read, and a poll that then
@@ -211,9 +211,14 @@ fixes in one release.
   reads exactly "Reading 0" through "Reading 1023", whose source name or
   reading label contains any literal tilde ("~"), or whose old key carried
   the "~n" duplicate suffix get no alias and need one reselection. This
-  includes unique names such as "Hot~Spot" and "CPU~Package".
+  includes unique names such as "Hot~Spot" and "CPU~Package". If both
+  readings of a same-name pair were ticked, 1.6.0 showed both (the second
+  as a "~1" copy). 1.7 withholds both while both are ticked. A key that
+  1.6.0 saved on the plain name was on the first of the two, so untick or
+  relabel the second; a key saved on the copy needs one reselection.
 - Advanced users can explicitly link a Shared Memory key and its Gadget
-  counterpart in the deck Config document. Links apply to keys, dense
+  counterpart in the Shared settings document (Advanced > Configuration
+  documents). Links apply to keys, dense
   layouts, dials and custom detail lists in either provider direction.
   Nothing is inferred from similar names or values. Conflicting links and
   changed native units or types are refused. The type is checked on the
@@ -289,7 +294,10 @@ fixes in one release.
   whatever the number of ticked readings; its 2.7 ms was measured with 13
   readings ticked, and the cost grows with the selection, to about 150 ms
   per poll with all 554 readings on my bench ticked (measured in PERF.md,
-  2026-09-20), so tick the readings you put on the deck.
+  2026-09-20), so tick the readings you put on the deck. 1.7 also rereads
+  each row to catch rows HWiNFO is renumbering, which roughly doubles the
+  registry reads per ticked reading compared with 1.6.0 (counted: 1,024
+  plus 7 per reading, against 1,024 plus 3).
 - In Auto mode with Shared Memory not running, a Gadget key that opened
   but whose scan was refused shows Source busy (the registry changed
   during the scan) or Source error (a registry value that cannot be read
@@ -306,6 +314,21 @@ fixes in one release.
   replaces them while it is set. Moving readings in a custom detail list
   keeps automatic colors adjusted for the theme instead of turning them
   into chosen colors.
+- Keys, dials and detail tiles draw in Segoe UI on the device, the font
+  every layout is measured for. The plugin named a font list, which the
+  Stream Deck app's SVG renderer reads as one unknown name, so it drew
+  Tahoma, about a tenth wider: on hardware long labels ran into their
+  values, and a three-row key could glue a label to its number. The
+  settings panel's header already showed Segoe UI, so the face now
+  matches it. Faces look slightly lighter than before.
+- A two-reading key keeps its value whole when a reading's unit is long:
+  the unit is shortened instead of pushing the number's first digits off
+  the key, and units that fit are unchanged.
+- A dial row in critical is a brighter red than in 1.6.0: on the dark
+  themes it reads at 4.5:1 or better, where 1.6.0's red read below 4:1,
+  and it stays apart from the temperature color. A row in warning keeps
+  1.6.0's amber on the dark themes. On Paper both are darkened until they
+  read at 4.5:1.
 - A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
   screen edge: the value and unit columns slide left together when the
   widest unit needs the room, and faces whose units already fit are
@@ -314,10 +337,10 @@ fixes in one release.
   the key leaves the screen inside the tick's moment (a Multi Action that
   also switches the page does that): the icon is restored on the way out
   and again when the key returns.
-- The Config document keeps a Gadget key whole, including trailing
+- The Configuration documents keep a Gadget key whole, including trailing
   whitespace in its label; only leading whitespace is dropped.
-- The settings panel keeps unapplied Config edits when Advanced is closed
-  and reopened, closes the sensor picker when keyboard focus leaves it,
+- The settings panel keeps unapplied edits to the Configuration documents
+  when Advanced is closed and reopened, closes the sensor picker when keyboard focus leaves it,
   and no longer marks saved selections as missing while the source is
   unavailable.
 - Invalid control characters in labels are replaced instead of breaking
@@ -355,6 +378,22 @@ fixes in one release.
   pinned actions. Native C behavior and the API are unchanged; the build
   now enforces warning level 4 and treats warnings as errors after
   node-gyp defaults are applied, which changes the recorded build source ID.
+
+## 1.6.92.0 - 2026-09-09
+
+- GitHub preview for issue #31, based only on released 1.6.0. Not a
+  Marketplace release. Adds **Color numbers by sensor type** and independent
+  **Reading colors** under Appearance for two-row and three-row dials.
+  Signal, Pairs and Uniform presets share the four-reading key's palette;
+  individual color wells follow reading identity through rotation and groups.
+- Chosen colors work with Type accents off, keeping existing graph colors.
+  Valid Custom Text and alerts retain priority; Dim uses the existing blend.
+  Existing settings, single dials and every key layout keep their behavior.
+- Multi-row gallery examples use the runtime composer with achievable
+  settings. Colored examples remain preview-only until a corrected
+  Marketplace build ships. Native bytes are reused from v1.6.0.
+- This preview upgrades 1.6.0 and 1.6.90. Planned stable 1.7.0 supersedes it;
+  1.6.1 does not. See the preview's install and return-to-stable notes.
 
 ## 1.6.0.0 - 2026-09-04
 
@@ -421,6 +460,28 @@ fixes in one release.
   Enable reporting to Gadget switch and Report value in Gadget on each
   reading, not a right-click menu. The status screens, the settings
   panel's first-run tip and the docs all say so now.
+
+## 1.5.90.0 - 2026-08-11
+
+Preview build for the issue #5 follow-up, cut from the detail-density
+branch for tester validation ahead of the next release. Not a general
+release.
+
+- "Tile shows" on a detail opener packs 1 to 4 readings onto each tile
+  of the detail view, using the same stacked, row and quad faces
+  regular keys have. Pressing a dense tile cycles the stat for all of
+  its readings together, and a quad's micro labels drop the leading
+  tokens all four cells share.
+- A Custom sensor list can group its tiles one by one: per-tile size,
+  per-cell labels and quad identity colors, edited in the key's sensor
+  list with drag, an armed plus marker, and inline pick results.
+- The detail filter matches in linear time and now survives sensor
+  names that carry their own literal wildcard characters; hostile text
+  in labels (an unpaired surrogate, a very long paste) degrades to a
+  safe face instead of freezing a tile or stalling a poll tick.
+- Carries the sparkline fix that also ships in 1.5.1: changing the Poll
+  interval no longer stops sparklines from collecting, so this preview
+  is a superset of the current stable release.
 
 ## 1.5.1.0 - 2026-08-11
 

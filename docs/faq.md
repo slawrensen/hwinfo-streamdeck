@@ -23,18 +23,24 @@ Dials are optional: a Stream Deck + or Stream Deck + XL adds the [Sensor Dial](s
 
 ### Is this the official HWiNFO plugin? Is it affiliated with REALiX?
 
-No. It's an independent, MIT-licensed project, not affiliated with or endorsed by REALiX/HWiNFO. It's a ground-up TypeScript rewrite inspired by `shayne/hwinfo-streamdeck`, the original Go-based plugin (no code shared).
+No. It's an independent, MIT-licensed project, not affiliated with or endorsed by REALiX/HWiNFO. It's a ground-up TypeScript rewrite inspired by the original Go-based plugin by [@shayne](https://github.com/shayne) (no code shared).
 
 ## HWiNFO editions and the 12-hour limit
 
 ### Do I need HWiNFO Pro?
 
-No. The free version works, with a time limit on Shared Memory:
+**It isn't required, but I recommend it** if HWiNFO runs longer than 12 hours at a stretch. The plugin works best on Shared Memory, and [HWiNFO Pro](https://www.hwinfo.com/licenses/) is the only edition that keeps Shared Memory on with no time limit.
 
-- **HWiNFO free**: Shared Memory Support switches off after **12 hours**. Auto can fall back to Gadget if reporting is enabled, then switch back when Shared Memory returns. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources; these links are new in 1.7.
-- **HWiNFO Pro**: removes the 12-hour Shared Memory limit. HWiNFO still needs to be running and publishing sensors.
+- **HWiNFO free**: Shared Memory Support switches off after **12 hours** and stays off until you turn it back on or restart HWiNFO. Auto can fall back to Gadget if reporting is enabled, then switch back when Shared Memory returns. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to work across sources; these links are new in 1.7.
+- **HWiNFO Pro**: no 12-hour limit. Shared Memory stays on, so keys keep their Shared Memory readings and HWiNFO's min/max/avg without you touching anything. HWiNFO still needs to be running and publishing sensors.
 
-Both editions provide Shared Memory readings while sharing is enabled. Pro removes its 12-hour limit. Gadget provides current values, and dials can collect local sessions while data is available.
+The Gadget registry works as a fallback, with real limits:
+
+- It carries only the readings you tick in HWiNFO.
+- It has current values only. Since 1.7 a key set to **Minimum**, **Maximum** or **Average** shows **N/A**; dials still keep their own session range while data arrives.
+- It has no producer timestamp, so a steady value can show **Age unknown**.
+
+If you restart HWiNFO at least every 12 hours, the free version with Shared Memory gives the same result as Pro. Commercial use of HWiNFO needs a Pro license either way. I'm not affiliated with REALiX and earn nothing from the link.
 
 ### Why did my values freeze / stop updating after about 12 hours?
 
@@ -47,7 +53,7 @@ After the timer expires:
 
 1. In HWiNFO **Settings → Shared Memory Support**, toggle it back on (resets the 12-hour clock).
 2. Enable **Gadget reporting** on the sensors you use, then explicitly [link each reading](data-sources.md#link-readings-across-providers) so its selection survives a provider change.
-3. Buy HWiNFO Pro to remove the limit entirely.
+3. Buy [HWiNFO Pro](https://www.hwinfo.com/licenses/) to remove the limit entirely.
 
 > Since 1.7, Shared Memory shows **Not updating / check sharing** after about 15 seconds without an advancing producer timestamp or observed value evidence. Gadget has no producer timestamp: before its first observed change, or after 15 seconds without another, it shows **Age unknown / check Gadget**. A steady registry value does not prove that HWiNFO stopped.
 
@@ -72,7 +78,7 @@ A provider switch does not translate saved identities by itself. Configure expli
 
 HWiNFO gives every ticked reading a numbered slot, and a reading that stays ticked but is not being written (one disabled in the sensor window, for example) leaves its slot empty, so the list can carry gaps. Plugin versions before 1.6.0 stopped at the first gap; 1.6.0 reads across them. Update, then press the circular-arrow button beside the **Reading** box (**Reload the sensor list**). Details in [Troubleshooting](troubleshooting.md#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 
-### Why are min / max / avg showing the current value?
+### Why do min / max / avg show N/A?
 
 Because you're reading from the **Gadget registry**, which only exposes the current value; HWiNFO doesn't write min/max/avg to the Gadget registry at all. Versions through 1.6.0 filled those fields with the current value. Since 1.7.0 they are unavailable: historical modes on keys and detail tiles show N/A with an empty value.
 
@@ -108,7 +114,7 @@ Changing the plugin's **Read every** interval (Advanced, Connection) *does* clea
 
 ### Does it slow down my PC? How much CPU and RAM?
 
-The recorded runs below used a live page at a one-second poll. They are measurements of those builds and setups, not a guarantee for every machine or the unfinished 1.7 qualification. Sources and harnesses are in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md):
+The recorded runs below used a live page at a one-second poll. They are measurements of those builds and setups, not a guarantee for every machine. Sources and harnesses are in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md):
 
 - **CPU: a fraction of one percent of one core** (~0.2 % long-run average on the live deck; zero polling cost when no Sensor Reading key or Sensor Dial is on screen, because the poller stops entirely).
 - **RAM: ~40–48 MB** RSS, stable across externally monitored multi-hour soaks (PERF.md carries the measured slopes).
@@ -187,14 +193,14 @@ A GitHub-release install matches its published hash byte for byte. Reporting a s
 
 ### Can I use the free / portable HWiNFO?
 
-Yes. The free version has the Shared Memory limit described above. The portable build also works while HWiNFO is running and publishing sensors:
+Yes. The free version has the Shared Memory limit described above; [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes it. The portable build also works while HWiNFO is running and publishing sensors:
 
 - Add HWiNFO to Windows autostart yourself if you want the deck populated at login.
 - If you see **Access denied**, review the account, session and permissions used to launch HWiNFO and Stream Deck. Matching elevation alone does not guarantee access.
 
 ### Do keys survive reboots, HWiNFO restarts, or reordering sensors in HWiNFO?
 
-Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Two ticked Gadget readings that share a source name and label are both withheld while both are ticked (untick or relabel one of them in HWiNFO and the other comes back on its own), and most Gadget selections saved by 1.6.0 keep working after the 1.7 upgrade; see the [identity limits](data-sources.md#enabling-gadget-reporting) for the ones that need a reselection. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
+Yes. On Shared Memory a key stores HWiNFO's **stable identity** for the reading (`sensor-id : instance : reading-id`), not a position in a list; on the Gadget registry, which carries no ids, it stores the source name and reading label as HWiNFO writes them. Unique Gadget names keep working across restarts and reordering. Two ticked Gadget readings that share a source name and label are both withheld while both are ticked (in HWiNFO, untick or relabel the one your key should not show, and the other comes back on its own), and most Gadget selections saved by 1.6.0 keep working after the 1.7 upgrade; see the [identity limits](data-sources.md#enabling-gadget-reporting) for the ones that need a reselection. If a saved sensor genuinely disappears (hardware/driver change, a renamed sensor profile, or a source or reading renamed in HWiNFO while on the Gadget source), the key shows `Sensor missing / pick again`: reopen its settings and pick it again.
 
 ### Can I use Stream Deck + dials without HWiNFO Pro?
 

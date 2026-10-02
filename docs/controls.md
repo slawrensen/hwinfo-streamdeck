@@ -13,7 +13,7 @@ How the dial's physical inputs map to actions. Everything on this page is config
 | **Elite** | Cycle readings | Switch sensor or [rotation group](#rotation-groups) | Short: pause/resume auto cycle. Long (hold half a second): reset session stats | Cycle stat mode, or [touch zones](#touch-zones) | Back to current |
 | **Custom** | Your pick | Your pick | Your pick, short and long separately | Your pick | Your pick |
 
-Nothing remaps until you change it: every dial that existed before presets, and every new dial, runs **Legacy**, which keeps every earlier release's gesture map exactly. One 1.1.10.0 fix applies to all presets: rotating to a different reading clears a custom title, so the title can no longer name one reading while showing another's value. Set **Title after a turn** to **Stays for this dial** to keep a fixed title through rotation, as before that fix.
+Nothing remaps until you change it: every dial that existed before presets, and every new dial, runs **Legacy**, which keeps every earlier release's gesture map exactly. One 1.1.10.0 fix applies to all presets: rotating to a different reading clears a custom title, so the title can no longer name one reading while showing another's value. Set **Title when the dial moves on** to **Stays for this dial** to keep a fixed title through rotation, as before that fix.
 
 Two Elite details:
 
@@ -98,7 +98,7 @@ Settings only ever gain fields; nothing existing is renamed or removed.
 - Dials without a `controlPreset` field run Legacy, exactly as before.
 - Rotation groups are an optional field; dials without groups behave exactly as before on every preset. The flat rotation set is kept mirrored to the union of all groups, so a downgrade to an older plugin version runs the union as one set and loses nothing.
 - The unit anchor for thresholds (`alertUnit`) is stamped the first time you edit a threshold after updating, from the reading on screen at that moment; until then thresholds behave exactly as they did.
-- **Title after a turn** defaults to the existing behavior (a custom title clears when rotation moves to another reading). Pick "Stays for this dial" to keep it through rotation.
+- **Title when the dial moves on** defaults to the existing behavior: a custom title clears whenever the dial moves on to another reading, by a turn, a press or touch set to step, a Control key or the auto cycle. Picking a reading in the settings panel keeps it. Pick "Stays for this dial" to keep it through rotation.
 - The dial's **View** (`dialView`) and the key's **Readings on this key** (`keyLayout`, labelled Layout before 1.7) are optional fields too (both 1.2.0; the key's `triple` marker arrived in 1.4.0). Only their exact markers switch face: `overview` and `tworow` on the dial, `dual`, `triple` and `quad` on the key. Anything else, including a value a newer version might write, renders the unchanged single face. A dual key also needs a second reading picked, and a triple or quad key at least two of its slots picked; short of that they stay single too.
 - Per-reading names (`rotationNames`, 1.2.0) are another optional field: a map from reading identity to display name, written only by **Rename** in the dial's rotation list. Junk entries are ignored one by one, and older plugin versions ignore the field entirely.
 - The overview's **Row labels** field (`overviewLabels`, 1.2.0) shortens shared prefixes by default; only the exact value "full" turns that off. Anything else, including future values, keeps the default.

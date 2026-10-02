@@ -370,8 +370,11 @@ describe("dense tile goldens", () => {
 	const SINCE_1_6_0: ReadonlyArray<readonly [before: string, after: string]> = [["#667082", "#6B7586"]];
 	// September 2026 (bench): the device gap fix moved each unit gap from
 	// dx into the tspan; beforeInlineGap puts the dx back, counted per face.
+	// October 2026 (1.7): one font family name, since the app's QtSvg read
+	// the old list as one name and drew Tahoma; every text element names it.
 	const asOf160 = (svg: string, movedFills: number, gaps: number): string => {
-		let out = beforeInlineGap(svg, gaps);
+		assert.ok(!svg.includes('font-family="Segoe UI, Arial, sans-serif"'), "the 1.6.0 family list cannot still be drawn");
+		let out = beforeInlineGap(svg, gaps).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
 		for (const [before, after] of SINCE_1_6_0) {
 			assert.equal(out.split(after).length - 1, movedFills, `${after} must appear exactly ${movedFills} times`);
 			assert.ok(!out.includes(before), `${before} is the 1.6.0 token and cannot still be drawn`);

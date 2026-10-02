@@ -22,7 +22,7 @@ import type { JsonValue } from "@elgato/utils";
 import { dispatchDialCommand, isControlCommand } from "../commands";
 import { parseResetScope } from "../controls";
 import { registerDiagnostics } from "../diagnostics";
-import { buildSupportReportPayload } from "../pi-protocol";
+import { buildSupportReportPayload, handlePiRequest } from "../pi-protocol";
 import { hashId, trace } from "../recorder";
 import { sortedJson } from "../sorted-json";
 
@@ -214,6 +214,10 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 		}
 		if (payload.event === "getSupportReport") {
 			void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload(payload.requestId));
+		} else if (payload.event === "getPanelFolds" || payload.event === "setPanelFolds") {
+			// The panel waits for its remembered folds before it shows its
+			// sections, like every HWiNFO panel; unanswered, it waited 600 ms.
+			handlePiRequest(payload);
 		}
 	}
 }

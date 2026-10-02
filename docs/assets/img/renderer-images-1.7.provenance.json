@@ -94,7 +94,7 @@
 							2850
 						]
 					},
-					"svgSha256": "ebb112659fbf93af8f33ce8c59e46e39b8d81808ec8bfb1a87c4045b6f6f8daf"
+					"svgSha256": "a7e8beb4007f7ff80b5a421ffca0249282ad3ac8dc9e841d7f6fff6d3dfbf4a0"
 				},
 				{
 					"view": "overview",
@@ -180,7 +180,7 @@
 							2850
 						]
 					},
-					"svgSha256": "a7c0b81cebd32cce9a0f3bf8f556cd8ffa001dc116439abe2ff0659b9b963da5"
+					"svgSha256": "efdfba7093d9d550b19f70b1179a7a5180322e01873d15cea7530785ef6be44d"
 				},
 				{
 					"view": "tworow",
@@ -239,7 +239,7 @@
 							98
 						]
 					},
-					"svgSha256": "7489641c27403ba634ec47c20ed1d3f66a3c3ecbab07fe7c3751a6293d99ba7e"
+					"svgSha256": "59d6be81f5dfef50718428d319ef2080901024adabab70e4441ecb1d2d1cb06e"
 				},
 				{
 					"view": "tworow",
@@ -305,7 +305,7 @@
 							98
 						]
 					},
-					"svgSha256": "a82f67bda6fe8036f75636bae794ffca4757c55ea26d5eb8bcabc160fff8b7d1"
+					"svgSha256": "5f82be3294bd8af6ea2148b7a384f0d7a416f31068f25dbdb3bab9562a82e4aa"
 				}
 			],
 			"validation": "SVGs match exactly after removing hexadecimal fill colors."

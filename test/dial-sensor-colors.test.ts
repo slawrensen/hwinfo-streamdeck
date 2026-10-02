@@ -185,7 +185,10 @@ const asOf160 = (key: string, drawn: string): string => {
 	const view = key.split("/")[0] as string;
 	// The device gap fix (bench 2026-09-23): the single view's unit gap is a
 	// space inside its tspan now; put the 1.6.0 dx back, exactly one site.
-	const svg = beforeInlineGap(drawn, view === "single" ? 1 : 0);
+	// The device font fix (1.7): one family name, since the app's QtSvg read
+	// the old list as one name and drew Tahoma; put the list back.
+	assert.ok(!drawn.includes('font-family="Segoe UI, Arial, sans-serif"'), `${key}: the 1.6.0 family list cannot still be drawn`);
+	const svg = beforeInlineGap(drawn, view === "single" ? 1 : 0).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
 	const roles = ROLES[view] as Record<string, RegExp>;
 	const moved = SINCE_1_6_0[key] ?? {};
 	const claimed = Object.values(roles).reduce((n, re) => n + roleFills(svg, re).length, 0);

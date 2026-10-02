@@ -5,9 +5,11 @@
 // see a 700 ms straggler. The badge's way out is locked here too: a key that
 // leaves the screen inside the window gets its manifest icon back.
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 
-import type { DidReceiveSettingsEvent, KeyAction, KeyDownEvent, KeyUpEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck from "@elgato/streamdeck";
+import type { DidReceiveSettingsEvent, KeyAction, KeyDownEvent, KeyUpEvent, SendToPluginEvent, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import type { JsonValue } from "@elgato/utils";
 
 import { HwinfoControlAction, type ControlActionSettings } from "../src/actions/hwinfo-control";
 import { registerDialCommandHandler, type DialControlCommand } from "../src/commands";
@@ -243,5 +245,27 @@ describe("a held Control key fires under the settings it was pressed with", () =
 		c.appear(NEXT);
 		await c.up(NEXT);
 		assert.deepEqual(c.sent, [{ command: "next", target: "safe", scope: "current" }]);
+	});
+});
+
+// The Control panel waits for its remembered folds before it shows its
+// sections, like every HWiNFO panel. The action used to answer only the
+// support report, so the panel sat empty until its 600 ms fallback and
+// never kept a fold.
+describe("the Control panel's remembered folds", () => {
+	it("answers getPanelFolds with what setPanelFolds stored for the control kind", () => {
+		const sent = mock.method(streamDeck.ui, "sendToPropertyInspector", async () => {});
+		try {
+			const action = new HwinfoControlAction();
+			const from = (payload: JsonValue) => ({ payload, action: { id: "ctx" } }) as unknown as SendToPluginEvent<JsonValue, ControlActionSettings>;
+			action.onSendToPlugin(from({ event: "setPanelFolds", kind: "control", folds: { "sec-advanced": true } }));
+			action.onSendToPlugin(from({ event: "getPanelFolds", kind: "control" }));
+			assert.deepEqual(
+				sent.mock.calls.map((c) => c.arguments[0]),
+				[{ event: "panelFolds", kind: "control", folds: { "sec-advanced": true } }]
+			);
+		} finally {
+			sent.mock.restore();
+		}
 	});
 });

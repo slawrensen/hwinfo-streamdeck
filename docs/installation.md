@@ -13,7 +13,7 @@ You need three things: the Stream Deck plugin, a running copy of HWiNFO, and a o
 | --- | --- |
 | **Windows 10 or later**, 64-bit (x64) | Windows-on-ARM is not supported (keys show **Needs x64 / Windows**). There is no macOS build; the plugin doesn't install there at all. |
 | **Stream Deck software 6.9+** | The Elgato desktop app that hosts plugins. Update it from within the app if you are on an older build. |
-| **HWiNFO** (free or Pro) | Installer or portable. Download from [hwinfo.com](https://www.hwinfo.com/download/). The plugin does not bundle HWiNFO; you run it yourself. |
+| **HWiNFO** (free or Pro) | Installer or portable. Download from [hwinfo.com](https://www.hwinfo.com/download/). The plugin does not bundle HWiNFO; you run it yourself. The free version works; [Pro](https://www.hwinfo.com/licenses/) removes the 12-hour Shared Memory limit, and I recommend it if HWiNFO runs all day. |
 
 Any Stream Deck hardware works for the **Sensor Reading** key action. The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL (the models with dials and a touchscreen). The **HWiNFO Control** key action goes anywhere a key action can, including the Stream Deck Pedal and Corsair G-keys, and drives Sensor Dials on other connected decks. The full device matrix is on [Hardware compatibility](hardware.md).
 
@@ -56,7 +56,7 @@ Shared Memory exposes **every** reading HWiNFO measures, with min / max / averag
    - (Combined with Sensors-only, HWiNFO runs in the background with its window minimized.)
 5. Click **OK**.
 
-> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; HWiNFO Pro removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
+> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
 
 ### Free path: Gadget reporting
 
@@ -64,7 +64,7 @@ Gadget reporting never expires on the free version, but it only exposes the sens
 
 1. Start **HWiNFO** in Sensors mode.
 2. In the HWiNFO **sensor window**, click **Configure Sensors** and open the **HWiNFO Gadget** tab.
-3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Shift-click selects a range, so you can tick many at once.
+3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Tick only the readings you put on the deck: each one adds to every scan, and a Shift-click range can tick a reading HWiNFO reports twice under one name, which 1.7 withholds.
 
 The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. HWiNFO 8.48 creates that key only once a reading is ticked: with reporting enabled and nothing ticked, keys show **Start HWiNFO / not detected** while HWiNFO is running. **Tick sensors / in Gadget** appears when the key is there but holds no rows, which unticking everything can leave.
 

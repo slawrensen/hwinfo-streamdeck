@@ -71,7 +71,7 @@ Example values for a CPU temperature key in °C. Choose limits appropriate to yo
 
 Idle and under load the key stays themed. At 80 °C it goes amber; at 90 °C it goes red. If you'd rather read the face in Fahrenheit, tick **°F** (under Temperature in Display) **and** enter the thresholds in °F (e.g. `176` / `194`); the numbers must match the displayed unit.
 
-The [theme reference](themes.md#alerts-override-everything) lists the alert palettes. Its older sample board predates the 1.7 contrast adjustments.
+The [theme reference](themes.md#alerts-override-everything) lists the alert palettes.
 
 ### Fan RPM: alert when it drops
 

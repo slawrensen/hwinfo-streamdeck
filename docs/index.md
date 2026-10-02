@@ -12,8 +12,7 @@ no ads, no telemetry.
 ![Seven themes, alert states, multi-reading keys and dial views.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
 *Production renderers with sample readings and generated histories. This is
-a layout comparison, not a hardware photograph. The board predates the 1.7
-contrast changes.*
+a layout comparison, not a hardware photograph.*
 
 > **1.7** redesigns the settings panels, adds per-reading dial colors and
 > changes how sources, identities and history are handled.

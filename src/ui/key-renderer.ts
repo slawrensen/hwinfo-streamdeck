@@ -13,7 +13,12 @@ import { cappedUnit, estimateKeyTextWidth, fitTextLadder, truncateLabel, type Fi
 import { themeTextColors, type QuadIdentity, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
-export const FONT = "Segoe UI, Arial, sans-serif";
+// One family name, not a fallback list: the Stream Deck app draws faces with
+// QtSvg, which takes the whole attribute as a single family, finds no font
+// called "Segoe UI, Arial, sans-serif" and falls back to Tahoma, about 10 %
+// wider than the Segoe UI Semibold every width budget here is measured on.
+// Segoe UI ships with every Windows the plugin supports.
+export const FONT = "Segoe UI";
 
 /** A gauge zone with its fill already resolved by the caller (the renderers
  * never decide alert colors). Normalized 0..1 along the track. */
@@ -391,6 +396,17 @@ function sharedBadgeSvg(badge: string, palette: Palette, badgeColor: string, gap
 	];
 }
 
+/** A dual row's value and unit center as one chunk, so a long custom unit
+ * ("requests/sec") pushed the value's first digits off the key: a different
+ * number. The unit never takes the value off the key: a unit that would
+ * take the chunk past the 120 px band, by the width estimate, is shortened,
+ * or left off when nothing fits. */
+function dualUnitFit(unit: string, budget: number): string {
+	if (unit === "" || estimateKeyTextWidth(unit, 14) <= budget) return unit;
+	const fitted = fitTextLadder(unit, budget, [14]).text;
+	return fitted === "…" ? "" : fitted;
+}
+
 /**
  * Dual-row value size by character count. One readout per half key: 32 px
  * for the numeric norm, stepped tiers for fixed-decimals extremes, never
@@ -458,8 +474,10 @@ export function renderDualKey(opts: DualKeyOptions): string {
 		// One middle-anchored chunk: the label and its badge center as a unit.
 		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
 		const valueText = truncateLabel(row.valueText, DUAL_VALUE_MAX);
-		const unit = row.unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${inlineGap(14)}${escapeXml(row.unitText)}</tspan>` : "";
-		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${dualValueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+		const valueSize = dualValueFontSize(valueText);
+		const unitText = dualUnitFit(row.unitText, LABEL_BUDGET - estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) - INLINE_GAP_PX);
+		const unit = unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${inlineGap(14)}${escapeXml(unitText)}</tspan>` : "";
+		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" ? "" : PRESERVE} font-family="${FONT}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	});
 	parts.push(`<rect x="12" y="${DUAL.dividerY}" width="120" height="2" fill="${palette.track}"/>`);
 	if (sharedBadge !== "") {

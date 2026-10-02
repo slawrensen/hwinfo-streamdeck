@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d20" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d21" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
@@ -87,7 +87,7 @@
 						<input id="f-label" type="text" data-setting="label" placeholder="The reading's own name" autocomplete="off" spellcheck="false" />
 					</div>
 					<div class="hw-field">
-						<label for="f-label-mode">Title after a turn</label>
+						<label for="f-label-mode">Title when the dial moves on</label>
 						<select id="f-label-mode" data-setting="labelMode" data-default="auto">
 							<option value="auto">Clears (default)</option>
 							<option value="fixed">Stays for this dial</option>
@@ -246,7 +246,7 @@
 						<option value="custom">Custom</option>
 					</select>
 				</div>
-				<dl class="hw-gestures" id="controls-now" aria-label="What the dial does now"></dl>
+				<dl class="hw-gestures" id="controls-now"></dl>
 				<div id="controls-custom" hidden>
 					<div class="hw-row2">
 						<div class="hw-field">
@@ -486,9 +486,9 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.0.0-d20"></script>
-		<script src="pi-shell.js?v=1.7.0.0-d20"></script>
-		<script src="pi-common.js?v=1.7.0.0-d20"></script>
-		<script src="pi-control.js?v=1.7.0.0-d20"></script>
+		<script src="pi-model.js?v=1.7.0.0-d21"></script>
+		<script src="pi-shell.js?v=1.7.0.0-d21"></script>
+		<script src="pi-common.js?v=1.7.0.0-d21"></script>
+		<script src="pi-control.js?v=1.7.0.0-d21"></script>
 	</body>
 </html>

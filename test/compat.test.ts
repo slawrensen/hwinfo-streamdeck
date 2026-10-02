@@ -27,11 +27,15 @@ import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { beforeInlineGap, gapSitesIn } from "./inline-gap";
 
 const legacy = JSON.parse(readFileSync(new URL("./golden/legacy-faces.json", import.meta.url), "utf8")) as Record<string, string>;
-// Retain the historical artifacts. Authorize only these foreground changes
-// and the device gap fix (the gap before a unit or badge is a space inside
-// its tspan, not dx; counted per face by beforeInlineGap); all other bytes
-// still compare exactly, including number and unit geometry.
-const golden = Object.fromEntries(Object.entries(legacy).map(([name, svg]) => [name, svg.replaceAll("#667082", "#6B7586").replaceAll("#8A6326", "#926E35")]));
+// Retain the historical artifacts. Authorize only these foreground changes,
+// the device gap fix (the gap before a unit or badge is a space inside its
+// tspan, not dx; counted per face by beforeInlineGap) and the device font
+// fix (one family name: the app's QtSvg read the old list as one name and
+// drew Tahoma); all other bytes still compare exactly, including number and
+// unit geometry.
+const golden = Object.fromEntries(
+	Object.entries(legacy).map(([name, svg]) => [name, svg.replaceAll("#667082", "#6B7586").replaceAll("#8A6326", "#926E35").replaceAll('font-family="Segoe UI, Arial, sans-serif"', 'font-family="Segoe UI"')])
+);
 const config = loadThemes();
 const VOID = resolvePalette(config, "void", null, "normal");
 const EMBER = resolvePalette(config, "ember", "temperature", "normal");

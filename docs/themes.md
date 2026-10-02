@@ -21,9 +21,9 @@ Pick a theme from the theme strip under the header in any key's or dial's settin
 | **Ember** | Black background, amber text and accent. |
 | **Paper** | Light background (`#E9E6DE`), dark text. |
 
-![Earlier production-rendered examples of seven themes, alert palettes, key layouts and dial views, using sample scenarios and generated histories.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+![Production-rendered examples of seven themes, alert palettes, key layouts and dial views, using sample scenarios and generated histories.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
 
-*This earlier board predates the 1.7 contrast adjustments. See the [1.7 reading-color examples](sensor-dial.md#reading-colors) for the new dial options.*
+*See the [reading-color examples](sensor-dial.md#reading-colors) for the dial's own number colors.*
 
 > **Note:** New installs start on **Void**. Installs configured before themes were added keep **Graphite** as the shared theme. Selecting a shared theme replaces that default.
 

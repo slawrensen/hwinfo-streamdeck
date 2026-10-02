@@ -100,7 +100,7 @@ A sensor *is* selected, but it isn't in HWiNFO's current output. The saved ident
 3. **HWiNFO profile / config change**, or you switched between shared memory and Gadget sources (the two expose different sensor sets).
 4. **The sensor simply isn't present yet**, e.g. a GPU that's asleep, or a drive that spun down.
 5. **An old Gadget selection with no alias** after the 1.7 upgrade: a label spelled exactly `Reading 0` through `Reading 1023`, any literal tilde (`~`) in the source name or reading label (including a unique name such as `Hot~Spot`), or a key carrying the old `~n` duplicate suffix needs one reselection. An old spelling that now matches two readings also stays unresolved while it is ambiguous. Most 1.6.0 Gadget selections keep working; see [Data sources](data-sources.md#enabling-gadget-reporting).
-6. **Two ticked Gadget readings share a source name and label** (1.7). Both are withheld while both are ticked, and the settings panel says that names are withheld. This one needs no reselection: see [below](#only-some-of-the-readings-i-ticked-in-gadget-show-up).
+6. **Two ticked Gadget readings share a source name and label** (1.7). Both are withheld while both are ticked: the key and the settings panel call the reading missing, and the panel's note under **Advanced → Connection** says that names are withheld. A key saved on the first of the two comes back once the second is unticked or relabelled; one saved on a 1.6.0 `~1` copy needs one reselection. See [below](#only-some-of-the-readings-i-ticked-in-gadget-show-up).
 7. **Shared Memory reports an ambiguous or ownerless identity** (1.7). Rows sharing the same `sensor-id : instance : reading-id`, or pointing to a missing sensor owner, are withheld. A saved unique identity recovers when the producer repairs it. An older selection carrying a duplicate suffix (`~n`) or an ownerless key (`?:...`) needs reselection once a valid unique reading is available. See [Data sources](data-sources.md#enabling-shared-memory).
 
 The settings panel tells this apart from HWiNFO being down: its header reads **Saved reading not found**, and the message under the header says the reading stays saved with its label and colors and shows again if HWiNFO publishes it, with **Reload sensor list** and **Pick another reading** buttons. While HWiNFO itself is unavailable the panel never calls a reading missing; it says the reading and every setting stay saved and no data is coming in.
@@ -126,7 +126,7 @@ HWiNFO gives every reading you tick **Report value in Gadget** a numbered regist
 1. **Update the plugin** to 1.6.0 or later, then click the reload button beside the picker's search box ("Reload the sensor list").
 2. **Check the tick itself.** Only readings with **Report value in Gadget** ticked are written, and only while they are enabled in the sensor window.
 3. **The scan is bounded.** The plugin reads slots 0 to 1023, far above any set a person ticks by hand; a reading parked above that is not read.
-4. **Two ticked readings share a name** (1.7). HWiNFO reports some readings twice under one source name and label, for example a GPU fan once in RPM and once in percent, and a shift-click range ticks both. The registry has nothing else to tell them apart, so both are withheld while both are ticked; the other readings keep working and the plugin log names the two slots. Untick one of the two in HWiNFO, or give one a different label, and the other comes back on its own after two polls.
+4. **Two ticked readings share a name** (1.7). HWiNFO reports some readings twice under one source name and label, for example a GPU fan once in RPM and once in percent, and a shift-click range ticks both. The registry has nothing else to tell them apart, so both are withheld while both are ticked; the other readings keep working and the plugin log names the two slots. In HWiNFO, untick or relabel the one your key should not show, and the other comes back on its own after two polls; a key saved by 1.6.0 was on the first of the two in HWiNFO's order. Acting on the reading a key was on hands that key to the other, so a key that showed RPM would show percent.
 
 ## Plugin shows nothing at all / the action is missing
 
@@ -237,7 +237,6 @@ Run through this first; most problems resolve here:
 - [ ] **HWiNFO is running** and its **Sensors window is open**.
 - [ ] At least one interface is enabled: **Shared Memory Support** *or* **Gadget reporting** ("Report value in Gadget" on the sensors you need).
 - [ ] **Data source** (**Advanced → Connection**) is **Auto** unless you have a specific reason otherwise.
-- [ ] HWiNFO and Stream Deck are at the **same elevation** (both normal, or both admin).
 - [ ] **Stream Deck 6.9+**, **64-bit Windows 10+**.
 - [ ] You **re-picked the sensor** if it went missing after a hardware/driver change.
 - [ ] Threshold values use the **displayed temperature unit**, or HWiNFO's **original byte/rate unit** before Data units changes the display scale, and **Alert when the value drops to or below these numbers** is ticked where low is bad.

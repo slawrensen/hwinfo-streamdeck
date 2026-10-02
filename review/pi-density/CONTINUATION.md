@@ -1,5 +1,56 @@
 # Continuation
 
+## Now (2026-10-02, evening): d22, the Text font
+
+- **Why.** After the d21 install the owner saw thinner text. Every release
+  through 1.6.0 and every candidate to d20 asked for "Segoe UI, Arial,
+  sans-serif"; the app's QtSvg reads that as one unknown family and drew
+  Tahoma Bold, while docs and marketing renders (librsvg) showed Segoe UI.
+  d21 had switched the device to Segoe UI. Owner's rule: keep Tahoma unless
+  Segoe UI is objectively bigger, more readable and causes no issues. It is
+  not: 24 to 38 % lighter in stroke, 4 to 9 % shorter at equal size; 6 %
+  larger restores number height only; bold costs 70 more cut labels.
+- **What d22 does.** Tahoma Bold is the default, named outright, with a
+  per-glyph Tahoma Bold width table measured through the app's QtSvg
+  (`src/ui/face-font.ts`; credit 0, title band 134 so "CPU Package" stays
+  20 px). Segoe UI is the option: Advanced > Shared defaults > **Text
+  font**, stored as global `textFont` ("segoe-ui" exactly; absent = Tahoma,
+  so the upgrade writes nothing). The Segoe UI option draws the d21 bytes
+  plus a bold-digit fix ("111.1" ran a three-row label 6 px into it).
+  Tahoma-only fits: status headlines, detail titles, dial title, value and
+  stats, two-row columns and wrap, three-row dial value column by measured
+  width, two-reading values give up to two 2 px steps to keep the unit
+  whole. Action icons name Tahoma. Panel token d22.
+- **Evidence.** QtSvg census of 596 faces: Tahoma default 0 overlaps, 0
+  touches, 1 edge clip (1.6.0: 30, 14, 58); Segoe option equal to d21.
+  Design review: 5 lenses plus a synthesis (private
+  `docs/release/external-review-1.7/rc-review-2026-10-02/face-font-*`),
+  then the freeze rule's two reviews of the d22 diff, whose findings are
+  fixed with failing-first tests (test/face-font.test.ts, 15 tests).
+- **Images.** Every face image regenerated in Tahoma: 11 docs boards, the
+  renderer boards and contact sheet, 6 README boards, all 8 Marketplace
+  stills (shot 8 had gone empty on a stale *4090* filter; the script now
+  refuses an empty page), 23 panel captures and the reading-colors capture.
+  The bench GPU is now an RTX 5080 with no hot spot: its memory junction
+  stands in; captions with live specifics were corrected. The photo is
+  captioned July 2026, an earlier version, Tahoma.
+- **Gates on d22 (plugin.js 5eabbe07):** lint and typecheck 0; unit
+  1,574 of 1,574; native 169 of 169; copy validator 0 warnings; panel
+  suite 453; persistence 646; under the app's Node 20.20.0 the harness 105,
+  drill-down 90, socket close 3, resilience 12, Gadget 28, native edge 37,
+  dead fallback 8, reading links 96, load 13 (23:15 to 23:27Z). Clean-clone
+  qualification on a snapshot clone (temporary commit 4ad07c3, only in
+  `%TEMP%\hw-qualify-d22b`): all 15 stages PASS, archive 372,301 bytes, 47
+  members, sha256
+  `c7e5037c26f0d458e0336b076d30c46f587055dda073a0004f680b44a3598cce`.
+- **Installed** on the bench deck by deploy.ps1 (equal version), settings
+  unchanged apart from the auto-cycling dial. Final bytes installed
+  23:28:40Z from the qualified extract: 47 files hash-verified, 0 WARN, the
+  log reads "text font tahoma", settings snapshot unchanged. The soak
+  monitor (pid 44260) follows the plugin until 22:27 local; its d20 window
+  was cut at 21:04Z, and the bytes changed again at 21:05, 22:55 and
+  23:28Z, so only the d20 window is a soak.
+
 ## Now (2026-10-02): d21, the release-candidate review
 
 - **What ran.** An evidence-driven review of the whole candidate (46

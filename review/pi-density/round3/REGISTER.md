@@ -781,3 +781,33 @@ bytes, 47 members). Not
 installed: the deck runs d20 until the soak closes, and the faces above
 have been drawn by the renderer and the app's QtSvg only, never on a deck
 (OWNER-CHECK step 9).
+
+## d22 (2026-10-02): the Text font
+
+After the d21 install the owner saw thinner text and set the rule: Tahoma
+stays the default unless Segoe UI is objectively bigger, more readable and
+causes no issues. Every release through 1.6.0 and every candidate to d20
+drew Tahoma Bold on the device (QtSvg reads the old family list as one
+unknown name); every docs and marketing render showed Segoe UI. Measured in
+the app's own Qt 6.9.3, Segoe UI is 24 to 38 % lighter in stroke and 4 to
+9 % shorter at equal size; 6 % larger restores only number height, and bold
+costs 70 more cut labels. Five design reviewers and a synthesis (private
+`face-font-design.json`) then two reviewers of the built diff
+(`face-font-d22-review.json`).
+
+| Finding | Sev | What was wrong | Fix | Proof |
+| --- | --- | --- | --- | --- |
+| FONT-1 (owner) | must | d21 made every upgraded deck draw lighter, narrower Segoe UI. | Tahoma Bold default, named outright, fitted on a per-glyph Tahoma Bold table measured through QtSvg; Segoe UI as Advanced > Shared defaults > Text font (`textFont`, absent = Tahoma, nothing written on upgrade). | QtSvg census of 596 faces: 0 overlaps, 0 touches, 1 edge clip (1.6.0: 30, 14, 58); the Segoe UI option equals d21 plus the digit fix. |
+| FONT-2 | should | Segoe UI Bold draws every digit 6.9 px wide; the estimate priced "1" at 5.0, so "111.1" ran a three-row label 6 px in. | A bold digit floor in the Segoe UI profile. | Unit test (1111 and 8888 price alike); 30 Segoe faces change, census unchanged. |
+| D22-R1 | should | On Tahoma, two-reading keys cut units to "Mi…", "M…", "R…". | The value gives up to two 2 px steps before the unit shortens. | Test fails with the fix removed. |
+| D22-R2 | should | On Tahoma, three-row dial labels 1.6.0 drew whole were cut (COMMITTED). | The value column books the measured bold width; the label prices its letter-spacing. | Test fails with the fix removed. |
+| D22-R3 | polish | A two-row second label line could sit under its value mask. | Measured value widths; the second line sized to the real room, else one cut line. | Test. |
+| D22-R4 | must | Marketplace shot 8 drew an empty page: its filter named the old RTX 4090. | Filter *5080*; the script refuses an empty page. | Shot 8 shows 1-11 / 82. |
+| D22-R5 | should | Captions named the hot spot, "cycle paused" whole, live 4090 counts, and the Themes section sat in the wrong place. | Captions, the capture script and the bench table corrected; section moved. | Copy validator 0 warnings. |
+
+d22 changes the renderers (`src/ui/face-font.ts` new; key, dial, detail
+renderers and format.ts read the profile), theme-store and the global
+settings type, both panels (Text font select, summary, token d22), the
+three action icons, tests (Segoe-calibrated suites pinned, 15 new Tahoma
+tests), two scripts (the bench GPU changed to an RTX 5080), every face
+image, and docs. native/ is unchanged. plugin.js `5eabbe07...`.

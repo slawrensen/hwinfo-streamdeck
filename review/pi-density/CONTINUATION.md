@@ -1,5 +1,77 @@
 # Continuation
 
+## Now (2026-10-02): d21, the release-candidate review
+
+- **What ran.** An evidence-driven review of the whole candidate (46
+  agents: functional and compatibility, lifecycle, faces, performance,
+  security, release integrity, docs), every finding reproduced or
+  refuted, then a skeptic round on the fixes (19 agents), then the freeze
+  rule's two independent reviews of the final delta (copy truth; code,
+  bytes and records), whose findings are fixed below. Records are
+  private: `docs/release/external-review-1.7/rc-review-2026-10-02/`.
+  REGISTER, d21 has the table.
+- **Fixed over 9da6f1c:** faces and the three manifest icons draw in
+  Segoe UI on the device (the app's QtSvg read the font list as one
+  unknown name and drew Tahoma); a Dual key shortens a long unit instead
+  of cutting the value; dial alert row colors (warn back to 1.6.0's
+  amber, crit #FF3B30); the Control panel's remembered folds are
+  answered; the dial setting **Title after a turn** is **Title when the
+  dial moves on** (PI-01: auto cycle, a Control key and a press set to
+  step clear the title too); the Gestures select's description reads the
+  gesture map (PI-03); panel build token d21; manifest description
+  wording; README merged from main's PR #40 with the 1.7 facts; NOTICE
+  and AGENTS take main's wording; docs truth fixes; CHANGELOG gains the
+  published pre-releases 1.6.92.0 and 1.5.90.0 verbatim from their tags
+  (DOC-04).
+- **Images, all real output:** status-screens.png and the themes contact
+  sheet by their scripts; pi-dial-rotation.png and pi-dial-picker.png by
+  `scripts/capture-pi.mjs` (filter `*GPU*`, the bench no longer has an
+  RTX 4090); pi-dial-reading-colors-1.7.png by its own script, provenance
+  pinned to panel build d21 and plugin.js 7c802b38; Marketplace shot 4
+  (`marketing/shot-4-settings.png`) rebuilt from the 1.7 captures with
+  the new `--only-settings` flag.
+- **Untracked, add at commit:** `.github/readme/`,
+  `scripts/readme-boards.mjs`, `test/pi-markup.test.ts`.
+- **Bytes.** plugin.js `7c802b38...` (d20: `0d0b4ef4...`), hwsm.node
+  `95ae41e5...` unchanged. Clean-clone qualification on a snapshot clone
+  (temporary commit 9176c36, only in `%TEMP%\hw-qualify-final3`): all 15
+  stages PASS, archive 370,885 bytes, 47 members, sha256
+  `3e92b18f7faad68b800361c56638cdda40c4359a6f8bc203eab38ea51854bb03`.
+  Against the installed d20: bin/plugin.js, manifest.json, themes.json,
+  NOTICE.md, the three icon SVGs and the five ui/ files differ.
+- **Gates on the final tree:** lint and typecheck 0; unit 1,559 of
+  1,559; native 169 of 169; copy validator 0 warnings; panel suite 453 of 453 and persistence
+  646 of 646 on the final d21 panels (17:06 to 17:12Z); the
+  nine runtime e2e suites on bundle 7c802b38 under the app's Node 20.20.0
+  (08:31 to 08:45Z), and the harness again (105 of 105) after the icon
+  change. ui/ changed after those runtime suites (label, description,
+  token); the panel and persistence suites cover it.
+- **Not installed.** The deck runs d20 until the soak closes.
+- **Soak:** app restart 05:00Z and HWiNFO restart 08:54:48Z on 10-02 are
+  in the CSV (the plugin held, warned once at 11 s and reopened at
+  08:55:08Z). A sleep/wake is still owed before 22:27 local. Exclusions
+  to add (local runs inside the soak, 10-02): 08:31 to 08:47Z, 09:00 to
+  09:20Z, 16:41 to 16:53Z and 17:03 to 17:14Z.
+- **Owed before the tag (owner):** the sleep/wake and the soak summary;
+  a decision that the d19 soak covers the shipping bytes (the soak ran
+  plugin.js `0d0b4ef4`; the delta is faces, theme colors, Control panel
+  routing, two panel labels, icons and text, with native and poller
+  unchanged, so the runbook's soak trigger is not met by the delta, but
+  it is your call); OWNER-CHECK steps 1 to 7 and step 9 on the final
+  archive; the upgrade install over 1.6.0; CI green on the pushed
+  commit; the CHANGELOG date; merging PR #39 and PR #33; the tag; then
+  runbook section 4 to the letter: download the CI draft pack and compare
+  its bin/plugin.js, ui/, profiles/ and manifest bytes with this
+  archive's, and read the native-drift annotation (the release workflow
+  path changed since v1.6.0 and has never run); VirusTotal on the CI
+  pack; the hardware.md 1.7 row and the PERF entry after the soak.
+- **Deferred, with reasons in review.json:** RND-05 (auto decimals),
+  PERF-1 code (scan timer), the COMPAT-1 runtime part, the status
+  headline fit (not a regression), SEC-02 (dev dependency, after the
+  tag), DOC-07 (equal-version reinstall, needs the app), DEV-01 to
+  DEV-09, and a panel pick clearing the title (today it keeps it, as the
+  docs now say).
+
 ## Now (2026-10-01): d20, review closed, ship-ready on the software side
 
 - **Review closed (owner's call, 2026-09-30: "no more hunting").** Nine

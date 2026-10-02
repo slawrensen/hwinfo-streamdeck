@@ -67,6 +67,45 @@ on the hardware myself: the app was not mine to click.
    the check: only the readings ticked for it, and no name stored by an
    unchanged F2 and Enter. Step 8 passes.
 
+9. **The final bundle's faces (RC review, 2026-10-02).** Only after the
+   soak closes, install the final archive (its hash is in CONTINUATION,
+   "Now (2026-10-02)"); the deck runs d20 until then. These faces changed
+   after every earlier step here, and only the renderer and the app's own
+   QtSvg have drawn them, never a deck.
+   a. **Three-row keys.** Two Triple keys between them carry CPU Package,
+      GPU Power, -12V and Battery (three readings each), on the + XL and,
+      if you have one, a 72 px deck (MK.2, Mini or Neo). Each label stays
+      clear of its number. Fail: a label touches or runs into its value.
+   b. **Long unit on a two-reading key (only if you have one).** The
+      plugin has no unit setting; a long unit comes from HWiNFO, such as a
+      custom sensor whose unit is "requests/sec" with a value of four
+      digits or more. On a Dual key the value shows whole, and the unit is
+      shortened with "…" only when it would not fit. Fail: the number
+      loses a digit.
+   c. **Status keys.** Quit HWiNFO and wait about 20 s: the keys hold
+      their last values for a few seconds (the plugin log said 11 s on
+      your restart today), then show "Start HWiNFO / not detected" inside
+      the key's visible area. "Shared Memory off" and "Sensor missing" are
+      a known, deferred fit on the smallest keys; note them, they are not
+      a new fail. Fail: "Start HWiNFO" is cut at the edge.
+   d. **Ember alert rows.** On a three-row Overview dial in Ember, set
+      Warn at and Critical at so one row is in warning and one critical.
+      The amber row stands apart from Ember's own amber numbers. With
+      **Color numbers by sensor type** ticked and Accent colors on By
+      sensor type, the red row also stands apart from a temperature row.
+      Fail: you cannot tell an alerting row from a calm one at a glance
+      (if so, I record it as a known limit or deepen Ember's warning color
+      after 1.7.0).
+   e. **Control key.** Its face reads HWiNFO / CONTROL in Segoe UI,
+      lighter than before, and a press still shows the small tick badge.
+      Fail: the face is blank or the badge sticks.
+   f. **Small text.** Units and three-row labels are lighter than in
+      1.6.0 (Segoe UI in place of Tahoma). Fail: you find them hard to
+      read at arm's length on the smallest keys you use.
+   g. **The dial's title setting.** In a dial's panel, Reading shows
+      **Title when the dial moves on** beside **Title on the dial**, on one
+      line. Fail: the label wraps or pushes the select out of line.
+
 Rollback, if anything is wrong:
 
 ```

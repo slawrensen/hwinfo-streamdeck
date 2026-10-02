@@ -112,7 +112,7 @@ fixes in one release.
 - Every control has a programmatic name and a visible focus ring, text
   contrast and small targets were raised, and the panels reflow at
   320 px wide without horizontal scrolling.
-- Labels follow the new vocabulary; stored settings are unchanged.
+- Labels follow the new vocabulary; the renames change no stored settings.
   "Deck default" is now Default; the deck theme, deck text and type
   accents are Theme, Text color and Accent colors under Advanced,
   Shared defaults (marked "All keys and dials"); Poll every is Read

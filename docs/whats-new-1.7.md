@@ -4,8 +4,8 @@ nav_order: 1.5
 ---
 
 **1.7.0.0 redesigns the settings panels, adds individual dial colors and
-changes how sources, identities and history are handled.** Stored settings
-are unchanged. The tables below say where a change needs you to act; the
+changes how sources, identities and history are handled.** The upgrade
+rewrites no stored settings. The tables below say where a change needs you to act; the
 [changelog](changelog.md) lists every change.
 
 ## The settings panels

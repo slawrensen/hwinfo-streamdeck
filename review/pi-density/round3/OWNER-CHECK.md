@@ -85,7 +85,7 @@ on the hardware myself: the app was not mine to click.
    c. **Status keys.** Quit HWiNFO and wait about 20 s: the keys hold
       their last values for a few seconds (the plugin log said 11 s on
       your restart today), then show "Start HWiNFO / not detected" inside
-      the key's visible area. "Shared Memory off" and "Sensor missing" are
+      the key's visible area. "Shared Memory / is off" and "Sensor missing" are
       a known, deferred fit on the smallest keys; note them, they are not
       a new fail. Fail: "Start HWiNFO" is cut at the edge.
    d. **Ember alert rows.** On a three-row Overview dial in Ember, set

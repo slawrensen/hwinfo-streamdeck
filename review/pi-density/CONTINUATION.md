@@ -46,14 +46,33 @@
   (08:31 to 08:45Z), and the harness again (105 of 105) after the icon
   change. ui/ changed after those runtime suites (label, description,
   token); the panel and persistence suites cover it.
-- **Not installed.** The deck runs d20 until the soak closes.
+- **Installed and upgrade-tested 2026-10-02 (owner's go, soak cut).**
+  Full backup first: `%USERPROFILE%\hwinfo-bench-backup6-10-02-1403-pre-upgrade`
+  (8,726 files of `%APPDATA%\Elgato\StreamDeck`, the app's registry key,
+  the d20 plugin's 47 hashes). The published v1.6.0 package (57fdf219,
+  verified) went on as a clean folder at 21:04:20Z (43 files exact, 0 WARN
+  under 1.6.0). The CI pack from f8625ac (fd3d7de8) was then opened with
+  the app's own installer at 21:05:10Z: "Update plugin", "Installed
+  plugin", AllOk, connected at 21:05:19Z. Installed = package, 47 files,
+  0 extra; plugin.js 7c802b38, hwsm.node 4066d09c (the CI build). 0 WARN
+  or ERROR on start. Settings snapshots (bench `snap.mjs`, 148 pages, 923
+  HWiNFO actions): d20, 1.6.0 and 1.7 differ only by the auto-cycling
+  dial stepping inside its group and the app recording the running
+  plugin version on that page; the global settings hash is unchanged
+  throughout. The installer replaced the whole plugin folder including
+  `logs/`; the d20 logs are in the backup. Rollback:
+  `deploy.ps1 -From <backup>\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin`.
 - **Soak:** app restart 05:00Z and HWiNFO restart 08:54:48Z on 10-02 are
   in the CSV (the plugin held, warned once at 11 s and reopened at
   08:55:08Z). Sleep/wake: 19:39:10 to 19:39:18Z by the system log (8 s,
   so the 60 s CSV shows no gap); both decks reconnected at 19:39:45Z and
   19:39:48Z, the source reopened at 19:39:47Z, no warning, plugin pid
   49804 unchanged, and the owner saw the deck come back. Every soak event
-  is in; the window closes 22:27 local. Exclusions
+  is in. The d20 window was cut at 21:04:12Z for the upgrade test
+  (39.6 h from 05:27Z on 10-01; summary: RSS slope -0.01 MB/30 min on
+  the longest run, private +0.01, handles 180 to 199, CPU 0.13 %, 1 WARN
+  at the HWiNFO restart, 0 ERROR). The monitor follows the shipping bytes
+  (pid 107588) from 21:05:19Z to 22:27 local. Exclusions
   to add (local runs inside the soak, 10-02): 08:31 to 08:47Z, 09:00 to
   09:20Z, 16:41 to 16:53Z and 17:03 to 17:14Z.
 - **Owed before the tag (owner):** the soak summary after 22:27;
@@ -62,8 +81,7 @@
   routing, two panel labels, icons and text, with native and poller
   unchanged, so the runbook's soak trigger is not met by the delta, but
   it is your call); OWNER-CHECK steps 1 to 7 and step 9 on the final
-  archive; the upgrade install over 1.6.0; CI green on the pushed
-  commit; the CHANGELOG date; merging PR #39 and PR #33; the tag; then
+  archive; CI green on the pushed commit; the CHANGELOG date; merging PR #39 and PR #33; the tag; then
   runbook section 4 to the letter: download the CI draft pack and compare
   its bin/plugin.js, ui/, profiles/ and manifest bytes with this
   archive's, and read the native-drift annotation (the release workflow

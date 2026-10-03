@@ -1,6 +1,58 @@
 # Continuation
 
-## Now (2026-10-03): d23, the Text font help on one line
+## Now (2026-10-03): d24, the room 1.6.0 gave the text
+
+- **Why.** The owner held the July hardware photo up to the d23 boards: on
+  the device 1.6.0 drew "Core Max", "CPU Package Power" and the dial
+  session line whole, and d23 cut them. d22 had measured Tahoma against
+  d20, not against what 1.6.0 drew. An audit of the 596-face QtSvg census
+  against 1.6.0 found 24 texts 1.6.0 drew whole that d23 cut; 10 of them
+  collided or clipped in 1.6.0 (cutting them is the fix), 14 were clean
+  (regressions), plus 5 clean texts drawn smaller.
+- **Measured facts.** The app's QtSvg ignores `letter-spacing` entirely
+  (identical ink at 0, 0.4 and 3 px), so the overview labels were priced
+  about 5 px too wide and every librsvg or Chromium preview drew tracking
+  the device never did. SVG draws a run of spaces as one, so the dial
+  stats line was priced 14 px too wide. 1.6.0's three-row labels got their
+  room by gluing the unit to the value (QtSvg ignores the tspan dx);
+  sibling faces overlapped ("GPU Power | 316W", gap -2). Wide Cyrillic
+  capitals reach 13.55 px at the 12 px basis (Tahoma unmapped rate 12.35)
+  and Segoe UI's "Щ"/"—" reach 12.25/12 (unmapped 9.1).
+- **What d24 does.** Three-row labels on Tahoma: 5 px gap, no slack, and
+  whole at 11 px only when no ladder size fits whole (peers capped as the
+  12 px floor would). Single-key value budgeted by ink (125). Dial titles
+  to x=196 (184). Stats line priced collapsed, bytes kept unless cut. No
+  face writes letter-spacing; the overview label is priced on each font's
+  measured table (Segoe UI keeps 2 px slack). Greek, Cyrillic and both
+  dashes measured through QtSvg into both tables. Panel token d24.
+- **Evidence.** Census on the real source, Tahoma: 0 overlaps, 0 touches,
+  1 edge clip, issue set identical to d23 except 6 lens entries where
+  CJK titles are now whole (inside the span Latin titles already use).
+  Segoe UI option: 0 overlaps and 0 touches (d23: 6 and 2). Against
+  1.6.0: clean texts cut 14 to 6, drawn smaller 5 to 4 (3 of them
+  "Sensor glitch" whole at 11 where 1.6.0's sibling faces overlapped).
+  Left as is, by design: "GPU Power" beside a separated unit, "219.20" at
+  the lens line, "INTERRUPTS/S" (the unit column moved left so units stop
+  clipping at x=199), and four CJK/Greek overview test labels. Every
+  changed string d23 to d24 listed and read: Tahoma only gains letters.
+- **Images.** Renderer boards, contact sheet, 5 README boards, 7
+  Marketplace stills and 24 panel captures regenerated (status boards and
+  the Control key came out byte-identical). Shot 8 keeps its d23 file: the
+  bench GPU fans sat at 0 RPM during the run and no d24 change touches
+  those tiles. Captions: the dial alt text quotes 60.4 °C, "cycle paused"
+  is whole, the reading-colors capture is build d24.
+- **Gates on d24 (plugin.js 8d42d0c5):** lint and typecheck 0; unit 1,580
+  of 1,580 (6 new face-font tests); native 169; copy validator 0 warnings;
+  panel suite 453; persistence 646; under the app's Node 20.20.0 the
+  harness 105, drill-down 90 (its micro-label reader keyed on the removed
+  tracking; fixed and re-run), socket close 3, resilience 12, Gadget 28,
+  native edge 37, dead fallback 8, reading links 96, load 13. Clean-clone
+  qualification (temporary commit 91a17c8, `%TEMP%\hw-qualify-d24`): 15
+  of 15, archive 373,602 bytes, 47 members, sha256
+  `eca2667000f15626578a674dcbb05a393c847d5826f7149343a628e8e1e6a145`.
+- **Installed** from the qualified extract by deploy.ps1 at 02:42Z: 47
+  files hash-verified, log 0 WARN 0 ERROR, "text font tahoma"; settings
+  snapshot identical apart from the auto-cycling dial's reading.
 
 - The owner found the Text font help too long (three lines). It now reads
   "Tahoma is the original look. Segoe UI is lighter and narrower." (one

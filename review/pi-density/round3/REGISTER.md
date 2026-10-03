@@ -819,3 +819,22 @@ The owner found the Text font help (three lines) too long. It reads
 one line at the panel's width. Panel token d23; plugin.js unchanged. Unit
 1,574, panel 453, persistence 646, clean-clone qualification 15 of 15
 (archive `dcc4ee18...`, 372,222 bytes).
+
+## d24 (2026-10-03): the room 1.6.0 gave the text
+
+The owner compared the July hardware photo with the d23 boards: 1.6.0 drew
+"Core Max", "CPU Package Power" and the dial session line whole on the
+device, d23 cut them. An audit of the QtSvg census against 1.6.0 (not d20)
+found 14 texts 1.6.0 drew whole and clean that d23 cut, and 5 drawn
+smaller. Causes, all measured: three-row labels held 10 px back on a
+measured table; dial titles kept a 176 px budget where 1.6.0's ink reached
+x=192; the stats line priced every space of a run the SVG draws as one;
+the overview and quad labels priced letter-spacing the app's QtSvg never
+draws (identical ink at 0, 0.4 and 3 px); single values budgeted their
+advance, not their ink. d24 fixes each, removes the never-drawn tracking
+from every face, and measures Greek, Cyrillic and the dashes for both
+fonts. Tahoma: 0 overlaps, 0 touches; Segoe UI option: 0 and 0 (was 6 and
+2). Against 1.6.0: clean cuts 14 to 6, smaller 5 to 4. Unit 1,580, native
+169, panel 453, persistence 646, nine runtime suites green under Node
+20.20.0, clean-clone qualification 15 of 15 (archive `eca26670...`,
+373,602 bytes), installed and logging clean.

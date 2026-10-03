@@ -1,6 +1,49 @@
 # Continuation
 
-## Now (2026-10-03): d24, the room 1.6.0 gave the text
+## Now (2026-10-03): d25, the unit gap where it fits
+
+- **Why.** On d24 the owner found "Core Max" at 11 px "shoved into the
+  corner" and asked for the three-row key as his July photo and homepage
+  show it: units tight ("59.0°C"), labels bigger. Then he asked for a
+  balance rather than dropping the space everywhere, decided by a UI, a
+  UX and a UX research reviewer (briefs and renders in
+  `%TEMP%\hw-rc-review\render\_rr\agents\unit-gap\`).
+- **The panel.** Unanimous: three-row key and tile tight; the MAX/MIN/AVG
+  badge keeps its en space. Dial keeps U+2004 (two of three). Two-reading
+  key: the middle of thin (UI), en with a fallback (UX) and word space
+  (research), with the safeguard UI and UX both asked for. Evidence: on
+  18 real labels a tight three-row key keeps 7 whole against 3 with the
+  en space; d24's en space shrank 4-digit rates on a two-reading key
+  (4850 MB/s 32 to 28 px); SI/ISO put a space before units, CLDR's narrow
+  form and 1.6.0 on the device drew them tight; QtSvg draws every
+  candidate space at its proper width in Tahoma Bold and Segoe UI.
+- **What d25 does.** Three-row unit tight (no gap, priced 0): "Core Max"
+  whole at 12 px beside "59.0°C". Two-reading unit: one word space
+  (U+0020, priced at the font's measured advance) unless it would cost
+  either row's value a size step or cut its unit, then both rows draw
+  tight, as 1.6.0 did (4850 MB/s and 2745 KB/s back at 32 px). Badges and
+  dials unchanged. Panel token d25. Changelog and What's new corrected
+  ("dual, triple and dial" no longer claims a triple gap).
+- **Evidence.** Census on the real source, both fonts: issue sets
+  identical to d24 (0 overlaps, 0 touches). Against 1.6.0: "GPU Power"
+  whole again (11 px), "Sensor glitch" 12 px (d24: 11). Known and older
+  than d25: a three-row face whose value plus unit runs past the 84 px
+  value cap (three decimals, odd custom units) draws its values one step
+  under 1.6.0's 18 px, as d22 to d24 did (d25 lifts "888.800W" 14 to 16).
+- **Images.** 19 boards and stills plus the panel captures regenerated at
+  d25 (shot 8 kept from d23 again); dial alt text quotes 62.8 °C.
+- **Gates on d25 (plugin.js c1a2410c):** lint and typecheck 0; unit 1,583
+  of 1,583 (the triple tile golden re-pinned at d25 bytes, 3 new two-row
+  gap tests); native 169; copy 0 warnings; panel 453; persistence 646;
+  under Node 20.20.0 harness 105, drill-down 90, socket close 3,
+  resilience 12, Gadget 28, native edge 37, dead fallback 8, reading
+  links 96, load 13. Clean-clone qualification (temporary commit
+  1b1a91c, `%TEMP%\hw-qualify-d25`): 15 of 15, archive 373,734 bytes,
+  47 members, sha256
+  `11401ec565917d4f7e89a7aafd0b1c218165bee612f6df3d45407a6e1dafec38`.
+- **Installed** from the qualified extract at 03:33Z: 47 files
+  hash-verified, log 0 WARN 0 ERROR, "text font tahoma"; settings
+  snapshot identical apart from the auto-cycling dial's reading.
 
 - **Why.** The owner held the July hardware photo up to the d23 boards: on
   the device 1.6.0 drew "Core Max", "CPU Package Power" and the dial

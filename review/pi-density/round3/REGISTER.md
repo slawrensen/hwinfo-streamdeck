@@ -838,3 +838,18 @@ fonts. Tahoma: 0 overlaps, 0 touches; Segoe UI option: 0 and 0 (was 6 and
 169, panel 453, persistence 646, nine runtime suites green under Node
 20.20.0, clean-clone qualification 15 of 15 (archive `eca26670...`,
 373,602 bytes), installed and logging clean.
+
+## d25 (2026-10-03): the unit gap where it fits
+
+On d24 the owner found "Core Max" at 11 px pushed into the corner and
+asked for the three-row key his July photo shows: units tight, the label
+bigger. He then asked for a balance across layouts, decided by a UI, a
+UX and a UX research reviewer. Their verdict, taken as is: the three-row
+key and tile draw the unit tight (labels keep the room; 7 of 18 real
+labels whole against 3); the two-reading key draws one word space unless
+it would cost a value a size step or cut a unit, then both rows go tight
+as 1.6.0 did (4850 MB/s back to 32 px); dials and badges keep their
+gaps. Census identical to d24 on both fonts (0 overlaps, 0 touches).
+Unit 1,583, native 169, panel 453, persistence 646, nine runtime suites
+green, clean-clone qualification 15 of 15 (archive `11401ec5...`,
+373,734 bytes), installed and logging clean.

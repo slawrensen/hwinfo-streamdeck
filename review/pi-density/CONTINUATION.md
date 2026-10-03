@@ -1,5 +1,26 @@
 # Continuation
 
+## Now (2026-10-03): d23, the Text font help on one line
+
+- The owner found the Text font help too long (three lines). It now reads
+  "Tahoma is the original look. Segoe UI is lighter and narrower." (one
+  line in the panel capture). Panel token d23; ui/ only, plugin.js
+  `5eabbe07...` unchanged.
+- Gates: unit 1,574 of 1,574; panel suite 453; persistence 646; copy
+  validator 0 warnings; clean-clone qualification on a snapshot clone
+  (temporary commit b0b9c22, `%TEMP%\hw-qualify-d23`): 15 of 15 stages,
+  archive 372,222 bytes, sha256
+  `dcc4ee18102a033d41726eb59c56d5fbc5bc5f5f596948c728fd9e6569812272`.
+  Retaken captures: settings-panel, pi-live-key-advanced,
+  pi-live-dial-advanced, the reading-colors capture (build d23).
+- Marketing check (owner asked): the shipped face images draw Tahoma; the
+  "1" in "71.4" (Marketplace hero) and "1180" (contact sheet) has Tahoma's
+  foot. The Segoe UI text left in the image scripts is board chrome
+  (headings and grey captions), never a face. Copies still showing Segoe
+  faces are the published ones: the live docs site and main README (until
+  1.7 merges), the preview site from 2026-10-02 morning and the live 1.6
+  Marketplace gallery.
+
 ## Now (2026-10-02, evening): d22, the Text font
 
 - **Why.** After the d21 install the owner saw thinner text. Every release

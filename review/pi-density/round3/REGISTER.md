@@ -811,3 +811,11 @@ settings type, both panels (Text font select, summary, token d22), the
 three action icons, tests (Segoe-calibrated suites pinned, 15 new Tahoma
 tests), two scripts (the bench GPU changed to an RTX 5080), every face
 image, and docs. native/ is unchanged. plugin.js `5eabbe07...`.
+
+## d23 (2026-10-03): the Text font help on one line
+
+The owner found the Text font help (three lines) too long. It reads
+"Tahoma is the original look. Segoe UI is lighter and narrower." and fits
+one line at the panel's width. Panel token d23; plugin.js unchanged. Unit
+1,574, panel 453, persistence 646, clean-clone qualification 15 of 15
+(archive `dcc4ee18...`, 372,222 bytes).

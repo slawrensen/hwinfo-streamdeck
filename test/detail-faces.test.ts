@@ -398,14 +398,14 @@ describe("dense tile goldens", () => {
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		// October 2026 (1.7): Segoe UI Bold draws every digit 6.9 px wide, so the
-		// first row's value is priced 2.9 px wider and its label steps 13 to 12
-		// px to stay clear. Exactly those two strings move; they go back here.
-		const before = svg
-			.replace('font-size="12" font-weight="600" fill="#7A8393">CPU Power<', 'font-size="13" font-weight="600" fill="#7A8393">CPU Power<')
-			.replace('<rect x="81.2" y="0" width="58.8" height="47"', '<rect x="84.1" y="0" width="55.9" height="47"');
-		assert.notEqual(before, svg, "the bold digit re-pricing must still be what this face draws");
-		assert.equal(golden(asOf160(before, 3, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		// October 2026 (d25): the unit sits against its value with no gap, as
+		// 1.6.0 drew it on the device, and every label takes that room ("CPU
+		// Power" 12 to 14 px), so each label, mask and unit moves at once. The
+		// face is pinned at the d25 bytes from here; the unit stays tight.
+		assert.match(svg, />W<\/tspan>/);
+		assert.doesNotMatch(svg, /<tspan[^>]*>[\u2002\u2004 ]/);
+		assert.match(svg, /font-size="14" font-weight="600" fill="#7A8393">CPU Power</);
+		assert.equal(golden(svg), "39533062f56258a95516b05b5d9df9fdb26e579cc2cc8cd2f681948fd050ec45");
 	});
 
 	it("quad chunk with the shared badge", () => {

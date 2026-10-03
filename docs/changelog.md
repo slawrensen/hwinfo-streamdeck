@@ -105,10 +105,12 @@ fixes in one release.
   another key is saved as the pointer leaves, instead of being lost
   with the panel.
 - Faces as the device draws them: the app's SVG engine dropped the gap
-  before a unit on dual, triple and dial faces ("59.7°C"), and now
-  draws it ("59.7 °C"). On a dual key with a pinned second row, each
-  row's MIN, MAX or AVG sits after its own label, so a value no longer
-  shrinks or moves as a press cycles the stats.
+  before a unit ("59.7°C"). Dual keys and dials now draw a space
+  ("59.7 °C"), unless it would shrink a value, and three-row keys keep
+  their units tight so the labels keep the room. On a dual key with a
+  pinned second row, each row's MIN, MAX or AVG sits after its own
+  label, so a value no longer shrinks or moves as a press cycles the
+  stats.
 - Every control has a programmatic name and a visible focus ring, text
   contrast and small targets were raised, and the panels reflow at
   320 px wide without horizontal scrolling.
@@ -320,7 +322,14 @@ fixes in one release.
   unknown name, so it drew Tahoma while every layout was measured for the
   narrower Segoe UI: on hardware a three-row label could run into its
   value and a long status line off the key. Labels now shorten or step
-  down a size instead, and titles keep their 1.6.0 sizes.
+  down a size instead, and titles keep their 1.6.0 sizes. Text keeps the
+  room 1.6.0 gave it where nothing collided: "Core Max" shows whole on a
+  three-row key again, a label one step longer shows whole at 11 px
+  instead of cut, dial titles such as "CPU Package Power" and session
+  lines show whole again, and Greek and Cyrillic labels are measured too.
+- Faces no longer ask for letter spacing, which the Stream Deck app never
+  draws, so the settings panel preview and the docs images now match the
+  keys and dials.
 - New **Text font** setting under Advanced, Shared defaults: Tahoma (the
   default) or Segoe UI, the font of Windows and the settings panel,
   lighter and narrower, so long labels fit more often. It applies to every

@@ -116,7 +116,10 @@ describe("Tahoma, the default face", () => {
 
 	it("two-reading keys keep a common unit whole, giving the value at most two size steps", () => {
 		// The unit tells 1785 RPM from 1785 MHz; a review render cut it to "R…".
+		// Its gap is a word space, or none when the space would cost a value a
+		// size step; either way the drawn row fits the band.
 		setFaceFont("tahoma");
+		const word = ((faceFont().advance12[" "] as number) * 14) / 12;
 		for (const [value, unit] of [["1023", "MiB/s"], ["4850.5", "MHz"], ["1785.0", "RPM"], ["987.65", "Mbps"], ["56.3", "°C"]] as const) {
 			const row = { label: "CPU", valueText: value, unitText: unit, statBadge: "" };
 			const svg = renderDualKey({ top: row, bottom: { ...row, label: "GPU" }, palette: VOID });
@@ -125,7 +128,8 @@ describe("Tahoma, the default face", () => {
 			assert.equal(m[2], value);
 			assert.equal((m[3] as string).trim(), unit, `${value} keeps ${unit} whole`);
 			const size = Number(m[1]);
-			assert.ok(estimateKeyTextWidth(value, size, { fontWeight: 700 }) + 6 + estimateKeyTextWidth(unit, 14) <= 120, `${value} ${unit} at ${size} fits the band`);
+			const gap = (m[3] as string).startsWith(" ") ? word : 0;
+			assert.ok(estimateKeyTextWidth(value, size, { fontWeight: 700 }) + gap + estimateKeyTextWidth(unit, 14) <= 120, `${value} ${unit} at ${size} fits the band`);
 		}
 	});
 
@@ -142,12 +146,16 @@ describe("Tahoma, the default face", () => {
 		assert.doesNotMatch(svg, /…/);
 	});
 
-	it("a three-row label too long at 12 px draws whole at 11 instead of cut (the hardware photo's Core Max)", () => {
+	it("a three-row key draws the hardware photo's Core Max whole at 12 px, its unit against the value", () => {
 		setFaceFont("tahoma");
-		const svg = renderTripleKey({ rows: [{ label: "CCD1", valueText: "66.9", unitText: "°C" }, { label: "CCD2", valueText: "64.1", unitText: "°C" }, { label: "Core Max", valueText: "71.4", unitText: "°C" }], palette: VOID });
-		const labels = [...svg.matchAll(/<text x="12"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/g)].map((m) => `${m[2]}@${m[1]}`);
-		// The whole label under the floor caps its peers as the floor would.
-		assert.deepEqual(labels, ["CCD1@14", "CCD2@14", "Core Max@11"]);
+		const rows = (third: string): TripleKeyRow[] => [{ label: "CCD1", valueText: "66.9", unitText: "°C" }, { label: "CCD2", valueText: "64.1", unitText: "°C" }, { label: third, valueText: "71.4", unitText: "°C" }];
+		const labels = (svg: string): string[] => [...svg.matchAll(/<text x="12"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/g)].map((m) => `${m[2]}@${m[1]}`);
+		const svg = renderTripleKey({ rows: rows("Core Max"), palette: VOID });
+		assert.deepEqual(labels(svg), ["CCD1@14", "CCD2@14", "Core Max@12"]);
+		assert.match(svg, />71\.4<tspan[^>]*>°C<\/tspan>/, "no gap before the unit, as 1.6.0 drew it on the device");
+		// One step longer still draws whole, at 11 instead of cut at 12, and the
+		// whole label under the floor caps its peers as the floor would.
+		assert.deepEqual(labels(renderTripleKey({ rows: rows("CPU Temp"), palette: VOID })), ["CCD1@14", "CCD2@14", "CPU Temp@11"]);
 	});
 
 	it("11 px only ever draws a whole three-row label, never a cut one or one that fits larger", () => {
@@ -159,6 +167,28 @@ describe("Tahoma, the default face", () => {
 				if (text !== label) assert.equal(size, "12", `${label}: a cut label stays at the 12 px floor`);
 			}
 		}
+	});
+
+	it("a two-reading key spaces its units with one word space where the values keep their size", () => {
+		setFaceFont("tahoma");
+		const r = (label: string, valueText: string, unitText: string) => ({ label, valueText, unitText, statBadge: "" });
+		const values = (svg: string): string[] => [...svg.matchAll(/font-size="(\d+)" font-weight="700"[^>]*>([^<]*)<tspan[^>]*>([^<]*)</g)].map((m) => `${m[2]}@${m[1]}|${m[3]}`);
+		assert.deepEqual(values(renderDualKey({ top: r("CPU", "56.3", "°C"), bottom: r("GPU", "2745", "MHz"), palette: VOID })), ["56.3@32| °C", "2745@32| MHz"]);
+	});
+
+	it("a two-reading key draws both units tight when a space would cost either value a size step, as 1.6.0 did", () => {
+		setFaceFont("tahoma");
+		const r = (label: string, valueText: string, unitText: string) => ({ label, valueText, unitText, statBadge: "" });
+		const values = (svg: string): string[] => [...svg.matchAll(/font-size="(\d+)" font-weight="700"[^>]*>([^<]*)<tspan[^>]*>([^<]*)</g)].map((m) => `${m[2]}@${m[1]}|${m[3]}`);
+		// The installed d24 drew these rates at 28 and 30 px to make room for its gap.
+		assert.deepEqual(values(renderDualKey({ top: r("Disk Read", "4850", "MB/s"), bottom: r("CPU", "56.3", "°C"), palette: VOID })), ["4850@32|MB/s", "56.3@32|°C"]);
+		assert.deepEqual(values(renderDualKey({ top: r("Net Down", "2745", "KB/s"), bottom: r("Fan", "1450", "RPM"), palette: VOID })), ["2745@32|KB/s", "1450@32|RPM"]);
+	});
+
+	it("a row badge keeps its en space: it is the next word, not a unit", () => {
+		setFaceFont("tahoma");
+		const svg = renderDualKey({ top: { label: "CPU Package", valueText: "90.8", unitText: "W", statBadge: "MAX" }, bottom: { label: "CPU Die", valueText: "56.3", unitText: "°C", statBadge: "" }, palette: VOID });
+		assert.match(svg, />\u2002MAX<\/tspan>/);
 	});
 
 	it("dial titles and stats lines 1.6.0 drew whole stay whole: CPU Package Power, Needs x64 Windows, a spaced session line", () => {

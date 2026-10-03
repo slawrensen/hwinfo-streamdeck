@@ -9,7 +9,7 @@ The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream De
 
 It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
 
-![A Sensor Dial face as the plugin renders it: CPU Temp at 60.4 °C, the session low 51.1 and high 73.5, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
+![A Sensor Dial face as the plugin renders it: CPU Temp at 62.8 °C, the session low 51.1 and high 73.5, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
 
 ## The touchscreen readout
 
@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d24 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.0.0-d25 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 

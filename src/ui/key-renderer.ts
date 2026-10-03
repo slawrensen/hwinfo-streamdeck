@@ -450,6 +450,30 @@ function rowBadgeWidth(badge: string): number {
 	return INLINE_GAP_PX + estimateKeyTextWidth(badge, DUAL_ROW_BADGE_SIZE, { fontWeight: 700 }) + 0.5 * Array.from(badge).length;
 }
 
+/** The gap before a two-reading key's unit: one word space, since the value
+ * has its line to itself (the standards and HWiNFO's own "55.2 °C" put a
+ * space there; an en space read loose). It is the first thing to give up
+ * room: when it would cost either row's value a size step or cut its unit,
+ * both rows draw the unit tight, as 1.6.0 drew every unit on the device. */
+const DUAL_UNIT_GAP = " ";
+
+type DualValueFit = { valueSize: number; unitText: string };
+
+function dualValueFit(valueText: string, unitText: string, gapPx: number): DualValueFit {
+	let valueSize = capValueSize(valueText, dualValueFontSize(valueText), LABEL_BUDGET, 14);
+	if (isTahoma() && unitText !== "") {
+		// Tahoma's wide digits leave a common unit (MiB/s, MHz, RPM) no room
+		// at the char-count size: the value gives up to two 2 px steps
+		// before the unit is shortened, so a long custom unit still cannot
+		// shrink the number far.
+		const floor = Math.max(14, valueSize - 4);
+		while (valueSize > floor && estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) + gapPx + estimateKeyTextWidth(unitText, 14) > LABEL_BUDGET) {
+			valueSize -= 2;
+		}
+	}
+	return { valueSize, unitText: dualUnitFit(unitText, LABEL_BUDGET - estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) - gapPx) };
+}
+
 export interface DualKeyRow {
 	label: string;
 	valueText: string;
@@ -487,7 +511,15 @@ export function renderDualKey(opts: DualKeyOptions): string {
 	const text = opts.text ?? themeTextColors(palette);
 	const sharedBadge = opts.sharedBadge ?? "";
 	const parts: string[] = svgOpen(144, 144, palette.bg);
-	[opts.top, opts.bottom].forEach((row, i) => {
+	const rows = [opts.top, opts.bottom];
+	const values = rows.map((row) => truncateLabel(row.valueText, DUAL_VALUE_MAX));
+	// The word space at the face font's own measured width, rounded up.
+	const gapPx = Math.ceil(((faceFont().advance12[DUAL_UNIT_GAP] as number) * 14) / 12 * 10) / 10;
+	const spaced = rows.map((row, i) => dualValueFit(values[i] as string, row.unitText, gapPx));
+	const tight = rows.map((row, i) => dualValueFit(values[i] as string, row.unitText, 0));
+	const gap = spaced.every((fit, i) => fit.valueSize === tight[i]?.valueSize && fit.unitText === tight[i]?.unitText) ? DUAL_UNIT_GAP : "";
+	const fits = gap === "" ? tight : spaced;
+	rows.forEach((row, i) => {
 		const labelY = DUAL.labelY + i * DUAL.rowPitch;
 		const valueY = DUAL.valueY + i * DUAL.rowPitch;
 		const badge = row.statBadge.toUpperCase();
@@ -495,21 +527,10 @@ export function renderDualKey(opts: DualKeyOptions): string {
 		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
 		// One middle-anchored chunk: the label and its badge center as a unit.
 		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
-		const valueText = truncateLabel(row.valueText, DUAL_VALUE_MAX);
-		let valueSize = capValueSize(valueText, dualValueFontSize(valueText), LABEL_BUDGET, 14);
-		if (isTahoma() && row.unitText !== "") {
-			// Tahoma's wide digits leave a common unit (MiB/s, MHz, RPM) no room
-			// at the char-count size: the value gives up to two 2 px steps
-			// before the unit is shortened, so a long custom unit still cannot
-			// shrink the number far.
-			const floor = Math.max(14, valueSize - 4);
-			while (valueSize > floor && estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) + INLINE_GAP_PX + estimateKeyTextWidth(row.unitText, 14) > LABEL_BUDGET) {
-				valueSize -= 2;
-			}
-		}
-		const unitText = dualUnitFit(row.unitText, LABEL_BUDGET - estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) - INLINE_GAP_PX);
-		const unit = unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${inlineGap(14)}${escapeXml(unitText)}</tspan>` : "";
-		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+		const valueText = values[i] as string;
+		const { valueSize, unitText } = fits[i] as DualValueFit;
+		const unit = unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${gap}${escapeXml(unitText)}</tspan>` : "";
+		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" || gap === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	});
 	parts.push(`<rect x="12" y="${DUAL.dividerY}" width="120" height="2" fill="${palette.track}"/>`);
 	if (sharedBadge !== "") {
@@ -547,8 +568,6 @@ const TRIPLE_VALUE_SIZES = [18, 16, 14] as const;
 const TRIPLE_LABEL_SIZES = [16, 15, 14, 13, 12] as const;
 /** Inline unit, the multi-readout family's 14 px step (dual and quad). */
 const TRIPLE_UNIT_SIZE = 14;
-/** The inline gap before the unit, as the device draws it (inlineGap). */
-const TRIPLE_UNIT_DX = INLINE_GAP_PX;
 /** Defensive value cut (the formatter compacts long before this). 11 keeps
  * even an all-digit value plus the widest data unit inside the canvas when
  * the chunk grows leftward from its end anchor. */
@@ -607,11 +626,14 @@ export interface TripleKeyOptions {
 }
 
 /** Estimated width of one row's end-anchored value+unit chunk at the given
- * value size (the unit keeps its fixed step, like the dual chunks). */
+ * value size (the unit keeps its fixed step, like the dual chunks). The unit
+ * sits against its value with no gap, as the device drew every three-row
+ * key through 1.6.0 ("59.0°C": the app's QtSvg ignored the old dx); the
+ * size and color step tells them apart, and the label keeps that room. */
 function tripleChunkWidth(row: TripleKeyRow, valueSize: number): number {
 	let width = estimateKeyTextWidth(row.valueText, valueSize, { fontWeight: 700 });
 	if (row.unitText !== "") {
-		width += TRIPLE_UNIT_DX + estimateKeyTextWidth(row.unitText, TRIPLE_UNIT_SIZE);
+		width += estimateKeyTextWidth(row.unitText, TRIPLE_UNIT_SIZE);
 	}
 	return width;
 }
@@ -688,8 +710,8 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 				`<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
 			);
 		}
-		const unit = row.unitText !== "" ? `<tspan font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${inlineGap(TRIPLE_UNIT_SIZE)}${escapeXml(row.unitText)}</tspan>` : "";
-		parts.push(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end"${unit === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(row.valueText)}${unit}</text>`);
+		const unit = row.unitText !== "" ? `<tspan font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</tspan>` : "";
+		parts.push(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(row.valueText)}${unit}</text>`);
 	});
 	// A separator draws only between configured rows: a trailing rule over
 	// an unpicked band would read as a row that failed to load. The empty

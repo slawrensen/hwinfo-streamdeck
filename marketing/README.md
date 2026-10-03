@@ -86,7 +86,7 @@ skips the other boards, though loading the script still needs HWiNFO Shared
 Memory with the readings named in `K` (the CPU temperature and pump rows). On a machine without an
 RTX 4090, set `PI_CAPTURE_FILTER` (for example `*GPU*`) for the capture's
 filter step. The 1.7 shot 4 was built this way on 2026-10-03 from panel
-build 1.7.0.0-d24 with the filter `*GPU*`.
+build 1.7.0.0-d25 with the filter `*GPU*`.
 
 Shot 2 wraps the real-hardware photograph in the standard board chrome:
 

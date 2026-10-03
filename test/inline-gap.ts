@@ -6,11 +6,13 @@
  * three-per-em space above), and each text element carrying one gained
  * xml:space="preserve". beforeInlineGap puts the older bytes back so the
  * historical goldens keep their hashes; `sites` states how many gaps the
- * face must carry, so every other difference still fails.
+ * face must carry, so every other difference still fails. Since d25 a
+ * two-reading key's unit gap is a word space (U+0020), or none when the
+ * space would cost a value a size step, and a three-row unit sits tight.
  */
 import assert from "node:assert/strict";
 
-const GAP = /<tspan ([^>]*)>[\u2002\u2004]/g;
+const GAP = /<tspan ([^>]*)>[\u2002\u2004 ]/g;
 const PRESERVE = ' xml:space="preserve"';
 
 export function beforeInlineGap(svg: string, sites: number): string {

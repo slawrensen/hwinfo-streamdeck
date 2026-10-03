@@ -3,7 +3,7 @@ title: Installation & requirements
 nav_order: 2
 ---
 
-Getting the plugin running is three things: the Stream Deck plugin itself, a working copy of HWiNFO, and a one-time toggle in HWiNFO so the plugin can read its sensors. This page covers all three.
+You need three things: the Stream Deck plugin, a running copy of HWiNFO, and a one-time setup in HWiNFO that lets the plugin read its sensors.
 
 > **Windows only.** HWiNFO is a Windows application and this plugin reads its shared-memory or Gadget-registry interface locally. There is no macOS or Windows-on-ARM build; the plugin needs 64-bit (x64) Windows. No ads, no telemetry, MIT licensed.
 
@@ -11,9 +11,9 @@ Getting the plugin running is three things: the Stream Deck plugin itself, a wor
 
 | Requirement | Notes |
 | --- | --- |
-| **Windows 10 or later**, 64-bit (x64) | Windows-on-ARM is not supported (keys show a clear "Needs x64 Windows" screen). There is no macOS build; the plugin doesn't install there at all. |
+| **Windows 10 or later**, 64-bit (x64) | Windows-on-ARM is not supported (keys show **Needs x64 / Windows**). There is no macOS build; the plugin doesn't install there at all. |
 | **Stream Deck software 6.9+** | The Elgato desktop app that hosts plugins. Update it from within the app if you are on an older build. |
-| **HWiNFO** (free or Pro) | Installer or portable. Download from [hwinfo.com](https://www.hwinfo.com/download/). The plugin does not bundle HWiNFO; you run it yourself. |
+| **HWiNFO** (free or Pro) | Installer or portable. Download from [hwinfo.com](https://www.hwinfo.com/download/). The plugin does not bundle HWiNFO; you run it yourself. The free version works; [Pro](https://www.hwinfo.com/licenses/) removes the 12-hour Shared Memory limit, and I recommend it if HWiNFO runs all day. |
 
 Any Stream Deck hardware works for the **Sensor Reading** key action. The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL (the models with dials and a touchscreen). The **HWiNFO Control** key action goes anywhere a key action can, including the Stream Deck Pedal and Corsair G-keys, and drives Sensor Dials on other connected decks. The full device matrix is on [Hardware compatibility](hardware.md).
 
@@ -32,7 +32,7 @@ There are two ways to install, depending on where you got the plugin.
 
 The plugin is on the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). Install it from there in one click and the Marketplace hands the package to the Stream Deck app. I publish each version to GitHub Releases first, so while an update is in review the Marketplace can be a version behind. Check the version shown on the listing if you want the newest build.
 
-> **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, Windows refused access needed to read the sensor source. That error alone does not identify an account, session or privilege mismatch. Open the key or dial settings and choose **Copy support report** for support; see [Troubleshooting](troubleshooting.md).
+> **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, Windows refused access needed to read the sensor source. That error alone does not identify an account, session or privilege mismatch. Open the key or dial settings and choose **Copy support report** under *Advanced → Support*; see [Troubleshooting](troubleshooting.md).
 
 ### Updating and removing
 
@@ -53,10 +53,10 @@ Shared Memory exposes **every** reading HWiNFO measures, with min / max / averag
 4. Recommended, so HWiNFO is always feeding the deck without a window in your way:
    - **Auto Start**: HWiNFO launches with Windows.
    - **Minimize Sensors on Startup**: the Sensors window starts minimized.
-   - (Combined with Sensors-only, HWiNFO runs quietly in the background.)
+   - (Combined with Sensors-only, HWiNFO runs in the background with its window minimized.)
 5. Click **OK**.
 
-> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; HWiNFO Pro removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
+> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
 
 ### Free path: Gadget reporting
 
@@ -64,11 +64,11 @@ Gadget reporting never expires on the free version, but it only exposes the sens
 
 1. Start **HWiNFO** in Sensors mode.
 2. In the HWiNFO **sensor window**, click **Configure Sensors** and open the **HWiNFO Gadget** tab.
-3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Shift-click selects a range, so you can tick many at once.
+3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Tick only the readings you put on the deck: each one adds to every scan, and a Shift-click range can tick a reading HWiNFO reports twice under one name, which 1.7 withholds.
 
 The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. HWiNFO 8.48 creates that key only once a reading is ticked: with reporting enabled and nothing ticked, keys show **Start HWiNFO / not detected** while HWiNFO is running. **Tick sensors / in Gadget** appears when the key is there but holds no rows, which unticking everything can leave.
 
-You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, select **Advanced → Data source → Gadget registry only** before choosing them. Since 1.7, Gadget shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
+You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, set **Data source** to **Gadget registry only** under *Advanced → Connection* before choosing them. Since 1.7, Gadget shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
 
 ## Portable HWiNFO caveats
 
@@ -81,14 +81,14 @@ The portable build of HWiNFO works identically, but there is no installer to wir
 ## Verify it works
 
 1. Drag **HWiNFO Sensors → Sensor Reading** onto a key.
-2. In the settings panel (property inspector), open the **Sensor** picker and choose a reading. The list groups readings by source (CPU, GPU, drives, …) and shows live values; type to filter.
+2. In the settings panel (property inspector), click the **Reading** search box and choose a reading. The list groups readings by source (CPU, GPU, drives, …) and shows live values; type to filter. The panel's header then shows the key's face and its state: **Live** with the data source while data arrives.
 3. With a readable source, the key shows the value. Since 1.7, Gadget can show **Age unknown** until a value change is observed; see [Status screens](status-screens.md).
 
 If instead the key shows a status screen like **Start HWiNFO** or **Shared Memory off**, HWiNFO isn't publishing yet; recheck the setup above, or see [Troubleshooting](troubleshooting.md) for what each screen means and how to fix it.
 
 ## Next steps
 
-- [Sensor Reading (keys)](sensor-reading.md): every key setting (label, theme, stat mode, decimals, sparkline, thresholds).
+- [Sensor Reading (keys)](sensor-reading.md): every key setting (label, theme, value shown, decimals, sparkline, thresholds).
 - [Sensor Dial (Stream Deck +)](sensor-dial.md): the dial and touchscreen action.
 - [Data sources](data-sources.md): Shared Memory vs. Gadget, and how auto-fallback works.
-- [Themes](themes.md): the seven presets, type accents, and alert colors.
+- [Themes](themes.md): the seven presets, accent colors, and alert colors.

@@ -6,8 +6,9 @@
  * Targeting is explicit: every dial, or only dials whose Link ID matches
  * the key's Target field. The key's own physical device is never consulted,
  * so a pedal or a headless controller can drive dials on a different deck.
- * Commands fire on key UP, once per press (Multi Action safe), and the
- * explicit pause/resume/pin/unpin variants are idempotent under repeats.
+ * Commands fire on key UP, once per press (Multi Action safe), under the
+ * settings the press began with, and the explicit pause/resume/pin/unpin
+ * variants are idempotent under repeats.
  * The destructive all-dials stats reset exists only as an explicit scope
  * choice in this action's settings, never as a default.
  */
@@ -15,14 +16,15 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import streamDeck, { action, SingletonAction, type KeyAction, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, SingletonAction, type DidReceiveSettingsEvent, type KeyAction, type KeyDownEvent, type KeyUpEvent, type SendToPluginEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 import type { JsonValue } from "@elgato/utils";
 
 import { dispatchDialCommand, isControlCommand } from "../commands";
 import { parseResetScope } from "../controls";
 import { registerDiagnostics } from "../diagnostics";
-import { buildSupportReportPayload } from "../pi-protocol";
+import { buildSupportReportPayload, handlePiRequest } from "../pi-protocol";
 import { hashId, trace } from "../recorder";
+import { sortedJson } from "../sorted-json";
 
 /**
  * Success feedback image: the key's own icon with a small tick badge in the
@@ -54,6 +56,9 @@ function buildSuccessImage(): string | undefined {
 }
 
 const SUCCESS_IMAGE = buildSuccessImage();
+
+/** A press whose key disappeared before its release (see `presses`). */
+const LEFT = Symbol("left");
 const SUCCESS_BADGE_MS = 700;
 
 /** Persisted settings (written by the PI; all optional). */
@@ -74,6 +79,16 @@ export type ControlActionSettings = {
 export class HwinfoControlAction extends SingletonAction<ControlActionSettings> {
 	/** By context id: Stream Deck can replay willAppear without a disappear. */
 	private readonly visible = new Set<string>();
+	/** The settings each held key was pressed under (sorted JSON), or null
+	 * once the press was consumed by a changed document or a replayed
+	 * appear, or LEFT once the key disappeared mid-press. Commands fire on
+	 * release, so a press begun as "Next reading" must not release as
+	 * "Reset every dial" (external review AX46, the Control sibling of
+	 * AX27). A repeated down keeps the record it finds, consumed or not
+	 * (AX57). A key that left cannot receive its release while away, so its
+	 * next down is a new press, as on a dial; a release that reaches it
+	 * after it returns, with no down since, is still consumed. */
+	private readonly presses = new Map<string, string | null | typeof LEFT>();
 	/** Pending badge reverts by context id, so repeats re-arm cleanly. */
 	private readonly badgeTimers = new Map<string, NodeJS.Timeout>();
 	/** The key each pending badge is painted on. willDisappear carries only
@@ -92,7 +107,8 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 
 	override onWillAppear(ev: WillAppearEvent<ControlActionSettings>): void {
 		this.visible.add(ev.action.id);
-		streamDeck.logger.debug(`Control key appeared on ${ev.action.device.name} (${ev.action.id})`);
+		if (typeof this.presses.get(ev.action.id) === "string") this.presses.set(ev.action.id, null);
+		streamDeck.logger.debug(`Control key appeared on ${JSON.stringify(ev.action.device.name)} (${ev.action.id})`);
 		if (this.restoreOwed.delete(ev.action.id)) {
 			// No argument restores the manifest image.
 			void ev.action.setImage();
@@ -109,6 +125,7 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 	 */
 	override onWillDisappear(ev: WillDisappearEvent<ControlActionSettings>): void {
 		this.visible.delete(ev.action.id);
+		if (this.presses.has(ev.action.id)) this.presses.set(ev.action.id, LEFT);
 		const timer = this.badgeTimers.get(ev.action.id);
 		if (timer !== undefined) {
 			clearTimeout(timer);
@@ -146,7 +163,23 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 		);
 	}
 
+	override onKeyDown(ev: KeyDownEvent<ControlActionSettings>): void {
+		const held = this.presses.get(ev.action.id);
+		if (held === undefined || held === LEFT) this.presses.set(ev.action.id, sortedJson(ev.payload.settings));
+	}
+
+	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<ControlActionSettings>): void {
+		// An unchanged echo, whatever its key order, leaves the press armed.
+		const pressed = this.presses.get(ev.action.id);
+		if (typeof pressed === "string" && pressed !== sortedJson(ev.payload.settings)) this.presses.set(ev.action.id, null);
+	}
+
 	override async onKeyUp(ev: KeyUpEvent<ControlActionSettings>): Promise<void> {
+		// A release with no press seen fires as it always has: a Multi Action
+		// or Key Logic step may deliver the release alone.
+		const pressed = this.presses.get(ev.action.id);
+		this.presses.delete(ev.action.id);
+		if (pressed === null || pressed === LEFT || (pressed !== undefined && pressed !== sortedJson(ev.payload.settings))) return;
 		const settings = ev.payload.settings;
 		// Honor the panel: its Command select shows "Next reading" until the
 		// user picks something, so an unset command is "next", not an error.
@@ -180,7 +213,11 @@ export class HwinfoControlAction extends SingletonAction<ControlActionSettings> 
 			return;
 		}
 		if (payload.event === "getSupportReport") {
-			void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload());
+			void streamDeck.ui.sendToPropertyInspector(buildSupportReportPayload(payload.requestId));
+		} else if (payload.event === "getPanelFolds" || payload.event === "setPanelFolds") {
+			// The panel waits for its remembered folds before it shows its
+			// sections, like every HWiNFO panel; unanswered, it waited 600 ms.
+			handlePiRequest(payload);
 		}
 	}
 }

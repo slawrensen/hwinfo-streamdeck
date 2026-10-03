@@ -1,0 +1,116 @@
+{
+	"role": "UX lead: visual systems and first-time comprehension combined. I am an AI reviewer. Nothing here is a user study; every claim is labeled MEASURED (simulated host), READ (code) or INFERRED.",
+	"environment": "Simulated host only. I used pi-sim.mjs from C:\\Users\\stephen\\git\\hwinfo-pi-density (production plugin-side modules from that working tree, which has uncommitted density-pass changes) with PI_SIM_PLUGIN_DIR set per build: proto-R, proto-A, the d04 reference, and my trial copy C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-ux\\proto-UX (R plus the UXR01 to UXR03 trials; the only edits are a tail block in ui/proto-R.css and two edits in ui/proto.js).\n\nBrowser: headless Chrome through cdp.mjs, run with npx tsx. Ports: 34210-34212 (R and trial), 34213-34215 (d04), 34216-34218 (A). DPR 1.5 at widths of 240 px and up, DPR 3 below, height 410. Widths: 373, 340, 320, 310, 300, 299, 280, 249, 220, 200, 199, 189, 175, 160.\n\nStates: key Default on Void, Paper, Ultraviolet, Graphite, Midnight and Forest; all 8 explicit picks; dial Ember; dial Default on Paper; empty key on Paper (folded directly, via a remembered fold, a reading picked while folded, then reopened and refolded); empty key with an unknown stored theme; empty dial on Void and Paper; unknown ids \"neon-2031\" and \"synthwave-sunset-2027\". Also: hover, focus-visible, Enter, Alt-click on the theme row, Fold all and Open all, Tab order on an explicit pick, and AX names from Accessibility.getPartialAXTree.\n\nLate fold answer: sim.replyDelayMs also delays the themes payload, so chips cannot be focused before the answer. For the chip case, lab2.mjs patches ws send in-process to delay only the panelFolds answer by 700 ms.\n\nScripts: hw-tfa-ux\\lab.mjs, lab2.mjs, sheet.py. Results: out\\{R,A,d04}\\lab.json and out2\\{R,UX}\\lab2.json. Contact sheets: sheets-chips-373.png, sheets-chips-160.png, sheets-states.png, sheets-empty.png, sheet-sbs-373.png, sheet-sbs-160.png, sheet-sbs-foldall.png, sheet-align.png. Read-only on the repo and every prototype dir. No Stream Deck app, HWiNFO, installed plugin, port 23654 or computer use.",
+	"verdict": "approve with changes",
+	"summary": "R reads as one of the panel's sections in both states, and a first-time user can answer \"what is drawn and where does it come from\" in both states. I approve it with one small blocking alignment fix (UXR01, proven in my trial copy) and three non-blocking fixes.\n\nFolded row (MEASURED):\n- The row is 30 px against Reading's 30.2.\n- \"Theme\" computes to 13px / 600 / rgb(236,236,236) at x 28, like Reading.\n- The marker is 0 px off the title's center, and the gap after the title is 8 px.\n- In Fold all, the six titles form one column and one rhythm. A's theme row is 34 px with the marker 2 px off.\n\nOpen row:\n- It is d04's own line (\"Theme Default (shared: Void) Change\") with a fold marker. The title is bold, the name regular and the scope muted, so a d04 user sees the same words in the same place.\n- Band height: 111 px against d04's 106.1 and A's 130 at 373.\n- A shows \"Theme\" twice (a section row, then the band's label); R shows it once.\n\nComprehension in both states (MEASURED):\n- The folded row keeps the same scope words as the open line. The chip carries the answer to \"what is drawn\": the name, the palette, and Default's dashed frame and link mark in the resolved palette.\n- The AX name equals the visible words in both states: \"Theme Default (shared: Void)\", \"Theme Ember (set on this key)\", \"Theme \\\"neon-2031\\\" (unknown; draws Void)\", and on an empty key \"... Shows on the key once a reading is picked.\"\n\nThe 24 px chip now reads as the chip, not a link (MEASURED plus RD):\n- I measured 13 theme and shared combinations at 373 and 160. The stripe sits 3.9 px (Default) or 4.9 px (presets) under the baseline.\n- Its gap to the word's line box is 1.1 px (Default) or 2.1 px (presets), identical to the grid chip's in every case.\n- A's 22 px chip overlaps its line box by 0.9 to 1.9 px.\n- Crops of all 8 chips (sheets-chips-373.png, sheets-chips-160.png) show a filled key face every time, never underlined text.\n- The weakest edge is Graphite's face against the panel (1.24:1), and it still reads as a box at DPR 1.5.\n\nThe first-time-user reviewer's three reasons are answered:\n1. The label-style title is now a section title (above).\n2. The underline chip is now the grid chip's anatomy.\n3. The empty-key fact now stays on the folded row, with Paper verified directly and via a remembered fold, at 373, 189 and 160, and in the AX name.\n\nAttempts to break R (MEASURED):\n- Pick stability: 8 picks on a key and a dial at 14 widths moved the chips 0 px. No line was cut and nothing overflowed.\n- Near misses around Change fold nothing.\n- Alt-click on the theme row folds every section.\n- Tab order on an explicit pick is: row, checked chip, Reading.\n- Clicking the folded chip opens the band.\n- The late-answer guard keeps a focused summary and a focused chip open and focused (700 ms late answer, themes on time).\n\nWhat I found:\n1. UXR01 (blocking, small): when the line wraps, align-items: center floats \"Theme\" off its marker.\n   - Folded, unknown id at 189 and 160: 13.2 to 21.6 px off (sheet-align.png).\n   - Folded dial at 249: 4.8 px off.\n   - Open, long unknown id at 373 and 320: 4.8 px off.\n   - Open at 189 and 160: 2.9 px off.\n   Six declarations fix every case (at most 0.1 px), and the known-theme heights and chip positions do not change.\n2. UXR02: the empty-key note's held slot never releases. After a pick, reopening and refolding still leaves a blank line (47.1 px instead of 31).\n3. UXR03: an empty key with an unknown stored theme loses the note.\n4. UXR04: the \"never folds\" comments are still in the files (BT03).\n\nAccepted deviation: at 200% zoom the open band is 247.6 px against d04's 216.7 and A's 240.6, and the row is 59.8 px against a11y's 42. That misses VT06's d04 + 8 budget. I accept it:\n- It buys Change out of the row at every width.\n- It keeps the two reserved lines, so no pick moves the chips.\n- Folding at zoom gives 47.8 px, where d04's band stays at 216.7.\n\nResidual for the owner (not a change): with focus in Reading when a late answer arrives, the band still folds and the focused field moves up 80 px, with focus kept (MEASURED). This already happens for every section and needs a fold reply slower than 300 ms.",
+	"round_one_blockers": [
+		{
+			"id": "BT01 (beginner): folded chip at the grid chip's geometry",
+			"status": "resolved",
+			"evidence": "MEASURED lab.json chips: the stripe-to-line-box gap is 1.1 px (Default) and 2.1 px (presets), identical to the grid chip in all 26 folded/grid pairs at 373 and 160. BT01 asks for at least 0.9 px and within 1 px of the grid; R is 0 px from the grid. The face is 24 px, not BT01's literal 30 px: R took VT03's 24 px anatomy, which passes BT01's own gap test. RD: sheets-chips-373.png and sheets-chips-160.png show the stripe clear of every word, including descenders (ink-to-stripe 1.9 px for Graphite, Midnight and Paper, the same as the grid). For comparison, A's 22 px chip measures -0.9 to -1.9 px."
+		},
+		{
+			"id": "BT02 (beginner): empty-key note on the folded row",
+			"status": "resolved",
+			"evidence": "MEASURED, empty key on a Paper shared theme, folded:\n- Visible text and AX name: 'Theme Default (shared: Paper) Shows on the key once a reading is picked.'\n- Band 47.1 px at 373 and 80 px at 189 and 160, with 0 overflow.\n- Same result through a fold remembered from a configured key.\n- Empty dial on Void and Paper: no note.\n- A reading picked while folded drops the text, keeps the band folded and moves Reading 0 px.\nThe wording differs from BT02's but states the same fact. Two small gaps remain: UXR02 (the slot never releases) and UXR03 (empty key plus unknown theme)."
+		},
+		{
+			"id": "VT01 (visual): 'Theme' styled as a section title",
+			"status": "resolved",
+			"evidence": "MEASURED: 13px / 600 / rgb(236,236,236) at x 28 open and folded, equal to Reading. sheet-sbs-foldall.png shows six titles in one weight and color."
+		},
+		{
+			"id": "VT03 (visual): 24 px mini chip with the grid anatomy",
+			"status": "resolved",
+			"evidence": "MEASURED: faces are 24 px tall and 72 to 76.2 px wide at 373, 64 to 68.2 px at 160. The stripe sits 3.9 px (Default) or 4.9 px (presets) under the baseline, at least 3 px as required."
+		},
+		{
+			"id": "VT06 (visual): zoomed layout",
+			"status": "partly",
+			"evidence": "MEASURED at 189 and 160:\n- Met: folded band 47.8 px (VT06 asks at most 50), chip beside the title, marker 0 px off on known themes, no overflow.\n- Not met: the open band is 247.6 px against VT06's at most d04 + 8 (224.7). This is the deliberate trade for AT01/AT02 and the reserved lines; I accept it.\n- Not met: the open marker is 2.9 px off the title (VT06 asks within 1). UXR01 fixes this.\n- Not met: an unknown id folded at zoom floats the title 13.2 to 21.6 px off its marker. UXR01 fixes this."
+		},
+		{
+			"id": "VT07 (visual): never ellipsize the line",
+			"status": "resolved",
+			"evidence": "MEASURED: 'synthwave-sunset-2027' and 'neon-2031' are never clipped, open or folded, at 373 and 320 (curClipped false), and the AX name ends 'draws Void'. When the id wraps, the title drifts off the marker (UXR01), but nothing is cut."
+		},
+		{
+			"id": "PT01 (power): the open row ends before Change",
+			"status": "resolved",
+			"evidence": "MEASURED: the summary's right edge is at 305 and Change's left at 318.5 (13.5 px gap, at least 12 required). The verify run shows 0 of 5 near misses toggling at 373, 189 and 160. sheets-states.png shows hover and focus stopping before Change while open, and spanning the full row while folded."
+		},
+		{
+			"id": "PT04 (power): port the lab checks into the product PI e2e suite",
+			"status": "partly",
+			"evidence": "READ: verify.mjs holds every check PT04 lists: near misses at 373/189/160, pick stability at 4 widths, the AX name and expanded state from the AX tree, Fold all/Open all, per-kind memory, and Enter/Space with 0 writes. They are not in the product suite yet. That is implementation work, not a design defect."
+		},
+		{
+			"id": "AT01 (a11y): Change outside the fold row's box and focus ring",
+			"status": "resolved",
+			"evidence": "MEASURED: the summary's right edge is at 305, at most Change's left (318.5) minus 4. state-open-focus.png shows the ring ending before Change. Tab order is Open all, summary, Change, checked chip."
+		},
+		{
+			"id": "AT02 (a11y): at zoom Change leaves the row",
+			"status": "partly",
+			"evidence": "MEASURED at 189 and 160: Change never intersects the summary, and there is no overflow. The summary is 59.8 px against AT02's at most 42, a deliberate deviation for the two reserved name lines that keep every pick at one height (0 px chip movement at 14 widths). I accept the deviation."
+		},
+		{
+			"id": "AT01 (adversarial): near misses on Change never fold the band",
+			"status": "resolved",
+			"evidence": "MEASURED (verify run, re-checked in the captures): 0 toggles and 0 writes at 373, 189 and 160. A press on Change opens Shared defaults and leaves the band open."
+		},
+		{
+			"id": "AT02 (adversarial): empty-key note with its slot held",
+			"status": "resolved",
+			"evidence": "MEASURED: the note shows folded and is in the AX name. The first reading moves #sec-reading 0 px (136.1 before and after). The hold now outlives its reason (UXR02, non-blocking)."
+		}
+	],
+	"changes": [
+		{
+			"id": "UXR01",
+			"change": "Align the fold row on its first line instead of its center. When the line does not fit beside the title, it wraps whole onto the next flex line (open too) instead of into a narrow column beside the title. Proven in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-ux\\proto-UX\\com.lawrensen.hwinfo.sdPlugin\\ui\\proto-R.css (tail block):\n\ndetails.hw-look-fold > summary.hw-look-name { flex-wrap: wrap; }\ndetails.hw-look-fold > summary.hw-look-name > .hw-label { line-height: 24px; }\n@media (max-width: 299px) {\n  details.hw-look-fold:not([open]) > summary.hw-look-name .hw-look-current { flex: 0 1 auto; }\n  details.hw-look-fold[open] > summary.hw-look-name > .hw-label { line-height: inherit; }\n  details.hw-look-fold[open] > summary.hw-look-name::before { top: 7px; }\n}",
+			"why": "MEASURED (out2/R/lab2.json, sheet-align.png): R centers the title on the whole wrapped block, so it leaves its marker's line:\n- 13.2 px (\"neon-2031\") and 21.6 px (\"synthwave-sunset-2027\") folded at 189 and 160, where the title floats mid-block beside a three-line column and the marker sits alone at the top;\n- 4.8 px folded on a dial at 249, with \"(set on this / dial)\" in two lines beside the chip;\n- 4.8 px open at 373 and 320 with a long unknown id;\n- 2.9 px open at 189 and 160 in every state.\nEvery other section keeps its title on the marker's line and wraps its summary under it, so these rows stop reading as a section in exactly the states the brief's question 5 names (unknown stored theme, 200% zoom).\n\nMEASURED in the trial:\n- Marker to title is at most 0.1 px in all 60 cases.\n- Known-theme rows keep R's exact heights, and chip tops per width are identical to R's.\n- Costs fall only on rare states: an unknown id wraps under the title (open 48.8 px at 373 instead of 39.6); a dial at 249 folds to 47.8 instead of 40.6.",
+			"acceptance_test": "On the simulated host at 373, 320, 249, 189 and 160, open and folded, test six states: key Default on Void, dial Ember, key \"neon-2031\", key \"synthwave-sunset-2027\", empty key on Paper, and empty key with \"neon-2031\".\n1. The fold marker's center (summary top + ::before top + 5) is within 1 px of the title's center.\n2. Whenever the line or note wraps to a second visual line, its left edge is at x 28.\n3. No horizontal overflow.\n4. The 8-pick sweep on a key and a dial with shared Ultraviolet at 373, 340, 320, 310, 300, 299, 249, 189 and 160 gives one chip top per width, equal to R's: 121/137, 133.6, 194.1, 210.2, 278.1/262.1, 294.2/262.1.\n5. Summary heights stay 30 px open at 300 and up, and 59.8 px open under 300. The folded band stays 31 px at 280 and up, and 47.8 px at 189 and 160.\n\nThe trial passes all five (lab2.mjs UX run).",
+			"blocking": true,
+			"category": "MF"
+		},
+		{
+			"id": "UXR02",
+			"change": "The empty-key note's held slot lasts only while the band stays folded. The next time the band opens with the note empty, drop the hold. Trial in proto-UX ui/proto.js: a 'toggle' listener on #sec-theme that, when details.open and the note is empty, clears noteHeld and re-syncs. In production this lives in the same render that fills the note.",
+			"why": "MEASURED (out2/R/lab2.json emptyHold, sheets-empty.png): after a reading is picked on a folded empty key, R keeps a blank line in the folded row for the rest of the panel's life. Refolded, the band is still 47.1 px instead of 31. After Fold all it is still 47.1. A newcomer sees an unexplained gap under 'Theme [chip] (shared: Paper)'.\n\nThe hold exists so the first reading moves nothing under the pointer. Once the band has been opened, the fold itself moves everything, so the hold has no job left. MEASURED in the trial: the pick still moves Reading 0 px (136.1 before and after).",
+			"acceptance_test": "Setup: key-empty on a Paper shared theme at 373, band folded (47.1 px).\n1. Push a reading: the band stays 47.1 px and #sec-reading's top moves 0 px.\n2. Open the band, then fold it: the band is 31 px and #theme-note's height is 0.\n3. Repeat the pick, then use Open all and Fold all: 31 px.\n\nThe trial measured 47.1, then 47.1 with 0 px move, then 31, then 31. R measures 47.1 at the last two steps.",
+			"blocking": false,
+			"category": "RD"
+		},
+		{
+			"id": "UXR03",
+			"change": "Drive the folded note from the same test that sets the help line, !configured && kind === \"key\" in renderThemeHelp, as BT02 asked. Do not use chip presence or a match on the help text (proto.js line 34 requires chip !== null and matches /^Shows on the key/). Then an empty key with an unknown stored theme also carries the note.",
+			"why": "MEASURED: key-empty with settings.theme \"neon-2031\" folds to 'Theme \"neon-2031\" (unknown; draws Void)' with no note. The row claims Void, while the empty key draws its fixed black 'Pick a sensor' prompt. The open help for that key does say 'Shows on the key once a reading is picked.' (READ renderThemeHelp: the no-reading text wins over the unknown text), so R shows the fact open and drops it folded. The state is rare, but it is the same truth gap as BT02.",
+			"acceptance_test": "1. key-empty with theme \"neon-2031\", folded: the AX name reads 'Theme \"neon-2031\" (unknown; draws Void) Shows on the key once a reading is picked.' The band is at most 47 px at 373 (the trial measured 46.1), with no overflow at 160.\n2. dial-empty with an unknown theme, folded: no note.\n3. Configured keys: no note.",
+			"blocking": false,
+			"category": "RD"
+		},
+		{
+			"id": "UXR04",
+			"change": "Carry out round one's BT03 when this lands in production. Rewrite the comments that still say the palette never folds:\n- sensor-reading.html line 39 and sensor-dial.html line 35 ('The palette is the one set of controls that never folds');\n- pi.css line 370 ('the look band: the palette, never folded');\n- pi-model.js line 117 ('always-open band above the sections and never folds').",
+			"why": "READ in proto-R: all four still state the retired rule, next to markup that now folds. The next reader could take a relaxed owner rule for a live one and 'fix' the fold back out.",
+			"acceptance_test": "grep -rn \"never fold\" com.lawrensen.hwinfo.sdPlugin/ui returns no line about the theme band or palette.",
+			"blocking": false,
+			"category": "RD"
+		}
+	],
+	"keep": [
+		"The theme line itself is the fold row. Open, it is d04's line plus a marker: 111 px against d04's 106.1 and A's 130 at 373. Folded, the chip takes the name's slot and the scope stays: 31 px.",
+		"One section row: 30 px against Reading's 30.2; title 13px/600/#ececec at x 28; marker 0 px off; 8 px after the title. Fold all shows one column of six titles (A: 34 px, marker 2 px off).",
+		"Name at weight 400 with a muted scope. The open line reads title, value, scope.",
+		"The 24 px folded chip with the grid chip's anatomy: stripe-to-line-box gap identical to the grid chip in all 26 measured pairs; Default's dashed frame and link mark in the resolved palette; no selection ring; not focusable. Clicking it opens the band.",
+		"Change outside the row: the row ends 13.5 px before it. Hover and focus stop before Change when open and span the full row when folded. At zoom, Change sits on its own line, right-aligned.",
+		"Two reserved name lines at zoom: 8 picks move the chips 0 px at 14 widths on a key and a dial. The accepted cost is 247.6 px open at 200% zoom.",
+		"Never ellipsized: an unknown id folds to text only, '\"id\" (unknown; draws X)', with the full id in the AX name.",
+		"The empty-key note on the folded row and in the AX name, with no note on dials, and 0 px movement when the first reading lands.",
+		"Open all, Fold all and Alt-click include the band (Alt-click on the theme row folds all, MEASURED). Folds are remembered per panel kind, and the band stays hidden until the fold answer arrives.",
+		"The shell guard: a late fold answer never folds a section holding focus. MEASURED for a focused summary and a focused chip, with a 700 ms answer and the themes on time.",
+		"#theme-desc hidden: it stays the radiogroup's description without a duplicate StaticText."
+	],
+	"cleanup": "Processes:\n- I started pi-sim on 34210/34211 (the R lab, then three lab2 runs: one on R, two on my trial copy), 34213/34214 (d04) and 34216/34217 (A). Each stopped through sim.stop().\n- I started headless Chrome through cdp.mjs on 34212, 34215 and 34218. As in round one, close() left the real browser child alive on Windows each time. I stopped exactly those seven browser trees, each matched by --remote-debugging-port equal to my own port, with taskkill /T: PIDs 150144, 155556, 151660, 140128 and 142996 (34212), 124772 (34215) and 155932 (34218).\n- I removed exactly their seven profile folders in %TEMP%: hw-pi-lab-5YhKMQ, lDKkqb, eXiuv1, WqkLwF, wlcA6f, T4Exvq and Vs3NDW. I left every other hw-pi-lab-* folder (other labs) alone.\n- Final check: no chrome.exe with a 3421x debug port, no listener on 34210-34219, and no node process from my directory.\n\nWrites:\n- None to the repository, the hwinfo-pi-density worktree or any prototype dir.\n- Everything I wrote is under C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-ux: lab.mjs, lab2.mjs, sheet.py, killmine.ps1, killport.ps1, the proto-UX trial copy, out\\, out2\\, the contact-sheet PNGs and the run logs.\n- The ws send patch in lab2.mjs is in-process only.\n\nUntouched: the Stream Deck app, HWiNFO, the installed plugin and port 23654. I did not use computer use."
+}

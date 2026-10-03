@@ -33,17 +33,20 @@
 // Run with `npm run e2e:pi` (no plugin process, no HWiNFO needed).
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket, { WebSocketServer } from "ws";
+import { chromePath } from "./lib/cdp.mjs";
 import { buildInfo, makeCheck, sleep } from "./lib/e2e-common.mjs";
 import { cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const WS_PORT = 28998;
 const HTTP_PORT = 28999;
 const DEBUG_PORT = 0; // Discovered only from this run's disposable profile.
-const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+// Windows Chrome by default; CHROME (or the Linux container's Chromium)
+// elsewhere, so the suite runs wherever a Chromium does.
+const CHROME = chromePath();
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 
@@ -361,6 +364,13 @@ wss.on("connection", (ws) => {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: THEMES });
 				} else if (event === "getDetailSupport") {
 					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: { event: "detailSupport", supported: true, model: "Harness Deck" } });
+				} else if (event === "getPreview" && treeDown) {
+					// The panel names a source outage from the preview the plugin
+					// answers getPreview with (buildPreview: state "unavailable",
+					// the source's hint, nothing missing), not from the tree.
+					// Answered only while the source is down, so every other run
+					// keeps the preview-free host it was written against.
+					toPi({ event: "sendToPropertyInspector", action: "com.lawrensen.hwinfo.reading", context: `ctx-${mode}`, payload: { event: "preview", state: "unavailable", hint: DOWN_TREE.hint, missing: false } });
 				}
 				break;
 			}
@@ -371,6 +381,13 @@ wss.on("connection", (ws) => {
 });
 
 const info = buildInfo({ devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }] });
+// The panel collapses the Press section by default; every leg here works in
+// it (the detail list, its drags and focus), so the suite opens it first,
+// the way a person does. A closed <details> renders nothing: its controls
+// neither take focus nor report geometry. Advanced stays closed, because
+// the config legs open it themselves and read the fill that opening does.
+const OPEN_PRESS = `<script>document.addEventListener("DOMContentLoaded",()=>{const s=document.getElementById("sec-interaction");if(s)s.open=true;});</script>`;
+
 function bootstrap() {
 	const actionInfo = {
 		action: "com.lawrensen.hwinfo.reading",
@@ -378,7 +395,7 @@ function bootstrap() {
 		device: "dev1",
 		payload: { settings: store.settings, coordinates: { column: 0, row: 0 }, controller: "Keypad" }
 	};
-	return `<style>body{background:#2d2d2d;margin:0;padding:8px 0;}</style>
+	return `<style>body{background:#2d2d2d;margin:0;padding:8px 0;}</style>${OPEN_PRESS}
 <script>window.addEventListener("load",()=>{connectElgatoStreamDeckSocket(String(${WS_PORT}),"pi-ctx","registerPropertyInspector",${JSON.stringify(JSON.stringify(info))},${JSON.stringify(JSON.stringify(actionInfo))});});</script>`;
 }
 
@@ -438,18 +455,39 @@ const chromeProfile = createBrowserProfile("pi-persist-profile-");
 const chromeStartedAt = new Date().toISOString();
 const chrome = spawn(
 	CHROME,
-	["--headless=new", "--disable-gpu", `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${chromeProfile}`, "--hide-scrollbars", "about:blank"],
+	[
+		...(process.platform === "linux" && process.getuid?.() === 0 ? ["--no-sandbox"] : []),
+		"--headless=new",
+		"--disable-gpu",
+		`--remote-debugging-port=${DEBUG_PORT}`,
+		`--user-data-dir=${chromeProfile}`,
+		"--hide-scrollbars",
+		"about:blank"
+	],
 	{ stdio: "ignore", windowsHide: true }
 );
 let chromeError;
 chrome.once("error", (err) => { chromeError = err; });
 function killChromeTree() {
+	if (process.platform !== "win32") {
+		// Only the browser this suite spawned; its renderers exit with it.
+		chrome.kill("SIGKILL");
+	} else {
+		try {
+			cleanupBrowser(chromeProfile, chromeStartedAt);
+		} catch (err) {
+			const message = `[pi-persistence] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`;
+			console.error(message);
+			results.errors.push(message);
+			return;
+		}
+	}
+	// The browser is gone, so its throwaway profile goes too: a run used to
+	// leave one in the temp folder every time.
 	try {
-		cleanupBrowser(chromeProfile, chromeStartedAt);
-	} catch (err) {
-		const message = `[pi-persistence] browser cleanup failed; profile ${chromeProfile} left for inspection: ${String(err)}`;
-		console.error(message);
-		results.errors.push(message);
+		rmSync(chromeProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+	} catch {
+		/* a straggling renderer may still hold a file; the OS temp sweep owns it */
 	}
 }
 const watchdog = setTimeout(() => {
@@ -484,24 +522,48 @@ try {
 		ws.once("error", reject);
 	});
 	let seq = 0;
+	let loadGeneration = 0;
 	const pending = new Map();
 	ws.on("message", (data) => {
 		const msg = JSON.parse(data.toString());
+		if (msg.method === "Page.loadEventFired") loadGeneration++;
 		if (msg.id !== undefined && pending.has(msg.id)) {
 			pending.get(msg.id)(msg);
 			pending.delete(msg.id);
 		}
 	});
-	const cdp = (method, params = {}) =>
+	const sendCdp = (method, params = {}) =>
 		new Promise((resolve, reject) => {
 			const id = ++seq;
 			pending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)));
 			ws.send(JSON.stringify({ id, method, params }));
 		});
+	const cdp = async (method, params = {}) => {
+		const generation = loadGeneration;
+		const result = await sendCdp(method, params);
+		if (method === "Page.navigate") {
+			const deadline = performance.now() + 3500;
+			while (loadGeneration === generation && performance.now() < deadline) await sleep(25);
+			if (loadGeneration === generation) throw new Error("Panel navigation did not load");
+		}
+		return result;
+	};
 	const evaluate = (expression) => cdp("Runtime.evaluate", { expression, returnByValue: true });
 	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
 	await cdp("Page.enable");
 
+	// A panel is settled once its document loaded, it connected, the sensor
+	// tree arrived and no fold state is pending: startup waits for that, up
+	// to the 3.5 s it once always slept, instead of always sleeping (MS03).
+	const settlePanel = async () => {
+		const deadline = performance.now() + 3500;
+		for (;;) {
+			const r = await evaluate('document.readyState === "complete" && !!window.__hwPanel?.context && window.__hwPanel?.tree != null && !document.documentElement.hasAttribute("data-folds-pending")');
+			if (r.result?.value === true) return;
+			if (performance.now() >= deadline) throw new Error("Panel did not settle within 3500 ms");
+			await sleep(25);
+		}
+	};
 	const deepEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 	/** The invariant after one edit: at least one new write arrived, the
 	 * edited field landed, and the marker + unknown blob rode through. */
@@ -517,24 +579,20 @@ try {
 	};
 	const setSelect = async (setting, value) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-select[setting="${setting}"]');
+			const el = document.querySelector('select[data-setting="${setting}"]:not([data-global])');
 			if (!el) return "missing";
-			el.value = ${JSON.stringify(value)};
-			const inner = (el.shadowRoot ?? el).querySelector("select");
-			if (inner && inner.value !== ${JSON.stringify(value)}) {
-				inner.value = ${JSON.stringify(value)};
-				inner.dispatchEvent(new Event("change", { bubbles: true }));
+			if (el.value !== ${JSON.stringify(value)}) {
+				el.value = ${JSON.stringify(value)};
+				el.dispatchEvent(new Event("change", { bubbles: true }));
 			}
 			return "ok";
 		})()`);
-		check(`sdpi-select ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
+		check(`select ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
 	};
 	const setTextfield = async (setting, value) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-textfield[setting="${setting}"]');
-			if (!el) return "missing";
-			const input = (el.shadowRoot ?? el).querySelector("input");
-			if (!input) return "no input";
+			const input = document.querySelector('input[data-setting="${setting}"]:not([data-global])');
+			if (!input) return "missing";
 			input.focus();
 			input.value = ${JSON.stringify(value)};
 			input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
@@ -542,18 +600,16 @@ try {
 			input.blur();
 			return "ok";
 		})()`);
-		check(`sdpi-textfield ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
+		check(`text field ${setting} driven`, res.result?.value === "ok", String(res.result?.value));
 	};
 	const clickCheckbox = async (setting) => {
 		const res = await evaluate(`(() => {
-			const el = document.querySelector('sdpi-checkbox[setting="${setting}"]');
-			if (!el) return "missing";
-			const input = (el.shadowRoot ?? el).querySelector("input[type=checkbox]");
-			if (!input) return "no input";
+			const input = document.querySelector('input[type=checkbox][data-setting="${setting}"]:not([data-global])');
+			if (!input) return "missing";
 			input.click();
 			return "ok";
 		})()`);
-		check(`sdpi-checkbox ${setting} clicked`, res.result?.value === "ok", String(res.result?.value));
+		check(`checkbox ${setting} clicked`, res.result?.value === "ok", String(res.result?.value));
 	};
 	/** Bounded DOM poll over CDP (the waitUntil idiom with an async
 	 * predicate): passes the check as soon as `expr` evaluates true, and a
@@ -578,7 +634,7 @@ try {
 	// ---- run 1: the marked Back tile ------------------------------------
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/back`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500); // load + register + the 400 ms visibility polls
+	await settlePanel(); // load + register + the 400 ms visibility polls
 
 	check("opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const vis = await evaluate(`JSON.stringify({
@@ -654,7 +710,9 @@ try {
 	check("second picker searched", pick.result?.value === "ok", String(pick.result?.value));
 	await sleep(600);
 	const row = await evaluate(`(() => {
-		const r = document.querySelector("#picker2-list .hw-row");
+		// The first row the filter left visible (non-matching rows stay in
+		// the list, hidden, so typing never rebuilds it).
+		const r = document.querySelector("#picker2-list .hw-row:not([hidden])");
 		if (!r) return "missing";
 		r.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 		return "ok";
@@ -712,7 +770,7 @@ try {
 	// ---- run 2: an ordinary key stays the stock panel --------------------
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 
 	check("ordinary key: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const plainVis = await evaluate(`JSON.stringify({
@@ -815,12 +873,12 @@ try {
 	// or the uniform fill built it.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("grouped: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	// The boot sensorTree echo runs every picker's showSelection; the
 	// collector's HTML resting text must survive it (placeholder ownership).
 	const restingPh = (await evaluate(`document.getElementById("pickerd-search")?.placeholder ?? "gone"`)).result?.value;
-	check("grouped: the boot tree echo kept the collector's resting placeholder", restingPh === "Search sensors to add…", String(restingPh));
+	check("grouped: the boot tree echo kept the collector's resting placeholder", restingPh === "Search readings to add", String(restingPh));
 
 	const clickChipRemove = async (key) =>
 		(await evaluate(`(() => {
@@ -945,7 +1003,7 @@ try {
 	check("leg B: the tile grew to a quad keeping its dressing", deepEqual(frame.detailTiles?.[0], { size: 4, labels: ["", "", "MINE", ""], colors: ["#FF00AA", null, null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
 	check("leg B: the neighbor tile is untouched", frame.detailTiles?.[1]?.size === 2, JSON.stringify(frame.detailTiles?.[1]));
 	check("leg B: full quad auto-disarmed", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg B: placeholder reset", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg B: placeholder reset", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg C: aiming at the under-occupied fill tail materializes it on the
 	// pick and keeps the aim until toggled off by hand.
@@ -963,7 +1021,7 @@ try {
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(400);
 	check("leg C: manual toggle-off wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
-	check("leg C: toggle-off reset the placeholder", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg C: toggle-off reset the placeholder", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg D: + all under a standing aim appends in ONE frame and disarms,
 	// so the lit marker never claims a landing that did not happen.
@@ -984,7 +1042,7 @@ try {
 	check("leg D: the block appended at the end", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:2", "bench:0:3", "bench:0:1", "bench:0:6", "bench:0:7", "bench:0:8", "bench:0:4", "twin:1:0", "twin:1:1"]), JSON.stringify(frame.detailKeys));
 	check("leg D: the plan rode through unchanged", frame.detailTiles?.length === 3 && frame.detailTiles?.[0]?.size === 4 && frame.detailTiles?.[1]?.size === 2 && frame.detailTiles?.[2]?.size === 4, JSON.stringify(frame.detailTiles?.map((t) => t.size)));
 	check("leg D: + all disarmed the stale aim", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg D: placeholder no longer claims the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg D: placeholder no longer claims the aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg E: the cell rename commit touches exactly one label; the dressed
 	// quad beside it is the index-slip tripwire. The commit also prunes the
@@ -1142,7 +1200,7 @@ try {
 	check("leg H: none of it wrote", writes.length === mark, `${writes.length - mark} frames`);
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(400);
-	check("leg H: manual disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg H: manual disarm restored the resting text", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg I: an edit that consumes the aimed tile disarms the aim, so the
 	// placeholder never claims a tile the walk no longer has (the shrink
@@ -1161,7 +1219,7 @@ try {
 	await sleep(700);
 	frame = atomic("leg I aimed-tile removal", writes.slice(mark));
 	check("leg I: no armed marker outlives the vanished tile", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
-	check("leg I: the placeholder dropped the stale claim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg I: the placeholder dropped the stale claim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	mark = writes.length;
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
 	await sleep(700);
@@ -1178,7 +1236,7 @@ try {
 	// density 4, so the walk is a dressed quad plus a full fill quad.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg L: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 
 	// L1: an in-tile chip drop reorders the cells AND their dressing: the
@@ -1233,6 +1291,13 @@ try {
 		JSON.stringify(frame.detailTiles)
 	);
 
+	// The drag legs below aim at pixel positions that assume a tile's chips
+	// share one row. At the panel's own width a four-cell tile wraps (its
+	// move and remove buttons are sized as touch-and-pointer targets), so
+	// these legs run wide, where the premise holds; the routing math they
+	// prove is width-independent, and the arrow-key legs cover narrow.
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// L4: tile chrome is a reorder surface, not a teleport. Dropping a
 	// chip beside its own cell writes nothing (the honest no-op), and a
 	// drop on the chrome left of the first chip lands BEFORE it, exactly
@@ -1431,6 +1496,8 @@ try {
 	);
 	check("leg L9: painting a caret wrote nothing", writes.length === mark, `${writes.length - mark} frames`);
 
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// ---- run 3c: the bench case, exactly as reported (leg M) -------------
 	// Stephen's tile on the real deck: a bare-values quad whose ONLY
 	// stored dressing is one cell label ("Solo" on cell 0) and no colors
@@ -1442,7 +1509,7 @@ try {
 	// color. Seeded fresh so the leg reads as its own story.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg M: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const wornColors = async () =>
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")[0].querySelectorAll(".hw-set-chip")).map((c) => [c.dataset.key, c.querySelector(".hw-tile-color")?.value ?? null, c.querySelector(".hw-set-name")?.textContent]))`)).result?.value;
@@ -1517,7 +1584,7 @@ try {
 	// where the walk cannot reach it. Seeded fresh, same bench tile.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg N: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const legNTail = JSON.parse(
 		(await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost)")).map((t) => t.querySelectorAll(".hw-set-chip").length))`)).result?.value ?? "[]"
@@ -1554,7 +1621,7 @@ try {
 	// tile the NEW walk holds the reading in.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg J: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const tileSizesNow = `JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-tile:not(.ghost) .hw-tile-size")).map((b) => b.textContent))`;
 	const densityBefore = (await evaluate(tileSizesNow)).result?.value;
@@ -1589,7 +1656,7 @@ try {
 	// then landed somewhere the panel never showed.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/density`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg J2: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("leg J2: armed tile 4's +", (await clickAdd("3")) === "ok");
 	await sleep(400);
@@ -1603,7 +1670,7 @@ try {
 		tileSizesNow
 	);
 	await sleep(700);
-	check("leg J2: the reshape disarmed the dangling aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J2: the reshape disarmed the dangling aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	check("leg J2: no armed marker after the reshape", (await evaluate(`document.querySelector('#detail-list .hw-add.armed') === null`)).result?.value === true);
 	check("leg J2: the disarm itself wrote only the density edit", writes.slice(mark).every((w) => w.detailDensity === "4"), JSON.stringify(writes.slice(mark).length));
 
@@ -1632,7 +1699,7 @@ try {
 		(await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value === "×4",
 		String((await evaluate(`document.querySelector('#detail-list .hw-tile:not(.ghost) .hw-tile-size')?.textContent`)).result?.value)
 	);
-	check("leg J3: the full-quad growth disarmed the aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J3: the full-quad growth disarmed the aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	mark = writes.length;
 	await evaluate(`document.querySelector('#pickerd-list .hw-row[data-key="gpu:0:0"] .hw-tick')?.click()`);
 	await sleep(700);
@@ -1683,8 +1750,14 @@ try {
 	check("leg J5: the armed + says aria-pressed", pressedArmed === "true", String(pressedArmed));
 	check("leg J5: disarmed again", (await clickAdd("1")) === "ok");
 	await sleep(400);
-	const noteLive = (await evaluate(`document.querySelector('#detail-list .hw-set-note')?.getAttribute("aria-live") ?? "none"`)).result?.value;
-	check("leg J5: the list note is a live region", noteLive === "polite", String(noteLive));
+	// The note is rebuilt with the list, so it is not itself live (a region
+	// created with its text is often not read); its text reaches the
+	// panel's one persistent polite region instead.
+	const noteSaid = (await evaluate(`(() => { const note = document.querySelector('#detail-list .hw-set-note')?.textContent ?? ""; const live = document.querySelector('.hw-sr-only[aria-live="polite"]'); return { note, live: live?.textContent ?? "none", persistent: live !== null && !document.getElementById("detail-list").contains(live) }; })()`)).result?.value;
+	check("leg J5: the list note reaches a persistent live region", noteSaid?.persistent === true && noteSaid.note !== "" && noteSaid.live === noteSaid.note, JSON.stringify(noteSaid));
+	// Wide for the same reason as the L legs: short tiles share a row there.
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// Leg J6: a whole tile drags (and arrow-keys) as one unit: its members
 	// travel as a run, its dressing travels with them, a partial spec
 	// shrinks to what it fills instead of swallowing a neighbor's head,
@@ -1756,7 +1829,7 @@ try {
 		tiles[1]?.querySelector(".hw-tile-grip")?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
 	})()`);
 	await sleep(700);
-	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("leg J6: the tile move disarmed the standing aim", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 
 	// Leg J7: dropping an existing chip ON a tile joins that tile: the
 	// target grows a cell and the chip's old tile shrinks by the cell it
@@ -1840,13 +1913,15 @@ try {
 	await evaluate(`document.querySelector('#detail-list input.hw-cell-rename')?.blur()`);
 	await sleep(400);
 
+	await cdp("Emulation.setDeviceMetricsOverride", { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
+	await sleep(200);
 	// ---- run 4: the 128-reading cap refuses loudly -----------------------
 	// At the cap the tick's native flip must not survive as a lying
 	// checkbox (the add was refused and nothing re-rendered), and the
 	// list note names the cap; freeing one slot lands the same tick.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/cap`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("cap: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const capNote = (await evaluate(`document.querySelector("#detail-list .hw-set-note")?.textContent ?? "gone"`)).result?.value;
 	check("cap: the list note names the cap", String(capNote).includes("That is the cap"), String(capNote));
@@ -1905,7 +1980,7 @@ try {
 	check("run 4b: focus followed the remove through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-set-remove")`)).result?.value === true);
 	await evaluate(`document.querySelector('#detail-list .hw-add.armed')?.click()`);
 	await sleep(300);
-	check("run 4b: disarm restored the resting text", (await placeholderNow()) === "Search sensors to add…", await placeholderNow());
+	check("run 4b: disarm restored the resting text", (await placeholderNow()) === "Search readings to add", await placeholderNow());
 	await evaluate(`document.querySelector('#detail-list .hw-tile-size[data-tile="0"]')?.click()`);
 	await sleep(500);
 	check("run 4b: focus followed the size cycler through the rebuild", (await evaluate(`document.activeElement !== null && document.activeElement.classList.contains("hw-tile-size") && document.activeElement.dataset.tile === "0"`)).result?.value === true);
@@ -1916,7 +1991,7 @@ try {
 	// chips wear renames and colors the deck never renders.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/salvage`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("salvage: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const salvage = JSON.parse(
 		(await evaluate(`JSON.stringify({
@@ -1938,7 +2013,7 @@ try {
 	// the parked chip's removal leave the plan untouched.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("adopted: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const adopted = JSON.parse(
 		(await evaluate(`JSON.stringify((() => {
@@ -1996,8 +2071,11 @@ try {
 	})()`);
 	await sleep(700);
 	frame = atomic("adopted rename", writes.slice(mark));
-	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[0]));
-	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }), JSON.stringify(frame.detailTiles?.[1]));
+	// Lossless tile writes (F01): a stored tile rewrites only the field an
+	// edit changed. The seed's tiles carry no colors and no cellLabels, and
+	// they gain none: absent stays absent, which the runtime reads the same.
+	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"] }), JSON.stringify(frame.detailTiles?.[0]));
+	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"] }), JSON.stringify(frame.detailTiles?.[1]));
 	check("adopted: the parked key stays in the stored list", frame.detailKeys?.length === 4 && frame.detailKeys?.[0] === "bench:0:0", JSON.stringify(frame.detailKeys));
 
 	// Removing the PARKED chip edits the list only: no tile held it, so
@@ -2014,7 +2092,7 @@ try {
 	check("adopted: removed the parked chip", parkedRemove.result?.value === "ok", String(parkedRemove.result?.value));
 	await sleep(700);
 	frame = atomic("adopted parked removal", writes.slice(mark));
-	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"], colors: [null, null], cellLabels: true }, { size: 2, labels: ["L3", "L4"], colors: [null, null], cellLabels: true }]), JSON.stringify(frame.detailTiles));
+	check("adopted: the plan rode through byte-identical", deepEqual(frame.detailTiles, [{ size: 2, labels: ["Renamed A", "L2"] }, { size: 2, labels: ["L3", "L4"] }]), JSON.stringify(frame.detailTiles));
 	check("adopted: only the parked key left the list", deepEqual(frame.detailKeys, ["bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
 
 	// ---- run 6b: dressing travels PAST a parked primary (leg O) ----------
@@ -2028,7 +2106,7 @@ try {
 	// off to whatever reading grows into that slot later.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg O: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	mark = writes.length;
 	check("leg O: dragged the tail reading onto the head tile", (await dragDrop("bench:0:3", '#detail-list .hw-set-chip[data-key="bench:0:1"]', "left")) === "ok");
@@ -2037,7 +2115,9 @@ try {
 	check("leg O: the listed order changed and the parked primary kept its slot", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:3", "bench:0:1", "bench:0:2"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg O: every label rode its own reading and the emptied tile left the plan",
-		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null], cellLabels: true }]),
+		// The grown tile rewrites the fields that changed (size, labels,
+		// colors); its untouched, absent cellLabels stays absent.
+		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null] }]),
 		JSON.stringify(frame.detailTiles)
 	);
 	check(
@@ -2054,7 +2134,7 @@ try {
 	// place.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/repick`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("repick: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("repick: no chip wears the Back-tile mark yet", (await evaluate(`Array.from(document.querySelectorAll("#detail-list .hw-set-name")).every((n) => !(n.textContent ?? "").includes("(Back tile)"))`)).result?.value === true);
 	const repickGates = async () =>
@@ -2135,7 +2215,7 @@ try {
 	// per-field store adopts the wholesale write.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/grouped`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("config: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	check("config: opened the Advanced fold", (await evaluate(`(() => {
 		const fold = document.querySelector('details[data-fold="advanced"]');
@@ -2178,12 +2258,14 @@ try {
 	mark = writes.length;
 	await evaluate(`(() => {
 		document.getElementById("config-key").value = "{nope";
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(400);
 	check("config: garbage is refused by name", String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value).startsWith("Refused: not JSON"), String((await evaluate(`document.getElementById("config-note")?.textContent`)).result?.value));
 	await evaluate(`(() => {
 		document.getElementById("config-key").value = "[1,2]";
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(400);
@@ -2193,6 +2275,7 @@ try {
 	await evaluate(`(() => {
 		const doc = ${JSON.stringify(JSON.stringify({ detailKeys: ["bench:0:0", "bench:0:2"], detailMode: "custom", detailTiles: [{ size: 2, labels: ["A", "B"], colors: [null, null], cellLabels: true }], futureBlob: FUTURE_BLOB, label: "Restored", pressBehavior: "open-details", readingKey: "cpu:0:0", cfgBlob: { keep: "yes" } }))};
 		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
@@ -2231,6 +2314,7 @@ try {
 			})
 		)};
 		document.getElementById("config-key").value = doc;
+		document.getElementById("config-key").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
@@ -2242,10 +2326,19 @@ try {
 	check("leg S: everything that is not a key rode through untouched", frame.label === "Named" && deepEqual(frame.futureBlob, FUTURE_BLOB) && frame.detailTiles?.[0]?.labels?.[0] === "A", JSON.stringify(frame).slice(0, 140));
 	await sleep(1400); // the panel reloads itself after an apply
 	check("leg S: the reloaded panel shows the chips in the pasted order", (await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value === JSON.stringify(["bench:0:2", "bench:0:0", "bench:0:5"]), String((await evaluate(`JSON.stringify(Array.from(document.querySelectorAll("#detail-list .hw-set-chip")).map((c) => c.dataset.key))`)).result?.value));
+	// The shared document reaches every key and dial: its first click only
+	// arms and says so; the second, within five seconds, replaces it.
+	const globalsBeforeArm = globalWrites.length;
 	await evaluate(`(() => {
 		document.getElementById("config-deck").value = JSON.stringify({ pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } });
+		document.getElementById("config-deck").dispatchEvent(new Event("input", { bubbles: true }));
 		document.getElementById("config-deck-apply").click();
 	})()`);
+	// Past the 450 ms double-click guard (round 3, R09): a second press that
+	// close to arming only keeps it armed, so a double click never replaces.
+	await sleep(600);
+	check("config: the shared document's first click only arms (no write)", globalWrites.length === globalsBeforeArm, `${globalWrites.length - globalsBeforeArm} writes`);
+	await evaluate(`document.getElementById("config-deck-apply").click()`);
 	await sleep(700);
 	check("config: the deck document applies through setGlobalSettings", deepEqual(globalWrites.at(-1), { pollIntervalMs: 500, theme: "paper", readingLinks: [{ sharedMemory: "f0001234:0:1000001", gadget: "g:Test Source:Test Temp", unit: "°C", sensorType: 1 }], futureGlobal: { keep: true } }), JSON.stringify(globalWrites.at(-1)));
 	await sleep(1400); // second self-reload before the next run navigates
@@ -2368,7 +2461,7 @@ try {
 	};
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("leg R: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
 	// Phase 1, the abandon path: open a rename, change nothing, press another
 	// chip's remove. The focusout repaint must not eat that press.
@@ -2400,7 +2493,7 @@ try {
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/bench`);
 	store.settings = { ...store.settings, theme: "paper", detailKeys: store.settings.detailKeys.slice(0, 4), detailTiles: [{ size: 4, cellLabels: false }] };
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("automatic detail colors: opening wrote nothing", writes.length === 0);
 	mark = writes.length;
 	check("automatic detail colors: moved the first chip with a real mouse", (await realClick('#detail-list .hw-set-chip[data-key="bench:0:0"] .hw-detail-move[data-move="1"]')) === "ok");
@@ -2413,7 +2506,7 @@ try {
 	const automaticPlan = structuredClone(frame.detailTiles);
 	mark = writes.length;
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("automatic detail colors: reload preserves provenance without writing", writes.length === mark && deepEqual(store.settings.detailTiles, automaticPlan));
 	// Choosing even the same raw hue must turn off automatic correction for
 	// that cell alone. Native wells dispatch change on a committed choice.
@@ -2442,21 +2535,24 @@ try {
 	// must say both; a zero-write open stays law on this PI too.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/dial`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("dial: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const dialTruth = JSON.parse(
 		(await evaluate(`JSON.stringify({
 		zonesHelp: document.querySelector("#controls-zones .hw-help")?.textContent ?? null,
 		zonesShown: document.getElementById("controls-zones")?.hidden === false,
-		warnPlaceholder: document.querySelector('sdpi-textfield[setting="warnValue"]')?.getAttribute("placeholder") ?? "gone",
-		rotationHelp: document.getElementById("rotation-help")?.textContent ?? "gone"
+		warnPlaceholder: document.getElementById("f-warn")?.getAttribute("placeholder") ?? "gone",
+		rotationHelp: document.getElementById("pickerr-help")?.textContent ?? "gone"
 	})`)).result?.value ?? "{}"
 	);
 	check("dial: touch zones are visible under the custom preset", dialTruth.zonesShown === true, JSON.stringify(dialTruth.zonesShown));
 	check("dial: the zones help names the dead tap", typeof dialTruth.zonesHelp === "string" && /tap/i.test(dialTruth.zonesHelp), String(dialTruth.zonesHelp));
-	check("dial: overview alert placeholders describe the row value and unit guidance", dialTruth.warnPlaceholder === "row value turns amber (see units below)", String(dialTruth.warnPlaceholder));
-	check("dial: the rotation help states picked order", String(dialTruth.rotationHelp).includes("in the order you tick them"), String(dialTruth.rotationHelp));
-	const colorToggle = `document.getElementById('sensor-value-colors-toggle').shadowRoot.querySelector('input[type=checkbox]')`;
+	check("dial: overview alert placeholders promise the row value, not a bar", dialTruth.warnPlaceholder === "Off (row value turns amber)", String(dialTruth.warnPlaceholder));
+	// The order is set on the list's toolbar (Earlier, Later), one Tab stop
+	// after the search, no longer by arrows on every chip.
+	check("dial: the rotation help states how the order is set", String(dialTruth.rotationHelp).includes("Earlier and Later set their order"), String(dialTruth.rotationHelp));
+	// A native checkbox in the Display section (1.7's sdpi toggle, ported).
+	const colorToggle = `document.getElementById('sensor-value-colors-toggle')`;
 	await waitDom("dial: sensor colors visible and off by default", `!document.getElementById('sensor-value-colors').hidden && !${colorToggle}.checked`, 2000);
 	await evaluate(`${colorToggle}.click()`);
 	await sleep(500);
@@ -2468,7 +2564,7 @@ try {
 	await waitDom("dial: two-row restores the checked option", `!document.getElementById('sensor-value-colors').hidden && ${colorToggle}.checked`, 2000);
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	check("dial: reopening writes nothing", writes.length === mark);
 	await waitDom("dial: reopening retains the saved toggle", `${colorToggle}.checked`, 2000);
 	await evaluate(`${colorToggle}.click()`);
@@ -2477,7 +2573,7 @@ try {
 	store.settings.sensorValueColors = "true";
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	await waitDom("dial: malformed boolean displays off", `!${colorToggle}.checked`, 2000);
 	check("dial: malformed setting is not rewritten on opening", writes.length === mark && store.settings.sensorValueColors === "true");
 	await setSelect("dialView", "overview");
@@ -2508,7 +2604,7 @@ try {
 	store.settings.rotationKeys = [...colorKeys].reverse();
 	mark = writes.length;
 	await cdp("Page.reload", {});
-	await sleep(3500);
+	await settlePanel();
 	check("dial: reopen and reordered readings write nothing", writes.length === mark);
 	await waitDom("dial: custom well survives reopening and reordering", `document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').value === '#123abc'`, 2000);
 	await evaluate(`document.querySelector('#reading-color-list input[data-key="${colorKeys[0]}"]').parentElement.querySelector('button').click()`);
@@ -2526,7 +2622,7 @@ try {
 	// cut keys in the config document.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/gadget`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("gadget: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const gadgetChips = JSON.parse(
 		(await evaluate(`JSON.stringify([...document.querySelectorAll("#detail-list .hw-set-chip")].map((c) => ({ key: c.dataset.key ?? null, missing: c.classList.contains("missing"), text: c.textContent.trim().slice(0, 40) })))`)).result?.value ?? "[]"
@@ -2587,7 +2683,7 @@ try {
 	// tick is exactly one write and no set ever holds both endpoints.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/linked`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("linked: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
 	const linkedTruth = JSON.parse(
 		(await evaluate(`JSON.stringify({
@@ -2599,7 +2695,7 @@ try {
 		preset: document.getElementById("reading-color-preset").value
 	})`)).result?.value ?? "{}"
 	);
-	check("linked: the picker names the saved key's live twin instead of asking to pick again", linkedTruth.value === "CPU Temp  ·  Link Source" && linkedTruth.missing === false && linkedTruth.placeholder === "Search sensors…", JSON.stringify({ value: linkedTruth.value, placeholder: linkedTruth.placeholder, missing: linkedTruth.missing }));
+	check("linked: the picker names the saved key's live twin instead of asking to pick again", linkedTruth.value === "CPU Temp  ·  Link Source" && linkedTruth.missing === false && linkedTruth.placeholder === "Search readings", JSON.stringify({ value: linkedTruth.value, placeholder: linkedTruth.placeholder, missing: linkedTruth.missing }));
 	check("linked: every saved chip resolves to its label and none is missing", linkedTruth.chips?.length === 3 && linkedTruth.chips.every((c) => c.missing === false) && deepEqual(linkedTruth.chips.map((c) => c.name), ["CPU Temp", "GPU Temp", "Pump"]), JSON.stringify(linkedTruth.chips));
 	check("linked: the chips keep the saved keys", deepEqual(linkedTruth.chips?.map((c) => c.key), LINKED_SM), JSON.stringify(linkedTruth.chips?.map((c) => c.key)));
 	const linkedWell = linkedTruth.wells?.find((w) => w.key === LINKED_SM[1]);
@@ -2615,14 +2711,32 @@ try {
 	})()`);
 	check("linked: primary picker opened", linkedOpen.result?.value === "ok", String(linkedOpen.result?.value));
 	await sleep(600);
-	const linkedTicks = `[...document.querySelectorAll("#picker-list .hw-row")].map((r) => [r.dataset.key, r.querySelector(".hw-tick")?.checked, r.classList.contains("selected")])`;
-	await waitDom("linked: the live rows tick as members through their aliases and the selection highlights its live row", `JSON.stringify(${linkedTicks}) === ${JSON.stringify(JSON.stringify(LINKED_G.map((key, i) => [key, true, i === 0])))}`, 2000, `JSON.stringify(${linkedTicks})`);
+	// The picker is a combobox now: it highlights the selection and holds no
+	// ticks. Rotation membership is its own checklist on the dial panel, so
+	// the membership ticks are read there, with that list opened the same way.
+	const linkedRotationOpen = await evaluate(`(() => {
+		const input = document.getElementById("pickerr-search");
+		if (!input) return "no rotation search input";
+		input.focus();
+		input.dispatchEvent(new Event("focus"));
+		return "ok";
+	})()`);
+	check("linked: rotation checklist opened", linkedRotationOpen.result?.value === "ok", String(linkedRotationOpen.result?.value));
+	await sleep(600);
+	const linkedTicks = `({
+		selected: [...document.querySelectorAll("#picker-list .hw-row")].map((r) => [r.dataset.key, r.classList.contains("selected")]),
+		ticked: [...document.querySelectorAll("#pickerr-list .hw-row")].map((r) => [r.dataset.key, r.querySelector(".hw-tick")?.checked])
+	})`;
+	const linkedTicksWant = { selected: LINKED_G.map((key, i) => [key, i === 0]), ticked: LINKED_G.map((key) => [key, true]) };
+	await waitDom("linked: the live rows tick as members through their aliases and the selection highlights its live row", `JSON.stringify(${linkedTicks}) === ${JSON.stringify(JSON.stringify(linkedTicksWant))}`, 2000, `JSON.stringify(${linkedTicks})`);
+	// The checklist adopts a tick on its change event; a real click on the
+	// box flips it and fires that change, like a person's click does.
 	mark = writes.length;
-	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await evaluate(`document.querySelector('#pickerr-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
 	await sleep(500);
 	check("linked: unticking the live twin is one write that drops the saved key and every alias of it", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2]]) && deepEqual(writes.at(-1)?.futureBlob, FUTURE_BLOB), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
 	mark = writes.length;
-	await evaluate(`document.querySelector('#picker-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
+	await evaluate(`document.querySelector('#pickerr-list .hw-row[data-key="${LINKED_G[0]}"] .hw-tick').click()`);
 	await sleep(500);
 	check("linked: ticking it back is one write, and no write ever holds both endpoints of a link", writes.length === mark + 1 && deepEqual(writes.at(-1)?.rotationKeys, [LINKED_SM[1], LINKED_SM[2], LINKED_G[0]]) && writes.every((w) => !LINKED_LINKS.some((l) => w.rotationKeys?.includes(l.sharedMemory) && w.rotationKeys?.includes(l.gadget))), JSON.stringify(writes.slice(mark).map((w) => w.rotationKeys)));
 	mark = writes.length;
@@ -2662,11 +2776,15 @@ try {
 	await cdp("Network.setBlockedURLs", { urls: ["*docs.slawrensen.com*"] });
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/plain`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("link: opened the Advanced fold", (await evaluate(`(() => {
 		const fold = document.querySelector('details[data-fold="advanced"]');
 		if (!fold) return "missing";
 		fold.open = true;
+		// The link sits in Advanced's Connection group, the way a person
+		// reaches it: open that group too.
+		const connection = document.getElementById("sec-connection");
+		if (connection) connection.open = true;
 		return "ok";
 	})()`)).result?.value === "ok");
 	await sleep(500);
@@ -2757,24 +2875,36 @@ try {
 	// answered does not list the key.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/down`);
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	check("down: opening the panel wrote nothing", writes.length === 0, `${writes.length} writes`);
+	// The panel's words for the three answers a saved key can get: found
+	// nowhere in a snapshot HWiNFO answered, kept while no tree can answer,
+	// and the header's data state for the missing case. The problem text
+	// lives in the Reading status block (role=status) and the header state
+	// (pi-shell.js renderStatus and dataState); the header paints on the
+	// next animation frame, which every sleep below outlasts.
+	const NOT_PRESENT = "Saved reading not found. Search to pick another";
+	const KEPT = "Saved reading kept (no HWiNFO data to show it)";
+	const HEAD_MISSING = "Saved reading not found";
 	const pickerState = `JSON.stringify({
 		placeholder: document.getElementById("picker-search").placeholder,
+		title: document.getElementById("picker-search").title,
 		missing: document.getElementById("picker-search").classList.contains("missing"),
 		chips: [...document.querySelectorAll("#rotation-set .hw-set-chip")].map((c) => c.classList.contains("missing")),
-		hint: document.getElementById("status-hint").textContent
+		state: document.getElementById("head-state")?.textContent ?? null,
+		status: [...document.querySelectorAll("#reading-status p")].map((p) => p.textContent).join(" "),
+		tone: document.getElementById("reading-status")?.dataset.tone ?? null
 	})`;
 	const downTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
-	check("down: the picker stays neutral while HWiNFO is not running", downTruth.placeholder === "Search sensors…" && downTruth.missing === false, JSON.stringify({ placeholder: downTruth.placeholder, missing: downTruth.missing }));
+	check("down: the picker stays neutral while HWiNFO is not running", downTruth.placeholder === KEPT && downTruth.title === "" && downTruth.missing === false, JSON.stringify({ placeholder: downTruth.placeholder, title: downTruth.title, missing: downTruth.missing }));
 	check("down: no saved chip is accused of being gone", downTruth.chips?.length === 3 && downTruth.chips.every((m) => m === false), JSON.stringify(downTruth.chips));
-	check("down: the hint names the real problem instead", String(downTruth.hint).includes("HWiNFO is not running"), String(downTruth.hint));
+	check("down: the hint names the real problem instead", String(downTruth.status).includes("HWiNFO is not running") && downTruth.state === "No HWiNFO data", JSON.stringify({ state: downTruth.state, status: downTruth.status }));
 	// HWiNFO comes up; the live tree genuinely does not list ghost:0:0.
 	await fetch(`http://127.0.0.1:${HTTP_PORT}/tree/up`);
 	await evaluate(`document.getElementById("picker-refresh").click()`);
 	await sleep(1200);
 	const upTruth = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
-	check("down: a live tree does name the key it cannot find", upTruth.placeholder === "⚠ Sensor not present. Pick again" && upTruth.missing === true, JSON.stringify({ placeholder: upTruth.placeholder, missing: upTruth.missing }));
+	check("down: a live tree does name the key it cannot find", upTruth.placeholder === NOT_PRESENT && upTruth.missing === true, JSON.stringify({ placeholder: upTruth.placeholder, missing: upTruth.missing }));
 	check("down: and marks that chip alone", deepEqual(upTruth.chips, [false, false, true]), JSON.stringify(upTruth.chips));
 	check("down: neither state wrote anything", writes.length === 0, `${writes.length} writes`);
 
@@ -2790,7 +2920,7 @@ try {
 	const staleGadgetSeed = structuredClone(store.settings);
 	const staleGlobalMark = globalWrites.length;
 	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-dial.html` });
-	await sleep(3500);
+	await settlePanel();
 	const gadgetUp = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
 	check("stale Gadget: a current tree marks only the absent selection", gadgetUp.missing === true && deepEqual(gadgetUp.chips, [false, false, true]), JSON.stringify(gadgetUp));
 	const staleHint = "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support.";
@@ -2799,19 +2929,22 @@ try {
 	sendGadgetPayload({ event: "preview", state: "stale", source: "gadget", hint: staleHint, missing: true });
 	await sleep(600);
 	const gadgetStale = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
-	const stalePreview = (await evaluate(`document.getElementById("preview-value").textContent`)).result?.value;
-	check("stale Gadget: the picker agrees with the missing live preview", stalePreview === "sensor missing" && gadgetStale.placeholder === "⚠ Sensor not present. Pick again" && gadgetStale.missing === true, JSON.stringify({ preview: stalePreview, ...gadgetStale }));
+	// The live preview's missing cue is the header's data state now (the
+	// Live value line and its "sensor missing" are gone).
+	check("stale Gadget: the picker agrees with the missing live preview", gadgetStale.state === HEAD_MISSING && gadgetStale.placeholder === NOT_PRESENT && gadgetStale.missing === true, JSON.stringify(gadgetStale));
 	check("stale Gadget: present chips stay valid and only the absent chip is marked", deepEqual(gadgetStale.chips, [false, false, true]), JSON.stringify(gadgetStale.chips));
-	check("stale Gadget: the freshness hint remains visible", gadgetStale.hint === staleHint, String(gadgetStale.hint));
+	// The plugin's freshness sentence was the hint line; the status block
+	// under the picker is where the panel says what is wrong with the data.
+	check("stale Gadget: the freshness hint remains visible", String(gadgetStale.status).includes(staleHint), JSON.stringify({ state: gadgetStale.state, tone: gadgetStale.tone, status: gadgetStale.status }));
 	sendGadgetPayload({ event: "sensorTree", groups: [], state: "unavailable", hint: DOWN_TREE.hint });
 	sendGadgetPayload({ event: "preview", state: "unavailable", hint: DOWN_TREE.hint, missing: false });
 	await sleep(600);
 	const gadgetDown = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
-	check("stale Gadget: losing the source clears every missing cue", gadgetDown.placeholder === "Search sensors…" && gadgetDown.missing === false && deepEqual(gadgetDown.chips, [false, false, false]), JSON.stringify(gadgetDown));
+	check("stale Gadget: losing the source clears every missing cue", gadgetDown.placeholder === KEPT && gadgetDown.title === "" && gadgetDown.missing === false && deepEqual(gadgetDown.chips, [false, false, false]) && gadgetDown.state !== HEAD_MISSING, JSON.stringify(gadgetDown));
 	await evaluate(`document.getElementById("picker-refresh").click()`);
 	await sleep(1200);
 	const gadgetRecovered = JSON.parse((await evaluate(pickerState)).result?.value ?? "{}");
-	check("stale Gadget: a recovered tree restores only the genuine missing cue", gadgetRecovered.placeholder === "⚠ Sensor not present. Pick again" && gadgetRecovered.missing === true && deepEqual(gadgetRecovered.chips, [false, false, true]), JSON.stringify(gadgetRecovered));
+	check("stale Gadget: a recovered tree restores only the genuine missing cue", gadgetRecovered.placeholder === NOT_PRESENT && gadgetRecovered.missing === true && deepEqual(gadgetRecovered.chips, [false, false, true]), JSON.stringify(gadgetRecovered));
 	check("stale Gadget: source states never rewrite saved settings", writes.length === 0 && globalWrites.length === staleGlobalMark && deepEqual(store.settings, staleGadgetSeed), `${writes.length} key writes, ${globalWrites.length - staleGlobalMark} global writes`);
 
 	// Production ticks emit previews, not unsolicited tree replies. Recovery
@@ -2829,13 +2962,27 @@ try {
 	toPi({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });
 	await sleep(500);
-	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Deck default · Void"`)).result?.value === true);
+	check("prototype-named themes leave the real panel usable", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Void"`)).result?.value === true);
+	// A Paper deck the way the plugin produces one: Paper is the stored
+	// shared theme and the plugin's answer. (A known stored shared theme is
+	// what the plugin draws, src/ui/theme-store.ts, so the panel reads it
+	// first since the external review's AX07; a payload saying Paper over a
+	// stored Void is a state the plugin cannot reach.)
+	const deckGlobals = (theme) => (mode === "linked" ? { theme, readingLinks: LINKED_LINKS } : { theme });
+	toPi({ event: "didReceiveGlobalSettings", payload: { settings: deckGlobals("paper") } });
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "paper" });
 	await sleep(500);
-	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").title === "Deck default · Paper"`)).result?.value === true);
+	check("an unknown local theme seeds Custom text from Void even on a Paper deck", (await evaluate(`document.getElementById("text-color").value === "#e8eaed" && document.querySelector("#theme-gallery .hw-theme").getAttribute("aria-label") === "Default: follow the shared theme, currently Paper"`)).result?.value === true);
 
-	// Hold the real socket reply while the user edits each config textarea.
-	// This races the production async fill path, with no helper extraction.
+	toPi({ event: "didReceiveGlobalSettings", payload: { settings: deckGlobals("void") } }); // the host's stored settings again
+	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "void" });
+	await sleep(200);
+
+	// The Config wells fill from the panel's own documents (external review
+	// AX77): a Copy asks the host for nothing, so no reply can land over a
+	// draft typed right after it. (This used to hold the host's reply and
+	// race it; the one fill that still reads, the shared document before
+	// its first answer, is raced in the panel suite.)
 	await evaluate(`document.querySelector('details[data-fold="advanced"]').open = true`);
 	await sleep(350);
 	const configWriteMark = writes.length;
@@ -2844,15 +2991,15 @@ try {
 		deferConfigReplies = true;
 		await evaluate(`document.getElementById("config-${scope}-copy").click()`);
 		for (let attempt = 0; configReplies.length === 0 && attempt < 20; attempt++) await sleep(50);
-		check(`delayed ${scope} config requested a socket reply`, configReplies.length > 0);
+		check(`${scope} config Copy asks the host for no document`, configReplies.length === 0, `${configReplies.length} reads`);
 		const draft = JSON.stringify({ draft: scope, readingLinks: [{ keep: "typing" }] });
 		await evaluate(`(() => { const el = document.getElementById("config-${scope}"); el.value = ${JSON.stringify(draft)}; el.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 		deferConfigReplies = false;
 		for (const reply of configReplies.splice(0)) reply();
 		await sleep(200);
-		check(`delayed ${scope} config preserves the typed draft`, (await evaluate(`document.getElementById("config-${scope}").value`)).result?.value === draft);
+		check(`${scope} config keeps a draft typed after Copy`, (await evaluate(`document.getElementById("config-${scope}").value`)).result?.value === draft);
 	}
-	check("delayed config reads write no settings", writes.length === configWriteMark && globalWrites.length === configGlobalMark);
+	check("config Copy and drafts write no settings", writes.length === configWriteMark && globalWrites.length === configGlobalMark);
 } catch (err) {
 	console.error("pi-persistence crashed:", err);
 	results.errors.push(String(err));

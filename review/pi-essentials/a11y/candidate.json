@@ -1,0 +1,828 @@
+{
+	"method": "Simulated host, headless Chromium. Own name/tabindex/hidden-focus checks plus axe-core when AXE_CORE is set. Not a full WCAG audit and not the embedded host.",
+	"axe": true,
+	"report": [
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "alerts-editing",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-custom-dim",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-inherited",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-alert",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"span[data-key=\"e0002000:0:1000000\"][data-tile=\"0\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power up the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power down the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-tile=\"3\"][data-key=\"f0200101:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-zero-negative",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-empty",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move CPU (Tctl/Tdie) later\"] (nonBmp)",
+							"button[aria-label=\"Move CPU CCD1 (Tdie) earlier\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							"button[aria-label=\"Move Hot Spot earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move CPU (Tctl/Tdie) later\"] (nonBmp)",
+							"button[aria-label=\"Move CPU CCD1 (Tdie) earlier\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							"button[aria-label=\"Move Hot Spot earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-alert",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".current > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							".current > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 21,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "control-reset",
+			"state": "expanded",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 22,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-back",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 400,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-configured",
+			"state": "alerts-editing",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-dense",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-custom-dim",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-inherited",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-alert",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-back",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "key-details",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"span[data-key=\"e0002000:0:1000000\"][data-tile=\"0\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-cell=\"1\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power up the list\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power down the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)",
+							"span[data-tile=\"2\"][data-key=\"f0200100:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"1\"][title=\"Move down the list\"] (nonBmp)",
+							"span[data-tile=\"3\"][data-key=\"f0200101:0:1000000\"][data-cell=\"0\"] > .hw-detail-move[data-move=\"-1\"][title=\"Move up the list\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "key-zero-negative",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-empty",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)",
+							".hw-set-chip[data-key=\"e0002000:0:1000001\"] > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Power earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move CPU (Tctl/Tdie) later\"] (nonBmp)",
+							"button[aria-label=\"Move CPU CCD1 (Tdie) earlier\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							"button[aria-label=\"Move Hot Spot earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 28,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move CPU (Tctl/Tdie) later\"] (nonBmp)",
+							"button[aria-label=\"Move CPU CCD1 (Tdie) earlier\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							"button[aria-label=\"Move Hot Spot earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-alert",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							"button[aria-label=\"Move GPU Temperature later\"] (nonBmp)",
+							".current > .hw-chip-move[data-move=\"-1\"][title=\"Move earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 27,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 25,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 26,
+				"incomplete": [
+					{
+						"id": "color-contrast",
+						"nodes": [
+							".current > .hw-chip-move[data-move=\"1\"][title=\"Move later\"] (nonBmp)",
+							"button[aria-label=\"Move GPU Temperature earlier\"] (nonBmp)"
+						]
+					}
+				]
+			}
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 21,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "control-reset",
+			"state": "expanded",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 22,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-back",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 320,
+			"own": [],
+			"axe": {
+				"violations": [],
+				"passes": 5,
+				"incomplete": []
+			}
+		}
+	]
+}

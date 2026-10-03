@@ -1,0 +1,115 @@
+{
+	"label": "B4.1-unavailable-gadget-b",
+	"rows": [
+		{
+			"t": "02:26:41",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:42",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:43",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:44",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:45",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:46",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:47",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		},
+		{
+			"t": "02:26:48",
+			"head": "No HWiNFO data",
+			"tone": "danger",
+			"status": "HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only mode with Shared Memory Support enabled, or enable Gadget r",
+			"statusTone": "danger",
+			"alt": "Key face now: Start HWiNFO not detected",
+			"placeholder": "Search readings",
+			"said": 1,
+			"writes": 0,
+			"previewState": "unavailable",
+			"source": null
+		}
+	],
+	"announcements": [
+		[
+			75237,
+			"HWiNFO is not running, or it isn't publishing data. Start HWiNFO in Sensors-only"
+		]
+	]
+}

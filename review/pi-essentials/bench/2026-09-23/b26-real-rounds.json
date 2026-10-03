@@ -1,0 +1,62 @@
+[
+	{
+		"round": 1,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 01",
+		"msFromLastKeyToClick": 46
+	},
+	{
+		"round": 2,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 02",
+		"msFromLastKeyToClick": 62
+	},
+	{
+		"round": 3,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 03",
+		"msFromLastKeyToClick": 63
+	},
+	{
+		"round": 4,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 04",
+		"msFromLastKeyToClick": 63
+	},
+	{
+		"round": 5,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 05",
+		"msFromLastKeyToClick": 62
+	},
+	{
+		"round": 6,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 06",
+		"msFromLastKeyToClick": 63
+	},
+	{
+		"round": 7,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 07",
+		"msFromLastKeyToClick": 47
+	},
+	{
+		"round": 8,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 08",
+		"msFromLastKeyToClick": 47
+	},
+	{
+		"round": 9,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 09",
+		"msFromLastKeyToClick": 62
+	},
+	{
+		"round": 10,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "Real 10",
+		"msFromLastKeyToClick": 62
+	}
+]

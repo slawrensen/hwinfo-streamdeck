@@ -1,0 +1,142 @@
+[
+	{
+		"setting": "label",
+		"global": false,
+		"control": "input:text",
+		"from": "Tctl",
+		"to": "B32",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"label"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "keyLayout",
+		"global": false,
+		"control": "select:select-one",
+		"from": "single",
+		"to": "dual",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"keyLayout"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "statMode",
+		"global": false,
+		"control": "select:select-one",
+		"from": "current",
+		"to": "min",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"statMode"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "decimals",
+		"global": false,
+		"control": "select:select-one",
+		"from": "auto",
+		"to": "0",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"decimals"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "fahrenheit",
+		"global": false,
+		"control": "input:checkbox",
+		"from": false,
+		"to": true,
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"fahrenheit"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "textMode",
+		"global": false,
+		"control": "select:select-one",
+		"from": "",
+		"to": "theme",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"textMode"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "warnValue",
+		"global": false,
+		"control": "input:text",
+		"from": "80",
+		"to": "7",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"warnValue"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "critValue",
+		"global": false,
+		"control": "input:text",
+		"from": "90",
+		"to": "7",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"critValue"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "alertBelow",
+		"global": false,
+		"control": "input:checkbox",
+		"from": false,
+		"to": true,
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"alertBelow"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "pressBehavior",
+		"global": false,
+		"control": "select:select-one",
+		"from": "",
+		"to": "open-details",
+		"writes": 1,
+		"globalWrites": 0,
+		"changed": [
+			"pressBehavior"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	}
+]

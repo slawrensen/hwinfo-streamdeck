@@ -1,0 +1,296 @@
+{
+	"method": "REAL Stream Deck app webview over CDP; probes ported from scripts/pi-lab.mjs a11y; keys dispatched through CDP Input (renderer level, not OS level)",
+	"layout": {
+		"w": 378,
+		"h": 410,
+		"dpr": 1.5,
+		"url": "sensor-reading.html"
+	},
+	"openAll": true,
+	"stops": 34,
+	"stopList": [
+		{
+			"tag": "SUMMARY",
+			"label": "ReadingTctl",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#picker-search",
+			"label": "Reading",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#picker-refresh",
+			"label": "Reload the sensor list",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#f-label",
+			"label": "Label on the key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-layout",
+			"label": "Readings on this key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "DisplayCurrent value · auto decimals · Void (shared) · theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-stat",
+			"label": "Value shown",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-decimals",
+			"label": "Decimals",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT",
+			"label": "Show temperatures in °F",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#display-mode",
+			"label": "Graph under the value",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Default: follow the shared theme, currently Void",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Change the shared theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-text",
+			"label": "Text color",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AlertsWarn ≥ 80 °C · critical ≥ 90 °C",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#f-warn",
+			"label": "Warn at",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#f-crit",
+			"label": "Critical at",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT",
+			"label": "Alert when the value drops to or below these numbers (for fa",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "PressPress cycles current, min, max, avg",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-press",
+			"label": "A press",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AdvancedAuto source · poll 250 ms · decimal data units",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-theme",
+			"label": "Theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-text",
+			"label": "Text color",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-accents",
+			"label": "Accent colors",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-units",
+			"label": "Data units",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-source",
+			"label": "Data source",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#shared-poll",
+			"label": "Read every",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "HWiNFO setup steps",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#support-report",
+			"label": "Copy support report",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "TEXTAREA#config-key",
+			"label": "This key's settings",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#config-key-copy",
+			"label": "Copy",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#config-key-apply",
+			"label": "Replace this key's settings",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "TEXTAREA#config-deck",
+			"label": "Shared settings All keys and dials",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#config-deck-copy",
+			"label": "Copy",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#config-deck-apply",
+			"label": "Replace shared settings",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		}
+	],
+	"backStops": 34,
+	"own": [],
+	"axe": {
+		"violations": [],
+		"passes": 27,
+		"incomplete": []
+	},
+	"writes": {
+		"writes": 0,
+		"globalWrites": 0
+	}
+}

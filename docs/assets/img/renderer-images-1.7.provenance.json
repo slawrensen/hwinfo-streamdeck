@@ -7,7 +7,7 @@
 			"file": "dial-reading-colors-1.7.png",
 			"width": 1340,
 			"height": 884,
-			"sha256": "b1bb0008ce622ea02e286e727de6ce7ed6a1185fac8407ff3fed3562e28445db",
+			"sha256": "b63a4a9104cca5788b596612e7725d5e11f49913b2690137218bb76eb7938ecf",
 			"kind": "production-renderer board",
 			"source": "src/actions/sensor-dial.ts: composeDialSvg",
 			"sampleData": true,
@@ -94,7 +94,7 @@
 							2850
 						]
 					},
-					"svgSha256": "ebb112659fbf93af8f33ce8c59e46e39b8d81808ec8bfb1a87c4045b6f6f8daf"
+					"svgSha256": "4e542e7e987c2da50df1c45ea5aaaf71c90be7c61f54b7e96a37eb2028488eea"
 				},
 				{
 					"view": "overview",
@@ -180,7 +180,7 @@
 							2850
 						]
 					},
-					"svgSha256": "a7c0b81cebd32cce9a0f3bf8f556cd8ffa001dc116439abe2ff0659b9b963da5"
+					"svgSha256": "2bce8d5d5dd340535e4ffcbd90ed98e50e480d2127e22bc90939d33d1e6aeb0a"
 				},
 				{
 					"view": "tworow",
@@ -239,7 +239,7 @@
 							98
 						]
 					},
-					"svgSha256": "7489641c27403ba634ec47c20ed1d3f66a3c3ecbab07fe7c3751a6293d99ba7e"
+					"svgSha256": "514bcc78b3b2c1ff35d829942f58cc88a2c3f5104e4ef66f71be20f4c4db3c4b"
 				},
 				{
 					"view": "tworow",
@@ -305,7 +305,7 @@
 							98
 						]
 					},
-					"svgSha256": "a82f67bda6fe8036f75636bae794ffca4757c55ea26d5eb8bcabc160fff8b7d1"
+					"svgSha256": "dc1565878f887e4695bef75e4a285411e13dad2b4635d3713149bff50aa0c708"
 				}
 			],
 			"validation": "SVGs match exactly after removing hexadecimal fill colors."
@@ -314,7 +314,7 @@
 			"file": "reading-status-1.7.png",
 			"width": 1360,
 			"height": 704,
-			"sha256": "5b53b534434e6bb043fad7836c3a21a29bf8486df96ce4d0bd3fabb6b399070b",
+			"sha256": "a12f567668526797e44db2bea37f053345aa1c1aa4b45238945b3ca815c4184f",
 			"kind": "production-renderer board",
 			"source": [
 				"src/ui/state-screens.ts: statusScreen",

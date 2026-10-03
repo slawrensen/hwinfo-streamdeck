@@ -1,0 +1,29 @@
+{
+	"label": "C1",
+	"at": "2026-09-24T01:49:24.885Z",
+	"hoverPoints": 5,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "control",
+				"context": "76f45f563a141ad6ef7791e6562aec4e",
+				"url": "control.html"
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": null,
+				"head": null
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

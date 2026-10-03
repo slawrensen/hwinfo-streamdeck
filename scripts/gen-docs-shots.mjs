@@ -98,7 +98,10 @@ const K = {
 	cpuPower: "f0000501:0:5000000",
 	cpuLoad: "f0000300:0:7000021",
 	gpuTemp: "e0002000:0:1000000",
-	gpuHot: "e0002000:0:1000005",
+	// The bench GPU (an RTX 5080 since September 2026) reports no hot spot;
+	// its memory junction stands in (same unit and type). Faces that force a
+	// sample value keep the "GPU Hot Spot" label most GPUs show.
+	gpuHot: "e0002000:0:1000004",
 	cpuFan: "f7006687:0:3000000",
 	pump: "f7006687:0:3000001"
 };

@@ -1,0 +1,36 @@
+{
+	"label": "K6",
+	"at": "2026-09-24T01:46:36.122Z",
+	"hoverPoints": 39,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "key",
+				"context": "9cef21911dcd6eb167acbd5d2f5bfa0e",
+				"url": "sensor-reading.html"
+			}
+		],
+		[
+			"picker",
+			{
+				"expanded": "false",
+				"w": 0
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": "ok",
+				"head": "Live · Shared Memory"
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

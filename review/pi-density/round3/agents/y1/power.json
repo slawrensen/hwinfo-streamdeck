@@ -1,0 +1,315 @@
+{
+	"role": "Agent 3, power user and density (round 3 integrated-candidate adversarial re-review). Simulated host only (scripts/lib/pi-sim.mjs serving the frozen panels via PI_SIM_PLUGIN_DIR, headless Chrome via scripts/lib/cdp.mjs). Candidate token 1.7.0.0-d04 (ui/ byte-identical to the live worktree when checked); baseline token 1.7.0.0-d03. Labels: MEASURED = my probe, READ = code or files, INFERRED = judgment. Line numbers refer to the frozen candidate ui/ files.",
+	"environment": "Ran from C:\\Users\\stephen\\git\\hwinfo-pi-density with `npx tsx <script> <out.json> <port base>`. Scripts, raw JSON and screenshots are all in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-power: lib.mjs (helper), p1-groups-lines, p2-dblclick, p3-groups-edit, p4-edges, p5-density, p6-long, p7-twins, p7b-smart, p8-folded, p8b-elite, p9-misc, p10-shots. Output files are named p*-cand.json, p*-base.json and p*-rerun.json, and the screenshots are shot-*.png. The candidate ran on ports 32030 (ws), 32031 (http) and 32032 (Chrome debug). The baseline ran on 32034, 32035 and 32036. Default viewport was 373x410 at DPR 1.5; I also used 320x560, 189x410 and 160x410. Side effects I could not avoid: importing the plugin modules makes the Elgato SDK logger write rotating files into the worktree's gitignored logs/ directory. Once, two of my runs in parallel raced that rotation and one crashed; I reran it serially. Lab-tool defect: on Windows, cdp.mjs close() stops only the launcher PID, so the real browser (its child) keeps listening on the debug port. Later launches on the same port then attached to that leftover browser. The findings rest on deterministic logic, and I reproduced the key one (PY01: p2 and p9) on a fresh browser after fixing my helper, with the same result. I never touched the Stream Deck app, HWiNFO, the installed plugin, port 23654 or the clipboard: navigator.clipboard and execCommand were stubbed on every page. I edited no repository files.",
+	"verified": [
+		{
+			"id": "R01",
+			"status": "fixed",
+			"evidence": "MEASURED p8 (373x410): dial-groups, #f-preset focused, trusted key 'c'. Candidate: stored custom, 7 writes all carrying custom, six gestures seeded from the Elite map. Baseline: stored elite, 6 writes all carrying elite."
+		},
+		{
+			"id": "R02",
+			"status": "partly",
+			"evidence": "MEASURED p3 and p4. A double press only arms, blur disarms, and after removal focus goes to a name field. Two gaps remain: holding Enter confirms (a 560 ms hold removed the group, 1 write; see PY02), and any rebuild silently drops the arm (see PY04). Armed widths at 373/320/189/160 cause no horizontal overflow and the pointer stays on the button."
+		},
+		{
+			"id": "R05",
+			"status": "fixed",
+			"evidence": "MEASURED p7: the 'missing' pill (49 px) is visible at 373, 189 and 160. At 189 and 160 the chip wraps to 40 px high and the name shows at its full 107 px. The note reads 'Rotation moves through 2 of these 3 readings...' (p1 D and the e2e check)."
+		},
+		{
+			"id": "R07",
+			"status": "partly",
+			"evidence": "MEASURED p7 and p7b. The fixture drives get #0 and #1. But two sensors sharing HWiNFO's [#0] mark ('...: Enhanced' and '...: DTS') both show '#0', and two identical S.M.A.R.T. drives both show 'Samsung SSD 9…'. See PY07."
+		},
+		{
+			"id": "R08",
+			"status": "fixed",
+			"evidence": "MEASURED p3 T8: typing a group name then Tab puts focus on that group's remove button with 1 write (baseline dropped focus to BODY). Enter is covered by the e2e check (READ)."
+		},
+		{
+			"id": "R12",
+			"status": "fixed",
+			"evidence": "MEASURED p6 frames: tick 1, untick 1, group rename plus Enter 1 (the frame carries both fields), Add group 1. Baseline: 2, 2, 2, 2."
+		},
+		{
+			"id": "R15",
+			"status": "fixed",
+			"evidence": "MEASURED p5, key-details with Press open. Tabs from the Press summary to Readings per tile went 35 to 2 (5 readings) and 176 to 2 (26 readings). Cost: the first tile grip went 4 to 7 Tabs, and the list starts 64 px lower (page y 950 to 1014). The moved help copy is now wrong for sighted readers (PY11)."
+		},
+		{
+			"id": "R17",
+			"status": "partly",
+			"evidence": "MEASURED p5: after a person's click, the rotation checklist opened low shows 4 rows on screen (baseline 0). Primary picker: key 6 to 7 rows, dial 6 to 6. But the pointer open scrolls between the two presses of a double click, and the second press ticks or picks a row (PY01). This is new for the rotation checklist and for 'Pick another reading'."
+		},
+		{
+			"id": "R18",
+			"status": "fixed",
+			"evidence": "MEASURED p1. For G (outside, groups) and H (empty first group), the named target matches the runtime (groupReadings enters group 0; rotationGroupsOf drops empty groups). Edge case F: when group 1 holds only missing members the line hides, while at runtime turns do nothing and a pressed turn lands in group 2 (minor)."
+		},
+		{
+			"id": "R19",
+			"status": "fixed",
+			"evidence": "MEASURED p1 B and p9: a Legacy dial with groups shows 'Legacy gestures cannot switch groups, so turns run through all groups as one list, in group order. Change gestures'. A MutationObserver from document start shows no Elite-text flash on first paint."
+		},
+		{
+			"id": "R21",
+			"status": "fixed",
+			"evidence": "MEASURED p6, 37-member flat set at 373x410. 36 Alt+Left presses left the selected chip out of view 0 times (baseline 7). Alt+End and Alt+Home are one key each and one frame each. As designed, toolbar presses still let the chip leave the view (16 of 36 clicks)."
+		},
+		{
+			"id": "R23",
+			"status": "fixed",
+			"evidence": "MEASURED p3 T1 and T3. Moving CCD2 from group 1 to group 2 takes a click on the chip and one Later: 1 write, it lands first in group 2, focus stays on Later, and the button stays under the pointer, including when the move empties the source group. Baseline cost (READ r1 P06): 5 clicks, 4 typed characters and 4 writes, landing last."
+		},
+		{
+			"id": "R29",
+			"status": "partly",
+			"evidence": "MEASURED p1 D and p7: dial-missing says 'Turns change this too.' and Elite plus auto cycle says 'Turns, pressed turns and auto cycle change this too.', yet nothing moves while the on-dial reading is missing. An Elite set holding one sensor claims pressed turns change the reading (PY06)."
+		},
+		{
+			"id": "R30",
+			"status": "partly",
+			"evidence": "MEASURED p7: an Elite dial whose flat set is GPU only reads 'pressed turn switches sensor' in both the summary and the open list, although stepSensorSource returns undefined with one sensor. The clause adds a line on every Elite dial (PY10)."
+		},
+		{
+			"id": "R36",
+			"status": "partly",
+			"evidence": "MEASURED p1 G: the fresh-page collector is right when the dial's reading is in a group, but it jumps groups while the person is working (PY08)."
+		},
+		{
+			"id": "R37",
+			"status": "fixed",
+			"evidence": "READ: the list has aria-keyshortcuts 'Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2', and tool titles read '... (Alt+Right in the list)'. The e2e R37 check covers it."
+		},
+		{
+			"id": "R38",
+			"status": "fixed",
+			"evidence": "MEASURED p5 at 373x410: the key band went 125 to 106 px and the picker 271 to 252. The dial band is also 106, but dial-groups' header grew 13 px with R43, so its picker moved only 287 to 281. key-empty holds its band at 125. The resolved theme stays on the line '(shared: Void)'."
+		},
+		{
+			"id": "R42",
+			"status": "fixed",
+			"evidence": "MEASURED p5: the dial-groups rotation box went 490 to 425 px and visible help lines 9 to 5 (pickerr-help 1, note 2, groups line 2). The derived line contradicts the note when fewer than two groups hold readings (PY05)."
+		},
+		{
+			"id": "R09",
+			"status": "partly",
+			"evidence": "MEASURED p4: holding Enter for 900 ms on Replace shared settings produced 1 global write. The 450 ms guard is shorter than the OS key-repeat delay (PY02). Pre-existing: the baseline's 5 s window allowed the same."
+		},
+		{
+			"id": "R03",
+			"status": "not-checked",
+			"evidence": "Not re-run by me. I READ the leave-flush registration and the e2e 'names' checks."
+		}
+	],
+	"findings": [
+		{
+			"id": "PY01",
+			"title": "A double click that opens a reading list picks or ticks whatever row the open scrolled under the pointer",
+			"severity": "S2",
+			"category": "RD",
+			"state_task_viewport": "373x410 DPR 1.5. Mouse user clicks a reading search box, or the 'Pick another reading' status button, with a normal double click (two presses about 90 ms apart) or a second click about 350 ms later. Cases: dial-configured and dial-groups with the rotation search at viewport y 344 (where it sits after a person scrolls to it); key-missing 'Pick another reading'; key-configured primary search at page top; key-details detail search at y 340.",
+			"observed": "MEASURED. The first press opens the list and the page jumps: revealOpenList (pi-common.js:2830) runs from mousedown (2914 and 2896), and reveal() (pi-shell.js:386) does the same for 'Pick another reading'. The second press, at the same point, lands on a list row. Combobox rows commit on mousedown, and checklist rows are native labels. Results per case: rotation checklist scrolled 44 to 156 and ticked 'CPU CCD1 (Tdie)' into the rotation (baseline: no scroll, 0 writes). 'Pick another reading' scrolled 0 to 261 and replaced the saved missing reading with CPU (Tctl/Tdie), 1 write (baseline: the pointer landed on a summary, 0 writes). Key primary picker scrolled 0 to 100 and picked CPU CCD1, in both builds. Detail checklist scrolled about 232 and the second press toggled a tile's size (1 detailTiles write), in both builds.",
+			"evidence": "MEASURED hw-r3y-power/p2-cand.json and p2-cand-rerun.json (fresh browser, identical), p2-base.json, p9-cand.json and p9-cand-rerun.json vs p9-base.json (pickDbl), p6-cand.json and p6-base.json (detailDbl). READ pi-common.js:2830-2842, 2896, 2914, 3007-3019 (row commit on mousedown); pi-shell.js:386-406.",
+			"affected_user": "Mouse users who double click, or click again right after opening (everyone at some point). The key-missing case hits the recovery flow.",
+			"confidence": "high",
+			"correction": "After any page scroll the panel makes on a pointer open or a reveal, swallow the next press at the same client point (within 4 px) until the pointer moves or 500 ms pass. One document capture listener for mousedown and click, with preventDefault and stopPropagation, covers rows, labels and tile buttons alike. Alternative: on pointer opens, do not scroll the page; cap the list's height to the space below the field instead.",
+			"tradeoff": "A deliberate press made within 500 ms of the jump without moving the pointer is ignored once. Keyboard opens are unaffected. The alternative shows fewer rows on low fields.",
+			"acceptance_test": "At 373x410 DPR 1.5, send a CDP double click (clickCount 1 then 2, 90 ms apart) and a 350 ms second click on each case above: dial-configured rotation search at y 344, key-missing 'Pick another reading', key-configured primary search, key-details detail search at y 340. Each writes 0 settings, the list still opens, and the R17 e2e reach check still passes.",
+			"new_in_candidate": true,
+			"register_ref": "R17 (side effect); first pass missed the pre-existing primary and detail variants"
+		},
+		{
+			"id": "PY02",
+			"title": "Holding Enter confirms an armed remove, Merge or Replace: the 450 ms guard is shorter than the key-repeat delay",
+			"severity": "S2",
+			"category": "RD",
+			"state_task_viewport": "373x410. dial-configured with three Elite groups; key-configured with Advanced > Config open. Keyboard user presses Enter on group 1's remove button (or on Merge, or on Replace shared settings) and holds it slightly longer than a tap.",
+			"observed": "MEASURED. With CDP keyDown autoRepeat events every 33 ms after 500 ms: a 560 ms hold removed group 1 and its readings (1 write). A 900 ms hold on Merge merged the groups and dropped their names (1 write). A 900 ms hold on Replace shared settings wrote the shared settings (1 global write). The first keydown arms; the first repeat arrives after 450 ms (armPress, pi-common.js:719; apply, 4768) and confirms. Windows' default repeat delay is about 500 ms and can be set to 250 ms (INFERRED).",
+			"evidence": "MEASURED hw-r3y-power/p3-cand.json T5_holdEnter; p4-cand.json merge_holdEnter, replace_holdEnter, remove_hold560. READ pi-common.js:718-742 and 4750-4770.",
+			"affected_user": "Keyboard users, users with motor tremor or slow key release, and screen reader users who press and hold",
+			"confidence": "high",
+			"correction": "In the confirm branch, require a fresh press: ignore activations that come from repeated keydowns. On these buttons, preventDefault a keydown with ev.repeat, or require a keyup after arming before a confirm counts. Keep the 450 ms guard for double clicks.",
+			"tradeoff": "A person who deliberately holds Enter must release and press again, which is the intent of arm-then-confirm.",
+			"acceptance_test": "Focus group 1's remove, send keyDown Enter, then autoRepeat keyDowns every 33 ms for 2 s, then keyUp: 0 writes, button still armed. One more Enter press: exactly 1 write. Same for Merge with named groups and for Replace shared settings (0 global writes on the hold).",
+			"new_in_candidate": false,
+			"register_ref": "R02, R09"
+		},
+		{
+			"id": "PY03",
+			"title": "The folded Controls summary hides a destructive reset reach",
+			"severity": "S2",
+			"category": "RD",
+			"state_task_viewport": "373x410, dial-configured. Legacy with 'A stats reset clears' set to 'Every dial, everywhere' (or 'The whole rotation set'); Elite with the same. Controls folded, which is its usual state.",
+			"observed": "MEASURED. Folded summary: 'Legacy: turn cycles readings · push resets session stats · tap cycles the stat'. The open list says 'Push: resets session stats (every dial, everywhere)'. On Elite the long push, which does the reset, is not in the summary at all. A Legacy push fires on dial down and resets every dial's session stats (READ src/controls.ts LEGACY.shortPress resetStats; sensor-dial.ts executeStateCommand with parseResetScope).",
+			"evidence": "MEASURED hw-r3y-power/p7-cand.json summary.legacy-all, legacy-set, elite-all (the summary, plus 'now' for the open list). READ pi-model.js:241. Raised as an S2 new concern in agents/x1/power.json; absent from REGISTER.md, so it is neither KEEP nor DEFER.",
+			"affected_user": "Power users who set a wide reset scope, and anyone reading the folded summary on a shared setup",
+			"confidence": "medium",
+			"correction": "When resetScope is 'set' or 'all', add the reach to whichever push resets: 'push resets stats on every dial' or 'long push resets the whole set'. Pay for it by dropping '(auto cycle is off)' from the pause clause when the reset clause is present.",
+			"tradeoff": "Can add a line to the folded row on those dials. The summary strings in test/pi-model.test.ts change.",
+			"acceptance_test": "dial-configured Legacy with resetScope 'all': the folded summary contains 'every dial'. Elite with 'all': it names the long push's reach. With 'current' the text is unchanged from today. 0 writes.",
+			"new_in_candidate": false,
+			"register_ref": "x1 power new_concerns (not registered)"
+		},
+		{
+			"id": "PY04",
+			"title": "A rotation rebuild silently disarms an armed group remove or Merge; on an auto-cycling dial the confirm window is at most one cycle",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "373x410, dial-configured Elite with three groups. Arm group 2's remove, then the dial moves (a readingKey echo, as an auto cycle step every 5 s or a hand turn produces), then press again.",
+			"observed": "MEASURED. After the echo, onSelectionEcho (pi-common.js:3117) rebuilds the headers. The button reads '×' again (armed unset) and keeps focus, while the live region still says 'Press again to remove group 2 and its 2 readings.' The second press at the same point only arms again: 0 writes. With auto cycle at its shortest (5 s), a confirmation has to land between 450 ms after arming and the next step, anywhere from 0 to 5 s. That is the timed window R09 removed from Replace because the spoken prompt alone takes about 5 s.",
+			"evidence": "MEASURED hw-r3y-power/p3-cand.json T6_armThenEcho. READ pi-common.js:943-1030 (renderRotationSet rebuilds every header on echo), 718-742 (arm state lives on the button element).",
+			"affected_user": "Screen reader and slower users removing a populated group on an auto-cycling or turning dial",
+			"confidence": "high",
+			"correction": "Keep the arm in module state (group index plus a signature of its keys) and re-apply it in groupHeader when the same group is rebuilt. Clear it on blur, on any edit to that group, and on an index shift. Or update the 'on dial' badge in place on selection echoes instead of rebuilding the headers.",
+			"tradeoff": "An arm that survives rebuilds needs a clear invalidation rule, or a stale arm could confirm on a different group after a reorder.",
+			"acceptance_test": "Arm group 2's remove, send two readingKey echoes 1 s apart, press again 3 s after arming: exactly one write, removing group 2. Blur still disarms. After a group above is removed, the arm does not carry over to another group.",
+			"new_in_candidate": true,
+			"register_ref": "R02, R09"
+		},
+		{
+			"id": "PY05",
+			"title": "The derived groups line promises group jumps while groups are not in effect",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "373x410. dial-configured Elite, press 'Split into groups' (group 1 holds all three readings, group 2 is empty). Also Custom with Touch zones 'Two' and Tap set to 'Switch sensor or group'. Task: read what a turn and a pressed turn do.",
+			"observed": "MEASURED. After Split, #rotation-help reads 'New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name.' The note under it reads '2 groups. They take effect once two of them hold readings; until then rotation runs as one flat list.' The folded Controls summary reads 'pressed turn switches sensor'. At runtime rotationGroupsOf returns undefined with fewer than two populated groups, so the flat set steps and a pressed turn switches sensors (READ rotation.ts:92-126, sensor-dial.ts:527-540). Custom with two zones and Tap = Switch: the line says 'a tap jumps to the next group', but with two zones every tap is a side (tapZoneOf) and scheme.tap never runs. Minor: Legacy with Ignore turns says 'turns run through all groups as one list' while the picker help says 'Turns are ignored here.'",
+			"evidence": "MEASURED hw-r3y-power/p1-cand.json A_afterSplit, I_onePopulated, E_twoZonesTapGroup, B_legacyIgnore; screenshot shot-split-contradiction-373.png. READ pi-common.js:836-880 (groupJumpers from preset only), pi-model.js groupsActive (used by the summary, not by this line), src/gestures.ts tapZoneOf.",
+			"affected_user": "Power users building groups (Split is the entry point every one of them passes through), and beginners reading the groups line",
+			"confidence": "high",
+			"correction": "Emit the 'stay inside / jumps' sentence only when model.groupsActive(settings) is true; otherwise leave it to the note. Count Tap as a jumper only when touchZones is 'off' or 'three'. Say 'Turns are ignored' instead of 'turns run through' when rotationDisabled is on. Separately, for the owner: schemeCanSwitchGroups ignores touch zones, so a two-zone Tap = Switch dial is confined to one group with no way out.",
+			"tradeoff": "The line changes the moment group 2 gets its first reading. That is a render, not an announcement, so no chatter.",
+			"acceptance_test": "dial-configured Elite, Split: #rotation-help contains neither 'jumps' nor 'stay inside'. Tick one reading into group 2: the sentence appears in the same render. Custom, zones two, gestureTap stepGroup: no 'a tap jumps'. 0 writes from rendering.",
+			"new_in_candidate": true,
+			"register_ref": "R19, R42"
+		},
+		{
+			"id": "PY06",
+			"title": "Movement lines claim moves that cannot happen: missing on-dial reading, and a pressed turn over a one-sensor set",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "373x410. dial-missing (the on-dial reading is not in HWiNFO), Legacy, and Elite with auto cycle 5 s. dial-configured Elite with rotationKeys [gpu, hot, gpuPower] (one sensor). Task: understand what a turn does.",
+			"observed": "MEASURED. dial-missing: the picker help reads 'Turns change this too.' (Legacy) and 'Turns, pressed turns and auto cycle change this too.' (Elite), yet advance() and autoCycle return early while the saved key is missing (READ sensor-dial.ts:521-526, 709-711). GPU-only Elite set: the summary and 'What the dial does now' say 'pressed turn switches sensor', and the picker help says 'Turns and pressed turns change this too.', yet stepSensorSource returns undefined when the list holds one sensor (READ rotation.ts:231-238). The x1 power cross-review gave acceptance tests for exactly these two states.",
+			"evidence": "MEASURED hw-r3y-power/p1-cand.json D_missing, D_missingElite, A_before; p7-cand.json summary.elite-gpuOnlySet. READ pi-common.js:890-905 (dialMovers), pi-model.js:218 (gestureWords).",
+			"affected_user": "Power users with single-sensor rotations; anyone recovering a missing reading",
+			"confidence": "high",
+			"correction": "When keyIsMissing(readingKey), dialMovers returns 'Turns and auto cycle wait while this reading is missing.' When groups are not active and the step source holds fewer than two sensors, gestureWords('stepGroup') says 'does nothing here' and dialMovers drops 'pressed turns'. The step source is the set, or the snapshot when the set is empty.",
+			"tradeoff": "Needs the tree's sensor index per key in pi-model or the panel. The wording changes when the set gains a second sensor.",
+			"acceptance_test": "dial-missing: #picker-moves contains 'wait'. dial-configured Elite with [gpu, hot, gpuPower]: neither the summary nor the list contains 'switches', and the picker help reads 'Turns change this too.' With rotationKeys [] it still says 'switches sensor'. 0 writes.",
+			"new_in_candidate": true,
+			"register_ref": "R29, R30"
+		},
+		{
+			"id": "PY07",
+			"title": "Twin tags fail for identical hardware: the same instance mark, or a long shared model name, yields identical tags",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "373x410 and 189x410, dial-configured. Rotation holds 'CPU Die (average)' from two sensors named 'CPU [#0]: Example 16-Core Processor: Enhanced' and '...: DTS' (the fixture's own naming style). Also two drives named 'S.M.A.R.T.: Samsung SSD 990 PRO 2TB (<serial>)'. Task: pick the right one to reorder or remove.",
+			"observed": "MEASURED. Both CPU chips read 'CPU Die (average) | #0'. Both drive chips read 'Drive Temperature | Samsung SSD 9…'. The visible text is identical; only title and sr-only text differ. twinTagOf (pi-common.js:418) takes the [#N] mark whenever one exists, else truncates the tail after the last colon to 13 characters, so the part that actually differs (DTS vs Enhanced, the serial) is dropped. INFERRED: HWiNFO names Intel DTS and Enhanced sensors under the same [#0], and S.M.A.R.T. sensors as 'model (serial)'.",
+			"evidence": "MEASURED hw-r3y-power/p7-cand.json twin; p7b-cand.json chips; screenshot shot-twins-smart-373.png.",
+			"affected_user": "Power users with identical drives or GPUs, or Intel CPUs (DTS and Enhanced both carry package and core readings); sighted users (screen readers get the full sensor)",
+			"confidence": "medium",
+			"correction": "Derive the tag from what differs among the colliding members: the [#N] mark only when the marks differ; else the last colon segment when it differs; else the shortest distinguishing end of the sensor name (for example the serial's last 4 to 6 characters); else HWiNFO's 1-based sensor order.",
+			"tradeoff": "Tags vary in style between cases, and a serial fragment means little to a beginner. The tooltip still carries the full name.",
+			"acceptance_test": "With the two added sensor pairs above, at 373 and 189: the two chips in each pair show different visible tags; unique names show no tag; the detail tile editor and Reading colors rows follow the same rule; 0 writes.",
+			"new_in_candidate": true,
+			"register_ref": "R07"
+		},
+		{
+			"id": "PY08",
+			"title": "The derived tick destination changes while the person works",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "373x410, dial-configured Elite with groups CPU [cpu, cpuPower] and GPU [gpu, hot]. The dial shows GPU Power, which is in no group. The person ticks a reading, then the dial steps into group 2 (auto cycle or a turn), then the person ticks again.",
+			"observed": "MEASURED. On the fresh page the label reads 'Readings for CPU', and the first tick lands in group 1 (group sizes 3 and 2). After a readingKey echo for Hot Spot, the label silently becomes 'Readings for GPU' with the group 2 radio checked, and the next tick lands in group 2 (sizes 3 and 3). The collector stays unsettled until the dial's reading happens to be in a group (pi-common.js:952-959), so a dial movement re-targets it mid-task. The register claims 'settled once per page'.",
+			"evidence": "MEASURED hw-r3y-power/p1-cand.json G_fresh, G_afterTick, G_tickLanded, G_afterDialMoved, G_secondTickLanded.",
+			"affected_user": "Power users filling groups on a turning or auto-cycling dial",
+			"confidence": "high",
+			"correction": "Settle on the first render that has both groups and the dial's reading, whether or not a group holds it, and on any tick or collector press.",
+			"tradeoff": "None beyond R36's own: the fresh-page default is still derived once.",
+			"acceptance_test": "Scenario above: after the echo the label still reads 'Readings for CPU' and the second tick lands in group 1. A fresh page with the dial's reading in group 2 still starts on group 2. 0 writes on open.",
+			"new_in_candidate": true,
+			"register_ref": "R36"
+		},
+		{
+			"id": "PY09",
+			"title": "Merge of unnamed groups still discards the whole partition in one press, 6 px from Add group",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "373x410, dial-configured Elite with two unnamed groups [cpu, ccd1] and [gpu, hot]. A single click on 'Merge back into one set' (a mis-aim for Add group, which sits 6 px to its left).",
+			"observed": "MEASURED. One press writes rotationGroups [] (1 write). 'Split into groups' afterwards gives group sizes 4 and 0, so which reading was in which group is gone. The arm applies only when a group is named (pi-common.js:4466). Baseline: the same single press (2 writes).",
+			"evidence": "MEASURED hw-r3y-power/p9-cand.json and p9-cand-rerun.json mergeUnnamed and splitAfter; p9-base.json. READ r1 P02 evidence (Add at x12 w79, Merge at x97).",
+			"affected_user": "Power users with curated but unnamed groups",
+			"confidence": "high",
+			"correction": "Arm Merge whenever two or more groups hold readings, with the text 'Merge N groups into one list?'. The partition is the content, not only the names.",
+			"tradeoff": "One more press for deliberate merges of unnamed groups.",
+			"acceptance_test": "Two unnamed populated groups: the first press arms and writes 0; a press 500 ms later merges with 1 write; a double press only arms.",
+			"new_in_candidate": false,
+			"register_ref": "R02 (scope)"
+		},
+		{
+			"id": "PY10",
+			"title": "Elite dials' folded Controls summary grows a line for the pressed-turn clause",
+			"severity": "S6",
+			"category": "MF",
+			"state_task_viewport": "Fold all; any Elite dial; 373x410 and 320x560",
+			"observed": "MEASURED. The folded Controls summary went from 2 to 3 lines (46 to 62 px) at 373 and from 3 to 4 (62 to 78) at 320 on every Elite dial. With Fold all on dial-groups at 373, the last summary's bottom moved from 417 to 427, so it misses the 410 px first screen by 17 px (the R43 header +13 is included). The cross-review's shortening of the pause clause ('pauses auto cycle (off)') recovers the line only at 320 (78 to 62); at 373 it stays 62.",
+			"evidence": "MEASURED hw-r3y-power/p8-cand.json and p8-base.json folded; p8b-cand.json and p8b-base.json (now vs shorter).",
+			"affected_user": "Power users who keep panels folded",
+			"confidence": "high",
+			"correction": "Fold the pressed turn into the turn clause ('turn cycles readings, pressed switches group') and drop '(auto cycle is off)' when auto cycle is off. Measure again at 373 before choosing.",
+			"tradeoff": "Denser wording; unit test strings change.",
+			"acceptance_test": "dial-groups Elite folded at 373: the summary is at most 2 lines and still names the pressed turn; at 320 at most 3 lines.",
+			"new_in_candidate": true,
+			"register_ref": "R30"
+		},
+		{
+			"id": "PY11",
+			"title": "The detail help now says 'below' for a list that sits above it",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "key-details, Press open, 'How the detail view works' expanded, 373x410",
+			"observed": "MEASURED. #density-help reads 'A custom list can group its tiles one by one below.' The paragraph sits at page y 1335 and the custom list at 1014, above it. 'Below' is only true for the Readings per tile select, whose aria-describedby points here (y 813). The baseline said 'above', which was right for a sighted reader.",
+			"evidence": "MEASURED hw-r3y-power/p5-cand.json and p5-base.json detail.howCopy. READ sensor-reading.html:316.",
+			"affected_user": "Sighted readers of the disclosure",
+			"confidence": "high",
+			"correction": "Use position-free wording, for example 'In a custom list, each tile's ×N button sets how many readings it holds.'",
+			"tradeoff": "None.",
+			"acceptance_test": "#density-help contains neither 'above' nor 'below'; the copy validator passes.",
+			"new_in_candidate": true,
+			"register_ref": "R15"
+		},
+		{
+			"id": "PY12",
+			"title": "At 200% zoom an armed group remove squeezes the group's name to 18 px and pushes the page down",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "dial-configured Elite with groups, 189x410 and 160x410. Press a populated group's ×.",
+			"observed": "MEASURED. The armed button 'Remove group and its 2 readings?' is 115x35 at 189 and 86x49 at 160. The name field shrinks to 18 px (the group name is not visible) and the header grows from 28 to 35 or 49 px, moving everything below while armed. The armed text does not name the group. Armed Merge wraps to 44 px at 189. No horizontal overflow, and the pointer stays on the button.",
+			"evidence": "MEASURED hw-r3y-power/p3-cand.json T7_armedWidths; screenshot shot-armed-remove-189.png.",
+			"affected_user": "Low vision users at 200% zoom",
+			"confidence": "high",
+			"correction": "Name the group in the armed text ('Remove CPU and its 2 readings?'), and below 240 px let the group header wrap so the name keeps its row.",
+			"tradeoff": "Longer armed text; a wrap shift at narrow widths replaces the squeeze.",
+			"acceptance_test": "At 189, armed: the visible text contains the group's name or number and the name field is at least 60 px wide or the name is readable in the armed text.",
+			"new_in_candidate": true,
+			"register_ref": "R02"
+		}
+	],
+	"keep": [
+		"Cross-group Earlier and Later (R23): 2 clicks and 1 write instead of 5 clicks, 4 typed characters and 4 writes. The pressed button stays under the pointer through page-follow, even when the move empties the source group; focus stays on the tool, and the announcement names the target group (MEASURED p3 T1, T3, T4).",
+		"Keyboard moves keep the selected chip in view (0 of 36 out of view vs 7 in the baseline), and Alt+Home and Alt+End move to either end of the list with one key and one frame (MEASURED p6).",
+		"Toolbar presses never scroll the page within a list, so the slot guarantee holds. The cost is that pointer-driven long reorders let the chip leave the view; keep this trade.",
+		"One frame per grouped edit: tick, untick, group rename plus Enter, and Add group each write one frame carrying both fields (MEASURED p6; the baseline wrote 2).",
+		"Readings per tile, Title tile text and Also go back sit above the Details list: 2 Tabs from the Press summary instead of 35 (5 readings) or 176 (26 readings), for 3 more Tabs to the first tile (MEASURED p5).",
+		"The theme band at 106 px on configured keys and dials (125 before), with the resolved theme on the line in the Text select's '(shared: Void)' idiom. key-empty holds its slot so the first pick shifts nothing (MEASURED p5).",
+		"The groups editor's help trimmed from 9 to 5 lines; rotation box 490 to 425 px at 373 (MEASURED p5).",
+		"Focus after a group name commit: Tab lands on that group's remove button, which now only arms (MEASURED p3 T8).",
+		"Custom chosen from Elite by a trusted key seeds the six gestures, and every write carries custom (MEASURED p8).",
+		"The missing pill wraps under a whole name at 189 and 160 instead of squeezing it (MEASURED p7).",
+		"Page reveal on keyboard opens (Down Arrow, first typed character): no pointer hazard, and the rotation checklist shows 4 rows instead of 0 when opened low.",
+		"Legacy dials with groups show the one-list line from first paint, with no flash of Elite text (MEASURED p9)."
+	],
+	"cleanup": "Every browser my runs started was a headless Chrome with --remote-debugging-port=32032 or 32036 and an hw-pi-lab- profile. The launcher PIDs are logged in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-power\\pids.log. cdp.mjs close() stopped only the launcher processes, so 19 real browser roots and their children stayed alive on my two ports. I stopped exactly those, matched by my port flag and profile prefix; a final check shows 0 Chrome processes on ports 32030-32039 and nothing listening there. I then fixed my own helper (lib.mjs stop) to stop the browser tree on its port, and reran PY01's probes on a fresh browser. Every node process my scripts started exited; 0 remain. I stopped no process I did not start. Files are only in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-power; I edited, staged or committed nothing in any repository. The only side effect outside scratch is the plugin logger's gitignored rotation files under C:\\Users\\stephen\\git\\hwinfo-pi-density\\logs, written by any pi-sim run."
+}

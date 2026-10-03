@@ -1,0 +1,340 @@
+{
+	"role": "Agent 1, visual systems (round 3 integrated-candidate adversarial re-review). Candidate 1.7.0.0-d04 compared side by side with baseline 1.7.0.0-d03 on the simulated host at 373x410 DPR 1.5, 320x560, 298/249 (125% and 150% zoom), 189x410 and 160x410 (DPR 2 at zoom widths).",
+	"environment": "Simulated host only: scripts/lib/pi-sim.mjs from C:\\Users\\stephen\\git\\hwinfo-pi-density, run with npx tsx, and PI_SIM_PLUGIN_DIR pointed at either the frozen baseline (r3-baseline) or the frozen candidate (r3-cand-d04). Headless Chrome through scripts/lib/cdp.mjs. Ports: the baseline used 32010-32012, the candidate 32013-32015, and one debug run used 32016-32018. Nothing touched the Stream Deck app, HWiNFO, the installed plugin or port 23654, and no repository or frozen directory was written. Scratch dir: C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-visual. It holds the scripts shots.mjs, probe2.mjs, slots.mjs, head2/3.mjs, scheme.mjs, wells.mjs, dbl.mjs, final.mjs, band299.mjs, twins2.mjs, armhover.mjs, r04r13.mjs, forced.mjs, dbg-merge.mjs, killport.mjs and sheet.py; the PNG contact sheets (sheet-373-a..d, sheet-189, sheet-160); and the JSON under shots\\, p2\\, scheme\\, wells\\, dbl\\, final\\, secs\\ and forced\\. The Copy probe stubbed navigator.clipboard.writeText and document.execCommand. Lab tooling defect (MEASURED): on this Windows machine cdp.mjs close() kills only the chrome.exe launcher PID. The real headless browser is a child process that survives and keeps its --remote-debugging-port. On my second run it made a new launch attach to a stale browser on the same port, and the run hung. I added killport.mjs, which runs taskkill /T on the chrome tree bound to my exact port after close. Other reviewers who reuse ports can hit the same stale-attach problem.",
+	"verified": [
+		{
+			"id": "R04",
+			"status": "fixed",
+			"evidence": "MEASURED r04r13.mjs on key-inherited at 373: trusted hover over all 8 chips plus focus on the checked chip leaves the line at 'Default (shared: Midnight)'. In the baseline the same sequence showed 8 different lines. 0 writes."
+		},
+		{
+			"id": "R38",
+			"status": "partly",
+			"evidence": "MEASURED shots.mjs, 373 and 320: the band drops from 125.2 to 106.1 px for Default, explicit, missing and outage states on key and dial. The line is never cut, Change sits 4 px after '(shared: X)', and the band top is unchanged through Fold all and Open all (89/118/250 px, 0 writes). Below 300 px Change moves to the label row, away from the scope text; see VY06."
+		},
+		{
+			"id": "R28",
+			"status": "fixed",
+			"evidence": "MEASURED crop-paper.png: with the Paper shared theme the link mark is now dark (value #14120D) and the dashed frame is #4A4740. On Void the frame is #7A8393 (5.5:1 on the black face, down from 10.6:1), so it no longer competes with the #ececec selection ring. The mark is kept."
+		},
+		{
+			"id": "R14",
+			"status": "fixed",
+			"evidence": "MEASURED p2 focus-chip-373/160: the checked Ember chip shows the blue focus ring 3 px outside the white checked ring, both whole at 373 and 160."
+		},
+		{
+			"id": "R47",
+			"status": "fixed",
+			"evidence": "MEASURED: summary outline-offset is -2px, and focus-sheet.png shows a closed ring inside the panel edge (the baseline showed only top and bottom lines)."
+		},
+		{
+			"id": "R06",
+			"status": "fixed",
+			"evidence": "MEASURED shots.mjs and probe2 header: overflowX is 0 in every fixture at 189 and 160. The baseline showed 58/87 on dial-groups. The header wraps its text under the face below 240 px (key 186 px, dial 170 px; baseline 476 px at 160 with one letter per line), and the dial face is 112 px wide and whole. New zoom costs are in VY03 and VY04."
+		},
+		{
+			"id": "R05",
+			"status": "fixed",
+			"evidence": "MEASURED pills: the missing chip shows a visible 'missing' pill after 'on dial'. Below 240 px both pills wrap under the name (chip 40 px) and are never cut. The name is still the raw key when no label is stored (R54 deferred)."
+		},
+		{
+			"id": "R07",
+			"status": "partly",
+			"evidence": "MEASURED: the Drive [#0]/[#1] fixture shows '#0'/'#1' pills. With realistic same-brand drive sensors both pills read 'Samsung SSD 9…', and CPU [#0] vs GPU [#0] both read '#0' (VY02). At zoom the pills squeeze the name away (VY03)."
+		},
+		{
+			"id": "R11",
+			"status": "fixed",
+			"evidence": "MEASURED: the healthy Gadget status is 48 px, 2 lines (baseline 96 px, 5 lines), so the band starts at 145 instead of 193.5 at 373. The full hint is under Advanced > Connection. Polish issues are in VY12."
+		},
+		{
+			"id": "R13",
+			"status": "fixed",
+			"evidence": "MEASURED r04r13.mjs, dial with a wrapping rotation name: 10 of 1568 fold-pair pixels do not hit their button (corners), against 348 in the baseline."
+		},
+		{
+			"id": "R26",
+			"status": "fixed",
+			"evidence": "MEASURED forced.mjs with forced-colors emulated: section and How disclosures draw triangles, not bars (forced-sheet.png)."
+		},
+		{
+			"id": "R41",
+			"status": "fixed",
+			"evidence": "MEASURED scheme.mjs: the computed-style diff between builds changes only native checkboxes, radios and color wells. The unchecked checkbox border is #858585 on #2d2d2d, 3.73:1, which passes WCAG 1.4.11. The unchecked group radio is now dark (scheme-check.png). Real-host rendering not observed."
+		},
+		{
+			"id": "R49",
+			"status": "fixed",
+			"evidence": "MEASURED icons: Reload is a Lucide rotate-cw SVG, 16 px with stroke-width 2, in the 32x28 field button (icons-sheet.png). The fold pair is 18 px with stroke 2."
+		},
+		{
+			"id": "R48",
+			"status": "fixed",
+			"evidence": "MEASURED key-back: the role note is inset at the gutter with an info background #263545 (baseline #44381f warn) and no amber bar."
+		},
+		{
+			"id": "R40",
+			"status": "partly",
+			"evidence": "MEASURED tiles: tiles use the panel tokens, and the tile border is #7c7c7c at 3.3:1 (was 2.15:1). Planned tiles lost their distinct edge, and the new pills wrap tiles at 320; see VY13."
+		},
+		{
+			"id": "R39",
+			"status": "partly",
+			"evidence": "MEASURED wells.mjs: automatic wells show the theme value color (#ffb84d on Ember) and a disabled Auto looks muted. With Text color set to Custom or Dimmed, the wells still show the theme value while the face draws another color (VY05)."
+		},
+		{
+			"id": "R43",
+			"status": "fixed",
+			"evidence": "MEASURED head2.mjs: the dial header leads with 'Hot Spot', matching the face's 'HOT SPOT' row, and the HWiNFO label moves to the source line. Cost: the pinned header grows from 105 to 117.7 px on every renamed reading at 373 and stays pinned. A long real source name also stayed at 117.7."
+		},
+		{
+			"id": "R29",
+			"status": "fixed",
+			"evidence": "MEASURED: picker help reads 'Turns change this too.' on the flat dial and 'Turns and pressed turns change this too.' on Elite groups."
+		},
+		{
+			"id": "R19",
+			"status": "partly",
+			"evidence": "MEASURED groups-legacy: the groups line is preset-aware and 'Change gestures' is a link, but the count note above it still says rotation moves inside a group (VY09)."
+		},
+		{
+			"id": "R42",
+			"status": "fixed",
+			"evidence": "MEASURED secs sbs-dial-groups--sec-reading.png: the long gesture paragraph is replaced by one derived line, and the order sentence under the search hides with groups. The Reading section is 606 px tall, down from about 610 plus the paragraph, at 373."
+		},
+		{
+			"id": "R15",
+			"status": "fixed",
+			"evidence": "MEASURED sbs-key-details--sec-interaction.png: Readings per tile, Title tile text and Also go back come before Details list, the list follows its select with no gap, and the How text says 'below'."
+		},
+		{
+			"id": "R20",
+			"status": "partly",
+			"evidence": "MEASURED check-373: 'Check again' produces 'Checked again at …: no change yet …'. The line grows the block by 36 px (68 at 189) and bounces on every re-press (VY11)."
+		},
+		{
+			"id": "R02",
+			"status": "fixed",
+			"evidence": "MEASURED arm probe: the first press arms, and at every width the armed button stays under the pointer (elementFromPoint equals the button at 373/320/249/189/160). There are 0 writes until the second press. Visual issues are in VY07 and VY08."
+		},
+		{
+			"id": "R17",
+			"status": "regressed",
+			"evidence": "MEASURED dbl.mjs: the reveal scroll on a pointer open puts a list row under the pointer. A double or second click now picks a reading on key-empty and ticks a reading into the dial rotation, which the baseline did not do (VY01). The friction it targets (list below the fold) is fixed."
+		}
+	],
+	"findings": [
+		{
+			"id": "VY01",
+			"title": "Opening a reading search with the pointer scrolls a list row under the pointer; a double-click or a second click then picks or ticks a reading",
+			"severity": "S2",
+			"category": "RD",
+			"state_task_viewport": "373x410 DPR 1.5 and 320x560. Fixtures: key-empty, key-configured, dial-configured (primary picker and rotation search) and key-details (Add readings, Press open). The field is placed 60 px above the panel bottom, where a person meets it. Trusted CDP mouse input: press the search box, then press again at the same point after 120 ms (clickCount 2) or after 600 ms (clickCount 1).",
+			"observed": "The first press focuses the box, and revealOpenList scrolls the page instantly during mousedown. At 373 that is 119 px on key-empty, 100 on key-configured, 116 on the dial primary picker and 132 on the rotation search; at 320 it is 43 and 59. The pointer is then resting on a list row, and rows commit on mousedown, so the second press changes a setting. On key-empty it writes readingKey = CPU CCD1 (Tdie), a reading nobody chose. On key-configured it replaces the saved CPU (Tctl/Tdie) with CPU CCD1. On the rotation search it ticks CPU CCD2 (373) or CPU (Tctl/Tdie) (320) into the rotation. On key-details the second press lands on a tile's size button and cycles it: 1 write in both builds. The baseline did not scroll on key-empty or the rotation search (0 writes). It already scrolled and picked on key-configured and the dial primary picker, through scrollIntoView. The candidate fixed the dial primary case, where the reveal now lands on the saved row and makes 0 writes, and added the empty-key and rotation-checklist cases. A slow second click (600 ms, no double-click) behaves the same.",
+			"evidence": "MEASURED %TEMP%\\hw-r3y-visual\\dbl.mjs output: 'cand 373 key-empty #picker-search gap=120 {scrolledBy:119, underPointerAfterFirst:\"ROW: CPU CCD1 (Tdie)\", writes:1, changed:[reading]}'; 'cand 373 dial-configured #pickerr-search {scrolledBy:132, ROW: CPU CCD2, writes:1, changed:[rot]}'; 'cand 320 key-empty {scrolledBy:43, writes:1}'; baseline 'base 373 key-empty {scrolledBy:0, writes:0}', 'base 373 dial-configured #pickerr-search {scrolledBy:0, writes:0}', 'base 373 key-configured {scrolledBy:91, writes:1}'. Screenshots dbl\\cand\\*.png. READ: the candidate's pi-common.js revealOpenList (openList(reveal) from the focus handler with pointerOpening) and the listEl mousedown commit at pi-common.js:3007-3019.",
+			"affected_user": "Everyone using a mouse. Most exposed: a beginner opening an empty key for the first time, anyone who double-clicks fields out of habit, and zoom users (larger scrolls).",
+			"confidence": "high",
+			"correction": "Add a stale-pointer guard. When revealOpenList scrolls, record the pointer's client point. Until a pointermove of at least 2 px arrives, ignore row mousedown commits, checklist label activations and tile-control presses at that point. Keyboard input is unaffected. Apply the same guard to the detail editor's existing reveal. A time-only guard like the 450 ms arm guard would miss the 600 ms repeat click.",
+			"tradeoff": "A person who clicks a row without moving the mouse after the jump has to nudge it first, which almost never happens. The guard needs care so a touch-style tap without pointermove still works in the real host.",
+			"acceptance_test": "Trusted CDP at 373x410 DPR 1.5 and 320x560 on key-empty, key-configured, the dial primary picker, the dial rotation search and key-details Add readings: press the search box, then press again at the same point at 120 ms (clickCount 2) and at 600 ms. Expect 0 setSettings frames. Then move 3 px onto a row and press: expect exactly 1 frame carrying that row's key.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY02",
+			"title": "Twin tags can be identical: two same-brand drives both read 'Samsung SSD 9…', and CPU [#0] and GPU [#0] both read '#0'",
+			"severity": "S3",
+			"category": "RD",
+			"state_task_viewport": "373x410 DPR 2, dial rotation using a sample snapshot with two changes. The drive sensors are renamed 'S.M.A.R.T.: Samsung SSD 980 PRO 1TB (S5GXNF0R123456)' and 'S.M.A.R.T.: Samsung SSD 980 PRO 2TB (S6B0NL0T654321)', each with 'Drive Temperature'. 'CPU (Tctl/Tdie)' and 'GPU Temperature' are relabeled 'Temperature' under CPU [#0] and GPU [#0].",
+			"observed": "twinTagOf uses HWiNFO's [#N] mark when present, and otherwise the text after the last colon cut to 13 characters. Both drives get the pill 'Samsung SSD 9…', and both temperatures get '#0'. The pill promises a difference but shows none, so the full sensor name is only in the tooltip and the accessible name. The fixture's 'Drive [#0]' and 'Drive [#1]' names are the favorable case.",
+			"evidence": "MEASURED final\\twins2\\twins2.png and the chip dump from twins2.mjs ('Drive TemperatureSamsung SSD 9… from …1TB…', 'Drive TemperatureSamsung SSD 9… from …2TB…on dial', 'Temperature#0 from CPU [#0]…', 'Temperature#0 from GPU [#0]…'). READ: twinTagOf in the candidate pi-common.js (the regex on [#N], else the tail sliced to 13 characters).",
+			"affected_user": "Anyone with two drives of one product line, or with same-labeled readings on sensors that share an instance number. Affects beginners and power users.",
+			"confidence": "medium",
+			"correction": "Derive the tag from where the colliding sensor names differ. Strip the prefix and suffix the twins share, and show the first token that differs ('1TB'/'2TB', 'CPU'/'GPU', a serial tail), capped at 12 characters. When the [#N] marks are equal, prefix the sensor's first word ('CPU #0', 'GPU #0'). Check that the resulting tags differ; if they still do not, fall back to the position in the list.",
+			"tradeoff": "Tag wording becomes less predictable, and a longer tag widens the chip, which makes VY03 worse at zoom.",
+			"acceptance_test": "Put the two renamed drives and the CPU/GPU 'Temperature' pair in one rotation and in the detail list. At 373, 320 and 189, every pair of twin chips shows different visible tag text. The existing fixture still shows '#0' and '#1'.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY03",
+			"title": "At 200% zoom the pills never shrink, so the name on an on-dial twin chip shrinks to one letter ('D. #1 on dial')",
+			"severity": "S3",
+			"category": "RD",
+			"state_task_viewport": "Dial rotation with drive0, drive1 (on the dial), gpu and hot, both flat and in two groups (CPU, GPU), at 189x410 and 160x410 DPR 2, compared with the baseline in the same states.",
+			"observed": "In the grouped list at 160 the on-dial chip is 106 px wide: the name span gets 10 px and renders 'D.', followed by the '#1' and 'on dial' pills. At 189 the name gets 39 px ('Drive…'); in the flat list at 160 it gets 36 px. The baseline gave the name 55 px at 160 and cut the 'on dial' pill instead. Below 240 px only .hw-set-chip.missing wraps its pills. Chips carrying 'on dial' or a twin tag do not wrap, so the chip stops saying which reading is on the dial, which is the one thing it exists to show.",
+			"evidence": "MEASURED probe2.mjs pills section: 'cand pills-dial-groups-twins-160 … nameW:10, nameCut:true, pills #1 (24 px) and on dial (45 px)', 'pills-dial-twins-160 nameW:36'. Baseline 'pills-dial-groups-twins-160 nameW:55, on dial cut:true'. Screenshot p2\\pills-zoom-sheet.png. READ: pi.css '.hw-set-chip > .hw-chip-badge { flex: none }' and the max-width 239px wrap rule, which targets .missing only.",
+			"affected_user": "Low-vision users at 200% zoom (189 and 160 CSS px).",
+			"confidence": "high",
+			"correction": "Below 240 px, let any chip that carries a pill wrap its pills under the name: extend the .missing rule to .hw-set-chip:has(> .hw-chip-badge), or to .current plus chips with .hw-chip-source (Chromium 130 supports :has). Give the name span min-width: 6ch so it keeps a readable stub before the pills wrap.",
+			"tradeoff": "Those chips grow from 28 to about 40 px at zoom. The on-dial chip then changes height when a turn moves the reading on the dial, which shifts rows at zoom widths.",
+			"acceptance_test": "At 160x410 and 189x410 on the four-member twin rotation, flat and grouped: every chip's name span is at least 6ch wide or shows its full text, no pill is cut, and overflowX is 0.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY04",
+			"title": "At 160 px every group reserves the four-row toolbar height, leaving about 96 px of blank under each unselected group",
+			"severity": "S5",
+			"category": "MF",
+			"state_task_viewport": "dial-groups with 2 and with 4 groups at 373, 320, 249, 189 and 160 (DPR 1.5 or 2), both builds.",
+			"observed": "The slot reservation follows the measured toolbar height (--hw-tools-h). At 160 the toolbar wraps to four rows (124 px) and every group reserves 130 px, so each unselected group shows its one-line hint and then about 96 px of empty panel. With 4 groups the rotation box is 1328 px, against 1184 in the baseline (+144 px, +12%). At 189 and 249 the reservation is 66 px and the box does not grow (1024 vs 1040, 976 vs 976), so the cost is at 160 only. The baseline instead overflowed sideways by 87 px at 160.",
+			"evidence": "MEASURED slots.mjs: 'cand 4 groups 160 {slots:[130,130,130,130], tools:124, box:1328, overflowX:0}' vs 'base 4 groups 160 {slots:[34,130,34,34], tools:124, box:1184, overflowX:87}'. The gap is visible in p2\\pills-zoom-sheet.png (left panel).",
+			"affected_user": "Low-vision users at 200% zoom on a 320 px wide panel.",
+			"confidence": "high",
+			"correction": "Below 240 px, make the toolbar smaller instead of reserving four rows. Drop the slot's 28 px left indent and the leading arrow and × glyphs so Earlier/Later and Rename/Remove pair up in two rows (about 62 px), and reserve that height.",
+			"tradeoff": "The glyphs would differ between widths. If the words still do not pair at 160 (for example in a longer translation), the reservation grows again.",
+			"acceptance_test": "dial-groups with 4 groups at 160x410: the toolbar is at most 2 rows, each slot is at most 66 px, the rotation box is at most 1184 px, overflowX is 0, and selecting a chip in another group moves nothing.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY05",
+			"title": "Automatic reading-color wells show the theme's value color while the face draws a custom or dimmed text color",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "dial-groups at 373x410 DPR 2 with Display open, one reading colored #FF00AA. Case 1: theme Ember with Text color Custom #8A2B2B. Case 2: theme Paper with Text color Dimmed.",
+			"observed": "With Custom text, the face draws the values in #8A2B2B while the three Automatic wells show #FFB84D. With Dimmed on Paper, the face draws #6B675E and #696762 while the wells show #14120D. The baseline's white well was an obvious placeholder; the new color reads as a statement about the dial and is wrong on the same screen as the face.",
+			"evidence": "MEASURED wells.mjs: 'ember-custom-text {wells #ffb84d x3, faceFills {#8A2B2B: 8}}' and 'paper-dim {wells #14120d, faceFills #6B675E, #696762}'. Screenshot wells\\wells-sbs.png. READ: themeValueSeed() in pi-common.js ignores textMode and textColor.",
+			"affected_user": "Everyone who combines Custom or Dimmed text with reading colors.",
+			"confidence": "high",
+			"correction": "Seed automatic wells from the effective number color: textColor when Text color is Custom and valid, the dimmed tone when Dimmed, and the theme value color otherwise. Alternatively, when Text color overrides reading colors, show the wells in the disabled look next to the existing words 'A custom text color overrides them'. Display only; nothing is written.",
+			"tradeoff": "One more place in the panel that must track the runtime's color resolver. The type-accent case stays deferred.",
+			"acceptance_test": "Ember with Custom #8A2B2B: the automatic wells read #8a2b2b. Paper with Dimmed: the wells match the face's dimmed value fill. Opening the panel makes 0 writes.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY06",
+			"title": "Below 300 px the band's Change moves away from '(shared: X)' and sits beside the bare 'Theme' label",
+			"severity": "S5",
+			"category": "WH",
+			"state_task_viewport": "key-configured and dial-configured with shared theme Ultraviolet at 299, 249, 189 and 160 px (125% zoom of the 373 px panel is 298 px).",
+			"observed": "At 373 and 320, Change follows '(shared: Ultraviolet)' with a 4 px gap. Below 300 px the grid puts 'Theme' and Change on row 1 and the name on rows 2 and 3. Change then sits 22 px (299, 249) to 39 px (160) above the end of the scope text, at the right edge. 'Theme … Change' reads as a control that changes this key's theme. The accessible name says 'Change the shared theme'; the visible text does not. The cross-review condition (keep '(shared: X)' immediately before Change) holds only from 300 px up.",
+			"evidence": "MEASURED final.mjs: 'change 299 key-configured {scopeEnd:[158,126], change:[245,104], changeRowWithLabel:true}', 'change 160 {scopeEnd:[70,243], change:[106,204]}', and 'change 373 {gapX:4}'. Screenshot final\\band\\band-sheet.png. READ: pi.css max-width 299px rule with grid-template-areas \"label change\" \"current current\".",
+			"affected_user": "Beginners and low-vision users at 125% to 200% zoom.",
+			"confidence": "medium",
+			"correction": "In the narrow grid, put Change in the name's row: grid-template-areas \"label .\" \"current change\" with align-self: end. Change then follows the last line of '(shared: X)' in a fixed column and still holds its place invisibly after an explicit pick.",
+			"tradeoff": "The name column loses about 50 px at 160, so 'Default (shared: Ultraviolet)' may need a third line. The 2lh reservation would then need to become 3lh at 160, or the chips would move on a pick.",
+			"acceptance_test": "At 299, 249, 189 and 160 on key and dial with shared Ultraviolet: Change's top is within 4 px of the top of the scope text's last line, and its left edge is within 12 px of the scope's end. All eight picks keep the chip-row top within 0.5 px, and the name is never cut.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY07",
+			"title": "Arming a group's remove at narrow widths collapses the group name to an empty 18 px box, so the question no longer shows which group",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "dial-groups at 373, 320, 249, 189 and 160; trusted click on group 1's × button.",
+			"observed": "The armed button grows leftward, and the pointer stays on it at every width (correct). At 373 the name field shrinks from 289 to 126 px, and at 320 to 73 px. At 249, 189 and 160 it collapses to 18 px and shows nothing, while the button reads 'Remove group and its 2 readings?' over 2 to 3 lines. The head grows by 7 px (249, 189) or 21 px (160) and pushes the group's chips down. The visible text never names the group (only the aria-label does), so a sighted person confirms by position alone.",
+			"evidence": "MEASURED probe2.mjs arm section: 'arm-group-189 after name.w 18, head.h 34.8', 'arm-group-160 after name.w 18, head.h 49.1, list.y 222.7 -> 243.8', 'arm-group-373 after name.w 126.1, underPointer button'. Screenshot p2\\arm-sheet.png.",
+			"affected_user": "Zoom users, and anyone working with several groups.",
+			"confidence": "high",
+			"correction": "Put the group's name in the armed words ('Remove CPU and its 2 readings?', falling back to 'group 2' when unnamed), and give the name field min-width: 4ch.",
+			"tradeoff": "The longer armed text wraps to one more line at 160.",
+			"acceptance_test": "Armed at 160, 189 and 373: the visible armed text contains the group name or number, the name field is at least 4ch wide, and elementFromPoint at the press point is still the button.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY08",
+			"title": "The armed group remove loses its danger fill while the pointer is on it",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "dial-groups at 373x410 DPR 1.5. Trusted press arms group 1's remove and the Merge button; computed styles are read with the pointer on the button and after moving it away.",
+			"observed": "Armed and hovered, the group remove's background is rgba(255,255,255,0.08): the .hw-group-remove:hover rule comes after the armed rule with equal specificity, so it wins. Armed and not hovered, the background is #4a2626. Merge keeps #4a2626 when hovered because its armed rule comes after its hover rule, and Replace behaves the same way. So the armed look is weakest exactly where the second press happens, and the two arm buttons in one editor look different.",
+			"evidence": "MEASURED armhover.mjs: '.hw-group-remove {hov:{armed:true, bg:rgba(255, 255, 255, 0.08)}, off:{bg:rgb(74, 38, 38)}}' and 'merge {hov:{bg:rgb(74, 38, 38)}}'. READ: pi.css, armed rule around line 1353 and hover rule around line 1379.",
+			"affected_user": "Everyone removing a group.",
+			"confidence": "high",
+			"correction": "Add .hw-group-remove[data-armed=\"true\"]:hover { background: var(--hw-danger-bg); }, or move the armed block after the hover rule.",
+			"tradeoff": "None measurable.",
+			"acceptance_test": "Armed and hovered, the group remove's computed background is rgb(74, 38, 38), equal to Merge's.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY09",
+			"title": "With Legacy gestures the groups count note says rotation moves inside a group, directly above a line saying it runs as one list",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "dial-groups with controlPreset legacy at 373x410, Reading open.",
+			"observed": "The note reads '2 groups. Rotation needs two or more readings in a group to move inside it.' The groups line below it reads 'New ticks go to the marked group. Legacy gestures cannot switch groups, so turns run through all groups as one list, in group order. Change gestures'. The two adjacent lines disagree. The baseline had the same note, but under a longer paragraph. R19 made the groups line preset-aware but left the note unchanged. The same applies to Custom without 'Switch sensor or group'.",
+			"evidence": "MEASURED probe2 'groups-legacy' text and screenshot p2\\misc-sheet.png (middle). READ: renderRotationSet's grouped note in pi-common.js, which does not read groupJumpers or presetNow.",
+			"affected_user": "Beginners using Legacy or Custom with groups.",
+			"confidence": "high",
+			"correction": "Derive the note from the same inputs as updateRotationHelp. When no gesture can jump, say '2 groups; with these gestures they act as one list of N readings.' and drop the 'inside a group' clause.",
+			"tradeoff": "Adds one more derived string that must follow the control map; unit coverage is needed.",
+			"acceptance_test": "dial-groups under Legacy, under Custom without a Switch sensor or group gesture, and under Elite with Ignore turns on: no line in the rotation box says that rotation moves inside a group.",
+			"new_in_candidate": false
+		},
+		{
+			"id": "VY10",
+			"title": "Copy support report looks enabled while it ignores presses",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "control-reset at 373x410 with Advanced open, simulated plugin reply delay 2500 ms, clipboard stubbed; trusted press on the button.",
+			"observed": "While waiting, the button carries aria-disabled=\"true\", which has no style: color stays #ececec, the cursor stays a pointer, and the label stays 'Copy support report' for up to 3 s. The baseline set the disabled property, so .hw-support:disabled painted it muted with a default cursor. The case the button exists to diagnose (a plugin that does not answer) now shows a live-looking button that does nothing for 3 s.",
+			"evidence": "MEASURED final.mjs 'support {waiting:{ariaDisabled:\"true\", disabled:false, color:\"rgb(236, 236, 236)\", cursor:\"pointer\", text:\"Copy support report\"}, done:\"Copied to clipboard\"}'. READ: pi.css '.hw-support:disabled { color: var(--hw-muted); cursor: default }' and the pi-control.js diff.",
+			"affected_user": "Anyone collecting a support report while the plugin is slow or down.",
+			"confidence": "high",
+			"correction": "Add .hw-support[aria-disabled=\"true\"] { color: var(--hw-muted); cursor: default; }. Optionally, show the label 'Asking the plugin…' while waiting.",
+			"tradeoff": "None; focus behavior is unchanged.",
+			"acceptance_test": "While waiting, the computed color is rgb(184, 184, 184) and the cursor is default; focus stays on the button; the outcome is still announced.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY11",
+			"title": "Check again's answer line grows the status block below the buttons and bounces the palette on every press",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "key-unavailable at 373x410 and 189x410; trusted press on Check again.",
+			"observed": "The answer line sits under the action buttons. When it arrives, the band and everything below move down 36 px at 373 and 68 px at 189. Each new press empties the line first, which moves the content up, and the answer then refills it, which moves it back down. The pressed button itself does not move.",
+			"evidence": "MEASURED probe2 check: 'check-373 before band 249.6, after 285.75', 'check-189 460.6 -> 528.97'. Screenshot p2\\check-sbs.png. READ: the pi-shell.js retry click handler sets 'ack.textContent = \"\"' before the plugin answers.",
+			"affected_user": "Everyone troubleshooting an outage.",
+			"confidence": "high",
+			"correction": "Keep the previous answer until the new one arrives and replace it in place (its timestamp already says when), so the block grows once per outage instead of twice per press.",
+			"tradeoff": "For a moment after a press the previous answer is still shown; its timestamp keeps that honest.",
+			"acceptance_test": "Press Check again three times on key-unavailable at 373: the band top changes only after the first answer, and not at all on the second or third press.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY12",
+			"title": "Healthy Gadget line: 'More under Advanced, Connection.' is plain text, and the destination repeats the help beside it",
+			"severity": "S6",
+			"category": "AP",
+			"state_task_viewport": "key-configured with data gadget at 373x410; Advanced > Connection open.",
+			"observed": "The status line ends with 'More under Advanced, Connection.' as plain text, although the panel has a one-press reveal link pattern: the band's Change and the status block's setup buttons. At the destination, #source-now repeats 'Auto switches providers' and the reading-links advice that #source-help already gives in the paragraph directly above it.",
+			"evidence": "MEASURED probe2 gadget ('links': [], sourceNow text) and screenshot p2\\misc-sheet.png (top). READ: the renderReadingStatus and renderSourceNow diff in pi-shell.js.",
+			"affected_user": "Gadget users (a common first setup).",
+			"confidence": "medium",
+			"correction": "Make 'More' an .hw-link with data-reveal=\"source-now\". Show in #source-now only the sentences #source-help does not already say, or hide #source-help's duplicate sentence while #source-now is shown.",
+			"tradeoff": "The plugin's hint is plugin-built text, so trimming it in the panel needs a stable sentence split.",
+			"acceptance_test": "Pressing 'More' opens Advanced > Connection and focuses #source-now. The text 'Auto switches providers' appears once in the Connection section.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "VY13",
+			"title": "Tile editor: tiles the person sized lost their distinct edge, and the new pills wrap three tiles at 320 px",
+			"severity": "S6",
+			"category": "AP",
+			"state_task_viewport": "key-details with Press open, 5 custom readings plus one missing key, at 373 and 320.",
+			"observed": "A tile the person sized ('planned') now differs from an automatic tile only by its fill: #343434 on #2d2d2d, 1.11:1. Both borders are #7c7c7c. In the baseline, the planned border #6d7a8a against the automatic #56606c was 1.46:1, plus a blue-grey fill. At 320 the '#0', '#1' and 'missing' pills push three single-reading tiles from 34 to 61 px each and leave the '+' alone on a second row.",
+			"evidence": "MEASURED probe2 tiles: 'cand tiles-320 … h:61' for three tiles vs 'base tiles-320 … h:34'; planned background rgb(52, 52, 52) with border rgb(124, 124, 124) vs baseline rgb(38, 43, 49) with rgb(109, 122, 138). Screenshot p2\\tiles-320-sbs.png.",
+			"affected_user": "Power users building custom detail lists.",
+			"confidence": "medium",
+			"correction": "Keep one token cue for planned tiles, for example border-color: var(--hw-muted) against var(--hw-edge). Let the chip name ellipsize inside tiles (min-width: 0) so the + marker stays on the chip's row.",
+			"tradeoff": "A brighter planned border adds one more mid-grey line to a busy editor.",
+			"acceptance_test": "At 320, single-reading tiles with a twin or missing pill stay 34 px tall with the + on the same row. A planned tile's border differs from an automatic tile's by at least 1.4:1.",
+			"new_in_candidate": true
+		}
+	],
+	"keep": [
+		"The one-line band at 373 and 320 ('Theme Default (shared: Void) Change', 'Theme Ember (set on this key)', 'set on this dial' on the dial): 106.1 px instead of 125.2, all eight names visible, the resolved theme named in text, chips stable across picks, band top unchanged in the default, all-folded and all-open states with 0 writes (MEASURED)",
+		"The line never follows hover or focus (R04); each chip carries its own name, drawn in its palette's value color (MEASURED)",
+		"Default's link mark and dashed frame drawn in the followed palette's value and label colors; legible on Paper and quieter than the selection ring on dark themes (MEASURED)",
+		"The focus ring 3 px outside the checked ring on theme chips, and inset focus rings on section summaries (MEASURED)",
+		"Below 240 px the header text moves under the face, and the dial face never shrinks below 112 px; no horizontal overflow at 189 or 160 in any fixture I ran (MEASURED)",
+		"Pills never clip; the missing chip's pills drop under the name at zoom (extend this to every chip with a pill, VY03)",
+		"Arm-then-confirm on group remove and Merge: the button grows in place and stays under the pointer at every width, a double press only arms, and 0 writes until the second press (MEASURED)",
+		"color-scheme: dark: unchecked checkbox and radio borders at 3.73:1 instead of glaring white; only native controls change (MEASURED)",
+		"Reload drawn as Lucide rotate-cw at stroke 2, next to the unchanged Lucide fold pair (MEASURED)",
+		"Tile editor on the panel tokens (tile border 3.3:1, up from 2.15:1)",
+		"The healthy Gadget status cut from 5 lines to 2; the Back-tile note inset in the info tone",
+		"The dial header leading with the name the dial draws ('Hot Spot' matches the face's 'HOT SPOT'), with HWiNFO's label kept on the source line",
+		"The one derived groups line in place of the old paragraph, with a 'Change gestures' link when nothing can jump",
+		"Press section order: Readings per tile, Title tile text and Also go back above Details list"
+	],
+	"cleanup": "I stopped every process I started. These were the node runners for shots.mjs, probe2.mjs, slots.mjs, head2/3.mjs, scheme.mjs, wells.mjs, dbl.mjs, final.mjs, band299.mjs, twins2.mjs, armhover.mjs, r04r13.mjs, forced.mjs and dbg-merge.mjs, plus the headless Chrome trees they launched on ports 32012, 32015 and 32018. Early runs leaked their browser children through cdp.mjs close(): PIDs 119296, 119508 and 133792 with their renderer children, plus a hung run (node 122840, 136060, 135456; chrome 132212 and 135604). I matched them by their --remote-debugging-port in my range and by their hw-pi-lab profile, then stopped them with Stop-Process. I stopped the hung background task with TaskStop. Later runs used killport.mjs, which runs taskkill /T on only the chrome tree bound to that run's exact port. Final check: no process with remote-debugging-port=32010-32019 or hw-r3y-visual in its command line, and nothing listening on 32010-32019. I removed the four leaked profile dirs I could attribute to my own ports (hw-pi-lab-1O6VF9, 3GFcx7, 7Fcaju, DUOJ40). I left the other hw-pi-lab-* dirs in %TEMP% (243, mostly other agents') because I cannot attribute them. Nothing was written outside C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-visual apart from those Chrome temp profiles, which cdp.mjs creates. No clipboard was touched: the Copy probe stubbed navigator.clipboard and execCommand. I wrote no report.md because the session rules forbid report files; the structured result is the deliverable."
+}

@@ -1,0 +1,36 @@
+{
+	"label": "K16",
+	"at": "2026-09-24T01:49:11.942Z",
+	"hoverPoints": 40,
+	"waitS": 10,
+	"log": [
+		[
+			"start",
+			{
+				"w": 0,
+				"g": 0,
+				"kind": "key",
+				"context": "2c1e2d0d7fcc6fae39598469180f4719",
+				"url": "sensor-reading.html"
+			}
+		],
+		[
+			"picker",
+			{
+				"expanded": "false",
+				"w": 0
+			}
+		],
+		[
+			"end",
+			{
+				"w": 0,
+				"g": 0,
+				"previewState": "ok",
+				"head": "Saved reading not found"
+			}
+		]
+	],
+	"writesDuring": 0,
+	"globalWritesDuring": 0
+}

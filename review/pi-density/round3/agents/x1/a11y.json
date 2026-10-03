@@ -1,0 +1,481 @@
+{
+	"key": "a11y",
+	"role": "Agent 4, accessibility cross-review (round 3). Read-only on every repository; simulated host only (scripts/lib/pi-sim.mjs serving the FROZEN copy via PI_SIM_PLUGIN_DIR, token 1.7.0.0-d03), headless Chrome on this Windows machine, lab ports 31810..31812, scratch C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-a11y. Every probe stubbed navigator.clipboard and execCommand; no Stream Deck app, HWiNFO, installed plugin or port 23654 touched; every Chromium I started was stopped (0 left on 31810..31812, verified). Labels: MEASURED (I ran it), READ (code), INFERRED (judgment). Probes and raw output: x-band.mjs + band\\band-a11y.json + band\\*.png (R38 prototypes at 373/320/189/160), x-p1b.mjs + p1b.json (P1b with a wrapping row), x-arm.mjs + arm.json (echo rebuild focus events, double click and held Enter click counts, select() focus theft, focused-node move, announcer first call, armed-label geometry, retry mutations, P1 focus scroll), x-replace.mjs + replace.json (Replace shared settings double click and held Enter), x-scheme.mjs + scheme\\scheme.json + crops (color-scheme dark), x-misc.mjs + misc.json (R17 prototype, R21 scroll padding, R05 pill names). Real screen readers (NVDA, JAWS, Narrator), real Windows High Contrast and the real QtWebEngine host were NOT RUN; every screen reader statement below is Chrome's accessibility tree, not speech.",
+	"verdicts": [
+		{
+			"id": "R02",
+			"verdict": "modify",
+			"rationale": "The arm-then-confirm idea is right, but the idiom as it exists (and as V01/B02/P02 word it) fails keyboard, screen reader and motor users in four measured ways. (1) A real double click delivers click detail 1 then 2 and a held Enter delivers 4 clicks (1 press + 3 auto-repeats), so a naive arm-then-confirm arms and confirms in one gesture: it does not meet V01's own test 'a double click removes nothing'. (2) Every readingKey echo (dial turn, autocycle step) and every sensorTree arrival rebuilds the grouped editor: measured, the focused group remove receives blur and focusout, is destroyed and a new node at the same index is focused. So 'disarm on blur/rebuild' would silently disarm under a turning or auto-cycling dial, which recreates the timed-window barrier R09 removes (WCAG 2.2.1). (3) The button carries a fixed aria-label, so changing its text leaves the accessible name 'Remove group 1; its readings leave the rotation' (measured): a screen reader user gets no armed state, and a visible 'Press again to remove' would not be in the name (2.5.3 label in name). (4) Long armed text in the button squeezes the name field to 18 px at 189 and 160 px and to 74 px at 320 (measured); only a short 'Remove?' keeps the name field usable (75 px at 189, 46 px at 160). The 5 s timeout in B02 must not be adopted.",
+			"regression_risk": "Armed state kept in module state can apply on a much later press if disarm is too lax; a note line under the armed group shifts later content down by one line (a person-initiated shift, and it moves the next group's x away from the pointer, which helps); e2e flows that remove a group in one press need a second press; the armed danger fill is 1.05:1 against the page, so without the border the armed look vanishes, and in forced colors only the text survives.",
+			"revised_correction": "Hold the arm in module state keyed by group identity (index plus name and key list), re-render it on every rebuild, and ignore the blur a rebuild causes (flag it inside renderRotationSet). Disarm only on a person moving focus elsewhere, a pointer press elsewhere, any rotation edit, or the group list changing. No timer. Confirm only on a press that starts after the arm: ignore click.detail > 1, ignore Enter/Space keydown with repeat, and require at least 400 ms since arming. Armed look: visible text 'Remove?' with the .hw-btn[data-armed] border (#ffb4ab, 8.11:1 on the page), plus one note line under that group head ('Removes CPU and its 2 readings from the rotation. Press Remove? again, or Tab away to keep it.') referenced by aria-describedby; set aria-label to start with the visible text ('Remove? Press again to remove group 1, CPU, and its 2 readings'). Announce the armed state once through hwShell.announce on a channel primed at load. After removal, focus the name field of the group now at that index, else the previous group's name, else Add group or the list; never a .hw-group-remove; announce 'Removed group 1, CPU, and its 2 readings'. Empty groups may remove in one press.",
+			"acceptance_test": "dial-groups + Add group at 373x410, keyboard: Enter on group 1's remove writes 0 frames, focus stays on it, its visible text is 'Remove?', its AX name starts with 'Remove?' and names the group and count, exactly one polite announcement. Wait 10 s and push a readingKey echo (emulated turn): still armed, focus on group 1's remove. Enter again (>= 400 ms later): exactly one group removed, one frame per field, document.activeElement matches .hw-group-name (never .hw-group-remove), one announcement naming the removed group. CDP double click (clickCount 1 then 2) on an unarmed remove: 0 frames, left armed. Enter held (1 press + 3 autoRepeat keyDowns): 0 frames. Arm then Tab away: text back to the glyph, aria-label restored, 0 frames. At 160x410: armed button scrollWidth <= clientWidth and name field >= 40 px. Forced colors (emulated): armed state readable as text. NOT RUN: whether NVDA/JAWS/Narrator speak the armed state (real screen reader).",
+			"evidence": "MEASURED arm.json: '1 echo rebuild under focused group remove' events [blur, focusout, focusin x4], sameNode false; '2a double click' click details [1,2]; '2b Enter held' [0,0,0,0]; '5 announcer first call' first message not written, second written; '6 armed label geometry' name field 289/259/190/127 px at 373 for glyph/'Remove?'/'Press again to remove'/'Remove group and its 2 readings?', 18 px at 189 and 160 for the long variants, AX name unchanged in every variant. Contrast (node): danger bg #4a2626 vs page 1.05:1, danger border #ffb4ab vs page 8.11:1. READ pi-common.js groupHeader (aria-label fixed), renderRotationSet rebuild on echo (primaryPicker onSelectionEcho) and on sensorTree (line ~3709), rotationFocusMemo groupRemove."
+		},
+		{
+			"id": "R09",
+			"verdict": "modify",
+			"rationale": "Agree to drop the 5 s window (A02 measured the re-arm at 5.3 s; the 15-word note alone takes about 5 s to speak). But the existing two-step is already defeated by one gesture: measured, a real double click on 'Replace shared settings' sends 1 setGlobalSettings frame, and a held Enter (1 press + 2 auto-repeats) sends 1 frame. A timerless arm keeps that hole unless the confirm is guarded. The label 'Click again...' is pointer-specific, and after a disarm the note still says 'Click again to confirm'.",
+			"regression_risk": "Without a timer a stale arm could apply on a much later accidental press; the guard delays a fast deliberate confirm by up to 400 ms; wording changes touch release copy rules (em dash free, validator).",
+			"revised_correction": "Armed until a person blurs the button or edits either well; no timer. Confirm guard as in R02 (ignore click.detail > 1 and repeated keydown, >= 400 ms since arming). Words: 'Press again to replace for all keys and dials'. On disarm, replace the note with 'Not replaced. Nothing was changed.' so no stale instruction remains in the live region.",
+			"acceptance_test": "key-configured all open, valid JSON in the shared well: Enter arms (0 frames), wait 10 s, Enter: exactly 1 setGlobalSettings. Arm, Tab away and back, Enter: re-arms, 0 frames, and #config-note no longer says 'again' after the Tab away. CDP double click on the unarmed button: 0 frames, armed. Enter held (1 press + 2 autoRepeat keyDowns): 0 frames. Arm then type in the well: disarmed.",
+			"evidence": "MEASURED replace.json: doubleClick globalWrites 1, heldEnter globalWrites 1. READ pi-common.js apply(): armedUntil = Date.now() + 5000, second click inside the window applies with no check on event.detail or key repeat. A02 (round 1) measured the 5.3 s re-arm."
+		},
+		{
+			"id": "R03",
+			"verdict": "agree",
+			"rationale": "Bound fields already save on mouseleave and window blur; the rotation rename, group name and cell rename fields do not (X07/P08). The commit must be silent and must not disturb the caret, because a keyboard or screen reader user may still be in the field when a mouse drifts out or the app takes focus.",
+			"regression_risk": "A flush implemented as a blur listener on the field would also fire on the rebuild-caused blur (measured for rotation rebuilds); a flush that calls blur() or renderRotationSet would drop focus and caret; the chip-rename commit path announces 'Named X on the dial', which would speak while the person is elsewhere; after a flush, a later Enter fires change again and sends a duplicate identical frame (breaks exact frame counts).",
+			"revised_correction": "Register each of the three fields with pendingFlushes while it is focused and dirty; the flush writes the value only (IME composition guard like bindControl), never blurs, never rebuilds (the existing focused-name guards in renderRotationSet and renderDetailList then hold), never announces, and records the flushed value so a later change with the same value writes nothing.",
+			"acceptance_test": "dial-groups at 373x410: type 'Drives' in group 2's name without Enter, dispatch mouseleave on documentElement then a window blur: exactly one frame carrying 'Drives', activeElement is still that field, selectionStart/selectionEnd unchanged, announcer and every aria-live region text unchanged. Then press Enter: 0 further frames. Same for the F2 chip rename and a key-details cell rename. Composition in progress: 0 frames until compositionend.",
+			"evidence": "READ pi-shell.js pendingFlushes/flushPending (bound fields only), pi-common.js chip-rename change handler announces, renderRotationSet guard on .hw-group-name, renderDetailList guard on .hw-cell-rename. MEASURED arm.json '1': rebuilds fire blur/focusout on the removed focused node."
+		},
+		{
+			"id": "R08",
+			"verdict": "agree",
+			"rationale": "Focus falling to BODY after Enter or Tab on a group name, and after Enter on a cell rename, breaks 2.4.3 for keyboard and screen reader users (P07 measured). The cause is the synchronous rebuild inside the change handler that runs during focus navigation.",
+			"regression_risk": "P07's acceptance text says Tab lands on the remove button 'armed, nothing removed': focus must never arm; only a press arms (R02). A deferred rebuild must still respect the focused-name guard. Returning focus to the field makes NVDA re-read the field value, which is the desired confirmation.",
+			"revised_correction": "Defer the rebuild one task after a name commit and let rotationFocusMemo read the new activeElement (it already knows groupRemove, collector, list, tool). Enter on a group name: focus back on that group's name field. Enter on a cell rename: focus on that cell's rename button (role=button span).",
+			"acceptance_test": "dial-groups: type in group 2's name, Enter: activeElement is .hw-group-name[data-group='1'] with the new value, 1 write per field. Type in group 1's name, Tab: activeElement is .hw-group-remove[data-group='0'], NOT armed (no 'Remove?' text, 0 frames). key-details: rename cell 1, Enter: activeElement is that cell's .hw-set-name[role=button] whose AX name contains the new label; next Tab: its up/down button.",
+			"evidence": "READ pi-common.js change handler (writeRotation then renderRotationSet synchronously), keydown Enter handler, detail cell rename handlers 3933-3949. P07 MEASURED BODY."
+		},
+		{
+			"id": "R05",
+			"verdict": "modify",
+			"rationale": "A visible pill is the right cue (today sighted users get only a title tooltip). Measured with the pill injected and the sr-only note removed, the option's AX name is 'f0099999:0:1000000 not in HWiNFO' (phrase once). Two gaps: the detail list chip is a plain span, so a Tab user lands only on the rename button ('Rename this cell's label, now X') and would never hear a pill placed beside it; and the note that 'names the skipped ones' would speak raw keys through the 'rotation' live channel, which also fires on tree arrivals, not only on the person's edits.",
+			"regression_risk": "At 160 px the chip keeps the whole pill but shows only 26 of 106 px of the name (measured); a chip that is both on the dial and missing shows two pills; the live-count note speaks when a sensor sleeps or wakes on a tree refresh; e2e option-name assertions change.",
+			"revised_correction": "Rotation option: visible .hw-chip-badge 'not in HWiNFO' (flex none, overflow visible), remove the sr-only duplicate; below 240 px let the chip wrap so the pill drops under the name. Detail chip: the same pill with an id, referenced by the rename button's aria-describedby (replacing the title). Note: 'Rotation moves through 2 of these 3 readings; 1 not in HWiNFO's list is skipped until it returns.' with no raw key in the text.",
+			"acceptance_test": "B01 fixture (rotationKeys [gpu, f0099999:0:1000000, hot]) at 373x410 and 160x410: the option's AX name contains 'not in HWiNFO' exactly once; pill scrollWidth <= clientWidth; at 160 the name shows >= 40 px; forced colors: pill border visible. key-details with the same key: Tab to that cell's rename button: AX name or description contains 'not in HWiNFO' once. The note and any announcer text never match /[0-9a-f]{8}:\\d+:\\d+/. Opening writes nothing.",
+			"evidence": "MEASURED misc.json R05: todayName 'f0099999:0:1000000 (not in HWiNFO's current list)', withPillName 'f0099999:0:1000000 not in HWiNFO', at 160 chipW 132, nameVisibleW 26 of 106, pillWhole true, overflowX 0. READ pi-common.js detailChip (role=button name with aria-label, missing only in title), setNote(..., 'rotation') announces, renderRotationSet on sensorTree."
+		},
+		{
+			"id": "R07",
+			"verdict": "modify",
+			"rationale": "Screen reader users cannot tell two 'Drive Temperature' members apart at all today (P03). The correction must reach every place a reading is named, and the visible suffix must survive the chip's ellipsis: .hw-set-list .hw-set-chip > .hw-set-name ellipsizes at 190 px, so a suffix appended at the end ('Drive Temperature · Samsung SSD 980 PRO') can be cut and the chips look identical again.",
+			"regression_risk": "Wider chips wrap sooner; long source names in accessible names make toolbar labels verbose; names must be computed alias-aware the way rotationNameOf is.",
+			"revised_correction": "When labels collide within one list, put the distinguishing part where ellipsis cannot remove it (a short non-shrinking span like the 'on dial' pill, for example '#1' or a short source name) and the full source in title and accessible names. Cover: rotation options, toolbar aria-labels, the 'Removed X' and 'X, 2 of 3' announcements, the rename label (it uses readingLabelOf, not rotationNameOf), the dial Reading colors rows (label, well title, Auto aria-label), and the detail list up/down/remove and rename names.",
+			"acceptance_test": "Two-drive fixture at 373x410 and 189x410: the two chips' rendered visible text (characters whose Range rects fall inside the name's clip box) differs; role=option names in each listbox are unique; toolbar names differ when each is selected; the removal announcement names the source; Reading colors row labels and Auto button names are unique; key-details remove buttons have distinct names.",
+			"evidence": "READ pi.css 1356-1362 (max-width 190px, ellipsis), pi-common.js rotationOption, syncRotationTools, startRotationRename label (readingLabelOf), renderReadingColors 3351-3360, detailChip spokenName. P03 MEASURED the collisions."
+		},
+		{
+			"id": "R06",
+			"verdict": "agree",
+			"rationale": "The header collapse at 189/160 px is the largest zoom barrier (A01/X04). A wrap scoped below about 240 px keeps DOM order (reading order and Tab order unchanged) and the header is already unpinned at those widths, so focus cannot be hidden under it.",
+			"regression_risk": "An unscoped wrap unpins the dial header at 252-270 px and the key header at 252 px (A01 measured); the key header grows at 210-239 px; the rotation slot hint wrapping breaks the constant-height slot at zoom only.",
+			"revised_correction": "As registered (A01 CSS under max-width 239px, face never shrinks below its image, slot min-width 0 with the hint allowed to wrap, pills flex none). Put the R38 band row wrap (see R38) in the same media query.",
+			"acceptance_test": "key-configured, dial-configured, dial-groups at 160x410 and 189x410: .hw-head-kind at most 2 lines and no break inside a word; face visible share 1.0; key palette top < 410; documentElement.scrollWidth == clientWidth; a full Tab walk finds no stop outside the viewport horizontally and none under a pinned header. At 240, 252, 270, 290, 320, 373 px header height and position equal the baseline.",
+			"evidence": "A01/X04/V07 MEASURED (round 1, including verified injection). READ pi-shell.js pin-off when header > innerHeight/3."
+		},
+		{
+			"id": "R10",
+			"verdict": "modify",
+			"rationale": "aria-disabled plus the existing 'waiting' guard keeps focus during the wait, but focus is also lost on the fallback copy path: measured, textarea.select() moves focus to the temporary textarea and removing it drops focus to BODY. Whether navigator.clipboard.writeText works in QtWebEngine is unknown, so the fallback may be the normal host path. And hwShell.announce swallows the first message of a new channel (measured), so a naive announce of the outcome is silent the first time.",
+			"regression_risk": "A focusable 'waiting' button can be pressed again (the guard must return early); the button's own text change plus an announcement may double-speak on screen readers that report name changes of the focused object.",
+			"revised_correction": "Replace disabled with aria-disabled='true' while waiting (guard stays); in copyText's fallback, remember document.activeElement and restore it with focus({ preventScroll: true }) after scratch.remove(); speak the outcome through hwShell.announce on a channel primed at load (or a dedicated polite region next to the button).",
+			"acceptance_test": "key-configured all open, sim replyDelayMs 600, navigator.clipboard stubbed to throw (forces the execCommand fallback): Enter on Copy support report: activeElement is the button during the wait and after the reply; exactly one polite region change whose text is the outcome; a second Enter during the wait sends no second getSupportReport. NOT RUN: whether the host's clipboard API succeeds, and real screen reader speech.",
+			"evidence": "MEASURED arm.json '3 select()': during TEXTAREA, after BODY; '5 announcer first call': first message not written. READ pi-control.js copyText fallback and supportEl.disabled."
+		},
+		{
+			"id": "R38",
+			"verdict": "modify",
+			"rationale": "From the accessibility side, P1 as prototyped must not ship: with Change inside the ellipsizing span (.hw-look-current is overflow hidden, nowrap) the 24 px target is clipped to about 17 px (68.8% of its box hittable at 373, 63.6% at 320), its focus ring is cut on three sides at every width, and at 189 px keyboard focus on Change scrolls the line to 'ed: Ultraviolet) Change' (scrollLeft 66). P1b (the same words, Change as its own flex:none sibling after the span) fixes that (93.9% at 373/320, full ring) and keeps the band at 106 px for every pick at 373 and 320. P3 fails the band's one-height promise (124 px Default vs 140 px Ember at 373; 216 vs 232 at 160) and puts the resolved name below the fold at 189. P2 is accessibility-neutral.",
+			"regression_risk": "P1b adds one Tab stop before the palette on Default keys (3 stops to the checked chip instead of 2, measured); the radiogroup loses its current description unless re-pointed; at 189/160 the one-line version truncates the resolved theme ('Default (sha...') unless the row wraps, which breaks contract 1 at zoom; the empty-key and unknown-value help lines must stay.",
+			"revised_correction": "Adopt P1b, not P1: 'Theme Default (shared: Void) [Change]' and 'Theme Ember (this key only)', Change outside the ellipsizing span with its existing data-reveal and aria-label 'Change the shared theme'; below 240 px let .hw-look-name wrap and .hw-look-current use white-space normal; point the radiogroup's aria-describedby at the scope span (preferably worded without parentheses for speech, for example an sr-only 'follows the shared theme, now Void'); keep #theme-help for the empty key and the unknown stored value only.",
+			"acceptance_test": "key-configured with shared Ultraviolet, shared Void and explicit Ember at 373, 320, 239, 189, 160 x410: #theme-current scrollWidth <= clientWidth (resolved name never cut); Change box >= 24 px tall with >= 90% of its box answering elementFromPoint when scrolled into view, focus ring fully inside the viewport and not clipped by an ancestor; band height equal for all eight picks at 373 and 320 (106 px); radiogroup AX description names the resolved theme for Default and the key scope for a preset; Tab from the fold toolbar reaches Change then the checked chip; 0 writes.",
+			"evidence": "MEASURED band\\band-a11y.json and band.log (P1: hit 68.8%/67.3% at 373, ring top/bottom/right clipped, 4.5% and 0% at 189/160; P1b: 93.9%, full ring; P3: band 124 vs 140), arm.json '8 P1 focus Change at 189' scrollLeft 66 visibleText 'ed: Ultraviolet) Change', p1b.json (with the wrap rule: no truncation at 239/189/160, Change 90-94%, band 106 at 373/320 for all picks, overflowX 0), misc.json R38 P1b+wrap group description '(shared: Ultraviolet)' / '(this key only)'. Screenshots band\\ultraviolet-default-P1-189.png ('Theme red: Ultra...'), ultraviolet-default-P1b-189.png ('Default (sha...')."
+		},
+		{
+			"id": "R41",
+			"verdict": "agree",
+			"rationale": "Measured at DPR 1.5: with color-scheme dark an unchecked checkbox or radio changes from a white fill (13.77:1 against the #2d2d2d page, the glare V10 found) to a #3b3b3b fill with a #858585 boundary at 3.73:1, which is higher than today's #767676 boundary (3.03:1), so 1.4.11 boundary contrast improves. Checked marks keep accent-color. Forced colors are unaffected (white boundary 21:1 in emulation). Only native checkbox, radio and color inputs change computed colors (2 of 37 controls on key-configured, 11 of 68 on dial-groups); author-styled selects, inputs and buttons do not.",
+			"regression_risk": "Unmeasured parts: native select popups, the color picker dialog, scrollbars (the lab launches with --hide-scrollbars) and autofill in QtWebEngine 6.9. A dark scrollbar thumb on the dark page could drop below 3:1 for low-vision users who rely on it to see scroll position.",
+			"revised_correction": "Add :root { color-scheme: dark; } in pi.css; keep it only if the real host renders select popups and scrollbars legibly.",
+			"acceptance_test": "getComputedStyle(document.documentElement).colorScheme === 'dark'; at DPR 1.5 an unchecked checkbox/radio boundary is >= 3:1 against the page and its fill is not brighter than the checked mark; forced-colors emulation unchanged. Real host (integrator, NOT RUN here): a select popup renders dark with readable text, scrollbar thumb >= 3:1 against its track, the color well dialog opens.",
+			"evidence": "MEASURED scheme\\scheme.json and crops: normal unchecked dominant 255,255,255 (13.77:1) and 118,118,118 (3.03:1); dark 59,59,59 (1.23:1) and 133,133,133 (3.73:1); forced-dark boundary 255,255,255 (21:1); changedComputed lists only checkbox/radio/color inputs."
+		},
+		{
+			"id": "R17",
+			"verdict": "agree",
+			"rationale": "Measured with a prototype (after the list opens, scroll by min(list overflow, room above the search under the pinned header)): dial-configured at 373 goes from 0 to 5 fully visible checklist rows, key-empty from 2 to 7, the search stays below the pinned header (210 vs 105; 144 vs 89), the next Tab stop is visible and unobscured, 0 writes. Because focus alone opens these lists, a keyboard user Tabbing into a search will see the page move; that is acceptable only because the moved element is the focused one and it stays clear of the header.",
+			"regression_risk": "The page jumps by up to about 165 px on Tab-in (magnifier users lose their place); it must never run on echoes, while typing, or when the list already fits; a smooth scroll would need a reduced-motion guard; it must share arithmetic with the 'Pick another reading' reveal (X11) instead of fighting its center scroll.",
+			"revised_correction": "On open only (not on echo or filter), when the list bottom exceeds the viewport, scroll by min(overflow + 8, searchTop - pinnedHeaderBottom - 8); instant scroll (no smooth behavior); use the same rule for reveal('picker-search').",
+			"acceptance_test": "373x410 and 189x410, keyboard Tab into #picker-search (key-empty) and #pickerr-search (dial-configured): search top >= pinned header bottom (or >= 0 when unpinned), >= 4 checklist rows / >= 6 combobox rows fully visible, 0 writes; typing a filter causes no further page scroll; Tab out lands on a stop that is fully visible and not under the header; key-missing 'Pick another reading': list bottom <= 410 with focus in the search.",
+			"evidence": "MEASURED misc.json R17 373/189 x dial-configured/key-empty (baseline rows 0/2, prototype 5/7 at 373; searchUnderHeader false; afterTabOut obscured false; writes 0). READ pi-common.js openList, searchEl focus handler opens the list."
+		},
+		{
+			"id": "R21",
+			"verdict": "agree",
+			"rationale": "Keeping the moved chip in view helps low-vision and keyboard users most. Measured: scrollIntoView({ block: 'nearest' }) on a chip above the view lands it at y 113 under a 105 px pinned header, so the existing scroll-padding-top already keeps it clear.",
+			"regression_risk": "Today Home/End in the list select first/last and the handler ignores Alt, so Alt+Home currently only selects; making it a move turns a harmless key into a write. Alt+Home is a desktop Chrome shortcut (lab only). The toolbar relocation moves a focused button (measured: appendChild of a focused node drops focus and fires blur), so moves driven from the toolbar rely on the focus memo.",
+			"revised_correction": "After every move call scrollIntoView({ block: 'nearest' }) on the moved chip (instant). Add Alt+Home / Alt+End as keyboard-only moves with the announcement 'X moved to first, 1 of N'; no write at the edge; update #rotation-keys-help (it lists only Alt+arrow and F2) and aria-keyshortcuts on the lists in the same change.",
+			"acceptance_test": "37-member rotation at 373x410: after every Earlier click and every Alt+Right press the moved chip is inside the viewport and its top >= pinned header bottom; Alt+Home on member 37 moves it to place 1 in one frame per field and announces once; Alt+Home on member 1 writes nothing; focus stays on the list (or on the same toolbar button) after each move.",
+			"evidence": "MEASURED misc.json 'R21 nearest under pinned header' chipTopAfter 113, headerBottom 105, clear true; arm.json '4' focusKept false, blurFired true. READ pi-common.js list keydown (Home/End without Alt check), rotation-keys-help text."
+		},
+		{
+			"id": "R22",
+			"verdict": "agree",
+			"rationale": "The detail checklist's '+ all' already follows an accessible pattern: it sits in the roving set (arrow keys visit it, tabIndex -1, one Tab stop for the list), acts on mousedown without stealing focus, and is named 'Add every reading of CPU'. Reusing it for the rotation checklist adds no new interaction model.",
+			"regression_risk": "With groups, the name does not say which group receives the readings; the grouped note does not contain a count, so a press that adds 10 readings to a group is not announced; very large sets grow the overview and the Reading colors list.",
+			"revised_correction": "Pass onGroupAdd to the rotation picker; aria-label 'Add every reading of CPU to group 2, GPU' when grouped; announce 'Added 10 readings from CPU to group 2' on a primed channel; keep focus on the '+ all' button; alias-aware and first-group-wins as P05 says.",
+			"acceptance_test": "dial-groups, checklist open, ArrowDown to the CPU '+ all' and Enter: focus stays on that button, one write per field, exactly one polite announcement with the count and target group, ticks update in place, the list keeps its scroll; the button's AX name names the source and target group.",
+			"evidence": "READ pi-common.js build() '+ all' (aria-label, tabIndex -1 in checklists), checklist keydown roving over .hw-tick and .hw-group-add, groupAdd mousedown/click de-dupe."
+		},
+		{
+			"id": "R23",
+			"verdict": "modify",
+			"rationale": "Making Earlier/Later at a group's edge cross into the neighbor group changes the meaning of a control silently (for sighted keyboard and pointer users the button still reads 'Later') and makes repeated Alt+Left overshoot into the previous group. The toolbar then relocates under the other list, which drops focus (measured) and moves the target away from the pointer.",
+			"regression_risk": "Alt+Up/Down currently duplicate Alt+Left/Right; repurposing them changes a documented shortcut ('Alt with an arrow'); a label that changes at the edge changes the button width, shifting Rename and Remove.",
+			"revised_correction": "Keyboard: keep Alt+Left/Right inside the group (no overshoot) and use Alt+Up/Alt+Down (free, the lists are aria-orientation horizontal) to move the selected member to the end of the previous group or the start of the next. Toolbar: at a group edge, Earlier/Later change their VISIBLE text to 'To group 1' / 'To group 2' and aria-label 'Move X to group 2, GPU'. After the move, focus follows the member into its new list (or the same tool in the relocated toolbar via the focus memo), the chip is scrolled into view, and the announcement names the group and position.",
+			"acceptance_test": "dial-groups at 373x410: select CPU CCD1 (last in group 1), Alt+Down: it is first in group 2, one frame per field, activeElement is group 2's listbox with aria-activedescendant on that chip, announcement 'CPU CCD1 moved to group 2, 1 of 3'. Alt+Right at the last place: 0 frames. Toolbar: with the last member selected the Later button's visible text is 'To group 2' and its AX name starts with that text; pressing it keeps focus on that tool; a press at the toolbar's old screen position afterwards writes nothing.",
+			"evidence": "MEASURED arm.json '4' (focused node move drops focus, fires blur). READ pi-common.js placeRotationTools, rotationFocusRestore, list keydown Alt+Arrow mapping, rotationListbox aria-orientation horizontal."
+		},
+		{
+			"id": "R24",
+			"verdict": "agree",
+			"rationale": "Mirroring the forced-colors scheme fixes an inversion for low-vision users: the selection in every picker list of the same panel is the --hw-select-bg fill, while in the rotation editor that fill means 'on dial' and the selection is a thin ring. Contrast check: the on-dial frame must NOT be drawn in --hw-select-bg (1.81:1 on the chip field #3a3a3a, 2.19:1 on the page); a 2 px dashed --hw-text frame is 9.63:1 and cannot be confused with the solid blue focus ring. White text on the selection fill is 6.29:1, and the focus ring against the fill is 3.36:1.",
+			"regression_risk": "Existing users relearn one mark; docs screenshots change; the focused-list indication must remain distinct from the selection fill.",
+			"revised_correction": "Selected option: --hw-select-bg fill, white text. On dial: 2 px dashed --hw-text frame plus the 'on dial' pill, no fill. Focused list: keep a 2 px --hw-focus ring on the selected chip. Toolbar aria-label becomes 'Selected reading: GPU Power' (a visible caption is optional because of width).",
+			"acceptance_test": "dial-configured at 373x410 after clicking GPU Power: the selected option and .current never share a background; .current has a dashed border >= 3:1 against the chip field and the pill; with the list focused the selected chip shows a focus ring >= 3:1 against its fill; forced colors unchanged (Highlight outline for selection, dashed CanvasText for on dial); toolbar AX name contains the selected reading.",
+			"evidence": "MEASURED (node contrast): #2660aa vs #3a3a3a 1.81:1, vs #2d2d2d 2.19:1; #ececec vs #3a3a3a 9.63:1; #7cc4ff vs #2660aa 3.36:1; #ffffff on #2660aa 6.29:1. READ pi.css 1154-1158, 1335-1345, forced-colors block."
+		},
+		{
+			"id": "R25",
+			"verdict": "modify",
+			"rationale": "An undo is valuable, but a transient control that appears in the toolbar slot and vanishes 'until the next edit' is easy for a screen reader user to miss and must never time out (2.2.1). It also must not take focus from the list.",
+			"regression_risk": "A stale undo could restore an outdated state; placing it in the slot conflicts with the toolbar that the slot holds; a keyboard shortcut like Ctrl+Z may collide with the host app (untested, like R52).",
+			"revised_correction": "After a Remove, add an 'Undo' button at the end of the rotation note line, persisting until the next rotation edit or a page reload (no timer), announced in the same message ('Removed Hot Spot from GPU. Undo is after the list.'). Undo restores group and position in one frame, focuses the restored chip in its list and announces 'Restored Hot Spot to group 2, 2 of 2'. No Ctrl+Z until checked on the host.",
+			"acceptance_test": "dial-groups: select Hot Spot, Delete: announcement mentions Undo; within 3 Tab presses from the list focus reaches Undo; Enter: rotationGroups byte-identical to the original, exactly one frame per field, activeElement is the GPU listbox with aria-activedescendant on Hot Spot. Any other edit removes the Undo button. Waiting 60 s leaves it in place.",
+			"evidence": "READ pi-common.js removeSelectedRotation announcement, setNote, slot layout. X10 MEASURED the multi-step recovery."
+		},
+		{
+			"id": "R37",
+			"verdict": "modify",
+			"rationale": "aria-keyshortcuts must sit on the element where the shortcut works. Alt+Arrow, F2 and Delete work only while a listbox has focus; on the toolbar buttons (which already carry aria-labels) they do nothing, so aria-keyshortcuts there would advertise a false shortcut, and a title of 'Earlier (Alt+Left)' becomes a description that repeats the name ('Move X earlier, Earlier (Alt+Left)').",
+			"regression_risk": "Titles and aria-keyshortcuts drift from the handlers; if R52 drops Delete, both must change in the same commit.",
+			"revised_correction": "aria-keyshortcuts='Alt+ArrowLeft Alt+ArrowRight F2 Delete' (plus any R21/R23 additions) on each .hw-set-list only; toolbar button titles 'Shortcut in the list: Alt+Left' (no repeated word); update #rotation-keys-help to mention Delete.",
+			"acceptance_test": "AX: each rotation listbox exposes keyshortcuts; no toolbar button exposes keyshortcuts; each toolbar button's AX description is exactly its shortcut sentence and does not repeat its name; axe reports 0 violations at 373 and 320.",
+			"evidence": "READ pi-common.js list keydown (shortcuts only when ev.target is the list), toolbar keydown (arrows only), sensor-dial.html rotation-keys-help (no Delete)."
+		},
+		{
+			"id": "R11",
+			"verdict": "modify",
+			"rationale": "#reading-status is role=status aria-live=polite and starts empty; renderStatus fills it after the first preview, so the healthy Gadget info paragraph is inserted into a live region every time a panel opens (every key selection). A standing fact is not a status change. Moving a disclosure into that region would also make its summary part of the announcement, and renderStatus's replaceChildren would drop focus from a focused summary (it only restores [data-status-action] buttons).",
+			"regression_risk": "Screen reader users lose the automatic reading of the Gadget caveat (still reachable in the page); status suites that read #reading-status change.",
+			"revised_correction": "Keep warn and danger in the live region. Render the healthy info tone as one line in a non-live element right after the status region ('Gadget registry: current values only, no min, max or average'), with 'More about Gadget' as a details element outside any live region. Forced-source text replaces the generic hint, as registered.",
+			"acceptance_test": "key-configured with data gadget at 373x410: a MutationObserver on #reading-status records no text on load; the one-line caveat is visible above the palette; key palette top <= 150, dial <= 166; opening 'More about Gadget' causes no mutation inside any aria-live region; the summary keeps focus across a preview tick. NOT RUN: real screen reader speech on panel open.",
+			"evidence": "READ sensor-reading.html:36 and sensor-dial.html:32 (role=status aria-live polite, empty), pi-shell.js renderStatus (info tone branch, replaceChildren, focusedAction restore limited to data-status-action)."
+		},
+		{
+			"id": "R20",
+			"verdict": "modify",
+			"rationale": "Reproduced: Enter on 'Reload sensor list' in key-missing produces 0 mutations in the status region, focus stays on the button, nothing is spoken. If the fix adds the line through renderStatus's signature and replaceChildren, the whole block (about 230 characters) is replaced inside a polite live region and re-read; a second click with identical text would be silent.",
+			"regression_risk": "Re-reading the whole block on every retry; a line that re-renders per tick would chatter.",
+			"revised_correction": "Keep one persistent line element for the retry result, updated in place (only its text node changes), with the existing no-break-space alternation or a clock time so a repeat is still a change; never include it in renderStatus's signature.",
+			"acceptance_test": "key-missing at 373x410: Enter on Reload sensor list: within 1.5 s exactly one text change in the live region containing 'again'; the existing paragraphs are not removed (MutationObserver sees no removal of them); focus stays on the button; a second Enter produces a second change; 0 writes; preview ticks produce 0 mutations.",
+			"evidence": "MEASURED arm.json '7 retry on key-missing': mutations 0, focus button.hw-btn. READ pi-shell.js renderStatus signature and replaceChildren."
+		},
+		{
+			"id": "R16",
+			"verdict": "agree",
+			"rationale": "Speaking the typo once on the valid-to-invalid transition closes the 4.1.3 gap without chatter. Implementation trap: hwShell.announce ignores the first message of any channel (measured), so the first typo after page load, which is the one that matters, would be silent unless the channel is primed at load.",
+			"regression_risk": "Announcing on every keystroke would be noisy; priming must not speak anything.",
+			"revised_correction": "In validateNumber, when aria-invalid flips false to true, call hwShell.announce('field-error', message); prime 'field-error' with '' at shell start.",
+			"acceptance_test": "key-configured, Alerts open: type '8o' in Warn at: exactly one announcer change containing 'Not a number' (including on the first typo after load); typing another letter: none; clearing: none; aria-invalid and aria-describedby unchanged.",
+			"evidence": "MEASURED arm.json '5 announcer first call' (afterFirstCall unchanged, afterSecondCall 'Second message'). READ pi-shell.js announce (if (!had) return)."
+		},
+		{
+			"id": "R29",
+			"verdict": "agree",
+			"rationale": "State-derived help is more truthful. Accessibility trap: #picker-help holds the visible sentence AND an sr-only span with the combobox keyboard instructions, and the search's aria-describedby points at it; replacing the sentence with textContent would delete the keyboard instructions.",
+			"regression_risk": "Loss of the sr-only instructions; help changing while focused re-reads the description.",
+			"revised_correction": "Swap only the visible sentence's own element; keep the sr-only span intact.",
+			"acceptance_test": "dial-configured with rotationDisabled true and with a missing reading: #picker-help's visible text no longer says turning changes it, and the AX description of #picker-search still contains 'Arrow keys browse, Enter picks'.",
+			"evidence": "READ sensor-dial.html:51 and :55 (aria-describedby=picker-help, sr-only span inside)."
+		},
+		{
+			"id": "R42",
+			"verdict": "modify",
+			"rationale": "Trimming is right, but two proposed sentences create new barriers: B12's 'the group with the filled circle' relies on shape alone (1.3.3), and #pickerr-help contains an sr-only span with the checklist keyboard instructions that a textContent rewrite would delete.",
+			"regression_risk": "Gesture rules move one click away; the Legacy warning must stay visible; e2e help assertions change.",
+			"revised_correction": "Use 'New ticks go to the group whose button is selected; the search label names it.' Keep the sr-only spans in #pickerr-help and #picker-help. Keep #groups-preset-help visible without a click.",
+			"acceptance_test": "dial-groups: at most 5 visible help lines in #rotation-box; no visible instruction refers to shape or color only; the AX description of #pickerr-search still contains 'Down Arrow moves into the search results'; the Legacy warning shows without a click.",
+			"evidence": "READ sensor-dial.html:63-71."
+		},
+		{
+			"id": "R18",
+			"verdict": "agree",
+			"rationale": "Naming the reading that the next turn leaves answers a core question. Constraint: if the line is part of the note announced on the 'rotation' channel, its text would change with turns and echoes and be spoken.",
+			"regression_risk": "Live-channel chatter on turns; one more line in the dial's longest fieldset.",
+			"revised_correction": "Render the line as its own non-announced element (not inside setNote's announced text).",
+			"acceptance_test": "After B05's J2 steps: the line names the on-dial reading and the first member; an emulated turn echo produces 0 announcer changes; ticking the on-dial reading removes the line; 0 extra writes.",
+			"evidence": "READ pi-common.js setNote(..., 'rotation') announces; readingKey echo rebuilds via onSelectionEcho."
+		},
+		{
+			"id": "R19",
+			"verdict": "agree",
+			"rationale": "A preset-aware note next to the lists plus a reveal button to #f-preset uses the panel's existing reveal pattern, which opens the section and focuses the target without writing.",
+			"regression_risk": "The note re-renders on preset change and may speak once on the rotation channel.",
+			"revised_correction": "As registered; the reveal button text states its action ('Set Gestures'), and the note changes at most once per preset change.",
+			"acceptance_test": "dial-configured (Legacy) after Split at 373x410: text saying these gestures cannot switch groups is inside the viewport; the reveal button focuses #f-preset below the pinned header with 0 writes; switching to Elite removes the caveat with at most one announcement.",
+			"evidence": "READ pi-shell.js reveal(), pi-common.js syncGroupsHelp."
+		},
+		{
+			"id": "R30",
+			"verdict": "agree",
+			"rationale": "The folded summary text is part of each <summary>'s accessible name, read on every focus, so it helps screen reader users decide without opening; keep the addition short.",
+			"regression_risk": "Longer section names slow screen reader navigation; test/pi-model.test.ts strings change.",
+			"revised_correction": "As registered, one short clause ('pressed turn switches group').",
+			"acceptance_test": "dial-groups: the Controls summary's AX name contains 'pressed turn'; Legacy unchanged.",
+			"evidence": "READ pi-model.js dialInteractionSummary; sections use <summary> with the data-summary span."
+		},
+		{
+			"id": "R34",
+			"verdict": "modify",
+			"rationale": "Showing the resolved shared theme is right, but a select that displays 'Void' while nothing is stored has a trap: picking 'Void' fires no change (same value), so nothing is written while the person believes it was set. The shell's kept-value pattern already solves this for unknown values.",
+			"regression_risk": "A display-only option must never be written on render.",
+			"revised_correction": "When globals.theme is absent or unknown, select a disabled display option 'Ember (not saved; the plugin draws it)' like the kept-value option, so choosing any real option, including Ember, fires change and writes.",
+			"acceptance_test": "key-configured with globals lacking theme and the plugin drawing Ember: the band, the shared select's displayed option and the summary all name Ember; the select's AX value says it is not saved; opening writes 0 frames; choosing Ember writes exactly one global frame.",
+			"evidence": "READ pi-shell.js showValue/keptLabel (data-unknown disabled option), sensor-reading.html data-default='void'."
+		},
+		{
+			"id": "R39",
+			"verdict": "agree",
+			"rationale": "The well's title 'Name: Automatic; choose a number color' is its accessible description, so seeding the displayed color from the dial's resolver stays truthful for screen reader users as long as the title keeps saying Automatic.",
+			"regression_risk": "Seeding must never fire change or write readingColors; disabled buttons below 4.5:1 are exempt but must stay distinguishable.",
+			"revised_correction": "As registered; keep the 'Automatic' title on automatic wells.",
+			"acceptance_test": "dial-groups under Paper: no automatic well shows #ffffff; each automatic well's AX description contains 'Automatic'; disabled Auto buttons differ from enabled in text and border color and use the default cursor; opening writes 0 frames.",
+			"evidence": "READ pi-common.js 3351-3360."
+		},
+		{
+			"id": "R01",
+			"verdict": "agree",
+			"rationale": "S1 reproduced for trusted keyboard, typeahead and mouse input (P01). On Windows a closed select changes value on each ArrowDown, so keyboard users are hit on every step. The new e2e check must use trusted CDP key events.",
+			"regression_risk": "Keyboard users arrowing Legacy to Elite to Custom pass Elite and get Elite seeding, while a mouse pick from Legacy straight to Custom gets none: two stored results for the same visible end state (INFERRED from the seed rule). showValue has no focus guard for selects, so a resync must never touch the focused select.",
+			"revised_correction": "As registered, plus: never resync a select that holds focus.",
+			"acceptance_test": "dial-groups, Controls open, focus Gestures, trusted 'c' and trusted ArrowDown from Elite: stored 'custom', the focused select shows Custom and keeps focus, Custom rows visible, gestures equal the Elite map, every write after the first carries 'custom'; from Legacy by two trusted ArrowDowns the 'What the dial does now' list matches the stored gestures.",
+			"evidence": "READ P01; READ pi-shell.js showValue (INPUT/TEXTAREA caret guard only)."
+		},
+		{
+			"id": "R04",
+			"verdict": "agree",
+			"rationale": "Removing the hover and focus preview makes the line state only what is stored and drawn. Keyboard and screen reader users lose nothing: arrows pick (selection follows focus) and each chip's accessible name carries its theme.",
+			"regression_risk": "The e2e focus-preview check must change in the same commit.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "key-configured: real pointer over each of the 8 chips: #theme-current unchanged; Tab into the gallery and 4 ArrowRights: the line equals the checked theme after each; unknown stored theme then Tab: line unchanged; 0 writes on hover and focus.",
+			"evidence": "READ pi-common.js previewSwatch listeners; X01/V04 MEASURED."
+		},
+		{
+			"id": "R12",
+			"verdict": "agree",
+			"rationale": "One frame per grouped edit and exact counts make regressions visible; no accessibility effect as long as announcements stay one per person action.",
+			"regression_risk": "Merged frames must not reorder announcements relative to writes.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "As registered, plus: each grouped edit produces at most one announcer change.",
+			"evidence": "READ writeRotation (two bindings); X02 MEASURED."
+		},
+		{
+			"id": "R51",
+			"verdict": "agree",
+			"rationale": "The graph select should name a kept unknown value like the bound selects; a disabled kept option is read as the select's value by screen readers.",
+			"regression_risk": "None found.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "key-configured with displayMode 'heatmap': the select's AX value is 'Stored value \"heatmap\" (not in this list, kept)', 0 writes on open, heatmap survives a Label edit.",
+			"evidence": "READ pi-shell.js keptLabel; X12 MEASURED."
+		},
+		{
+			"id": "R13",
+			"verdict": "agree",
+			"rationale": "z-index on the fold pair restores the full 28 px target where the dial's reading name wraps under it (A05 measured 75.4%/81.0% to 99%).",
+			"regression_risk": "The pair's hover fill paints over the top 6 px of the reading name while hovered.",
+			"revised_correction": "As registered (the -2px margin alternative if the owner accepts +4 px of header).",
+			"acceptance_test": "dial-groups at 373x410: >= 98% of each 28x28 box answers elementFromPoint; at rest the #head-reading pixels are identical to the baseline.",
+			"evidence": "A05 MEASURED (round 1)."
+		},
+		{
+			"id": "R14",
+			"verdict": "agree",
+			"rationale": "outline-offset 3px separates the keyboard focus ring from the checked ring on the checked chip (A06).",
+			"regression_risk": "Relies on the 6 px grid gap.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "Tab into the gallery at DPR 1.5: at least 2 CSS px of focus color separated from the checked ring on all four sides; in forced colors both rings visible.",
+			"evidence": "A06 MEASURED (round 1)."
+		},
+		{
+			"id": "R26",
+			"verdict": "agree",
+			"rationale": "Disclosure markers turn into bars in forced colors (A10/V12); the fix uses system color keywords.",
+			"regression_risk": "None found in emulation.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "Forced colors (emulated): closed markers point right, open markers point down for sections, sub-sections and help disclosures. NOT RUN: real Windows contrast themes.",
+			"evidence": "A10/V12 MEASURED in emulation."
+		},
+		{
+			"id": "R27",
+			"verdict": "agree",
+			"rationale": "The saved reading must stay marked in forced colors once the highlight moves (A11).",
+			"regression_risk": "Where SelectedItem equals Highlight, shape (fill vs outline) is the only distinction.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "Forced colors (emulated), list open, highlight moved: saved row has a system-color fill, active row an outline. NOT RUN: real contrast themes.",
+			"evidence": "A11 MEASURED in emulation."
+		},
+		{
+			"id": "R28",
+			"verdict": "agree",
+			"rationale": "Drawing the link mark and a 1 px frame in the resolved palette's own colors lifts Paper from 1.39:1/1.59:1 to the palette's text/label contrast (V02 measured 5.2 to 7.4:1 for label colors) and removes the second 2 px frame competing with the selection ring.",
+			"regression_risk": "A 1 px dashed border at DPR 1.5 is thin; in forced colors the checked Default's inset Highlight outline covers the frame, so the link mark must stay the identity cue there.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "For each of the 7 shared palettes at DPR 1.5, sampled pixels: mark and frame >= 3:1 against the Default face; in forced colors (emulated) the checked Default still shows its link mark.",
+			"evidence": "V02/A12 MEASURED; READ pi.css forced-colors block (.hw-theme[aria-checked] .hw-theme-face outline -2px)."
+		},
+		{
+			"id": "R45",
+			"verdict": "agree",
+			"rationale": "All disclosure markers should stop transitioning under reduced motion (A14).",
+			"regression_risk": "None.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "Under prefers-reduced-motion: reduce, all four summary markers compute transition-duration 0s; no new scroll uses smooth behavior.",
+			"evidence": "A14 MEASURED."
+		},
+		{
+			"id": "R46",
+			"verdict": "agree",
+			"rationale": "The Default chip's description repeats its name; with R38 the line already names the resolved theme.",
+			"regression_risk": "Pointer users lose the tooltip (the name is on the chip).",
+			"revised_correction": "Drop the title on the Default chip.",
+			"acceptance_test": "The Default radio's AX description is empty or equals its name.",
+			"evidence": "A15 MEASURED; band-a11y.json shows the checked Default description 'Default: follows the shared theme (Void)'."
+		},
+		{
+			"id": "R47",
+			"verdict": "agree",
+			"rationale": "Full-width summaries lose the left and right sides of their focus ring (V11).",
+			"regression_risk": "An inset ring may overlap the marker at 12 px.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "A full Tab audit finds no focus outline extending past the viewport; the marker stays visible inside the ring.",
+			"evidence": "V11 MEASURED."
+		},
+		{
+			"id": "R48",
+			"verdict": "agree",
+			"rationale": "Neutral information should not wear the warning look; inset alignment matches the status blocks.",
+			"regression_risk": "None found.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "key-back: role note rect left 12, width 349, background --hw-info-bg; text contrast >= 4.5:1.",
+			"evidence": "V13 MEASURED."
+		},
+		{
+			"id": "R52",
+			"verdict": "agree",
+			"rationale": "Only the real host can show whether the app acts on Delete, F2 or Alt+Arrow.",
+			"regression_risk": "If Delete is dropped, #rotation-keys-help, aria-keyshortcuts (R37) and docs must change in the same commit.",
+			"revised_correction": "As registered (owner check on a throwaway profile).",
+			"acceptance_test": "As X09's C11. NOT RUN here by rule.",
+			"evidence": "X09 (INFERRED risk)."
+		},
+		{
+			"id": "R15",
+			"verdict": "agree",
+			"rationale": "Moving Readings per tile, Title tile text and the second Back above the list cuts dozens of Tab stops for keyboard users (A07/P09).",
+			"regression_risk": "If done with CSS order instead of moving the DOM, visual and focus order diverge (2.4.3, 1.3.2).",
+			"revised_correction": "Move the elements in the DOM, not with CSS order.",
+			"acceptance_test": "key-details with 25 readings: at most 4 Tabs from the Details list select to Readings per tile; the DOM order of those controls equals their visual order.",
+			"evidence": "A07/P09 MEASURED."
+		},
+		{
+			"id": "R36",
+			"verdict": "agree",
+			"rationale": "A derived collector is visible through the search label ('Readings for GPU'), which is part of the search's accessible name, so the state is not hidden.",
+			"regression_risk": "A different default than group 1.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "dial-groups, fresh page: the GPU radio is checked and the search's AX name contains 'Readings for GPU'.",
+			"evidence": "READ syncAddLabel; P10 MEASURED."
+		},
+		{
+			"id": "R32",
+			"verdict": "agree",
+			"rationale": "Consistent words reduce cognitive load; panel copy only.",
+			"regression_risk": "Copy rules and validator apply.",
+			"revised_correction": "As registered.",
+			"acceptance_test": "As B11; the placeholder is not the search's only name (a label remains).",
+			"evidence": "B11 READ."
+		},
+		{
+			"id": "R43",
+			"verdict": "modify",
+			"rationale": "On the dial, using the rotation name in the header matches what the face draws (B15) at no size cost. On quad keys, listing four labels grows the pinned header and wraps at 320 px; the face image's alt text already reads every value for screen reader users.",
+			"regression_risk": "A taller pinned header reduces the visible panel and raises the risk of a focused control sitting under it; above 136 px (a third of 410) the header unpins.",
+			"revised_correction": "Dial: rotation name on line 1, HWiNFO label and sensor on line 2. Quad keys: labels on one line clamped to two lines, and only if the header stays pinned and grows at most 16 px at 373.",
+			"acceptance_test": "dial-groups: #head-reading is 'Hot Spot'. key-dense at 373x410: header height <= baseline + 16 px and still sticky; a Tab walk finds no stop under it.",
+			"evidence": "READ pi-shell.js renderHeader and pin measurement (innerHeight / 3)."
+		},
+		{
+			"id": "R40",
+			"verdict": "agree",
+			"rationale": "Replacing 'x2' (reads like remove next to the x) with words helps everyone, and tokens raise consistency.",
+			"regression_risk": "If the glyphs change to left and right, aria-labels saying 'up the list' no longer match what speech input users see.",
+			"revised_correction": "As registered; aria-labels say 'earlier' and 'later' to match the glyphs.",
+			"acceptance_test": "As V09, plus no visible x on a control that does not remove, and move buttons' AX names use earlier/later.",
+			"evidence": "READ detailChip aria-labels."
+		},
+		{
+			"id": "R49",
+			"verdict": "agree",
+			"rationale": "The Reload button keeps its aria-label 'Reload the sensor list'; an SVG icon with stroke currentColor follows ButtonText in forced colors.",
+			"regression_risk": "None if the SVG is aria-hidden.",
+			"revised_correction": "As registered, SVG aria-hidden, stroke currentColor.",
+			"acceptance_test": "#picker-refresh AX name unchanged; in forced colors (emulated) the icon renders in the button text color.",
+			"evidence": "READ sensor-reading.html:56."
+		},
+		{
+			"id": "R50",
+			"verdict": "defer",
+			"rationale": "Moving reading 1's label changes Tab order between layouts; the gain is alignment only.",
+			"regression_risk": "Focus order differing by layout.",
+			"revised_correction": "None now.",
+			"acceptance_test": "If revisited: DOM order equals visual order in every layout.",
+			"evidence": "V17 AP."
+		},
+		{
+			"id": "R44",
+			"verdict": "agree",
+			"rationale": "Stricter first-screen definitions and zoom widths in the matrix would have caught X03 and the band's zoom truncation.",
+			"regression_risk": "Old and new tables not comparable.",
+			"revised_correction": "As registered, plus accessibility rows: target hit percentage for every control at 373/189/160, focus-not-obscured for every Tab stop, overflowX at 189/160.",
+			"acceptance_test": "Rerun: the rotation search reports onFirstScreen false at 373x410; every zoom overflow and every target under 90% hit appears in the table.",
+			"evidence": "X08 READ."
+		},
+		{
+			"id": "R53",
+			"verdict": "agree",
+			"rationale": "KEEP is reasonable: no user stylesheet path in the host; revisit only if batch 3 padding changes it.",
+			"regression_risk": "None.",
+			"revised_correction": "None.",
+			"acceptance_test": "Re-run A13's override after batch 3.",
+			"evidence": "A13 MEASURED."
+		},
+		{
+			"id": "R54",
+			"verdict": "agree",
+			"rationale": "DEFER is right; it needs plugin-side memory.",
+			"regression_risk": "None now.",
+			"revised_correction": "None.",
+			"acceptance_test": "None now.",
+			"evidence": "B16."
+		}
+	],
+	"band_prototype": {
+		"preferred": "P1b: P1's wording ('Theme Default (shared: Void) Change' / 'Theme Ember (this key only)', no help line) with Change as its own flex:none sibling AFTER the ellipsizing #theme-current span, not inside it. P2 is the accessibility-neutral fallback if the owner prefers the current structure.",
+		"conditions": "(1) Change stays outside .hw-look-current (overflow hidden) and keeps data-reveal='shared-theme' and aria-label 'Change the shared theme'. (2) Below 240 px the name row wraps (.hw-look-name flex-wrap: wrap; .hw-look-current white-space: normal): measured, no truncation of the resolved theme at 239/189/160 and Change 90-94% hittable, 44x25, overflowX 0. (3) The radiogroup's aria-describedby points at the scope text (worded for speech, for example 'follows the shared theme, now Void' / 'this key only'), not at the hidden help, so screen reader users entering the group still hear the scope. (4) #theme-help stays for the unconfigured key and the unknown stored value. (5) Band height stays equal for all eight picks at 373 and 320 (measured 106). (6) Accept one extra Tab stop before the palette on Default keys (measured 3 stops to the checked chip vs 2), without CSS reordering. Acceptance: at 373/320/239/189/160 x410 for shared Void, shared Ultraviolet and explicit Ember, #theme-current never truncates, Change is fully visible with an unclipped focus ring, 0 writes.",
+		"rejected_because": "P1 as injected: Change inside the ellipsizing span is clipped to about 17 px tall (68.8% hittable at 373, 63.6% at 320, 4.5% or 0% at 189/160), its focus ring is cut on three sides at every width, and at 189 keyboard focus on it scrolls the line to 'ed: Ultraviolet) Change' (scrollLeft 66); the hidden help also stays as a stale group description. P3: the band changes height with the pick (124 px Default vs 140 px Ember at 373; 216 vs 232 at 160), so a pick moves everything below, and at 189 the only place naming the resolved theme sits below the fold. P0/P2 work (Change 93.6-100%, resolved name whole at 373 to 189) but keep the repetition R38 targets and truncate the resolved name at 160."
+	},
+	"new_concerns": [
+		"EXISTING, MEASURED (S2, everyone, motor and keyboard most): the two-step 'Replace shared settings' is defeated by one gesture today. A real double click sends 1 setGlobalSettings frame, and a held Enter (1 press + 2 auto-repeats) sends 1 frame, replacing the shared settings for every key and dial. Chrome delivers click detail 1 then 2 for a double click and one click per Enter auto-repeat. Any arm-then-confirm (R02, R09) needs a confirm guard: ignore click.detail > 1 and repeated keydown, and require about 400 ms since arming. Evidence: replace.json, arm.json '2a' and '2b'.",
+		"MEASURED: hwShell.announce ignores the first message of every new channel ('if (!had) return'). Any new announcement (R02 armed state, R10 support result, R16 typo, R20 retry, R22 '+ all' count) is silent the first time unless its channel is primed with '' at load. Evidence: arm.json '5'.",
+		"MEASURED: every readingKey echo (dial turn, autocycle step) and every sensorTree arrival rebuilds the rotation editor, and the focused control receives blur and focusout before a new node is focused. Any 'disarm on blur' (R02) or 'commit on blur' (R03) logic inside the rotation editor must tell a rebuild-caused blur from a person's. Evidence: arm.json '1'.",
+		"MEASURED: the support report's execCommand fallback moves focus to a temporary textarea and then to BODY (select() focuses in Chrome). R10's aria-disabled change alone does not keep focus when the host's clipboard API is unavailable. Evidence: arm.json '3'.",
+		"READ, speech NOT RUN: #reading-status is an empty role=status polite region that renderStatus fills after load, so any status present at open is inserted into a live region on every key selection. For warn and danger that is useful; for the healthy Gadget info (42 words) it is noise on every panel open (see R11).",
+		"READ: #picker-help and #pickerr-help each contain an sr-only span with keyboard instructions and are the searches' aria-describedby targets. Copy edits in R29 and R42 made with textContent would silently delete those instructions.",
+		"READ, INFERRED: after Replace applies, the panel reloads 350 ms later, so the 'Replaced ... reloading' sentence is unlikely to be spoken and focus returns to the top of a fresh page with no confirmation. Per the bench note, web storage survives a same-panel reload, so a one-shot flag could announce 'Shared settings replaced' after the reload. Needs an owner decision and a real screen reader check.",
+		"READ: duplicate labels (R07) also collide in the dial's Reading colors list (row label, well title, Auto button aria-label) and in the rotation announcements ('Removed X', 'X, 2 of 3'), which the register's R07 scope does not name."
+	],
+	"report_path": "NOT WRITTEN. My operating instructions forbid writing report or findings .md files from a subagent, and round 1 reviewers were refused the same way, so this structured result is the full report. Evidence scripts, JSON and screenshots are in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3x-a11y\\ (x-band.mjs, band\\band-a11y.json, band\\*.png, x-p1b.mjs, p1b.json, x-arm.mjs, arm.json, x-replace.mjs, replace.json, x-scheme.mjs, scheme\\scheme.json and crops, x-misc.mjs, misc.json, lab.mjs, cleanup.ps1)."
+}

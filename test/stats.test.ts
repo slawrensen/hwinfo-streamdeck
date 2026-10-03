@@ -9,6 +9,51 @@ import { SessionStatsStore } from "../src/stats";
 import { thresholdsApplyTo } from "../src/ui/format";
 
 describe("SessionStatsStore", () => {
+	// Finite samples can overflow the running sum; the session average must
+	// stay finite and inside the samples' range (external review AX64).
+	it("a sum that overflows keeps a finite average", () => {
+		const cases: Array<[number[], number]> = [
+			[[1e308, 1e308], 1e308],
+			[[1e308, 1e308, -1e308, -1e308], 0],
+			[[Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE], Number.MAX_VALUE],
+			[[-1e308, -1e308, 1e308], -1e308 / 3]
+		];
+		for (const [values, mean] of cases) {
+			const store = new SessionStatsStore();
+			for (const value of values) store.sample("r", value);
+			const stats = store.get("r")!;
+			assert.ok(stats.mean !== undefined && Math.abs(stats.mean - mean) <= Math.abs(mean) * 1e-12, `${values.join(", ")}: ${stats.mean}`);
+			assert.equal(stats.count, values.length);
+		}
+		let seed = 0x0d15a64;
+		const random = (): number => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+		for (let run = 0; run < 200; run++) {
+			const store = new SessionStatsStore();
+			for (let i = 0; i < 50; i++) store.sample("r", (random() * 2 - 1) * Number.MAX_VALUE);
+			const stats = store.get("r")!;
+			const mean = stats.mean ?? stats.sum / stats.count;
+			assert.ok(Number.isFinite(mean) && mean >= stats.min && mean <= stats.max, `run ${run}: ${mean}`);
+		}
+	});
+
+	// Past the overflow, a sample of the mean's own sign moves the mean by
+	// their difference, so a steady stream averages to exactly its value
+	// and never leaves its own [min, max].
+	it("a steady stream whose sum overflows averages to exactly its value", () => {
+		const streams: Array<[number, number]> = [[Number.MAX_VALUE, 3], [1.5e308, 10], [-1.5e308, 10]];
+		for (const [value, count] of streams) {
+			const store = new SessionStatsStore();
+			for (let i = 0; i < count; i++) store.sample("r", value);
+			assert.equal(store.get("r")!.mean, value, `${count} samples of ${value}`);
+		}
+	});
+
+	it("an ordinary sum keeps its exact state: no mean field", () => {
+		const store = new SessionStatsStore();
+		for (const value of [0.1, 0.2, 0.3]) store.sample("r", value);
+		assert.deepEqual(store.get("r"), { min: 0.1, max: 0.3, sum: 0.1 + 0.2 + 0.3, count: 3 });
+	});
+
 	it("folds samples per reading, independently", () => {
 		const store = new SessionStatsStore();
 		store.sample("cpu", 50);

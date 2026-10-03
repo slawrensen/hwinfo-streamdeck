@@ -1,0 +1,142 @@
+[
+	{
+		"round": 1,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r01",
+		"msFromLastKeyToClick": 77,
+		"ack": "ok 2022"
+	},
+	{
+		"round": 2,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r02",
+		"msFromLastKeyToClick": 63,
+		"ack": "ok 5508"
+	},
+	{
+		"round": 3,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r03",
+		"msFromLastKeyToClick": 48,
+		"ack": "ok 8980"
+	},
+	{
+		"round": 4,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r04",
+		"msFromLastKeyToClick": 49,
+		"ack": "ok 12452"
+	},
+	{
+		"round": 5,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r05",
+		"msFromLastKeyToClick": 57,
+		"ack": "ok 15924"
+	},
+	{
+		"round": 6,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r06",
+		"msFromLastKeyToClick": 50,
+		"ack": "ok 19380"
+	},
+	{
+		"round": 7,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r07",
+		"msFromLastKeyToClick": 65,
+		"ack": "ok 22852"
+	},
+	{
+		"round": 8,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r08",
+		"msFromLastKeyToClick": 48,
+		"ack": "ok 26308"
+	},
+	{
+		"round": 9,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r09",
+		"msFromLastKeyToClick": 50,
+		"ack": "ok 29765"
+	},
+	{
+		"round": 10,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r10",
+		"msFromLastKeyToClick": 49,
+		"ack": "ok 33222"
+	},
+	{
+		"round": 11,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r11",
+		"msFromLastKeyToClick": 66,
+		"ack": "ok 36694"
+	},
+	{
+		"round": 12,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r12",
+		"msFromLastKeyToClick": 51,
+		"ack": "ok 40134"
+	},
+	{
+		"round": 13,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r13",
+		"msFromLastKeyToClick": 51,
+		"ack": "ok 43607"
+	},
+	{
+		"round": 14,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r14",
+		"msFromLastKeyToClick": 51,
+		"ack": "ok 47048"
+	},
+	{
+		"round": 15,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r15",
+		"msFromLastKeyToClick": 50,
+		"ack": "ok 50520"
+	},
+	{
+		"round": 16,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r16",
+		"msFromLastKeyToClick": 66,
+		"ack": "ok 54007"
+	},
+	{
+		"round": 17,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r17",
+		"msFromLastKeyToClick": 49,
+		"ack": "ok 57479"
+	},
+	{
+		"round": 18,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r18",
+		"msFromLastKeyToClick": 50,
+		"ack": "ok 60951"
+	},
+	{
+		"round": 19,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r19",
+		"msFromLastKeyToClick": 51,
+		"ack": "ok 64408"
+	},
+	{
+		"round": 20,
+		"context": "e98274e833a9a2101f3d5b90413fbd8f",
+		"text": "B26 r20",
+		"msFromLastKeyToClick": 50,
+		"ack": "ok 67864"
+	}
+]

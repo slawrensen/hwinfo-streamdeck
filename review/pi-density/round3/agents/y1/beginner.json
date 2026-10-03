@@ -1,0 +1,280 @@
+{
+	"role": "Agent 2, first-time user comprehension (round 3 integrated-candidate re-review, finding ids BY). Simulated host only (scripts/lib/pi-sim.mjs serving the FROZEN candidate 1.7.0.0-d04 via PI_SIM_PLUGIN_DIR, and the frozen baseline 1.7.0.0-d03 for before/after), sample data, headless Chrome. Labels: MEASURED (I ran it), READ (code), INFERRED (my judgment). All walkthroughs are my simulated cognitive walkthroughs; no people were observed and no user research is claimed.",
+	"environment": "Scripts in C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-beginner (walk.mjs, probe2.mjs, probe3.mjs, p4.mjs, p5.mjs), run with `npx tsx` from C:\\Users\\stephen\\git\\hwinfo-pi-density, importing scripts/lib/cdp.mjs, pi-sim.mjs, pi-fixtures.mjs and src/panel-folds.ts by file URL. Ports: 32020 (sim WebSocket), 32021 (sim HTTP), 32022 (Chrome CDP); nothing else used, port 23654 never touched. Viewports 373x410 DPR 1.5 (all states), 189x410 (zoom subset), 160x410 (theme unknown). Evidence: walk\\walk-373.json + 68 PNGs (34 states, first screen and full page), walk189\\walk-189.json + PNGs, p2\\probe2.json + PNGs (Check again transitions, Split, group remove at 373/189, Change link, R34, twins without marks, on-dial missing, unknown theme, collector drift, outside-tick), p3c\\probe3.json (candidate) and p3b\\probe3.json (baseline) for tick destinations and group lines, crops crop-*.png. Every walk and probe counted writes: 0 settings and 0 global writes on open, hover, focus and folding in every state; the only writes were deliberate clicks (Split 1, group remove 1, tick 1). No Copy button pressed, clipboard untouched. Read-only on every repository and frozen dir; the only files written are in my scratch dir. Chrome browser processes started (launcher pids 117848, 124116, 134268, 138576, 122340, 142252, 115468) each left a relaunched browser child on port 32022 after cdp close (pids 20424, 120452, 134404, 138936, 122600, 114940, 128192); the parent-child link and port were verified before stopping them. One run (p4) hit my 120 s timeout after printing its result; its sim ports were free for the next run.",
+	"verified": [
+		{
+			"id": "R02",
+			"status": "fixed",
+			"evidence": "MEASURED p2 group-remove-373: first press arms, the button grows from 28 to 191 px toward the left and stays under the pointer (elementFromPoint = the armed button), text 'Remove group and its 2 readings?', aria 'Press again to remove group 1 (CPU) and its 2 readings'; second press after 600 ms removes; 1 write; focus on the surviving group's name 'GPU'. At 189 the armed button wraps to 115x35 and the list below moves 6 px (cosmetic)."
+		},
+		{
+			"id": "R04",
+			"status": "fixed",
+			"evidence": "MEASURED p5: #theme-current stays 'Default (shared: Void)' while the pointer rests on Midnight and while Paper has focus; 0 writes."
+		},
+		{
+			"id": "R05",
+			"status": "fixed",
+			"evidence": "MEASURED walk dial-member-missing and key-details-missing: visible 'missing' pill on the chip (wraps under the name at 189, crop-mm-189.png); note 'Rotation moves through 2 of these 3 readings, in this order; the missing one is skipped until HWiNFO lists it again.' The note still claims movement when the reading ON the dial is the missing one: see BY02."
+		},
+		{
+			"id": "R07",
+			"status": "partly",
+			"evidence": "MEASURED walk dial-twins: 'Drive Temperature #0 (on dial)' and 'Drive Temperature #1', matching the header's 'Drive [#0]'. MEASURED p2 twins-nomark: sensors without an [#N] mark get identical tags ('Example NVMe …' twice). See BY04."
+		},
+		{
+			"id": "R11",
+			"status": "fixed",
+			"evidence": "MEASURED walk key-gadget and dial-gadget: one info box (two lines at 373, y 97 to 145) 'Gadget registry: current values only, no min, max or average. More under Advanced, Connection.'; the full hint shows in #source-now. The path is plain text behind two closed folds: see BY08."
+		},
+		{
+			"id": "R15",
+			"status": "partly",
+			"evidence": "MEASURED p5: Readings per tile now at y 1025, above the custom list (1226). The How text at y 1547 now says the list is 'below', but the list is above it. See BY09."
+		},
+		{
+			"id": "R18",
+			"status": "fixed",
+			"evidence": "MEASURED walk dial-outside and dial-outside-elite: 'CPU (Tctl/Tdie) is on the dial but not in this rotation; the next step moves to GPU Temperature and does not come back.' The target matches the runtime's entry member (READ src/rotation.ts stepReading, stepSensorSource and stepGroup all enter at the first member). MEASURED p2 outside-tick: the line disappears after ticking the reading. Wording and placement: see BY07."
+		},
+		{
+			"id": "R19",
+			"status": "partly",
+			"evidence": "MEASURED walk dial-groups-legacy: the groups line now says 'Legacy gestures cannot switch groups, so turns run through all groups as one list, in group order. Change gestures', but the set note 60 px above it still says 'Rotation needs two or more readings in a group to move inside it.' See BY01."
+		},
+		{
+			"id": "R20",
+			"status": "partly",
+			"evidence": "MEASURED p2 check-same-*: the answer line 'Checked again at 11:54:36 AM: no change yet. The plugin also reads HWiNFO every 1 s on its own.' appears and focus stays on the button. When the answer changed (unavailable to stale, unavailable to missing), the same 'no change yet' is written under the new problem. See BY03."
+		},
+		{
+			"id": "R29",
+			"status": "partly",
+			"evidence": "MEASURED walk: 'Turns and pressed turns change this too.' (Elite), 'Turns are ignored here.' (Ignore turns), 'Auto cycle changes this too.', 'Turns and the strip's sides change this too.' are all correct. Still claims movement when the reading on the dial is missing and when HWiNFO is off (BY02), and the empty-dial lines from B08 remain (BY10)."
+		},
+		{
+			"id": "R30",
+			"status": "fixed",
+			"evidence": "MEASURED walk dial-groups: 'Elite: turn cycles readings · pressed turn switches group · ...'; with no group in effect it says 'pressed turn switches sensor'; Legacy omits the pressed turn. That correct resolution now contradicts the groups line: see BY01."
+		},
+		{
+			"id": "R32",
+			"status": "partly",
+			"evidence": "MEASURED walk: panel prose uses 'sensor' for HWiNFO's group ('rotation: this sensor's readings'; the details option reads 'Every reading from this reading's sensor', READ). The key's HTML placeholder edit 'Search readings or sensors' never renders: the runtime sets 'Search readings' (BY11)."
+		},
+		{
+			"id": "R34",
+			"status": "fixed",
+			"evidence": "MEASURED p2 r34-ember: no shared theme stored while the plugin draws Ember: band 'Default (shared: Ember)', Shared defaults select 'Ember', summary 'Ember · theme text · ...'; 0 global writes."
+		},
+		{
+			"id": "R36",
+			"status": "partly",
+			"evidence": "MEASURED p3c vs p3b: the collector now settles on the group holding the on-dial reading. When group 1 is empty and the on-dial reading is in group 2, a tick lands in group 2 while the empty group 1 still says 'Empty: tick readings in the search above to fill this group.' The baseline was consistent in that state. See BY05."
+		},
+		{
+			"id": "R38",
+			"status": "fixed",
+			"evidence": "MEASURED walk: 'Default (shared: Void)' with Change, 'Ember (set on this key)' with Change invisible (visibility hidden, not focusable), spoken description 'Follows the shared theme, now Void.' / 'Set on this key; kept when the shared theme changes.', unknown value '\"neon-2027\" (unknown; draws Void)' plus one help line. MEASURED p2 change-link: Change opens Advanced > Shared defaults and focuses the Theme select under 'All keys and dials'; 0 writes. At 189 Change is separated from '(shared: ...)': see BY06."
+		},
+		{
+			"id": "R42",
+			"status": "partly",
+			"evidence": "MEASURED: the ten-line help became one derived line and the order sentence hides while groups exist (walk dial-groups: #pickerr-order-help hidden). The line makes present-tense group claims that the set note and the Controls section contradict (BY01)."
+		},
+		{
+			"id": "R43",
+			"status": "fixed",
+			"evidence": "MEASURED walk dial-groups: header 'Hot Spot' / 'GPU Hot Spot Temperature · GPU [#0]: Example Graphics 24GB', matching the face's title precedence (READ src/actions/sensor-dial.ts:1091)."
+		},
+		{
+			"id": "R54",
+			"status": "not-checked",
+			"evidence": "DEFER in the register. Unchanged: with HWiNFO off, the header says 'Saved reading' and the rotation chips show raw hex keys (walk dial-unavailable-set)."
+		}
+	],
+	"findings": [
+		{
+			"id": "BY01",
+			"title": "The new groups line contradicts the set note and the Controls section about what a turn and a pressed turn do",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "Task: answer 'what does a turn or pressed turn do now'. States: dial-configured (three GPU readings) with Gestures Elite, then press Split into groups; dial-groups with Gestures Legacy, and with Custom without a Switch gesture; dial-groups Legacy with Ignore turns. 373x410 DPR 1.5, also 189x410.",
+			"observed": "After Split on Elite, three visible statements disagree. The set note says '2 groups. They take effect once two of them hold readings; until then rotation runs as one flat list.' The groups line says 'New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name.' The Controls summary and 'What the dial does now' say 'pressed turn switches sensor'. On Legacy (and Custom without a Switch gesture) with both groups filled, the set note says 'Rotation needs two or more readings in a group to move inside it.' The line 60 px below says 'Legacy gestures cannot switch groups, so turns run through all groups as one list, in group order.' On Legacy with Ignore turns, the line still says 'turns run through all groups' while the picker line says 'Turns are ignored here.'",
+			"evidence": "MEASURED p2\\probe2.json split-elite and split-legacy; walk\\walk-373.json dial-groups-legacy, dial-groups-custom, dial-groups-onefull, dial-groups-legacy-ignore; crop-dial-groups-legacy.png, crop-dial-groups-onefull.png. Baseline (p3b\\probe3.json split-elite): a generic conditional paragraph, and Controls said 'switches sensor or group', so this direct contradiction is new. READ: candidate pi-common.js updateRotationHelp (line 836) derives the line from the stored map only and never checks whether groups are in effect; the set note (lines 1015-1016) ignores the preset. Runtime: src/ui/dial-overview.ts:25-30 (groups steer only when schemeCanSwitchGroups) and src/rotation.ts rotationGroupsOf (two or more groups must hold keys).",
+			"affected_user": "beginner (the state right after Split is the first thing anyone creating groups sees); screen reader users read both sentences in sequence",
+			"confidence": "high",
+			"correction": "Derive the set note and the groups line from one rule: the map can switch groups AND model.groupsActive(settings). While fewer than two groups hold readings, put the line in the future tense ('Once two groups hold readings, turns stay inside a group and a pressed turn jumps between groups.'). When the map cannot switch groups, remove 'Rotation needs two or more readings in a group to move inside it' from the note, because the line already says what happens. With Ignore turns on and no other gesture that jumps, say 'Ignore turns is on; groups only set the order.' Optional: replace 'the marked group' with 'the group with the filled circle'.",
+			"tradeoff": "Two strings gain a branch, and the R19/R42 e2e strings change. The risk is growing back to several lines; keep it to one note plus one line.",
+			"acceptance_test": "dial-configured with Elite, press Split: no visible text in #rotation-set or #rotation-help says 'stay inside a group' or 'jumps to the next group' in the present tense while [data-summary=interaction] contains 'switches sensor'. dial-groups with controlPreset legacy, or custom without stepGroup: no visible sentence contains 'move inside it'. With rotationDisabled true on Legacy, #rotation-help does not contain 'turns run'. Opening makes 0 writes.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY02",
+			"title": "'Turns change this too' and the rotation note still claim movement when the runtime holds the dial (reading on the dial missing, HWiNFO off)",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "Task: recover a dial whose reading went missing ('what will my next turn do'). States: dial-missing with rotationKeys [missing, GPU Temperature, GPU Hot Spot] on Elite; the dial-missing fixture; dial-unavailable with a set. 373x410.",
+			"observed": "With the reading on the dial missing and two live members, the panel says 'Turns and pressed turns change this too.' and 'Rotation moves through 2 of these 3 readings, in this order; the missing one is skipped until HWiNFO lists it again.' In the dial-missing fixture it says 'Turns change this too.' and 'Only one of these 2 readings is in HWiNFO's list now, so rotation does not move until another returns.' That reason and remedy are wrong: the dial holds because the reading on the dial is missing. With HWiNFO not running it says 'Turns change this too.' and 'Rotation moves through these 3 readings only, in this order.' over three raw hex chips. The face meanwhile reads 'Sensor missing / waiting'. Low confidence: on Elite with a set from one sensor it says 'Turns and pressed turns change this too.' although a pressed turn has nowhere to land.",
+			"evidence": "MEASURED p2\\probe2.json ondial-missing-2live and elite-onesensor; walk\\walk-373.json dial-missing, dial-unavailable, dial-unavailable-set; p2\\ondial-missing-2live.png. READ runtime: src/actions/sensor-dial.ts advance() lines 514-526 returns when the status is unavailable or the saved key is not in the snapshot, and onPollerTick (704-716) holds auto cycle on the same condition; src/rotation.ts stepSensorSource returns undefined with fewer than two sensors. READ candidate pi-common.js dialMovers (line 890) reads only preview.effective.controls, which buildPreview sends even when unavailable (src/pi-protocol.ts:266-268). The baseline also said 'Turning the dial changes this too.' in these states, and B08 named the missing case.",
+			"affected_user": "beginner recovering from a missing reading; screen reader users",
+			"confidence": "high",
+			"correction": "In dialMovers, return a hold reason first. When preview.missing is true: 'Nothing moves the dial while its reading is missing; pick another reading to move on.' When preview.state is 'unavailable': 'Nothing moves the dial until HWiNFO data returns.' While the reading on the dial is missing, the rotation note says 'Rotation holds while the reading on the dial is missing.' instead of a count. Optional: name pressed turns only when the set spans two or more sensors or groups are in effect.",
+			"tradeoff": "Two more strings. The status block already explains the missing reading, so keep these lines short and do not repeat it.",
+			"acceptance_test": "dial-missing with rotationKeys [missing, gpu, hot] on Elite, and dial-unavailable with a set: #picker-moves contains neither 'change this too' nor 'change' followed by 'too', and the set note does not contain 'moves through'. dial-configured still reads 'Turns change this too.'",
+			"new_in_candidate": false
+		},
+		{
+			"id": "BY03",
+			"title": "The Check again answer says 'no change yet' even when the answer changed",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "Task: after fixing HWiNFO, ask the panel whether it worked. States: key-unavailable at 373x410, press Check again while the plugin's answer changes (Shared Memory frozen, or the saved reading absent); key-missing, press Reload sensor list.",
+			"observed": "The status region rebuilds with the new problem (the stale block or the missing-reading block) and ends with 'Checked again at 11:54:41 AM: no change yet. The plugin also reads HWiNFO every 1 s on its own.' On the missing block the button says 'Reload sensor list' but the answer says 'Checked again'. With HWiNFO not running, 'reads HWiNFO every 1 s' overstates what happens (the plugin retries opening it).",
+			"evidence": "MEASURED p2\\probe2.json check-unavail-to-stale, check-unavail-to-missing, check-same-unavailable, check-same-missing, check-same-stale-dial, with PNGs. READ candidate pi-shell.js answerCheck (line 701) writes 'no change yet' whenever a tree answer arrives after the press, including at the end of the rebuilt-box path in renderStatus. It never compares the answer with the problem shown at the press. On the real host previews arrive every tick, so the window is narrow (INFERRED).",
+			"affected_user": "beginner; screen reader users hear the whole rebuilt block including the false line",
+			"confidence": "high",
+			"correction": "Store the status signature at the press. Write 'no change yet' only when the answer's signature matches it; otherwise write nothing (the new lines already speak) or 'Checked again at X: the problem changed.' On the missing block, say 'Reloaded at X: still not in HWiNFO's list.' When the status is unavailable, say 'tries HWiNFO every 1 s'.",
+			"tradeoff": "One stored value. None visible.",
+			"acceptance_test": "key-unavailable: set the sim data to stale and press Check again; .hw-status-ack does not contain 'no change'. A press with an unchanged answer still gets the timed line. key-missing: the answer line after Reload sensor list does not start with 'Checked again'.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY04",
+			"title": "Twin tags are identical when HWiNFO's sensor names carry no instance mark, so two drives still look the same",
+			"severity": "S4",
+			"category": "RD",
+			"state_task_viewport": "Task: tell two 'Drive Temperature' chips apart in the rotation list. Dial with rotationKeys [drive0, drive1, gpu] on a simulated snapshot whose two drive sensors are named 'S.M.A.R.T.: Example NVMe SSD 2TB (S5GXNF0R100001)' and '...100002)'. 373x410.",
+			"observed": "Both chips read 'Drive Temperature' followed by a tag reading 'Example NVMe …'. Only the tooltip and the screen-reader text tell them apart. By the same rule, 'Samsung SSD 980 PRO 1TB' and 'Samsung SSD 990 PRO 2TB' both shorten to 'Samsung SSD 9…'. With the fixture's '[#0]' and '[#1]' names the tags work ('#0' and '#1').",
+			"evidence": "MEASURED p2\\probe2.json twins-nomark (tag 'Example NVMe …' on both chips) and p2\\twins-nomark.png; walk dial-twins for the marked case. READ candidate pi-common.js twinTagOf (line 418): HWiNFO's instance mark, else the text after the last colon cut to 13 characters plus an ellipsis, with no check that the tags differ. INFERRED: HWiNFO names drive sensors like 'S.M.A.R.T.: <model> (<serial>)' without [#N]. If so, drives, the register's own example, take this path, and the fixture's 'Drive [#0]' names hide it.",
+			"affected_user": "everyone with two same-model or same-brand drives (beginners do not hover)",
+			"confidence": "medium",
+			"correction": "After computing the tags for a scope, check colliding readings for equal tags. If two are equal, use the shortest distinguishing part (for example keep the end: '…100001)'), or number the twins in HWiNFO's list order in the same pill. Keep the full sensor name in the title and in the screen-reader text.",
+			"tradeoff": "A synthesized number is not HWiNFO's own mark. Tags that keep the end are longer and may wrap at 189 (the pills already wrap there).",
+			"acceptance_test": "For any rotation or detail list holding two equal names whose sensors differ (including sensors without [#N] whose names share their first 13 characters), the visible .hw-chip-source texts differ at 373 and 189.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY05",
+			"title": "An empty group invites ticks that then land in a different group (R36 adds a new case)",
+			"severity": "S5",
+			"category": "RD",
+			"state_task_viewport": "Task: fill an empty group. dial-groups on Elite on a fresh page, with group 1 empty and group 2 holding the reading on the dial; also group 1 holding it with group 2 empty. 373x410.",
+			"observed": "Under the empty group: 'Empty: tick readings in the search above to fill this group.' The collector settles on the group holding the reading on the dial, so ticking GPU Power lands in that other group. The search label does say 'Readings for GPU'. The baseline kept the empty-first case consistent (collector on group 1, the tick filled the empty group). The group-1-holds case was already wrong in the baseline.",
+			"evidence": "MEASURED p3c\\probe3.json emptyfirst (the tick joined the GPU group; it now holds 3) vs p3b\\probe3.json emptyfirst (baseline: the tick filled the empty group 1); onefull behaves the same in both builds. READ candidate pi-common.js 1005 (note), 952-957 (R36 settle).",
+			"affected_user": "beginner",
+			"confidence": "high",
+			"correction": "Show 'tick readings in the search above to fill this group' only under the marked group. Under any other empty group, say 'Empty: mark its circle, then tick readings above.'",
+			"tradeoff": "A small copy branch that re-renders on a radio change.",
+			"acceptance_test": "In both states, no empty group that is not the marked one says 'tick readings in the search above'. A tick lands in the group whose note invites ticks.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY06",
+			"title": "At 200% zoom, 'Change' sits beside 'Theme' and away from '(shared: ...)', so it reads as 'change this key's theme'",
+			"severity": "S5",
+			"category": "WH",
+			"state_task_viewport": "Task: change the theme of this one key. key-configured with Default at 189x410 (and 160x410).",
+			"observed": "Row 1 reads 'Theme ........ Change'; row 2 reads 'Default (shared: Void)'. Read top to bottom, 'Theme Change' offers to change this key's theme, but it opens Shared defaults for all keys and dials. At 373 'Change' follows '(shared: Void)' and reads correctly.",
+			"evidence": "MEASURED walk189\\key-configured-189-first.png. READ pi.css @media (max-width: 299px) grid areas 'label change' / 'current current' (line 434). The x1 beginner cross-review flagged a bare 'Change' and proposed visible text 'Change shared'. Mitigation, MEASURED p2 change-link: the destination shows 'All keys and dials' before any write (0 writes, focus on #shared-theme).",
+			"affected_user": "low vision users at 200% zoom, beginners",
+			"confidence": "medium",
+			"correction": "Make the visible text 'Change shared' (the accessible name stays 'Change the shared theme'), or below 300 px put Change on row 2 after the resolved name.",
+			"tradeoff": "The button is wider at 373 (x1 measured one line still fits at 320). At 160 the reserved lines may need one more.",
+			"acceptance_test": "At 189 and 160, the Change control's visible text contains 'shared', or its box shares a row with '(shared: '. The band height stays identical across the 8 picks.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY07",
+			"title": "The 'on the dial but not in this rotation' line uses 'step', gives no remedy, and sits under the Split button below the fold",
+			"severity": "S5",
+			"category": "WH",
+			"state_task_viewport": "Task: build a rotation after putting a reading on the dial. dial-configured with CPU (Tctl/Tdie) on the dial, outside the set, on Legacy and Elite. 373x410 and 189x410.",
+			"observed": "'CPU (Tctl/Tdie) is on the dial but not in this rotation; the next step moves to GPU Temperature and does not come back.' It sits after 'Split into groups' at y 604 to 637 (892 to 956 at 189), away from the note it qualifies. The panel's word for the gesture is 'turn' (Controls: 'turn cycles readings'). 'does not come back' can be read either way. The fix, ticking the reading, is not mentioned, although it clears the line (MEASURED outside-tick).",
+			"evidence": "MEASURED walk\\walk-373.json dial-outside, crop-dial-outside.png, p2\\probe2.json outside-tick. READ candidate pi-common.js 937.",
+			"affected_user": "beginner",
+			"confidence": "medium",
+			"correction": "'CPU (Tctl/Tdie) is on the dial but not ticked here: the next turn moves to GPU Temperature and rotation will not return to it. Tick it above to keep it.' Use 'turn' when turns move the dial, else 'the next auto cycle'. Place the line right after the rotation note, before Split.",
+			"tradeoff": "About one line longer. Moving it changes the DOM order that e2e checks may assume.",
+			"acceptance_test": "On dial-outside, the line contains 'Tick', uses the word dialMovers reports ('turn' on Legacy), and its top is above the Split button's top.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY08",
+			"title": "The compact Gadget line's 'More under Advanced, Connection.' is plain text behind two closed folds; the Press summary promises min, max and avg",
+			"severity": "S6",
+			"category": "MF",
+			"state_task_viewport": "Task: understand the Gadget source. key-configured with a Gadget source, fresh fold memory, 373x410.",
+			"observed": "The status line reads 'Gadget registry: current values only, no min, max or average. More under Advanced, Connection.' and has no control. #source-now is inside Advanced (closed) > Connection (closed), at y 1009. Every other pointer of this kind is a reveal button ('Change', 'Change gestures', 'Data source setting'). The same panel's Press summary says 'Press cycles current, min, max, avg', and on Gadget those three draw N/A.",
+			"evidence": "MEASURED p4 (fold chain: sec-connection closed, sec-advanced closed; no buttons in #reading-status; Press summary text) and walk key-gadget. READ src/ui/format.ts:26-42 (N/A when statistics are unavailable), docs/sensor-details.md:69.",
+			"affected_user": "beginner on Gadget; keyboard users (two folds to open)",
+			"confidence": "high",
+			"correction": "Make 'More' a reveal button (data-reveal pointing at #source-now, the Change idiom). On Gadget, add '(min, max and avg show N/A on Gadget)' to the Press summary.",
+			"tradeoff": "One more focus stop in the status region; a longer summary.",
+			"acceptance_test": "One press on the status line's control opens both folds and scrolls #source-now into view. On key-gadget the Press summary mentions N/A.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY09",
+			"title": "The detail 'How' text now says the custom list is 'below' when it is above",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "Task: read how the detail view works. key-details with the Press section and 'How the detail view works' open. 373x410.",
+			"observed": "'A custom list can group its tiles one by one below.' sits at y 1547; the custom list is at y 1226, above it. The candidate changed 'above' to 'below' when Readings per tile moved above the list, but the How disclosure stayed below the list.",
+			"evidence": "MEASURED p5: {density: 1025, list: 1226, howText: 1547}. READ candidate sensor-reading.html:292-316 and the diff hunk for #density-help.",
+			"affected_user": "beginner (sighted readers of the disclosure)",
+			"confidence": "high",
+			"correction": "Use wording that does not depend on position: 'A custom list can group its tiles one by one in the list.'",
+			"tradeoff": "None.",
+			"acceptance_test": "#density-help contains neither 'above' nor 'below', or its direction matches #detail-list's position relative to the How disclosure.",
+			"new_in_candidate": true
+		},
+		{
+			"id": "BY10",
+			"title": "The empty dial still talks about a picked sensor and a list below that do not exist",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "Task: understand a new dial. dial-empty at 373x410.",
+			"observed": "'Empty: rotation moves through all readings of the picked sensor.' shows with nothing picked, and 'Select one in the list below, then Earlier and Later set their order.' shows with no list.",
+			"evidence": "MEASURED walk\\walk-373.json dial-empty. READ src/rotation.ts:52-57 (with nothing picked, the first turn takes the first reading of the whole list). B08's correction named both lines; R29 as landed covers only the picker line.",
+			"affected_user": "beginner",
+			"confidence": "high",
+			"correction": "'Empty: the first turn picks a reading; rotation then moves through that reading's sensor.' Hide #pickerr-order-help while the set is empty.",
+			"tradeoff": "None.",
+			"acceptance_test": "On dial-empty, neither 'picked sensor' nor 'list below' is visible.",
+			"new_in_candidate": false
+		},
+		{
+			"id": "BY11",
+			"title": "The key's new placeholder 'Search readings or sensors' never renders",
+			"severity": "S6",
+			"category": "RD",
+			"state_task_viewport": "key-empty and key-configured at 373x410.",
+			"observed": "The HTML placeholder changed to 'Search readings or sensors', but the runtime sets 'Search readings' once the tree arrives. The visible field never says that sensor names are searchable; only the screen-reader help does.",
+			"evidence": "MEASURED walk key-empty and key-configured (pickerPlaceholder 'Search readings'). READ candidate pi-common.js:2583.",
+			"affected_user": "beginner",
+			"confidence": "high",
+			"correction": "Set the runtime placeholder on the key to 'Search readings or sensors' (the filter matches sensor names), or revert the dead HTML edit.",
+			"tradeoff": "None.",
+			"acceptance_test": "After load, #picker-search placeholder on the key equals the intended text.",
+			"new_in_candidate": true
+		}
+	],
+	"keep": [
+		"The theme line idiom 'Default (shared: Void)' / 'Ember (set on this key)' / '(set on this dial)', which answers what is drawn and whether it is inherited in one place; it no longer follows the pointer or focus (MEASURED p5).",
+		"Change landing on Shared defaults > Theme under the 'All keys and dials' pill with its one-sentence explanation, with 0 writes.",
+		"The spoken scope line on the theme radiogroup ('Follows the shared theme, now Void.').",
+		"The visible 'missing' pill (the face's own word), which wraps under the name at 189, and the note counting live members ('2 of these 3 ... skipped until HWiNFO lists it again').",
+		"The '#0'/'#1' tags when HWiNFO marks exist; they tie to the header's 'Drive [#0]' source line.",
+		"Arm-then-confirm on group remove and Merge, with the consequence in words ('Remove group and its 2 readings?'); the armed button stays under the pointer, and focus goes to the surviving group name.",
+		"'Turns are ignored here.', 'Auto cycle changes this too.' and 'Turns and the strip's sides change this too.', which are correct derivations.",
+		"The Controls summary naming the pressed turn as 'switches group' or 'switches sensor' (R30).",
+		"'Change gestures' revealing and focusing the Gestures select.",
+		"The R18 line vanishing as soon as the reading on the dial is ticked, and naming the runtime's real entry member.",
+		"The Check again answer line with a clock time and the read cadence, in the same-answer case, with focus kept on the button.",
+		"The dial header leading with the name the dial shows (R43) and the resolved shared theme in Shared defaults (R34).",
+		"The compact one-box Gadget line with the full account kept under Connection (#source-now).",
+		"Zero writes on open, hover, focus and folding in all 34 walked states."
+	],
+	"cleanup": "Started: 12 node/tsx runs (walk.mjs twice, probe2, probe3 twice, p4, p5 and the helper runs), each with one pi-sim on ports 32020/32021 and one Chrome on CDP port 32022. The node processes all exited (p4 was killed by my 120 s timeout after it printed; I checked afterwards and found no node process whose command line mentions hw-r3y-beginner). Chrome: the cdp launcher pids (117848, 124116, 134268, 138576, 122340, 142252, 115468) exited on close, but each had relaunched a browser child that stayed on port 32022 (20424, 120452, 134404, 138936, 122600, 114940, 128192). I confirmed each by its parent pid and by --remote-debugging-port=32022, then stopped only those with taskkill /T /F. Final check: 0 Chrome processes on ports 3202x and no listener on ports 32020 to 32029. I did not touch Chrome processes from other labs (other ports and profiles). Files written only under C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-r3y-beginner. Chrome profile dirs under %TEMP%\\hw-pi-lab-* may remain where a straggling renderer held a file (cdp.mjs leaves those to the OS temp sweep)."
+}

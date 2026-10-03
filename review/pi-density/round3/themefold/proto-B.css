@@ -1,0 +1,113 @@
+/* Prototype: the selected theme's chip, small, in the folded row. */
+.hw-look-mini {
+	display: none;
+	flex: none;
+}
+.hw-mini-wrap {
+	display: inline-flex;
+}
+details .hw-look-mini .hw-theme-face {
+	position: relative;
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	box-sizing: border-box;
+	width: auto;
+	height: 22px;
+	padding: 0 8px;
+	overflow: hidden;
+	border: 1px solid #1f1f1f;
+	border-radius: 5px;
+}
+details .hw-look-mini .hw-theme-deck .hw-theme-face {
+	border: 2px dashed;
+}
+details .hw-look-mini .hw-theme-value,
+details .hw-look-mini .hw-theme-deck .hw-theme-value {
+	display: block;
+	font-size: 11.5px;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+details .hw-look-mini .hw-theme-spark {
+	position: absolute;
+	left: 6px;
+	right: 6px;
+	bottom: 2px;
+	height: 2px;
+	border-radius: 1px;
+}
+details .hw-look-mini .hw-theme-badge {
+	display: flex;
+	order: -1;
+	width: 14px;
+	height: 14px;
+	background: none;
+}
+details .hw-look-mini .hw-theme-badge svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* B: the theme line is the fold row. Open it reads as today with a fold
+   marker; folded, the selected chip takes the name's place. Change sits
+   at the row's end, outside the summary (never a control inside it). */
+details.hw-look-fold {
+	position: relative;
+	padding: 0 0 var(--hw-s2);
+}
+details.hw-look-fold:not([open]) {
+	padding-bottom: 0;
+}
+details.hw-look-fold > summary.hw-look-name {
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 6px;
+	min-height: 32px;
+	margin: 0;
+	padding: 4px 72px 4px 28px;
+}
+details.hw-look-fold > summary.hw-look-name::before {
+	top: 11px;
+}
+details.hw-look-fold:not([open]) > summary.hw-look-name {
+	padding-right: var(--hw-gutter);
+}
+details.hw-look-fold > .hw-look-row {
+	padding: 2px var(--hw-gutter) 0;
+}
+details.hw-look-fold > .hw-help {
+	margin: 3px var(--hw-gutter) 0;
+}
+details.hw-look-fold .hw-look-change {
+	position: absolute;
+	top: 4px;
+	right: var(--hw-gutter);
+	margin: 0;
+	z-index: 1;
+}
+details.hw-look-fold:not([open]) .hw-look-mini {
+	display: inline-flex;
+}
+details.hw-look-fold:not([open]):not(.hw-mini-none) #theme-current > span:first-child {
+	display: none;
+}
+/* Zoomed: "Theme" (and the chip when folded) on the first row, Change at
+   its end; the name wraps under them in two reserved lines when open, and
+   the scope takes one line when folded. */
+@media (max-width: 299px) {
+	details.hw-look-fold > summary.hw-look-name {
+		display: flex;
+		flex-wrap: wrap;
+		row-gap: 2px;
+	}
+	details.hw-look-fold > summary.hw-look-name .hw-look-current {
+		flex: 1 1 100%;
+	}
+	details.hw-look-fold:not([open]) > summary.hw-look-name .hw-look-current {
+		min-height: 0;
+	}
+}

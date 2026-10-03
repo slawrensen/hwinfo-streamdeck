@@ -23,6 +23,41 @@ describe("dial numeric alert contrast on actual row surfaces", () => {
 	}
 });
 
+/** CIE76 distance in Lab: enough to say two colors read as different. */
+function labDistance(a: string, b: string): number {
+	const lab = (hex: string): number[] => {
+		const [r, g, bl] = [1, 3, 5].map((i) => {
+			const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+			return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+		}) as [number, number, number];
+		const f = (t: number): number => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
+		const [x, y, z] = [(r * 0.4124 + g * 0.3576 + bl * 0.1805) / 0.95047, r * 0.2126 + g * 0.7152 + bl * 0.0722, (r * 0.0193 + g * 0.1192 + bl * 0.9505) / 1.08883].map(f) as [number, number, number];
+		return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+	};
+	const [p, q] = [lab(a), lab(b)];
+	return Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!, p[2]! - q[2]!);
+}
+
+// A dial row in alert shows it only through its value color, so that color
+// must not sit next to the colors a calm row wears: the theme's own value
+// color (Ember's amber), or a sensor-type number color (temperature pink,
+// power gold). The first 1.7 hues measured 7.5, 18.3 and 12.9 here; 1.6.0's
+// warn amber measured 16.4 against Ember.
+describe("dial alert values stay apart from calm row colors", () => {
+	for (const [name, palette] of Object.entries(config.themes)) {
+		it(`${name}: warn and crit rows read as different from a calm row`, () => {
+			for (const background of [palette.bg, palette.track]) {
+				const warn = alertValueColor(config, "warn", background);
+				const crit = alertValueColor(config, "crit", background);
+				assert.ok(labDistance(warn, palette.value) >= 15, `${name} warn ${warn} vs value ${palette.value}`);
+				if (config.typeAccentsDisabledOn.includes(name)) continue;
+				assert.ok(labDistance(crit, config.typeAccents.temperature) >= 20, `${name} crit ${crit} vs temperature ${config.typeAccents.temperature}`);
+				assert.ok(labDistance(warn, config.typeAccents.power) >= 20, `${name} warn ${warn} vs power ${config.typeAccents.power}`);
+			}
+		});
+	}
+});
+
 /** The spec's token table, verbatim — order bg,label,value,unit,accent,track. */
 const SPEC_THEMES: Record<string, [string, string, string, string, string, string]> = {
 	void: ["#000000", "#7A8393", "#FFFFFF", "#6B7586", "#4CC2FF", "#161A21"],

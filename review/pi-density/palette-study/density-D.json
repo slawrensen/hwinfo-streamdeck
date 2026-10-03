@@ -1,0 +1,4210 @@
+{
+	"method": "Simulated host (scripts/lib/pi-sim.mjs), sample data, headless Chromium on this machine. Heights are the body's content box (no capture padding). Keyboard routes start with nothing focused at the top; each closed section on the way costs one Enter. Folds start at the panel defaults.",
+	"panels": "C:\\Users\\stephen\\AppData\\Local\\Temp\\claude\\C--Users-stephen-git-hwinfo-streamdeck\\91b47c1b-9d80-49d5-bfea-6c93b12f0164\\scratchpad\\cand-v1\\com.lawrensen.hwinfo.sdPlugin",
+	"study": "palette-D",
+	"host": "win32 x64 node v24.16.0",
+	"states": [
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 695,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 695,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 2306,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 432,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 241,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-folded",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 277,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 952,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 371,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 2579,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 460,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 258,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 798,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 289,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 298,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-details",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 2918,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 432,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 241,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 709,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 218,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 768,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 854,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 360,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 838,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 854,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 311,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1096,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 448,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3242,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 639,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 448,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 443,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-folded",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 178,
+				"height": 60,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 309,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1574,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 691,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 652,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3822,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 912,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 652,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 545,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3421,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 639,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 352,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 717,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1207,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 559,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1159,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 511,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 378,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 188,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "control-reset",
+			"state": "all-open",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 565,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 278,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 128,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 378,
+			"viewportHeight": 410,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 229,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 695,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 695,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 2306,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 432,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 241,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-folded",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 277,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 952,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 371,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 2579,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 460,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 258,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 159,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": true
+			},
+			"pinnedHeight": 102,
+			"height": 798,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 289,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 298,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-details",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 2918,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 432,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 241,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 709,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 218,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": true
+			},
+			"pinnedHeight": 89,
+			"height": 768,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": true
+			},
+			"pinnedHeight": 89,
+			"height": 854,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 360,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": true
+			},
+			"pinnedHeight": 89,
+			"height": 838,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 146,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": true
+			},
+			"pinnedHeight": 89,
+			"height": 854,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 343,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 311,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1096,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 448,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3242,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 639,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 448,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 443,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-folded",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 178,
+				"height": 60,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 309,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1574,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 691,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 652,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3822,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 912,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 652,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 545,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 3421,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 639,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 352,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 315,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 717,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1277,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1207,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 559,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": {
+				"top": 162,
+				"height": 60,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 105,
+			"height": 1159,
+			"headerHeight": 105,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 417,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 511,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 378,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 188,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "control-reset",
+			"state": "all-open",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 565,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 278,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 128,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 380,
+			"viewportHeight": 720,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 229,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "key-empty",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 146,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 743,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 756,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 2556,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 496,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 258,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-configured",
+			"state": "all-folded",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 175,
+				"height": 92,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 290,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 1013,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 433,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-dense",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 2813,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 538,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 368,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 258,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 98,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-triple",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 862,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 337,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 314,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-details",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 3205,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 480,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 258,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 764,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-back",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 247,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 844,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 153,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-missing",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 146,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 886,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-stale",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 898,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 295,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "key-unavailable",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 146,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 89,
+			"height": 918,
+			"headerHeight": 89,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 392,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 327,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 1189,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 465,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 480,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 3572,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 719,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 480,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 331,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 491,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-configured",
+			"state": "all-folded",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 175,
+				"height": 92,
+				"folded": true,
+				"onScreenAtLoad": false,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 322,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 177,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 120,
+			"height": 1701,
+			"headerHeight": 120,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 755,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 684,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 63,
+					"summary": 62.28125
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-groups",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 177,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 120,
+			"height": 4186,
+			"headerHeight": 120,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 1009,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 684,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 331,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 593,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-custom-gestures",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 159,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 102,
+			"height": 3751,
+			"headerHeight": 102,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 719,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 384,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": true,
+					"height": 331,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": true,
+					"height": 765,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 1433,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-missing",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 136,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 79,
+			"height": 1261,
+			"headerHeight": 79,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 465,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 591,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "dial-unavailable",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": {
+				"top": 136,
+				"height": 92,
+				"folded": false,
+				"onScreenAtLoad": true,
+				"onScreenAtEnd": false
+			},
+			"pinnedHeight": 79,
+			"height": 1229,
+			"headerHeight": 79,
+			"pinned": true,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-display",
+					"open": true,
+					"height": 465,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-reading",
+					"open": true,
+					"height": 559,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-alerts",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-interaction",
+					"open": false,
+					"height": 47,
+					"summary": 46.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": "1.7.0.0-d01",
+			"writes": 0
+		},
+		{
+			"fixture": "control-default",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 378,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 188,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": false,
+					"height": 31,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "control-reset",
+			"state": "all-open",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 582,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [
+				{
+					"id": "sec-command",
+					"open": true,
+					"height": 294,
+					"summary": 30.1875
+				},
+				{
+					"id": "sec-advanced",
+					"open": true,
+					"height": 128,
+					"summary": 30.1875
+				}
+			],
+			"build": null,
+			"writes": 0
+		},
+		{
+			"fixture": "slot-reading",
+			"state": "default",
+			"width": 320,
+			"viewportHeight": 560,
+			"palette": null,
+			"pinnedHeight": 0,
+			"height": 229,
+			"headerHeight": 67,
+			"pinned": false,
+			"overflowX": 0,
+			"sections": [],
+			"build": null,
+			"writes": 0
+		}
+	],
+	"tasks": [
+		{
+			"task": "T1",
+			"fixture": "key-empty",
+			"what": "Pick a reading",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 12,
+			"enters": 0,
+			"keystrokes": 12,
+			"foldsToOpen": 0,
+			"top": 489,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 119,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Theme gallery",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 146,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "dial-configured",
+			"what": "Theme gallery (dial)",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 162,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Text color (this key)",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 5,
+			"enters": 0,
+			"keystrokes": 5,
+			"foldsToOpen": 0,
+			"top": 252,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Decimals",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 7,
+			"enters": 0,
+			"keystrokes": 7,
+			"foldsToOpen": 0,
+			"top": 309,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-configured",
+			"what": "Readings on this key",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 544,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 174,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-dense",
+			"what": "Reading 4 picker",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 25,
+			"enters": 0,
+			"keystrokes": 25,
+			"foldsToOpen": 0,
+			"top": 749,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 379,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T4",
+			"fixture": "key-configured",
+			"what": "Warn threshold",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 17,
+			"enters": 1,
+			"keystrokes": 18,
+			"foldsToOpen": 1,
+			"top": 642,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 272,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-configured",
+			"what": "Rotation search",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 685,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 315,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation search (groups)",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 22,
+			"enters": 0,
+			"keystrokes": 22,
+			"foldsToOpen": 0,
+			"top": 959,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 589,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation list (reorder)",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 27,
+			"enters": 0,
+			"keystrokes": 27,
+			"foldsToOpen": 0,
+			"top": 1056,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 686,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "key-configured",
+			"what": "Press behavior",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 18,
+			"enters": 1,
+			"keystrokes": 19,
+			"foldsToOpen": 1,
+			"top": 673,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 303,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "dial-configured",
+			"what": "Dial gestures preset",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 31,
+			"enters": 1,
+			"keystrokes": 32,
+			"foldsToOpen": 1,
+			"top": 1075,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 705,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-missing",
+			"what": "Recovery action",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 642,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 272,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-unavailable",
+			"what": "Recovery action",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 642,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 272,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T8",
+			"fixture": "key-configured",
+			"what": "Shared theme",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 20,
+			"enters": 2,
+			"keystrokes": 22,
+			"foldsToOpen": 2,
+			"top": 803,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 433,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T9",
+			"fixture": "key-configured",
+			"what": "This key's config document",
+			"width": 378,
+			"viewportHeight": 410,
+			"found": true,
+			"tabs": 23,
+			"enters": 2,
+			"keystrokes": 25,
+			"foldsToOpen": 2,
+			"top": 875,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 505,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T1",
+			"fixture": "key-empty",
+			"what": "Pick a reading",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 12,
+			"enters": 0,
+			"keystrokes": 12,
+			"foldsToOpen": 0,
+			"top": 489,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Theme gallery",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 146,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "dial-configured",
+			"what": "Theme gallery (dial)",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 162,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Text color (this key)",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 5,
+			"enters": 0,
+			"keystrokes": 5,
+			"foldsToOpen": 0,
+			"top": 252,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Decimals",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 7,
+			"enters": 0,
+			"keystrokes": 7,
+			"foldsToOpen": 0,
+			"top": 309,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-configured",
+			"what": "Readings on this key",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 544,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-dense",
+			"what": "Reading 4 picker",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 25,
+			"enters": 0,
+			"keystrokes": 25,
+			"foldsToOpen": 0,
+			"top": 749,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 69,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T4",
+			"fixture": "key-configured",
+			"what": "Warn threshold",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 17,
+			"enters": 1,
+			"keystrokes": 18,
+			"foldsToOpen": 1,
+			"top": 642,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-configured",
+			"what": "Rotation search",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 685,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 5,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation search (groups)",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 22,
+			"enters": 0,
+			"keystrokes": 22,
+			"foldsToOpen": 0,
+			"top": 959,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 279,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation list (reorder)",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 27,
+			"enters": 0,
+			"keystrokes": 27,
+			"foldsToOpen": 0,
+			"top": 1056,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 376,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "key-configured",
+			"what": "Press behavior",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 18,
+			"enters": 1,
+			"keystrokes": 19,
+			"foldsToOpen": 1,
+			"top": 673,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "dial-configured",
+			"what": "Dial gestures preset",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 31,
+			"enters": 1,
+			"keystrokes": 32,
+			"foldsToOpen": 1,
+			"top": 1075,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 395,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-missing",
+			"what": "Recovery action",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 642,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-unavailable",
+			"what": "Recovery action",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 642,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T8",
+			"fixture": "key-configured",
+			"what": "Shared theme",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 20,
+			"enters": 2,
+			"keystrokes": 22,
+			"foldsToOpen": 2,
+			"top": 803,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 123,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T9",
+			"fixture": "key-configured",
+			"what": "This key's config document",
+			"width": 380,
+			"viewportHeight": 720,
+			"found": true,
+			"tabs": 23,
+			"enters": 2,
+			"keystrokes": 25,
+			"foldsToOpen": 2,
+			"top": 875,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 195,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T1",
+			"fixture": "key-empty",
+			"what": "Pick a reading",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 12,
+			"enters": 0,
+			"keystrokes": 12,
+			"foldsToOpen": 0,
+			"top": 538,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 18,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Theme gallery",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 159,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "dial-configured",
+			"what": "Theme gallery (dial)",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 3,
+			"enters": 0,
+			"keystrokes": 3,
+			"foldsToOpen": 0,
+			"top": 159,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Text color (this key)",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 5,
+			"enters": 0,
+			"keystrokes": 5,
+			"foldsToOpen": 0,
+			"top": 313,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T2",
+			"fixture": "key-configured",
+			"what": "Decimals",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 7,
+			"enters": 0,
+			"keystrokes": 7,
+			"foldsToOpen": 0,
+			"top": 369,
+			"onFirstScreen": true,
+			"pointerClicks": 1,
+			"scrollToReach": 0,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-configured",
+			"what": "Readings on this key",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 605,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 85,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T3",
+			"fixture": "key-dense",
+			"what": "Reading 4 picker",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 25,
+			"enters": 0,
+			"keystrokes": 25,
+			"foldsToOpen": 0,
+			"top": 811,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 291,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T4",
+			"fixture": "key-configured",
+			"what": "Warn threshold",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 17,
+			"enters": 1,
+			"keystrokes": 18,
+			"foldsToOpen": 1,
+			"top": 703,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 183,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-configured",
+			"what": "Rotation search",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 15,
+			"enters": 0,
+			"keystrokes": 15,
+			"foldsToOpen": 0,
+			"top": 730,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 210,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation search (groups)",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 22,
+			"enters": 0,
+			"keystrokes": 22,
+			"foldsToOpen": 0,
+			"top": 1038,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 518,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T5",
+			"fixture": "dial-groups",
+			"what": "Rotation list (reorder)",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 27,
+			"enters": 0,
+			"keystrokes": 27,
+			"foldsToOpen": 0,
+			"top": 1151,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 631,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "key-configured",
+			"what": "Press behavior",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 18,
+			"enters": 1,
+			"keystrokes": 19,
+			"foldsToOpen": 1,
+			"top": 734,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 214,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T6",
+			"fixture": "dial-configured",
+			"what": "Dial gestures preset",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 31,
+			"enters": 1,
+			"keystrokes": 32,
+			"foldsToOpen": 1,
+			"top": 1167,
+			"onFirstScreen": false,
+			"pointerClicks": 2,
+			"scrollToReach": 647,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-missing",
+			"what": "Recovery action",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 674,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 154,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T7",
+			"fixture": "key-unavailable",
+			"what": "Recovery action",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 14,
+			"enters": 0,
+			"keystrokes": 14,
+			"foldsToOpen": 0,
+			"top": 706,
+			"onFirstScreen": false,
+			"pointerClicks": 1,
+			"scrollToReach": 186,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T8",
+			"fixture": "key-configured",
+			"what": "Shared theme",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 20,
+			"enters": 2,
+			"keystrokes": 22,
+			"foldsToOpen": 2,
+			"top": 879,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 359,
+			"focusedCoveredByHeader": false
+		},
+		{
+			"task": "T9",
+			"fixture": "key-configured",
+			"what": "This key's config document",
+			"width": 320,
+			"viewportHeight": 560,
+			"found": true,
+			"tabs": 23,
+			"enters": 2,
+			"keystrokes": 25,
+			"foldsToOpen": 2,
+			"top": 952,
+			"onFirstScreen": false,
+			"pointerClicks": 3,
+			"scrollToReach": 432,
+			"focusedCoveredByHeader": false
+		}
+	]
+}

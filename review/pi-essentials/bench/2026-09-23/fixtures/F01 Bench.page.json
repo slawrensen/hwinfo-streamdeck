@@ -1,0 +1,1075 @@
+{
+	"Controllers": [
+		{
+			"Actions": {
+				"0,0": {
+					"ActionID": "b9cc5b22-4219-49e0-b9e8-80bba8c37f23",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"label": "Tctl",
+						"displayMode": "sparkline",
+						"warnValue": "80",
+						"critValue": "90"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"1,0": {
+					"ActionID": "9318d355-edc8-466b-9e13-da9b75563b5d",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"secondaryReadingKey": "f0000501:0:1000009",
+						"keyLayout": "dual",
+						"label": "Tctl",
+						"secondaryLabel": "CCD2",
+						"secondaryStatMode": "max"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"2,0": {
+					"ActionID": "945d443c-43ef-4622-a60e-fb086204c316",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000008",
+						"secondaryReadingKey": "f0000501:0:1000009",
+						"quadReadingKey3": "f0000501:0:1000003",
+						"keyLayout": "triple",
+						"label": "CCD1",
+						"secondaryLabel": "CCD2",
+						"quadLabel3": "Die"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"3,0": {
+					"ActionID": "6b03ee45-dc40-4526-b05e-291fb13045c4",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000100:0:1000000",
+						"secondaryReadingKey": "f0000100:2:1000000",
+						"quadReadingKey3": "f0000100:3:1000000",
+						"quadReadingKey4": "f0000100:4:1000000",
+						"keyLayout": "quad",
+						"label": "D0",
+						"secondaryLabel": "D2",
+						"quadLabel3": "D3",
+						"quadLabel4": "D4",
+						"quadLabels": true,
+						"quadColors": [
+							"#4cc2ff",
+							"#ff7e8e",
+							"#38cd89",
+							"#d4ab33"
+						]
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"4,0": {
+					"ActionID": "98147883-c151-49d2-aceb-e7c08ca98d13",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:1000000",
+						"label": "GPU",
+						"theme": "ember",
+						"textMode": "custom",
+						"textColor": "#ffd166",
+						"textDimSecondary": true,
+						"displayMode": "bar"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"5,0": {
+					"ActionID": "f846134b-0c55-4600-8c35-a0d85178a100",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f7006687:0:3000001",
+						"label": "Pump",
+						"warnValue": "1800",
+						"critValue": "1500",
+						"alertBelow": true
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"6,0": {
+					"ActionID": "077410e6-856d-459d-984c-6b1d9c4406d4",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"label": "Tctl F",
+						"fahrenheit": true,
+						"warnValue": "176",
+						"critValue": "194",
+						"decimals": "1"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"7,0": {
+					"ActionID": "9b3d94d6-c127-4360-a17e-6848e46fedb9",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:7000000",
+						"label": "GPU Load",
+						"displayMode": "ring"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"8,0": {
+					"ActionID": "c2e5b643-76b1-476e-b80c-a78a0b1451fc",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000301:0:8000005",
+						"label": "RAM",
+						"displayMode": "none",
+						"statMode": "max",
+						"theme": "paper"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"0,1": {
+					"ActionID": "fbd17a20-6459-415f-887a-9369b43f07a9",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000009",
+						"label": "Custom",
+						"pressBehavior": "open-details",
+						"detailMode": "custom",
+						"detailKeys": [
+							"f0000501:0:1000000",
+							"f0000501:0:1000009",
+							"e0002000:0:1000000",
+							"e0002000:0:1000005",
+							"f7006687:0:3000001",
+							"f0000301:0:8000005"
+						],
+						"detailTiles": [
+							{
+								"size": "2",
+								"labels": [
+									"Tctl",
+									"CCD2"
+								],
+								"colors": [
+									"#4cc2ff",
+									null
+								],
+								"cellLabels": true
+							},
+							{
+								"size": "4",
+								"labels": [
+									"",
+									"",
+									"Pump",
+									"RAM"
+								],
+								"colors": [
+									null,
+									null,
+									null,
+									null
+								],
+								"cellLabels": false
+							}
+						],
+						"detailTitle": "Bench",
+						"detailDensity": "1"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"1,1": {
+					"ActionID": "9589c5db-b6dc-4491-bd51-f965628011fa",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000100:2:1000000",
+						"label": "Drives",
+						"pressBehavior": "open-details",
+						"detailMode": "filter",
+						"detailFilter": "drive",
+						"detailDensity": "2",
+						"detailTitle": "Drives",
+						"detailMirrorBack": false
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"2,1": {
+					"ActionID": "0bc77ed0-f729-436c-8206-743842828ec1",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:1000000",
+						"label": "GPU src",
+						"pressBehavior": "tap-cycle-hold-details",
+						"detailMode": "source"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"3,1": {
+					"ActionID": "03ddd415-e19a-4e74-969e-6d323980419e",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000300:0:7000021",
+						"label": "Empty flt",
+						"pressBehavior": "open-details",
+						"detailMode": "filter",
+						"detailFilter": ""
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"4,1": {
+					"ActionID": "68216066-edbf-4152-95b9-8c4b80cb32cc",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000300:0:7000007",
+						"label": "Zero"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"5,1": {
+					"ActionID": "3ee05fb5-45d4-46cc-83f1-450705abe02f",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "fc04a100:256:2000004",
+						"label": "-12V",
+						"decimals": "2"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"6,1": {
+					"ActionID": "686deacc-d594-42fc-86cd-e80d357d737e",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:10000ff",
+						"label": "Missing"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"7,1": {
+					"ActionID": "26879c91-1d5a-4073-8f06-ae0687f9190f",
+					"LinkedTitle": true,
+					"Name": "HWiNFO Control",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"command": "next",
+						"target": "bench"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.control"
+				},
+				"8,1": {
+					"ActionID": "2277d8ca-2868-4eff-9673-c83f71a7c942",
+					"LinkedTitle": true,
+					"Name": "HWiNFO Control",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"command": "resetStats",
+						"target": "",
+						"resetScope": "all"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.control"
+				},
+				"0,2": {
+					"ActionID": "1a2a5ac6-49f3-40b1-9c91-0a4af00b03c4",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"label": "Junk",
+						"keyLayout": "hex",
+						"theme": "neon",
+						"decimals": "auto",
+						"zzFuture": 42,
+						"zzNested": {
+							"a": [
+								1,
+								{
+									"b": "c"
+								}
+							],
+							"d": null
+						},
+						"pressBehavior": "open-details",
+						"detailMode": "custom",
+						"detailMirrorBack": "false",
+						"detailKeys": [
+							"f0000501:0:1000000",
+							7,
+							"",
+							"f0000501:0:1000009",
+							null,
+							"  ",
+							"e0002000:0:1000000"
+						],
+						"detailTiles": [
+							3,
+							"marker",
+							{
+								"size": 6
+							},
+							{
+								"size": "2",
+								"labels": [
+									"A",
+									"B"
+								],
+								"colors": [
+									null,
+									null
+								],
+								"cellLabels": true,
+								"futureTileField": "x"
+							}
+						],
+						"quadColors": [
+							"#111111",
+							"#222222",
+							"#333333",
+							"#444444",
+							"#123456",
+							"#abcdef"
+						]
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"1,2": {
+					"ActionID": "d6ba5aa2-bb64-493b-86bb-704a517f2f1b",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"2,2": {
+					"ActionID": "cebef868-e256-4a1c-a194-a623066932f3",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"label": "Bad warn",
+						"warnValue": "abc",
+						"critValue": "90"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"3,2": {
+					"ActionID": "c4d6f39c-fdda-4634-86b3-c9acc75de6ca",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"label": "1.7 flds",
+						"sensorValueColors": false,
+						"readingColors": {
+							"f0000501:0:1000000": "#4cc2ff"
+						},
+						"zz17": true
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"4,2": {
+					"ActionID": "5f7d41ea-0386-4b16-83aa-0271e627dd1d",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:1000000",
+						"label": "Shared"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				},
+				"5,2": {
+					"ActionID": "bdece297-817a-4b03-9863-e8d1d665a875",
+					"LinkedTitle": true,
+					"Name": "Sensor Reading",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:1000005",
+						"label": "Own void",
+						"theme": "void"
+					},
+					"State": 0,
+					"States": [
+						{
+							"FontFamily": "",
+							"FontSize": 12,
+							"FontStyle": "",
+							"FontUnderline": false,
+							"OutlineThickness": 2,
+							"ShowTitle": false,
+							"TitleAlignment": "middle",
+							"TitleColor": "#ffffff"
+						}
+					],
+					"UUID": "com.lawrensen.hwinfo.reading"
+				}
+			},
+			"Type": "Keypad"
+		},
+		{
+			"Actions": {
+				"0,0": {
+					"ActionID": "6fe2da53-c8e8-400c-ad62-dbf128d1ce3e",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"rotationKeys": [
+							"f0000501:0:1000000",
+							"f0000501:0:1000009",
+							"e0002000:0:1000000"
+						],
+						"rotationNames": {
+							"f0000501:0:1000000": "Tctl",
+							"f0000501:0:1000009": "CCD2",
+							"e0002000:0:1000000": "GPU"
+						},
+						"rotationGroups": [
+							{
+								"name": "CPU",
+								"keys": [
+									"f0000501:0:1000000",
+									"f0000501:0:1000009"
+								]
+							},
+							{
+								"name": "GPU",
+								"keys": [
+									"e0002000:0:1000000"
+								]
+							}
+						],
+						"controlPreset": "legacy"
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				},
+				"1,0": {
+					"ActionID": "694af26f-ba53-4686-b2c2-d5721927ed89",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "e0002000:0:1000000",
+						"rotationKeys": [
+							"e0002000:0:1000000",
+							"e0002000:0:1000005",
+							"e0002000:0:5000000"
+						],
+						"controlPreset": "elite",
+						"touchZones": "two",
+						"autoCycleMs": "5000"
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				},
+				"2,0": {
+					"ActionID": "fc0c5aad-faa8-4cbc-9dc6-6ae67c539477",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000009",
+						"rotationKeys": [
+							"f0000501:0:1000009",
+							"f0000501:0:5000000"
+						],
+						"controlPreset": "custom",
+						"gestureRotate": "step",
+						"gesturePressedRotate": "stepGroup",
+						"gestureShortPress": "cycleStat",
+						"gestureLongPress": "resetStats",
+						"gestureTap": "pauseResume",
+						"gestureTouchHold": "pin",
+						"touchZones": "three",
+						"linkId": "bench",
+						"autoCycleMs": "off"
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				},
+				"3,0": {
+					"ActionID": "ddda773a-a01f-4f1c-a2d3-b9df8b067c4c",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"rotationKeys": [
+							"f0000501:0:1000000",
+							5,
+							"",
+							"f0000501:0:1000009",
+							null,
+							"e0002000:0:1000000"
+						],
+						"rotationNames": {
+							"f0000501:0:1000000": "T",
+							"junk": 5,
+							"": "x"
+						},
+						"rotationGroups": [
+							3,
+							"marker",
+							{
+								"size": 6
+							},
+							{
+								"name": "A",
+								"keys": [
+									"f0000501:0:1000000",
+									"f0000501:0:1000009"
+								],
+								"futureGroupField": true
+							},
+							{
+								"name": "B",
+								"keys": [
+									"e0002000:0:1000000"
+								]
+							}
+						],
+						"autoCycleMs": "15000",
+						"zzFuture": {
+							"v": 1
+						}
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				},
+				"4,0": {
+					"ActionID": "02e07ae4-2996-41ad-92c5-c54b862e5305",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:10000ff",
+						"label": "Missing"
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				},
+				"5,0": {
+					"ActionID": "d597b0dd-081e-45c9-8a2c-80ddae180148",
+					"LinkedTitle": true,
+					"Name": "Sensor Dial",
+					"Plugin": {
+						"Name": "HWiNFO Sensors",
+						"UUID": "com.lawrensen.hwinfo",
+						"Version": "1.6.0.0"
+					},
+					"Resources": null,
+					"Settings": {
+						"readingKey": "f0000501:0:1000000",
+						"rotationKeys": [
+							"f0000501:0:1000000",
+							"f7006687:0:3000001"
+						],
+						"warnValue": "80",
+						"critValue": "90",
+						"alertUnit": "°C"
+					},
+					"State": 0,
+					"States": [
+						{}
+					],
+					"UUID": "com.lawrensen.hwinfo.dial"
+				}
+			},
+			"Type": "Encoder"
+		}
+	],
+	"Icon": "",
+	"Name": ""
+}

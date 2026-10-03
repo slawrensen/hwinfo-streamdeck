@@ -1,0 +1,280 @@
+{
+	"method": "REAL Stream Deck app webview over CDP; probes ported from scripts/pi-lab.mjs a11y; keys dispatched through CDP Input (renderer level, not OS level)",
+	"layout": {
+		"w": 378,
+		"h": 410,
+		"dpr": 1.5,
+		"url": "sensor-reading.html"
+	},
+	"openAll": false,
+	"stops": 32,
+	"stopList": [
+		{
+			"tag": "SUMMARY",
+			"label": "ReadingTctl",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#picker-search",
+			"label": "Reading",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#picker-refresh",
+			"label": "Reload the sensor list",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#f-label",
+			"label": "Label on the key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-layout",
+			"label": "Readings on this key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "DisplayCurrent value · auto decimals · Void (shared) · theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-stat",
+			"label": "Value shown",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-decimals",
+			"label": "Decimals",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT",
+			"label": "Show temperatures in °F",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#display-mode",
+			"label": "Graph under the value",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Default: follow the shared theme, currently Void",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Change the shared theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-text",
+			"label": "Text color",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AlertsWarn ≥ 80 °C · critical ≥ 90 °C",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "PressPress cycles current, min, max, avg",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AdvancedAuto source · poll 250 ms · decimal data units",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "ReadingTctl",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#picker-search",
+			"label": "Reading",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON#picker-refresh",
+			"label": "Reload the sensor list",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT#f-label",
+			"label": "Label on the key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-layout",
+			"label": "Readings on this key",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "DisplayCurrent value · auto decimals · Void (shared) · theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-stat",
+			"label": "Value shown",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-decimals",
+			"label": "Decimals",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "INPUT",
+			"label": "Show temperatures in °F",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#display-mode",
+			"label": "Graph under the value",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Default: follow the shared theme, currently Void",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "BUTTON",
+			"label": "Change the shared theme",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SELECT#f-text",
+			"label": "Text color",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AlertsWarn ≥ 80 °C · critical ≥ 90 °C",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "PressPress cycles current, min, max, avg",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		},
+		{
+			"tag": "SUMMARY",
+			"label": "AdvancedAuto source · poll 250 ms · decimal data units",
+			"hiddenBy": null,
+			"ring": true,
+			"obscured": false,
+			"partly": false
+		}
+	],
+	"backStops": 16,
+	"own": [],
+	"axe": {
+		"violations": [],
+		"passes": 25,
+		"incomplete": []
+	},
+	"writes": {
+		"writes": 0,
+		"globalWrites": 0
+	}
+}

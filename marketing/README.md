@@ -2,8 +2,11 @@
 
 The Elgato Marketplace listing images for HWiNFO Sensors. The boards use
 production renderers with sample scenarios, live HWiNFO inputs and generated
-histories. They are sample-data renders, not physical screenshots.
-`shot-2-hardware.png` is the photograph of the plugin on real hardware.
+histories. They are sample-data renders, not physical screenshots. Their
+faces draw in Tahoma, the default Text font, as the device does (before 1.7
+the renders drew Segoe UI while the device drew Tahoma).
+`shot-2-hardware.png` is the photograph of the plugin on real hardware,
+taken in July 2026 on an earlier version, in Tahoma.
 Multi-row dials now go through the runtime action composer, including its
 formatting, settings and color precedence.
 
@@ -18,9 +21,9 @@ Replace `shot-7-dial-views.png` (the customer's image), `shot-1-hero.png` and
 `thumbnail.png` with the corrected default renders here for the stable
 listing. Their normal numeric Text styling is achievable in 1.6.0.
 Automatic category colors require **Color numbers by sensor type** under
-Appearance, Text → Theme, and Type accents enabled. The unreleased 1.7
-candidate also has individual **Reading colors**, which work with Type
-accents off. Neither option exists in stable 1.6.0. Regenerating assets does
+Display, Text color on Theme text or Dimmed, and Accent colors on By sensor
+type. The unreleased 1.7 candidate also has individual **Reading colors**,
+which also work with Accent colors on Theme accent everywhere. Neither option exists in stable 1.6.0. Regenerating assets does
 not update the Marketplace listing.
 
 `issue-31/before-after.png` compares identical fixtures through the production
@@ -78,7 +81,12 @@ npx tsx scripts/marketplace-shots.mjs marketing <dir>
 
 Shot 4 uses `pi-picker-block.png`, `pi-key-quad-rows.png` and
 `pi-key-detail-filter.png`; the dial/control captures feed the docs site
-(`docs/assets/img/`).
+(`docs/assets/img/`). To rebuild shot 4 alone, append `--only-settings`: it
+skips the other boards, though loading the script still needs HWiNFO Shared
+Memory with the readings named in `K` (the CPU temperature and pump rows). On a machine without an
+RTX 4090, set `PI_CAPTURE_FILTER` (for example `*GPU*`) for the capture's
+filter step. The 1.7 shot 4 was built this way on 2026-10-03 from panel
+build 1.7.0.0-d25 with the filter `*GPU*`.
 
 Shot 2 wraps the real-hardware photograph in the standard board chrome:
 
@@ -133,7 +141,7 @@ through the same production dial composer. Generate it with
 `npx tsx scripts/dial-color-comparison.mjs marketing/issue-31 --custom`.
 Both sides use Text: Theme, Type accents: OFF, identical readings, histories,
 selection and layout. Only `readingColors` changes, using the achievable
-Appearance → Reading colors → Signal preset. CPU and GPU temperatures can
+Display → Reading colors → Signal preset. CPU and GPU temperatures can
 therefore differ while graph lines keep their previous colors. This is preview
 evidence, not a physical screenshot or a claim about the stable Marketplace build.
 
@@ -156,7 +164,7 @@ the stable Marketplace gallery:
   by the production key and dial code. It shows Source busy, no new Shared
   Memory data and Gadget Age unknown.
 - `docs/assets/img/pi-dial-reading-colors-1.7.png`: the 1.7 candidate's
-  settings panel (build 1.7.0.0-1) captured through the local test host with
+  settings panel (its build is in the image's provenance file) captured through the local test host with
   live HWiNFO. It is a settings-panel capture of an unreleased build.
 
 The first two are sample-data renders. None is a photograph of a physical

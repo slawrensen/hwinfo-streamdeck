@@ -111,7 +111,7 @@ function measureData(canonical: number, ladder: readonly string[], base: number,
 		// Rounding can hit the next tier ("1024 KiB"), and a quad cell squeezes
 		// a 5-glyph value ("-1010") into its own magnitude suffix ("-1k", NaN
 		// here): both promote a tier instead, so a value suffix never stacks on
-		// a unit prefix. Past the top tier the quad clamp keeps the budget.
+		// a unit prefix. Past the top tier the value keeps its own suffix.
 		const rounded = Math.abs(Number(valueText));
 		if (tier < ladder.length - 1 && !(rounded < base)) {
 			tier++;
@@ -163,10 +163,15 @@ export function formatMeasurement(value: number, unit: string, opts: MeasureOpti
 		return { valueText: formatValue(converted.value, opts.decimals), unitText: converted.unit };
 	}
 	const { canonical, ladder, base } = dataDisplay(converted.value * data.toBase, data.kind, opts.dataUnits);
+	// A finite reading can still overflow once normalized (AX44): it gets the
+	// same placeholder and source unit as any other non-finite value.
+	if (!Number.isFinite(canonical)) {
+		return { valueText: formatValue(canonical, opts.decimals), unitText: converted.unit };
+	}
 	return measureData(canonical, ladder, base, opts.decimals, false);
 }
 
-/** The quad-cell variant: same tiering, value capped at the quad glyph
+/** The quad-cell variant: same tiering, value aimed at the quad glyph
  * budget. A value that only fits with its own magnitude suffix (a negative
  * near a binary tier edge, "-1010") promotes a tier instead. */
 export function formatQuadMeasurement(value: number, unit: string, opts: MeasureOptions): Measurement {
@@ -180,6 +185,9 @@ export function formatQuadMeasurement(value: number, unit: string, opts: Measure
 		return { valueText: formatQuadValue(converted.value, opts.decimals), unitText: converted.unit };
 	}
 	const { canonical, ladder, base } = dataDisplay(converted.value * data.toBase, data.kind, opts.dataUnits);
+	if (!Number.isFinite(canonical)) {
+		return { valueText: formatQuadValue(canonical, opts.decimals), unitText: converted.unit };
+	}
 	return measureData(canonical, ladder, base, opts.decimals, true);
 }
 

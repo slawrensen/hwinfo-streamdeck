@@ -1,0 +1,86 @@
+[
+	{
+		"setting": "theme",
+		"global": true,
+		"control": "select:select-one",
+		"from": "void",
+		"to": "graphite",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"theme"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "textMode",
+		"global": true,
+		"control": "select:select-one",
+		"from": "theme",
+		"to": "dim",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"textMode"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "typeAccents",
+		"global": true,
+		"control": "select:select-one",
+		"from": "off",
+		"to": "on",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"typeAccents"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "dataUnits",
+		"global": true,
+		"control": "select:select-one",
+		"from": "decimal",
+		"to": "binary",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"dataUnits"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "source",
+		"global": true,
+		"control": "select:select-one",
+		"from": "auto",
+		"to": "shared-memory",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"source"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	},
+	{
+		"setting": "pollIntervalMs",
+		"global": true,
+		"control": "select:select-one",
+		"from": "250",
+		"to": "500",
+		"writes": 0,
+		"globalWrites": 1,
+		"changed": [
+			"pollIntervalMs"
+		],
+		"otherDocChanged": [],
+		"ok": true
+	}
+]

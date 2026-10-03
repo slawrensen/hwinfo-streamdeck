@@ -8,6 +8,12 @@ import { describe, it } from "node:test";
 import { estimateKeyTextWidth, fitTextLadder, formatQuadValue, formatValue } from "../src/ui/format";
 import { formatMeasurement, formatQuadMeasurement, formatStat, isDataUnit, parseDataUnit, parseDataUnitsPref, type MeasureOptions } from "../src/ui/measure";
 
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+
 const DEC: MeasureOptions = { decimals: "auto", fahrenheit: false, dataUnits: "decimal" };
 const BIN: MeasureOptions = { decimals: "auto", fahrenheit: false, dataUnits: "binary" };
 
@@ -393,5 +399,19 @@ describe("fitTextLadder (largest safe size, ellipsis only at the floor)", () => 
 		// floor cuts could poke ~3px past their budget. Now 9.8 minus the 1.5
 		// terminal credit; mispricing either way misplaces the cut point.
 		assert.ok(Math.abs(estimateKeyTextWidth("…", 12) - 8.3) < 1e-9);
+	});
+});
+
+describe("normalization overflow (external review AX44)", () => {
+	it("a finite data reading that overflows once normalized shows the placeholder in its source unit", () => {
+		for (const value of [Number.MAX_VALUE, -Number.MAX_VALUE]) {
+			for (const unit of ["MB", "TB", "MiB/s", "Mbps"]) {
+				for (const dataUnits of ["decimal", "binary"] as const) {
+					for (const format of [formatMeasurement, formatQuadMeasurement]) {
+						assert.deepEqual(format(value, unit, { decimals: "auto", fahrenheit: false, dataUnits }), { valueText: "\u2014", unitText: unit }, `${format.name} ${value} ${unit} ${dataUnits}`);
+					}
+				}
+			}
+		}
 	});
 });

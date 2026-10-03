@@ -1,0 +1,123 @@
+{
+	"role": "Agent 5, adversarial evidence (round 2). AI reviewer, not a user study. Every claim is labelled MEASURED (simulated host), READ (source) or INFERRED.",
+	"environment": "Simulated host only. pi-sim.mjs and cdp.mjs from C:\\Users\\stephen\\git\\hwinfo-pi-density (HEAD 4bf09c0), run with npx tsx, headless Chrome 152. PI_SIM_PLUGIN_DIR pointed at proto-R, proto-B, d04, or my copy proto-R2. Ports used: 34230 (ws), 34231 (http) and 34232 (browser), nothing else. Every run ended by killing the browser tree on 34232, and a final check found no listener on 34230..34239 and no chrome.exe carrying a 3423x debug port. I did not touch the Stream Deck app, HWiNFO, the installed plugin or port 23654, and used no computer use. Viewports: 373/320 x 410 at DPR 1.5; 298/249 at DPR 1.5; 213/189/160 at DPR 3, with Change scrolled into view. READ: the app's engine is QtWebEngine 6.9.3 / Chrome 130 (review/pi-density bench notes). The lh unit that R relies on exists there, and d04 already uses 2lh. Scratch dir C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-adversarial holds the evidence:\n- verify-copy.mjs (the 37 checks, writing here; results in verify-R, verify-B, verify-R2)\n- lab-nearmiss.mjs (lab-nearmiss-R-d04.json, lab-nearmiss-R2-zoom.json)\n- lab-sweep.mjs (lab-sweep-R-1.5.json, lab-sweep-R-3.json)\n- lab-behave.mjs (lab-behave-R.json, lab-behave-R2.json)\n- lab-chip.mjs (lab-chip-R.json)\n- lab-heights.mjs\n- captures in shots-R and shots-R2\n- proto-R2, my copy with ADR01, ADR02, ADR03 and ADR05 applied",
+	"verdict": "approve with changes",
+	"summary": "R resolves most of round one, and I reproduced 37 of 37 checks (MEASURED). Two things did not hold up.\n\n**The near-miss defect is back under 300 px.**\n- Change sits on its own line 2 px under the full-width fold row.\n- At 298, 249, 213, 189 and 160 px, a press 3 to 8 px above Change folds the band. d04 does nothing at any offset (MEASURED, lab-nearmiss-R-d04.json).\n- The acceptance run's \"above\" press is 2 px, inside that 2 px gap, so the check passes on the defect.\n- PT01's own test (3 px outside each edge at 189 and 160) fails on R.\n- ADR01 is the one blocking change. It moves the row's 3 px bottom padding into a 4 px top margin on Change, which makes a 6 px dead band. Cost: +1 px. On proto-R2: presses 1 to 6 px above do nothing and 37 of 37 still pass.\n\n**Zoom height is worse than disclosed.** The stated deviation (open row 57 px, not 42) understates it. MEASURED, below 300 px:\n- R's open band is 247.6 px.\n- d04's is 216.7 px (R is +30.9).\n- B's is 216.7 px at 189 to 298 and 233.5 px at 160.\n\nThis misses VT06's test (d04 + 8) and reverses the aim of the a11y AT02 item. It is not a standing-rule breach, and the fold now gives zoom users a 47.8 px band. I rate it partly resolved and leave the call to the owner.\n\n**Other findings, all MEASURED:**\n- **Empty key, open-then-fold:** a key that was empty when its panel opened keeps an empty 16 px note line in the folded row after a reading is picked with the band open (47.1 vs 31 px). ADR02 fixes it.\n- **Empty key with an unknown stored theme:** the folded row reads '\"neon\" (unknown; draws Void)' with no note, while the key draws the black prompt. ADR03 fixes it.\n- **Late fold answer:**\n  - R's shell tweak keeps the band open when focus is in the row, on a chip, or after a pointer pick.\n  - With focus in Reading's search field, the late fold still moves that field up 80 px.\n  - With no focus, everything below the band jumps 80 px.\n  - A stronger rule (ADR05, owner's call) removes every late jump and keeps the memory.\n- **Passes, where I tried to break R:**\n  - **Stale chip:** the mini chip never went stale (globals and themes 400 ms apart in both orders, a change while open, echoes to Midnight, \"neon\" and back).\n  - **Pick stability:** 0 moves at every width from 160 to 373 at DPR 1.5 and 3, key and dial.\n  - **Chip anatomy:** all 8 folded chips pass at 373 and 160.\n  - **Accessible names:** the name equals the visible text in 12 states.\n  - **Contrast:** the word on the face is at least 12.22:1 on every palette; Paper's face on the panel is 9.98:1.\n  - **Folds:** Fold all, Open all and Alt-click include the band, and dial memory is kept per kind.\n  - **Echoes:** 10 echoes rebuild the mini 10 times and focus stays on the row.\n  - **Text spacing (WCAG 1.4.12):** no overlap.\n\n**Checks that pass on a broken build or measure the wrong thing:**\n- The zoom near-miss offsets (above).\n- \"Row at most 60 px\": the threshold is R's own value and it hides the band-level cost.\n- \"A dial keeps its own fold\" would also pass if dial folds were never applied.\n- The empty-key check never tests the open-then-pick-then-fold path.\n- Nothing tests the late answer, stale chips, Alt-click or contrast.\n- The pick check passes on B too, so it guards against regressions but does not tell R from B.\n\n**Owner's standing rules:** R keeps them (MEASURED and READ):\n- Every name is visible open.\n- Default keeps its link mark and dashed frame folded, and the scope stays.\n- The resolved theme is on screen folded (except the ADR03 corner).\n- The band stays first under the header.\n- The row is 30 px and no control changes size.\n- There is no new mode, setting, banner or animation.\n- sec-theme is 10 of 12 memory slots.\n\nThe pi-shell change alters how folds are applied on every section. build.py itself calls it the owner's call, so it needs his explicit OK before production.",
+	"round_one_blockers": [
+		{
+			"id": "VT01 (visual)",
+			"status": "resolved",
+			"evidence": "MEASURED (verify-R and lab-chip): #theme-label computes 13px / 600 / rgb(236,236,236) at x 28, identical to Reading, at 373 and 320."
+		},
+		{
+			"id": "VT03 (visual)",
+			"status": "resolved",
+			"evidence": "MEASURED (lab-chip-R.json), all 8 folded chips at 373 and 160:\n- face 24 px tall, 72 to 76.2 px wide (64 to 68.2 at 160);\n- stripe 3.5 px (Default) and 4.5 px (presets) below the baseline;\n- stripe clear of the descender line by 0.9 / 1.9 px;\n- no clipped word, chip on the title row at 160, no selection ring (READ: pi.css scopes the ring to .hw-theme[aria-checked])."
+		},
+		{
+			"id": "VT06 (visual)",
+			"status": "partly",
+			"evidence": "MEASURED, 160 to 299 px:\n- Resolved parts: the name has full width in two reserved lines and is never cut (no mid-word break at any width, lab-sweep); chips move 0 px on 8 picks at every width; the folded band is 47.8 px or less (at most 50).\n- Not met: row 1 does not hold Change (it has its own line), and the open band is 247.6 px against d04's 216.7 (+30.9) at 298, 249, 213, 189 and 160 (lab-heights). The test asked for d04 + 8 or less. The acceptance run checks only the row (60 px or less), not the band."
+		},
+		{
+			"id": "VT07 (visual)",
+			"status": "resolved",
+			"evidence": "MEASURED: 'synthwave-sunset-2027' is not clipped open or folded at 373 and 320, and its AX name contains 'draws Void'. Across the 160 to 373 sweep, no word of a known theme's line breaks mid-word."
+		},
+		{
+			"id": "BT01 (beginner)",
+			"status": "partly",
+			"evidence": "MEASURED:\n- The underline misread is fixed by VT03's anatomy: the stripe sits 3.5 to 4.5 px under the baseline and clears the descender line.\n- The chip is 24 px, not the 30 x 83 grid size BT01 specified.\n- BT01 allowed a smaller fallback only as INFERRED, so the beginner reviewer has to accept the substitution."
+		},
+		{
+			"id": "BT02 (beginner)",
+			"status": "resolved",
+			"evidence": "MEASURED (lab-behave-R):\n- A fold remembered from a configured key onto an empty key on Paper reads 'Theme Default (shared: Paper) Shows on the key once a reading is picked.' visually and as the CDP AX name. Band 47.1 px at 373, 80 px at 189 and 160, no overflow.\n- Picking a reading keeps the band folded, empties the note, and moves Reading 0 px.\n- dial-empty shows no note (31 px).\n\nFollow-ups, not blockers: ADR02 (empty held line) and ADR03 (unknown theme on an empty key; the prototype also matches help text, which BT02 asked production not to do)."
+		},
+		{
+			"id": "PT01 (power)",
+			"status": "partly",
+			"evidence": "MEASURED (lab-nearmiss-R-d04.json):\n- At 373 and 320, presses 1 to 8 px above, left and right of Change do nothing, and the row ends 13.5 px before Change.\n- Below Change, the first chip pick is at 4 px (373) or 5 px (320); on d04 it is at 1 px.\n- At 298, 249, 213, 189 and 160, presses 3 to 8 px above Change fold the band (d04: none). PT01's test at 189 and 160 therefore fails. See ADR01."
+		},
+		{
+			"id": "PT04 (power)",
+			"status": "not resolved",
+			"evidence": "READ: verify.mjs is a scratch script, not the product PI e2e suite. It lacks the late-answer check, zoom near misses beyond 2 px, a positive dial-memory check, and the stale-chip and Alt-click checks. It remains a condition on the implementation (see ADR04)."
+		},
+		{
+			"id": "AT01 (a11y)",
+			"status": "resolved",
+			"evidence": "MEASURED at 373 and 320:\n- Summary right edge 305 vs Change left 318.5 (13.5 px gap); 252 vs 265.5 at 320.\n- Presses 3 px right, 2 px below and 3 px left leave the band open.\n- Tab order: fold toolbar, row, Change, checked chip. Change still reveals Shared defaults.\n\nThe zoom near miss is tracked under PT01 and ADR01."
+		},
+		{
+			"id": "AT02 (a11y)",
+			"status": "partly",
+			"evidence": "MEASURED:\n- Resolved parts: Change is out of the row below 300 px (no box overlap), no overflow, Tab order unchanged, and the unknown theme's open row stays under 60 px at 160 only for short ids.\n- Not met: the open row is 59.8 px against the test's 42 or less (the declared deviation), and the open band grows from B's 233.5 to R's 247.6 at 160, and from 216.7 to 247.6 at 189 to 298. The item's aim was less height at zoom.\n- INFERRED: folding (47.8 px) is the practical remedy for zoom users."
+		},
+		{
+			"id": "AT01 (adversarial, round 1)",
+			"status": "partly",
+			"evidence": "MEASURED:\n- My round-one test offsets (2 px above; 2 and 5 px below; 2 and 6 px left and right) pass at every width.\n- The same defect class returns at 3 px above Change below 300 px. My 2 px 'above' offset was too narrow. Fixed on proto-R2 by ADR01."
+		},
+		{
+			"id": "AT02 (adversarial, round 1)",
+			"status": "resolved",
+			"evidence": "MEASURED: the empty-key note shows folded, visually and in the AX name. Band 47.1 px at 373 (I had estimated 46) and 80 px at 160. The note empties on the first reading with 0 px movement. Configured keys, dials and unknown themes on configured keys show no note. Corners are in ADR02 and ADR03."
+		}
+	],
+	"changes": [
+		{
+			"id": "ADR01",
+			"category": "RD",
+			"blocking": true,
+			"change": "Under 300 px, leave a 6 px dead band between the open fold row and Change. Inside the existing @media (max-width: 299px) block, in proto-R.css (and production pi.css):\n`details.hw-look-fold[open] > summary.hw-look-name { padding-bottom: 0; }`\n`details.hw-look-fold .hw-look-change { margin-top: 4px; }`\nChange's margin becomes 4px -2px 2px auto. Nothing changes at 300 px and wider.",
+			"why": "MEASURED (lab-nearmiss-R-d04.json): at 298, 249 (DPR 1.5) and 213, 189, 160 (DPR 3), a press 3, 4, 5, 6 or 8 px above Change folds the band, at Change's center and at its left edge. d04 does nothing at any of these points.\n\nThe cause: the open summary ends 2 px above Change, and its second reserved name line is usually empty. A remembered fold then carries to every panel of that kind.\n\nThe 37-check run misses it because its 'above' press is 2 px, inside the gap. PT01's own acceptance test (3 px outside each edge at 189 and 160) fails on R.",
+			"acceptance_test": "Setup: Default key, band open, Change scrolled into view; 298 and 249 at DPR 1.5, and 213, 189, 160 at DPR 3.\n1. Real mouse presses 1 to 6 px above Change, at its center and 3 px in from its left edge, leave #sec-theme open with 0 writes and scrollY unchanged.\n2. A press at Change's top + 1 px still opens Shared defaults.\n3. The open band is at most 249 px at 160.\n4. The 37 checks still pass.\n\nMEASURED on C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-adversarial\\proto-R2: offsets 1 to 6 do nothing and 8 folds at all five widths (lab-nearmiss-R2-zoom.json); band 248.6 px; 37 of 37 pass (verify-R2)."
+		},
+		{
+			"id": "ADR02",
+			"category": "RD",
+			"blocking": false,
+			"change": "Hold the empty-key note's slot only after the note has shown while the band is folded, and release it when the band opens.\n\nIn proto.js:\n- replace `if (text !== \"\") noteHeld = true; note.classList.toggle(\"shown\", noteHeld);` with `if (text !== \"\" && !details.open) noteHeld = true; if (text === \"\" && details.open) noteHeld = false; note.classList.toggle(\"shown\", text !== \"\" || noteHeld);`\n- add `details.addEventListener(\"toggle\", sync)`.\n\nIn production, put the same rule in renderThemeHelp.",
+			"why": "MEASURED (lab-behave-R, emptyOpenPickThenFold): an empty key's panel opens with the band open, a reading is picked, then the band is folded. The folded band is then 47.1 px with an empty 16.1 px line under 'Theme Default (shared: ...)', against 31 px on a configured key.\n\nThis is the ordinary first-use path, and the blank line stays for that panel's life. It breaks the one-section-row look (VT04) in the all-folded list. The acceptance run only tests the folded-then-pick path.",
+			"acceptance_test": "At 373:\n(a) key-empty, band open, a reading arrives, then fold: band 31 px and #theme-note not rendered.\n(b) key-empty with the band remembered folded, a reading arrives: the band stays folded and #sec-reading moves 0 px.\n(c) after (b), open the band and fold it again: band 31 px.\n\nMEASURED on proto-R2: (a) 31 px, (b) 0 px. I did not run (c)."
+		},
+		{
+			"id": "ADR03",
+			"category": "RD",
+			"blocking": false,
+			"change": "Show the empty-key note whenever the key has no reading, whatever theme is stored. Drive it from renderThemeHelp's own `!configured && hw.kind === \"key\"` test. Do not gate it on a checked chip (the prototype's `chip !== null`), and do not match on the help text.",
+			"why": "MEASURED (lab-behave-R, emptyUnknown; shots-R/empty-unknown-folded-373.png): on key-empty with stored theme 'neon', folded, both the row and its AX name read 'Theme \"neon\" (unknown; draws Void)'. Meanwhile the key draws the black 'Pick a sensor' prompt, and the open band's help says 'Shows on the key once a reading is picked.'\n\nFolded, the row states a palette the key does not draw. This is the owner's 'resolved theme visible, folded included' rule, in a rare state.",
+			"acceptance_test": "At 373:\n- key-empty with settings.theme 'neon', folded: #sec-theme > summary innerText and CDP AX name read 'Theme \"neon\" (unknown; draws Void) Shows on the key once a reading is picked.'\n- dial-empty and key-configured with 'neon' show no note.\n\nMEASURED on proto-R2: the first case reads exactly that."
+		},
+		{
+			"id": "ADR04",
+			"category": "MF",
+			"blocking": false,
+			"change": "Before the acceptance run feeds PT04's product suite, make it able to fail. Add or replace these checks:\n1. Near misses at offsets 1 to 6 px in four directions at 373, 320, 298, 249, 213, 189 and 160, with Change scrolled into view and DPR 3 below 240.\n2. Replace 'row at most 60 px' with open and folded band budgets measured against d04 in the same run (R: 247.6 vs 216.7 below 300 px), stated in the deviation note.\n3. A positive per-kind memory check: fold on a dial, then the next dial is folded and a key is not, and the reverse.\n4. The late fold answer: hold panelFolds 900 ms; focus is kept and no section top moves after the reveal, under the chosen rule.\n5. Empty-key paths: open, pick, then fold; and an unknown theme on an empty key.\n6. The stale chip: globals and themes payload 400 ms apart in both orders; the mini face's computed bg, value, spark and frame colors equal the checked gallery chip's.\n7. All 8 chips at 160 as well as 373.\n8. AX names for Default, explicit Paper, Paper shared, unknown, empty key and dial Ember, at 373 and 160.",
+			"why": "MEASURED: several of the 37 checks pass on a broken build or measure the wrong thing.\n- The zoom near-miss offsets sit inside the 2 px gap.\n- The zoom check tests the row, not the band.\n- 'Dial keeps its own fold' passes if dial folds are never applied.\n- The pick check passes on B too, so it tells nothing about R's changes.\n- The shell change R ships has no check at all.\n\nOn proto-B, 17 of the 37 fail, so most checks do discriminate. The gaps are exactly where ADR01 to ADR03 live.",
+			"acceptance_test": "1. The strengthened run fails on proto-R, with the zoom near miss, the ADR02 blank line and the ADR03 note all red.\n2. It passes on proto-R2.\n3. It still fails at least 17 checks on proto-B.\n4. It stops only the browser and sim processes it started."
+		},
+		{
+			"id": "ADR05",
+			"category": "MF",
+			"blocking": false,
+			"change": "Owner's call, because it changes how folds are applied on every section. It does not change how folds are kept. In pi-shell.js's panelFolds handler, once the panel is showing, a late answer never folds a section: `if (showing && !folds[section.id]) continue;`. This replaces R's `&& section.contains(document.activeElement)`. The plugin's memory is untouched, so the next panel still opens with the remembered fold.",
+			"why": "MEASURED (lab-behave-R) with panelFolds held 900 ms and the band remembered folded. R's tweak keeps the band open when focus is on the row, on a chip, or after a real pointer pick on a chip. Two cases are still unprotected:\n- With focus in Reading's search field (a combobox whose list opens on focus), the late fold moves the focused field from 257 to 177 px.\n- With no focus, Reading jumps from 200 to 120 px under the pointer.\nBefore R the first section never folded, so these 80 px late jumps are new in size.\n\nWith the stronger rule (lab-behave-R2), no section moves in any of the five cases, focus is kept, and the next panel opens folded.",
+			"acceptance_test": "Hold panelFolds 900 ms with sec-theme remembered folded. For five cases (no focus, row focused, checked chip focused, #picker-search focused, a real click on the Ember chip):\n- 1.5 s later, #sec-reading's top and the focused element's top are unchanged within 0.5 px, and activeElement is the same element.\n- The next key panel opens with the band folded.\n- With a prompt answer, the remembered fold still applies before the first visible paint (the 37-check memory tests pass).\n\nMEASURED on proto-R2: all five unchanged; next panel folded; 37 of 37."
+		}
+	],
+	"keep": [
+		"The fold row is today's theme line (B's structure) with 'Theme' styled as a section title. It is 30 px, like Reading's 30.2, and names the theme at weight 400 with the scope muted. MEASURED.",
+		"Open, the row ends 13.5 px before Change at 373 and 320: no near miss 1 to 8 px around Change folds the band. The first chip pick below Change moved from 1 px (d04) to 4 px (373) and 5 px (320). MEASURED.",
+		"The 24 px folded chip passes the anatomy test on all 8 themes at 373 and 160: stripe 3.5 to 4.5 px under the baseline, link mark and dashed frame drawn in the followed palette, no selection ring. MEASURED and READ.",
+		"The folded chip never went stale. It matched the checked gallery chip's colors and word after globals then themes 400 ms apart, themes then globals, a change made while open, and echoes to Midnight, 'neon' and back to Default. MEASURED.",
+		"Picks never move the chips: 0 moves over 214 widths (160 to 373) at DPR 1.5 and at DPR 3, key and dial, shared theme Ultraviolet. MEASURED.",
+		"Accessible names equal the visible words in 12 states (6 states at 373 and 160, open and folded), with the correct expanded state. The radiogroup is named 'Theme', and the #theme-desc description is read once now that the span is hidden. MEASURED (CDP Accessibility; WCAG 2.5.3, APG Disclosure).",
+		"The empty-key note on the remembered-fold path. It is in the row's accessible name, empties on the first reading with 0 px movement, and never appears on a dial. MEASURED.",
+		"Fold all, Open all and Alt-click include the band: Alt-click on the row, on the mini chip and on another section's title all act on every section. Memory is per kind for key and dial, and sec-theme is the 10th of 12 slots. MEASURED and READ.",
+		"Contrast: the word on the face is at least 12.22:1 on every palette, Paper's face on the panel is 9.98:1, and the Default frame on the panel is 3.26:1 (Void) and 3.09:1 (Ember). Under forced colors the palette stays, because .hw-theme-face keeps forced-color-adjust: none. MEASURED and READ.",
+		"R's focus guard on late fold answers is the right direction: the band stays open when focus is on the row, on a chip, or after a pointer pick. MEASURED."
+	],
+	"cleanup": "- **BT03 is still unresolved (READ in proto-R).** These comments still say the palette never folds:\n  - sensor-reading.html line 39 and sensor-dial.html line 35 ('The palette is the one set of controls that never folds')\n  - pi.css line 370 ('the look band: the palette, never folded')\n  - pi-model.js line 117 ('always-open band ... never folds')\n- **Review ids in comments.** proto-R.css cites review ids that collide: AT01 and AT02 exist in both a11y.json and adversarial.json, and 'AT02' labels the zoom rule and the empty-key rule. Drop review ids from production comments.\n- **State the zoom deviation fully.** The deviation note should give band heights, not only the row. Below 300 px the open band is 247.6 px, against d04's 216.7 and B's 216.7 (189 to 298) or 233.5 (160); folded is 47.8 px.\n- **Small observations, no change asked:**\n  - At 229 to 232 and 252 to 275 px, the folded row is 31 or 40.6 (or 40.6 or 47.8) px depending on the theme, so a shared-theme change from another panel moves the content below by up to 9.6 px.\n  - Below 300 px, a press 6 px under Change picks the Void chip; d04 does nothing there.\n  - Each settings echo rebuilds the mini chip once. It is harmless and goes away once production draws the chip from renderGallery.\n- **Production.** Draw the mini chip and the note from renderGallery and renderThemeHelp (round-one AT03), not a MutationObserver.\n- **The pi-shell change** in build.py applies to every section. Get the owner's explicit OK for either R's rule or ADR05.\n- **Housekeeping.** My scratch dir is C:\\Users\\stephen\\AppData\\Local\\Temp\\hw-tfa-adversarial. Every process I started is stopped, and nothing outside that dir was written."
+}

@@ -1,0 +1,14 @@
+{
+ "innerWidth": 378,
+ "innerHeight": 410,
+ "dpr": 1.5,
+ "clientWidth": 373,
+ "scrollWidth": 373,
+ "scrollHeight": 1039,
+ "headHeight": 111,
+ "headPosition": "static",
+ "pinOff": false,
+ "headThird": 0.27,
+ "horizontalOverflow": false,
+ "overflowing": []
+}

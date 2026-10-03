@@ -12,7 +12,7 @@ import { describe, it } from "node:test";
 
 import { faceFont, parseFaceFont, setFaceFont } from "../src/ui/face-font";
 import { estimateKeyTextWidth } from "../src/ui/format";
-import { renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
+import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDetailTitleKey } from "../src/ui/detail-renderer";
 import { renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type TripleKeyRow } from "../src/ui/key-renderer";
 import { applyGlobalThemeSettings, onThemeChange } from "../src/ui/theme-store";
@@ -140,6 +140,70 @@ describe("Tahoma, the default face", () => {
 		});
 		for (const label of ["COMMITTED", "AVAILABLE", "LOAD"]) assert.match(svg, new RegExp(`>${label}<`));
 		assert.doesNotMatch(svg, /…/);
+	});
+
+	it("a three-row label too long at 12 px draws whole at 11 instead of cut (the hardware photo's Core Max)", () => {
+		setFaceFont("tahoma");
+		const svg = renderTripleKey({ rows: [{ label: "CCD1", valueText: "66.9", unitText: "°C" }, { label: "CCD2", valueText: "64.1", unitText: "°C" }, { label: "Core Max", valueText: "71.4", unitText: "°C" }], palette: VOID });
+		const labels = [...svg.matchAll(/<text x="12"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/g)].map((m) => `${m[2]}@${m[1]}`);
+		// The whole label under the floor caps its peers as the floor would.
+		assert.deepEqual(labels, ["CCD1@14", "CCD2@14", "Core Max@11"]);
+	});
+
+	it("11 px only ever draws a whole three-row label, never a cut one or one that fits larger", () => {
+		setFaceFont("tahoma");
+		for (const label of ["Max", "Core", "GPU Power", "CPU Package", "Total Host Writes", "GPU Memory Junction Temperature"]) {
+			const svg = renderTripleKey({ rows: [0, 1, 2].map(() => ({ label, valueText: "71.4", unitText: "°C" })), palette: VOID });
+			for (const [, size, text] of svg.matchAll(/<text x="12"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/g)) {
+				if (size === "11") assert.equal(text, label, `${label}: 11 px draws only a whole label`);
+				if (text !== label) assert.equal(size, "12", `${label}: a cut label stays at the 12 px floor`);
+			}
+		}
+	});
+
+	it("dial titles and stats lines 1.6.0 drew whole stay whole: CPU Package Power, Needs x64 Windows, a spaced session line", () => {
+		setFaceFont("tahoma");
+		for (const title of ["CPU Package Power", "Needs x64 Windows"]) {
+			const svg = renderDial({ title, valueText: "90.8", unitText: "W", statsText: "▼ 20.0GB   ▲ 32.4GB   session", fraction: 0.5, palette: VOID, barColor: VOID.accent });
+			assert.match(svg, new RegExp(`>${title}</text>`));
+			// SVG draws the space runs as one; the line keeps its own bytes.
+			assert.match(svg, />▼ 20\.0GB {3}▲ 32\.4GB {3}session<\/text>/);
+		}
+	});
+
+	it("a single key's value keeps its 1.6.0 size while its ink stays inside the lens span", () => {
+		setFaceFont("tahoma");
+		const size = (valueText: string): number => Number(attr((renderReadingKey({ label: "Used", valueText, unitText: "", statBadge: "", palette: VOID }).match(/<text x="72" y="94"[^>]*>/) as RegExpMatchArray)[0], "font-size"));
+		assert.equal(size("98.8M"), 40, "1.6.0 drew it at 40, ink at x=11..131");
+		assert.equal(size("5462.4"), 34, "at 36 its ink would cross x=133");
+	});
+
+	it("no face writes letter-spacing, which the app's QtSvg never draws", () => {
+		for (const font of ["tahoma", "segoe-ui"] as const) {
+			setFaceFont(font);
+			const row = { label: "CPU", valueText: "56.3", unitText: "°C", statBadge: "MAX" };
+			const cell = { label: "CPU", valueText: "56.3", unitText: "°C", color: "#4CC2FF" };
+			const faces = [
+				renderReadingKey({ ...row, palette: VOID }),
+				renderDualKey({ top: row, bottom: { ...row, statBadge: "" }, palette: VOID }),
+				renderQuadKey({ cells: [cell, cell, cell, cell], labels: true, sharedBadge: "MAX", palette: VOID } as never),
+				renderDialOverview({ rows: [{ ...row, selected: true, valueColor: "#FFF" }], contextText: "session", statsText: "▼1 ▲2", palette: VOID })
+			];
+			for (const svg of faces) assert.doesNotMatch(svg, /letter-spacing/, `${font}: ${svg.slice(0, 120)}`);
+		}
+		setFaceFont("tahoma");
+	});
+
+	it("Greek and Cyrillic labels are priced at their measured widths, not the unknown-glyph rate", () => {
+		const letters = Array.from("АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюяΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψω—–");
+		for (const font of ["tahoma", "segoe-ui"] as const) {
+			setFaceFont(font);
+			for (const g of letters) assert.ok(Object.hasOwn(faceFont().advance12, g), `${font} measures ${g}`);
+		}
+		setFaceFont("tahoma");
+		// The widest Cyrillic capital ran past the 12.35 unknown rate, so a label
+		// of them could reach its value.
+		assert.ok((faceFont().advance12["Щ"] as number) > faceFont().unmapped12);
 	});
 
 	it("a two-row dial's wrapped second line ends before the value's mask", () => {

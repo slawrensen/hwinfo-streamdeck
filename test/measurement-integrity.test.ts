@@ -307,7 +307,7 @@ describe("an alert changes colors and nothing else: no severity mark, no text mo
 
 		it(`${level}: an alerting overview row's label starts at the same x as the calm row under it`, () => {
 			const svg = dial("overview", level);
-			const labelXs = [...svg.matchAll(/<text x="([0-9.]+)" y="[0-9.]+" text-anchor="start" [^>]*letter-spacing="0\.4"/g)].map((m) => m[1]);
+			const labelXs = [...svg.matchAll(/<text x="([0-9.]+)" y="[0-9.]+" text-anchor="start" [^>]*>[^<]*<\/text><rect /g)].map((m) => m[1]);
 			assert.deepEqual(labelXs, ["12", "12"], "one label per row, both on the shared left edge");
 			assert.match(svg, new RegExp(`fill="${alertValueColor(config, level, config.themes.void!.bg)}">40\\.0</text>`), "the alerting row still takes the alert value color");
 			assert.equal(geometryOf(svg), geometryOf(dial("overview", "normal")), "the alerting row keeps the calm row's label fit, mask and columns");

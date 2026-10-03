@@ -309,7 +309,14 @@ fixes in one release.
   unknown name, so it drew Tahoma while every layout was measured for the
   narrower Segoe UI: on hardware a three-row label could run into its
   value and a long status line off the key. Labels now shorten or step
-  down a size instead, and titles keep their 1.6.0 sizes.
+  down a size instead, and titles keep their 1.6.0 sizes. Text keeps the
+  room 1.6.0 gave it where nothing collided: a three-row label too long
+  for 12 px shows whole at 11 instead of cut ("Core Max"), dial titles
+  such as "CPU Package Power" and session lines show whole again, and
+  Greek and Cyrillic labels are measured too.
+- Faces no longer ask for letter spacing, which the Stream Deck app never
+  draws, so the settings panel preview and the docs images now match the
+  keys and dials.
 - New **Text font** setting under Advanced, Shared defaults: Tahoma (the
   default) or Segoe UI, the font of Windows and the settings panel,
   lighter and narrower, so long labels fit more often. It applies to every

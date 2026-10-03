@@ -100,6 +100,11 @@ export function ringValueFontSize(text: string): number {
  * sizes only ever grow (the issue #3 ask), never shrink an existing
  * profile's label. */
 const LABEL_BUDGET = 120;
+/** The single key's value stands alone, centered, so it is budgeted by its
+ * ink: Tahoma's bold side bearings sit inside the advance. "98.8M" prices
+ * 124.8 at 40 px and draws ink at x=11..131, as 1.6.0 drew it; 125 keeps
+ * every drawn value inside the x=10..133 lens span. */
+const SINGLE_VALUE_BUDGET = 125;
 const LABEL_SIZES = [20, 18, 16] as const;
 /** The band a title or label row may spend: Tahoma keeps the 132 px its
  * 1.6.0 titles drew in, Segoe UI the 120 px lens band. */
@@ -346,7 +351,7 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		// its full band — a stat must never cost title width.
 		parts.push(...sharedBadgeSvg(statBadge, palette, text.badge, BADGE_GAP_Y, BADGE_TEXT_Y));
 	}
-	parts.push(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${ring ? ringValueFontSize(valueText) : capValueSize(valueText, valueFontSize(valueText), LABEL_BUDGET, 20)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
+	parts.push(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${ring ? ringValueFontSize(valueText) : capValueSize(valueText, valueFontSize(valueText), SINGLE_VALUE_BUDGET, 20)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
 	if (unitText !== "") {
 		// Baseline 114/18: worst-case spark/bar ink starts at y=120 (the spark
 		// span is inset for its stroke), so the corridor is optically balanced
@@ -409,7 +414,7 @@ const DUAL_BADGE_GAP = { x: 47, y: 63, w: 50, h: 14 } as const;
 function sharedBadgeSvg(badge: string, palette: Palette, badgeColor: string, gapY: number = DUAL_BADGE_GAP.y, textY = 76): [string, string] {
 	return [
 		`<rect x="${DUAL_BADGE_GAP.x}" y="${gapY}" width="${DUAL_BADGE_GAP.w}" height="${DUAL_BADGE_GAP.h}" fill="${palette.bg}"/>`,
-		`<text x="72" y="${textY}" text-anchor="middle" font-family="${fontFamily()}" font-size="12" font-weight="700" letter-spacing="0.5" fill="${badgeColor}">${escapeXml(badge.toUpperCase())}</text>`
+		`<text x="72" y="${textY}" text-anchor="middle" font-family="${fontFamily()}" font-size="12" font-weight="700" fill="${badgeColor}">${escapeXml(badge.toUpperCase())}</text>`
 	];
 }
 
@@ -487,7 +492,7 @@ export function renderDualKey(opts: DualKeyOptions): string {
 		const valueY = DUAL.valueY + i * DUAL.rowPitch;
 		const badge = row.statBadge.toUpperCase();
 		const label = fitTextLadder(row.label, labelBand() - (badge === "" ? 0 : rowBadgeWidth(badge)), i === 0 ? DUAL_LABEL_SIZES_TOP : DUAL_LABEL_SIZES);
-		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" letter-spacing="0.5" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
+		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
 		// One middle-anchored chunk: the label and its badge center as a unit.
 		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
 		const valueText = truncateLabel(row.valueText, DUAL_VALUE_MAX);
@@ -562,6 +567,15 @@ const TRIPLE_LABEL_SPREAD = 2;
 const TRIPLE_CHUNK_MAX = 84;
 /** Optical gap between a fitted label and its row's value chunk. */
 const TRIPLE_LABEL_GAP = 8;
+/** Tahoma's gap: its advances are measured through the app's own QtSvg, so
+ * the gap is ink rather than estimate slack (the narrowest drawn gap in the
+ * face census is 6 px). The Segoe UI option keeps the wider gap and its
+ * slack, since its estimate credits side bearings. */
+const TRIPLE_LABEL_GAP_TAHOMA = 5;
+/** Whole one step under the ladder's floor beats cut at it: beside "71.4 °C"
+ * "Core Max" draws whole at 11 px where 12 px ellipsizes it to "Core…".
+ * Tahoma only, and only when no ladder size fits the label whole. */
+const TRIPLE_LABEL_WHOLE_MIN = 11;
 /** No label renders below this budget: a lone ellipsis is noise, and the
  * band reads cleaner as value-only. */
 const TRIPLE_LABEL_MIN_BUDGET = 16;
@@ -643,11 +657,16 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 			return null;
 		}
 		const chunkWidth = tripleChunkWidth(row, valueSize);
-		const labelBudget = TRIPLE.rowWidth - chunkWidth - TRIPLE_LABEL_GAP;
+		const tahoma = isTahoma();
+		const labelBudget = TRIPLE.rowWidth - chunkWidth - (tahoma ? TRIPLE_LABEL_GAP_TAHOMA : TRIPLE_LABEL_GAP);
 		if (labelBudget < TRIPLE_LABEL_MIN_BUDGET) {
 			return { chunkWidth, label: null };
 		}
-		const label = fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, { minimumSlack: 2 });
+		const slack = tahoma ? 0 : 2;
+		let label = fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, { minimumSlack: slack });
+		if (tahoma && label.text !== row.label && estimateKeyTextWidth(row.label, TRIPLE_LABEL_WHOLE_MIN) <= labelBudget) {
+			label = { text: row.label, fontSize: TRIPLE_LABEL_WHOLE_MIN };
+		}
 		return { chunkWidth, label: label.text === "" || label.text === "…" ? null : label };
 	});
 	const minLabelSize = Math.min(...fitted.map((f) => (f !== null && f.label !== null ? f.label.fontSize : Number.POSITIVE_INFINITY)));
@@ -661,8 +680,9 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 		const fit = fitted[i] as { chunkWidth: number; label: FittedText | null };
 		if (fit.label !== null) {
 			// A size already fitted only shrinks under the cap, never grows,
-			// so the fitted text stays valid at the capped size.
-			const size = Math.min(fit.label.fontSize, minLabelSize + TRIPLE_LABEL_SPREAD);
+			// so the fitted text stays valid at the capped size. A whole label
+			// under the floor caps its peers as the floor would, no lower.
+			const size = Math.min(fit.label.fontSize, Math.max(minLabelSize, TRIPLE_LABEL_SIZES[TRIPLE_LABEL_SIZES.length - 1] as number) + TRIPLE_LABEL_SPREAD);
 			parts.push(
 				`<text x="${TRIPLE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${size}" font-weight="600" fill="${text.label}">${escapeXml(fit.label.text)}</text>`,
 				`<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
@@ -802,10 +822,12 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 			const micro = Array.from(cell.label.trim().toUpperCase()).slice(0, QUAD_LABEL_MAX).join("").trimEnd();
 			if (micro !== "") {
 				// The 4-code-point cut above keeps the identity budget; the fit
-				// only picks the size (four bold W's price 48.2, inside 50 —
-				// any slack here would push WWWW into an ellipsis).
-				const fit = fitTextLadder(micro, QUAD_LABEL_BUDGET, QUAD_LABEL_SIZES, { fontWeight: 700, letterSpacing: 0.5 });
-				parts.push(`<text x="${cx}" y="${top + 20}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="700" letter-spacing="0.5" fill="${cell.color}">${escapeXml(fit.text)}</text>`);
+				// only picks the size (four bold Tahoma W's price 49.4 at 12,
+				// inside 50; any slack here would push WWWW into an ellipsis).
+				// No letter-spacing: the app's QtSvg draws none, so it is
+				// neither priced nor written.
+				const fit = fitTextLadder(micro, QUAD_LABEL_BUDGET, QUAD_LABEL_SIZES, { fontWeight: 700 });
+				parts.push(`<text x="${cx}" y="${top + 20}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="700" fill="${cell.color}">${escapeXml(fit.text)}</text>`);
 			}
 		}
 		parts.push(`<text x="${cx}" y="${top + (labeled ? 45 : 40)}" text-anchor="middle" font-family="${fontFamily()}" font-size="${quadValueFontSize(valueText, labeled)}" font-weight="700" fill="${labeled ? text.value : cell.color}">${escapeXml(valueText)}</text>`);

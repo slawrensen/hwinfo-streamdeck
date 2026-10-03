@@ -411,7 +411,13 @@ describe("dense tile goldens", () => {
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(asOf160(svg, 4, 0)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		// October 2026 (1.7): the app's QtSvg draws no letter-spacing, so the
+		// four micro-labels and the badge no longer write their +0.5; exactly
+		// those five sites go back here.
+		assert.doesNotMatch(svg, /letter-spacing/);
+		const tracked = /(<text x="[0-9]+" y="(?:20|92|76)" text-anchor="middle" [^>]*font-weight="700")( fill="#[0-9A-Fa-f]{6}">[A-Z]{1,4}<)/g;
+		assert.equal(svg.match(tracked)?.length, 5);
+		assert.equal(golden(asOf160(svg.replace(tracked, '$1 letter-spacing="0.5"$2'), 4, 0)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

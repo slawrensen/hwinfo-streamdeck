@@ -61,7 +61,7 @@ Off by default, and only on Elite and Custom: the **Touch zones** select appears
 
 Pause and pin survive page switches and profile changes for up to 30 minutes off screen (the plugin parks the state of the 64 most recently hidden dials; past either bound a returning dial starts fresh). They also reset when the Stream Deck app restarts.
 
-![Three dial faces rendered by the plugin: CPU Temp with "pinned" in place of "session" on its stats line, Pump with its "cycle paused" tag cut to "cycle pau…" there, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds.]({{ '/assets/img/dial-states.png' | relative_url }})
+![Three dial faces rendered by the plugin: CPU Temp with "pinned" in place of "session" on its stats line, Pump with "cycle paused" in its place, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds.]({{ '/assets/img/dial-states.png' | relative_url }})
 
 ## Session stats are per reading
 

@@ -168,12 +168,12 @@ describe("label fitting and badge collision", () => {
 		assert.ok(svg.indexOf(label) < gap && gap < svg.indexOf(">AVG<"), "gap must draw after the label and before the badge");
 	});
 
-	it("badge is 12/700 CAPS centered at x=72 y=48, accent fill, +0.5 tracking", () => {
+	it("badge is 12/700 CAPS centered at x=72 y=48, accent fill, no tracking (the app's QtSvg draws none)", () => {
 		const svg = render({ statBadge: "min" });
 		const badge = textElement(svg, "MIN");
 		assert.match(badge, /x="72" y="48" text-anchor="middle"/);
 		assert.match(badge, /font-size="12" font-weight="700"/);
-		assert.match(badge, /letter-spacing="0.5"/);
+		assert.doesNotMatch(badge, /letter-spacing/);
 		assert.match(badge, new RegExp(`fill="${VOID.accent}"`));
 	});
 });
@@ -619,7 +619,7 @@ describe("dual labels and badges", () => {
 		const svg = renderDual({ sharedBadge: "min" });
 		const divider = svg.indexOf(`<rect x="12" y="71" width="120" height="2" fill="${VOID.track}"/>`);
 		const gap = svg.indexOf(`<rect x="47" y="63" width="50" height="14" fill="${VOID.bg}"/>`);
-		const badge = svg.match(new RegExp(`<text x="72" y="76" text-anchor="middle" [^>]*font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">MIN</text>`));
+		const badge = svg.match(new RegExp(`<text x="72" y="76" text-anchor="middle" [^>]*font-size="12" font-weight="700" fill="${VOID.accent}">MIN</text>`));
 		assert.ok(divider !== -1, "divider missing");
 		assert.ok(gap !== -1, "divider gap missing");
 		assert.ok(badge !== null, "centered badge missing");
@@ -634,7 +634,7 @@ describe("dual labels and badges", () => {
 
 	it("a row's own badge rides on its label line after the label; the value keeps full size and center", () => {
 		const svg = renderDual({ bottom: dualRow({ label: "GPU Temp", valueText: "48.2", statBadge: "max" }) });
-		assert.match(svg, new RegExp(`<text x="72" y="94" text-anchor="middle" [^>]*font-weight="600" fill="${VOID.label}">GPU Temp<tspan font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">\u2002MAX</tspan></text>`));
+		assert.match(svg, new RegExp(`<text x="72" y="94" text-anchor="middle" [^>]*font-weight="600" fill="${VOID.label}">GPU Temp<tspan font-size="12" font-weight="700" fill="${VOID.accent}">\u2002MAX</tspan></text>`));
 		assert.match(svg, new RegExp(`<text x="72" y="128" [^>]*font-size="32" font-weight="700" fill="${VOID.value}">48\\.2<tspan font-size="14" font-weight="600" fill="${VOID.unit}">\u2002°C</tspan></text>`));
 		assert.doesNotMatch(svg, /<rect x="47"/); // the divider stays whole
 		assert.doesNotMatch(svg, /x="132"/); // nothing end-anchored into the corner
@@ -741,8 +741,8 @@ describe("quad layout geometry (2x2 cells behind a hairline cross)", () => {
 describe("quad micro-label variant", () => {
 	it("14/700 slot-colored micro-labels at top+20, values 24/700 in the theme value color at top+45, units at top+61", () => {
 		const svg = renderQuad({ labels: true });
-		assert.match(svg, /<text x="36" y="20" text-anchor="middle" [^>]*font-size="14" font-weight="700" letter-spacing="0.5" fill="#4CC2FF">CPU<\/text>/);
-		assert.match(svg, /<text x="36" y="92" text-anchor="middle" [^>]*font-size="14" font-weight="700" letter-spacing="0.5" fill="#38CD89">PUMP<\/text>/);
+		assert.match(svg, /<text x="36" y="20" text-anchor="middle" [^>]*font-size="14" font-weight="700" fill="#4CC2FF">CPU<\/text>/);
+		assert.match(svg, /<text x="36" y="92" text-anchor="middle" [^>]*font-size="14" font-weight="700" fill="#38CD89">PUMP<\/text>/);
 		assert.match(svg, new RegExp(`<text x="36" y="45" text-anchor="middle" [^>]*font-size="24" font-weight="700" fill="${VOID.value}">56\\.3</text>`));
 		assert.match(svg, new RegExp(`<text x="108" y="117" text-anchor="middle" [^>]*font-size="24" font-weight="700" fill="${VOID.value}">142</text>`));
 		assert.match(svg, new RegExp(`<text x="36" y="61" text-anchor="middle" [^>]*font-size="14" font-weight="600" fill="${VOID.unit}">°C</text>`));
@@ -750,7 +750,7 @@ describe("quad micro-label variant", () => {
 
 	it("four wide caps drop back to the old 12px so they clear the lens crop", () => {
 		const svg = renderQuad({ labels: true, cells: [quadCell({ label: "WWWW" }), null, null, null] });
-		assert.match(svg, /<text x="36" y="20" text-anchor="middle" [^>]*font-size="12" font-weight="700" letter-spacing="0.5"[^>]*>WWWW<\/text>/);
+		assert.match(svg, /<text x="36" y="20" text-anchor="middle" [^>]*font-size="12" font-weight="700"[^>]*>WWWW<\/text>/);
 	});
 
 	it("micro-labels uppercase and hard-cut to 4 code points, no ellipsis", () => {
@@ -773,7 +773,7 @@ describe("quad shared badge (the dual gap idiom at the cross intersection)", () 
 		const svg = renderQuad({ sharedBadge: "min" });
 		const cross = svg.indexOf(`<rect x="71" y="12" width="2" height="120" fill="${VOID.track}"/>`);
 		const gap = svg.indexOf(`<rect x="47" y="63" width="50" height="14" fill="${VOID.bg}"/>`);
-		const badge = svg.match(new RegExp(`<text x="72" y="76" text-anchor="middle" [^>]*font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">MIN</text>`));
+		const badge = svg.match(new RegExp(`<text x="72" y="76" text-anchor="middle" [^>]*font-size="12" font-weight="700" fill="${VOID.accent}">MIN</text>`));
 		assert.ok(cross !== -1, "cross missing");
 		assert.ok(gap !== -1, "cross gap missing");
 		assert.ok(badge !== null, "centered badge missing");
@@ -1036,7 +1036,7 @@ describe("triple shared badge (the dual gap idiom on the first separator)", () =
 		const svg = renderTriple({ sharedBadge: "max" });
 		const separator = svg.indexOf(`<rect x="12" y="47" width="120" height="2" fill="${VOID.track}"/>`);
 		const gap = svg.indexOf(`<rect x="47" y="39" width="50" height="14" fill="${VOID.bg}"/>`);
-		const badge = svg.match(new RegExp(`<text x="72" y="52" text-anchor="middle" [^>]*font-size="12" font-weight="700" letter-spacing="0.5" fill="${VOID.accent}">MAX</text>`));
+		const badge = svg.match(new RegExp(`<text x="72" y="52" text-anchor="middle" [^>]*font-size="12" font-weight="700" fill="${VOID.accent}">MAX</text>`));
 		assert.ok(separator !== -1, "first separator missing");
 		assert.ok(gap !== -1, "separator gap missing");
 		assert.ok(badge !== null, "centered badge missing");

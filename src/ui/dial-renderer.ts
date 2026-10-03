@@ -18,6 +18,10 @@ import type { Palette } from "./themes";
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
 /** 18 px/600 runs ~10 px per glyph; 17 chars keeps clear of the right edge. */
 const TITLE_MAX = 17;
+/** Tahoma titles may run to x=196: 1.6.0 drew "CPU Package Power" with ink
+ * to x=192 on the device, and 184 keeps every measured title 4 px clear of
+ * the segment edge. */
+const TAHOMA_TITLE_BUDGET = 184;
 /** The smallest value tier fits ~19 glyphs; longer text ellipsizes. */
 const VALUE_MAX = 19;
 
@@ -224,18 +228,17 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 			parts.push(`<rect x="0" y="${bandTop}" width="4" height="${g.bandH}" rx="2" fill="${palette.accent}"/>`);
 		}
 		// The label fills to ITS OWN row's value, not the widest row's, and
-		// ellipsizes only when genuinely longer (~6% held back for the 0.4
-		// letter-spacing the estimator does not model). Painting order is
-		// the real guarantee: the mask and the value draw after the label,
-		// so a hot estimate ends up under the value, never over it.
+		// ellipsizes only when genuinely longer. Painting order is the real
+		// guarantee: the mask and the value draw after the label, so a hot
+		// estimate ends up under the value, never over it.
 		const labelRight = valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
-		// Tahoma prices the label's own 0.4 letter-spacing with its measured
-		// table instead of holding back a flat 6 %.
-		const label = isTahoma()
-			? fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { letterSpacing: 0.4 }).text
-			: fitFooter(row.label.toUpperCase(), Math.max(0, (labelRight - WIDE.labelX) * 0.94));
+		// Both fonts price the label on their measured tables, with no
+		// letter-spacing: the app's QtSvg draws none (measured even at 3 px),
+		// so writing it only made previews wider than the device. Segoe UI's
+		// estimate credits side bearings, so it keeps 2 px of slack.
+		const label = fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { minimumSlack: isTahoma() ? 0 : 2 }).text;
 		parts.push(
-			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" letter-spacing="0.4" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
+			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
 			// Bg-colored insurance between the label run and this row's value:
 			// invisible (rows sit on plain bg), and renderer-proof where the
 			// label estimate ran hot (clipPath is unproven on this engine).
@@ -448,18 +451,27 @@ function tahomaDialValueSize(value: string, unit: string): 34 | 24 | 17 {
 	return 17;
 }
 
+/** Tahoma: the stats line priced as drawn. SVG draws each run of spaces as
+ * one, so "▼ 20.0GB   ▲ 32.4GB   session" fits whole; the text keeps its own
+ * bytes unless it has to be cut. */
+function tahomaStatsLine(stats: string): string {
+	const drawn = stats.replace(/\s+/g, " ").trim();
+	const fitted = fitFooter(drawn, 182);
+	return fitted === drawn ? stats : fitted;
+}
+
 export function renderDial(opts: DialRenderOptions): string {
 	const { palette, barColor } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const parts: string[] = [
 		...svgOpen(200, 100, palette.bg),
-		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitTextLadder(opts.title, 176, [18]).text : truncateLabel(opts.title, TITLE_MAX))}</text>`
+		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitTextLadder(opts.title, TAHOMA_TITLE_BUDGET, [18]).text : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
 	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${inlineGap(17)}${escapeXml(opts.unitText)}</tspan>` : "";
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
 	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${isTahoma() ? tahomaDialValueSize(valueText, opts.unitText) : valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
-		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? fitFooter(opts.statsText, 182) : opts.statsText)}</text>`);
+		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? tahomaStatsLine(opts.statsText) : opts.statsText)}</text>`);
 	}
 	parts.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" fill="${palette.track}"/>`);
 	for (const zone of opts.zones ?? []) {

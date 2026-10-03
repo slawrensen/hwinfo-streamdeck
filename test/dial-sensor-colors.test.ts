@@ -196,8 +196,15 @@ const asOf160 = (key: string, drawn: string): string => {
 	// space inside its tspan now; put the 1.6.0 dx back, exactly one site.
 	// The device font fix (1.7): one family name, since the app's QtSvg read
 	// the old list as one name and drew Tahoma; put the list back.
+	// The device tracking fix (1.7): the app's QtSvg draws no letter-spacing,
+	// so the overview labels no longer write it; put it back on each label
+	// (the start-anchored text its row's bg mask follows).
 	assert.ok(!drawn.includes('font-family="Segoe UI, Arial, sans-serif"'), `${key}: the 1.6.0 family list cannot still be drawn`);
-	const svg = beforeInlineGap(drawn, view === "single" ? 1 : 0).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
+	assert.ok(!drawn.includes("letter-spacing"), `${key}: tracking the device never drew cannot still be written`);
+	const tracked = beforeInlineGap(drawn, view === "single" ? 1 : 0).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
+	const labelSite = /(<text x="12" y="[0-9.]+" text-anchor="start" [^>]*font-size="12" font-weight="600")( fill="#[0-9A-Fa-f]{6}">[^<]*<\/text><rect )/g;
+	const svg = view === "overview" ? tracked.replace(labelSite, '$1 letter-spacing="0.4"$2') : tracked;
+	if (view === "overview") assert.equal(tracked.match(labelSite)?.length, 3, `${key}: one tracked label per overview row`);
 	const roles = ROLES[view] as Record<string, RegExp>;
 	const moved = SINCE_1_6_0[key] ?? {};
 	const claimed = Object.values(roles).reduce((n, re) => n + roleFills(svg, re).length, 0);

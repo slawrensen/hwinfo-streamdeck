@@ -848,7 +848,8 @@ async function finish() {
 
 	// Dense tiles (readings per tile). Every asserted face is CONSTANT by
 	// construction (the fake's fan, volt and core readings never move).
-	const microLabelsOf = (svg) => (typeof svg === "string" ? [...svg.matchAll(/letter-spacing="0\.5" fill="#[0-9A-Fa-f]{6}">([^<]*)</g)].map((m) => m[1]) : []);
+	// A quad micro-label: the 700-weight text centered over a cell's top line.
+	const microLabelsOf = (svg) => (typeof svg === "string" ? [...svg.matchAll(/<text x="(?:36|108)" y="(?:20|92)" text-anchor="middle" [^>]*font-weight="700" fill="#[0-9A-Fa-f]{6}">([^<]*)</g)].map((m) => m[1]) : []);
 	check(
 		"the opener itself renders as a quad key (multi-reading opener)",
 		typeof results.den2OpenerFace === "string" && results.den2OpenerFace.includes('<rect x="71" y="12" width="2" height="120"'),

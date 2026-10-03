@@ -7,7 +7,7 @@
 			"file": "dial-reading-colors-1.7.png",
 			"width": 1340,
 			"height": 884,
-			"sha256": "e2cb5659a2e5a7113b8a5b9914e78378aa100fa07dddf26909b83632b0f45659",
+			"sha256": "b63a4a9104cca5788b596612e7725d5e11f49913b2690137218bb76eb7938ecf",
 			"kind": "production-renderer board",
 			"source": "src/actions/sensor-dial.ts: composeDialSvg",
 			"sampleData": true,
@@ -94,7 +94,7 @@
 							2850
 						]
 					},
-					"svgSha256": "284b3a54852b43e1c6772ae42163cbcd65cc6d84d01659717b1de1e083568af0"
+					"svgSha256": "4e542e7e987c2da50df1c45ea5aaaf71c90be7c61f54b7e96a37eb2028488eea"
 				},
 				{
 					"view": "overview",
@@ -180,7 +180,7 @@
 							2850
 						]
 					},
-					"svgSha256": "6906e5f1c738da30da20280fdba8e7a23964459c13f04df9774d116d5ffc7171"
+					"svgSha256": "2bce8d5d5dd340535e4ffcbd90ed98e50e480d2127e22bc90939d33d1e6aeb0a"
 				},
 				{
 					"view": "tworow",

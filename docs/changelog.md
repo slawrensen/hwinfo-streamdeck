@@ -50,7 +50,7 @@ fixes in one release.
   drops that line and keeps its longer explanations behind a How …
   works link. A default key's panel measures more than a quarter
   shorter than the first 1.7 draft's, which never shipped (1,042 to 753
-  CSS px on the simulated test host, review/pi-density). Fields and buttons share
+  CSS px on the simulated test host). Fields and buttons share
   one height (28 px), every theme chip carries its name, and small
   marks (checkboxes, group radios, text actions) take at least a 24 px
   target.

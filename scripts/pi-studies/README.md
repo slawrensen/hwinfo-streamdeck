@@ -1,7 +1,7 @@
 # Property-inspector layout studies (not shipped)
 
 Three bounded studies of the same real panel, used once to choose the
-redesign's direction (see review/pi-essentials/README.md, "Layout studies").
+redesign's direction.
 They are injected into the shipped `sensor-reading.html` / `sensor-dial.html`
 by the lab on the simulated host; nothing here is copied into the plugin
 package, and the plugin never references this folder.

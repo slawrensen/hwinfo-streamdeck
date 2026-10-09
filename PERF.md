@@ -50,9 +50,8 @@ once per sensor tree and filtered in place by toggling `hidden`, and
 groups off screen skip layout (`content-visibility: auto` with a
 per-group size estimate). The target was p95 ≤ 100 ms per query; the
 worst open (building 5,000 rows) is 62.6 ms. With no settings panel
-visible the plugin builds no preview at all. Raw samples:
-`review/pi-essentials/perf/picker-main-2ca44e9.json` and
-`picker-candidate.json`.
+visible the plugin builds no preview at all. I keep the raw samples
+with my private review records.
 
 ### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
 

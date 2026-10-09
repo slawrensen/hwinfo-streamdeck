@@ -3,7 +3,7 @@
    One small token set (surfaces, text, borders, spacing, focus, selection,
    status) on the Stream Deck app's own dark page. Text tokens clear WCAG AA
    on the surfaces they sit on (4.5:1 for text, 3:1 for field edges and the
-   focus ring; see review/pi-essentials for the measured ratios). The panel
+   focus ring). The panel
    chrome never touches what a key or dial draws: themes, custom colors and
    dimming belong to the device faces and are shown here only as those
    faces, unchanged. */

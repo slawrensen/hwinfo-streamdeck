@@ -1004,8 +1004,8 @@ try {
 	check("T5: focus stays on Later and the moved reading stays selected at its new place", focusAfterMove.tool === "later" && focusAfterMove.selected === orderBefore[0] && focusAfterMove.pos === "2", JSON.stringify(focusAfterMove));
 	check("T5: the move is said once, with the new place", /, 2 of 3$/.test(await b.evaluate(`[...document.querySelectorAll('body > .hw-sr-only[role="status"]')].pop()?.textContent ?? ""`)));
 	check("T5: moving never changed the reading on the dial", w?.readingKey === sim.settings.readingKey && w?.readingKey === orderBefore[0], JSON.stringify(w?.readingKey));
-	const mark = await b.evaluate(`(() => { const c = document.querySelectorAll("#rotation-set .hw-set-chip.current"); return { current: c.length, chips: document.querySelectorAll("#rotation-set .hw-set-chip").length, drawn: c[0]?.querySelectorAll(".hw-chip-badge").length ?? -1, spoken: c[0]?.querySelector(".hw-sr-only")?.textContent ?? null }; })()`);
-	check("T5: the reading on the dial is one filled member, heard as on dial and drawn without a badge", mark.current === 1 && mark.chips === 3 && mark.drawn === 0 && mark.spoken === " on dial", JSON.stringify(mark));
+	const mark = await b.evaluate(`(() => { const c = document.querySelectorAll("#rotation-set .hw-set-chip.current"); return { current: c.length, chips: document.querySelectorAll("#rotation-set .hw-set-chip").length, badges: c[0]?.querySelectorAll(".hw-chip-badge").length ?? -1 }; })()`);
+	check("T5: the reading on the dial is one highlighted member, with no badge", mark.current === 1 && mark.chips === 3 && mark.badges === 0, JSON.stringify(mark));
 	// The owner's report (2026-10-10): the drawn badge widened the chip it sat
 	// on, so the list rewrapped and the panel jumped each time the dial moved
 	// on. Every member's size holds wherever the mark goes.

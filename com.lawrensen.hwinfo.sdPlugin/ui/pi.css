@@ -1258,7 +1258,7 @@ body[data-kind="control"] > .hw-lede {
 
 /* The reading on the dial right now: a fill, which never changes the
    chip's size, so the list never rewraps as the dial moves on. The header
-   above names the reading in words; a screen reader hears "on dial". */
+   above names the reading in words. */
 .hw-set-chip.current {
 	background: var(--hw-select-bg);
 	border-color: var(--hw-select-bg);

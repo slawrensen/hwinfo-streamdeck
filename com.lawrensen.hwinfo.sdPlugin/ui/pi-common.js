@@ -15,7 +15,7 @@
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.0.0-d26";
+	const PI_BUILD = "1.7.0.0-d27";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -375,7 +375,7 @@
 	// ONE toolbar (Earlier, Later, Rename, Remove) that acts on the selected
 	// member (W3C APG rearrangeable listbox: the options hold no controls of
 	// their own). The selection is the editor's own, panel-local and never
-	// written; the reading on the dial now is a separate mark ("on dial"),
+	// written; the reading on the dial now is a separate mark (a fill),
 	// and membership is the checklist's ticks. Selecting a member never
 	// changes what is on the dial.
 	let rotationSel = null; // { key, group: number | null }
@@ -510,9 +510,9 @@
 		const option = document.createElement("div");
 		option.setAttribute("role", "option");
 		option.id = `rot-${groupIndex === null ? "f" : groupIndex}-${index}`;
-		// "current" paints the reading on the dial right now (a fill AND an
-		// "on dial" badge, never color alone), so the open panel shows where
-		// rotation (and a group jump) landed.
+		// "current" paints the reading on the dial right now, so the open
+		// panel shows where rotation (and a group jump) landed. The mark never
+		// changes the chip's size.
 		option.className = "hw-set-chip" + (missing ? " missing" : "") + (current ? " current" : "");
 		option.dataset.key = key;
 		if (groupIndex !== null) option.dataset.group = String(groupIndex);
@@ -522,7 +522,7 @@
 		option.setAttribute("aria-setsize", String(count));
 		const tag = twinTagOf(key, rotationScope(), rotationNameOf);
 		const from = tag === null ? "" : ` (${sourceNameOf(key)})`;
-		option.title = missing ? MISSING_TITLE : custom !== undefined && label !== null ? `${label}${from}, shown on the dial as ${custom}` : `${label ?? key}${from}`;
+		option.title = missing ? MISSING_TITLE : (custom !== undefined && label !== null ? `${label}${from}, shown on the dial as ${custom}` : `${label ?? key}${from}`) + (current ? "; on the dial now" : "");
 		const name = document.createElement("span");
 		name.className = "hw-set-name" + (custom !== undefined ? " renamed" : "");
 		name.textContent = custom ?? label ?? key;
@@ -537,10 +537,13 @@
 			option.append(spoken);
 		}
 		if (current) {
-			const badge = document.createElement("span");
-			badge.className = "hw-chip-badge";
-			badge.textContent = "on dial";
-			option.append(badge);
+			// Spoken, never drawn: a drawn word widened this one chip, so the
+			// list rewrapped and the panel jumped each time the dial moved on.
+			// The header above names the reading in words.
+			const spoken = document.createElement("span");
+			spoken.className = "hw-sr-only";
+			spoken.textContent = " on dial";
+			option.append(spoken);
 		}
 		if (missing) option.append(missingPill());
 		return option;

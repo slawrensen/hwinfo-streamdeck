@@ -2,14 +2,14 @@
 	"command": "node scripts/capture-pi-reading-colors.mjs",
 	"kind": "Real property-inspector screenshot",
 	"note": "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to the Display section. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.",
-	"captureTime": "2026-10-10T03:45:28.083Z",
+	"captureTime": "2026-10-10T19:53:15.088Z",
 	"panelSha256": "eea38f4a9e20cf4247c4753adf85ed8e33b8bb52f347c0a98ec77f32a7ccd317",
 	"file": "pi-dial-reading-colors-1.7.png",
-	"sha256": "1a1d10488bfaa93e0189b6c4b446f2b94b1c78e107bb880fb5297297621c66fd",
+	"sha256": "50d578a9cc1cad572be408ec5aedb744ef37c694599b7a476158af9822000097",
 	"width": 800,
 	"height": 1360,
 	"evidence": {
-		"build": "1.7.0.0-d26",
+		"build": "1.7.0.0-d27",
 		"rows": [
 			{
 				"key": "f0000501:0:1000000",
@@ -75,14 +75,14 @@
 			"textMode": "theme",
 			"source": "shared-memory"
 		},
-		"liveDialSha256": "c6beb7a1fbc4d2c442fb5754d141b8170e300ddabe72d4c955379e9e31adfd48"
+		"liveDialSha256": "c5730a1381cd6f838f30d6c337e613779b54dc0f8cac36874dfb3347b686a4dd"
 	},
 	"sourceSha256": {
-		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "68f2160001230e9e3e0157d6e10f459a773c2d4b0e64066ebd284572da6fda8c",
+		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "1c9ad75e7eab81fe334aabc8180335c4f0b4a8639e5cc5c51786cbc89cc27178",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js": "ac94d3075a394e16de6142410d63603aab51c3fd4548444551d625b6c0e82156",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi-shell.js": "1cdbd26576a0ec8f2b677779753f4578106e8f05efb9b962e9184aba51078c50",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "b48be0044a565411dce146943e0e244ec6c881c441754c348a8e3ac849a9aa15",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "b901932beee059022a1f136fb664dacaa5ae5a98ad1a0d9e0d723aabd6cc904d",
-		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "457741f3b7374fa18d03d298e9e83544d4672cab2ffcf7ee3510032469800b9a"
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "098c14a16b43886cbfc88f39b017b76b7a474ade3398e76a2d57a1405ea9c221",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "a8ce3a6a50111e9a1898785babea0c6986cbac5d44a8ee0c144f871b30758f18",
+		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "c35a5224756b0e85195c3348ad494a6f49dcea106149db1130644387e6c6eb76"
 	}
 }

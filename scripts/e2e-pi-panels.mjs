@@ -1004,7 +1004,37 @@ try {
 	check("T5: focus stays on Later and the moved reading stays selected at its new place", focusAfterMove.tool === "later" && focusAfterMove.selected === orderBefore[0] && focusAfterMove.pos === "2", JSON.stringify(focusAfterMove));
 	check("T5: the move is said once, with the new place", /, 2 of 3$/.test(await b.evaluate(`[...document.querySelectorAll('body > .hw-sr-only[role="status"]')].pop()?.textContent ?? ""`)));
 	check("T5: moving never changed the reading on the dial", w?.readingKey === sim.settings.readingKey && w?.readingKey === orderBefore[0], JSON.stringify(w?.readingKey));
-	check("T5: the current reading and membership are distinct marks", (await b.evaluate(`document.querySelectorAll("#rotation-set .hw-set-chip.current .hw-chip-badge").length === 1 && document.querySelectorAll("#rotation-set .hw-set-chip").length === 3`)));
+	const mark = await b.evaluate(`(() => { const c = document.querySelectorAll("#rotation-set .hw-set-chip.current"); return { current: c.length, chips: document.querySelectorAll("#rotation-set .hw-set-chip").length, drawn: c[0]?.querySelectorAll(".hw-chip-badge").length ?? -1, spoken: c[0]?.querySelector(".hw-sr-only")?.textContent ?? null }; })()`);
+	check("T5: the reading on the dial is one filled member, heard as on dial and drawn without a badge", mark.current === 1 && mark.chips === 3 && mark.drawn === 0 && mark.spoken === " on dial", JSON.stringify(mark));
+	// The owner's report (2026-10-10): the drawn badge widened the chip it sat
+	// on, so the list rewrapped and the panel jumped each time the dial moved
+	// on. Every member's size holds wherever the mark goes.
+	const onDialBefore = sim.settings.readingKey;
+	const sizes = [];
+	for (const key of sim.settings.rotationKeys) {
+		sim.pushSettings({ ...sim.settings, readingKey: key });
+		await sleep(200);
+		sizes.push(await b.evaluate(`({ at: document.querySelector("#rotation-set .hw-set-chip.current")?.dataset.key ?? null, boxes: [...document.querySelectorAll('#rotation-set [role="option"]')].map((o) => { const r = o.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(","); }).join(" ") })`));
+	}
+	sim.pushSettings({ ...sim.settings, readingKey: onDialBefore });
+	await sleep(200);
+	check("T5: the dial moving on moves the mark and never resizes or rewraps a member", sizes.every((s, i) => s.at === sim.settings.rotationKeys[i]) && new Set(sizes.map((s) => s.boxes)).size === 1, JSON.stringify(sizes));
+	// High contrast drops the fill; a dashed frame marks the reading on the
+	// dial. It keeps every member's box too, and on the member that is also
+	// selected (the reading on the dial is, here) the Highlight ring sits
+	// inside the frame rather than over it.
+	await b.send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "active" }] });
+	const hcSizes = [];
+	for (const key of sim.settings.rotationKeys) {
+		sim.pushSettings({ ...sim.settings, readingKey: key });
+		await sleep(200);
+		hcSizes.push(await b.evaluate(`[...document.querySelectorAll('#rotation-set [role="option"]')].map((o) => { const r = o.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(","); }).join(" ")`));
+	}
+	sim.pushSettings({ ...sim.settings, readingKey: onDialBefore });
+	await sleep(200);
+	const hcBoth = await b.evaluate(`(() => { const c = document.querySelector('#rotation-set .hw-set-chip.current[aria-selected="true"]'); if (c === null) return null; const s = getComputedStyle(c); return { frame: s.borderTopStyle, border: parseFloat(s.borderTopWidth), ring: parseFloat(s.outlineWidth), offset: parseFloat(s.outlineOffset) }; })()`);
+	await b.send("Emulation.setEmulatedMedia", { features: [{ name: "forced-colors", value: "none" }] });
+	check("T5: in high contrast the frame keeps every member's box, and the selection ring sits inside it", hcSizes.every((s) => s === sizes[0].boxes) && hcBoth !== null && hcBoth.frame === "dashed" && -hcBoth.offset >= hcBoth.border + hcBoth.ring, JSON.stringify({ hcSizes, plain: sizes[0].boxes, hcBoth }));
 	// Keyboard inside the list: arrows select (no write), Alt+Arrow moves.
 	const writesBeforeArrows = sim.writes.length;
 	await b.evaluate(`document.querySelector("#rotation-set [role=listbox]").focus()`);

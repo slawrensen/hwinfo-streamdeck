@@ -52,8 +52,8 @@ Control key has **Command** and **Advanced**.
   Arrow keys browse, Enter picks, and Tab or a click elsewhere closes the list
   without changing anything.
 - **Rotation on a dial.** Tick readings under **Readings to rotate through**.
-  The rotation shows as one list with the reading on the dial marked
-  **on dial**. Select a reading, then use **Earlier**, **Later**, **Rename** or
+  The rotation shows as one list with the reading on the dial highlighted.
+  Select a reading, then use **Earlier**, **Later**, **Rename** or
   **Remove**; at a group's edge, Earlier and Later move it into the
   neighboring group. **Split into groups**, **Add group** and **Merge back
   into one set** manage [rotation groups](controls.md#rotation-groups).
@@ -77,7 +77,7 @@ Control key has **Command** and **Advanced**.
   second click in its box and when the panel loses focus. Text typed just
   before you select another key is saved as the pointer leaves the panel.
 
-![The dial's settings panel: the header with the dial's face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and marked on dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title when the dial moves on.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
+![The dial's settings panel: the header with the dial's face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and filled as the one on the dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title when the dial moves on.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host.*

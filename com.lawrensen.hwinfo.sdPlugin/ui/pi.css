@@ -1243,7 +1243,7 @@ body[data-kind="control"] > .hw-lede {
 	border-style: dashed;
 }
 
-/* Zoomed: a chip that carries a pill ("on dial", "missing", a sensor tag)
+/* Zoomed: a chip that carries a pill ("missing", a sensor tag)
    lets its pills drop under the name rather than squeeze the name to a
    letter or two (round 3, re-review VY03). */
 @media (max-width: 239px) {
@@ -1256,8 +1256,9 @@ body[data-kind="control"] > .hw-lede {
 	}
 }
 
-/* The reading on the dial right now: a fill plus a text badge, so the
-   distinction from membership never rests on color alone. */
+/* The reading on the dial right now: a fill, which never changes the
+   chip's size, so the list never rewraps as the dial moves on. The header
+   above names the reading in words; a screen reader hears "on dial". */
 .hw-set-chip.current {
 	background: var(--hw-select-bg);
 	border-color: var(--hw-select-bg);
@@ -1271,8 +1272,8 @@ body[data-kind="control"] > .hw-lede {
 	max-width: 170px;
 }
 
-/* "on dial" and "missing" are the non-color marks: they never
-   shrink or clip; the name beside them does. */
+/* "missing" is a non-color mark: a pill never shrinks or clips; the
+   name beside it does. */
 .hw-set-chip > .hw-chip-badge {
 	flex: none;
 	overflow: visible;
@@ -1300,8 +1301,8 @@ body[data-kind="control"] > .hw-lede {
 	font-style: italic;
 }
 
-/* "on dial": the smallest words in the panel, still at the swatch faces'
-   11 px, in a pill that fits the 28 px chip. */
+/* A chip's pill: the smallest words in the panel, still at the swatch
+   faces' 11 px, in a pill that fits the 28 px chip. */
 .hw-chip-badge {
 	padding: 0 5px;
 	border: 1px solid currentColor;
@@ -1442,7 +1443,7 @@ body[data-kind="control"] > .hw-lede {
 
 /* The rotation editor: each list is one listbox (one Tab stop), its
    members wrap as chips; the selected member wears a ring, the reading on
-   the dial a fill and a text badge, so neither rests on color alone. */
+   the dial a fill. */
 .hw-set-list {
 	display: flex;
 	flex-wrap: wrap;
@@ -1471,8 +1472,7 @@ body[data-kind="control"] > .hw-lede {
 	box-shadow: inset 0 0 0 2px #ffffff;
 }
 
-/* On the dial AND missing: the warning wins the fill; the badge still
-   says "on dial". */
+/* On the dial AND missing: the warning wins the fill. */
 .hw-set-chip.current.missing {
 	background: var(--hw-warn-bg);
 	border-color: var(--hw-warn-text);
@@ -1989,9 +1989,20 @@ body[data-kind="control"] > .hw-lede {
 	}
 
 	/* The reading on the dial: a dashed frame, so it never reads as the
-	   selection (which alone wears Highlight). */
+	   selection (which alone wears Highlight). The padding gives back the
+	   frame's extra pixel, so the chip keeps its size. */
 	.hw-set-chip.current {
 		border: 2px dashed CanvasText;
+	}
+
+	.hw-set-list .hw-set-chip.current {
+		padding: 0 7px;
+	}
+
+	/* Selected AND on the dial: the ring sits inside the frame instead of
+	   over it, so both marks show. */
+	.hw-set-list .hw-set-chip.current[aria-selected="true"] {
+		outline-offset: -4px;
 	}
 
 	.hw-set-tools button[aria-disabled="true"],

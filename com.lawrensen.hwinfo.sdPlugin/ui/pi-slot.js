@@ -15,7 +15,7 @@
 		if (typeof slot === "string" && Object.hasOwn(ROLES, slot)) return ROLES[slot];
 		const index = settings?.index;
 		if (slot === "reading" && Number.isInteger(index) && index >= 0 && index <= 255) {
-			return [`Reading tile ${index + 1}`, `Shows reading ${index + 1} of the current page. Pressing it cycles current, min, max and average for this visit.`];
+			return ["Reading tile", "Shows one to four of the page's readings; a press cycles current, min, max and average for this visit. Where the opening key sits, it goes back instead, unless that key's Also go back is off."];
 		}
 		return ["Unrecognized detail tile", "This version does not know this tile's role; it shows an empty face and does nothing when pressed."];
 	}

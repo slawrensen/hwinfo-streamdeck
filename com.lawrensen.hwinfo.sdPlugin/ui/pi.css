@@ -3,7 +3,7 @@
    One small token set (surfaces, text, borders, spacing, focus, selection,
    status) on the Stream Deck app's own dark page. Text tokens clear WCAG AA
    on the surfaces they sit on (4.5:1 for text, 3:1 for field edges and the
-   focus ring; see review/pi-essentials for the measured ratios). The panel
+   focus ring). The panel
    chrome never touches what a key or dial draws: themes, custom colors and
    dimming belong to the device faces and are shown here only as those
    faces, unchanged. */
@@ -82,15 +82,6 @@ body {
 
 [hidden] {
 	display: none !important;
-}
-
-.hw-sr {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	overflow: hidden;
-	clip-path: inset(50%);
-	white-space: nowrap;
 }
 
 /* --- header: identity, truthful face, status ------------------------ */
@@ -812,8 +803,7 @@ body[data-kind="control"] > .hw-lede {
 
 .hw-field select,
 .hw-field input[type="text"],
-.hw-field textarea,
-.hw-input {
+.hw-field textarea {
 	box-sizing: border-box;
 	width: 100%;
 	min-width: 0;
@@ -828,20 +818,17 @@ body[data-kind="control"] > .hw-lede {
 }
 
 .hw-field select:hover,
-.hw-field input[type="text"]:hover,
-.hw-input:hover {
+.hw-field input[type="text"]:hover {
 	background: var(--hw-field-hover);
 }
 
-.hw-field input::placeholder,
-.hw-input::placeholder {
+.hw-field input::placeholder {
 	color: var(--hw-placeholder);
 }
 
 /* On the lighter hover fill the placeholder steps up to stay at 4.5:1
    (#b0b0b0 on #424242 is 4.63:1; the resting #a3a3a3 would be 3.98:1). */
 .hw-field input:hover::placeholder,
-.hw-input:hover::placeholder,
 .hw-picker > input:hover:not(.missing)::placeholder {
 	color: #b0b0b0;
 }
@@ -984,17 +971,7 @@ body[data-kind="control"] > .hw-lede {
 	background: var(--hw-field-hover);
 }
 
-.hw-btn-primary {
-	background: var(--hw-select-bg);
-	border-color: var(--hw-select-bg);
-	color: var(--hw-select-text);
-}
-
-.hw-btn-primary:hover {
-	background: #2f6fc0;
-}
-
-.hw-btn[data-armed="true"] {
+.hw-config-row button[data-armed="true"] {
 	background: var(--hw-danger-bg);
 	border-color: var(--hw-danger-text);
 }
@@ -1339,8 +1316,7 @@ body[data-kind="control"] > .hw-lede {
 
 .hw-set-remove,
 .hw-group-remove,
-.hw-detail-move,
-.hw-chip-move {
+.hw-detail-move {
 	min-width: var(--hw-target);
 	min-height: var(--hw-target);
 	padding: 0 4px;
@@ -1392,21 +1368,18 @@ body[data-kind="control"] > .hw-lede {
 	line-height: var(--hw-target);
 }
 
-.hw-set-chip.current .hw-set-remove,
-.hw-set-chip.current .hw-chip-move {
+.hw-set-chip.current .hw-set-remove {
 	color: #dcebff;
 }
 
 .hw-set-remove:hover,
 .hw-group-remove:hover,
-.hw-detail-move:hover:not(:disabled),
-.hw-chip-move:hover:not(:disabled) {
+.hw-detail-move:hover:not(:disabled) {
 	color: var(--hw-text);
 	background: rgba(255, 255, 255, 0.08);
 }
 
-.hw-detail-move:disabled,
-.hw-chip-move:disabled {
+.hw-detail-move:disabled {
 	color: #6a6a6a;
 	cursor: default;
 }
@@ -1467,16 +1440,6 @@ body[data-kind="control"] > .hw-lede {
 	color: var(--hw-placeholder);
 }
 
-.hw-set-chips {
-	flex-basis: 100%;
-	box-sizing: border-box;
-	min-width: 0;
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--hw-s1);
-	padding: 2px 0 2px 20px;
-}
-
 /* The rotation editor: each list is one listbox (one Tab stop), its
    members wrap as chips; the selected member wears a ring, the reading on
    the dial a fill and a text badge, so neither rests on color alone. */
@@ -1529,7 +1492,6 @@ body[data-kind="control"] > .hw-lede {
 	text-decoration: none;
 }
 
-.hw-set-chips .hw-set-list,
 .hw-set > .hw-set-list + .hw-set-tools {
 	margin-top: 0;
 }
@@ -2096,8 +2058,8 @@ body[data-kind="control"] > .hw-lede {
 /* --- the theme band as a fold row -------------------------------------------
    The band folds like every section (owner, 2026-09-26). Its theme line is
    the summary; folded, the checked chip stands in for the name. Design R2,
-   reviewed in two rounds (review/pi-density/round3/themefold); the ids in
-   the comments are the reviewers' findings. */
+   reviewed in two rounds; the ids in the comments are the reviewers'
+   findings. */
 
 /* The folded chip: the grid chip's anatomy at 24 px, the accent stripe
    clear of the word (VT03, PT03). */

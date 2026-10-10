@@ -1170,6 +1170,9 @@ try {
 	await sleep(250);
 	const armedReplace = await b.evaluate(`document.getElementById("config-deck-apply").dataset.armed`);
 	check("replace: a double press on Replace shared settings only arms it", armedReplace === "true" && sim.globalWrites.length === 0, JSON.stringify({ armedReplace, ...writes() }));
+	// The armed Replace wears the danger style the armed removes copy.
+	const armedLook = await b.evaluate(`(() => { const probe = document.createElement("div"); probe.style.background = "var(--hw-danger-bg)"; document.body.append(probe); const danger = getComputedStyle(probe).backgroundColor; probe.remove(); return { danger, button: getComputedStyle(document.getElementById("config-deck-apply")).backgroundColor }; })()`);
+	check("replace: the armed Replace shared settings turns the danger color", armedLook.button === armedLook.danger, JSON.stringify(armedLook));
 	await sleep(5500);
 	await b.click("#config-deck-apply");
 	await sleep(250);
@@ -1468,8 +1471,7 @@ try {
 	}
 
 	// ---- the theme band folds (owner, 2026-09-26; design R2) ----------------
-	// Ported from the design's acceptance run (review/pi-density/round3/
-	// themefold): the row is one section row that keeps the checked chip,
+	// Ported from the design's acceptance run: the row is one section row that keeps the checked chip,
 	// a near miss on Change never folds it, a late fold answer folds nothing
 	// under the person, the empty key keeps its fact, each panel kind keeps
 	// its own fold, and the title stays on its marker's line.

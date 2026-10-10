@@ -10,11 +10,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { composeDialSvg, type InstanceState } from "../src/actions/sensor-dial";
+import { IDLE_GESTURE } from "../src/gestures";
+import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
+import { SessionStatsStore } from "../src/stats";
 import { faceFont, parseFaceFont, setFaceFont } from "../src/ui/face-font";
-import { estimateKeyTextWidth } from "../src/ui/format";
+import { estimateFooterWidth, estimateKeyTextWidth, fitFooter } from "../src/ui/format";
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { renderDetailTitleKey } from "../src/ui/detail-renderer";
-import { renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type TripleKeyRow } from "../src/ui/key-renderer";
+import { inKeyLens, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type TripleKeyRow } from "../src/ui/key-renderer";
 import { applyGlobalThemeSettings, onThemeChange } from "../src/ui/theme-store";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 
@@ -103,14 +107,14 @@ describe("Tahoma, the default face", () => {
 		}
 	});
 
-	it("long status headlines step down to fit the key instead of running off its edges", () => {
+	it("long status headlines step down until the lens shows them whole instead of running off its edges", () => {
 		setFaceFont("tahoma");
 		for (const headline of ["Sensor missing", "Shared Memory", "Start HWiNFO", "Access denied"]) {
 			const svg = renderStatusKey({ icon: "warning", accent: "#E8940D", lines: [headline, "pick again"] });
 			const element = (svg.match(new RegExp(`<text[^>]*>${headline}</text>`)) as RegExpMatchArray)[0];
 			const size = Number(attr(element, "font-size"));
-			assert.ok(estimateKeyTextWidth(headline, size) <= faceFont().titleBand, `${headline} at ${size}`);
-			assert.ok(size >= 16, `${headline} stays large (${size})`);
+			assert.ok(inKeyLens([{ text: headline, fontSize: size }]), `${headline} at ${size}`);
+			assert.ok(size >= 15, `${headline} stays large (${size})`);
 		}
 	});
 
@@ -119,7 +123,6 @@ describe("Tahoma, the default face", () => {
 		// Its gap is a word space, or none when the space would cost a value a
 		// size step; either way the drawn row fits the band.
 		setFaceFont("tahoma");
-		const word = ((faceFont().advance12[" "] as number) * 14) / 12;
 		for (const [value, unit] of [["1023", "MiB/s"], ["4850.5", "MHz"], ["1785.0", "RPM"], ["987.65", "Mbps"], ["56.3", "°C"]] as const) {
 			const row = { label: "CPU", valueText: value, unitText: unit, statBadge: "" };
 			const svg = renderDualKey({ top: row, bottom: { ...row, label: "GPU" }, palette: VOID });
@@ -128,8 +131,7 @@ describe("Tahoma, the default face", () => {
 			assert.equal(m[2], value);
 			assert.equal((m[3] as string).trim(), unit, `${value} keeps ${unit} whole`);
 			const size = Number(m[1]);
-			const gap = (m[3] as string).startsWith(" ") ? word : 0;
-			assert.ok(estimateKeyTextWidth(value, size, { fontWeight: 700 }) + gap + estimateKeyTextWidth(unit, 14) <= 120, `${value} ${unit} at ${size} fits the band`);
+			assert.ok(inKeyLens([{ text: value, fontSize: size, fontWeight: 700 }, { text: m[3] as string, fontSize: 14 }]), `${value} ${unit} at ${size} stays inside the lens`);
 		}
 	});
 
@@ -151,11 +153,10 @@ describe("Tahoma, the default face", () => {
 		const rows = (third: string): TripleKeyRow[] => [{ label: "CCD1", valueText: "66.9", unitText: "°C" }, { label: "CCD2", valueText: "64.1", unitText: "°C" }, { label: third, valueText: "71.4", unitText: "°C" }];
 		const labels = (svg: string): string[] => [...svg.matchAll(/<text x="12"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/g)].map((m) => `${m[2]}@${m[1]}`);
 		const svg = renderTripleKey({ rows: rows("Core Max"), palette: VOID });
-		assert.deepEqual(labels(svg), ["CCD1@14", "CCD2@14", "Core Max@12"]);
+		assert.deepEqual(labels(svg), ["CCD1@15", "CCD2@15", "Core Max@13"]);
 		assert.match(svg, />71\.4<tspan[^>]*>°C<\/tspan>/, "no gap before the unit, as 1.6.0 drew it on the device");
-		// One step longer still draws whole, at 11 instead of cut at 12, and the
-		// whole label under the floor caps its peers as the floor would.
-		assert.deepEqual(labels(renderTripleKey({ rows: rows("CPU Temp"), palette: VOID })), ["CCD1@14", "CCD2@14", "CPU Temp@11"]);
+		// One step longer still draws whole at the floor, and caps its peers.
+		assert.deepEqual(labels(renderTripleKey({ rows: rows("CPU Temp"), palette: VOID })), ["CCD1@14", "CCD2@14", "CPU Temp@12"]);
 	});
 
 	it("11 px only ever draws a whole three-row label, never a cut one or one that fits larger", () => {
@@ -180,9 +181,8 @@ describe("Tahoma, the default face", () => {
 		setFaceFont("tahoma");
 		const r = (label: string, valueText: string, unitText: string) => ({ label, valueText, unitText, statBadge: "" });
 		const values = (svg: string): string[] => [...svg.matchAll(/font-size="(\d+)" font-weight="700"[^>]*>([^<]*)<tspan[^>]*>([^<]*)</g)].map((m) => `${m[2]}@${m[1]}|${m[3]}`);
-		// The installed d24 drew these rates at 28 and 30 px to make room for its gap.
-		assert.deepEqual(values(renderDualKey({ top: r("Disk Read", "4850", "MB/s"), bottom: r("CPU", "56.3", "°C"), palette: VOID })), ["4850@32|MB/s", "56.3@32|°C"]);
-		assert.deepEqual(values(renderDualKey({ top: r("Net Down", "2745", "KB/s"), bottom: r("Fan", "1450", "RPM"), palette: VOID })), ["2745@32|KB/s", "1450@32|RPM"]);
+		// The spaced line would step 1011 MiB/s to 30 px; 1.6.0 drew it tight at 32.
+		assert.deepEqual(values(renderDualKey({ top: r("Read", "1011", "MiB/s"), bottom: r("CPU", "56.3", "°C"), palette: VOID })), ["1011@32|MiB/s", "56.3@32|°C"]);
 	});
 
 	it("a row badge keeps its en space: it is the next word, not a unit", () => {
@@ -199,6 +199,65 @@ describe("Tahoma, the default face", () => {
 			// SVG draws the space runs as one; the line keeps its own bytes.
 			assert.match(svg, />▼ 20\.0GB {3}▲ 32\.4GB {3}session<\/text>/);
 		}
+	});
+
+	it("a dial's stats line keeps every word: whole at 12 px where 1.6.0 drew it, else whole at 11", () => {
+		for (const font of ["tahoma", "segoe-ui"] as const) {
+			setFaceFont(font);
+			const stats = (statsText: string): { size: string; text: string } => {
+				const svg = renderDial({ title: "Current DL rate", valueText: "450", unitText: "Mbps", statsText, fraction: 0.5, palette: VOID, barColor: VOID.accent });
+				const m = /<text x="12" y="78"[^>]*font-size="(\d+)"[^>]*>([^<]*)<\/text>/.exec(svg);
+				return { size: m?.[1] ?? "", text: m?.[2] ?? "" };
+			};
+			for (const line of ["▼419Mbps ▲481Mbps session", "▼419Mbps ▲481Mbps pinned", "▼0.00bps ▲33.6Mbps session", "▼12.3MB/s ▲98.7MB/s session", "▼12.3MiB/s ▲98.7MiB/s session", "▼ 1540   ▲ 2238   cycle paused", "▼ 12,450   ▲ 12,503   cycle paused"]) {
+				const drawn = stats(line);
+				assert.equal(drawn.text, line, `${font}: ${line}`);
+				assert.ok(drawn.size === "12" || drawn.size === "11", `${font}: ${line} at ${drawn.size}`);
+			}
+		}
+		setFaceFont("tahoma");
+	});
+
+	it("1.6.0's whole stats lines keep their 12 px on Tahoma", () => {
+		setFaceFont("tahoma");
+		for (const line of ["▼419Mbps ▲481Mbps session", "▼ 1540   ▲ 2238   cycle paused", "▼ 45.0   ▲ 81.0   session"]) {
+			const svg = renderDial({ title: "Pump", valueText: "1793", unitText: "RPM", statsText: line, fraction: 0.5, palette: VOID, barColor: VOID.accent });
+			assert.match(svg, /<text x="12" y="78"[^>]*font-size="12"/, line);
+		}
+	});
+
+	it("a paused dial composes its whole cycle paused tag, which 1.6.0 cut at 28 characters", () => {
+		setFaceFont("tahoma");
+		const pump: Reading = { key: "f0001234:0:3000001", sensorIndex: 0, id: 1, label: "Pump", type: 3, unit: "RPM", value: 1793, valueMin: 1540, valueMax: 2238, valueAvg: 1800 };
+		const snap: SensorSnapshot = { pollTime: 1, valueRevision: 1, version: 1, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "Board" }], readings: [pump], byKey: new Map([[pump.key, pump]]) };
+		const stats = new SessionStatsStore();
+		stats.sample(pump.key, 1540);
+		stats.sample(pump.key, 2238);
+		const state: InstanceState = {
+			settings: { readingKey: pump.key, rotationKeys: [pump.key], autoCycleMs: "5000", theme: "void" },
+			stats, statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: true, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false
+		};
+		const svg = composeDialSvg(state, { state: "ok", source: "shared-memory", snapshot: snap }, () => undefined);
+		assert.match(svg, /<text x="12" y="78"[^>]*>▼ 1540 {3}▲ 2238 {3}cycle paused<\/text>/);
+	});
+
+	it("a cut stats line ends inside its budget, Tahoma's wider ellipsis included", () => {
+		setFaceFont("tahoma");
+		for (const a of ["1,234", "4,800", "12.3", "999.9", "2100"]) {
+			for (const unit of ["RPM", "MHz", "W", "MB/s"]) {
+				for (const tag of ["cycle paused", "pinned", "session"]) {
+					const cut = fitFooter(`▼ ${a} ${unit} ▲ ${a}9 ${unit} ${tag}`, 182);
+					assert.ok(estimateFooterWidth(cut) <= 182, `${cut} prices ${estimateFooterWidth(cut)}`);
+				}
+			}
+		}
+	});
+
+	it("a row badge costs its label only its own width: MAX beside Total Activity and Pump Speed", () => {
+		setFaceFont("tahoma");
+		const svg = renderDualKey({ top: { label: "Total Activity", valueText: "45", unitText: "%", statBadge: "MAX" }, bottom: { label: "Pump Speed", valueText: "2100", unitText: "RPM", statBadge: "MAX" }, palette: VOID });
+		assert.match(svg, /font-size="15"[^>]*>Total Activity</);
+		assert.match(svg, /font-size="16"[^>]*>Pump Speed</);
 	});
 
 	it("a single key's value keeps its 1.6.0 size while its ink stays inside the lens span", () => {

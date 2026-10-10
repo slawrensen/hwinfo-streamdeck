@@ -72,7 +72,7 @@ When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears i
 **Row 2 shows** decides the second row's stat:
 
 - **The same stat as row 1** *(default)*: both rows show the same stat, and the key press cycles them together. When that stat isn't the current value, **one MIN / MAX / AVG badge sits centered in the divider gap**, the key's most visible spot.
-- **Always the current value / minimum / maximum / average**: pins the second row to a fixed stat, and the key press then cycles row 1 alone. Each row that isn't showing the current value names its stat in a small badge after its own label (for example **CCD2 MAX**), so both values keep their full size and their place on every press.
+- **Always the current value / minimum / maximum / average**: pins the second row to a fixed stat, and the key press then cycles row 1 alone. Each row that isn't showing the current value names its stat in a small badge after its own label (for example **CCD2 MAX**), so both values keep their full size and their place on every press. When a label is too long to keep its size beside the badge, that row's badge follows its value instead, as in 1.6.0, and the label stays whole. Two rows pinned to the same stat share one badge in the divider gap.
 
 ![The key's settings panel with Readings on this key set to Two readings, stacked: the header's face shows both rows, Reading 2 holds a GPU temperature beside an empty Label 2 field, and Row 2 shows is set to The same stat as row 1 with its help line; Display has no Graph under the value select, and the folded Alerts line ends in first reading.]({{ '/assets/img/pi-key-dual.png' | relative_url }})
 
@@ -90,7 +90,7 @@ What carries over, and what stays with the first reading:
 - **Warn at / Critical at** watch the **first** reading only, and an alert recolors the whole key exactly like the single layout. There are no per-row thresholds; put the reading you want alerts on first (or use two keys).
 - The sensor-type accent (badge color) follows the first reading.
 - The **Display strip is a single-layout feature**: the second row takes its space, so **Graph under the value** hides while the layout is dual (the setting is kept for when you switch back).
-- Row labels size themselves like the single layout's label. A pinned row's stat badge shares its label line, so a long label can shrink or shorten to make room.
+- Row labels size themselves like the single layout's label. A pinned row's stat badge shares its label line only while the label keeps its size there; otherwise the badge follows the value.
 - If one row's sensor drops out of HWiNFO's output, that row shows an em-dash placeholder while the other keeps updating; if both drop out, the key shows the usual **Sensor missing** screen.
 
 Switching back to **One reading** restores the exact single-layout face; the second reading's settings are remembered.

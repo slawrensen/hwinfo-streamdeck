@@ -103,19 +103,19 @@ export function statusSentence(status: PollerStatus): string {
 		case "not-running":
 			return "The plugin could not open a sensor feed. Check that HWiNFO is running in Sensors-only mode with Shared Memory Support enabled, or enable Gadget reporting and tick the sensors you need.";
 		case "busy":
-			return "The sensor source was busy or changed during a read. The plugin retries automatically. If this persists, open settings and choose \"Copy support report\" for support.";
+			return "The sensor source was busy or changed during a read. The plugin retries automatically. If this persists, choose \"Copy support report\" under Advanced, Support.";
 		case "gadget-empty":
 			return "The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab. Check Enable reporting to Gadget and tick \"Report value in Gadget\" for the readings you need.";
 		case "disabled":
 			return "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.";
 		case "access-denied":
-			return "Windows denied access needed to read the sensor source. Open settings and choose \"Copy support report\" for support. This error alone does not identify which access rule failed.";
+			return "Windows denied access needed to read the sensor source. Choose \"Copy support report\" under Advanced, Support. This error alone does not identify which access rule failed.";
 		case "unsupported-platform":
 			return "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).";
 		case "bridge-failed":
 			return "The native HWiNFO bridge (bin/hwsm.node) could not load. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A load failure alone does not identify the cause.";
 		default:
-			return "The sensor source could not be opened or validated. Open settings and choose \"Copy support report\" for support.";
+			return "The sensor source could not be opened or validated. Choose \"Copy support report\" under Advanced, Support.";
 	}
 }
 

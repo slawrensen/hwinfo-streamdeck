@@ -97,9 +97,11 @@ fixes in one release.
   before a unit ("59.7°C"). Dual keys and dials now draw a space
   ("59.7 °C"), unless it would shrink a value, and three-row keys keep
   their units tight so the labels keep the room. On a dual key with a
-  pinned second row, each row's MIN, MAX or AVG sits after its own
-  label, so a value no longer shrinks or moves as a press cycles the
-  stats.
+  pinned second row, a row's MIN, MAX or AVG sits after its own label
+  when the label still draws whole at its usual size, so that value keeps
+  its size as a press cycles the stats; otherwise it follows the value as
+  in 1.6.0 and the label stays whole. When both rows show the same stat,
+  one badge sits in the divider, as in 1.6.0.
 - Every control has a programmatic name and a visible focus ring, text
   contrast and small targets were raised, and the panels reflow at
   320 px wide without horizontal scrolling.
@@ -310,12 +312,17 @@ fixes in one release.
   named a font list, which the Stream Deck app's SVG renderer reads as one
   unknown name, so it drew Tahoma while every layout was measured for the
   narrower Segoe UI: on hardware a three-row label could run into its
-  value and a long status line off the key. Labels now shorten or step
-  down a size instead, and titles keep their 1.6.0 sizes. Text keeps the
-  room 1.6.0 gave it where nothing collided: "Core Max" shows whole on a
-  three-row key again, a label one step longer shows whole at 11 px
-  instead of cut, dial titles such as "CPU Package Power" and session
-  lines show whole again, and Greek and Cyrillic labels are measured too.
+  value and a long status line off the key. Every fit now measures the
+  ink Tahoma Bold actually draws, from the font's own metrics, against
+  the key's visible area and the dial's edge. Where 1.6.0 drew a title,
+  label, value or stats line whole and clear of its neighbors, 1.7 keeps
+  its size and letters, except where 1.6.0's ink already sat within a
+  pixel or two of the edge or of its neighbor. Text that ran into a value
+  or off the key now shortens or steps down a size instead. Accented
+  Latin, Greek and Cyrillic letters are measured too. Two trades remain on
+  three-row keys: a value too wide for 18 px draws at 16 px so its label
+  keeps its letters, and a label stays within 2 px of its row's other
+  labels.
 - Faces no longer ask for letter spacing, which the Stream Deck app never
   draws, so the settings panel preview and the docs images now match the
   keys and dials.

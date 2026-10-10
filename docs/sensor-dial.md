@@ -9,7 +9,7 @@ The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream De
 
 It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
 
-![A Sensor Dial face as the plugin renders it: CPU Temp at 62.8 °C, the session low 51.1 and high 73.5, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
+![A Sensor Dial face as the plugin renders it: CPU Temp at 58.6 °C, the session low 52.8 and high 78.9, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
 
 ## The touchscreen readout
 
@@ -19,7 +19,7 @@ The slot draws four things, top to bottom:
 | --- | --- |
 | **Title** | Your **Title on the dial**. Left blank, the name you gave the reading with **Rename** in the rotation list, else HWiNFO's label. |
 | **Value + unit** | The live reading, formatted per **Decimals**, with the unit inline. A stat badge (`· MIN`, `· MAX`, `· AVG`) is appended when you're viewing a session stat instead of the live value. |
-| **Stats line** | `▼ <low>   ▲ <high>   session`: the lowest and highest values seen this session. `pinned` replaces `session` while the dial is pinned, and `cycle paused` while its auto cycle is paused. A short message (a group name after a group jump, `stats reset`) takes the whole line for a moment. |
+| **Stats line** | `▼ <low>   ▲ <high>   session`: the lowest and highest values seen this session. `pinned` replaces `session` while the dial is pinned, and `cycle paused` while its auto cycle is paused. A line too long for 12 px draws at 11 px instead of losing a word. A short message (a group name after a group jump, `stats reset`) takes the whole line for a moment. |
 | **Range bar** | A fill showing where the **live** value sits between the bar's min and max. |
 
 The bar always tracks the live value, even while you're touching through MIN / MAX / AVG on the number above it.
@@ -70,7 +70,7 @@ These controls arrived in 1.7 (and the earlier issue #31 preview); 1.6.0 does no
 In **Display**, choose one of the two overview **View** options. **Color numbers by sensor type** and **Reading colors** then appear under the overview options. **Reading colors** uses the same presets and color wells as the [four-reading key](sensor-reading.md#layout-four-readings-the-quad-grid):
 
 - **Signal (four hues)**, **Pairs (two hues)** or **Uniform** applies a preset to the listed readings.
-- Click a reading's color well to choose its own number color. Two temperatures can have different colors, like DIMM 1 and DIMM 2 below.
+- Click a reading's color well to choose its own number color. Two temperatures can have different colors, like CPU Temp and GPU Temp below.
 - **Auto** resets one reading; **Automatic** resets the listed readings. Readings without a chosen color follow the sensor-type option below, or normal text.
 
 Colors follow each reading through rotation, reordering and groups. Switching views or removing and re-adding a reading keeps its saved color. Individual colors work with **Accent colors** set to **Theme accent everywhere**, including on Paper. Labels, units, footer, graphs and the selection indicator keep their existing styling.
@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d25 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.0.0-d26 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 

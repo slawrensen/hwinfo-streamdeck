@@ -1,6 +1,6 @@
 /** Value formatting, unit conversion and stat-mode selection. */
 import type { Reading } from "../hwinfo/types";
-import { faceFont, isTahoma } from "./face-font";
+import { faceFont, isTahoma, SEGOE_UI } from "./face-font";
 
 export type StatMode = "current" | "min" | "max" | "avg";
 export type DecimalsSetting = "auto" | "0" | "1" | "2" | "3";
@@ -41,6 +41,13 @@ export function statValue(reading: Reading, mode: StatMode): number {
 /** An unavailable historical field must never wear a numeric MIN/MAX/AVG. */
 export function readingStatBadge(reading: Reading | undefined, mode: StatMode): string {
 	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? "N/A" : STAT_BADGE[mode];
+}
+
+/** One badge shared by several rows reads N/A only when no present row has
+ * the stat; while any row has it, the badge names the stat, as 1.6.0's did. */
+export function sharedStatBadge(readings: ReadonlyArray<Reading | undefined>, mode: StatMode): string {
+	const present = readings.filter((reading): reading is Reading => reading !== undefined);
+	return mode !== "current" && present.length > 0 && present.every((reading) => !Number.isFinite(statValue(reading, mode))) ? "N/A" : STAT_BADGE[mode];
 }
 
 /** Converts a value for display; only °C→°F is meaningful in HWiNFO data. */
@@ -306,8 +313,6 @@ export type TextFitOptions = {
 	/** Glyph weight the caller will render; the face font's table is at its
 	 * label weight. */
 	fontWeight?: 600 | 700;
-	/** SVG letter-spacing in px, applied per inter-glyph gap at every size. */
-	letterSpacing?: number;
 	/** Extra px the fit must leave unused, on top of the caller's budget. */
 	minimumSlack?: number;
 };
@@ -315,8 +320,7 @@ export type TextFitOptions = {
 /**
  * Estimated ink width of a string as a key face renders it: the measured
  * advance table scaled linearly from its 12 px calibration, minus the
- * terminal-bearing credit, a flat widening for weight 700, and the caller's
- * letter-spacing per gap. Estimation only (the Stream Deck engine cannot be
+ * terminal-bearing credit and a flat widening for weight 700. Estimation only (the Stream Deck engine cannot be
  * asked to measure), but calibrated against rasterized ink, so callers can
  * spend their whole pixel budget.
  */
@@ -340,7 +344,7 @@ export function estimateKeyTextWidth(text: string, fontSize: number, options?: T
 	if (bold) {
 		width *= font.boldFactor;
 	}
-	return width + Math.max(0, count - 1) * (options?.letterSpacing ?? 0);
+	return width;
 }
 
 /** One fitted string: what to draw, at what size. */
@@ -369,14 +373,12 @@ export function fitTextLadder(text: string, maxWidth: number, sizes: readonly nu
 	}
 	const chars = Array.from(text);
 	// Pre-cut the prefix walk: the narrowest glyph advance is 2.9px at
-	// size 12 (scaled by the floor, less any negative letter spacing), so
-	// no prefix longer than budget/perChar can ever fit. Without the cut,
-	// the walk from the far end of an unbounded label (a panel paste, a
-	// hand-edited profile, a registry label) is quadratic: 16.8 s at 40k
-	// chars, synchronous inside the tick.
-	const spacing = options?.letterSpacing ?? 0;
-	const perChar = (2.9 * floor) / 12 + Math.min(0, spacing);
-	const maxFit = perChar > 0 ? Math.max(1, Math.ceil(budget / perChar) + 2) : chars.length - 1;
+	// size 12 (scaled by the floor), so no prefix longer than budget/perChar
+	// can ever fit. Without the cut, the walk from the far end of an
+	// unbounded label (a panel paste, a hand-edited profile, a registry
+	// label) is quadratic: 16.8 s at 40k chars, synchronous inside the tick.
+	const perChar = (2.9 * floor) / 12;
+	const maxFit = Math.max(1, Math.ceil(budget / perChar) + 2);
 	for (let i = Math.min(chars.length - 1, maxFit); i > 0; i--) {
 		const candidate = `${chars.slice(0, i).join("").trimEnd()}…`;
 		if (estimateKeyTextWidth(candidate, floor, options) <= budget) {
@@ -384,6 +386,130 @@ export function fitTextLadder(text: string, maxWidth: number, sizes: readonly nu
 		}
 	}
 	return { text: "…", fontSize: floor };
+}
+
+/** One run of a drawn line: the text element's own text or one of its
+ * tspans, each at its own size. */
+export type TextRun = { text: string; fontSize: number; fontWeight?: 600 | 700 };
+
+/** A line's extent from its pen start: the advance, and where its ink
+ * starts and ends. Tahoma carries each glyph's measured ink insets; a glyph
+ * without them (unmapped, wide, or any glyph under Segoe UI) inks its whole
+ * advance, and a blank glyph inks nothing. */
+export type InkSpan = { advance: number; left: number; right: number };
+
+export function inkSpan(runs: readonly TextRun[]): InkSpan {
+	const insets = faceFont().insets12;
+	if (insets === undefined) {
+		const advance = runs.reduce((sum, run) => sum + estimateKeyTextWidth(run.text, run.fontSize, { fontWeight: run.fontWeight }), 0);
+		return { advance, left: 0, right: advance };
+	}
+	let pen = 0;
+	let left = Number.POSITIVE_INFINITY;
+	let right = Number.NEGATIVE_INFINITY;
+	for (const run of runs) {
+		const k = run.fontSize / 12;
+		for (const ch of run.text) {
+			const advance = keyGlyphWidth12(ch) * k;
+			const inset = insets.get(ch);
+			if (inset !== null) {
+				left = Math.min(left, pen + (inset === undefined ? 0 : inset[0] * k));
+				right = Math.max(right, pen + advance - (inset === undefined ? 0 : inset[1] * k));
+			}
+			pen += advance;
+		}
+	}
+	return left === Number.POSITIVE_INFINITY ? { advance: pen, left: 0, right: 0 } : { advance: pen, left, right };
+}
+
+/**
+ * The pixel rule behind every ink fit, measured through the app's QtSvg
+ * 6.9.3 on 405,856 probe strings (every generated Tahoma Bold glyph at both
+ * ends of a line, 11 to 52 px, 10 to 32 subpixel phases; a column counts as
+ * ink above 60/255, the review census's test): a modeled right ink edge at or
+ * left of column + 0.900 never lit a column past it, and a left edge at or
+ * right of column - 0.450 never lit one before it (the generated insets are
+ * already reduced where a glyph drew closer). The fits keep 0.05 of that.
+ */
+export const INK_RIGHT_SLACK = 0.85;
+export const INK_LEFT_SLACK = 0.4;
+/** Two lines whose modeled ink edges sit this far apart leave at least the
+ * census's two blank columns between their drawn ink. */
+export const INK_CLEAR_GAP = 4 - INK_LEFT_SLACK - INK_RIGHT_SLACK;
+
+export type TextAnchor = "start" | "middle" | "end";
+
+/** Where a line drawn at x with this text-anchor puts its ink. */
+export function inkEdges(runs: readonly TextRun[], anchor: TextAnchor, x: number): { left: number; right: number } {
+	const span = inkSpan(runs);
+	const start = anchor === "start" ? x : anchor === "middle" ? x - span.advance / 2 : x - span.advance;
+	return { left: start + span.left, right: start + span.right };
+}
+
+/** True when the line inks no pixel column outside first..last. */
+export function inksWithin(runs: readonly TextRun[], anchor: TextAnchor, x: number, first: number, last: number): boolean {
+	const edges = inkEdges(runs, anchor, x);
+	return edges.left >= first - INK_LEFT_SLACK && edges.right <= last + INK_RIGHT_SLACK;
+}
+
+/** The widest prefix plus an ellipsis that `fits` accepts, else the lone
+ * ellipsis. A longer prefix never inks less, so a binary search finds it
+ * without the quadratic walk a pasted 40k-character label would cost. */
+export function cutToFit(text: string, fits: (line: string) => boolean): string {
+	const chars = Array.from(text);
+	const cut = (i: number): string => `${chars.slice(0, i).join("").trimEnd()}…`;
+	let lo = 0;
+	let hi = chars.length - 1;
+	while (lo < hi) {
+		const mid = Math.ceil((lo + hi) / 2);
+		if (fits(cut(mid))) lo = mid;
+		else hi = mid - 1;
+	}
+	return lo === 0 ? "…" : cut(lo);
+}
+
+/** fitTextLadder by what the line inks instead of a width budget: the
+ * largest size `fits` accepts, else the widest prefix plus an ellipsis it
+ * accepts at the floor size. */
+export function fitLadderBy(text: string, sizes: readonly number[], fits: (line: string, size: number) => boolean): FittedText {
+	if (text === "") {
+		return { text: "", fontSize: sizes[0] as number };
+	}
+	for (const size of sizes) {
+		if (fits(text, size)) return { text, fontSize: size };
+	}
+	const floor = sizes[sizes.length - 1] as number;
+	return { text: cutToFit(text, (line) => fits(line, floor)), fontSize: floor };
+}
+
+/**
+ * 1.6.0's own label estimate, kept to recognize the sizes it drew: its Segoe
+ * UI Semibold Latin table (the rows below U+0370 that SEGOE_UI still carries,
+ * plus the ellipsis), 9.1 for any other non-wide glyph, a full em for wide
+ * ones, less its 1.5 bearing credit, at weight 600. The device drew Tahoma
+ * whatever 1.6.0 estimated, and the same text at the same size draws the same
+ * ink in both releases, so a size this estimate picks is one 1.6.0 users saw.
+ */
+export function legacyLabelWidth(text: string, fontSize: number): number {
+	const table = SEGOE_UI.advance12;
+	let width = 0;
+	let count = 0;
+	for (const ch of text) {
+		const code = ch.codePointAt(0) as number;
+		const mapped = code < 0x370 || ch === "…" ? table[ch] : undefined;
+		width += mapped ?? (isWideGlyph(code) ? 12 : 9.1);
+		count++;
+	}
+	return count === 0 ? 0 : ((width - 1.5) * fontSize) / 12;
+}
+
+/** The size 1.6.0's label ladder picked for this text in its 120 px band, or
+ * null when it cut the text at the floor. */
+export function legacyLabelSize(text: string, sizes: readonly number[]): number | null {
+	for (const size of sizes) {
+		if (legacyLabelWidth(text, size) <= 120) return size;
+	}
+	return null;
 }
 
 /**
@@ -397,7 +523,7 @@ export function fitFooter(text: string, maxPx: number): string {
 		return text;
 	}
 	const chars = Array.from(text);
-	let width = 10; // the ellipsis
+	let width = estimateFooterWidth("…");
 	let kept = 0;
 	for (const ch of chars) {
 		const next = width + estimateFooterWidth(ch);
@@ -440,24 +566,24 @@ export function wrapLabelTwoLines(label: string, line1Max: number, line2Max: num
 	return rest === "" ? [line1] : [line1, truncateLabel(rest, line2Max)];
 }
 
-/** wrapLabelTwoLines by measured width instead of code points, for Tahoma,
- * whose glyphs run 12 to 19 % wider than the counts assume. */
-export function wrapLabelTwoLinesPx(label: string, size: number, line1Px: number, line2Px: number): string[] {
+/** The two-line wrap by what each line inks: line one takes whole words
+ * while `line1Fits` holds, the rest goes to line two, cut to `line2Fits`;
+ * a first word too long for line one is cut there and nothing wraps. */
+export function wrapLabelTwoLinesBy(label: string, line1Fits: (line: string) => boolean, line2Fits: (line: string) => boolean): string[] {
 	const text = label.trim();
-	const fits = (s: string, px: number): boolean => estimateKeyTextWidth(s, size) <= px;
-	if (fits(text, line1Px)) return [text];
+	if (line1Fits(text)) return [text];
 	const words = text.split(" ").filter((w) => w !== "");
 	let line1 = "";
 	let index = 0;
 	while (index < words.length) {
 		const candidate = line1 === "" ? (words[index] as string) : `${line1} ${words[index] as string}`;
-		if (!fits(candidate, line1Px)) break;
+		if (!line1Fits(candidate)) break;
 		line1 = candidate;
 		index++;
 	}
-	if (line1 === "") return [fitTextLadder(text, line1Px, [size]).text];
+	if (line1 === "") return [cutToFit(text, line1Fits)];
 	const rest = words.slice(index).join(" ");
-	return rest === "" ? [line1] : [line1, fitTextLadder(rest, line2Px, [size]).text];
+	return rest === "" ? [line1] : [line1, line2Fits(rest) ? rest : cutToFit(rest, line2Fits)];
 }
 
 /**

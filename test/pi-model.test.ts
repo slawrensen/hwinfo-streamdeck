@@ -83,7 +83,7 @@ describe("reading summary", () => {
 describe("display summary", () => {
 	it("marks inherited choices as shared and own choices without the mark", () => {
 		// The theme is not summarized here: it sits in the always-open band
-		// above the sections (palette study, review/pi-density).
+		// above the sections (palette study).
 		const shared = model.displaySummary("key", {}, {}, { effective: effective({ text: { mode: "dim", applied: "dim", own: false, color: null, dimSecondary: false } }) });
 		assert.equal(shared, "Current value · auto decimals · dimmed text (shared)");
 		const own = model.displaySummary("key", { statMode: "max", decimals: "1" }, {}, { effective: effective({ theme: { id: "ember", drawn: "ember", own: true, unknown: false }, text: { mode: "custom", applied: "custom", own: true, color: "#8A2B2B", dimSecondary: true } }) });
@@ -297,5 +297,18 @@ describe("stored names are this build's own", () => {
 			win.connectElgatoStreamDeckSocket?.("0", "u", "e", "{}", JSON.stringify({ payload: { settings: { slot } } }));
 			assert.equal(text["slot-role"], slot === "back" ? "Back tile" : "Unrecognized detail tile", slot);
 		}
+	});
+	it("the detail slot panel names a reading tile without a reading number the page does not keep", () => {
+		// A tile holds one to four readings and the second Back takes a slot,
+		// so slot N is not reading N.
+		const slotSource = readFileSync(fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-slot.js", import.meta.url)), "utf8");
+		const text: Record<string, string> = {};
+		const doc = { getElementById: (id: string) => ({ set textContent(v: string) { text[id] = v; } }) };
+		const win: { connectElgatoStreamDeckSocket?: (...args: string[]) => void } = {};
+		new Function("window", "document", slotSource)(win, doc);
+		win.connectElgatoStreamDeckSocket?.("0", "u", "e", "{}", JSON.stringify({ payload: { settings: { slot: "reading", index: 3 } } }));
+		assert.equal(text["slot-role"], "Reading tile");
+		assert.doesNotMatch(text["slot-explain"] ?? "", /\d/);
+		assert.match(text["slot-explain"] ?? "", /goes back/);
 	});
 });

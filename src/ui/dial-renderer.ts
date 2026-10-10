@@ -9,7 +9,7 @@
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
  */
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitTextLadder, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesPx } from "./format";
+import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextRun } from "./format";
 import { faceFont, isTahoma } from "./face-font";
 import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
@@ -18,10 +18,21 @@ import type { Palette } from "./themes";
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
 /** 18 px/600 runs ~10 px per glyph; 17 chars keeps clear of the right edge. */
 const TITLE_MAX = 17;
-/** Tahoma titles may run to x=196: 1.6.0 drew "CPU Package Power" with ink
- * to x=192 on the device, and 184 keeps every measured title 4 px clear of
- * the segment edge. */
-const TAHOMA_TITLE_BUDGET = 184;
+/** The last pixel column a dial line may ink: 1.6.0 drew whole lines with
+ * ink to column 198 and the census flags column 199, the slot's edge. */
+const DIAL_LAST_COL = 198;
+/** True when a line drawn from x inks nothing past DIAL_LAST_COL. */
+function dialLineFits(runs: readonly TextRun[], x: number): boolean {
+	return inksWithin(runs, "start", x, 1, DIAL_LAST_COL);
+}
+/** A start-anchored 12 to 18 px dial line: whole while its ink ends by the
+ * edge, else cut where it still does. Runs of spaces draw as one, so they
+ * are priced as one; a whole line keeps its own bytes. */
+function fitDialLine(text: string, x: number, fontSize: number): string {
+	const drawn = text.replace(/\s+/g, " ").trim();
+	const fits = (line: string): boolean => dialLineFits([{ text: line, fontSize }], x);
+	return fits(drawn) ? text : cutToFit(drawn, fits);
+}
 /** The smallest value tier fits ~19 glyphs; longer text ellipsizes. */
 const VALUE_MAX = 19;
 
@@ -74,6 +85,11 @@ const WIDE_UNIT_MAX = 4;
  * by estimated glyph widths (fitFooter). Exported so the dial action sizes
  * its roomy/tight footer choice against the same budget. */
 export const FOOTER_PX = 188;
+/** Whether the two-row footer draws this text whole: Tahoma by its ink
+ * against the slot edge, Segoe UI by FOOTER_PX. */
+export function footerFits(text: string): boolean {
+	return isTahoma() ? dialLineFits([{ text: text.replace(/\s+/g, " ").trim(), fontSize: 12 }], 6) : estimateFooterWidth(text) <= FOOTER_PX;
+}
 
 /**
  * Ladder fit: the largest step where every visible value stays inside the
@@ -81,18 +97,18 @@ export const FOOTER_PX = 188;
  * length flicker (99.9 to 100) cannot re-truncate labels every tick.
  * Returns the chosen size and the estimated width the column books.
  */
-/** One value's booked column width at `size`: the even-quantized character
- * count (the flicker damping above) times the face font's flat 700-weight
- * char factor (Segoe UI 0.6, the previous per-tier table's 9.6/16 = 7.8/13 =
- * 7.2/12; Tahoma 0.64). The end anchor makes alignment exact regardless, and
- * estimate error only moves the label budget. */
+/** One value's booked column width at `size`. Segoe UI: the even-quantized
+ * character count (the flicker damping above) times its flat 700-weight char
+ * factor, 0.6 (the previous per-tier table's 9.6/16 = 7.8/13 = 7.2/12).
+ * Tahoma: its measured bold width, below. The end anchor makes alignment
+ * exact regardless, and estimate error only moves the label budget. */
 function wideValueWidth(text: string, size: number): number {
 	const count = Array.from(text).length;
 	if (isTahoma()) {
-		// Tahoma books the measured bold width, padded by one digit when the
-		// count is odd: the same flicker damping, without pricing "." like a
-		// digit, which cut labels 1.6.0 drew whole ("COMMITTED").
-		return estimateKeyTextWidth(text, size, { fontWeight: 700 }) + (count % 2 === 1 ? estimateKeyTextWidth("0", size, { fontWeight: 700 }) : 0);
+		// Tahoma books the larger of its measured bold width and 1.6.0's even-
+		// quantized count (the flicker damping), so the size never steps above
+		// 1.6.0's, nor past what Tahoma's real digits need.
+		return Math.max(estimateKeyTextWidth(text, size, { fontWeight: 700 }), Math.ceil(count / 2) * 2 * 0.6 * size);
 	}
 	return Math.ceil(count / 2) * 2 * faceFont().valueEm * size;
 }
@@ -119,6 +135,12 @@ export function wideValueFit(values: readonly string[]): { size: number; maxW: n
  * glyph's left bearing (~1 px) rides on top; the 3 px to the edge absorb it.
  */
 function wideUnitShift(units: readonly string[]): number {
+	if (isTahoma()) {
+		// Tahoma: only as far as the widest unit's ink needs to end by the
+		// slot edge from x=172 (RPM and MHz from there end by column 197).
+		const right = Math.max(0, ...units.map((unit) => (unit === "" ? 0 : inkEdges([{ text: unit, fontSize: 12 }], "start", WIDE.unitLeft).right)));
+		return Math.max(0, Math.ceil((right - DIAL_LAST_COL - INK_RIGHT_SLACK) * 10) / 10);
+	}
 	const maxW = Math.max(0, ...units.map((unit) => estimateKeyTextWidth(unit, 12)));
 	return Math.max(0, Math.round((WIDE.unitLeft + maxW - WIDE.unitRight) * 10) / 10);
 }
@@ -167,7 +189,19 @@ function wideContextLine(baseline: number, contextText: string, statsText: strin
 	const stats = statsText === "" ? "" : fitFooter(statsText, WIDE.lineRight - WIDE.lineLeft);
 	const rightX = stats === "" ? WIDE.lineRight : WIDE.lineRight - estimateFooterWidth(stats) - WIDE.lineGap;
 	let out = "";
-	if (contextText !== "") {
+	if (contextText !== "" && isTahoma()) {
+		// Tahoma: the name's ink ends a clear gap before the stats' first ink
+		// column, or by the slot edge when no stats show (an overlay).
+		const statsInk = stats === "" ? null : inkEdges([{ text: stats, fontSize: 12 }], "end", WIDE.lineRight).left;
+		const fits = (line: string, size: number): boolean => {
+			const right = inkEdges([{ text: line, fontSize: size }], "start", WIDE.lineLeft).right;
+			return statsInk === null ? right <= DIAL_LAST_COL + INK_RIGHT_SLACK : right <= statsInk - INK_CLEAR_GAP;
+		};
+		const name = fitLadderBy(contextText, [13, 12], fits);
+		if (name.text !== "…") {
+			out += `<text x="${WIDE.lineLeft}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${name.fontSize}" font-weight="600" fill="${colors.label}">${escapeXml(name.text)}</text>`;
+		}
+	} else if (contextText !== "") {
 		const maxW = rightX - WIDE.lineLeft - 2;
 		if (maxW > 8) {
 			// estimateFooterWidth is 12/600-calibrated; scale for the 13 px try.
@@ -231,12 +265,17 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// ellipsizes only when genuinely longer. Painting order is the real
 		// guarantee: the mask and the value draw after the label, so a hot
 		// estimate ends up under the value, never over it.
-		const labelRight = valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
+		// Tahoma: the label's ink ends a clear gap before this row's value ink;
+		// the mask starts 1.5 px before that ink, past the label's last column.
+		const valueInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: fit.size, fontWeight: 700 }], "end", valueRight).left : 0;
+		const labelRight = isTahoma() ? valueInk - 1.5 : valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
 		// Both fonts price the label on their measured tables, with no
 		// letter-spacing: the app's QtSvg draws none (measured even at 3 px),
 		// so writing it only made previews wider than the device. Segoe UI's
 		// estimate credits side bearings, so it keeps 2 px of slack.
-		const label = fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { minimumSlack: isTahoma() ? 0 : 2 }).text;
+		const label = isTahoma()
+			? fitLadderBy(row.label.toUpperCase(), [12], (line) => inkEdges([{ text: line, fontSize: 12 }], "start", WIDE.labelX).right <= valueInk - INK_CLEAR_GAP).text
+			: fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { minimumSlack: 2 }).text;
 		parts.push(
 			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
 			// Bg-colored insurance between the label run and this row's value:
@@ -364,8 +403,14 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 		}
 		// Tahoma: a second line only where the value leaves it readable room;
 		// otherwise one cut line, and line 2 goes to the trend.
-		const room2 = valueStartEst - 20;
-		const lines = isTahoma() ? (room2 >= 40 ? wrapLabelTwoLinesPx(row.label, 13, 180, room2) : [fitTextLadder(row.label, 180, [13]).text]) : wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
+		// Tahoma: line two ends a clear gap before THIS row's value ink (the
+		// other row's wider value no longer costs it room), line one by the
+		// slot edge.
+		const rowInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: row.size, fontWeight: 700 }], "end", valueEndX).left : valueStartEst;
+		const room2 = isTahoma() ? rowInk - INK_CLEAR_GAP - 12 : valueStartEst - 20;
+		const line1Fits = (line: string): boolean => dialLineFits([{ text: line, fontSize: 13 }], 12);
+		const line2Fits = (line: string): boolean => inkEdges([{ text: line, fontSize: 13 }], "start", 12).right <= rowInk - INK_CLEAR_GAP;
+		const lines = isTahoma() ? (room2 >= 40 ? wrapLabelTwoLinesBy(row.label, line1Fits, line2Fits) : [fitLadderBy(row.label, [13], line1Fits).text]) : wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
 		// The label token marks the selected row; the unit token paints the
 		// other. The selected row sits on the track, where the face label
 		// can read dimmer than the row's own unit (Dim lifts units to the
@@ -394,7 +439,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 			// The mask covers only the value line's band, so a wrapped label
 			// or sparkline that ran long is clipped renderer-proof, while the
 			// full-width label line above stays untouched.
-			`<rect x="${(valueStartEst - 4).toFixed(1)}" y="${top + 18}" width="${(204 - valueStartEst).toFixed(1)}" height="${TWO_ROW.height - 18}" fill="${rowBg}"/>`,
+			`<rect x="${(isTahoma() ? rowInk - 1.5 : valueStartEst - 4).toFixed(1)}" y="${top + 18}" width="${(isTahoma() ? 201.5 - rowInk : 204 - valueStartEst).toFixed(1)}" height="${TWO_ROW.height - 18}" fill="${rowBg}"/>`,
 			`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
 		);
 		if (row.unitText !== "") {
@@ -402,7 +447,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 		}
 	});
 	if (opts.footerText !== "") {
-		parts.push(`<text x="6" y="96" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(fitFooter(opts.footerText, FOOTER_PX))}</text>`);
+		parts.push(`<text x="6" y="96" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? fitDialLine(opts.footerText, 6, 12) : fitFooter(opts.footerText, FOOTER_PX))}</text>`);
 	}
 	parts.push("</svg>");
 	return parts.join("");
@@ -439,25 +484,55 @@ function dialZoneSvg(zone: DrawnZone): string {
 	return barSegment(x, w, BAR.y, BAR.h, BAR.r, zone.color, zone.from <= 0, zone.to >= 1);
 }
 
-/** Tahoma: the single dial keeps the char-count tier unless the measured
- * value plus its inline unit would run past x=194. */
-function tahomaDialValueSize(value: string, unit: string): 34 | 24 | 17 {
+/** Tahoma: the single dial keeps the char-count tier while the value line's
+ * ink ends by the slot edge; the inline gap gives way before the size does,
+ * as on a two-reading key, so a line 1.6.0 drew tight keeps its size. */
+function tahomaDialValueFit(value: string, unit: string): { size: 34 | 24 | 17; gap: boolean } {
 	const tier = valueFontSize(value);
+	const line = (size: number, gap: boolean): TextRun[] => [{ text: value, fontSize: size, fontWeight: 700 }, ...(unit === "" ? [] : [{ text: (gap ? inlineGap(17) : "") + unit, fontSize: 17 }])];
 	for (const s of [34, 24, 17] as const) {
 		if (s > tier) continue;
-		const w = estimateKeyTextWidth(value, s, { fontWeight: 700 }) + (unit === "" ? 0 : 6 + estimateKeyTextWidth(unit, 17));
-		if (w <= 182) return s;
+		if (dialLineFits(line(s, true), 12)) return { size: s, gap: true };
+		if (unit !== "" && dialLineFits(line(s, false), 12)) return { size: s, gap: false };
 	}
-	return 17;
+	// Past the edge even at the floor: the tighter line runs out least.
+	return { size: 17, gap: unit === "" };
 }
 
-/** Tahoma: the stats line priced as drawn. SVG draws each run of spaces as
- * one, so "▼ 20.0GB   ▲ 32.4GB   session" fits whole; the text keeps its own
- * bytes unless it has to be cut. */
-function tahomaStatsLine(stats: string): string {
+/** Segoe UI's stats line room, from x=12. Tahoma fits by ink to the slot
+ * edge; Segoe UI has only its per-class footer estimate, which can price a
+ * line about a pixel under its ink, so it keeps 4 px of margin
+ * ("▼0.000bps ▲784.000Mbps session" inked to column 199 at 186). */
+const SEGOE_STATS_LINE_BUDGET = 182;
+
+/** The stats line, priced as drawn (SVG draws a run of spaces as one):
+ * whole at 12 px while it fits, else whole at 11 px, so "▼ 1540   ▲ 2238
+ * cycle paused" and a long rate line keep every word. Only a line 11 px
+ * cannot hold leaves off its quiet "session" tag, and only then is it cut.
+ * A whole line keeps its own bytes. */
+function fitStatsLine(stats: string): FittedText {
 	const drawn = stats.replace(/\s+/g, " ").trim();
-	const fitted = fitFooter(drawn, 182);
-	return fitted === drawn ? stats : fitted;
+	const wholeSize = (line: string): number => {
+		if (isTahoma()) return dialLineFits([{ text: line, fontSize: 12 }], 12) ? 12 : dialLineFits([{ text: line, fontSize: 11 }], 12) ? 11 : 0;
+		const width = estimateFooterWidth(line);
+		return width <= SEGOE_STATS_LINE_BUDGET ? 12 : (width * 11) / 12 <= SEGOE_STATS_LINE_BUDGET ? 11 : 0;
+	};
+	const size = wholeSize(drawn);
+	if (size !== 0) return { text: stats, fontSize: size };
+	const quiet = drawn.startsWith("▼") ? drawn.replace(/ session$/, "") : drawn;
+	const quietSize = quiet === drawn ? 0 : wholeSize(quiet);
+	if (quietSize !== 0) return { text: quiet, fontSize: quietSize };
+	return { text: isTahoma() ? cutToFit(drawn, (line) => dialLineFits([{ text: line, fontSize: 12 }], 12)) : fitFooter(drawn, SEGOE_STATS_LINE_BUDGET), fontSize: 12 };
+}
+
+/** Tahoma: where a whole 12 px stats line starts when ending it by the slot
+ * edge from x=12 would cost it 11 px: up to 2.5 px left, where its ink still
+ * starts by x=12, so it keeps 1.6.0's size. 12 when no such start exists. */
+function statsLineShift(stats: string): number {
+	const drawn = stats.replace(/\s+/g, " ").trim();
+	const right = inkEdges([{ text: drawn, fontSize: 12 }], "start", 12).right;
+	const over = Math.ceil((right - DIAL_LAST_COL - INK_RIGHT_SLACK) * 10) / 10;
+	return over > 0 && over <= 2.5 ? Number((12 - over).toFixed(1)) : 12;
 }
 
 export function renderDial(opts: DialRenderOptions): string {
@@ -465,13 +540,17 @@ export function renderDial(opts: DialRenderOptions): string {
 	const text = opts.text ?? themeTextColors(palette);
 	const parts: string[] = [
 		...svgOpen(200, 100, palette.bg),
-		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitTextLadder(opts.title, TAHOMA_TITLE_BUDGET, [18]).text : truncateLabel(opts.title, TITLE_MAX))}</text>`
+		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitDialLine(opts.title, 12, 18) : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
-	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${inlineGap(17)}${escapeXml(opts.unitText)}</tspan>` : "";
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
-	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${isTahoma() ? tahomaDialValueSize(valueText, opts.unitText) : valueFontSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+	const valueFit = isTahoma() ? tahomaDialValueFit(valueText, opts.unitText) : { size: valueFontSize(valueText), gap: true };
+	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${valueFit.gap ? inlineGap(17) : ""}${escapeXml(opts.unitText)}</tspan>` : "";
+	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" || !valueFit.gap ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueFit.size}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
-		parts.push(`<text x="12" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? tahomaStatsLine(opts.statsText) : opts.statsText)}</text>`);
+		const stats = fitStatsLine(opts.statsText);
+		const statsX = isTahoma() && stats.fontSize === 11 ? statsLineShift(opts.statsText) : 12;
+		const shifted = statsX < 12;
+		parts.push(`<text x="${statsX}" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="${shifted ? 12 : stats.fontSize}" font-weight="600" fill="${text.unit}">${escapeXml(shifted ? opts.statsText : stats.text)}</text>`);
 	}
 	parts.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" fill="${palette.track}"/>`);
 	for (const zone of opts.zones ?? []) {

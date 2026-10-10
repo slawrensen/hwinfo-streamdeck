@@ -36,9 +36,9 @@ import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
 import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
-import { FOOTER_PX, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
+import { footerFits, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
 import { dialViewOf, overviewRowColors, rotationKeysOf, stepListOf } from "../ui/dial-overview";
-import { alertLevel, convertUnit, dedupeSharedLabelPrefix, estimateFooterWidth, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, truncateLabel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, dedupeSharedLabelPrefix, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatStat, isDataUnit } from "../ui/measure";
 import { statusDialText } from "../ui/state-screens";
@@ -1115,10 +1115,9 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 	const label = customLabelOf(settings) ?? readingNameOf(rotationNamesOf(settings), reading) ?? reading.label;
 	// A transient hint owns the whole stats line for its moment (appending it
 	// to min/max would run past the 200 px canvas); persistent states replace
-	// only the trailing "session" tag. Belt and braces: the line is truncated
-	// to what 12 px/600 fits, so no combination can clip off-canvas. Data
-	// units carry their own tier suffix per stat, so that variant packs
-	// tighter to keep the whole line on canvas.
+	// only the trailing "session" tag. The renderer fits the line by its drawn
+	// width, so no combination can clip off-canvas. Data units carry their
+	// own tier suffix per stat, so that variant packs tighter.
 	const overlay = state.overlay;
 	const stateTag = state.pinned ? "pinned" : state.cyclePaused && parseAutoCycleMs(settings.autoCycleMs) !== null ? "cycle paused" : "session";
 	const minText = formatStat(stats.min, reading.unit, measureOpts);
@@ -1128,7 +1127,7 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 		title: label,
 		valueText: shown.valueText,
 		unitText: `${shown.unitText}${badge !== "" ? " · " + badge : ""}`.trim(),
-		statsText: truncateLabel(statsLine, 28),
+		statsText: statsLine,
 		fraction,
 		palette,
 		barColor: level !== "normal" ? config.alerts[level].bg : palette.accent,
@@ -1252,7 +1251,7 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 		const context = deduped.prefix !== "" ? `· ${deduped.prefix}` : "";
 		const roomy = [`▼ ${minText}`, `▲ ${maxText}`, tags, context].filter((part) => part !== "").join("  ");
 		const tight = [`▼${minText}`, `▲${maxText}`, tags, context].filter((part) => part !== "").join(" ");
-		const footer = overlayActive ? overlay.text : estimateFooterWidth(roomy) <= FOOTER_PX ? roomy : tight;
+		const footer = overlayActive ? overlay.text : footerFits(roomy) ? roomy : tight;
 		return renderDialTwoRow({ rows: overviewRows, footerText: footer, palette, text });
 	}
 	// The three-row wide tile splits that line: the stats are their own

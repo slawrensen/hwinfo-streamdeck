@@ -16,7 +16,7 @@ import { buildThemesPayload, forgetPanelFace, handlePiRequest, pushPreviewToPi }
 import { poller, type PollerStatus } from "../poller";
 import { sortedJson } from "../sorted-json";
 import type { Reading, SensorSnapshot } from "../hwinfo/types";
-import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, readingStatBadge, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
+import { alertLevel, convertUnit, isStatMode, nextStatMode, parseThreshold, readingStatBadge, sharedStatBadge, statValue, type AlertLevel, type DecimalsSetting, type StatMode } from "../ui/format";
 import { computeGauge, drawnZones } from "../ui/gauge";
 import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
 import { QUAD_DEFAULT_COLORS, quadIdentityOf, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DrawnZone, type QuadKeyCell } from "../ui/key-renderer";
@@ -655,11 +655,11 @@ function composeDual(settings: ReadingSettings, snapshot: SensorSnapshot, primar
 	// salvage); only an explicit stat mode pins the second row.
 	const pinned = isStatMode(settings.secondaryStatMode);
 	const bottomMode = pinned ? (settings.secondaryStatMode as StatMode) : topMode;
-	const shared = !pinned;
+	const shared = !pinned || bottomMode === topMode;
 	return renderDualKey({
 		top: readingRow(primary, topMode, measureOpts, settings.label, shared ? "" : readingStatBadge(primary ?? secondary, topMode)),
 		bottom: readingRow(secondary, bottomMode, measureOpts, settings.secondaryLabel, shared ? "" : readingStatBadge(secondary, bottomMode)),
-		sharedBadge: shared ? readingStatBadge(primary ?? secondary, topMode) : "",
+		sharedBadge: shared ? sharedStatBadge([primary, secondary], topMode) : "",
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
@@ -692,7 +692,7 @@ function composeTriple(settings: ReadingSettings, snapshot: SensorSnapshot, slot
 	const customLabels = [settings.label, settings.secondaryLabel, settings.quadLabel3];
 	return renderTripleKey({
 		rows: slotKeys.map((key, i) => (key === undefined ? null : readingRow(readings[i], mode, measureOpts, customLabels[i]))),
-		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
+		sharedBadge: sharedStatBadge(readings, mode),
 		palette,
 		text: resolveTextColors(palette, effectiveTextFor(settings), level),
 		returnMark
@@ -734,7 +734,7 @@ function composeQuad(settings: ReadingSettings, snapshot: SensorSnapshot, slotKe
 	return renderQuadKey({
 		cells: slotKeys.map((key, i) => (key === undefined ? null : quadCell(readings[i], customLabels[i], labeled, mode, measureOpts, alertColor ?? quadIdentityColor(colors[i] as QuadIdentity, labeled, textSettings, text, palette)))),
 		labels: labeled,
-		sharedBadge: readingStatBadge(readings.find((reading) => reading !== undefined), mode),
+		sharedBadge: sharedStatBadge(readings, mode),
 		palette,
 		text,
 		returnMark

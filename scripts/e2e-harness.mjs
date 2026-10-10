@@ -915,7 +915,16 @@ async function finish() {
 		dualFrame !== undefined && (dualFrame.match(/font-weight="700"/g) ?? []).length >= 3 && dualFrame.includes('y="56"') && dualFrame.includes('y="128"'),
 		`${results.dualFrames?.length ?? 0} frames`
 	);
-	check("dual key pinned second row names its MAX after its own label", dualFrame !== undefined && /<text x="72" y="94" [^>]*>[^<]*<tspan [^>]*>\u2002MAX<\/tspan><\/text>/.test(dualFrame) && !dualFrame.includes('x="132"'));
+	// A pinned row names its stat once: after its label while the label keeps
+	// its size there, else after its value (1.6.0's place), so a long live
+	// label stays whole.
+	const afterLabel = dualFrame !== undefined && /<text x="72" y="94" [^>]*>[^<]*<tspan [^>]*>\u2002MAX<\/tspan><\/text>/.test(dualFrame);
+	const afterValue = dualFrame !== undefined && /<text x="72" y="128" [^>]*>[^<]*(?:<tspan [^>]*>[^<]*<\/tspan>)?<tspan [^>]*>\u2002?MAX<\/tspan><\/text>/.test(dualFrame);
+	check(
+		"dual key pinned second row names its MAX once, after its label or after its value",
+		(afterLabel || afterValue) && (dualFrame.match(/MAX</g) ?? []).length === 1 && !dualFrame.includes('x="132"'),
+		dualFrame === undefined ? "no frame" : (dualFrame.match(/>[^<]+</g) ?? []).join(" ")
+	);
 	check(
 		"follow mode centers one shared badge in the divider gap",
 		typeof results.dualSharedFrame === "string" && results.dualSharedFrame.includes('<text x="72" y="76"') && results.dualSharedFrame.includes(">MAX<") && !results.dualSharedFrame.includes('x="132"'),

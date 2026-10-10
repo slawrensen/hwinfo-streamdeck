@@ -329,12 +329,8 @@ describe("estimateKeyTextWidth (the key faces' glyph-class estimator)", () => {
 		}
 	});
 
-	it("weight 700 runs a flat few percent wider; letter-spacing adds per gap", () => {
-		const base = estimateKeyTextWidth("MAX", 12);
-		assert.ok(estimateKeyTextWidth("MAX", 12, { fontWeight: 700 }) > base);
-		assert.equal(estimateKeyTextWidth("MAX", 12, { letterSpacing: 0.5 }), base + 1);
-		// Single glyph, no gaps: measured M advance 11.1 minus the 1.5 credit.
-		assert.ok(Math.abs(estimateKeyTextWidth("M", 12, { letterSpacing: 0.5 }) - 9.6) < 1e-9);
+	it("weight 700 runs a flat few percent wider", () => {
+		assert.ok(estimateKeyTextWidth("MAX", 12, { fontWeight: 700 }) > estimateKeyTextWidth("MAX", 12));
 	});
 });
 

@@ -9,7 +9,7 @@
  * value and label glyph sizes flex with content.
  */
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, estimateKeyTextWidth, fitTextLadder, truncateLabel, type FittedText } from "./format";
+import { cappedUnit, cutToFit, estimateKeyTextWidth, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, inkEdges, inksWithin, legacyLabelSize, truncateLabel, type FittedText, type TextRun } from "./format";
 import { themeTextColors, type QuadIdentity, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 import { faceFont, isTahoma } from "./face-font";
@@ -100,16 +100,44 @@ export function ringValueFontSize(text: string): number {
  * sizes only ever grow (the issue #3 ask), never shrink an existing
  * profile's label. */
 const LABEL_BUDGET = 120;
-/** The single key's value stands alone, centered, so it is budgeted by its
- * ink: Tahoma's bold side bearings sit inside the advance. "98.8M" prices
- * 124.8 at 40 px and draws ink at x=11..131, as 1.6.0 drew it; 125 keeps
- * every drawn value inside the x=10..133 lens span. */
-const SINGLE_VALUE_BUDGET = 125;
 const LABEL_SIZES = [20, 18, 16] as const;
-/** The band a title or label row may spend: Tahoma keeps the 132 px its
+/** The band a title or label row may spend: Tahoma about the 134 px its
  * 1.6.0 titles drew in, Segoe UI the 120 px lens band. */
 function labelBand(): number {
 	return faceFont().titleBand;
+}
+/** The physical key's lens shows ink columns 10..133 of the 144 px canvas
+ * (hardware-verified 2026-07-16: a pill at x8/y124 ran into the crop). */
+const LENS = { first: 10, last: 133 } as const;
+/** True when a line centered on the key inks only what the lens shows. */
+export function inKeyLens(runs: readonly TextRun[]): boolean {
+	return inksWithin(runs, "middle", 72, LENS.first, LENS.last);
+}
+/** A line exactly as 1.6.0 drew it (same text, sizes and tight runs) draws
+ * exactly 1.6.0's ink, so one whose modeled ink sits within the rule's
+ * measured uncertainty of the lens (right edge to 134.1, left to 9.35) keeps
+ * that drawing: of 396 values rendered so at 1.6.0's size, the only crops sat
+ * at 134.15. */
+function drawnAs160(runs: readonly TextRun[]): boolean {
+	const edges = inkEdges(runs, "middle", 72);
+	return edges.left >= 9.35 && edges.right <= 134.1;
+}
+/** A centered label line on Tahoma: the largest size the lens shows whole;
+ * or the size 1.6.0 drew the same label at (its look, the same ink), inside
+ * the title band; else cut inside the lens at the floor. */
+function fitLensLabel(label: string, sizes: readonly number[]): FittedText {
+	const drew = legacyLabelSize(label, sizes);
+	return fitLadderBy(label, sizes, (line, size) => inKeyLens([{ text: line, fontSize: size }]) || (line === label && size === drew && estimateKeyTextWidth(line, size) <= labelBand()));
+}
+/** The single key's value: the 1.6.0 char-count size (kept while it draws
+ * as 1.6.0 did), stepping down 2 px only while Tahoma's ink would leave the
+ * lens. */
+function singleValueSize(text: string): number {
+	let size = valueFontSize(text);
+	if (!isTahoma()) return size;
+	if (drawnAs160([{ text, fontSize: size, fontWeight: 700 }])) return size;
+	while (size > 20 && !inKeyLens([{ text, fontSize: size, fontWeight: 700 }])) size -= 2;
+	return size;
 }
 /** The stat badge's shared-badge rows: gap 38..52, caps on baseline 48 —
  * between the label band and the widest value's digit tops (y≈56.6). */
@@ -138,8 +166,7 @@ export function inlineGap(fontSize: number): string {
  * that carry one (their other text has no spaces to keep). */
 export const PRESERVE = ' xml:space="preserve"';
 /** An inlineGap in px for width budgets: exact for the 12 px badge (an
- * en space), one pixel short of the 14 px unit gap, which the label gap
- * beside it absorbs; the same 6 px the dx gaps budgeted before. */
+ * en space). */
 export const INLINE_GAP_PX = 6;
 
 export function escapeXml(text: string): string {
@@ -337,7 +364,7 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 	const { valueText, unitText, statBadge, history, gauge, palette } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const ring = gauge?.kind === "ring";
-	const label = fitTextLadder(opts.label, labelBand(), LABEL_SIZES);
+	const label = isTahoma() ? fitLensLabel(opts.label, LABEL_SIZES) : fitTextLadder(opts.label, labelBand(), LABEL_SIZES);
 	const parts: string[] = svgOpen(144, 144, palette.bg);
 	if (ring && gauge !== undefined) {
 		// The ring draws first so the value, unit and badge paint over its field.
@@ -351,7 +378,7 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		// its full band — a stat must never cost title width.
 		parts.push(...sharedBadgeSvg(statBadge, palette, text.badge, BADGE_GAP_Y, BADGE_TEXT_Y));
 	}
-	parts.push(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${ring ? ringValueFontSize(valueText) : capValueSize(valueText, valueFontSize(valueText), SINGLE_VALUE_BUDGET, 20)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
+	parts.push(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${ring ? ringValueFontSize(valueText) : singleValueSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
 	if (unitText !== "") {
 		// Baseline 114/18: worst-case spark/bar ink starts at y=120 (the spark
 		// span is inset for its stroke), so the corridor is optically balanced
@@ -447,7 +474,7 @@ export function dualValueFontSize(text: string): 32 | 24 | 17 | 14 {
  * down or ellipsizes rather than pushing the badge off the face. */
 const DUAL_ROW_BADGE_SIZE = 12;
 function rowBadgeWidth(badge: string): number {
-	return INLINE_GAP_PX + estimateKeyTextWidth(badge, DUAL_ROW_BADGE_SIZE, { fontWeight: 700 }) + 0.5 * Array.from(badge).length;
+	return INLINE_GAP_PX + estimateKeyTextWidth(badge, DUAL_ROW_BADGE_SIZE, { fontWeight: 700 });
 }
 
 /** The gap before a two-reading key's unit: one word space, since the value
@@ -459,28 +486,71 @@ const DUAL_UNIT_GAP = " ";
 
 type DualValueFit = { valueSize: number; unitText: string };
 
-function dualValueFit(valueText: string, unitText: string, gapPx: number): DualValueFit {
-	let valueSize = capValueSize(valueText, dualValueFontSize(valueText), LABEL_BUDGET, 14);
-	if (isTahoma() && unitText !== "") {
-		// Tahoma's wide digits leave a common unit (MiB/s, MHz, RPM) no room
-		// at the char-count size: the value gives up to two 2 px steps
-		// before the unit is shortened, so a long custom unit still cannot
-		// shrink the number far.
+/** Tahoma: the value keeps its char-count tier while the value line's ink
+ * stays inside the lens, then gives up to two 2 px steps (never under 14) for
+ * its unit before the unit is shortened, or left off when nothing fits. */
+function dualValueFitInk(valueText: string, unitText: string, gap: string): DualValueFit {
+	const line = (size: number, unit: string): TextRun[] => [{ text: valueText, fontSize: size, fontWeight: 700 }, ...(unit === "" ? [] : [{ text: gap + unit, fontSize: 14 }])];
+	let valueSize: number = dualValueFontSize(valueText);
+	// The tight line at the char-count size is the one 1.6.0 drew.
+	if (gap === "" && drawnAs160(line(valueSize, unitText))) return { valueSize, unitText };
+	while (valueSize > 14 && !inKeyLens(line(valueSize, ""))) valueSize = Math.max(14, valueSize - 2);
+	if (unitText !== "") {
 		const floor = Math.max(14, valueSize - 4);
-		while (valueSize > floor && estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) + gapPx + estimateKeyTextWidth(unitText, 14) > LABEL_BUDGET) {
-			valueSize -= 2;
-		}
+		while (valueSize > floor && !inKeyLens(line(valueSize, unitText))) valueSize = Math.max(floor, valueSize - 2);
 	}
+	if (unitText === "" || inKeyLens(line(valueSize, unitText))) return { valueSize, unitText };
+	const cut = cutToFit(unitText, (unit) => inKeyLens(line(valueSize, unit)));
+	return { valueSize, unitText: cut === "…" ? "" : cut };
+}
+
+function dualValueFit(valueText: string, unitText: string, gapPx: number): DualValueFit {
+	if (isTahoma()) return dualValueFitInk(valueText, unitText, gapPx > 0 ? DUAL_UNIT_GAP : "");
+	const valueSize = capValueSize(valueText, dualValueFontSize(valueText), LABEL_BUDGET, 14);
 	return { valueSize, unitText: dualUnitFit(unitText, LABEL_BUDGET - estimateKeyTextWidth(valueText, valueSize, { fontWeight: 700 }) - gapPx) };
+}
+
+/** Tahoma: where a row's own badge goes when its label line has no room for
+ * it, 1.6.0's badged value line: the value one tier down, then the unit and
+ * the badge. The 1.7 gaps stay while the spaced line keeps inside the lens;
+ * else the line draws tight, as 1.6.0 drew it on the device, and only a line
+ * 1.6.0 itself ran past the lens steps its value (two steps at most) or
+ * shortens its unit. */
+type BadgedLine = { size: number; unit: string; spaced: boolean };
+function badgedValueFit(valueText: string, unitText: string, badge: string): BadgedLine {
+	const count = Array.from(valueText).length;
+	const tier = count <= 4 ? 0 : count <= 6 ? 1 : count <= 9 ? 2 : 3;
+	const start = ([32, 24, 17, 14] as const)[Math.min(3, tier + 1)] as number;
+	const line = (size: number, unit: string, spaced: boolean): TextRun[] => [
+		{ text: valueText, fontSize: size, fontWeight: 700 },
+		...(unit === "" ? [] : [{ text: (spaced ? DUAL_UNIT_GAP : "") + unit, fontSize: 14 }]),
+		{ text: (spaced ? inlineGap(DUAL_ROW_BADGE_SIZE) : "") + badge, fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 as const }
+	];
+	if (inKeyLens(line(start, unitText, true))) return { size: start, unit: unitText, spaced: true };
+	if (drawnAs160(line(start, unitText, false))) return { size: start, unit: unitText, spaced: false };
+	const floor = Math.max(14, start - 4);
+	let size = start;
+	while (size > floor && !inKeyLens(line(size, unitText, false))) size = Math.max(floor, size - 2);
+	if (inKeyLens(line(size, unitText, false))) return { size, unit: unitText, spaced: false };
+	const cut = cutToFit(unitText, (u) => inKeyLens(line(size, u, false)));
+	const unit = cut === "…" ? "" : cut;
+	// Past the lens even so: the closest this row gets, as 1.6.0's own line ran past it too.
+	return { size, unit, spaced: false };
+}
+
+function badgedValueSvg(valueText: string, fit: BadgedLine, badge: string, valueY: number, text: TextColors): string {
+	const unitSpan = fit.unit === "" ? "" : `<tspan font-size="14" font-weight="600" fill="${text.unit}">${fit.spaced ? DUAL_UNIT_GAP : ""}${escapeXml(fit.unit)}</tspan>`;
+	const badgeSpan = `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${fit.spaced ? inlineGap(DUAL_ROW_BADGE_SIZE) : ""}${escapeXml(badge)}</tspan>`;
+	return `<text x="72" y="${valueY}" text-anchor="middle"${fit.spaced ? PRESERVE : ""} font-family="${fontFamily()}" font-size="${fit.size}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unitSpan}${badgeSpan}</text>`;
 }
 
 export interface DualKeyRow {
 	label: string;
 	valueText: string;
 	unitText: string;
-	/** This row's own "MIN" | "MAX" | "AVG", drawn on the label line after
-	 * the label; empty for the live value or when sharedBadge covers both
-	 * rows. */
+	/** This row's own "MIN" | "MAX" | "AVG": drawn after the label while the
+	 * label keeps its size there, else after the value as 1.6.0 drew it;
+	 * empty for the live value or when sharedBadge covers both rows. */
 	statBadge: string;
 }
 
@@ -517,13 +587,36 @@ export function renderDualKey(opts: DualKeyOptions): string {
 	const gapPx = Math.ceil(((faceFont().advance12[DUAL_UNIT_GAP] as number) * 14) / 12 * 10) / 10;
 	const spaced = rows.map((row, i) => dualValueFit(values[i] as string, row.unitText, gapPx));
 	const tight = rows.map((row, i) => dualValueFit(values[i] as string, row.unitText, 0));
-	const gap = spaced.every((fit, i) => fit.valueSize === tight[i]?.valueSize && fit.unitText === tight[i]?.unitText) ? DUAL_UNIT_GAP : "";
+	const ladder = (i: number): readonly number[] => (i === 0 ? DUAL_LABEL_SIZES_TOP : DUAL_LABEL_SIZES);
+	// Tahoma: each label fits the lens on its own first; a row's own badge
+	// rides its label line only while the label keeps that fit whole and the
+	// line stays inside the lens, else it goes after the unit, where 1.6.0
+	// drew it, and that row sits out the shared unit-gap vote.
+	const plain = rows.map((row, i) => (isTahoma() ? fitLensLabel(row.label, ladder(i)) : null));
+	const onValue = rows.map((row, i) => {
+		const fit = plain[i];
+		if (fit === null || fit === undefined || row.statBadge === "") return false;
+		return !(fit.text === row.label && inKeyLens([{ text: row.label, fontSize: fit.fontSize }, { text: inlineGap(DUAL_ROW_BADGE_SIZE) + row.statBadge.toUpperCase(), fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 }]));
+	});
+	const badgedFits = rows.map((row, i) => (onValue[i] === true ? badgedValueFit(values[i] as string, row.unitText, row.statBadge.toUpperCase()) : null));
+	const gap = spaced.every((fit, i) => onValue[i] === true || (fit.valueSize === tight[i]?.valueSize && fit.unitText === tight[i]?.unitText)) ? DUAL_UNIT_GAP : "";
 	const fits = gap === "" ? tight : spaced;
 	rows.forEach((row, i) => {
 		const labelY = DUAL.labelY + i * DUAL.rowPitch;
 		const valueY = DUAL.valueY + i * DUAL.rowPitch;
 		const badge = row.statBadge.toUpperCase();
-		const label = fitTextLadder(row.label, labelBand() - (badge === "" ? 0 : rowBadgeWidth(badge)), i === 0 ? DUAL_LABEL_SIZES_TOP : DUAL_LABEL_SIZES);
+		const lensFit = plain[i];
+		if (onValue[i] === true && lensFit !== null && lensFit !== undefined) {
+			parts.push(`<text x="72" y="${labelY}" text-anchor="middle" font-family="${fontFamily()}" font-size="${lensFit.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(lensFit.text)}</text>`);
+			parts.push(badgedValueSvg(values[i] as string, badgedFits[i] as BadgedLine, badge, valueY, text));
+			return;
+		}
+		const label =
+			lensFit === null || lensFit === undefined
+				? fitTextLadder(row.label, labelBand() - (badge === "" ? 0 : rowBadgeWidth(badge)), ladder(i))
+				: badge === ""
+					? lensFit
+					: fitLadderBy(row.label, ladder(i), (line, size) => inKeyLens([{ text: line, fontSize: size }, { text: inlineGap(DUAL_ROW_BADGE_SIZE) + badge, fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 }]));
 		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
 		// One middle-anchored chunk: the label and its badge center as a unit.
 		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
@@ -584,15 +677,14 @@ const TRIPLE_LABEL_SPREAD = 2;
 /** A value chunk may claim at most this much of the 120 px row, so every
  * fitted label keeps a readable minimum before it ellipsizes. */
 const TRIPLE_CHUNK_MAX = 84;
+/** Tahoma's 16 px step: 1.6.0 checked 84 against Segoe UI estimates plus a gap
+ * the device never drew, so its 16 px chunks drew up to 94 px wide; the label
+ * budget still comes from the real chunk. */
+const TRIPLE_CHUNK_MAX_16_TAHOMA = 94;
 /** Optical gap between a fitted label and its row's value chunk. */
 const TRIPLE_LABEL_GAP = 8;
-/** Tahoma's gap: its advances are measured through the app's own QtSvg, so
- * the gap is ink rather than estimate slack (the narrowest drawn gap in the
- * face census is 6 px). The Segoe UI option keeps the wider gap and its
- * slack, since its estimate credits side bearings. */
-const TRIPLE_LABEL_GAP_TAHOMA = 5;
-/** Whole one step under the ladder's floor beats cut at it: beside "71.4 °C"
- * "Core Max" draws whole at 11 px where 12 px ellipsizes it to "Core…".
+/** Whole one step under the ladder's floor beats cut at it: beside "61.0°C"
+ * "GPU Temp" draws whole at 11 px where 12 px would cut it.
  * Tahoma only, and only when no ladder size fits the label whole. */
 const TRIPLE_LABEL_WHOLE_MIN = 11;
 /** No label renders below this budget: a lone ellipsis is noise, and the
@@ -646,7 +738,7 @@ function tripleChunkWidth(row: TripleKeyRow, valueSize: number): number {
  */
 export function tripleValueFontSize(rows: readonly (TripleKeyRow | null)[]): number {
 	for (const size of TRIPLE_VALUE_SIZES) {
-		if (rows.every((row) => row === null || tripleChunkWidth(row, size) <= TRIPLE_CHUNK_MAX)) {
+		if (rows.every((row) => row === null || tripleChunkWidth(row, size) <= (isTahoma() && size === 16 ? TRIPLE_CHUNK_MAX_16_TAHOMA : TRIPLE_CHUNK_MAX))) {
 			return size;
 		}
 	}
@@ -680,16 +772,19 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 		}
 		const chunkWidth = tripleChunkWidth(row, valueSize);
 		const tahoma = isTahoma();
-		const labelBudget = TRIPLE.rowWidth - chunkWidth - (tahoma ? TRIPLE_LABEL_GAP_TAHOMA : TRIPLE_LABEL_GAP);
+		// Tahoma: the label's ink ends a clear gap before the chunk's first ink
+		// column, both measured; Segoe UI keeps its advance budget and gap.
+		const chunkInk = tahoma ? inkEdges([{ text: row.valueText, fontSize: valueSize, fontWeight: 700 }, { text: row.unitText, fontSize: TRIPLE_UNIT_SIZE }], "end", TRIPLE.valueRight).left : 0;
+		const labelBudget = tahoma ? chunkInk - INK_CLEAR_GAP - TRIPLE.labelX : TRIPLE.rowWidth - chunkWidth - TRIPLE_LABEL_GAP;
 		if (labelBudget < TRIPLE_LABEL_MIN_BUDGET) {
-			return { chunkWidth, label: null };
+			return { chunkWidth, chunkInk, label: null };
 		}
-		const slack = tahoma ? 0 : 2;
-		let label = fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, { minimumSlack: slack });
-		if (tahoma && label.text !== row.label && estimateKeyTextWidth(row.label, TRIPLE_LABEL_WHOLE_MIN) <= labelBudget) {
+		const fitsInk = (line: string, size: number): boolean => inkEdges([{ text: line, fontSize: size }], "start", TRIPLE.labelX).right <= chunkInk - INK_CLEAR_GAP;
+		let label = tahoma ? fitLadderBy(row.label, TRIPLE_LABEL_SIZES, fitsInk) : fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, { minimumSlack: 2 });
+		if (tahoma && label.text !== row.label && fitsInk(row.label, TRIPLE_LABEL_WHOLE_MIN)) {
 			label = { text: row.label, fontSize: TRIPLE_LABEL_WHOLE_MIN };
 		}
-		return { chunkWidth, label: label.text === "" || label.text === "…" ? null : label };
+		return { chunkWidth, chunkInk, label: label.text === "" || label.text === "…" ? null : label };
 	});
 	const minLabelSize = Math.min(...fitted.map((f) => (f !== null && f.label !== null ? f.label.fontSize : Number.POSITIVE_INFINITY)));
 	const parts: string[] = svgOpen(144, 144, palette.bg);
@@ -699,7 +794,7 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 		}
 		const baseline = TRIPLE.baselines[i] as number;
 		const band = TRIPLE_BANDS[i] as (typeof TRIPLE_BANDS)[number];
-		const fit = fitted[i] as { chunkWidth: number; label: FittedText | null };
+		const fit = fitted[i] as { chunkWidth: number; chunkInk: number; label: FittedText | null };
 		if (fit.label !== null) {
 			// A size already fitted only shrinks under the cap, never grows,
 			// so the fitted text stays valid at the capped size. A whole label
@@ -707,7 +802,11 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 			const size = Math.min(fit.label.fontSize, Math.max(minLabelSize, TRIPLE_LABEL_SIZES[TRIPLE_LABEL_SIZES.length - 1] as number) + TRIPLE_LABEL_SPREAD);
 			parts.push(
 				`<text x="${TRIPLE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${size}" font-weight="600" fill="${text.label}">${escapeXml(fit.label.text)}</text>`,
-				`<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
+				// Tahoma: the mask starts 1.5 px before the chunk's ink, past the
+				// label's last ink column, which ends the clear gap before it.
+				isTahoma()
+					? `<rect x="${(fit.chunkInk - 1.5).toFixed(1)}" y="${band.top}" width="${(141.5 - fit.chunkInk).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
+					: `<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
 			);
 		}
 		const unit = row.unitText !== "" ? `<tspan font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</tspan>` : "";
@@ -848,7 +947,11 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 				// inside 50; any slack here would push WWWW into an ellipsis).
 				// No letter-spacing: the app's QtSvg draws none, so it is
 				// neither priced nor written.
-				const fit = fitTextLadder(micro, QUAD_LABEL_BUDGET, QUAD_LABEL_SIZES, { fontWeight: 700 });
+				// Tahoma: ink inside 26 px either side of the cell center, cut by
+				// the lens on the outer side (10..62 left, 82..133 right).
+				const fit = isTahoma()
+					? fitLadderBy(micro, QUAD_LABEL_SIZES, (line, size) => inksWithin([{ text: line, fontSize: size, fontWeight: 700 }], "middle", cx, Math.max(LENS.first, cx - 26), Math.min(LENS.last, cx + 26)))
+					: fitTextLadder(micro, QUAD_LABEL_BUDGET, QUAD_LABEL_SIZES, { fontWeight: 700 });
 				parts.push(`<text x="${cx}" y="${top + 20}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="700" fill="${cell.color}">${escapeXml(fit.text)}</text>`);
 			}
 		}
@@ -911,6 +1014,10 @@ export interface StatusKeyOptions {
 	returnMark?: boolean;
 }
 
+/** The first column a Back tile's sub-line may ink: the return hook's ink
+ * ends at column 34, then the census's two clear columns. */
+const STATUS_HOOK_CLEAR = 37;
+
 export function renderStatusKey(opts: StatusKeyOptions): string {
 	// True black so the key vanishes into an OLED panel (no backlight glow,
 	// no burn-in worry) and stays calm on the desk.
@@ -925,11 +1032,20 @@ export function renderStatusKey(opts: StatusKeyOptions): string {
 		const y = single ? 104 : 100 + i * 22;
 		// Tahoma fits the status lines to its title band: Tahoma Bold "Sensor
 		// missing" at 19 px is 146 px, wider than the key.
-		const fit = isTahoma() ? fitTextLadder(lines[i] as string, labelBand(), headline ? [19, 18, 17, 16, 15, 14] : [13, 12]) : { text: lines[i] as string, fontSize: headline ? 19 : 13 };
+		// Tahoma: the largest size the lens shows whole. A Back tile's sub-line
+		// shares the return hook's rows (its ink ends at column 34), so it keeps
+		// a clear gap after it: centered while it clears, else centered on the
+		// hook-free span, x=37..133.
+		const hookSide = !headline && opts.returnMark === true;
+		const clears = (line: string, size: number): boolean => inksWithin([{ text: line, fontSize: size }], "middle", 72, hookSide ? STATUS_HOOK_CLEAR : LENS.first, LENS.last);
+		const x = hookSide && !clears(lines[i] as string, 13) && !clears(lines[i] as string, 12) ? 85 : 72;
+		const fit = isTahoma()
+			? fitLadderBy(lines[i] as string, headline ? [19, 18, 17, 16, 15, 14] : [13, 12], (line, size) => inksWithin([{ text: line, fontSize: size }], "middle", x, hookSide ? STATUS_HOOK_CLEAR : LENS.first, LENS.last))
+			: { text: lines[i] as string, fontSize: headline ? 19 : 13 };
 		// Hierarchy comes from size + color, not weight — both stay >=600 so the
 		// strokes survive the 0.5x downscale to the 72 px physical key.
 		parts.push(
-			`<text x="72" y="${y}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="600" fill="${headline ? "#d6d9de" : "#6b7280"}">${escapeXml(fit.text)}</text>`
+			`<text x="${isTahoma() ? x : 72}" y="${y}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="600" fill="${headline ? "#d6d9de" : "#6b7280"}">${escapeXml(fit.text)}</text>`
 		);
 	}
 	if (opts.returnMark === true) {

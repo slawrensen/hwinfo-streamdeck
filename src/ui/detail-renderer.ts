@@ -5,9 +5,9 @@
  * restart inside the view). Reading slots and the Back tile reuse the
  * ordinary reading renderer; these tiles are the only new furniture.
  */
-import { wrapLabelTwoLines, wrapLabelTwoLinesPx } from "./format";
+import { wrapLabelTwoLines, wrapLabelTwoLinesBy } from "./format";
 import { isTahoma } from "./face-font";
-import { escapeXml, fontFamily, renderStatusKey, svgOpen } from "./key-renderer";
+import { escapeXml, fontFamily, inKeyLens, renderStatusKey, svgOpen } from "./key-renderer";
 import { mixToward, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
@@ -22,7 +22,9 @@ export interface DetailTitleKeyOptions {
 /** The title/page tile: the group name over the visible slot range. */
 export function renderDetailTitleKey(opts: DetailTitleKeyOptions): string {
 	const parts = svgOpen(144, 144, opts.palette.bg);
-	const lines = isTahoma() ? wrapLabelTwoLinesPx(opts.title, 16, 120, 120) : wrapLabelTwoLines(opts.title, 14, 14);
+	// Tahoma: each 16 px line keeps its ink inside the key's lens.
+	const lineFits = (line: string): boolean => inKeyLens([{ text: line, fontSize: 16 }]);
+	const lines = isTahoma() ? wrapLabelTwoLinesBy(opts.title, lineFits, lineFits) : wrapLabelTwoLines(opts.title, 14, 14);
 	const single = lines.length === 1;
 	for (let i = 0; i < lines.length; i++) {
 		parts.push(`<text x="72" y="${single ? 56 : 44 + i * 24}" text-anchor="middle" font-family="${fontFamily()}" font-size="16" font-weight="600" fill="${opts.text.label}">${escapeXml(lines[i] as string)}</text>`);

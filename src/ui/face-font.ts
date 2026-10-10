@@ -15,6 +15,8 @@
  * labels to their values on hardware).
  */
 
+import { TAHOMA_BOLD_BLOCKS, TAHOMA_BOLD_UNITS_PER_EM } from "./tahoma-bold-metrics";
+
 export type FaceFontId = "tahoma" | "segoe-ui";
 
 export interface FaceFontProfile {
@@ -23,6 +25,11 @@ export interface FaceFontProfile {
 	readonly family: string;
 	/** Measured advances at the 12 px basis, at the label weight. */
 	readonly advance12: Readonly<Record<string, number>>;
+	/** Where each glyph's ink sits inside its advance at the 12 px basis:
+	 * [lead, trail], or null for a blank glyph (a space) that inks nothing.
+	 * Only a face whose ink is measured carries it (Tahoma); without it every
+	 * glyph inks its whole advance. */
+	readonly insets12?: ReadonlyMap<string, readonly [number, number] | null>;
 	/** Unmapped non-wide glyphs (µ, Ω, §, ...): a near-worst measured advance,
 	 * so an odd custom name over-prices instead of leaving the face. */
 	readonly unmapped12: number;
@@ -75,43 +82,30 @@ const SEGOE_UI_SEMIBOLD_12: Readonly<Record<string, number>> = {
 };
 
 /**
- * Tahoma Bold advances at the 12 px basis, measured 2026-10-02 through the
- * app's own QtSvg 6.9.3 by string differencing at 96 px (8x the basis),
- * rounded UP to 0.05. They match the font's own advance table (tahomabd.ttf)
- * to 0.01 and hold linear at 12, 16 and 20 px. Tahoma has no 600 weight:
- * QtSvg draws 600 and 700 as the same Bold face, so one table serves both.
+ * Tahoma Bold at the 12 px basis, from the generated font metrics
+ * (tahoma-bold-metrics.ts): the exact advances, which the app's QtSvg 6.9.3
+ * draws to within 0.02 px and holds linear in size, and each glyph's ink
+ * insets. Tahoma has no 600 weight: QtSvg draws 600 and 700 as the same Bold
+ * face (identical pixels on 1,554 probe strings), so one table serves both.
  */
-const TAHOMA_BOLD_12: Readonly<Record<string, number>> = {
-	"0": 7.65, "1": 7.65, "2": 7.65, "3": 7.65, "4": 7.65, "5": 7.65, "6": 7.65, "7": 7.65, "8": 7.65, "9": 7.65,
-	A: 8.25, B: 8.25, C: 8.05, D: 9.1, E: 7.4, F: 7, G: 8.95, H: 9.2, I: 5.8, J: 6, K: 8.4, L: 6.9, M: 10.75, N: 9.25,
-	O: 9.25, P: 7.9, Q: 9.25, R: 8.75, S: 7.6, T: 7.35, U: 8.9, V: 8.1, W: 12.35, X: 8.25, Y: 8.05, Z: 7.5,
-	a: 7.2, b: 7.6, c: 6.35, d: 7.6, e: 7.15, f: 4.6, g: 7.6, h: 7.7, i: 3.65, j: 4.4, k: 7.25, l: 3.65, m: 11.45,
-	n: 7.7, o: 7.45, p: 7.6, q: 7.6, r: 5.2, s: 6.2, t: 5, u: 7.7, v: 6.95, w: 10.7, x: 7.25, y: 6.95, z: 6.3,
-	" ": 3.55, "(": 5.45, ")": 5.45, "/": 6.95, ".": 3.75, ",": 3.75, "'": 3.35, ":": 4.4, ";": 4.4, "!": 4.15, "|": 7.65,
-	"%": 14.4, "°": 6.25, "…": 12, "#": 9.85, "+": 9.85, "-": 5.2, _: 7.65, "&": 9.4, "=": 9.85, "~": 9.85, "*": 7.65,
-	"[": 5.45, "]": 5.45, "<": 9.85, ">": 9.85, '"': 5.9, "?": 6.8, "@": 11.05, "▼": 11.9, "▲": 11.9, "·": 4.4, µ: 7.8, Ω: 9.25,
-	// Greek, Cyrillic and the dashes, measured 2026-10-02 the same way: the
-	// wide Cyrillic capitals reach 13.55, past the 12.35 unmapped rate.
-	"Α": 8.25, "Β": 8.25, "Γ": 6.8, "Δ": 8.45, "Ε": 7.4, "Ζ": 7.5, "Η": 9.2, "Θ": 9.25, "Ι": 5.8, "Κ": 8.4, "Λ": 8.1, "Μ": 10.75,
-	"Ν": 9.25, "Ξ": 7.6, "Ο": 9.25, "Π": 9.2, "Ρ": 7.9, "Σ": 7.35, "Τ": 7.35, "Υ": 8.05, "Φ": 10.55, "Χ": 8.25, "Ψ": 10.85, "α": 7.6,
-	"β": 7.7, "γ": 6.95, "δ": 7.4, "ε": 6.3, "ζ": 5.8, "η": 7.7, "θ": 7.6, "ι": 3.65, "κ": 7.2, "λ": 6.95, "μ": 7.85, "ν": 6.95,
-	"ξ": 6.15, "ο": 7.4, "π": 7.8, "ρ": 7.6, "σ": 7.9, "ς": 6.05, "τ": 6.25, "υ": 7.65, "φ": 10.05, "χ": 6.75, "ψ": 10.25, "ω": 9.75,
-	"Ά": 8.75, "Έ": 9.45, "Ή": 11.25, "Ί": 7.95, "Ό": 10.75, "Ύ": 10.55, "Ώ": 10.85, "ά": 7.6, "έ": 6.3, "ή": 7.7, "ί": 3.65, "ό": 7.4,
-	"ύ": 7.65, "ώ": 9.75, "ϊ": 3.65, "ϋ": 7.65, "ΐ": 3.65, "ΰ": 7.65, "Ϊ": 5.8, "Ϋ": 8.05, "А": 8.25, "Б": 8.25, "В": 8.25, "Г": 6.8,
-	"Д": 9.25, "Е": 7.4, "Ё": 7.4, "Ж": 12.55, "З": 7.65, "И": 9.3, "Й": 9.3, "К": 8.4, "Л": 9.35, "М": 10.75, "Н": 9.2, "О": 9.25,
-	"П": 9.2, "Р": 7.9, "С": 8.05, "Т": 7.35, "У": 8.05, "Ф": 10.55, "Х": 8.25, "Ц": 9.35, "Ч": 8.65, "Ш": 13.1, "Щ": 13.25, "Ъ": 9.7,
-	"Ы": 11.55, "Ь": 8.15, "Э": 8.05, "Ю": 13.55, "Я": 8.6, "а": 7.2, "б": 7.55, "в": 7.3, "г": 6, "д": 7.8, "е": 7.15, "ё": 7.15,
-	"ж": 10.65, "з": 6.3, "и": 7.85, "й": 7.85, "к": 7.25, "л": 7.85, "м": 9.1, "н": 7.8, "о": 7.4, "п": 7.8, "р": 7.6, "с": 6.35,
-	"т": 6.25, "у": 6.9, "ф": 10.65, "х": 7.25, "ц": 7.9, "ч": 7.4, "ш": 11.1, "щ": 11.25, "ъ": 8.15, "ы": 10.15, "ь": 6.9, "э": 6.4,
-	"ю": 11.1, "я": 7.35, "І": 5.8, "Ї": 5.8, "Є": 8.05, "Ґ": 6.8, "і": 3.65, "ї": 3.65, "є": 6.4, "ґ": 6, "—": 10.95, "–": 7.65
-};
+const TAHOMA_BOLD_12: Record<string, number> = {};
+const TAHOMA_INSETS_12 = new Map<string, readonly [number, number] | null>();
+for (const [first, units] of TAHOMA_BOLD_BLOCKS) {
+	const k = 12 / TAHOMA_BOLD_UNITS_PER_EM;
+	for (let i = 0; i + 2 < units.length; i += 3) {
+		const advance = units[i] as number;
+		if (advance === 0) continue;
+		const ch = String.fromCodePoint(first + i / 3);
+		TAHOMA_BOLD_12[ch] = Math.abs(advance) * k;
+		TAHOMA_INSETS_12.set(ch, advance < 0 ? null : [(units[i + 1] as number) * k, (units[i + 2] as number) * k]);
+	}
+}
 
-/** Credit 0: across 595 corpus strings at 12 to 20 px the table then
- * under-prices by at most 0.78 px (never by 1 px), and the app's QtSvg drew
- * no label into a value on any face (a 1.5 credit put 26 back). Titles stand
- * alone on their line, so they keep a 134 px band, about what the 1.6.0 faces
- * drew in: "CPU Package" stays at 20 px and "Total CPU Usage" whole at 16. */
-export const TAHOMA: FaceFontProfile = { id: "tahoma", family: "Tahoma", advance12: TAHOMA_BOLD_12, unmapped12: 12.35, bearingCredit12: 0, boldFactor: 1, valueEm: 0.64, titleBand: 134 };
+/** No bearing credit: fits read each glyph's measured ink instead. Titles
+ * stand alone on their line, so a title 1.6.0 drew keeps its size inside a
+ * 134 px band, about what the 1.6.0 faces drew in: "CPU Package" stays at 20
+ * px and "Total CPU Usage" whole at 16. */
+export const TAHOMA: FaceFontProfile = { id: "tahoma", family: "Tahoma", advance12: TAHOMA_BOLD_12, insets12: TAHOMA_INSETS_12, unmapped12: 12.35, bearingCredit12: 0, boldFactor: 1, valueEm: 0.64, titleBand: 134 };
 /** The bearing credit makes Segoe UI estimates track rasterized ink within
  * +4/-2.5 px at 16 px; without it "Total CPU Usage" (ink 118.4) prices at 121
  * and wrongly ellipsizes. */

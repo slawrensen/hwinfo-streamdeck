@@ -296,5 +296,5 @@ await hero();
 await keys();
 await dials();
 await themes();
-await reframe("detail-view.png", "details.png");
+await reframe("detail-view-filter.png", "details.png");
 await reframe("status-screens.png", "status.png");

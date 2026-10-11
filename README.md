@@ -92,7 +92,7 @@ Seven themes, set per key or once for the whole deck.
 
 A key press can open a full page of readings, then return.
 
-<img src=".github/readme/details.png" width="100%" alt="A detail page listing every reading of one HWiNFO sensor, with a Back key top left">
+<img src=".github/readme/details.png" width="100%" alt="A detail page of the CPU's per-core temperatures, picked by a filter, with a Back key top left">
 
 - Show every reading from the pressed sensor, a list you build, or a filter such as `*gpu*fan*`.
 - Pack up to four readings per tile and page through long sources.

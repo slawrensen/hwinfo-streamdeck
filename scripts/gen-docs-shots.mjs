@@ -458,22 +458,22 @@ async function detailBoard() {
 	};
 	const status = { state: "ok", snapshot, source: "shared-memory" };
 
-	const render = async (outName, mirrorIndex) => {
+	const render = async (outName, mirrorIndex, view = { group, groupSettings: { readingKey: primary.key } }) => {
 		const state = {
 			deviceId: "docs",
 			profileName: profile.name,
 			pageSize: profile.layout.readings.length,
 			primaryKey: primary.key,
-			groupSettings: { readingKey: primary.key },
+			groupSettings: view.groupSettings,
 			presentation: {},
-			group,
+			group: view.group,
 			offset: 0,
 			statModes: new Map(),
 			surfaceCount: 1,
 			pending: false,
 			mirrorSlotIndex: mirrorIndex ?? null
 		};
-		const page = pageOf(group.keys, 0, state.pageSize, mirrorIndex);
+		const page = pageOf(view.group.keys, 0, state.pageSize, mirrorIndex);
 		const faceAt = (column, row) => {
 			const nav = profile.layout.nav;
 			if (nav.back.column === column && nav.back.row === row) return composeBackFace(state, status, ctx);
@@ -508,6 +508,17 @@ async function detailBoard() {
 
 	await render("detail-view.png", undefined);
 	await render("detail-second-back.png", 4); // reading slot 4 = cell 2,1
+
+	// The README's board: a filter whose matches carry short labels (the
+	// per-core temperatures, Core0 (CCD1) and on) under a title tile set to
+	// "CPU", so every tile reads whole. The docs page keeps the default
+	// whole-sensor page above.
+	const filterSettings = { readingKey: primary.key, detailMode: "filter", detailFilter: "(CCD", detailTitle: "CPU" };
+	const filterGroup = resolveDetailGroup(snapshot, filterSettings);
+	if (filterGroup === null || filterGroup.keys.length < 11) {
+		throw new Error("detail board: the (CCD filter matched fewer than a page of readings");
+	}
+	await render("detail-view-filter.png", undefined, { group: filterGroup, groupSettings: filterSettings });
 }
 
 /**

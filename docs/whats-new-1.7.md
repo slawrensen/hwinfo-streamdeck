@@ -8,7 +8,7 @@ changes how sources, identities and history are handled.** The upgrade
 rewrites no stored settings. The tables below say where a change needs you to act; the
 [changelog](changelog.md) lists every change.
 
-## The settings panels
+## UX improvements in the settings panels
 
 The Sensor Reading, Sensor Dial and HWiNFO Control panels share one layout.
 On a key or dial, a header stays at the top while you scroll: the face

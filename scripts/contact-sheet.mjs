@@ -5,6 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
+import { drawnZones } from "../src/ui/gauge";
 import { renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer";
 import { classifyTypeAccent, loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType } from "../src/hwinfo/types";
@@ -35,6 +36,8 @@ const HEADER = 22;
 // the multi-readout layouts and the two bounded-value gauges. The themes rows
 // above are all single faces, so without this the sheet never shows the
 // layouts at all.
+// Zone spans as the gauge model emits them, muted like the device draws them.
+const ZONE_SPANS = [{ from: 0.8, to: 0.9, level: "warn" }, { from: 0.9, to: 1, level: "crit" }];
 const FACES_ROW_Y = HEADER + 3 * CELL + 14;
 // Dial slots are drawn at their real size relative to a key, not at the size
 // their images happen to be. A key icon is 144x144 and a dial slot renders
@@ -124,7 +127,7 @@ const FACES = [
 		name: "bar",
 		svg: renderReadingKey({
 			label: "Total CPU Usage", valueText: "37.4", unitText: "%", statBadge: "",
-			gauge: { kind: "bar", fraction: 0.374, zones: [{ from: 0.8, to: 0.9, color: config.alerts.warn.bg }, { from: 0.9, to: 1, color: config.alerts.crit.bg }] },
+			gauge: { kind: "bar", fraction: 0.374, zones: drawnZones(ZONE_SPANS, config.alerts, facePalette("load").bg) },
 			palette: facePalette("load")
 		})
 	},
@@ -132,7 +135,7 @@ const FACES = [
 		name: "ring",
 		svg: renderReadingKey({
 			label: "CPU (Tctl/Tdie)", valueText: "56.3", unitText: "°C", statBadge: "",
-			gauge: { kind: "ring", fraction: 0.62, zones: [{ from: 0.8, to: 0.9, color: config.alerts.warn.bg }, { from: 0.9, to: 1, color: config.alerts.crit.bg }] },
+			gauge: { kind: "ring", fraction: 0.62, zones: drawnZones(ZONE_SPANS, config.alerts, facePalette("temperature").bg) },
 			palette: facePalette("temperature")
 		})
 	}

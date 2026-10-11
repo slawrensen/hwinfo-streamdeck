@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import { renderDial, renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer.ts";
+import { drawnZones } from "../src/ui/gauge.ts";
 import { renderDualKey, renderQuadKey, renderReadingKey, renderTripleKey } from "../src/ui/key-renderer.ts";
 import { loadThemes, resolvePalette } from "../src/ui/themes.ts";
 
@@ -24,7 +25,9 @@ mkdirSync(outDir, { recursive: true });
 
 const config = loadThemes();
 const pal = (theme, accent = null, level = "normal") => resolvePalette(config, theme, accent, level);
-const ZONES = [{ from: 0.8, to: 0.9, color: config.alerts.warn.bg }, { from: 0.9, to: 1, color: config.alerts.crit.bg }];
+// Zone spans as the gauge model emits them; drawnZones mutes them toward the
+// face background the way the device draws them.
+const ZONES = [{ from: 0.8, to: 0.9, level: "warn" }, { from: 0.9, to: 1, level: "crit" }];
 
 // The docs boards' own background, so cut tiles keep their edges.
 const PANEL = { r: 0x11, g: 0x13, b: 0x17, alpha: 1 };
@@ -91,7 +94,7 @@ function history(seed, from, to, n = 36) {
 }
 
 const spark = (palette, label, valueText, unitText, seed, from, to) => renderReadingKey({ label, valueText, unitText, statBadge: "", history: history(seed, from, to), palette });
-const gauge = (palette, label, valueText, unitText, kind, fraction) => renderReadingKey({ label, valueText, unitText, statBadge: "", gauge: { kind, fraction, zones: ZONES }, palette });
+const gauge = (palette, label, valueText, unitText, kind, fraction) => renderReadingKey({ label, valueText, unitText, statBadge: "", gauge: { kind, fraction, zones: drawnZones(ZONES, config.alerts, palette.bg) }, palette });
 const single = (palette, title, value, unit, min, max, fraction, barColor = palette.accent) =>
 	renderDial({ title, valueText: value, unitText: unit, statsText: `▼ ${min}   ▲ ${max}   session`, fraction, palette, barColor });
 const threeRows = (palette, rows, selected, stats, colors = []) =>

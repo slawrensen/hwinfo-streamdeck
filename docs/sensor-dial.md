@@ -19,7 +19,7 @@ The slot draws four things, top to bottom:
 | --- | --- |
 | **Title** | Your **Title on the dial**. Left blank, the name you gave the reading with **Rename** in the rotation list, else HWiNFO's label. |
 | **Value + unit** | The live reading, formatted per **Decimals**, with the unit inline. A stat badge (`· MIN`, `· MAX`, `· AVG`) is appended when you're viewing a session stat instead of the live value. |
-| **Stats line** | `▼ <low>   ▲ <high>   session`: the lowest and highest values seen this session. `pinned` replaces `session` while the dial is pinned, and `cycle paused` while its auto cycle is paused. A line too long for 12 px draws at 11 px instead of losing a word. A short message (a group name after a group jump, `stats reset`) takes the whole line for a moment. |
+| **Stats line** | `▼ <low>   ▲ <high>   session`: the lowest and highest values seen this session. `pinned` replaces `session` while the dial is pinned, and `cycle paused` while its auto cycle is paused. A line too long for 12 px draws at 11 px; only a line too long even then loses words, `session` first. A short message (a group name after a group jump, `stats reset`) takes the whole line for a moment. |
 | **Range bar** | A fill showing where the **live** value sits between the bar's min and max. |
 
 The bar always tracks the live value, even while you're touching through MIN / MAX / AVG on the number above it.

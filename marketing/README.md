@@ -17,14 +17,12 @@ remain in that release; the [original script](https://github.com/slawrensen/hwin
 records their source. The colored multi-row examples were not achievable
 with released settings.
 
-Replace `shot-7-dial-views.png` (the customer's image), `shot-1-hero.png` and
-`thumbnail.png` with the corrected default renders here for the stable
-listing. Their normal numeric Text styling is achievable in 1.6.0.
-Automatic category colors require **Color numbers by sensor type** under
+`shot-7-dial-views.png`, `shot-1-hero.png` and `thumbnail.png` use the
+default numeric Text styling. Automatic category colors require **Color numbers by sensor type** under
 Display, Text color on Theme text or Dimmed, and Accent colors on By sensor
-type. The unreleased 1.7 candidate also has individual **Reading colors**,
-which also work with Accent colors on Theme accent everywhere. Neither option exists in stable 1.6.0. Regenerating assets does
-not update the Marketplace listing.
+type. 1.7 also has individual **Reading colors**, which also work with
+Accent colors on Theme accent everywhere; neither option exists in 1.6.0.
+Regenerating assets does not update the Marketplace listing.
 
 `issue-31/before-after.png` compares identical fixtures through the production
 composer, changing only the new setting. Both temperatures share pink, fan
@@ -39,11 +37,13 @@ Paper and unknown categories keep normal text.
 | `app-icon-288.png` | Marketplace app icon | 288x288 |
 | `thumbnail.png` | Listing thumbnail | 1920x960 |
 | `shot-1-hero.png` | Gallery 1: sample-data deck render | 1920x960 |
-| `shot-2-hardware.png` | Gallery 2: real Stream Deck + XL photograph board | 1920x960 |
-| `shot-3-themes.png` | Gallery 3: all seven themes + alert states | 1920x960 |
-| `shot-4-settings.png` | Gallery 4: the real settings panel | 1920x960 |
-| `shot-5-dials.png` | Gallery 5: Stream Deck + dials | 1920x960 |
-| `shot-7-dial-views.png` | Gallery 7: production-composed sample dial views | 1920x960 |
+| `shot-6-multi.png` | Gallery 2: two, three and four readings on one key | 1920x960 |
+| `shot-8-drilldown.png` | Gallery 3: a key opens a page of the whole sensor | 1920x960 |
+| `shot-2-hardware.png` | Gallery 4: real Stream Deck + XL photograph board | 1920x960 |
+| `shot-4-settings.png` | Gallery 5: the settings panel | 1920x960 |
+| `shot-7-dial-views.png` | Gallery 6: production-composed sample dial views | 1920x960 |
+| `shot-3-themes.png` | Gallery 7: all seven themes + alert states | 1920x960 |
+| `shot-5-dials.png` | Generated, not uploaded: Stream Deck + dials | 1920x960 |
 | `hwinfo-streamdeckxlplus.png` | Photo master: Camera Raw develop of the Sony A7 III capture | source |
 | `hwinfo-streamdeckxlplus-squared.png` | Photo master as the board consumes it; the board's default source | source |
 
@@ -54,8 +54,9 @@ are not size-checked.
 
 ## Regenerate
 
-Shots 1, 3, 5 and the thumbnail render straight from the renderers with live
-HWiNFO running:
+Shots 1, 3, 5, 6, 7, 8 and the thumbnail render straight from the renderers
+with live HWiNFO running. Shot 8 shows the GPU's fans, so render it with the
+GPU under load:
 
 ```bash
 npx tsx scripts/marketplace-shots.mjs marketing
@@ -85,8 +86,8 @@ Shot 4 uses `pi-picker-block.png`, `pi-key-quad-rows.png` and
 skips the other boards, though loading the script still needs HWiNFO Shared
 Memory with the readings named in `K` (the CPU temperature and pump rows). On a machine without an
 RTX 4090, set `PI_CAPTURE_FILTER` (for example `*GPU*`) for the capture's
-filter step. The 1.7 shot 4 was built this way on 2026-10-09 from panel
-build 1.7.0.0-d26 with the filter `*GPU*`.
+filter step. The 1.7 shot 4 was built this way on 2026-10-11 from panel
+build 1.7.0.0-d28 with the filter `*GPU*`.
 
 Shot 2 wraps the real-hardware photograph in the standard board chrome:
 
@@ -153,8 +154,8 @@ of the physical display or a replacement for the stable Marketplace assets.
 
 ## 1.7 documentation images
 
-These additions document the unreleased 1.7 candidate. They do not replace
-the stable Marketplace gallery:
+These images document 1.7 on the docs site. They are not Marketplace
+gallery images:
 
 - `docs/assets/img/dial-reading-colors-1.7.png`: fixed sample data composed by
   the production dial action. Three-row and two-row examples compare
@@ -163,9 +164,9 @@ the stable Marketplace gallery:
 - `docs/assets/img/reading-status-1.7.png`: simulated source states rendered
   by the production key and dial code. It shows Source busy, no new Shared
   Memory data and Gadget Age unknown.
-- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the 1.7 candidate's
-  settings panel (its build is in the image's provenance file) captured through the local test host with
-  live HWiNFO. It is a settings-panel capture of an unreleased build.
+- `docs/assets/img/pi-dial-reading-colors-1.7.png`: the 1.7 settings panel
+  (its build is in the image's provenance file) captured through the local
+  test host with live HWiNFO.
 
 The first two are sample-data renders. None is a photograph of a physical
 display. Generate them with `npx tsx scripts/docs-v17-images.mjs`; capture

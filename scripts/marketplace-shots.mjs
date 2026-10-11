@@ -30,7 +30,7 @@ const sensorValueColors = process.argv.includes("--sensor-value-colors");
 applyGlobalThemeSettings({ theme: "void", textMode: "theme", typeAccents: "on" });
 const dialCaption = sensorValueColors
 	? "PREVIEW ONLY: Color numbers by sensor type ON; Text: Theme; Type accents: ON"
-	: "Sample-data renders; multi-row numbers use stable Theme text";
+	: "Sample-data renders; multi-row numbers use Theme text";
 
 // ---------- live data ----------
 const provider = SharedMemoryProvider.open();
@@ -283,8 +283,8 @@ async function themes() {
 	const rowY = [246, 246 + KEY + 54];
 
 	const chrome = [
-		`<text x="960" y="96" text-anchor="middle" font-family="${FONT}" font-size="52" font-weight="700" fill="${HEADLINE}">Seven themes. One instrument.</text>`,
-		`<text x="960" y="142" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Per key or deck-wide. Anchors never move, only the palette changes.</text>`,
+		`<text x="960" y="96" text-anchor="middle" font-family="${FONT}" font-size="52" font-weight="700" fill="${HEADLINE}">Seven themes, per key or deck-wide.</text>`,
+		`<text x="960" y="142" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Set one theme for the deck or choose a theme per action. Only the palette changes.</text>`,
 		`<text x="960" y="${rowY[0] - 62}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">type accents ON: the line follows the sensor type, the same red in every theme</text>`,
 		`<text x="960" y="${rowY[1] - 30}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">type accents OFF: the line follows the theme instead</text>`,
 		`<text x="960" y="${rowY[1] + KEY + 64}" text-anchor="middle" font-family="${FONT}" font-size="21" fill="${BODY}">Alerts are global and never themed: amber field with black text at warn, red with white at critical.</text>`
@@ -618,7 +618,7 @@ async function settings(piDir) {
 
 	const chrome = [
 		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">The settings panel, live.</text>`,
-		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">The real settings panel, not a mockup: search with live values, stack up to four, aim a drill-down key.</text>`
+		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Captured from the settings panel: search with live values, stack up to four, aim a drill-down key.</text>`
 	];
 	const composites = [];
 	for (let i = 0; i < panels.length; i++) {

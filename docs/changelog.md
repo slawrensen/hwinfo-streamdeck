@@ -15,7 +15,7 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
-## 1.7.0.0 - Unreleased
+## 1.7.0.0 - 2026-10-11
 
 Redesigned settings panels, per-reading dial colors and reliability
 fixes in one release.

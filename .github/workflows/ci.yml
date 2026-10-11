@@ -80,7 +80,7 @@ jobs:
           npm run e2e:resilience
       - name: Retain recovery stock logs
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: producer-recovery-logs
           path: com.lawrensen.hwinfo.sdPlugin/logs/
@@ -100,7 +100,7 @@ jobs:
         run: node scripts/qualify.mjs --stages pack,archive,abi,recovery,tree --out qualification-ci
       - name: Retain the CI pack and its qualification record
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ci-pack-qualification
           path: |
@@ -109,7 +109,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Upload built addon for the ABI matrix
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hwsm-node20-build
           path: native/hwsm/build/Release/hwsm.node

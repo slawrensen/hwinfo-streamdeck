@@ -617,7 +617,7 @@ async function settings(piDir) {
 	const captionY = 908;
 
 	const chrome = [
-		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">The settings panel, live.</text>`,
+		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">Simple setup.</text>`,
 		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Captured from the settings panel: search with live values, stack up to four, aim a drill-down key.</text>`
 	];
 	const composites = [];

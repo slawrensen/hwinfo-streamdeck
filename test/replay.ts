@@ -163,10 +163,11 @@ export function replayTrace(fixture: TraceFixture, snapshot: SensorSnapshot = st
 					: event.event === "dialRotate"
 						? { kind: "dialRotate", at, ticks: event.ticks ?? 1, pressed: event.pressed === true }
 						: { kind: "touchTap", at, hold: event.hold === true, x: event.tapX ?? CANVAS_WIDTH / 2, canvasWidth: CANVAS_WIDTH };
+		const firstDown = model.gesture.downAt === null;
 		const routed = routeGesture(model.gesture, input, scheme.touchZones);
 		model.gesture = routed.state;
 
-		if (event.event === "dialDown" && scheme.pushTiming === "down") {
+		if (event.event === "dialDown" && scheme.pushTiming === "down" && firstDown) {
 			// Legacy: the push command fires immediately and consumes the press.
 			model.gesture = { downAt: model.gesture.downAt, rotatedWhileDown: true };
 			execute(model, scheme.shortPress, 0);

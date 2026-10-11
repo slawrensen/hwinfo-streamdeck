@@ -25,20 +25,35 @@ export interface SensorSource {
 
 /** A single reading, e.g. "CPU (Tctl/Tdie) = 56.3 °C". */
 export interface Reading {
+	/** Every key that resolves to this measurement (its provider key and the
+	 * confirmed aliases: explicit cross-provider links, and legacy Gadget keys
+	 * kept resolvable), in the runtime's lookup order. Absent when the key
+	 * stands alone. */
+	readonly linkedKeys?: readonly string[];
+	/** The provider's own key when this entry is a confirmed alias of it;
+	 * absent on the provider's own entry. Personalization stays keyed by the
+	 * saved key; sessions and history follow this identity. */
+	readonly aliasOf?: string;
 	/**
-	 * Stable identity of this reading across HWiNFO restarts:
-	 * `sensorId:sensorInstance:readingId` (hex), with `~n` appended for
-	 * duplicates. Persist this in action settings — never the array index.
+	 * Stable identity of this reading across HWiNFO restarts. Shared Memory:
+	 * `sensorId:sensorInstance:readingId` (sensor id and reading id in hex,
+	 * the instance in decimal); a tuple that occurs twice, or whose owner is
+	 * missing, is withheld rather than numbered. Gadget: the source name and
+	 * label (see gadget-identity.ts). Persist this in action settings, never
+	 * the array index.
 	 */
 	readonly key: string;
 	readonly type: SensorType;
-	/** Index of the owning sensor in {@link SensorSnapshot.sensors}, or -1. */
+	/** Index of the owning sensor in {@link SensorSnapshot.sensors}. */
 	readonly sensorIndex: number;
 	readonly id: number;
 	/** Effective display label (user rename respected, UTF-8 preferred). */
 	readonly label: string;
 	readonly unit: string;
 	readonly value: number;
+	/** Producer history capability. Omitted on legacy snapshots means producer
+	 * history; unavailable sources must not substitute their current value. */
+	readonly statistics?: "producer" | "unavailable";
 	readonly valueMin: number;
 	readonly valueMax: number;
 	readonly valueAvg: number;
@@ -56,7 +71,20 @@ export interface Reading {
  * cache `Reading` objects across ticks expecting historical values.
  */
 export interface SensorSnapshot {
-	/** Unix seconds of HWiNFO's last sensor poll (its clock, same machine). */
+	/** Rendering invalidation for changed explicit provider links. */
+	readonly bindingRevision?: number;
+	/** Gadget readings withheld because their names are incomplete, or
+	 * shared with another row until two scans running show otherwise. */
+	readonly blockedReadingCount?: number;
+	/** Gadget rows withheld because the formatted value contradicts the raw
+	 * value; the plugin log names the slot. */
+	readonly contradictoryReadingCount?: number;
+	/** Finite same-measurement value changes, distinct from render/topology
+	 * revision. Initial decoding is zero. Producer timestamps travel only in
+	 * pollTime so their evidence can be aged independently of value changes. */
+	readonly freshnessRevision?: number;
+	/** Unix seconds of HWiNFO's last sensor poll. Gadget uses the time of an
+	 * observed value change, or zero when no change has been observed. */
 	readonly pollTime: number;
 	/**
 	 * Bumped by the provider whenever any value actually changed or the

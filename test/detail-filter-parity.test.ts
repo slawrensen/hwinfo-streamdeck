@@ -13,7 +13,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { compileDetailFilter, DETAIL_FILTER_MAX } from "../src/detail/detail-settings";
+import { compileDetailFilter, detailFilterOf, DETAIL_FILTER_MAX } from "../src/detail/detail-settings";
 
 const piPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "com.lawrensen.hwinfo.sdPlugin", "ui", "pi-common.js");
 const piSource = readFileSync(piPath, "utf8");
@@ -76,6 +76,24 @@ describe("panel filter parity: the shipped panel matcher agrees with the runtime
 	});
 
 	it("the panel caps the pattern at the runtime's cap", () => {
-		assert.ok(piSource.includes(`.slice(0, ${DETAIL_FILTER_MAX})`), "panel pattern cap no longer matches DETAIL_FILTER_MAX");
+		// Run the actual consumer: the matcher takes an already-salvaged
+		// pattern, and a source-wide string search can match an unrelated cap.
+		const start = piSource.indexOf("const GLOB_STAR");
+		const end = piSource.indexOf("// The armed per-tile add:", start);
+		assert.ok(start !== -1 && end > start, "panel count anchors moved; re-point this suite at the consumer");
+		const count = new Function("detailFilterValue", "tree", "isDetailPrimary", "document", `${piSource.slice(start, end)}; updateFilterCount();`) as
+			(pattern: string, tree: unknown, isPrimary: (key: string) => boolean, document: { getElementById: () => { hidden: boolean; textContent: string } }) => void;
+		const prefix = "a".repeat(DETAIL_FILTER_MAX - 1);
+		const tree = [{ name: "", readings: [{ key: "match", label: `${prefix}b` }, { key: "other", label: `${prefix}c` }] }];
+		for (const raw of [`${prefix}bX`, `  ${prefix}bX  `, `${prefix}b`, "*" + "a".repeat(DETAIL_FILTER_MAX - 3) + "?bX"]) {
+			const el = { hidden: true, textContent: "" };
+			count(raw, tree, () => false, { getElementById: () => el });
+			const parsed = detailFilterOf({ detailFilter: raw });
+			assert.ok(parsed !== undefined);
+			const expected = tree[0]!.readings.filter((reading) => compileDetailFilter(parsed)(` ${reading.label}`)).length;
+			assert.equal(expected, 1, "the fixture must distinguish cap-1, cap, and no cap");
+			assert.equal(el.hidden, false);
+			assert.equal(el.textContent, "Matches 1 reading right now.", JSON.stringify(raw));
+		}
 	});
 });

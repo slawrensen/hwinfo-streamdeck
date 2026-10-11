@@ -30,6 +30,12 @@
   <a href="#build-from-source">Build</a>
 </p>
 
+> [!NOTE]
+> **1.7** redesigns the settings panels, adds individual dial colors and
+> changes how sources, saved readings and HWiNFO's statistics are handled.
+> The upgrade rewrites no stored settings; [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html)
+> says where an upgrade needs you to act.
+
 ## Install
 
 1. **Install** from the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54), or download the `.streamDeckPlugin` from [Releases](https://github.com/slawrensen/hwinfo-streamdeck/releases/latest).
@@ -49,7 +55,7 @@ One reading with a sparkline, bar or ring, or up to four readings on one key.
 
 <img src=".github/readme/keys.png" width="100%" alt="Six key faces: one reading with a sparkline, a bar with warn and critical zones, and a ring; then two sensors on one key, three readings in rows, and four readings in a quad grid">
 
-- Press to cycle current, MIN, MAX and AVG.
+- Press to cycle current, MIN, MAX and AVG: HWiNFO's own statistics over Shared Memory; on the Gadget source they show N/A.
 - Labels size themselves to fit; decimals compact through k, M, G and T.
 - Temperatures in °C or °F; bytes in decimal or binary units.
 
@@ -62,7 +68,8 @@ One reading or several on each Stream Deck + and + XL touchscreen segment, in an
 <img src=".github/readme/dials.png" width="100%" alt="Nine dial faces with sample values across all seven themes: Void with one CPU temperature reading, Ultraviolet with two power readings and trend lines, Forest with three fan rows, Midnight with three temperature rows, Ember with PSU power, Graphite with memory and CPU usage trends, Paper with a core clock, Graphite at a warn value with an amber bar, and Void at a critical value with a red bar">
 
 - **View**: one reading with a range bar, three compact rows, or two rows with big values and a trend line.
-- At warn and critical the bar turns amber or red; the rest of the face keeps its theme.
+- At warn and critical the bar turns amber or red; in the two- and three-row views, which have no bar, the alerting row's number does. The rest of the face keeps its theme.
+- **Reading colors**: give each reading on a two- or three-row dial its own number color, or start from the Signal, Pairs or Uniform presets.
 - Rotate to move through the readings; the marked row follows and the list scrolls. Touch cycles stats; push resets the session.
 - An **HWiNFO Control** key steers a dial from a pedal, a Multi Action or another deck.
 
@@ -75,8 +82,9 @@ Seven themes, set per key or once for the whole deck.
 <img src=".github/readme/themes.png" width="100%" alt="The seven themes (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper) in two rows of keys: with type accents on, each graph takes its sensor type's color; with type accents off, rings, bars and multi-reading keys take each theme's own color. Below, the alert states: an amber warn key, a red critical key, dials whose bar turns amber or red, and a three-row dial whose alerting row turns amber">
 
 - At the warn threshold the key turns amber; at critical, red. Alert colors are the same on every theme.
-- *Alert when below* flips the comparison for fan RPM or free space.
-- Type accents (on by default) color the graph by sensor type; turn them off and each theme uses its own color.
+- **Alert when the value drops to or below these numbers** flips the comparison for fan RPM or free space.
+- **Accent colors** (By sensor type, the default) color the graph by sensor type; choose *Theme accent everywhere* and each theme uses its own color.
+- **Text font** sets the font on every reading key, dial and detail tile: Tahoma, the default and the look every release has drawn, or Segoe UI, lighter and narrower.
 
 **More:** [Themes](https://docs.slawrensen.com/hwinfo-streamdeck/themes.html) · [Thresholds and alerts](https://docs.slawrensen.com/hwinfo-streamdeck/thresholds-alerts.html)
 
@@ -96,7 +104,7 @@ A key press can open a full page of readings, then return.
 
 When a key can't show a reading, it names the problem and the fix.
 
-<img src=".github/readme/status.png" width="100%" alt="Status screens: Start HWiNFO, HWiNFO busy, Shared Memory off, Access denied, Tick sensors in Gadget, Not updating, Pick a sensor, Sensor missing">
+<img src=".github/readme/status.png" width="100%" alt="Status screens: Start HWiNFO, Source busy, Shared Memory is off, Access denied, Tick sensors in Gadget, Not updating, Age unknown, Pick a sensor, Sensor missing">
 
 <details>
 <summary>What each screen means</summary>
@@ -104,13 +112,15 @@ When a key can't show a reading, it names the problem and the fix.
 | Key shows | Fix |
 | --- | --- |
 | **Start HWiNFO** | Start HWiNFO with Shared Memory Support or Gadget reporting on. |
-| **HWiNFO busy** | Momentary; the plugin retries on the next poll. |
-| **Shared Memory off** | Turn it back on in HWiNFO Settings (the free version's 12-hour timer lands here), or enable Gadget reporting. |
+| **Source busy** | Momentary; the plugin retries on the next poll. |
+| **Shared Memory off** | Turn it back on in HWiNFO Settings; the free version switches it off after 12 hours. |
 | **Tick sensors in Gadget** | In HWiNFO: *Configure Sensors → HWiNFO Gadget*, tick *Report value in Gadget* per reading. |
 | **Not updating** | Reopen HWiNFO's Sensors window; restart HWiNFO if it repeats. |
-| **Access denied** | Run HWiNFO and Stream Deck at the same privilege level. |
-| **Plugin damaged** | Reinstall the plugin; an antivirus often quarantined `bin/hwsm.node`. |
-| **Pick a sensor** / **Sensor missing** | Open the key's settings and pick the reading again. |
+| **Age unknown** | Gadget cannot prove HWiNFO is still updating. Check HWiNFO and Gadget reporting. |
+| **Access denied** | Open the key's settings and choose **Copy support report** under *Advanced → Support*. See the troubleshooting guide before changing elevation. |
+| **Bridge failed** | Reinstall the plugin. If Windows or security software reports a block, keep that report for support. |
+| **Source error** | Open the key's settings and choose **Copy support report** under *Advanced → Support*. |
+| **Pick a sensor** / **Sensor missing** | Open the key's settings and pick the reading again, or check the current source and any reading link. |
 
 </details>
 
@@ -120,6 +130,7 @@ When a key can't show a reading, it names the problem and the fix.
 
 ```bash
 npm ci                  # Node 20+
+npm run build:native    # hwsm addon (node-gyp; needs the MSVC C++ build tools)
 npm run build           # bundles bin/plugin.js
 npm test                # unit suites (node:test)
 npm run e2e             # drives the built plugin over a mock Stream Deck

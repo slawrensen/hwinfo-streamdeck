@@ -19,7 +19,8 @@ import { DeviceType } from "@elgato/schemas/streamdeck/plugins";
 type DeviceKind = "keys" | "keys+dials" | "dials" | "headless";
 
 export type DeviceCapabilities = {
-	/** DeviceType as reported by the app; undefined when it sent none. */
+	/** DeviceType as reported by the app; undefined when it sent none, or
+	 *  anything but a whole non-negative number. */
 	readonly type: number | undefined;
 	/** Model name from the table, or a safe "Unknown device" fallback. */
 	readonly model: string;
@@ -80,9 +81,13 @@ const MODELS: Readonly<Record<number, ModelSpec>> = {
 
 /** Derives a safe capability object from what a device event carries. */
 export function deriveCapabilities(info: { type?: number; columns?: number; rows?: number }): DeviceCapabilities {
-	const spec = info.type !== undefined ? MODELS[info.type] : undefined;
-	const columns = info.columns ?? 0;
-	const rows = info.rows ?? 0;
+	// Host input is untyped at runtime: an inherited name ("constructor") is
+	// not a model, and an object must not be coerced (external review AX66).
+	const type = typeof info.type === "number" && Number.isInteger(info.type) && info.type >= 0 ? info.type : undefined;
+	const spec = type !== undefined && Object.hasOwn(MODELS, type) ? MODELS[type] : undefined;
+	const whole = (n: unknown): number => (typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : 0);
+	const columns = whole(info.columns);
+	const rows = whole(info.rows);
 	const keys = columns * rows;
 	const encoders = spec?.encoders ?? 0;
 	// Unknown devices with a key grid are assumed drawable: rendering to a
@@ -91,8 +96,8 @@ export function deriveCapabilities(info: { type?: number; columns?: number; rows
 	const displayCapable = spec !== undefined ? spec.display !== false : keys > 0;
 	const kind: DeviceKind = keys > 0 && encoders > 0 ? "keys+dials" : encoders > 0 ? "dials" : keys > 0 && displayCapable ? "keys" : "headless";
 	return {
-		type: info.type,
-		model: spec?.model ?? (info.type !== undefined ? `Unknown device (type ${info.type})` : "Unknown device"),
+		type,
+		model: spec?.model ?? (type !== undefined ? `Unknown device (type ${type})` : "Unknown device"),
 		columns,
 		rows,
 		keys,

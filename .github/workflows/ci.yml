@@ -1,13 +1,30 @@
-# Static + unit + native verification on every push/PR. The UI e2e suites
-# need a live plugin process against a mock Stream Deck socket, so they stay
-# local (`npm run suite:full`); the native integration suite creates its own
-# Win32 named objects (Local\ namespace + a synthetic HKCU key) and runs
-# fine on hosted runners.
+# Static, unit, native and built-plugin recovery verification on every
+# push/PR. Recovery uses an isolated synthetic producer and mock Stream Deck
+# socket on the hosted runner. The full browser/capture suite remains local
+# (`npm run suite:full`); neither harness proves physical device behavior.
 #
-# The runner label is pinned (not windows-latest) so a compiler-generation
-# change is a reviewed diff here, never a silent image migration. The
+# The runner label is pinned (not windows-latest) so a wholesale image family
+# change is a reviewed diff here. That is all the pin buys: the MSVC toolset
+# inside the image still moves with image updates (the label currently
+# resolves to a Visual Studio 2026 image, and identical native source built
+# different hwsm.node bytes for 1.5.1 and 1.6.0 that way). The
 # toolchain-versions step prints what actually compiled the addon;
-# release-native-manifest.json records the same facts per release.
+# release-native-manifest.json records the same facts per release, and
+# release.yml compares them with the previous release's manifest.
+#
+# Retained pins (package.json), with the reason each one waits:
+# - typescript 6.0.3: TypeScript 7 is the Go compiler; typescript-eslint 8.x
+#   peers on <6.1 and @rollup/plugin-typescript crashes on it. Revisit when
+#   both support 7.
+# - node-gyp 12.4.0: 13 requires a Node 22+/24+ host and changes Windows LTO,
+#   which would change the shipped native bytes.
+# - koffi 3.1.2: test-only producer script; 3.2 rewrote the call machinery.
+#   Bump on its own with test:native green.
+# - sharp 0.35.4: current.
+# - @elgato/cli 1.7.4 (here and release.yml): the packer must match the
+#   locally validated candidate for this release; bump all three together
+#   after 1.7.
+# - @types/node 20.x: see the node-version comment below.
 name: ci
 
 on:
@@ -15,15 +32,24 @@ on:
     branches: [main]
   pull_request:
 
+# Nothing here writes to the repository: npm ci runs third-party install
+# scripts and build:native runs the native toolchain, so the token they can
+# reach stays read-only, as it already does in release.yml.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Node 20 is the host contract: the Stream Deck app bundles Node 20,
-          # and build:native pins its headers to 20.20.0 to match.
+          # Node 20 is the host contract: the Stream Deck app bundles Node
+          # 20.20.0, and build:native pins its headers to 20.20.0 to match.
+          # @types/node stays on 20.x for the same reason: 26.x typings admit
+          # APIs the host lacks, and typecheck would pass code that throws at
+          # runtime inside the app.
           node-version: 20
           cache: npm
       - run: npm ci
@@ -33,7 +59,12 @@ jobs:
           node --version; npm --version; python --version
           npx node-gyp --version
           $cl = Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\cl.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1
-          if ($cl) { & $cl.FullName 2>&1 | Select-Object -First 1 }
+          if ($cl) {
+            # The banner goes to stderr and the usage line to stdout; read the
+            # whole merged output instead of the first line, whichever it is.
+            $m = [regex]::Match((& $cl.FullName 2>&1 | Out-String), 'Version (\d+\.\d+\.\d+)')
+            Write-Output "cl.exe $(if ($m.Success) { $m.Groups[1].Value } else { (Get-Item $cl.FullName).VersionInfo.FileVersion }) ($($cl.FullName))"
+          }
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -41,10 +72,44 @@ jobs:
       - run: npm run build
       - name: Native integration suite
         run: npm run test:native
+      - name: Built-plugin producer recovery
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          Get-FileHash com.lawrensen.hwinfo.sdPlugin/bin/plugin.js, com.lawrensen.hwinfo.sdPlugin/bin/hwsm.node -Algorithm SHA256 | Format-List Algorithm, Hash, Path
+          npm run e2e:resilience
+      - name: Retain recovery stock logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: producer-recovery-logs
+          path: com.lawrensen.hwinfo.sdPlugin/logs/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Native packaging gate
         run: node scripts/validate-native.mjs
+      # The same packer version release.yml pins, so the archive contract is
+      # held on every push, not only at a tag: pack through the staged copy,
+      # validate the archive, extract it, and run the ABI check and the
+      # producer recovery suite on the EXTRACTED bytes. The record and the
+      # pack are retained so a reviewer can hold a candidate to them.
+      - name: Install Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.7.4
+      - name: Pack, archive contract, ABI and recovery on the extracted bytes
+        timeout-minutes: 6
+        run: node scripts/qualify.mjs --stages pack,archive,abi,recovery,tree --out qualification-ci
+      - name: Retain the CI pack and its qualification record
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-pack-qualification
+          path: |
+            qualification-ci/
+            release/com.lawrensen.hwinfo.streamDeckPlugin
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload built addon for the ABI matrix
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hwsm-node20-build
           path: native/hwsm/build/Release/hwsm.node
@@ -61,13 +126,13 @@ jobs:
       matrix:
         node-version: [20, 22, 24]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: hwsm-node20-build
           path: abi-artifact

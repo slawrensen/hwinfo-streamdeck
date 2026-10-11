@@ -24,9 +24,10 @@ export type GaugeInput = {
 	manualMax?: number;
 	/** Values actually visited: session or HWiNFO min/max, series extremes. */
 	evidence?: { min: number; max: number };
-	/** Display unit; "%" fixes the automatic range to 0..100, and "" with
-	 * 0..1 evidence fixes it to 0..1 (HWiNFO's yes/no readings). Omit to
-	 * keep bounds purely evidence-based (the dial's established behavior). */
+	/** Display unit; "%" fixes the automatic range to 0..100, and "Yes/No"
+	 * (HWiNFO's boolean readings), or "" with 0..1 evidence, fixes it to
+	 * 0..1. Omit to keep bounds purely evidence-based (the dial's
+	 * established behavior). */
 	unit?: string;
 	warn?: number;
 	crit?: number;
@@ -93,7 +94,7 @@ export function computeGauge(input: GaugeInput): Gauge {
 	if (input.unit === "%") {
 		autoLo = Math.min(0, evMin === Number.POSITIVE_INFINITY ? 0 : evMin);
 		autoHi = Math.max(100, evMax === Number.NEGATIVE_INFINITY ? 100 : evMax);
-	} else if (input.unit === "" && evMin >= 0 && evMax <= 1) {
+	} else if (input.unit === "Yes/No" || (input.unit === "" && evMin >= 0 && evMax <= 1)) {
 		autoLo = 0;
 		autoHi = 1;
 	}

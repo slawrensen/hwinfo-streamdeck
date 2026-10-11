@@ -12,9 +12,17 @@ import { pageOf } from "../src/detail/detail-group";
 import type { DeviceDetailState } from "../src/detail/navigation";
 import type { PollerStatus } from "../src/poller";
 import { QUAD_DEFAULT_COLORS, renderReadingKey, renderStatusKey } from "../src/ui/key-renderer";
-import { effectiveTextSettings, parseTextSettings } from "../src/ui/text-colors";
+import { DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, readableValueColor } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
+import { contrast } from "./wcag";
+import { beforeInlineGap } from "./inline-gap";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
 
 function reading(key: string, value: number, unit = "°C", label = key): Reading {
 	return { key, type: unit === "W" ? SensorType.Power : SensorType.Temperature, sensorIndex: 0, id: 0, label, unit, value, valueMin: value - 10, valueMax: value + 10, valueAvg: value };
@@ -86,6 +94,17 @@ describe("Back tile", () => {
 		assert.notEqual(calm, warned);
 		const warnBg = resolvePalette(config, config.defaultTheme, null, "warn").bg;
 		assert.ok(warned.includes(warnBg), "warn palette background expected");
+	});
+
+	it("an alerting Back tile is the calm tile recolored: no severity mark at warn or crit", () => {
+		const geometryOf = (svg: string): string => svg.replace(/#[0-9A-Fa-f]{6}/g, "#");
+		const calm = composeBackFace(stateOf(), ok, ctxOf());
+		for (const [level, presentation] of [["warn", { warnValue: "50" }], ["crit", { warnValue: "40", critValue: "50" }]] as const) {
+			const svg = composeBackFace(stateOf({ presentation }), ok, ctxOf());
+			assert.ok(svg.includes(resolvePalette(config, config.defaultTheme, null, level).bg), `${level} palette background expected`);
+			assert.doesNotMatch(svg, /data-severity/);
+			assert.equal(geometryOf(svg), geometryOf(calm), `${level}: something other than color differs from the calm tile`);
+		}
 	});
 
 	it("stays operable through unavailable data and a missing primary", () => {
@@ -214,12 +233,19 @@ describe("dense reading tiles (composeChunkFace)", () => {
 	});
 
 	it("the tile's type accent follows its FIRST reading", () => {
-		const config = loadThemes();
-		const powerFirst = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
-		const tempFirst = composeChunkFace(stateOf(), ["cpu:0:2", "cpu:0:1"], "current", ok, ctxOf());
-		assert.notEqual(powerFirst, tempFirst);
-		const powerAccentBg = resolvePalette(config, config.defaultTheme, "power", "normal").bg;
-		assert.ok(powerFirst.includes(powerAccentBg), "power accent expected from the first reading");
+		// MIN exposes the resolved accent on the shared badge. Backgrounds
+		// are identical across type accents, and reordering rows changes an
+		// SVG even if accent selection is broken, so neither proves this.
+		for (const tail of [[], ["gpu:0:1"], ["gpu:0:1", "gpu:0:2"]]) {
+			for (const [keys, accent] of [
+				[["cpu:0:1", "cpu:0:2", ...tail], config.typeAccents.power],
+				[["cpu:0:2", "cpu:0:1", ...tail], config.typeAccents.temperature]
+			] as const) {
+				const svg = composeChunkFace(stateOf(), keys, "min", ok, ctxOf());
+				const badgeFills = [...svg.matchAll(/<text\b[^>]*fill="([^"]+)"[^>]*>MIN<\/text>/g)].map((match) => match[1]);
+				assert.deepEqual(badgeFills, [accent], `${keys.length} readings, first ${keys[0]}`);
+			}
+		}
 	});
 
 	it("never inherits the opener's thresholds at any density", () => {
@@ -288,6 +314,24 @@ describe("hand-grouped tile specs (composeChunkFace + spec)", () => {
 		assert.ok(bare.includes(`fill="${QUAD_DEFAULT_COLORS[1] as string}">38`), "the first value wears the color that traveled with its reading");
 		assert.ok(!bare.includes(`fill="${QUAD_DEFAULT_COLORS[0] as string}">38`), "and not the default its position would hand it");
 	});
+
+	// A hand-grouped tile color follows the dial per-reading color contract:
+	// exact in Theme whatever its contrast, only blended in Dim, never
+	// lifted. The unset cells beside it keep the automatic readable defaults.
+	it("a dark hand-grouped tile color renders exact in Theme and only blended in Dim", () => {
+		const palette = resolvePalette(config, config.defaultTheme, "temperature", "normal");
+		assert.ok(contrast("#123456", palette.bg) < 4.5, "the fixture starts below the numeric floor");
+		const theme = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { cellLabels: false, colors: ["#123456", null, null, null] }));
+		assert.ok(theme.includes('fill="#123456">38'), "the chosen color reaches the value byte-exact");
+		assert.ok(theme.includes(`fill="${readableValueColor(QUAD_DEFAULT_COLORS[1] as string, palette.bg)}">44`), "the default beside it keeps its readable lift");
+		const labeled = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, ctxOf(), spec(4, { colors: ["#123456", null, null, null] }));
+		assert.ok(labeled.includes('fill="#123456">MEMO<'), "the chosen color carries the micro-label byte-exact");
+		const dimCtx = { ...ctxOf(), text: effectiveTextSettings(parseTextSettings({ textMode: "dim" }), null) };
+		const dim = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "current", ok, dimCtx, spec(4, { cellLabels: false, colors: ["#123456", null, null, null] }));
+		const blended = mixToward("#123456", palette.bg, DIM_VALUE_BLEND);
+		assert.ok(dim.includes(`fill="${blended}">38`), `Dim blends the chosen color to ${blended} and stops there`);
+		assert.ok(contrast(blended, palette.bg) < 4.5, "no lift happened");
+	});
 });
 
 describe("chunk micro-label stripping", () => {
@@ -318,28 +362,62 @@ describe("chunk micro-label stripping", () => {
 });
 
 describe("dense tile goldens", () => {
-	// Byte-locks for the three new face families, like the archive pins in
+	// Byte-locks for the three dense face families, like the archive pins in
 	// detail-profiles.test.ts: same fixed snapshot, default theme, default
-	// measure. A hash move means the composed bytes changed for everyone;
-	// change it ONLY alongside a deliberate face change.
+	// measure. The hashes are the 1.6.0 faces and stay the reference. What a
+	// later release draws differently is enumerated in SINCE_1_6_0 and put
+	// back before hashing, so the entry states exactly which bytes were
+	// allowed to move and every other byte still compares exactly. Extend the
+	// list ONLY alongside a deliberate face change.
+	// September 2026 (1.7): the void unit token rose to the numeric 4.5 floor
+	// in themes.json. On these faces that is every unit text and tspan and
+	// nothing else: 2 fills on the dual, 3 on the triple, 4 on the quad.
 	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
+	const SINCE_1_6_0: ReadonlyArray<readonly [before: string, after: string]> = [["#667082", "#6B7586"]];
+	// September 2026 (bench): the device gap fix moved each unit gap from
+	// dx into the tspan; beforeInlineGap puts the dx back, counted per face.
+	// October 2026 (1.7): one font family name, since the app's QtSvg read
+	// the old list as one name and drew Tahoma; every text element names it.
+	const asOf160 = (svg: string, movedFills: number, gaps: number): string => {
+		assert.ok(!svg.includes('font-family="Segoe UI, Arial, sans-serif"'), "the 1.6.0 family list cannot still be drawn");
+		let out = beforeInlineGap(svg, gaps).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
+		for (const [before, after] of SINCE_1_6_0) {
+			assert.equal(out.split(after).length - 1, movedFills, `${after} must appear exactly ${movedFills} times`);
+			assert.ok(!out.includes(before), `${before} is the 1.6.0 token and cannot still be drawn`);
+			out = out.replaceAll(after, before);
+		}
+		return out;
+	};
 
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(svg), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(asOf160(svg, 2, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(svg), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		// October 2026 (d25): the unit sits against its value with no gap, as
+		// 1.6.0 drew it on the device, and every label takes that room ("CPU
+		// Power" 12 to 14 px), so each label, mask and unit moves at once. The
+		// face is pinned at the d25 bytes from here; the unit stays tight.
+		assert.match(svg, />W<\/tspan>/);
+		assert.doesNotMatch(svg, /<tspan[^>]*>[\u2002\u2004 ]/);
+		assert.match(svg, /font-size="14" font-weight="600" fill="#7A8393">CPU Power</);
+		assert.equal(golden(svg), "39533062f56258a95516b05b5d9df9fdb26e579cc2cc8cd2f681948fd050ec45");
 	});
 
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(svg), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		// October 2026 (1.7): the app's QtSvg draws no letter-spacing, so the
+		// four micro-labels and the badge no longer write their +0.5; exactly
+		// those five sites go back here.
+		assert.doesNotMatch(svg, /letter-spacing/);
+		const tracked = /(<text x="[0-9]+" y="(?:20|92|76)" text-anchor="middle" [^>]*font-weight="700")( fill="#[0-9A-Fa-f]{6}">[A-Z]{1,4}<)/g;
+		assert.equal(svg.match(tracked)?.length, 5);
+		assert.equal(golden(asOf160(svg.replace(tracked, '$1 letter-spacing="0.5"$2'), 4, 0)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

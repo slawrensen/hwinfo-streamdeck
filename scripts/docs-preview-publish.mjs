@@ -25,9 +25,9 @@ import { fileURLToPath } from "node:url";
 const PREVIEW_REPO = "slawrensen/hwinfo-streamdeck-preview";
 const PREVIEW_BASEURL = "/hwinfo-streamdeck-preview";
 const PREVIEW_URL = `https://docs.slawrensen.com${PREVIEW_BASEURL}/`;
-const PREVIEW_LABEL = "1.6.0 preview";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PREVIEW_LABEL = `${JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version} preview`;
 const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", cwd: repoRoot, ...opts });
 
 const branch = run("git", ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
@@ -36,9 +36,7 @@ if (files.length === 0) {
 	throw new Error("no docs files found");
 }
 
-const stage = path.join(os.tmpdir(), "hwinfo-docs-preview-stage");
-fs.rmSync(stage, { recursive: true, force: true });
-fs.mkdirSync(stage, { recursive: true });
+const stage = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-docs-preview-stage-"));
 for (const file of files) {
 	const rel = file.slice("docs/".length);
 	const target = path.join(stage, rel);

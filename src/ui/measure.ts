@@ -111,7 +111,7 @@ function measureData(canonical: number, ladder: readonly string[], base: number,
 		// Rounding can hit the next tier ("1024 KiB"), and a quad cell squeezes
 		// a 5-glyph value ("-1010") into its own magnitude suffix ("-1k", NaN
 		// here): both promote a tier instead, so a value suffix never stacks on
-		// a unit prefix. Past the top tier the quad clamp keeps the budget.
+		// a unit prefix. Past the top tier the value keeps its own suffix.
 		const rounded = Math.abs(Number(valueText));
 		if (tier < ladder.length - 1 && !(rounded < base)) {
 			tier++;
@@ -122,6 +122,24 @@ function measureData(canonical: number, ladder: readonly string[], base: number,
 }
 
 export type Measurement = { valueText: string; unitText: string };
+
+/** The unit both sources give HWiNFO's boolean readings. */
+const BOOLEAN_UNIT = "Yes/No";
+
+/**
+ * A boolean reading as the word HWiNFO's own windows show. Both sources
+ * publish these as 0 or 1 in the unit "Yes/No", so the face read "0.00
+ * Yes/No", which says nothing to the person looking at the key. The number
+ * itself is untouched: thresholds, gauges and evidence still see 0 and 1.
+ * Only exactly 0 and 1 are words; anything else stays a number, because a
+ * reading that is not one of the two is not a boolean this can name.
+ */
+function booleanMeasurement(value: number, unit: string): Measurement | null {
+	if (unit !== BOOLEAN_UNIT || (value !== 0 && value !== 1)) {
+		return null;
+	}
+	return { valueText: value === 1 ? "Yes" : "No", unitText: "" };
+}
 
 export type MeasureOptions = {
 	decimals: DecimalsSetting;
@@ -135,25 +153,41 @@ export type MeasureOptions = {
  * Non-finite values keep the placeholder glyph and the source unit.
  */
 export function formatMeasurement(value: number, unit: string, opts: MeasureOptions): Measurement {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word;
+	}
 	const converted = convertUnit(value, unit, opts.fahrenheit);
 	const data = parseDataUnit(converted.unit);
 	if (data === null || !Number.isFinite(converted.value)) {
 		return { valueText: formatValue(converted.value, opts.decimals), unitText: converted.unit };
 	}
 	const { canonical, ladder, base } = dataDisplay(converted.value * data.toBase, data.kind, opts.dataUnits);
+	// A finite reading can still overflow once normalized (AX44): it gets the
+	// same placeholder and source unit as any other non-finite value.
+	if (!Number.isFinite(canonical)) {
+		return { valueText: formatValue(canonical, opts.decimals), unitText: converted.unit };
+	}
 	return measureData(canonical, ladder, base, opts.decimals, false);
 }
 
-/** The quad-cell variant: same tiering, value capped at the quad glyph
+/** The quad-cell variant: same tiering, value aimed at the quad glyph
  * budget. A value that only fits with its own magnitude suffix (a negative
  * near a binary tier edge, "-1010") promotes a tier instead. */
 export function formatQuadMeasurement(value: number, unit: string, opts: MeasureOptions): Measurement {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word;
+	}
 	const converted = convertUnit(value, unit, opts.fahrenheit);
 	const data = parseDataUnit(converted.unit);
 	if (data === null || !Number.isFinite(converted.value)) {
 		return { valueText: formatQuadValue(converted.value, opts.decimals), unitText: converted.unit };
 	}
 	const { canonical, ladder, base } = dataDisplay(converted.value * data.toBase, data.kind, opts.dataUnits);
+	if (!Number.isFinite(canonical)) {
+		return { valueText: formatQuadValue(canonical, opts.decimals), unitText: converted.unit };
+	}
 	return measureData(canonical, ladder, base, opts.decimals, true);
 }
 
@@ -170,6 +204,10 @@ export function isDataUnit(unit: string): boolean {
  * picks its own tier and a bare number would read in the wrong unit.
  */
 export function formatStat(value: number, unit: string, opts: MeasureOptions): string {
+	const word = booleanMeasurement(value, unit);
+	if (word !== null) {
+		return word.valueText;
+	}
 	if (!isDataUnit(unit)) {
 		return formatValue(convertUnit(value, unit, opts.fahrenheit).value, opts.decimals);
 	}

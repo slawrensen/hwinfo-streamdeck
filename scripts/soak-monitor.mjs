@@ -29,6 +29,8 @@ import os from "node:os";
 import path from "node:path";
 import { parseArgs, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { creationMs, selectSoakHost } from "./lib/soak-host.mjs";
+import { makeLogTail } from "./lib/soak-log-tail.mjs";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -52,7 +54,9 @@ if (args.help) {
 }
 
 const MB = 1024 * 1024;
-const CSV_HEADER = "tsIso,tsMs,pid,matches,rssB,privateB,handles,threads,cpuS,sdAppPid,hwinfoCount,logWarnDelta,logErrorDelta,note";
+const LEGACY_CSV_HEADER = "tsIso,tsMs,pid,matches,rssB,privateB,handles,threads,cpuS,sdAppPid,hwinfoCount,logWarnDelta,logErrorDelta,note";
+const HOST_CSV_HEADER = `${LEGACY_CSV_HEADER},sdRssB,sdPrivateB,sdHandles,sdThreads,sdCpuS`;
+const CSV_HEADER = `${HOST_CSV_HEADER},pluginStartedMs,sdStartedMs,sdMatches`;
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const localStamp = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
@@ -65,11 +69,11 @@ const TARGET_RE = args.pattern ? new RegExp(args.pattern, "i") : /com\.lawrensen
 
 async function processSnapshot() {
 	const ps =
-		"$procs = @(Get-CimInstance Win32_Process -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
-		"Select-Object ProcessId,Name,CommandLine,WorkingSetSize,PrivatePageCount,HandleCount,ThreadCount,UserModeTime,KernelModeTime); " +
+		"$procs = @(Get-CimInstance Win32_Process -ErrorAction Stop -Filter \"Name='node.exe' OR Name='StreamDeck.exe' OR Name LIKE 'HWiNFO%'\" | " +
+		"Select-Object ProcessId,ParentProcessId,SessionId,CreationDate,Name,CommandLine,WorkingSetSize,PrivatePageCount,HandleCount,ThreadCount,UserModeTime,KernelModeTime); " +
 		"ConvertTo-Json -InputObject $procs -Depth 2 -Compress";
 	const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", ps], { timeout: 30_000, maxBuffer: 8 * MB });
-	return JSON.parse(stdout.trim() || "[]");
+	return JSON.parse(stdout);
 }
 
 /** Sticky selection: keep the known PID while it lives; otherwise pick the
@@ -86,75 +90,9 @@ function pickSticky(rows, previousPid) {
 }
 
 // ---------------------------------------------------------------------------
-// Log tail: newest plugin log, WARN/ERROR deltas, harness lines excluded.
-// Pre-existing content is the baseline and is never counted. Rotation is
-// detected by NTFS file identity (ino), not by path or size: the Stream
-// Deck SDK recreates the SAME .0.log path on plugin restart, and the new
-// file can grow past the old offset before the next poll, which a
-// path-or-shrink check silently misses (found against the live SDK).
+// Log tail: scripts/lib/soak-log-tail.mjs (newest plugin log, WARN/ERROR
+// deltas, harness lines excluded, nothing lost across a rotation).
 // ---------------------------------------------------------------------------
-
-const HARNESS_RE = /Harness Deck|Load Deck/;
-const LEVEL_RE = /\b(WARN|ERROR)\b/;
-
-function makeLogTail(dir) {
-	let file = null;
-	let fileIno = null;
-	let offset = 0;
-	let primed = false;
-	const newest = () => {
-		if (!fs.existsSync(dir)) {
-			return null;
-		}
-		const logs = fs
-			.readdirSync(dir)
-			.filter((f) => f.endsWith(".log"))
-			.map((f) => ({ p: path.join(dir, f), m: fs.statSync(path.join(dir, f)).mtimeMs }))
-			.sort((a, b) => b.m - a.m);
-		return logs[0]?.p ?? null;
-	};
-	return function poll() {
-		const current = newest();
-		if (current === null) {
-			return { warn: 0, error: 0, note: primed ? "" : "logs-missing" };
-		}
-		const st = fs.statSync(current, { bigint: true });
-		const size = Number(st.size);
-		if (!primed) {
-			// Baseline: only lines written after the soak starts count.
-			primed = true;
-			file = current;
-			fileIno = st.ino;
-			offset = size;
-			return { warn: 0, error: 0, note: "" };
-		}
-		let note = "";
-		if (current !== file || st.ino !== fileIno || size < offset) {
-			file = current;
-			fileIno = st.ino;
-			offset = 0;
-			note = "log-rotated";
-		}
-		if (size === offset) {
-			return { warn: 0, error: 0, note };
-		}
-		const fd = fs.openSync(current, "r");
-		const buf = Buffer.alloc(size - offset);
-		fs.readSync(fd, buf, 0, buf.length, offset);
-		fs.closeSync(fd);
-		offset = size;
-		let warn = 0;
-		let error = 0;
-		for (const line of buf.toString("utf8").split(/\r?\n/)) {
-			const m = LEVEL_RE.exec(line);
-			if (m && !HARNESS_RE.test(line)) {
-				if (m[1] === "WARN") warn++;
-				else error++;
-			}
-		}
-		return { warn, error, note };
-	};
-}
 
 // ---------------------------------------------------------------------------
 // Summary: shared by the live run and --summary, so one validated code path.
@@ -162,11 +100,15 @@ function makeLogTail(dir) {
 
 function parseCsv(file) {
 	const lines = fs.readFileSync(file, "utf8").split(/\r?\n/).filter((l) => l.length > 0);
-	if (lines[0] !== CSV_HEADER) {
+	if (lines[0] !== CSV_HEADER && lines[0] !== HOST_CSV_HEADER && lines[0] !== LEGACY_CSV_HEADER) {
 		throw new Error(`${file} does not start with the soak-monitor CSV header`);
 	}
 	return lines.slice(1).map((l) => {
 		const c = l.split(",");
+		const note = c[13] ?? "";
+		// Historical collectors wrote zero counts on a failed observation.
+		// Preserve that note as evidence; those zeros never prove absence.
+		const unknown = note.startsWith("snapshot-failed:");
 		return {
 			tsIso: c[0],
 			tsMs: Number(c[1]),
@@ -176,9 +118,17 @@ function parseCsv(file) {
 			handles: c[6] === "" ? null : Number(c[6]),
 			cpuS: c[8] === "" ? null : Number(c[8]),
 			sdAppPid: c[9] === "" ? null : Number(c[9]),
-			hwinfoCount: Number(c[10]),
+			hwinfoCount: unknown || c[10] === "" ? null : Number(c[10]),
 			warn: Number(c[11]),
-			error: Number(c[12])
+			error: Number(c[12]),
+			note,
+			unknown,
+			sdRssB: c[14] ? Number(c[14]) : null,
+			sdPrivateB: c[15] ? Number(c[15]) : null,
+			sdHandles: c[16] ? Number(c[16]) : null,
+			sdCpuS: c[18] ? Number(c[18]) : null,
+			startedMs: c[19] ? Number(c[19]) : null,
+			sdStartedMs: c[20] ? Number(c[20]) : null
 		};
 	});
 }
@@ -229,7 +179,7 @@ function slopeMbPer30Min(rows, field) {
 	return ((n * sxy - sx * sy) / denominator) * 30;
 }
 
-function computeSummary(rows) {
+function computeSummary(rows, includeHost = true) {
 	if (rows.length === 0) {
 		return null;
 	}
@@ -241,18 +191,35 @@ function computeSummary(rows) {
 	const sorted = [...dts].sort((a, b) => a - b);
 	const medianDt = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
 	const events = [];
+	const gapBefore = new Set();
 	for (let i = 1; i < rows.length; i++) {
 		if (medianDt > 0 && rows[i].tsMs - rows[i - 1].tsMs > 3 * medianDt) {
-			events.push(`${rows[i].tsIso} sampling gap of ${Math.round((rows[i].tsMs - rows[i - 1].tsMs) / 1000)} s (sleep or stall)`);
+			gapBefore.add(rows[i]);
+			if (includeHost) events.push(`${rows[i].tsIso} sampling gap of ${Math.round((rows[i].tsMs - rows[i - 1].tsMs) / 1000)} s (sleep or stall)`);
 		}
 	}
 
 	// Contiguous same-PID present segments; restarts and absences are events.
+	const scope = includeHost ? "plugin" : "Stream Deck host";
+	// A missing host selection may be ambiguity, not a stopped host process.
+	const unavailable = includeHost ? "plugin process absent" : "Stream Deck host observation unavailable";
 	const segments = [];
 	let seg = null;
-	let lastPid = null;
+	let lastPresent = null;
 	let absentRun = null;
+	let restarts = 0;
 	for (const r of rows) {
+		if (gapBefore.has(r)) seg = null;
+		if (r.unknown) {
+			if (absentRun !== null) {
+				events.push(`${absentRun} ${unavailable} before observation became unknown at ${r.tsIso}`);
+				absentRun = null;
+			}
+			if (includeHost) events.push(`${r.tsIso} observation unknown (${r.note})`);
+			seg = null;
+			continue;
+		}
+		if (includeHost && r.note) events.push(`${r.tsIso} ${r.note}`);
 		if (r.pid === null) {
 			if (absentRun === null) {
 				absentRun = r.tsIso;
@@ -261,29 +228,36 @@ function computeSummary(rows) {
 			continue;
 		}
 		if (absentRun !== null) {
-			events.push(`${absentRun} plugin process absent until ${r.tsIso}`);
+			events.push(`${absentRun} ${unavailable} until ${r.tsIso}`);
 			absentRun = null;
 		}
-		if (lastPid !== null && r.pid !== lastPid) {
-			events.push(`${r.tsIso} plugin PID changed ${lastPid} -> ${r.pid} (restart)`);
+		if (lastPresent !== null && r.pid !== lastPresent.pid) {
+			events.push(`${r.tsIso} ${scope} PID changed ${lastPresent.pid} -> ${r.pid} (restart)`);
+			restarts++;
+		}
+		const previous = lastPresent;
+		if (previous && previous.pid === r.pid) {
+			const newLifetime = r.startedMs !== null && previous.startedMs !== null && r.startedMs !== previous.startedMs;
+			const counterReset = r.cpuS !== null && previous.cpuS !== null && r.cpuS < previous.cpuS;
+			if (newLifetime || counterReset) {
+				events.push(`${r.tsIso} ${scope} PID ${r.pid}: ${newLifetime ? "creation time changed (restart)" : "CPU counter reset; new resource segment"}`);
+				if (newLifetime) restarts++;
+				seg = null;
+			}
 		}
 		if (seg === null || seg.pid !== r.pid) {
 			seg = { pid: r.pid, rows: [] };
 			segments.push(seg);
 		}
 		seg.rows.push(r);
-		lastPid = r.pid;
+		lastPresent = r;
 	}
 	if (absentRun !== null) {
-		events.push(`${absentRun} plugin process absent through the end of the window`);
-	}
-	const sdPids = [...new Set(rows.map((r) => r.sdAppPid).filter((p) => p !== null))];
-	if (sdPids.length > 1) {
-		events.push(`Stream Deck app PID changed across the window: ${sdPids.join(" -> ")} (app restart)`);
+		events.push(`${absentRun} ${unavailable} through the end of the window`);
 	}
 
 	const longest = segments.reduce((a, b) => (b.rows.length > (a?.rows.length ?? 0) ? b : a), null);
-	const present = rows.filter((r) => r.pid !== null);
+	const present = rows.filter((r) => !r.unknown && r.pid !== null);
 	const rss = present.filter((r) => r.rssB !== null).map((r) => r.rssB);
 	const handles = present.filter((r) => r.handles !== null).map((r) => r.handles);
 	let cpuPct = null;
@@ -300,7 +274,8 @@ function computeSummary(rows) {
 		firstIso: rows[0].tsIso,
 		lastIso: rows[rows.length - 1].tsIso,
 		spanHours: spanMs / 3_600_000,
-		restarts: events.filter((e) => e.includes("(restart)")).length,
+		restarts,
+		unknownSamples: rows.filter((r) => r.unknown).length,
 		hwinfoAbsentSamples: rows.filter((r) => r.hwinfoCount === 0).length,
 		warnTotal: rows.reduce((a, r) => a + r.warn, 0),
 		errorTotal: rows.reduce((a, r) => a + r.error, 0),
@@ -316,6 +291,13 @@ function computeSummary(rows) {
 		rssSlope: longest !== null ? slopeMbPer30Min(longest.rows, "rssB") : null,
 		privateSlope: longest !== null ? slopeMbPer30Min(longest.rows, "privateB") : null,
 		cpuPct,
+		// Summarize host resources by the host's own PID segments. A plugin
+		// restart must not reset host CPU, and a host restart must not turn
+		// cumulative CPU counters into a negative utilization estimate.
+		host: includeHost ? computeSummary(rows.map((r) => ({
+			...r, pid: r.sdAppPid, rssB: r.sdRssB, privateB: r.sdPrivateB,
+			handles: r.sdHandles, cpuS: r.sdCpuS, startedMs: r.sdStartedMs
+		})), false) : null,
 		events
 	};
 }
@@ -332,12 +314,20 @@ function printSummary(s, csvFile, adversary = null) {
 	console.log(`| Private bytes slope, same run | ${slope(s.privateSlope)} |`);
 	console.log(`| Handles | ${s.handlesFirst ?? "n/a"} to ${s.handlesLast ?? "n/a"} (max ${s.handlesMax ?? "n/a"}) |`);
 	console.log(`| Avg CPU, same run | ${s.cpuPct === null ? "n/a" : s.cpuPct.toFixed(2) + "%"} |`);
+	if (s.host !== null) {
+		console.log(`| Stream Deck host RSS | ${mb(s.host.rssFirstMb)} to ${mb(s.host.rssLastMb)} MB (min ${mb(s.host.rssMinMb)}, max ${mb(s.host.rssMaxMb)}) |`);
+		console.log(`| Host RSS slope, host PID ${s.host.longestSegPid ?? "n/a"} (${s.host.longestSegSamples} samples) | ${slope(s.host.rssSlope)} |`);
+		console.log(`| Host handles | ${s.host.handlesFirst ?? "n/a"} to ${s.host.handlesLast ?? "n/a"} (max ${s.host.handlesMax ?? "n/a"}) |`);
+		console.log(`| Host avg CPU, same host PID | ${s.host.cpuPct === null ? "n/a" : s.host.cpuPct.toFixed(2) + "%"} |`);
+		console.log(`| Host restarts | ${s.host.restarts} |`);
+	}
 	console.log(`| Plugin restarts / HWiNFO-absent samples | ${s.restarts} / ${s.hwinfoAbsentSamples} |`);
+	console.log(`| Unknown process snapshots | ${s.unknownSamples} |`);
 	console.log(`| New log WARN / ERROR lines | ${s.warnTotal} / ${s.errorTotal} |`);
 	if (adversary !== null) {
 		console.log(`| Adversary events (injected faults survived) | ${adversary.pass}/${adversary.total} |`);
 	}
-	const events = [...s.events, ...(adversary?.events ?? [])].sort();
+	const events = [...s.events, ...(s.host?.events ?? []), ...(adversary?.events ?? [])].sort();
 	if (events.length > 0) {
 		console.log("\nEvents:");
 		for (const e of events.slice(0, 40)) {
@@ -383,19 +373,26 @@ if (!Number.isFinite(intervalSec) || intervalSec < 1) {
 	process.exit(1);
 }
 const durationSec = args.duration === undefined ? null : Number(args.duration);
+if (durationSec !== null && (!Number.isFinite(durationSec) || durationSec <= 0)) {
+	console.error("soak-monitor: --duration must be a positive number of seconds");
+	process.exit(1);
+}
 const stamp = new Date();
 const defaultOut = path.join(repoRoot, "release", `soak-${stamp.getFullYear()}${pad2(stamp.getMonth() + 1)}${pad2(stamp.getDate())}-${pad2(stamp.getHours())}${pad2(stamp.getMinutes())}.csv`);
 const outPath = path.resolve(args.out ?? defaultOut);
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 if (!fs.existsSync(outPath)) {
 	fs.writeFileSync(outPath, CSV_HEADER + os.EOL);
+} else if (fs.readFileSync(outPath, "utf8").split(/\r?\n/, 1)[0] !== CSV_HEADER) {
+	console.error("soak-monitor: existing output has a different schema; choose a new --out file");
+	process.exit(1);
 }
 
 const logDir = args.logs ?? path.join(process.env.APPDATA ?? "", "Elgato", "StreamDeck", "Plugins", "com.lawrensen.hwinfo.sdPlugin", "logs");
 const pollLogs = makeLogTail(logDir);
 
 let knownPid = null;
-let knownSdPid = null;
+let knownHost = null;
 let stopping = false;
 
 async function sampleOnce() {
@@ -406,18 +403,18 @@ async function sampleOnce() {
 		const targets = procs.filter((r) => r.Name === "node.exe" && r.ProcessId !== process.pid && TARGET_RE.test(r.CommandLine ?? ""));
 		const target = pickSticky(targets, knownPid);
 		const sdApps = procs.filter((r) => r.Name === "StreamDeck.exe");
-		const sdApp = pickSticky(sdApps, knownSdPid);
+		const hostSelection = selectSoakHost(target, sdApps, knownHost);
+		const sdApp = hostSelection.host;
+		knownHost = hostSelection.identity;
 		const hwinfoCount = procs.filter((r) => /^HWiNFO/i.test(r.Name ?? "")).length;
 		const logs = pollLogs();
 		const notes = [logs.note];
 		if (targets.length > 1) {
 			notes.push(`${targets.length}-matches`);
 		}
+		if (hostSelection.reason) notes.push(hostSelection.reason);
 		if (target !== null) {
 			knownPid = target.ProcessId;
-		}
-		if (sdApp !== null) {
-			knownSdPid = sdApp.ProcessId;
 		}
 		const cpuS = target === null ? "" : (((target.UserModeTime ?? 0) + (target.KernelModeTime ?? 0)) / 1e7).toFixed(3);
 		row = [
@@ -434,10 +431,18 @@ async function sampleOnce() {
 			hwinfoCount,
 			logs.warn,
 			logs.error,
-			notes.filter((n) => n.length > 0).join(";")
+			notes.filter((n) => n.length > 0).join(";"),
+			sdApp?.WorkingSetSize ?? "",
+			sdApp?.PrivatePageCount ?? "",
+			sdApp?.HandleCount ?? "",
+			sdApp?.ThreadCount ?? "",
+			sdApp === null ? "" : (((sdApp.UserModeTime ?? 0) + (sdApp.KernelModeTime ?? 0)) / 1e7).toFixed(3),
+			creationMs(target?.CreationDate) ?? "",
+			creationMs(sdApp?.CreationDate) ?? "",
+			hostSelection.matches
 		];
 	} catch (err) {
-		row = [new Date(startedAt).toISOString(), startedAt, "", 0, "", "", "", "", "", "", 0, 0, 0, `snapshot-failed: ${String(err?.message ?? err).replaceAll(",", ";").replaceAll("\n", " ").slice(0, 120)}`];
+		row = [new Date(startedAt).toISOString(), startedAt, "", "", "", "", "", "", "", "", "", "", "", `snapshot-failed: ${String(err?.message ?? err).replaceAll(",", ";").replaceAll("\n", " ").replaceAll("\r", " ").slice(0, 120)}`, "", "", "", "", "", "", "", ""];
 	}
 	fs.appendFileSync(outPath, row.join(",") + os.EOL);
 	return Date.now() - startedAt;

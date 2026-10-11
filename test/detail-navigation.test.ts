@@ -674,8 +674,8 @@ describe("tickSignature — the detail render gate", () => {
 
 	it("a stale line names its source, so a mid-stale provider swap still repaints", () => {
 		// While stale in auto mode, probeReopen can swap shared-memory for
-		// the Gadget registry (the registry persists after HWiNFO exits, so
-		// the reopen succeeds on frozen values) and the stale screen's
+		// the Gadget registry (a killed or crashed HWiNFO leaves its registry
+		// behind, so the reopen succeeds on frozen values) and the stale screen's
 		// sub-line flips between "check sharing" and "check Gadget" under
 		// otherwise frozen data. The source member is what repaints it.
 		const snap = snapshotOf([reading("cpu:0:0", 0)], ["CPU"]);
@@ -702,4 +702,44 @@ describe("tickSignature — the detail render gate", () => {
 		assert.notEqual(tickSignature({ state: "stale", snapshot: snap, source: "shared-memory", staleForMs: 20_000 }), tickSignature(ok(snap)));
 		assert.notEqual(tickSignature({ state: "unavailable", reason: "busy", message: "" }), tickSignature({ state: "unavailable", reason: "not-running", message: "" }));
 	});
+});
+
+// The production default clock, not an injected one: a wall clock corrected
+// an hour either way between two Back presses neither lets a second hop
+// through nor stalls Back and the blackout (external review AX49).
+describe("the navigator's own clock ignores wall-clock corrections", () => {
+	for (const jump of [-3_600_000, 0, 3_600_000]) {
+		it(`a clock set ${jump / 60_000} minutes between presses`, async () => {
+			const realNow = Date.now;
+			const perf = performance as unknown as { now?: () => number };
+			let wall = 100_000_000;
+			let mono = 10_000;
+			Date.now = () => wall;
+			perf.now = () => mono;
+			try {
+				const switches: string[] = [];
+				const nav = new DetailNavigator({
+					switchProfile: (deviceId) => {
+						switches.push(deviceId);
+						return Promise.resolve();
+					},
+					setTimer: () => 0 as unknown as ReturnType<typeof setTimeout>,
+					clearTimer: () => {}
+				});
+				await nav.leave("d");
+				mono += 100;
+				wall += jump + 100;
+				await nav.leave("d");
+				assert.equal(switches.length, 1, "a second Back 100 ms later is the same hop");
+				mono += 1_900;
+				wall += 1_900;
+				assert.equal(nav.recentlyLeft("d"), false, "the blackout ends with the beat");
+				await nav.leave("d");
+				assert.equal(switches.length, 2, "a Back 2 s later hops again");
+			} finally {
+				Date.now = realNow;
+				delete perf.now;
+			}
+		});
+	}
 });

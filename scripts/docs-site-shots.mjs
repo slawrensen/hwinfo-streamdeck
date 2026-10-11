@@ -11,10 +11,11 @@
 //
 // Without page names it captures the pages listed in PAGES. Exit 1 when a
 // page logs a console error or a request fails.
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import WebSocket from "ws";
+import { browserDebuggerPort, cleanupBrowser, createBrowserProfile } from "./lib/process-ownership.mjs";
 
 const [outDir, root, commit = "unknown", ...only] = process.argv.slice(2);
 if (typeof outDir !== "string" || typeof root !== "string" || !/^https?:\/\//.test(root)) {
@@ -28,23 +29,25 @@ const VIEWPORTS = [
 	{ name: "desktop", width: 1280, height: 900 },
 	{ name: "mobile", width: 390, height: 844, mobile: true }
 ];
-const DEBUG_PORT = 29224;
 const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(outDir, { recursive: true });
 
-const chrome = spawn(CHROME, ["--headless=new", "--disable-gpu", `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${path.join(process.env.TEMP ?? ".", "docs-shots-profile")}`, "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
+const chromeProfile = createBrowserProfile("docs-shots-profile-");
+const chromeStartedAt = new Date().toISOString();
+const chrome = spawn(CHROME, ["--headless=new", "--disable-gpu", "--remote-debugging-port=0", `--user-data-dir=${chromeProfile}`, "--hide-scrollbars", "about:blank"], { stdio: "ignore", windowsHide: true });
+let chromeError;
+chrome.once("error", (err) => { chromeError = err; });
 function killChromeTree() {
-	try {
-		spawnSync("taskkill", ["/PID", String(chrome.pid), "/T", "/F"], { stdio: "ignore" });
-	} catch {
-		chrome.kill();
-	}
+	cleanupBrowser(chromeProfile, chromeStartedAt);
 }
 const watchdog = setTimeout(() => {
 	console.error("[docs-shots] watchdog: 300s elapsed, aborting");
-	killChromeTree();
-	process.exit(2);
+	try {
+		killChromeTree();
+	} finally {
+		process.exit(2);
+	}
 }, 300000);
 watchdog.unref();
 
@@ -55,8 +58,13 @@ try {
 	let target = null;
 	for (let i = 0; i < 30 && target === null; i++) {
 		await sleep(500);
+		if (chromeError) throw chromeError;
+		// The Windows launcher can exit zero after handing off to its browser.
+		// Readiness still requires the debugger from this run's unique profile.
+		if ((chrome.exitCode !== null && chrome.exitCode !== 0) || chrome.signalCode !== null) throw new Error(`Chrome exited before its debugger became ready (exit ${chrome.exitCode}, signal ${chrome.signalCode})`);
 		try {
-			const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+			const debugPort = browserDebuggerPort(chromeProfile);
+			const list = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
 			target = list.find((t) => t.type === "page") ?? null;
 		} catch {
 			/* not up yet */
@@ -130,6 +138,7 @@ try {
 	writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, "\t"));
 	console.log(`${manifest.length} screenshots and manifest.json in ${outDir}`);
 } finally {
+	clearTimeout(watchdog);
 	cdpSocket?.terminate();
 	killChromeTree();
 }

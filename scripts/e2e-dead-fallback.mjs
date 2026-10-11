@@ -10,7 +10,7 @@
 //
 // Phase B (busy-at-open): with the SAME populated gadget key, a LIVE mapping
 // whose consistency mutex is held at the instant the plugin opens must show
-// "HWiNFO busy" and retry shared memory, never silently fall back to gadget
+// "Source busy" and retry shared memory, never silently fall back to gadget
 // (whose key namespace differs, so a shared-memory key would read "Sensor
 // missing" until the upgrade probe swung back).
 //
@@ -155,6 +155,10 @@ try {
 		// 1. Present DEAD mapping must not block the gadget fallback in auto mode.
 		//    (Pre-fix: SharedMemoryProvider.open() "succeeds" on the dead mapping,
 		//    so auto never reaches gadget and the key shows "Shared Memory off".)
+		await expectFrame("initial Gadget freshness is unknown", (svg) => svg.includes("Age unknown"), 9000, { fromStart: true });
+		publish(47.6);
+		await sleep(1100);
+		publish(47.5);
 		await expectFrame("present DEAD mapping → falls back to live gadget value", (svg) => svg.includes("Test Temp") && svg.includes("47.5"), 9000);
 		const smFrames = frames.map((svg, i) => [i, svg]).filter(([, svg]) => svg.includes("Shared Memory"));
 		if (smFrames.length > 0) {
@@ -164,8 +168,20 @@ try {
 
 		// 2. Keep updating and outlast the 1.5 s upgrade probe: the probe opens the
 		//    dead mapping and must throw (not clobber the working gadget provider).
-		const updater = setInterval(() => publish((49.0 + Math.random() * 0.05).toFixed(2)), 600);
-		await expectFrame("gadget survives upgrade probes → value keeps updating (no clobber)", (svg) => svg.includes("49.0"), 9000);
+		//    The published value climbs a visible tenth per write: a key only
+		//    repaints when its face changes, so jitter inside one displayed
+		//    decimal would leave a live key silent and look like a clobber.
+		let step = 0;
+		const updater = setInterval(() => publish((49 + ++step * 0.1).toFixed(1)), 600);
+		const valueOf = (svg) => Number(/y="94"[^>]*>(-?\d+(?:\.\d+)?)</.exec(svg ?? "")?.[1] ?? Number.NaN);
+		await expectFrame("gadget survives upgrade probes → value keeps updating (no clobber)", (svg) => valueOf(svg) >= 49.1, 9000);
+		// The first live frame can land before an upgrade probe has fired since
+		// the fallback took hold. Outlast the 1.5 s probe interval, then
+		// demand a frame that moved on: a probe that clobbered the source
+		// would leave the key on a status screen or a frozen value from here on.
+		const valueBeforeProbeWait = Math.max(...frames.map(valueOf).filter(Number.isFinite));
+		await sleep(2200);
+		await expectFrame(`gadget still updates after an upgrade probe interval (no clobber; was ${valueBeforeProbeWait.toFixed(1)})`, (svg) => valueOf(svg) > valueBeforeProbeWait, 4000);
 		clearInterval(updater);
 	} finally {
 		plugin.kill();
@@ -176,14 +192,14 @@ try {
 	// fresh plugin opens. The gadget key is still populated, so a fallback
 	// would "succeed" and this key's shared-memory identity would read
 	// "Sensor missing" until the upgrade probe swung back. The poller must
-	// surface "HWiNFO busy" and retry shared memory instead.
+	// surface "Source busy" and retry shared memory instead.
 	phase = "busy";
 	await fakeCmd("alive", "MODE alive");
 	await fakeCmd("hold", "HELD");
 	const busyStart = frames.length;
 	const plugin2 = spawnPlugin("e2e-busy-open");
 	try {
-		await expectFrame("mutex held at open → 'HWiNFO busy' screen", (svg) => svg.includes("HWiNFO busy"), 9000);
+		await expectFrame("mutex held at open → 'Source busy' screen", (svg) => svg.includes("Source busy"), 9000);
 		fake.stdin.write("release\n");
 		await expectFrame("mutex released → live shared-memory value", (svg) => svg.includes("Test Temp") && svg.includes("°C"), 9000);
 		const missing = frames.slice(busyStart).filter((svg) => svg.includes("Sensor missing"));

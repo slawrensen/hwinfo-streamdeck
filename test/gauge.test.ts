@@ -28,6 +28,9 @@ describe("automatic bounds", () => {
 		close(gauge({ value: 0, unit: "" }).fraction, 0, "no");
 		close(gauge({ value: 1, unit: "" }).fraction, 1, "yes");
 		close(gauge({ value: 1, unit: "", evidence: { min: 0, max: 1 } }).fraction, 1, "yes with evidence");
+		// The unit both providers publish for HWiNFO's boolean readings.
+		close(gauge({ value: 0, unit: "Yes/No", evidence: { min: 0, max: 0 } }).fraction, 0, "No is empty, not half");
+		close(gauge({ value: 1, unit: "Yes/No", evidence: { min: 1, max: 1 } }).fraction, 1, "Yes is full");
 	});
 
 	it("a unitless reading beyond 0..1 is not a boolean", () => {

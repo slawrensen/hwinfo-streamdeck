@@ -27,6 +27,161 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-10-11: the 1.7.0.0 soak closed clean
+
+`node scripts/soak-monitor.mjs --summary release/soak-1.7.0.0-d26-20261010-1220.csv`.
+The subject was the installed 1.7.0.0 candidate under a day of desk
+use, sampled from outside the process once a minute. Its
+`bin/plugin.js` (`c35a5224…`) is the one the candidate pack
+(`0315f978…`, 380,443 B) carries. Two settings-panel updates landed
+inside the window (panel builds 1.7.0.0-d27 and -d28, at
+2026-10-10T20:01Z and 20:15Z) as file copies with the plugin running,
+so one PID carried the whole window, and the install now matches that
+pack file for file.
+
+| Soak | Value |
+| --- | ---: |
+| Window | 2026-10-10T19:20:07Z to 2026-10-11T19:21:00Z (24.0 h, 1443 samples) |
+| RSS slope, longest same-PID run (1443 samples, PID 3192) | +0.01 MB/30 min |
+| Private bytes slope, same run | +0.02 MB/30 min |
+| RSS, start to close | 51.2 MB to 50.9 MB (min 45.2, max 53.1) |
+| Handles | 191 to 191 (max 191) |
+| Avg CPU, same run | 0.21% |
+| Stream Deck restarts | 0 |
+| Plugin restarts / HWiNFO-absent samples | 0 / 0 |
+| New log WARN / ERROR lines | 0 / 0 |
+| Sampling gaps over 90 s | 0 |
+
+Both slopes sit far inside the 1 MB/30 min gate. A local test run
+started a second `plugin.js` for two samples (2026-10-10T19:35Z and
+19:36Z); the sampler stayed on PID 3192 throughout.
+
+No HWiNFO restart, Stream Deck restart or sleep/wake fell inside this
+window, so a follow-up window on the same installed bytes
+(`release/soak-1.7.0.0-d28-20261011-1236.csv`, 2026-10-11T19:36Z to
+19:51Z) took all three at the desk:
+
+- **Stream Deck restart**, 19:44:47Z: plugin PID 3192 to 89788, and
+  the new plugin opened shared memory in its first second.
+- **HWiNFO restart**: HWiNFO quit at 19:45:04Z. The plugin held values
+  for 13 s, then logged HWiNFO as not running. HWiNFO started again at
+  19:45:20Z, and the plugin logged one busy-mutex WARN while it came up.
+  It reopened 8 s after HWiNFO returned and took HWiNFO's startup layout
+  growth in place.
+- **Sleep**: S3 from 19:46:39Z for about two minutes (a 176 s sampling
+  gap). PID 89788 kept running and logged no WARN or ERROR after resume.
+
+The window's two WARN lines are the two HWiNFO-restart states above;
+it logged zero ERROR. Rows 11 to 13 of `native/hwsm/TESTING.md` cite
+this run.
+
+### 2026-09-24: settings-panel reading picker without a row cap (1.7.0.0 candidate)
+
+Harness: `npx tsx scripts/pi-lab.mjs perf <out.json>`, a headless Chromium
+on Linux x64 (Node 22) driving the shipped `sensor-reading.html` against
+the simulated Stream Deck host (`scripts/lib/pi-sim.mjs`) with generated
+trees of 0, 1, 500 and 5,000 readings, the saved reading placed near the
+end. Each run: 3 warm-up queries, then 11 timed queries, each measured
+from the input event to the next frame (so ~16.7 ms, one frame, is the
+floor); 3 runs per size. Not the Stream Deck app's webview and not live
+HWiNFO; the embedded-host timing is a remaining gate.
+
+| Readings | main 2ca44e9 p50 / p95 | rows rendered | candidate p50 / p95 | rows rendered | saved reading visible on open (main / candidate) | open, worst (candidate) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 16.8 / 17.3 ms | 0 | 16.8 / 17.2 ms | 0 | n/a | 4.4 ms |
+| 1 | 16.6 / 18.0 ms | 1 | 16.8 / 17.7 ms | 1 | yes / yes | 8.2 ms |
+| 500 | 15.3 / 21.2 ms | 150 | 16.9 / 21.8 ms | 500 | no / yes | 18.4 ms |
+| 5,000 | 20.5 / 28.6 ms | 150 | 17.1 / 26.7 ms | 5,000 | no / yes | 62.6 ms |
+
+The 150-row cap is gone at the same filtering cost: the list is built
+once per sensor tree and filtered in place by toggling `hidden`, and
+groups off screen skip layout (`content-visibility: auto` with a
+per-group size estimate). The target was p95 ≤ 100 ms per query; the
+worst open (building 5,000 rows) is 62.6 ms. With no settings panel
+visible the plugin builds no preview at all. I keep the raw samples
+with my private review records.
+
+The baseline is 1.6.0.0. The 1.7 line lifted the cap on its own before
+this picker was merged into it; that intermediate picker was not
+measured, and the combined release ships the one measured here.
+
+### 2026-09-20: what a Gadget scan costs as the selection grows
+
+Harnesses: `node --import tsx scripts/gadget-scan-benchmark.mjs` on a
+throwaway HKCU subkey (the default is the 39-row sparse fixture of the
+2026-09-07 entry; `--rows N` writes N dense rows in the shapes HWiNFO 8.48
+writes, five REG_SZ fields a row), and
+`node --import tsx scripts/gadget-scan-live.mjs`, which times the same
+provider read-only over the key HWiNFO itself is writing (120 scans, 250 ms
+apart). Windows x64, Node v24.16.0, the 1.7.0.0 candidate's provider over
+the native bridge. A scan runs synchronously on the plugin's one thread,
+inside the poll tick.
+
+| Key | Rows | Queries per scan | p50 | p95 |
+| --- | ---: | ---: | ---: | ---: |
+| throwaway, default fixture | 39 sparse | 1,297 | 5.12 ms | 5.51 ms |
+| throwaway, `--rows 500` | 500 dense | 4,524 | 121.9 ms | 123.9 ms |
+| throwaway, `--rows 1000` | 1,000 dense | 8,024 | 376.4 ms | 380.0 ms |
+| HWiNFO 8.48's own key, rewritten every 2 s | 554 | not counted | 151.8 ms | 158.9 ms |
+
+The live run's slowest scan took 161.2 ms. 1 of its 120 scans was skipped
+for an interleave, and no row contradicted itself. The 500 and 1,000-row
+numbers were first taken with a scratch script that writes the same rows; a
+re-run through `--rows` the same day gave 121.9 / 123.1 ms (500 samples)
+and 376.5 / 379.3 ms (`--samples 200`), and the default fixture 5.12 /
+5.31 ms.
+
+The query count still follows the 2026-09-07 entry's `1024 + 7N`, but the
+time does not scale with it. One query costs more the more values the key
+holds. Dividing each p50 above by its query count gives about 3.9 µs a
+query on the default fixture (156 values in the key), 27 µs at 2,500
+values and 47 µs at 5,000, which is what a by-name lookup that walks the
+key's values would give. A scan therefore grows roughly with the square of
+the ticked readings, and the 8,192 queries of a full key cannot be priced
+from the 39-row number.
+
+This corrects the 2026-09-04 entry and the 1.6.0.0 changelog line that
+rests on it. "The cost is set by the bound, not by how many readings are
+ticked" was measured with 13 readings ticked and holds only for a selection
+that small; the 0.3% and 1.1% of one core are 13-reading figures. With
+every reading on my bench ticked (554 rows) a scan takes about 150 ms:
+about 15% of the thread at the default 1 s poll and about 60% at the
+fastest 250 ms poll. Somewhere between 500 and 1,000 ticked rows a scan
+outlasts that 250 ms interval; the poller runs on `setInterval` with a
+synchronous tick, so from there the next tick is due as soon as the last
+one ends. `docs/data-sources.md` now says to tick the readings that are on
+the deck. These are short runs on one machine, not a host-resource budget,
+a physical-device result or a soak.
+
+### 2026-09-07: bounded Gadget row validation, synthetic registry
+
+Harness: `node --import tsx scripts/gadget-scan-benchmark.mjs`, Windows x64,
+Node v24.16.0, 39 populated sparse slots, 50 warmup scans and 500 measured
+scans. Native registry queries and production provider/identity handling
+are included. The before run uses the measurement-integrity candidate
+before row rereads; subsequent runs include one reread of every row field
+and then the numeric precision consistency check. The final run occurred
+after the native and Gadget e2e processes finished.
+
+| Measurement | Before | Row reread | Final row and number checks |
+| --- | ---: | ---: | ---: |
+| Registry queries per scan | 1,141 | 1,297 | 1,297 |
+| Mean scan | 4.56 ms | 6.03 ms | 5.15 ms |
+| Median scan | 4.51 ms | 5.42 ms | 5.04 ms |
+| P95 scan | 4.95 ms | 7.95 ms | 5.78 ms |
+
+These are separate short runs with ordinary system variance. The lower
+final timing does not establish that adding numeric checks improves speed.
+
+Query count changes from `1024 + 3N` to `1024 + 7N`. At 1,024 occupied
+slots this is 8,192 queries per scan, twice the previous 4,096. The 39-row
+result is a short synthetic measurement on this machine, not a 1,024-row
+timing result, host-resource budget, physical-device result or soak.
+The validation detects observed interleavings and withholds the scan;
+it cannot establish atomicity for a writer paused in an intermediate row.
+Raw before/after JSON is retained in the worktree's ignored
+`release/audit-evidence/sprint-03-scan-{before,after,final-isolated}.json`.
+
 ### 2026-09-04: 1.6.0.0 release candidate, and what the Gadget fix costs
 
 `node scripts/perf-report.mjs` against the final release candidate pack
@@ -62,6 +217,8 @@ ERROR_FILE_NOT_FOUND, so the cost is set by the bound, not by how many
 readings are ticked: at the default 1 s poll it is about 0.3% of one
 core, at the fastest 250 ms poll about 1.1%, and the shared-memory
 path, the default source and the one Auto mode prefers, pays nothing.
+(Corrected 2026-09-20: that holds for the 13 readings measured here.
+The cost grows with the selection; see that entry.)
 Earlier entries carry "n/a" for the Gadget tick because the key was
 absent on this machine; this is the file's first before-and-after row
 for it.

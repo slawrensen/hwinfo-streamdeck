@@ -124,7 +124,8 @@ try {
 	if (exitCode === null) {
 		check(`plugin exits within ${EXIT_BUDGET_MS / 1000}s of the socket dying, with a key still visible`, false, "still running: it would poll HWiNFO forever, painting into nothing");
 	} else {
-		check(`plugin exits within ${EXIT_BUDGET_MS / 1000}s of the socket dying, with a key still visible`, true, `after ${((exitedAt - closedAt) / 1000).toFixed(1)}s, code ${exitCode}`);
+		// Code 0 only: a plugin that throws on its way out also "exits".
+		check(`plugin exits within ${EXIT_BUDGET_MS / 1000}s of the socket dying, with a key still visible, code 0`, exitCode === 0, `after ${((exitedAt - closedAt) / 1000).toFixed(1)}s, code ${exitCode}`);
 	}
 } finally {
 	if (exitCode === null) {

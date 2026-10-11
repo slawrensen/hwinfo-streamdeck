@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 
 import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
 import { compileDetailFilter, DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
+import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
 function reading(key: string, sensorIndex: number, label = key): Reading {
@@ -79,7 +80,13 @@ describe("detail settings parsing", () => {
 		// and turned every tile of a Gadget custom list into Sensor missing.
 		const vid = "g:CPU [#0]: AMD Ryzen 9 9950X3D2:Core 0 VID";
 		const gap = "g:Gap Source:After Gap";
-		assert.deepEqual(detailKeysOf({ detailKeys: [vid, gap, `${vid}~1`, ` ${gap} `] }), [vid, gap, `${vid}~1`]);
+		// A hand indent comes off; the trailing space stays, because a label
+		// ending in a space is a different reading from the one without.
+		assert.deepEqual(detailKeysOf({ detailKeys: [vid, gap, `${vid}~1`, ` ${gap} `] }), [vid, gap, `${vid}~1`, `${gap} `]);
+		for (const edge of [" ", "\u00a0", "\u3000", "\t"]) {
+			assert.deepEqual(detailKeysOf({ detailKeys: [`${gap}${edge}`] }), [`${gap}${edge}`], JSON.stringify(edge));
+		}
+		assert.deepEqual(detailKeysOf({ detailKeys: ["g:GPU:Reading 3 "] }), ["g:GPU:Reading 3 "], "a trailing space never turns a label into the retired slot spelling");
 		// A Gadget key already reads as a name, so the document never appends
 		// one and nothing after the key is cut: a label with a double space
 		// inside it must survive, so no separator heuristic applies.
@@ -438,6 +445,22 @@ describe("detailTiles parsing (hand-grouped custom pages)", () => {
 		assert.deepEqual(detailTilesOf({}), []);
 		assert.deepEqual(detailTilesOf({ detailTiles: "4,2,1" }), []);
 	});
+
+	it("automatic color provenance requires an exact true flag paired with a valid stored hue", () => {
+		const input = { detailTiles: [
+			{ size: 4, colors: ["#4CC2FF", "#FF7E8E", "invalid", "#FFFFFF"], automaticColors: [true, "true", true, 1, true] },
+			{ size: 2, colors: ["#123456", "#654321"], automaticColors: "true" },
+			{ size: 1, automaticColors: [true] },
+			{ size: 4, colors: ["#123456", "#123456", "#123456", "#123456"], automaticColors: ["true", 1, null, false] }
+		] };
+		const before = JSON.stringify(input);
+		const parsed = detailTilesOf(input);
+		assert.deepEqual(parsed[0]?.automaticColors, [true, false, false, false]);
+		assert.equal(parsed[1]?.automaticColors, undefined, "malformed flags preserve legacy chosen semantics");
+		assert.equal(parsed[2]?.automaticColors, undefined, "an absent color has no stored provenance");
+		assert.equal(parsed[3]?.automaticColors, undefined, "truthy and null flags never turn chosen colors automatic");
+		assert.equal(JSON.stringify(input), before, "salvage parsing never rewrites the input");
+	});
 });
 
 describe("hand-grouped pagination (mixed tile sizes)", () => {
@@ -505,5 +528,30 @@ describe("hand-grouped pagination (mixed tile sizes)", () => {
 		assert.deepEqual(page.chunks[1], []);
 		assert.equal(page.specs[1], undefined);
 		assert.equal(page.rangeText, "1-1 / 1");
+	});
+});
+
+describe("custom lists over confirmed aliases", () => {
+	// A confirmed cross-provider pair makes two saved keys one measurement.
+	// The opener's own reading lives on the Back tile whichever spelling the
+	// list carries, and one measurement fills one tile, however many of its
+	// spellings were picked. With no snapshot the list stays positional.
+	const sm = (n: number): Reading => ({ key: `f0001234:0:100000${n}`, type: SensorType.Temperature, sensorIndex: 0, id: n, label: `Reading ${n}`, unit: "°C", value: 40 + n, valueMin: 40, valueMax: 60, valueAvg: 50 });
+	const readings = [sm(1), sm(2), sm(3)];
+	const raw: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0xf0001234, instance: 0, name: "Test Source" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	const links = [1, 2, 3].map((n) => ({ sharedMemory: `f0001234:0:100000${n}`, gadget: `g:Test Source:Reading ${n}`, unit: "°C", sensorType: 1 }));
+	const linked = applyReadingLinks(raw, links, 1);
+	const settings = { readingKey: "f0001234:0:1000001", detailMode: "custom", detailKeys: ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"] };
+
+	it("excludes the opener's measurement under its other spelling and lists one tile per measurement", () => {
+		assert.deepEqual(resolveDetailGroup(linked, settings)?.keys, ["f0001234:0:1000002", "f0001234:0:1000003", "gone:0:1"]);
+	});
+
+	it("keeps every position when no snapshot can resolve the spellings", () => {
+		assert.deepEqual(resolveDetailGroup(null, settings)?.keys, ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"]);
+	});
+
+	it("without links the same list keeps both spellings, as before", () => {
+		assert.deepEqual(resolveDetailGroup(raw, settings)?.keys, ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"]);
 	});
 });

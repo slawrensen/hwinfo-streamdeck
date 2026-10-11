@@ -6,8 +6,8 @@
 //   node scripts/docs-crawl.mjs https://docs.slawrensen.com/hwinfo-streamdeck/
 //   node scripts/docs-crawl.mjs https://docs.slawrensen.com/hwinfo-streamdeck-preview/ --expect "1.6.0"
 //
-// Exit 1 on any broken link, image or anchor, on a private path that
-// serves, or on a page missing the --expect text. Prints a summary table.
+// Exit 1 on any broken link, image or anchor, on a private path that does
+// not answer 404, or on a page missing the --expect text. Prints a summary table.
 const root = process.argv[2];
 if (typeof root !== "string" || !/^https?:\/\//.test(root)) {
 	console.error("usage: node scripts/docs-crawl.mjs <site root url> [--expect <text>]");
@@ -17,12 +17,13 @@ const expectAt = process.argv.indexOf("--expect");
 const expectText = expectAt === -1 ? null : process.argv[expectAt + 1] ?? null;
 const base = new URL(root.endsWith("/") ? root : `${root}/`);
 
-/** Paths that the site's _config.yml excludes; any 200 here is a leak. */
+/** Paths that the site's _config.yml excludes; each must answer 404. */
 const PRIVATE = ["release/RELEASE_RUNBOOK.html", "release/COPY_RULES.html", "release/STREAM_DECK_MARKETPLACE.html", "release/", "release/evidence/", "README.html"];
 /** Strings that never belong in a public page. */
 const LEAK = [/C:\\Users\\/i, /RELEASE_RUNBOOK/, /STREAM_DECK_MARKETPLACE/, /\.private\b/, /hwinfoden|hwinfospk/, /ghp_[A-Za-z0-9]{20,}/];
 
 const seen = new Map(); // url -> { status, html }
+const processed = new Set(); // fetched for an anchor does not mean inspected
 const problems = [];
 const queue = [base.href];
 
@@ -50,6 +51,8 @@ const attr = (html, re) => [...html.matchAll(re)].map((m) => m[1]);
 
 while (queue.length > 0) {
 	const url = queue.shift();
+	if (processed.has(url)) continue;
+	processed.add(url);
 	const page = await fetchPage(url);
 	if (page.status !== 200) {
 		problems.push(`${url}: HTTP ${page.status}`);
@@ -86,7 +89,7 @@ while (queue.length > 0) {
 					problems.push(`${url}: anchor ${target.pathname}#${hash} not on that page`);
 				}
 			}
-			if (!seen.has(target.href) && !queue.includes(target.href)) queue.push(target.href);
+			if (!processed.has(target.href) && !queue.includes(target.href)) queue.push(target.href);
 		}
 	}
 	for (const src of [...attr(page.html, /<img[^>]+src="([^"]+)"/g), ...attr(page.html, /<link[^>]+href="([^"]+)"/g), ...attr(page.html, /<script[^>]+src="([^"]+)"/g)]) {
@@ -104,7 +107,7 @@ while (queue.length > 0) {
 
 for (const rel of PRIVATE) {
 	const res = await fetchPage(new URL(rel, base).href);
-	if (res.status === 200) problems.push(`private path serves: ${rel}`);
+	if (res.status !== 404) problems.push(`private path ${rel}: HTTP ${res.status}, expected 404`);
 }
 
 const pages = [...seen.entries()].filter(([, e]) => e.type.includes("text/html") && e.status === 200);
@@ -115,6 +118,7 @@ for (const [url, e] of seen) {
 if (problems.length > 0) {
 	console.error(`\n${problems.length} problem(s):`);
 	for (const p of problems) console.error(`  ${p}`);
-	process.exit(1);
+	process.exitCode = 1;
+} else {
+	console.log("\nDOCS CRAWL: no broken links, images or anchors; private paths answer 404");
 }
-console.log("\nDOCS CRAWL: no broken links, images or anchors; private paths answer 404");

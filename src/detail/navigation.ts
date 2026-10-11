@@ -9,9 +9,10 @@
  * previous-profile hop), and pagination never switches profiles at all —
  * it only moves plugin state inside the one active page.
  */
+import { monotonicNow } from "../clock";
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
-import { pageOf, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
+import { pageOf, projectDetailTiles, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
 import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
 import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
 
@@ -89,7 +90,10 @@ type NavigatorDeps = {
 	disappearGraceMs?: number;
 	setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
 	clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
-	/** Clock for the leave debounce; tests inject a manual one. */
+	/** Clock for the entry and leave debounces and the expired-prompt
+	 * tombstones: monotonic by default, so a wall-clock correction never lets
+	 * a second hop through or stalls Back (external review AX49); tests
+	 * inject a manual one. */
 	now?: () => number;
 };
 
@@ -131,7 +135,7 @@ export class DetailNavigator {
 			// alive after the app closes the socket (exit hygiene).
 			setTimer: (fn, ms) => setTimeout(fn, ms).unref(),
 			clearTimer: (h) => clearTimeout(h),
-			now: Date.now,
+			now: monotonicNow,
 			...deps
 		};
 	}
@@ -356,7 +360,7 @@ export class DetailNavigator {
 
 	/** The current logical page projection for a device's state. */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan);
+		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, projectDetailTiles(state.group, state.tilePlan));
 	}
 
 	/**
@@ -427,10 +431,10 @@ export class DetailNavigator {
 		if (group === null) {
 			return;
 		}
-		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]);
+		const changed = group.title !== state.group.title || group.keys.length !== state.group.keys.length || group.keys.some((k, i) => k !== state.group.keys[i]) || JSON.stringify(group.sourceKeys) !== JSON.stringify(state.group.sourceKeys);
 		if (changed) {
 			state.group = group;
-			state.offset = pageOf(group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, state.tilePlan).offset;
+			state.offset = this.pageFor(state).offset;
 		}
 	}
 

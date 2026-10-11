@@ -148,7 +148,7 @@ async function hero() {
 		renderReadingKey({ label: "VRM MOS", valueText: "88.4", unitText: "°C", statBadge: "", history: history(91, 70, 88), palette: pal("void", "temperature", "warn") })
 	);
 	grid[3].push(
-		gauge(pal("void", "memory"), "Physical Memory", "20.4", "GB", "bar", 0.32),
+		gauge(pal("void", "memory"), "Memory", "20.4", "GB", "bar", 0.32),
 		renderReadingKey({ label: "GPU Hot Spot", valueText: "104", unitText: "°C", statBadge: "MAX", palette: pal("void", "temperature", "crit") })
 	);
 

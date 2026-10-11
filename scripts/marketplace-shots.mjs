@@ -618,7 +618,7 @@ async function settings(piDir) {
 
 	const chrome = [
 		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">Simple setup.</text>`,
-		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Search with live values, stack up to four, aim a drill-down key.</text>`
+		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">Find any reading, put up to four on one key, and choose what a press opens.</text>`
 	];
 	const composites = [];
 	for (let i = 0; i < panels.length; i++) {

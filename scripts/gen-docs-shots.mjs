@@ -258,10 +258,13 @@ async function multiReadouts() {
 		const readings = [byKey(K.cpuTemp), byKey(K.gpuTemp), byKey(K.pump)];
 		const first = readings[0];
 		const palette = resolvePalette(config, "void", classifyTypeAccent(first.type, first.unit, first.label), "normal");
+		// Short labels, as the panel's Label fields suggest: a row's label gets
+		// about half the key, so HWiNFO's full names only ever draw cut.
+		const labels = ["CPU", "GPU", "Pump"];
 		return renderTripleKey({
-			rows: readings.map((r) => {
+			rows: readings.map((r, i) => {
 				const m = formatMeasurement(r.value, r.unit, { decimals: "auto", fahrenheit: false, dataUnits: "decimal" });
-				return { label: r.label, valueText: m.valueText, unitText: m.unitText };
+				return { label: labels[i], valueText: m.valueText, unitText: m.unitText };
 			}),
 			palette
 		});

@@ -27,6 +27,49 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-10-11: the 1.7.0.0 soak closed clean
+
+`node scripts/soak-monitor.mjs --summary release/soak-1.7.0.0-d26-20261010-1220.csv`.
+The subject was the installed 1.7.0.0 candidate under a day of desk
+use, sampled from outside the process once a minute. Its
+`bin/plugin.js` (`c35a5224…`) is the one the candidate pack
+(`0315f978…`, 380,443 B) carries. Two settings-panel updates landed
+inside the window (panel builds 1.7.0.0-d27 and -d28, at
+2026-10-10T20:01Z and 20:15Z) as file copies with the plugin running,
+so one PID carried the whole window, and the install now matches that
+pack file for file.
+
+| Soak | Value |
+| --- | ---: |
+| Window | 2026-10-10T19:20:07Z to 2026-10-11T19:21:00Z (24.0 h, 1443 samples) |
+| RSS slope, longest same-PID run (1443 samples, PID 3192) | +0.01 MB/30 min |
+| Private bytes slope, same run | +0.02 MB/30 min |
+| RSS, start to close | 51.2 MB to 50.9 MB (min 45.2, max 53.1) |
+| Handles | 191 to 191 (max 191) |
+| Avg CPU, same run | 0.21% |
+| Stream Deck restarts | 0 |
+| Plugin restarts / HWiNFO-absent samples | 0 / 0 |
+| New log WARN / ERROR lines | 0 / 0 |
+| Sampling gaps over 90 s | 0 |
+
+Both slopes sit far inside the 1 MB/30 min gate. A local test run
+started a second `plugin.js` for two samples (2026-10-10T19:35Z and
+19:36Z); the sampler stayed on PID 3192 throughout.
+
+No HWiNFO restart, Stream Deck restart or sleep/wake fell inside this
+window. `src/poller.ts`, `src/hwinfo/` and `native/` are unchanged
+since 2026-09-27, and two earlier soaks of that same source covered all
+three. `release/soak-1.7.0.0-d16-20260928-0144.csv` holds a HWiNFO
+restart (HWiNFO absent 2026-09-28T21:51Z to 21:54Z, plugin PID kept,
+one WARN) and a Stream Deck restart at 2026-09-29T14:17Z.
+`release/soak-1.7.0.0-d19-20260930-2227.csv` holds a Stream Deck
+restart at 2026-10-02T05:00Z and one 36 s sleep (Windows logs
+19:39:04Z to 19:39:40Z; plugin PID 49804 kept, zero WARN, zero ERROR).
+The plugin was back within a minute of both app restarts. The sleep
+was shorter than the sampling interval, so it left no gap in the CSV,
+and the WARN line from the HWiNFO restart has rotated out of the
+plugin log.
+
 ### 2026-09-24: settings-panel reading picker without a row cap (1.7.0.0 candidate)
 
 Harness: `npx tsx scripts/pi-lab.mjs perf <out.json>`, a headless Chromium

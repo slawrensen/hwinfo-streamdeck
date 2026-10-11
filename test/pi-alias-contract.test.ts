@@ -1,16 +1,23 @@
 /**
  * The property inspector's alias contract, proven through the PRODUCTION
- * panel: ui/pi-common.js is loaded in a node vm over a minimal fake DOM
- * and a fake SDPIComponents store, then fed the REAL sensorTree and
+ * panel: ui/pi-model.js, ui/pi-shell.js and ui/pi-common.js are loaded, in
+ * the panels' order, into one node vm over a minimal fake DOM and a fake
+ * SDPIComponents store, then fed the REAL sensorTree and
  * preview payloads that src/pi-protocol.ts builds over applyReadingLinks
  * snapshots. Whatever the runtime resolves through a confirmed link (a
  * saved Shared Memory key while the Gadget provider is live, and the
  * reverse) the editor must name, tick and color the same way, and it may
  * never rewrite a saved key to do so. The config document half drives
  * Copy and Apply through their own buttons on the same file, and the
- * identity table at the end runs the extracted bareKey, namedKey and
- * mapReadingKeys helpers verbatim over every whitespace edge a Gadget
- * label can carry.
+ * identity table runs the extracted bareKey, namedKey and mapReadingKeys
+ * helpers verbatim over every whitespace edge a Gadget label can carry.
+ * After it come the checks the external review's class 11 asked for: the
+ * shell's pointer-start notes run alone, the Config wells, picker option
+ * ids and the no-answer status.
+ *
+ * The panel header and status block (pi-shell.js) are read where 1.7 read
+ * its Live value line: the header names the reading and its data state,
+ * and the face beside it is the plugin's own SVG, passed through as is.
  *
  * The fake DOM supports exactly the selectors and element behavior the two
  * settings panels use; it is not a browser, so nothing here speaks for
@@ -42,6 +49,8 @@ type OkStatus = Extract<PollerStatus, { state: "ok" }>;
 
 const PI_PATH = new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js", import.meta.url);
 const PI_SOURCE = readFileSync(PI_PATH, "utf8");
+/** The panels load these before pi-common.js (sensor-reading.html, sensor-dial.html). */
+const PI_PRELUDE = ["pi-model.js", "pi-shell.js"].map((name) => ({ name, source: readFileSync(new URL(`../com.lawrensen.hwinfo.sdPlugin/ui/${name}`, import.meta.url), "utf8") }));
 
 // ------------------------------------------------------------- fixtures
 const SM = ["f0000501:0:1000000", "e0002000:0:1000000", "f7006687:0:3000001"] as const;
@@ -52,8 +61,8 @@ const LINKS = [
 	{ sharedMemory: SM[1], gadget: G[1], unit: "°C", sensorType: SensorType.Temperature },
 	{ sharedMemory: SM[2], gadget: G[2], unit: "RPM", sensorType: SensorType.Fan }
 ];
-const NOT_PRESENT = "⚠ Sensor not present. Pick again";
-const RESTING = "Search sensors…";
+const NOT_PRESENT = "Saved reading not found. Search to pick another";
+const RESTING = "Search readings";
 
 function sample(key: string, id: number, label: string, type: SensorType, unit: string, value: number, sensorIndex = 0): Reading {
 	return { key, sensorIndex, id, label, type, unit, value, valueMin: value, valueMax: value, valueAvg: value, statistics: "unavailable" };
@@ -190,6 +199,21 @@ class FakeElement {
 		node.parent = p;
 		this.parent = null;
 	}
+	remove(): void {
+		this.parent?.removeChild(this);
+	}
+	/** Inserts `node` right after this element (the rotation toolbar moves this way). */
+	after(node: FakeElement): void {
+		const p = this.parent;
+		if (p === null) return;
+		node.parent?.removeChild(node);
+		p.children.splice(p.children.indexOf(this) + 1, 0, node);
+		node.parent = p;
+	}
+	get nextElementSibling(): FakeElement | null {
+		const p = this.parent;
+		return p === null ? null : (p.children[p.children.indexOf(this) + 1] ?? null);
+	}
 	contains(node: unknown): boolean {
 		let n = node as FakeElement | null;
 		while (n !== null) {
@@ -221,6 +245,21 @@ class FakeElement {
 	}
 	getAttribute(k: string): string | null {
 		return this.attrs[k] ?? null;
+	}
+	hasAttribute(k: string): boolean {
+		return k in this.attrs;
+	}
+	removeAttribute(k: string): void {
+		delete this.attrs[k];
+	}
+	toggleAttribute(k: string, force?: boolean): boolean {
+		const on = force ?? !(k in this.attrs);
+		if (on) this.attrs[k] = "";
+		else delete this.attrs[k];
+		return on;
+	}
+	matches(selector: string): boolean {
+		return matches(this, selector);
 	}
 	focus(): void {
 		this.doc.activeElement = this;
@@ -271,11 +310,14 @@ function matches(el: FakeElement, selectorList: string): boolean {
 }
 
 class FakeDocument {
+	readonly documentElement: FakeElement;
 	readonly body: FakeElement;
 	activeElement: FakeElement;
 	private readonly elements = new Map<string, FakeElement>();
 	constructor(readonly title: string) {
+		this.documentElement = new FakeElement("html", this);
 		this.body = new FakeElement("body", this);
+		this.documentElement.appendChild(this.body);
 		this.activeElement = this.body;
 	}
 	getElementById(id: string): FakeElement | null {
@@ -323,17 +365,20 @@ type Mounted = {
 	flush(): Promise<void>;
 	/** Simulates the app echoing didReceiveSettings for one field. */
 	echo(name: string, value: unknown): void;
+	/** Simulates a shared-settings change made outside this panel. */
+	echoGlobal(name: string, value: unknown): void;
 	/** The last write of one field, by value. */
 	lastWrite(name: string): unknown;
 };
 
-const SHARED_IDS = ["preview-value", "preview-stats", "status-hint", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
-const DIAL_IDS = ["rotation-set", "rotation-help", "reading-color-list", "overview-rows", "sensor-value-colors"];
+const SHARED_IDS = ["hw-head", "head-reading", "head-source", "head-state", "reading-status", "face", "face-img", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
+const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors"];
 const READING_IDS = ["detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
 
 /** Loads the production panel over a fresh DOM, store and socket. */
 function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}, replies?: { settings?: () => Promise<Record<string, unknown>>; globals?: () => Promise<Record<string, unknown>>; textControls?: boolean }): Mounted {
 	const doc = new FakeDocument(shape === "dial" ? "Sensor Dial settings" : "Sensor Reading settings");
+	doc.body.dataset.kind = shape === "dial" ? "dial" : "key";
 	for (const id of [...SHARED_IDS, ...(shape === "dial" ? DIAL_IDS : READING_IDS)]) doc.make(id, id.endsWith("-copy") || id.endsWith("-apply") ? "button" : id.startsWith("config-") && !id.endsWith("-note") ? "textarea" : "div");
 	const pickerWrap = doc.createElement("div");
 	pickerWrap.className = "hw-picker";
@@ -345,6 +390,10 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 	}
 	if (shape === "dial") {
 		doc.make("reading-color-preset", "select").value = "automatic";
+		const rotationWrap = doc.createElement("div");
+		rotationWrap.className = "hw-picker";
+		doc.body.appendChild(rotationWrap);
+		doc.make("pickerr-search", "input", rotationWrap);
 	} else {
 		const collectorWrap = doc.createElement("div");
 		collectorWrap.className = "hw-picker";
@@ -359,33 +408,53 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 	const applied: unknown[] = [];
 	const sent: { event: string; payload: unknown }[] = [];
 	const clipboard = { text: "" };
-	const useStore = (target: Record<string, unknown>) => (name: string, cb?: (v: unknown) => void) => {
+	// A store saves its WHOLE document through the client, as sdpi's does,
+	// so the shell sees every save; only Apply's documents count as applied.
+	let storeSaving = false;
+	const useStore = (target: Record<string, unknown>, save: (docValue: Record<string, unknown>) => void) => (name: string, cb?: (v: unknown) => void) => {
 		if (cb !== undefined) (subs.get(name) ?? subs.set(name, []).get(name)!).push(cb);
 		return [
 			() => Promise.resolve(target[name]),
 			(v: unknown) => {
 				target[name] = v;
 				writes.push({ name, value: plain(v) });
+				storeSaving = true;
+				try {
+					save({ ...target });
+				} finally {
+					storeSaving = false;
+				}
 			}
 		];
 	};
-	let piSubscriber: ((ev: { payload: unknown }) => void) | null = null;
+	// The shell, the fold memory and pi-common each subscribe; every one hears every message.
+	const piSubscribers: ((ev: { payload: unknown }) => void)[] = [];
+	// The app sends each document on connect and again on every change made
+	// outside this panel; the shell keeps its own copy from these.
+	const settingsSubscribers: ((ev: { payload: { settings: unknown } }) => void)[] = [];
+	const globalSubscribers: ((ev: { payload: { settings: unknown } }) => void)[] = [];
+	const deliver = (subscribers: typeof settingsSubscribers, target: Record<string, unknown>): void => {
+		for (const cb of subscribers) cb({ payload: { settings: { ...target } } });
+	};
 	const SDPIComponents = {
-		useSettings: useStore(store),
-		useGlobalSettings: useStore(globalStore),
+		useSettings: useStore(store, (docValue) => SDPIComponents.streamDeckClient.setSettings(docValue)),
+		useGlobalSettings: useStore(globalStore, (docValue) => SDPIComponents.streamDeckClient.setGlobalSettings(docValue)),
 		streamDeckClient: {
 			send: (event: string, payload: unknown) => sent.push({ event, payload }),
 			sendToPropertyInspector: {
 				subscribe: (cb: (ev: { payload: unknown }) => void) => {
-					piSubscriber = cb;
+					piSubscribers.push(cb);
 				}
 			},
+			didReceiveSettings: { subscribe: (cb: (typeof settingsSubscribers)[number]) => settingsSubscribers.push(cb) },
+			didReceiveGlobalSettings: { subscribe: (cb: (typeof globalSubscribers)[number]) => globalSubscribers.push(cb) },
+			getConnectionInfo: async () => ({ actionInfo: { context: "" } }),
 			getSettings: async () => ({ settings: replies?.settings === undefined ? store : await replies.settings() }),
 			getGlobalSettings: async () => replies?.globals === undefined ? globalStore : await replies.globals(),
 			setSettings: (docValue: unknown) => {
-				applied.push(plain(docValue));
+				if (!storeSaving) applied.push(plain(docValue));
 			},
-			setGlobalSettings: () => {}
+			setGlobalSettings: (() => {}) as (docValue: unknown) => void
 		}
 	};
 	const intervals: (() => void)[] = [];
@@ -396,6 +465,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		setTimeout,
 		clearTimeout,
 		queueMicrotask,
+		requestAnimationFrame: (fn: () => void) => setTimeout(fn, 0),
+		cancelAnimationFrame: clearTimeout,
 		setInterval: (fn: () => void) => {
 			intervals.push(fn);
 			return intervals.length;
@@ -414,10 +485,18 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		},
 		performance,
 		location: { reload() {} },
-		addEventListener() {}
+		addEventListener() {},
+		removeEventListener() {}
 	};
 	sandbox.window = sandbox;
-	vm.runInNewContext(PI_SOURCE, sandbox, { filename: "pi-common.js" });
+	sandbox.self = sandbox;
+	const context = vm.createContext(sandbox);
+	for (const { name, source } of PI_PRELUDE) vm.runInContext(source, context, { filename: name });
+	vm.runInContext(PI_SOURCE, context, { filename: "pi-common.js" });
+	setTimeout(() => {
+		deliver(settingsSubscribers, store);
+		deliver(globalSubscribers, globalStore);
+	}, 0);
 	return {
 		doc,
 		store,
@@ -431,8 +510,8 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 			return found;
 		},
 		feed: (payload) => {
-			assert.ok(piSubscriber !== null, "the panel subscribed to sendToPropertyInspector");
-			piSubscriber({ payload });
+			assert.ok(piSubscribers.length > 0, "the panel subscribed to sendToPropertyInspector");
+			for (const cb of piSubscribers) cb({ payload });
 		},
 		flush: async () => {
 			for (const fn of intervals) fn();
@@ -441,6 +520,11 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 		echo: (name, value) => {
 			store[name] = value;
 			for (const cb of subs.get(name) ?? []) cb(value);
+			deliver(settingsSubscribers, store);
+		},
+		echoGlobal: (name, value) => {
+			globalStore[name] = value;
+			deliver(globalSubscribers, globalStore);
 		},
 		lastWrite: (name) => writes.filter((w) => w.name === name).at(-1)?.value
 	};
@@ -457,18 +541,28 @@ async function openPanel(shape: "dial" | "reading", seed: Record<string, unknown
 	return m;
 }
 
-it("the production Live value consumer paints the selected overview row color from the real preview payload", async () => {
+it("the preview carries the selected overview row color, and the panel shows the face the plugin drew", async () => {
 	applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "theme" });
 	const status = linkedStatus();
 	for (const dialView of ["overview", "tworow"]) {
 		const seed = { readingKey: SM[0], rotationKeys: [...G], dialView, theme: "void", textMode: "theme", readingColors: { [SM[0]]: "#4CC2FF", [G[0]]: "#FF7E8E" } };
 		const m = await openPanel("dial", seed, status);
-		assert.equal(m.el("preview-value").style.color, "#FF7E8E", "the row's exact color wins over the selection alias");
-		assert.equal(m.el("preview-value").style.color, paint(m.store, status)[0]);
-		assert.equal(m.el("preview-value").textContent, "71.4 °C");
+		const face = composeDialSvg(dialState(m.store), status, () => []);
+		const preview = buildPreview(status, m.store as { readingKey?: string }, false, { kind: "dial", face });
+		assert.equal(preview.display?.valueColor, "#FF7E8E", "the row's exact color wins over the selection alias");
+		assert.equal(preview.display?.valueColor, paint(m.store, status)[0]);
+		assert.equal(`${preview.display?.value}${preview.display?.unit}`, "71.4°C");
+		m.feed(preview);
+		await m.flush();
+		assert.equal(m.el("face-img").dataset.face, face, "the header shows the face exactly as drawn");
+		assert.deepEqual(header(m), { reading: LABELS[0], state: "Live · Gadget registry" });
 		assert.deepEqual(plain(m.store), seed);
 	}
 });
+
+/** The header the shell draws from the preview (pi-shell.js renderHeader). */
+const header = (m: Mounted): { reading: string; state: string } => ({ reading: m.el("head-reading").textContent, state: m.el("head-state").textContent });
+const NOT_FOUND = "Saved reading not found";
 
 const chips = (m: Mounted, list = "rotation-set"): FakeElement[] => m.el(list).querySelectorAll(".hw-set-chip");
 const chipNames = (m: Mounted, list = "rotation-set"): string[] => chips(m, list).map((c) => c.querySelector(".hw-set-name")!.textContent);
@@ -485,14 +579,14 @@ const colorRow = (m: Mounted, key: string): ColorRow => {
 	assert.ok(row !== undefined, `a color row for ${key}`);
 	return row;
 };
-/** Clicks the tick of one picker row as the browser would: the box has
- * already flipped to `checked` when the delegated click handler runs. */
-const clickTick = (m: Mounted, key: string, checked: boolean, list = "picker-list"): void => {
+/** Ticks one checklist row as the browser would: the box has already
+ * flipped to `checked` when the delegated change handler runs. */
+const clickTick = (m: Mounted, key: string, checked: boolean, list = "pickerr-list"): void => {
 	const row = pickerRows(m, list).find((r) => r.dataset.key === key);
 	assert.ok(row !== undefined, `picker row ${key}`);
 	const tick = tickOf(row);
 	tick.checked = checked;
-	m.el(list).fire("click", { target: tick });
+	m.el(list).fire("change", { target: tick });
 };
 const choosePreset = (m: Mounted, preset: string): void => {
 	const select = m.el("reading-color-preset");
@@ -527,7 +621,7 @@ describe("remaining PI review regressions", () => {
 			m.feed({ event: "themes", ...config, effectiveDeckTheme: "paper" });
 			await m.flush();
 			assert.equal(m.el("text-color").value, resolvePalette(config, effectiveThemeFor({ theme }), null, "normal").value.toLowerCase(), theme);
-			assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Paper");
+			assert.equal(m.el("theme-gallery").children[0]!.getAttribute("aria-label"), "Default: follow the shared theme, currently Paper");
 			assert.equal(m.store.theme, theme, "salvage does not rewrite the setting");
 			assert.equal(m.writes.length, 0);
 			m.echo("theme", "");
@@ -543,7 +637,7 @@ describe("remaining PI review regressions", () => {
 		m.feed({ event: "themes", ...loadThemes(), effectiveDeckTheme: "constructor" });
 		await m.flush();
 		assert.equal(m.el("text-color").value, loadThemes().themes.void!.value.toLowerCase());
-		assert.equal(m.el("theme-gallery").children[0]!.title, "Deck default · Void");
+		assert.equal(m.el("theme-gallery").children[0]!.getAttribute("aria-label"), "Default: follow the shared theme, currently Void");
 		assert.equal(m.writes.length, 0);
 	});
 
@@ -584,7 +678,7 @@ describe("remaining PI review regressions", () => {
 	});
 
 	for (const scope of ["key", "deck"] as const) {
-		it(`a delayed ${scope} config read cannot overwrite a draft typed while waiting`, async () => {
+		it(`a draft typed right after a ${scope} Copy stays`, async () => {
 			let answer: (value: Record<string, unknown>) => void = () => {};
 			const reply = new Promise<Record<string, unknown>>((resolve) => { answer = resolve; });
 			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: () => reply } : { globals: () => reply });
@@ -601,20 +695,26 @@ describe("remaining PI review regressions", () => {
 			assert.equal(m.writes.length, 0);
 		});
 
-		it(`out-of-order ${scope} config reads keep the newest reply`, async () => {
-			const answers: ((value: Record<string, unknown>) => void)[] = [];
-			const read = (): Promise<Record<string, unknown>> => new Promise((resolve) => { answers.push(resolve); });
-			const m = mountPanel("dial", {}, {}, scope === "key" ? { settings: read } : { globals: read });
+		// Contract changed on purpose (external review AX77): a Copy used to
+		// read its document from the host, and the host's answer reached
+		// every control, so a late one rolled the panel back. It now shows
+		// the newest document the panel holds and asks the host for none.
+		it(`a ${scope} Copy shows the newest document the panel holds and asks the host for none`, async () => {
+			let reads = 0;
+			const read = async (): Promise<Record<string, unknown>> => {
+				reads++;
+				return { old: true };
+			};
+			const m = mountPanel("dial", { theme: "void" }, { theme: "void" }, scope === "key" ? { settings: read } : { globals: read });
+			await m.flush();
+			if (scope === "key") m.echo("theme", "paper");
+			else m.echoGlobal("theme", "paper");
 			await m.flush();
 			m.el(`config-${scope}-copy`).fire("click");
-			m.el(`config-${scope}-copy`).fire("click");
-			assert.equal(answers.length, 2);
-			answers[1]!({ newest: true });
 			await m.flush();
-			answers[0]!({ old: true });
-			await m.flush();
-			assert.deepEqual(JSON.parse(m.el(`config-${scope}`).value), { newest: true });
-			assert.deepEqual(JSON.parse(m.clipboard.text), { newest: true });
+			assert.equal(reads, 0, "the well asked the host for nothing");
+			assert.equal(JSON.parse(m.el(`config-${scope}`).value).theme, "paper");
+			assert.equal(JSON.parse(m.clipboard.text).theme, "paper");
 			assert.equal(m.writes.length, 0);
 		});
 	}
@@ -625,14 +725,18 @@ describe("remaining PI review regressions", () => {
 		const stale: PollerStatus = { ...status, state: "stale", staleForMs: 16_000 };
 		m.feed(buildSensorTree(stale));
 		m.feed(buildPreview(stale, { readingKey: "gone:0:1" }, false));
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		await m.flush();
+		assert.equal(header(m).state, NOT_FOUND);
+		assert.match(m.el("reading-status").children[0]!.textContent, /^The saved reading is not in HWiNFO's current sensor list/);
 		assert.equal(m.el("picker-search").placeholder, NOT_PRESENT);
 		assert.ok(chips(m)[0]!.classList.contains("missing"));
 		const before = m.sent.length;
 		m.feed(buildPreview(status, { readingKey: "gone:0:1" }, false));
 		assert.equal(m.sent.length, before + 1, "ok after stale still requests a fresh tree");
 		m.feed({ event: "sensorTree", state: "unavailable", groups: [], hint: "Down" });
-		assert.equal(m.el("picker-search").placeholder, RESTING);
+		assert.equal(m.el("picker-search").placeholder, "Saved reading kept (no HWiNFO data to show it)", "unknown, not missing");
+		assert.equal(m.el("picker-search").title, "", "the missing tooltip goes with the missing mark");
+		assert.ok(!m.el("picker-search").classList.contains("missing"));
 		assert.ok(!chips(m)[0]!.classList.contains("missing"));
 		assert.equal(m.writes.length, 0);
 	});
@@ -904,7 +1008,7 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 		assert.equal(search.value, `${LABELS[0]}  ·  Sample sensors`);
 		assert.equal(search.placeholder, RESTING);
 		assert.ok(!search.classList.contains("missing"), "no missing mark on a resolvable key");
-		assert.equal(m.el("preview-value").textContent, "71.4 °C");
+		assert.deepEqual(header(m), { reading: LABELS[0], state: "Live · Gadget registry" });
 		assert.ok(!composeDialSvg(dialState(m.store), status, () => []).includes("Sensor missing"));
 		assert.equal(m.store.readingKey, SM[0], "the saved key is never rewritten");
 	});
@@ -922,11 +1026,16 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 	});
 
 	it("the live rows tick as members through their aliases and the selection highlights its live row", () => {
-		m.el("picker-search").fire("focus");
-		const rows = pickerRows(m);
+		m.el("pickerr-search").fire("focus");
+		const rows = pickerRows(m, "pickerr-list");
 		assert.deepEqual(rows.map((r) => r.dataset.key), [...G], "the tree lists live keys only");
 		for (const row of rows) assert.equal(tickOf(row).checked, true, `${row.dataset.key} ticks as a member`);
-		assert.deepEqual(rows.filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [G[0]]);
+		const onDial = rows.filter((r) => r.querySelector(".hw-now")?.textContent === "on dial").map((r) => r.dataset.key);
+		assert.deepEqual(onDial, [G[0]], "the saved key's live twin is the row marked on the dial");
+		m.el("picker-search").fire("focus");
+		const picked = pickerRows(m);
+		assert.deepEqual(picked.map((r) => r.dataset.key), [...G]);
+		assert.deepEqual(picked.filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [G[0]]);
 	});
 
 	it("a second tick on the live twin writes nothing: a key and its aliases are one member", () => {
@@ -944,7 +1053,7 @@ describe("a saved Shared Memory selection and set while the Gadget provider is l
 		assert.deepEqual(m.lastWrite("rotationKeys"), [SM[1], SM[2]]);
 		assert.deepEqual(chipNames(m), [LABELS[1], LABELS[2]]);
 		assert.equal(rotationReadings(m.store.rotationKeys as string[], SM[1], status.snapshot).length, 2);
-		assert.equal(tickOf(pickerRows(m).find((r) => r.dataset.key === G[0])!).checked, false, "the tick follows the set");
+		assert.equal(tickOf(pickerRows(m, "pickerr-list").find((r) => r.dataset.key === G[0])!).checked, false, "the tick follows the set");
 	});
 
 	it("the config document names a hex key that resolves only through its alias", async () => {
@@ -974,12 +1083,14 @@ describe("the picker lists every reading however long the tree", () => {
 		const m = await openPanel("dial", { readingKey: HOT, rotationKeys: [HOT, RAIL] }, status);
 		m.el("picker-search").fire("focus");
 		assert.equal(pickerRows(m).length, readings.length, "no row budget");
-		assert.equal(m.el("picker-list").querySelector(".hw-more"), null, "nothing is held back behind a refine note");
-		assert.deepEqual(ticked(m, "picker-list"), [HOT, RAIL]);
+		assert.equal(m.el("picker-list").querySelector(".hw-more:not([hidden])") === null, true, "nothing is held back behind a refine note");
 		assert.deepEqual(pickerRows(m).filter((r) => r.classList.contains("selected")).map((r) => r.dataset.key), [HOT]);
+		m.el("pickerr-search").fire("focus");
+		assert.equal(pickerRows(m, "pickerr-list").length, readings.length, "no row budget in the rotation list either");
+		assert.deepEqual(ticked(m, "pickerr-list"), [HOT, RAIL]);
 		clickTick(m, RAIL, false);
 		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT]);
-		assert.deepEqual(ticked(m, "picker-list"), [HOT], "the unticked row stays listed to be ticked again");
+		assert.deepEqual(ticked(m, "pickerr-list"), [HOT], "the unticked row stays listed to be ticked again");
 		clickTick(m, RAIL, true);
 		assert.deepEqual(m.lastWrite("rotationKeys"), [HOT, RAIL]);
 	});
@@ -1017,7 +1128,10 @@ describe("a color saved under the dormant endpoint while the rows are keyed by t
 	it("Auto clears the color under every key of that reading and leaves unrelated entries alone", () => {
 		colorRow(m, G[1]).auto.fire("click");
 		assert.deepEqual(m.lastWrite("readingColors"), { dormant: "#ABCDEF", future: { keep: "unknown" } });
-		assert.equal(colorRow(m, G[1]).well.value, "#FFFFFF");
+		// An automatic well shows the color the dial draws for the row: the
+		// resolved theme's value color (Void's white here), not a fixed white
+		// (round 3, R39).
+		assert.equal(colorRow(m, G[1]).well.value.toLowerCase(), "#ffffff");
 		assert.equal(colorRow(m, G[1]).auto.disabled, true);
 		assert.equal(m.el("reading-color-preset").value, "automatic");
 		assert.notEqual(paint(m.store, status)[1], "#FF7E8E", "the face no longer paints it");
@@ -1034,8 +1148,17 @@ describe("a color saved under the dormant endpoint while the rows are keyed by t
 		choosePreset(m, "automatic");
 		assert.deepEqual(m.lastWrite("readingColors"), { dormant: "#ABCDEF", future: { keep: "unknown" } });
 		assert.equal(m.el("reading-color-preset").value, "automatic");
-		assert.ok(colorRows(m).every((r) => r.well.value === "#FFFFFF"));
+		assert.ok(colorRows(m).every((r) => r.well.value.toLowerCase() === "#ffffff"));
 		assert.notEqual(paint(m.store, status)[1], "#FF7E8E", "Automatic cleared what the face rendered");
+	});
+
+	it("automatic wells show the resolved theme's value color, and follow a shared theme change", async () => {
+		const themes = loadThemes();
+		const writesBefore = m.writes.length;
+		m.feed({ event: "themes", ...themes, effectiveDeckTheme: "paper" });
+		await m.flush();
+		assert.ok(colorRows(m).every((r) => r.well.value === themes.themes.paper!.value.toLowerCase()), JSON.stringify(colorRows(m).map((r) => r.well.value)));
+		assert.equal(m.writes.length, writesBefore, "display only: nothing is written");
 	});
 });
 
@@ -1083,7 +1206,7 @@ describe("without a usable link the editor falls back to exact keys, like the ru
 		const search = m.el("picker-search");
 		assert.equal(search.placeholder, NOT_PRESENT);
 		assert.ok(search.classList.contains("missing"));
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		assert.equal(header(m).state, NOT_FOUND);
 		assert.deepEqual(chips(m).map((c) => c.classList.contains("missing")), [true, false], "the surviving pair still resolves");
 		assert.deepEqual(chipNames(m), [SM[0], LABELS[2]]);
 		assert.equal(rotationReadings(m.store.rotationKeys as string[], SM[0], status.snapshot).length, 1);
@@ -1093,7 +1216,7 @@ describe("without a usable link the editor falls back to exact keys, like the ru
 		const status = linkedStatus([{ sharedMemory: SM[0], gadget: "g:Sample sensors:Absent", unit: "°C", sensorType: SensorType.Temperature }]);
 		const m = await openPanel("dial", { readingKey: SM[0], ...OVERVIEW }, status);
 		assert.equal(m.el("picker-search").placeholder, NOT_PRESENT);
-		assert.equal(m.el("preview-value").textContent, "sensor missing");
+		assert.equal(header(m).state, NOT_FOUND);
 		assert.deepEqual(colorRows(m).map((r) => r.key), [SM[0]], "no tree group resolves, so the pick alone is listed");
 	});
 
@@ -1118,7 +1241,7 @@ describe("a legacy Gadget key the provider republishes", () => {
 	it("resolves in the picker, the preview and the document, and the g: spelling is never annotated", async () => {
 		const m = await openPanel("dial", { readingKey: legacy, ...OVERVIEW }, status);
 		assert.equal(m.el("picker-search").value, "Hot Spot:Max  ·  GPU");
-		assert.equal(m.el("preview-value").textContent, "70.0 °C");
+		assert.deepEqual(header(m), { reading: "Hot Spot:Max", state: "Live · Gadget registry" });
 		const exported = await copiedDocument(m);
 		assert.equal(exported.readingKey, legacy);
 		assert.equal((await applyDocument(m, exported)).readingKey, legacy);
@@ -1401,5 +1524,243 @@ describe("bareKey, namedKey and mapReadingKeys as shipped", () => {
 	it("list adoption (value.map(bareKey)) keeps stored Gadget keys byte for byte", () => {
 		const stored = ["g:GPU:Temperature ", "g:GPU:Temperature ", HEX];
 		assert.deepEqual(stored.map((k) => bareKey(k)), stored);
+	});
+});
+
+// The pointer-start notes run alone over a stand-in document, so a guard
+// that throws on an event the panel suites never send, or a note one pointer
+// lends another, fails here (external review AX79, AX83).
+describe("the shell's pointer-start notes", () => {
+	type PointerNote = { target: unknown; detail?: number; pointerId?: number };
+	const mountNotes = () => {
+		const source = PI_PRELUDE.find((part) => part.name === "pi-shell.js")!.source;
+		const start = source.indexOf("	// A pointer press confirms only if it began on the button");
+		const end = source.indexOf("	// --- disclosure:", start);
+		assert.ok(start > 0 && end > start, "the block's comment markers moved");
+		/** closest("button") is the element itself for a button, else the button it sits in. */
+		class Element {
+			dataset: Record<string, string> = {};
+			constructor(
+				private readonly isButton = false,
+				private readonly parent: Element | null = null
+			) {}
+			closest(): Element | null {
+				return this.isButton ? this : this.parent;
+			}
+		}
+		const listeners = new Map<string, ((event: PointerNote) => void)[]>();
+		const document = {
+			addEventListener: (type: string, listener: (event: PointerNote) => void) => listeners.set(type, [...(listeners.get(type) ?? []), listener])
+		};
+		const panel = {
+			swallowed: 0,
+			document,
+			background: new Element(),
+			/** A button, and the element inside it (its label text) that a press can land on. */
+			button: () => {
+				const button = new Element(true);
+				return { button, inside: new Element(false, button) };
+			},
+			// As on a real document, an event no listener takes does nothing.
+			fire: (type: string, event: PointerNote) => {
+				for (const listener of listeners.get(type) ?? []) listener(event);
+			}
+		};
+		vm.runInNewContext(source.slice(start, end), { document, Element, swallow: () => panel.swallowed++ });
+		return panel;
+	};
+
+	it("a background press, a document-targeted event and an unknown pointer never throw", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		assert.doesNotThrow(() => p.fire("pointerdown", { target: p.document, pointerId: 1 }));
+		assert.doesNotThrow(() => p.fire("pointerdown", { target: p.background, pointerId: 2 }));
+		assert.doesNotThrow(() => p.fire("focusout", { target: button }));
+		assert.doesNotThrow(() => p.fire("click", { target: inside, detail: 0, pointerId: -1 }));
+		p.fire("pointerdown", { target: inside, pointerId: 3 });
+		assert.doesNotThrow(() => p.fire("click", { target: p.document, detail: 1, pointerId: 3 }));
+		assert.doesNotThrow(() => p.fire("click", { target: inside, detail: 1, pointerId: 9 }));
+		assert.equal(p.swallowed, 0);
+	});
+
+	// Chromium gives a keyboard or screen reader click pointerId -1, which no
+	// note has; a click with detail 0 is not judged whatever id it carries.
+	it("a click-only activation is not judged by a pointer's note", () => {
+		for (const pointerId of [-1, 1]) {
+			const p = mountNotes();
+			const { button, inside } = p.button();
+			p.fire("pointerdown", { target: inside, pointerId: 1 });
+			button.dataset.armed = "true";
+			p.fire("click", { target: inside, detail: 0, pointerId });
+			assert.equal(p.swallowed, 0, `pointerId ${pointerId}`);
+		}
+	});
+
+	it("each pointer keeps its own start: a touch on the armed button lends a held mouse nothing", () => {
+		for (const cancelled of [false, true]) {
+			const p = mountNotes();
+			const { button, inside } = p.button();
+			p.fire("pointerdown", { target: inside, pointerId: 1 });
+			button.dataset.armed = "true";
+			p.fire("pointerdown", { target: button, pointerId: 2 });
+			if (cancelled) p.fire("pointercancel", { target: button, pointerId: 2 });
+			p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+			assert.equal(p.swallowed, 1, "the mouse began before the arm");
+			if (cancelled) continue;
+			p.fire("click", { target: button, detail: 1, pointerId: 2 });
+			assert.equal(p.swallowed, 1, "the touch began on the armed button");
+		}
+	});
+
+	it("a click reads only its own pointer's note, in either order", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("pointerdown", { target: inside, pointerId: 2 });
+		p.fire("click", { target: inside, detail: 1, pointerId: 2 });
+		assert.equal(p.swallowed, 0, "the touch's click, first, began armed");
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1, "the mouse's click, second, began unarmed");
+	});
+
+	// A second mouse button pressed while the first is held sends no
+	// pointerup for the first: its click comes with no lift in between.
+	it("a click with no lift before it (a second mouse button held) is judged by its press", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1);
+	});
+
+	it("a note judges one click only", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1);
+	});
+
+	it("a press begun off every button leaves no note from an earlier press", () => {
+		const p = mountNotes();
+		const { button, inside } = p.button();
+		p.fire("pointerdown", { target: inside, pointerId: 1 });
+		p.fire("pointerdown", { target: p.background, pointerId: 1 });
+		button.dataset.armed = "true";
+		p.fire("click", { target: inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 0);
+	});
+
+	it("focus leaving the pressed button drops its arm; focus leaving another element does not", () => {
+		const p = mountNotes();
+		const pressed = p.button();
+		const other = p.button();
+		pressed.button.dataset.armed = "true";
+		p.fire("pointerdown", { target: pressed.inside, pointerId: 1 });
+		p.fire("focusout", { target: other.button });
+		p.fire("click", { target: pressed.inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 0, "another element's focus left");
+		p.fire("pointerdown", { target: pressed.inside, pointerId: 1 });
+		p.fire("focusout", { target: pressed.button });
+		p.fire("click", { target: pressed.inside, detail: 1, pointerId: 1 });
+		assert.equal(p.swallowed, 1, "the pressed button's focus left");
+	});
+});
+
+// An untouched Config well follows every later document on its own; the
+// older tests read it after Copy, which refills it (external review AX81).
+describe("Config wells follow the panel's documents", () => {
+	it("an untouched shared Config well follows later documents without another Copy", async () => {
+		const m = mountPanel("dial", {}, { theme: "void", future: { keep: 1 } });
+		await m.flush();
+		m.el("config-deck-copy").fire("click");
+		await m.flush();
+		assert.equal(JSON.parse(m.el("config-deck").value).theme, "void");
+		m.echoGlobal("theme", "paper");
+		await m.flush();
+		assert.deepEqual(JSON.parse(m.el("config-deck").value), { theme: "paper", future: { keep: 1 } });
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("dirty key and shared Config wells keep their exact drafts through later documents", async () => {
+		const m = mountPanel("dial", { theme: "void" }, { theme: "void" });
+		await m.flush();
+		for (const scope of ["key", "deck"]) {
+			m.el(`config-${scope}`).value = '{ "draft" : true }';
+			m.el(`config-${scope}`).fire("input");
+		}
+		m.echo("theme", "paper");
+		m.echoGlobal("theme", "paper");
+		await m.flush();
+		for (const scope of ["key", "deck"]) assert.equal(m.el(`config-${scope}`).value, '{ "draft" : true }');
+		assert.equal(m.writes.length, 0);
+	});
+
+	// An auto-cycling dial changes its document every few seconds: a well
+	// someone has clicked into holds still (a refill throws the caret to the
+	// end), catches up when focus leaves, and Replace on it writes the
+	// current document, never the one shown when it was focused.
+	it("a focused untouched well holds still, catches up on blur, and Replace writes the current document", async () => {
+		const m = mountPanel("dial", { theme: "void" });
+		await m.flush();
+		const well = m.el("config-key");
+		m.echo("theme", "ember");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "ember", "an unfocused well follows");
+		well.focus();
+		m.echo("theme", "paper");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "ember", "a focused well holds still");
+		well.blur();
+		well.fire("blur");
+		await m.flush();
+		assert.equal(JSON.parse(well.value).theme, "paper", "it catches up when focus leaves");
+		well.focus();
+		m.echo("theme", "forest");
+		await m.flush();
+		const before = m.applied.length;
+		m.el("config-key-apply").fire("click");
+		await m.flush();
+		assert.equal(m.applied.length, before + 1);
+		assert.equal((m.applied.at(-1) as Record<string, unknown>).theme, "forest", "Replace refreshed the untouched well first");
+	});
+});
+
+// Option ids are numbered once per key: a tree delivered again renumbers
+// nothing (external review AX80).
+describe("picker option ids", () => {
+	it("picker ids stay distinct and stable when the same sensor tree arrives again", async () => {
+		const status = linkedStatus();
+		const m = await openPanel("dial", { readingKey: SM[0] }, status);
+		m.el("picker-search").fire("focus");
+		const before = pickerRows(m).map((row) => ({ key: row.dataset.key, id: row.id }));
+		assert.ok(before.length >= 3);
+		m.feed(buildSensorTree(status));
+		await m.flush();
+		const after = pickerRows(m).map((row) => ({ key: row.dataset.key, id: row.id }));
+		assert.equal(new Set(after.map((row) => row.id)).size, after.length);
+		assert.deepEqual(after, before);
+		assert.equal(m.writes.length, 0);
+	});
+});
+
+// A panel that hears nothing from the plugin says so (external review AX82).
+// The shell renders again 3.2 s after connecting (pi-shell.js, the
+// setTimeout(scheduleRender, 3200) in the connect handler), so this test
+// waits that long in real time.
+describe("the no-answer status", () => {
+	const PAST_THE_NO_ANSWER_RENDER_MS = 3300;
+	it("a connected panel without a plugin reply explains the failure after the wait", async () => {
+		const m = mountPanel("reading", {});
+		await m.flush();
+		assert.equal(m.el("reading-status").children.length, 0);
+		await new Promise((resolve) => setTimeout(resolve, PAST_THE_NO_ANSWER_RENDER_MS));
+		await m.flush();
+		assert.match(m.el("reading-status").children.map((child) => child.textContent).join(" "), /plugin is not answering this panel/);
+		assert.equal(m.writes.length, 0);
 	});
 });

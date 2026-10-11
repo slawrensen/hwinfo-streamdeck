@@ -1,7 +1,5 @@
 # GitHub Pages / just-the-docs configuration for the documentation site.
 # Publish: repo Settings -> Pages -> Deploy from a branch -> main -> /docs.
-# (GitHub Pages on a private repo needs a paid plan; this is ready to serve the
-#  moment the repo is public.)
 title: HWiNFO Sensors for Stream Deck
 description: >-
   Live HWiNFO sensor readings on your Elgato Stream Deck: temperatures, clocks,

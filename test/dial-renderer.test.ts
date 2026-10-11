@@ -13,6 +13,12 @@ import { resolveTextColors, type TextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { contrast } from "./wcag";
 
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+
 const config = loadThemes();
 const MIDNIGHT = resolvePalette(config, "midnight", null, "normal");
 
@@ -36,7 +42,7 @@ describe("dial geometry", () => {
 
 	it("value 34/700 at x=12 y=58 with inline 17/600 unit in unit color", () => {
 		const svg = render({});
-		assert.match(svg, new RegExp(`<text x="12" y="58" text-anchor="start" [^>]*font-size="34" font-weight="700" fill="${MIDNIGHT.value}">56\\.3<tspan dx="6" font-size="17" font-weight="600" fill="${MIDNIGHT.unit}">°C</tspan></text>`));
+		assert.match(svg, new RegExp(`<text x="12" y="58" text-anchor="start" [^>]*font-size="34" font-weight="700" fill="${MIDNIGHT.value}">56\\.3<tspan font-size="17" font-weight="600" fill="${MIDNIGHT.unit}">\u2004°C</tspan></text>`));
 	});
 
 	it("long value prose steps down so status faces never clip at the slot edge", () => {
@@ -132,10 +138,11 @@ describe("overview geometry (V3 wide tile: rail, fixed columns, context line)", 
 		assert.doesNotMatch(svg, /<rect x="0" y="17" width="4" height="26"/);
 	});
 
-	it("UPPERCASE labels 12/600 +0.4 tracking at x=12; the selected label lifts to label color", () => {
+	it("UPPERCASE labels 12/600 at x=12 with no tracking (the app's QtSvg draws none); the selected label lifts to label color", () => {
 		const svg = renderOverview({});
-		assert.match(svg, new RegExp(`<text x="12" y="36.8" text-anchor="start" [^>]*font-size="12" font-weight="600" letter-spacing="0.4" fill="${MIDNIGHT.label}">CPU PACKAGE</text>`));
-		assert.match(svg, new RegExp(`<text x="12" y="64.8" text-anchor="start" [^>]*font-size="12" font-weight="600" letter-spacing="0.4" fill="${MIDNIGHT.unit}">GPU TEMP</text>`));
+		assert.match(svg, new RegExp(`<text x="12" y="36.8" text-anchor="start" [^>]*font-size="12" font-weight="600" fill="${MIDNIGHT.label}">CPU PACKAGE</text>`));
+		assert.doesNotMatch(svg, /letter-spacing/);
+		assert.match(svg, new RegExp(`<text x="12" y="64.8" text-anchor="start" [^>]*font-size="12" font-weight="600" fill="${MIDNIGHT.unit}">GPU TEMP</text>`));
 		assert.match(svg, new RegExp(`<text x="12" y="92.8" [^>]*fill="${MIDNIGHT.unit}">SSD</text>`));
 	});
 
@@ -192,7 +199,9 @@ describe("overview geometry (V3 wide tile: rail, fixed columns, context line)", 
 	it("an opaque bg mask separates the label run from its row's value (estimate insurance)", () => {
 		// A four-glyph value at the 20px step books 48px: labelRight = 118.
 		const svg = renderOverview({ rows: [overviewRow({ label: "GPU Memory Junction Temperature", selected: true })] });
-		const label = svg.indexOf(">GPU MEMORY J…<");
+		// Priced on Segoe UI's measured table (no tracking held back, since
+		// the device draws none): one letter more than the old 6 % holdback.
+		const label = svg.indexOf(">GPU MEMORY JU…<");
 		const mask = svg.indexOf(`<rect x="118.0" y="17" width="82.0" height="26" fill="${MIDNIGHT.bg}"/>`);
 		const value = svg.indexOf(`<text x="168" y="36.8"`);
 		assert.ok(label !== -1, "fitted label missing");
@@ -559,7 +568,7 @@ describe("dial text colors", () => {
 	it("single view: title, value, unit chunk and stats take the resolved text", () => {
 		const svg = render({ text: custom });
 		assert.match(svg, /<text x="12" y="24" [^>]*fill="#550505"/);
-		assert.match(svg, /<text x="12" y="58" [^>]*fill="#660000">56\.3<tspan [^>]*fill="#440A0A">°C<\/tspan><\/text>/);
+		assert.match(svg, /<text x="12" y="58" [^>]*fill="#660000">56\.3<tspan [^>]*fill="#440A0A">\u2004°C<\/tspan><\/text>/);
 		assert.match(svg, /<text x="12" y="78" [^>]*fill="#440A0A"/);
 	});
 
@@ -571,8 +580,8 @@ describe("dial text colors", () => {
 
 	it("three-row overview: labels, units, context and stats take the text; rail stays", () => {
 		const svg = renderOverview({ text: custom });
-		assert.match(svg, /letter-spacing="0.4" fill="#550505">CPU PACKAGE</); // selected row label
-		assert.match(svg, /letter-spacing="0.4" fill="#440A0A">GPU TEMP</); // unselected row label
+		assert.match(svg, /font-weight="600" fill="#550505">CPU PACKAGE</); // selected row label
+		assert.match(svg, /font-weight="600" fill="#440A0A">GPU TEMP</); // unselected row label
 		assert.match(svg, /fill="#440A0A">°C</); // unit column
 		assert.match(svg, /fill="#550505">session</); // context line
 		assert.match(svg, /fill="#440A0A">▼42\.0 ▲78\.5</); // stats
@@ -600,7 +609,7 @@ describe("Dim keeps the selection cue on the multi-row views", () => {
 	// and on the two-row selected band, where the caller resolves the label
 	// on the track exactly as it resolves the unit there.
 	const dim: TextSettings = { mode: "dim", color: undefined, dimSecondary: false };
-	const labelFill = (svg: string, label: string): string => (svg.match(new RegExp(`letter-spacing="0.4" fill="(#[0-9A-F]{6})">${label}<`)) as RegExpMatchArray)[1] as string;
+	const labelFill = (svg: string, label: string): string => (svg.match(new RegExp(`<text x="12" [^>]*font-weight="600" fill="(#[0-9A-F]{6})">${label}<`)) as RegExpMatchArray)[1] as string;
 	const twoRowLabelFill = (svg: string, y: number): string => (svg.match(new RegExp(`<text x="12" y="${y}" [^>]*fill="(#[0-9A-Fa-f]{6})"`)) as RegExpMatchArray)[1] as string;
 
 	for (const name of Object.keys(config.themes)) {

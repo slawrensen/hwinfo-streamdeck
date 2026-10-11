@@ -1,0 +1,18 @@
+/* Study B: compact task sections. Label-left rows, smaller face in the
+   Reading section, help lines tightened. Study only, never shipped. */
+body[data-study="b"] .hw-head { padding-top: 6px; padding-bottom: 6px; }
+body[data-study="b"] .hw-face img { width: 48px; height: 48px; }
+body[data-study="b"] .hw-head[data-kind="dial"] .hw-face img { width: 120px; height: 60px; }
+body[data-study="b"] .hw-face figcaption { display: none; }
+body[data-study="b"] .hw-field { display: grid; grid-template-columns: minmax(84px, 34%) 1fr; column-gap: 8px; align-items: center; }
+body[data-study="b"] .hw-field > .hw-help,
+body[data-study="b"] .hw-field > .hw-error,
+body[data-study="b"] .hw-field > .hw-picker,
+body[data-study="b"] .hw-field > .hw-themes,
+body[data-study="b"] .hw-field > .hw-swatch-row,
+body[data-study="b"] .hw-field > .hw-quad-colors { grid-column: 2; }
+body[data-study="b"] .hw-field > label,
+body[data-study="b"] .hw-field > .hw-label { margin: 0; text-align: right; color: var(--hw-muted); }
+body[data-study="b"] .hw-row2 { display: block; }
+body[data-study="b"] .hw-sec > summary { padding-top: 7px; padding-bottom: 7px; }
+body[data-study="b"] .hw-sec-body .hw-help { font-size: 11px; }

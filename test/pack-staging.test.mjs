@@ -74,6 +74,12 @@ describe("pack through a staged copy", () => {
 		assert.ok(sameSnapshot(before_, snapshotDir(source)));
 	});
 
+	it("a packer that writes its archive and then fails leaves no archive (external review AX39)", () => {
+		assert.throws(() => packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: (stagedDir, out) => { fs.writeFileSync(path.join(out, archiveName), "a half-written archive"); throw new Error("streamdeck pack exited with 1"); }, log: () => {} }), /exited with 1/);
+		assert.equal(fs.existsSync(path.join(outputDir, archiveName)), false);
+		assert.ok(sameSnapshot(before_, snapshotDir(source)));
+	});
+
 	it("a packer that writes nothing is reported", () => {
 		assert.throws(() => packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: () => {}, log: () => {} }), /left no/);
 		assert.ok(sameSnapshot(before_, snapshotDir(source)));

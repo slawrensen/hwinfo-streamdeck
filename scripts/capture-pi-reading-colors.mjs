@@ -132,14 +132,14 @@ try {
 		build: window.__hwPiVersion,
 		rows: [...document.querySelectorAll("#reading-color-list .hw-quad-colors")].map(row => ({ key: row.querySelector("input").dataset.key, label: row.querySelector("label").textContent, color: row.querySelector("input").value })),
 		preset: document.getElementById("reading-color-preset").value,
-		liveValue: document.getElementById("preview-value").textContent,
-		statusHint: document.getElementById("status-hint").hidden ? "" : document.getElementById("status-hint").textContent
+		liveState: document.getElementById("head-state").textContent,
+		statusHint: document.getElementById("reading-status").textContent.trim()
 	}))()`);
 	assert.match(evidence.build, /^1\.7\.0\.0-/);
 	assert.equal(evidence.preset, "signal");
 	assert.deepEqual(evidence.rows.map((row) => row.label), labels);
 	assert.deepEqual(evidence.rows.map((row) => row.color.toUpperCase()), ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33", "#4CC2FF"]);
-	assert.match(evidence.liveValue, /\d/);
+	assert.equal(evidence.liveState, "Live · Shared Memory");
 	assert.equal(evidence.statusHint, "");
 	const face = await (await fetch(`${base}/face/ctx-dial.svg`)).text();
 	assert.ok(!face.includes("Sensor missing") && !face.includes("No new data"), "The live dial must resolve the selected readings");
@@ -147,10 +147,12 @@ try {
 	evidence.appliedSettings = { ...settings, readingColors: Object.fromEntries(evidence.rows.map((row) => [row.key, row.color])) };
 	evidence.appliedGlobals = globals;
 	evidence.liveDialSha256 = sha256(face);
-	console.log("UI state verified; capturing Appearance");
+	console.log("UI state verified; capturing Display");
 	const clip = await evaluate(`(() => {
 		for (const fold of document.querySelectorAll("details")) fold.open = false;
-		const head = [...document.querySelectorAll(".hw-section")].find(el => el.textContent === "Appearance");
+		const section = document.getElementById("sec-display");
+		section.open = true;
+		const head = section.querySelector("summary");
 		const tail = document.getElementById("sensor-value-colors");
 		const top = Math.floor(head.getBoundingClientRect().top + window.scrollY - 8);
 		const bottom = Math.ceil(tail.getBoundingClientRect().bottom + window.scrollY + 8);
@@ -161,11 +163,11 @@ try {
 	const size = await sharp(panel).metadata();
 	// The title is external board chrome. The panel itself stays pixel exact.
 	// This visible stamp comes from the running page's own build marker.
-	const header = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="92"><rect width="100%" height="100%" fill="#202226"/><g font-family="Segoe UI, Arial"><text x="24" y="35" font-size="25" fill="#F0F2F5">Dial appearance</text><text x="24" y="68" font-size="19" fill="#B3BAC7">Property inspector · UI build ${evidence.build}</text></g></svg>`);
+	const header = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="92"><rect width="100%" height="100%" fill="#202226"/><g font-family="Segoe UI, Arial"><text x="24" y="35" font-size="25" fill="#F0F2F5">Dial display</text><text x="24" y="68" font-size="19" fill="#B3BAC7">Property inspector · UI build ${evidence.build}</text></g></svg>`);
 	const file = path.join(out, "pi-dial-reading-colors-1.7.png");
 	await sharp({ create: { width: size.width, height: size.height + 92, channels: 3, background: "#2D2D2D" } }).composite([{ input: header, left: 0, top: 0 }, { input: panel, left: 0, top: 92 }]).png().toFile(file);
-	const sourceFiles = ["com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html", "com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js", "com.lawrensen.hwinfo.sdPlugin/ui/pi.css", "com.lawrensen.hwinfo.sdPlugin/bin/plugin.js"];
-	writeFileSync(path.join(out, "pi-dial-reading-colors-1.7.provenance.json"), `${JSON.stringify({ command: "node scripts/capture-pi-reading-colors.mjs", kind: "Real property-inspector screenshot", note: "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to Appearance. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.", captureTime: new Date().toISOString(), panelSha256: sha256(panel), file: path.basename(file), sha256: sha256(readFileSync(file)), width: size.width, height: size.height + 92, evidence, sourceSha256: Object.fromEntries(sourceFiles.map((source) => [source, sha256(readFileSync(path.join(root, source)))])) }, null, "\t")}\n`);
+	const sourceFiles = ["com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html", "com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js", "com.lawrensen.hwinfo.sdPlugin/ui/pi-shell.js", "com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js", "com.lawrensen.hwinfo.sdPlugin/ui/pi.css", "com.lawrensen.hwinfo.sdPlugin/bin/plugin.js"];
+	writeFileSync(path.join(out, "pi-dial-reading-colors-1.7.provenance.json"), `${JSON.stringify({ command: "node scripts/capture-pi-reading-colors.mjs", kind: "Real property-inspector screenshot", note: "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to the Display section. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.", captureTime: new Date().toISOString(), panelSha256: sha256(panel), file: path.basename(file), sha256: sha256(readFileSync(file)), width: size.width, height: size.height + 92, evidence, sourceSha256: Object.fromEntries(sourceFiles.map((source) => [source, sha256(readFileSync(path.join(root, source)))])) }, null, "\t")}\n`);
 	console.log(`wrote ${file} (${size.width}x${size.height + 92}), UI build ${evidence.build}`);
 } finally {
 	clearTimeout(watchdog);

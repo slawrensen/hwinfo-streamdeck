@@ -1,0 +1,59 @@
+/* Palette-placement studies; see palette.js. Study only. */
+
+/* B and E: an always-open band under the header, set like a section body
+   with no disclosure row. */
+body[data-palette="B"] .hw-look,
+body[data-palette="E"] .hw-look {
+	padding: 0 var(--hw-gutter) var(--hw-s2);
+	border-bottom: 1px solid var(--hw-rule);
+	background: var(--hw-bg);
+}
+
+/* E: the header and the band pin as one region. */
+body[data-palette="E"] .hw-pinwrap {
+	position: sticky;
+	top: 0;
+	z-index: 60;
+	background: var(--hw-bg);
+	box-shadow: 0 6px 10px -6px rgba(0, 0, 0, 0.6);
+}
+
+body[data-palette="E"] .hw-pinwrap .hw-head[data-pin] {
+	position: static !important;
+	box-shadow: none !important;
+}
+
+/* C: a swatch row in the pinned header; each swatch keeps a 24 px target,
+   the names move to the tooltip and the accessible name. */
+body[data-palette="C"] .hw-head-palette {
+	margin-top: 4px;
+}
+
+body[data-palette="C"] .hw-head-palette > .hw-label,
+body[data-palette="C"] .hw-head-palette > .hw-help {
+	display: none;
+}
+
+body[data-palette="C"] .hw-head-palette .hw-themes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+}
+
+body[data-palette="C"] .hw-head-palette .hw-theme {
+	min-height: 24px;
+	padding: 1px;
+}
+
+body[data-palette="C"] .hw-head-palette .hw-theme-face {
+	width: 24px;
+	height: 20px;
+}
+
+body[data-palette="C"] .hw-head-palette .hw-theme-name {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}

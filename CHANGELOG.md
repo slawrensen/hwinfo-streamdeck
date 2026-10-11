@@ -6,8 +6,116 @@ listing is a separate track.
 
 ## 1.7.0.0 - Unreleased
 
-Per-reading dial colors and reliability fixes in one release.
+Redesigned settings panels, per-reading dial colors and reliability
+fixes in one release.
 
+- The settings panels for Sensor Reading keys, Sensor Dials, HWiNFO
+  Control keys and detail tiles share one essentials-first layout. On
+  Sensor Reading keys and Sensor Dials a header with the exact face the
+  plugin last drew and its live state stays pinned while you scroll the
+  app's own 410 px panel, and a theme strip under it opens on a first
+  visit (one line naming what is drawn and where it comes from, such as
+  "Default (shared: Void)" with Change beside it, then every theme as a
+  chip drawn in its own colors with its name on it). The strip folds
+  like a section; folded, its line keeps the checked theme as a small
+  chip in that theme's colors, beside where it comes from. When a key's or
+  dial's own theme differs from the shared one, Make shared takes
+  Change's place: it makes that theme the shared theme and sets the key
+  or dial back to Default. The
+  chips keep the themes' defined order in the Stream Deck app, which
+  delivered them alphabetized. Then come
+  Reading,
+  Display, Alerts, Press (Controls on a dial) and Advanced, whose
+  Shared defaults, Connection, Support and Configuration documents
+  fold on their own. Reading and Display start open, a section you open
+  or fold stays that way on the next key's panel while the app runs
+  (the two chevron buttons at the top right of the header, or Alt-click
+  on a title, open or fold them all; never stored in a key's settings),
+  and every folded section's title line says what it holds in the
+  runtime's own terms: inherited choices are marked "shared",
+  thresholds read as at or beyond (≥, ≤) with their unit and a dial's
+  unit scope, and a dial's gesture line follows the resolved preset,
+  so a tap made dead by touch zones is not listed. Open, a section
+  drops that line and keeps its longer explanations behind a How …
+  works link. A default key's panel measures more than a quarter
+  shorter than the first 1.7 draft's, which never shipped (1,042 to 753
+  CSS px on the simulated test host). Fields and buttons share
+  one height (28 px), every theme chip carries its name, and small
+  marks (checkboxes, group radios, text actions) take at least a 24 px
+  target.
+- The panel tells its states apart: connecting, plugin not answering,
+  no reading selected, HWiNFO unavailable (the saved reading is kept
+  and never called missing), no new Shared Memory data (with how long,
+  for example "Not updating for 42 s"), an unknown Gadget data age
+  (named as unknown, never as stopped), the source being reopened
+  after a layout change or restart ("Reopening source", never "Live"),
+  saved reading not found, and no search matches. The header's state
+  uses the words on the face. Where there is a local fix, it sits right
+  under the header: Check again (which says when the answer came back
+  if nothing changed), HWiNFO setup steps, Pick another reading, or,
+  when Data source is set to one provider only, a way to that setting.
+  A healthy Gadget source says so in one line; the rest sits under
+  Advanced, Connection.
+- Opening a panel writes nothing, and an edit changes only the field it
+  touched. Rotation groups, detail tiles, per-reading names, quad cell
+  colors and list entries keep fields and entries this version does not
+  know instead of being normalized away, and a stored choice this
+  version does not know shows as kept rather than silently replaced.
+  Replacing the shared settings document, removing a rotation group
+  that holds readings and a merge that drops group names or folds two
+  or more groups of readings into one each ask for a second, separate
+  press: a quick double click only arms them, and so does a mouse button
+  already held down when Enter arms them.
+- The reading picker is built once per sensor list and filtered in
+  place, and stays responsive on a 5,000-reading tree (PERF.md). It follows the
+  combobox pattern: arrow keys browse, Enter picks, Tab or a click
+  elsewhere closes without changing anything. Rotation membership and
+  custom detail lists are checklists instead (one Tab stop; arrow keys
+  move inside), so ticking a reading never changes the reading on the
+  dial. On a dial the rotation sits right under the reading on the dial:
+  the search that ticks readings first, then the rotation as one list
+  (one Tab stop; arrow keys select) with the reading on the dial marked,
+  so you can watch it move as you turn, and one toolbar under it,
+  Earlier, Later, Rename and Remove, for the selected reading. At a
+  group's edge Earlier and Later move the reading into the neighboring
+  group.
+  A reading HWiNFO no longer lists shows a "missing" pill, two readings
+  with the same name carry the word that tells their sensors apart
+  (for example #0 and #1), and the lines
+  under the lists follow the dial's control map (what a turn or a
+  pressed turn does, and when the reading on the dial is outside the
+  set). The dial's face sits beside its name in the header instead of
+  above it, and the header leads with the name the dial shows.
+- The Stream Deck app keeps the Escape key and most of its own clicks
+  from reaching a panel, so the open list also closes on a second click
+  in the box and when the panel loses focus. Moving the pointer out of
+  the panel never closes it. A click that opens it selects the
+  whole name, so typing replaces it. Text typed just before selecting
+  another key is saved as the pointer leaves, instead of being lost
+  with the panel.
+- Faces as the device draws them: the app's SVG engine dropped the gap
+  before a unit ("59.7°C"). Dual keys and dials now draw a space
+  ("59.7 °C"), unless it would shrink a value, and three-row keys keep
+  their units tight so the labels keep the room. On a dual key with a
+  pinned second row, a row's MIN, MAX or AVG sits after its own label
+  when the label still draws whole at its usual size, so that value keeps
+  its size as a press cycles the stats; otherwise it follows the value as
+  in 1.6.0 and the label stays whole. When both rows show the same stat,
+  one badge sits in the divider, as in 1.6.0.
+- Every control has a programmatic name and a visible focus ring, text
+  contrast and small targets were raised, and the panels reflow at
+  320 px wide without horizontal scrolling.
+- Labels follow the new vocabulary; the renames change no stored settings.
+  "Deck default" is now Default; the deck theme, deck text and type
+  accents are Theme, Text color and Accent colors under Advanced,
+  Shared defaults (marked "All keys and dials"); Poll every is Read
+  every; Label mode is Title when the dial moves on; Reset reach is A stats reset
+  clears; Press does is A press; Detail contains is Details list; Tile
+  shows is Readings per tile; and "Repeat Back under this key's own
+  cell" is "Also go back from this key's own position". The Text
+  color help says it colors the numbers and labels while graphs, bars
+  and stat badges take the accent color, and the Accent colors help says
+  which colors reach the numbers (issue #31).
 - Malformed Gadget raw numbers remain unavailable instead of displaying a
   numeric prefix or adding it to freshness, history and session statistics.
   Healthy neighboring readings keep serving. Detail faces also refresh when
@@ -15,7 +123,24 @@ Per-reading dial colors and reliability fixes in one release.
 - A raw value that overflows to infinity is unavailable everywhere it is
   compared, not only where it is drawn: it no longer paints a key critical,
   colors a dial row with the alert color, or holds an alert-aware auto
-  cycle on the reading, while the face shows no value.
+  cycle on the reading, while the face shows no value. A data reading that
+  only overflows once converted to bytes shows the same unavailable mark in
+  its own unit instead of "Infinity". A dial's session AVG stays a number
+  when readings are large enough to overflow their running total.
+- A key, dial or HWiNFO Control key held down while its settings change
+  does nothing when released: the press ends, and the next press uses the
+  new settings. Before, a held press could run the command the new
+  settings named, such as resetting every dial. The press also stays over
+  when the Stream Deck app repeats the key-down or replays the key's
+  appearance while it is held. A key set to open details on a hold opens
+  them when held past half a second, even if a busy or waking PC delivers
+  the release before the hold is noticed.
+- Auto cycle keeps its interval when the Windows clock is corrected, and so
+  do the detail view's Back (a second press right after the first is still
+  one hop) and the settings panel's second-press confirmations. A
+  hand-edited interval that is not a number or text (true, a list) reads as
+  off instead of cycling. A threshold typed while HWiNFO is away applies to
+  the reading it was typed for, even if the dial moves before data returns.
 - A newly accepted source keeps its own sample age. Switching from recent
   Gadget values to an old Shared Memory sample no longer makes that sample
   appear live.
@@ -25,12 +150,25 @@ Per-reading dial colors and reliability fixes in one release.
   with a fresh history segment. Saved selections are never rewritten;
   old duplicate-suffixed or ownerless keys need reselection after repair.
 - Invalid theme names fall back safely. The settings panel refreshes its
-  picker after source recovery or a provider change, preserves Config drafts
-  while settings replies are pending, and retains unknown Config fields.
+  picker after source recovery or a provider change, preserves drafts in
+  the Configuration documents, fills them from the settings it already
+  holds (a slow reply to a fresh read could put an older document back
+  into the panel), and retains unknown fields in them. A reading name holding a
+  malformed character no longer empties the picker. A
+  detail tile setting this version cannot read stays as stored when the
+  tile is edited, and a hand-edited command or shared theme that is not
+  text no longer stops a panel summary from drawing.
+- Copy support report copies only the report it asked for, once: a late,
+  repeated or unrequested answer, or an earlier copy that failed late, no
+  longer replaces the clipboard.
+- Shared settings changed just as the plugin starts are kept: the plugin
+  no longer applies or writes back an older copy that reached it first.
 - Group jumps skip a confirmed alias of the current reading so the next
   distinct reading in the target group remains reachable.
+- The plugin log quotes names that come from HWiNFO or the Stream Deck app,
+  so a name with a line break in it stays on its own log line.
 - Two-row and three-row dials can color each reading's number separately.
-  Appearance adds Reading colors with Signal, Pairs and Uniform presets,
+  Display adds Reading colors with Signal, Pairs and Uniform presets,
   individual color wells, and Auto resets. Colors follow each reading
   through rotation, reordering, groups and confirmed cross-source links,
   including with Type accents off. An optional Color numbers by sensor
@@ -41,8 +179,8 @@ Per-reading dial colors and reliability fixes in one release.
   withheld while both are ticked, instead of being numbered in encounter
   order. HWiNFO reports some readings twice under one name (a GPU fan once
   in RPM and once in percent, for example), and a shift-click range ticks
-  both. Untick or relabel one of the two in HWiNFO and the other comes
-  back on its own after two polls. Nothing is written to disk and nothing
+  both. In HWiNFO, untick or relabel the one your key should not show,
+  and the other comes back on its own after two polls. Nothing is written to disk and nothing
   is remembered after a plugin restart. HWiNFO rewrites its Gadget rows
   one at a time after a tick or untick, so a name seen on two rows for the
   first time skips that one poll like any torn read, and a poll that then
@@ -66,9 +204,14 @@ Per-reading dial colors and reliability fixes in one release.
   reads exactly "Reading 0" through "Reading 1023", whose source name or
   reading label contains any literal tilde ("~"), or whose old key carried
   the "~n" duplicate suffix get no alias and need one reselection. This
-  includes unique names such as "Hot~Spot" and "CPU~Package".
+  includes unique names such as "Hot~Spot" and "CPU~Package". If both
+  readings of a same-name pair were ticked, 1.6.0 showed both (the second
+  as a "~1" copy). 1.7 withholds both while both are ticked. A key that
+  1.6.0 saved on the plain name was on the first of the two, so untick or
+  relabel the second; a key saved on the copy needs one reselection.
 - Advanced users can explicitly link a Shared Memory key and its Gadget
-  counterpart in the deck Config document. Links apply to keys, dense
+  counterpart in the Shared settings document (Advanced > Configuration
+  documents). Links apply to keys, dense
   layouts, dials and custom detail lists in either provider direction.
   Nothing is inferred from similar names or values. Conflicting links and
   changed native units or types are refused. The type is checked on the
@@ -90,7 +233,7 @@ Per-reading dial colors and reliability fixes in one release.
   such as the GPU only appeared when searched for, and a reading ticked
   or selected there could not be seen or unticked in the list.
 - A stale sensor snapshot keeps the picker's missing-reading cue, matching
-  Live value; an unavailable source still leaves the picker neutral. Bar
+  the panel header; an unavailable source still leaves the picker neutral. Bar
   and Ring help now distinguishes Shared Memory session min/max from
   Gadget's moving window of 36 samples, which restarts after a gap.
 - Gadget starts with unknown freshness until a value change is observed.
@@ -144,7 +287,10 @@ Per-reading dial colors and reliability fixes in one release.
   whatever the number of ticked readings; its 2.7 ms was measured with 13
   readings ticked, and the cost grows with the selection, to about 150 ms
   per poll with all 554 readings on my bench ticked (measured in PERF.md,
-  2026-09-20), so tick the readings you put on the deck.
+  2026-09-20), so tick the readings you put on the deck. 1.7 also rereads
+  each row to catch rows HWiNFO is renumbering, which roughly doubles the
+  registry reads per ticked reading compared with 1.6.0 (counted: 1,024
+  plus 7 per reading, against 1,024 plus 3).
 - In Auto mode with Shared Memory not running, a Gadget key that opened
   but whose scan was refused shows Source busy (the registry changed
   during the scan) or Source error (a registry value that cannot be read
@@ -161,6 +307,39 @@ Per-reading dial colors and reliability fixes in one release.
   replaces them while it is set. Moving readings in a custom detail list
   keeps automatic colors adjusted for the theme instead of turning them
   into chosen colors.
+- Keys, dials and detail tiles keep the Tahoma Bold they have always
+  drawn on the device, now named outright and measured. Earlier versions
+  named a font list, which the Stream Deck app's SVG renderer reads as one
+  unknown name, so it drew Tahoma while every layout was measured for the
+  narrower Segoe UI: on hardware a three-row label could run into its
+  value and a long status line off the key. Every fit now measures the
+  ink Tahoma Bold actually draws, from the font's own metrics, against
+  the key's visible area and the dial's edge. Where 1.6.0 drew a title,
+  label, value or stats line whole and clear of its neighbors, 1.7 keeps
+  its size and letters, except where 1.6.0's ink already sat within a
+  pixel or two of the edge or of its neighbor. Text that ran into a value
+  or off the key now shortens or steps down a size instead. Accented
+  Latin, Greek and Cyrillic letters are measured too. Two trades remain on
+  three-row keys: a value too wide for 18 px draws at 16 px so its label
+  keeps its letters, and a label stays within 2 px of its row's other
+  labels.
+- Faces no longer ask for letter spacing, which the Stream Deck app never
+  draws, so the settings panel preview and the docs images now match the
+  keys and dials.
+- New **Text font** setting under Advanced, Shared defaults: Tahoma (the
+  default) or Segoe UI, the font of Windows and the settings panel,
+  lighter and narrower, so long labels fit more often. It applies to every
+  Sensor Reading key, Sensor Dial and detail tile (the HWiNFO Control key
+  keeps its fixed Tahoma icon); an install without the setting keeps
+  Tahoma.
+- A two-reading key keeps its value whole when a reading's unit is long:
+  the unit is shortened instead of pushing the number's first digits off
+  the key, and units that fit are unchanged.
+- A dial row in critical is a brighter red than in 1.6.0: on the dark
+  themes it reads at 4.5:1 or better, where 1.6.0's red read below 4:1,
+  and it stays apart from the temperature color. A row in warning keeps
+  1.6.0's amber on the dark themes. On Paper both are darkened until they
+  read at 4.5:1.
 - A three-row Overview dial no longer cuts Mbps, Gbps, MB/s or MT/s at the
   screen edge: the value and unit columns slide left together when the
   widest unit needs the room, and faces whose units already fit are
@@ -169,10 +348,10 @@ Per-reading dial colors and reliability fixes in one release.
   the key leaves the screen inside the tick's moment (a Multi Action that
   also switches the page does that): the icon is restored on the way out
   and again when the key returns.
-- The Config document keeps a Gadget key whole, including trailing
+- The Configuration documents keep a Gadget key whole, including trailing
   whitespace in its label; only leading whitespace is dropped.
-- The settings panel keeps unapplied Config edits when Advanced is closed
-  and reopened, closes the sensor picker when keyboard focus leaves it,
+- The settings panel keeps unapplied edits to the Configuration documents
+  when Advanced is closed and reopened, closes the sensor picker when keyboard focus leaves it,
   and no longer marks saved selections as missing while the source is
   unavailable.
 - Invalid control characters in labels are replaced instead of breaking
@@ -210,6 +389,22 @@ Per-reading dial colors and reliability fixes in one release.
   pinned actions. Native C behavior and the API are unchanged; the build
   now enforces warning level 4 and treats warnings as errors after
   node-gyp defaults are applied, which changes the recorded build source ID.
+
+## 1.6.92.0 - 2026-09-09
+
+- GitHub preview for issue #31, based only on released 1.6.0. Not a
+  Marketplace release. Adds **Color numbers by sensor type** and independent
+  **Reading colors** under Appearance for two-row and three-row dials.
+  Signal, Pairs and Uniform presets share the four-reading key's palette;
+  individual color wells follow reading identity through rotation and groups.
+- Chosen colors work with Type accents off, keeping existing graph colors.
+  Valid Custom Text and alerts retain priority; Dim uses the existing blend.
+  Existing settings, single dials and every key layout keep their behavior.
+- Multi-row gallery examples use the runtime composer with achievable
+  settings. Colored examples remain preview-only until a corrected
+  Marketplace build ships. Native bytes are reused from v1.6.0.
+- This preview upgrades 1.6.0 and 1.6.90. Planned stable 1.7.0 supersedes it;
+  1.6.1 does not. See the preview's install and return-to-stable notes.
 
 ## 1.6.0.0 - 2026-09-04
 
@@ -276,6 +471,28 @@ Per-reading dial colors and reliability fixes in one release.
   Enable reporting to Gadget switch and Report value in Gadget on each
   reading, not a right-click menu. The status screens, the settings
   panel's first-run tip and the docs all say so now.
+
+## 1.5.90.0 - 2026-08-11
+
+Preview build for the issue #5 follow-up, cut from the detail-density
+branch for tester validation ahead of the next release. Not a general
+release.
+
+- "Tile shows" on a detail opener packs 1 to 4 readings onto each tile
+  of the detail view, using the same stacked, row and quad faces
+  regular keys have. Pressing a dense tile cycles the stat for all of
+  its readings together, and a quad's micro labels drop the leading
+  tokens all four cells share.
+- A Custom sensor list can group its tiles one by one: per-tile size,
+  per-cell labels and quad identity colors, edited in the key's sensor
+  list with drag, an armed plus marker, and inline pick results.
+- The detail filter matches in linear time and now survives sensor
+  names that carry their own literal wildcard characters; hostile text
+  in labels (an unpaired surrogate, a very long paste) degrades to a
+  safe face instead of freezing a tile or stalling a poll tick.
+- Carries the sparkline fix that also ships in 1.5.1: changing the Poll
+  interval no longer stops sparklines from collecting, so this preview
+  is a superset of the current stable release.
 
 ## 1.5.1.0 - 2026-08-11
 

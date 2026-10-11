@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { GadgetRegistryProvider } from "../src/hwinfo/gadget-registry";
 import { gadgetRawValue, gadgetUnitOf, gadgetValueAgrees } from "../src/hwinfo/gadget-value";
 
 describe("Gadget formatted/raw numeric consistency", () => {
@@ -95,4 +96,42 @@ describe("Gadget formatted/raw numeric consistency", () => {
 			assert.ok(Number.isNaN(gadgetRawValue(raw)));
 		}
 	});
+});
+
+// The query boundary is fake; all scanning and notice logic is production
+// code. No native addon, registry key or running HWiNFO is involved. The
+// names end in a line break and what would read as a new ERROR line of the
+// plugin log: a notice quotes outside text, so it never starts a line of
+// its own (external review AX50, AX85).
+describe("Gadget notices through a query-only test key", () => {
+	const fakeLogLine = "\n2026-09-27T00:00:00.000Z ERROR fake\r";
+	for (const [what, rows, quoted] of [
+		["contradictory values", { Sensor0: `CPU${fakeLogLine}`, Label0: `Temp "one"${fakeLogLine}`, Value0: "100 °C", ValueRaw0: "40" }, `Temp "one"${fakeLogLine}`],
+		["duplicate names", { Sensor0: `CPU${fakeLogLine}`, Label0: "T", Value0: "40 °C", ValueRaw0: "40", Sensor1: `CPU${fakeLogLine}`, Label1: "T", Value1: "41 °C", ValueRaw1: "41" }, `CPU${fakeLogLine}`]
+	] as const) {
+		it(`${what} produces one escaped notice over repeated scans`, () => {
+			let closes = 0;
+			const values: Readonly<Record<string, string>> = rows;
+			const key = { queryString: (name: string): string | null => values[name] ?? null, close: (): void => { closes++; } };
+			// Reflect.construct reaches the private constructor, which takes the
+			// key; open() would load the native registry bridge instead.
+			const provider = Reflect.construct(GadgetRegistryProvider, [key]) as GadgetRegistryProvider;
+			try {
+				// A condition is reported only once it holds on consecutive
+				// complete scans (a first sighting may be a torn read), and
+				// then once: four scans cover the wait and the repeats.
+				const lines: string[] = [];
+				for (let scan = 0; scan < 4; scan++) {
+					provider.read();
+					lines.push(...provider.notices());
+				}
+				assert.equal(lines.length, 1);
+				assert.doesNotMatch(lines[0]!, /[\r\n]/);
+				assert.ok(lines[0]!.includes(JSON.stringify(quoted)), lines[0]);
+			} finally {
+				provider.close();
+			}
+			assert.equal(closes, 1);
+		});
+	}
 });

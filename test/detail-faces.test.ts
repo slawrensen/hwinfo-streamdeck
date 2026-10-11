@@ -16,6 +16,13 @@ import { DIM_VALUE_BLEND, effectiveTextSettings, mixToward, parseTextSettings, r
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import { contrast } from "./wcag";
+import { beforeInlineGap } from "./inline-gap";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
 
 function reading(key: string, value: number, unit = "°C", label = key): Reading {
 	return { key, type: unit === "W" ? SensorType.Power : SensorType.Temperature, sensorIndex: 0, id: 0, label, unit, value, valueMin: value - 10, valueMax: value + 10, valueAvg: value };
@@ -367,8 +374,13 @@ describe("dense tile goldens", () => {
 	// nothing else: 2 fills on the dual, 3 on the triple, 4 on the quad.
 	const golden = (svg: string): string => createHash("sha256").update(svg).digest("hex");
 	const SINCE_1_6_0: ReadonlyArray<readonly [before: string, after: string]> = [["#667082", "#6B7586"]];
-	const asOf160 = (svg: string, movedFills: number): string => {
-		let out = svg;
+	// September 2026 (bench): the device gap fix moved each unit gap from
+	// dx into the tspan; beforeInlineGap puts the dx back, counted per face.
+	// October 2026 (1.7): one font family name, since the app's QtSvg read
+	// the old list as one name and drew Tahoma; every text element names it.
+	const asOf160 = (svg: string, movedFills: number, gaps: number): string => {
+		assert.ok(!svg.includes('font-family="Segoe UI, Arial, sans-serif"'), "the 1.6.0 family list cannot still be drawn");
+		let out = beforeInlineGap(svg, gaps).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
 		for (const [before, after] of SINCE_1_6_0) {
 			assert.equal(out.split(after).length - 1, movedFills, `${after} must appear exactly ${movedFills} times`);
 			assert.ok(!out.includes(before), `${before} is the 1.6.0 token and cannot still be drawn`);
@@ -380,19 +392,32 @@ describe("dense tile goldens", () => {
 	it("dual chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2"], "current", ok, ctxOf());
 		assert.match(svg, />CPU Power</);
-		assert.equal(golden(asOf160(svg, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
+		assert.equal(golden(asOf160(svg, 2, 2)), "27c1e1fa909a340aa32d5b16390bb41515c45fdf70e20695aca7a522a1abb017");
 	});
 
 	it("triple chunk", () => {
 		const svg = composeChunkFace(stateOf(), ["cpu:0:1", "cpu:0:2", "gpu:0:4"], "current", ok, ctxOf());
 		assert.match(svg, />GPU Core…</); // the row ladder ellipsizes beside the value chunk
-		assert.equal(golden(asOf160(svg, 3)), "c4fb54e77250c41601fe52700b3f05f6529a48900373678d4144314174396d16");
+		// October 2026 (d25): the unit sits against its value with no gap, as
+		// 1.6.0 drew it on the device, and every label takes that room ("CPU
+		// Power" 12 to 14 px), so each label, mask and unit moves at once. The
+		// face is pinned at the d25 bytes from here; the unit stays tight.
+		assert.match(svg, />W<\/tspan>/);
+		assert.doesNotMatch(svg, /<tspan[^>]*>[\u2002\u2004 ]/);
+		assert.match(svg, /font-size="14" font-weight="600" fill="#7A8393">CPU Power</);
+		assert.equal(golden(svg), "39533062f56258a95516b05b5d9df9fdb26e579cc2cc8cd2f681948fd050ec45");
 	});
 
 	it("quad chunk with the shared badge", () => {
 		const svg = composeChunkFace(stateOf(), ["gpu:0:1", "gpu:0:2", "gpu:0:3", "gpu:0:4"], "max", ok, ctxOf());
 		assert.match(svg, />MAX</);
-		assert.equal(golden(asOf160(svg, 4)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
+		// October 2026 (1.7): the app's QtSvg draws no letter-spacing, so the
+		// four micro-labels and the badge no longer write their +0.5; exactly
+		// those five sites go back here.
+		assert.doesNotMatch(svg, /letter-spacing/);
+		const tracked = /(<text x="[0-9]+" y="(?:20|92|76)" text-anchor="middle" [^>]*font-weight="700")( fill="#[0-9A-Fa-f]{6}">[A-Z]{1,4}<)/g;
+		assert.equal(svg.match(tracked)?.length, 5);
+		assert.equal(golden(asOf160(svg.replace(tracked, '$1 letter-spacing="0.5"$2'), 4, 0)), "150cd08b20b5105d5783e5fec085d6b90c2f8ec35770388d00d18dea12fd0ec2");
 	});
 });
 

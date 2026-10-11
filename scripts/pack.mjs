@@ -76,13 +76,17 @@ export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacke
 		if (!fs.existsSync(archivePath)) throw new Error(`the packer left no ${path.basename(archivePath)} in ${outputDir}`);
 		const { failures, members, payload } = validatePack({ archiveBytes: fs.readFileSync(archivePath), stagingDir: sourceDir, packageVersion });
 		if (failures.length > 0) {
-			fs.rmSync(archivePath, { force: true });
 			throw new Error(`PACK VALIDATION: ${failures.length} failure(s); the archive was removed\n  ${failures.join("\n  ")}`);
 		}
 		log(`PACK VALIDATION: OK (${members} members match the shipping contract and the staged build)`);
 		log(`  bin/plugin.js ${payload.get("bin/plugin.js")}`);
 		log(`  bin/hwsm.node ${payload.get("bin/hwsm.node")}`);
 		return archivePath;
+	} catch (error) {
+		// Whatever failed, including a packer that wrote its archive and
+		// then exited nonzero, nothing it wrote is left to pass as good.
+		fs.rmSync(archivePath, { force: true });
+		throw error;
 	} finally {
 		fs.rmSync(stagingRoot, { recursive: true, force: true });
 	}

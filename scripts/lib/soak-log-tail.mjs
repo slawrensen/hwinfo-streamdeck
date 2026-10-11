@@ -19,7 +19,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const HARNESS_RE = /Harness Deck|Load Deck/;
-const LEVEL_RE = /\b(WARN|ERROR)\b/;
+// The level is the column after the timestamp: a WARN or ERROR inside a
+// message (a device the person named "ERROR deck") is not one.
+const LEVEL_RE = /^\S+\s+(WARN|ERROR)\b/;
 
 /** WARN/ERROR lines in `file` between two byte offsets, added to `totals`. */
 function tally(file, from, to, totals, expectedIno) {

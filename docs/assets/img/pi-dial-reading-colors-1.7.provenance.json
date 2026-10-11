@@ -1,15 +1,15 @@
 {
 	"command": "node scripts/capture-pi-reading-colors.mjs",
 	"kind": "Real property-inspector screenshot",
-	"note": "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to Appearance. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.",
-	"captureTime": "2026-09-22T04:55:37.473Z",
-	"panelSha256": "250369dafa06439e925d698fbe9ce1680eff8de884b764738877d5931acc5193",
+	"note": "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to the Display section. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.",
+	"captureTime": "2026-10-10T20:06:30.521Z",
+	"panelSha256": "eea38f4a9e20cf4247c4753adf85ed8e33b8bb52f347c0a98ec77f32a7ccd317",
 	"file": "pi-dial-reading-colors-1.7.png",
-	"sha256": "5744d264807e1e3e73f59d8ab3a6bbfd473aac62363895e7bf73ef8743fc3c06",
+	"sha256": "b06bfe6581701d01312d4e365d0f0ca7c59cf41755b807be25afcf072743b3c4",
 	"width": 800,
-	"height": 1220,
+	"height": 1360,
 	"evidence": {
-		"build": "1.7.0.0-8",
+		"build": "1.7.0.0-d28",
 		"rows": [
 			{
 				"key": "f0000501:0:1000000",
@@ -38,7 +38,7 @@
 			}
 		],
 		"preset": "signal",
-		"liveValue": "62.1 °C",
+		"liveState": "Live · Shared Memory",
 		"statusHint": "",
 		"appliedSettings": {
 			"readingKey": "f0000501:0:1000000",
@@ -75,12 +75,14 @@
 			"textMode": "theme",
 			"source": "shared-memory"
 		},
-		"liveDialSha256": "918960a1087c3c129eb90b910ee8bd643d0d8cad7e5cebf7a8ba05fd049e61cb"
+		"liveDialSha256": "1a99524ea5bca074c55e0fd9086eaf2841b970bd8497f98018d51cec5fb134bd"
 	},
 	"sourceSha256": {
-		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "f2246f7d237bb6205ffc036a240683811c680fbcd7849d1e5f2d7e99ba08ea65",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "8f4773c565474b28f78645fb1b5924d8f2e54abc339c4d47fe3d8b99ca0315ec",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "a23f757c7dab577dfeef96b330b56999e601f47dc5e2c402ad936bf58861050c",
-		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "3de4d2586f3b65216035de97bfbc7810dc4bae6e8c4302c732b1e280534a52e7"
+		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "b2f3f85c65c9644a2082da9460c5a5f86275b078ef9250db031e3be5df88878c",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js": "ac94d3075a394e16de6142410d63603aab51c3fd4548444551d625b6c0e82156",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-shell.js": "1cdbd26576a0ec8f2b677779753f4578106e8f05efb9b962e9184aba51078c50",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "c94e892a18849b8a7acc3a1aac4248cae62fbf6e09fcef35895cf2a5d99324ad",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "2e47df1ec6f8ec8a1bc61f4f118a4bcdd2b25e0754ac155fd6030c5dad3c9246",
+		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "c35a5224756b0e85195c3348ad494a6f49dcea106149db1130644387e6c6eb76"
 	}
 }

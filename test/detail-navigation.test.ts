@@ -703,3 +703,43 @@ describe("tickSignature — the detail render gate", () => {
 		assert.notEqual(tickSignature({ state: "unavailable", reason: "busy", message: "" }), tickSignature({ state: "unavailable", reason: "not-running", message: "" }));
 	});
 });
+
+// The production default clock, not an injected one: a wall clock corrected
+// an hour either way between two Back presses neither lets a second hop
+// through nor stalls Back and the blackout (external review AX49).
+describe("the navigator's own clock ignores wall-clock corrections", () => {
+	for (const jump of [-3_600_000, 0, 3_600_000]) {
+		it(`a clock set ${jump / 60_000} minutes between presses`, async () => {
+			const realNow = Date.now;
+			const perf = performance as unknown as { now?: () => number };
+			let wall = 100_000_000;
+			let mono = 10_000;
+			Date.now = () => wall;
+			perf.now = () => mono;
+			try {
+				const switches: string[] = [];
+				const nav = new DetailNavigator({
+					switchProfile: (deviceId) => {
+						switches.push(deviceId);
+						return Promise.resolve();
+					},
+					setTimer: () => 0 as unknown as ReturnType<typeof setTimeout>,
+					clearTimer: () => {}
+				});
+				await nav.leave("d");
+				mono += 100;
+				wall += jump + 100;
+				await nav.leave("d");
+				assert.equal(switches.length, 1, "a second Back 100 ms later is the same hop");
+				mono += 1_900;
+				wall += 1_900;
+				assert.equal(nav.recentlyLeft("d"), false, "the blackout ends with the beat");
+				await nav.leave("d");
+				assert.equal(switches.length, 2, "a Back 2 s later hops again");
+			} finally {
+				Date.now = realNow;
+				delete perf.now;
+			}
+		});
+	}
+});

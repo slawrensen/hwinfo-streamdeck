@@ -9,6 +9,7 @@
  * previous-profile hop), and pagination never switches profiles at all —
  * it only moves plugin state inside the one active page.
  */
+import { monotonicNow } from "../clock";
 import type { SensorSnapshot } from "../hwinfo/types";
 import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
 import { pageOf, projectDetailTiles, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
@@ -89,7 +90,10 @@ type NavigatorDeps = {
 	disappearGraceMs?: number;
 	setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
 	clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
-	/** Clock for the leave debounce; tests inject a manual one. */
+	/** Clock for the entry and leave debounces and the expired-prompt
+	 * tombstones: monotonic by default, so a wall-clock correction never lets
+	 * a second hop through or stalls Back (external review AX49); tests
+	 * inject a manual one. */
 	now?: () => number;
 };
 
@@ -131,7 +135,7 @@ export class DetailNavigator {
 			// alive after the app closes the socket (exit hygiene).
 			setTimer: (fn, ms) => setTimeout(fn, ms).unref(),
 			clearTimer: (h) => clearTimeout(h),
-			now: Date.now,
+			now: monotonicNow,
 			...deps
 		};
 	}

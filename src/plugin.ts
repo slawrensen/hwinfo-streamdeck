@@ -7,8 +7,9 @@ import { SensorDialAction } from "./actions/sensor-dial";
 import { SensorReadingAction } from "./actions/sensor-reading";
 import { DetailController } from "./detail/controller";
 import { DetailNavigator } from "./detail/navigation";
-import { deviceCapabilities } from "./devices";
+import { deriveCapabilities, deviceCapabilities } from "./devices";
 import { registerDiagnostics } from "./diagnostics";
+import { readGlobalSettings } from "./global-settings";
 import { initHwsm } from "./hwinfo/hwsm-loader";
 import { classifyProbeError, ParentLiveness, type ParentProbe, probeErrorCode } from "./parent-liveness";
 import { parsePollInterval, parseSourceMode, poller } from "./poller";
@@ -33,6 +34,9 @@ type GlobalSettings = {
 	textDimSecondary?: boolean;
 	/** Data-unit preference: "decimal" (default) | "binary". */
 	dataUnits?: string;
+	/** Text font on every face: "tahoma" (default, also when absent or
+	 * unknown) | "segoe-ui". */
+	textFont?: string;
 };
 
 // Diagnostic knob for support and hardware bring-up; defaults stay quiet.
@@ -186,9 +190,16 @@ streamDeck.actions.registerAction(new HwinfoControlAction());
 streamDeck.actions.registerAction(new DetailSlotAction(detailController));
 
 // One line per deck so support logs say exactly what hardware was involved.
-const describeDevice = (d: Pick<Device, "name" | "type" | "size">): string => `${d.name} (${DeviceType[d.type] ?? `type ${d.type}`}, ${d.size.columns}x${d.size.rows})`;
+// The name is the person's own text: quoted, so it stays on its log line.
+// The type and grid are host input: a type that is not a number is quoted,
+// and the grid is read as the capability table read it (AX66).
+const describeDevice = (d: Pick<Device, "name" | "type" | "size">): string => {
+	const caps = deriveCapabilities({ type: d.type, columns: d.size?.columns, rows: d.size?.rows });
+	const type = typeof d.type !== "number" ? `type ${JSON.stringify(d.type)}` : Object.hasOwn(DeviceType, d.type) ? DeviceType[d.type] : `type ${d.type}`;
+	return `${JSON.stringify(d.name)} (${type}, ${caps.columns}x${caps.rows})`;
+};
 const ingestDevice = (d: Pick<Device, "id" | "type" | "size">): void => {
-	deviceCapabilities.ingest(d.id, { type: d.type, columns: d.size.columns, rows: d.size.rows });
+	deviceCapabilities.ingest(d.id, { type: d.type, columns: d.size?.columns, rows: d.size?.rows });
 };
 streamDeck.devices.onDeviceDidConnect((ev) => {
 	ingestDevice(ev.device);
@@ -220,6 +231,7 @@ if (traceEnabled()) {
 	streamDeck.logger.info("Event trace recorder is ON (HWINFO_TRACE_EVENTS=1): redacted input traces in logs/");
 }
 
+// Every delivery is applied here, the startup read's reply included.
 streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
 	poller.setReadingLinks(ev.settings.readingLinks);
 	poller.setIntervalMs(parsePollInterval(ev.settings.pollIntervalMs));
@@ -234,11 +246,9 @@ for (const device of streamDeck.devices) {
 	streamDeck.logger.info(`Device ${device.isConnected ? "connected" : "known"}: ${describeDevice(device)}`);
 }
 
-const globals = await streamDeck.settings.getGlobalSettings<GlobalSettings>();
-poller.setReadingLinks(globals.readingLinks);
-poller.setIntervalMs(parsePollInterval(globals.pollIntervalMs));
-poller.setSourceMode(parseSourceMode(globals.source));
-applyGlobalThemeSettings(globals);
+// Applied by the listener above; applying the reply again here would put
+// back an older document when a newer one followed it (AX61).
+const globals = await readGlobalSettings<GlobalSettings>();
 // Pre-theme installs that already tweaked plugin-wide settings keep the old
 // look (graphite); otherwise the first appearing action decides (see actions).
 if (globals.theme === undefined && Object.values(globals).some((v) => v !== undefined)) {

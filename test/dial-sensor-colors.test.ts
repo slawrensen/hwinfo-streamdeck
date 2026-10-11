@@ -10,9 +10,19 @@ import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { buildPreview } from "../src/pi-protocol";
 import { stepReading } from "../src/rotation";
 import { DIM_VALUE_BLEND, mixToward, readableValueColor } from "../src/ui/text-colors";
-import { applyGlobalThemeSettings } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings as applyDeckSettings } from "../src/ui/theme-store";
 import { alertValueColor, classifyTypeAccent, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
+import { beforeInlineGap } from "./inline-gap";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+// Every deck write here keeps Segoe UI, so a settings object without
+// textFont (which means Tahoma) cannot switch the font under these goldens.
+const applyGlobalThemeSettings = (settings: Parameters<typeof applyDeckSettings>[0]): void => applyDeckSettings({ textFont: "segoe-ui", ...settings });
 
 const config = loadThemes();
 type Fixture = ReturnType<typeof dialGalleryFixture>;
@@ -180,8 +190,21 @@ const goldenFixture = (key: string): Fixture => {
 /** The face as 1.6.0 drew it: each enumerated role's fill put back, after
  * checking that the face draws that role in the enumerated 1.7 token and
  * that every text fill on the face belongs to some role. */
-const asOf160 = (key: string, svg: string): string => {
+const asOf160 = (key: string, drawn: string): string => {
 	const view = key.split("/")[0] as string;
+	// The device gap fix (bench 2026-09-23): the single view's unit gap is a
+	// space inside its tspan now; put the 1.6.0 dx back, exactly one site.
+	// The device font fix (1.7): one family name, since the app's QtSvg read
+	// the old list as one name and drew Tahoma; put the list back.
+	// The device tracking fix (1.7): the app's QtSvg draws no letter-spacing,
+	// so the overview labels no longer write it; put it back on each label
+	// (the start-anchored text its row's bg mask follows).
+	assert.ok(!drawn.includes('font-family="Segoe UI, Arial, sans-serif"'), `${key}: the 1.6.0 family list cannot still be drawn`);
+	assert.ok(!drawn.includes("letter-spacing"), `${key}: tracking the device never drew cannot still be written`);
+	const tracked = beforeInlineGap(drawn, view === "single" ? 1 : 0).replaceAll('font-family="Segoe UI"', 'font-family="Segoe UI, Arial, sans-serif"');
+	const labelSite = /(<text x="12" y="[0-9.]+" text-anchor="start" [^>]*font-size="12" font-weight="600")( fill="#[0-9A-Fa-f]{6}">[^<]*<\/text><rect )/g;
+	const svg = view === "overview" ? tracked.replace(labelSite, '$1 letter-spacing="0.4"$2') : tracked;
+	if (view === "overview") assert.equal(tracked.match(labelSite)?.length, 3, `${key}: one tracked label per overview row`);
 	const roles = ROLES[view] as Record<string, RegExp>;
 	const moved = SINCE_1_6_0[key] ?? {};
 	const claimed = Object.values(roles).reduce((n, re) => n + roleFills(svg, re).length, 0);
@@ -476,6 +499,23 @@ it("Live value uses the actual row spelling when a selection and its rotation ro
 			assert.equal(previewOf(fixture).valueColor, expected, `${view}/${curated}`);
 			assert.equal(previewOf(fixture).valueColor, values(compose(fixture))[0]);
 			assert.equal(fixture.state.settings.readingKey, alias);
+		}
+	}
+});
+
+// Each row shows the chosen statistic of its own session: MIN the lowest,
+// MAX the highest, AVG the mean, Current the live value.
+it("overview and two-row rows show the chosen session statistic, each row its own", () => {
+	const expected = {
+		overview: { current: ["71.4", "76.2", "2850"], min: ["51.0", "48.0", "2565"], max: ["79.0", "82.0", "2900"], avg: ["65.4", "67.4", "2758"] },
+		tworow: { current: ["316", "98.0"], min: ["64.5", "12.0"], max: ["349", "100"], avg: ["241", "70.6"] }
+	};
+	for (const view of ["overview", "tworow"] as const) {
+		for (const mode of ["current", "min", "max", "avg"] as const) {
+			const fixture = dialGalleryFixture(view);
+			fixture.state.statMode = mode;
+			const shown = [...compose(fixture).matchAll(/font-weight="700" fill="[^"]+">([^<]+)<\/text>/g)].map((m) => m[1]);
+			assert.deepEqual(shown, expected[view][mode], `${view} ${mode}`);
 		}
 	}
 });

@@ -19,7 +19,7 @@
  * A stable owner ID/instance/reading ID must identify exactly one raw row.
  * Ambiguous and ownerless rows are withheld, never assigned positional keys.
  */
-import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
+import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, HEADER_SIZE, MAX_ELEMENT_COUNT, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "./layout";
 import { HwinfoError, SensorType, type SensorSnapshot, type SensorSource } from "./types";
 
 /** Reads a NUL-terminated string out of a fixed-width field. */
@@ -118,6 +118,8 @@ export class SnapshotParser {
 	 * the fast path never assigns a withheld row's values to a survivor. */
 	private readingOffsets = new Uint32Array(0);
 	private snapshot: MutableSnapshot | null = null;
+	/** Bytes the cached skeleton reads: a shorter buffer must rebuild. */
+	private extent = 0;
 	// DataView beats Buffer.read* in the hot loop: its accessors are TurboFan
 	// intrinsics, so reads stay unboxed (readDoubleLE allocates a HeapNumber
 	// per call). Cached per Buffer identity — the session reuses its scratch.
@@ -125,13 +127,18 @@ export class SnapshotParser {
 	private viewOwner: Buffer | null = null;
 
 	parse(buf: Buffer): SensorSnapshot {
+		// The native reader validates the layout before this runs; a direct
+		// caller still gets the typed error, never a RangeError (AX38).
+		if (buf.length < HEADER_SIZE) {
+			throw new HwinfoError("invalid", `Snapshot of ${buf.length} bytes is shorter than its ${HEADER_SIZE}-byte header.`);
+		}
 		if (this.viewOwner !== buf || this.view === null) {
 			this.view = new DataView(buf.buffer, buf.byteOffset, buf.length);
 			this.viewOwner = buf;
 		}
 		const dv = this.view;
 		const cached = this.snapshot;
-		if (cached !== null && this.headerMatches(dv) && this.refresh(dv, cached)) {
+		if (cached !== null && buf.length >= this.extent && this.headerMatches(dv) && this.refresh(dv, cached)) {
 			return cached;
 		}
 		return this.rebuild(buf, dv);
@@ -259,6 +266,13 @@ export class SnapshotParser {
 		if (entryElementSize < ENTRY_CLASSIC_SIZE) {
 			throw new HwinfoError("invalid", `Reading element stride ${entryElementSize} is smaller than the classic layout (${ENTRY_CLASSIC_SIZE}).`);
 		}
+		// The native reader's bounds, so nothing below reads or allocates
+		// past what the buffer holds.
+		const sectionEnd = (offset: number, stride: number, count: number): number => (count === 0 ? HEADER_SIZE : offset < HEADER_SIZE ? Infinity : offset + stride * count);
+		const extent = Math.max(sectionEnd(sensorSectionOffset, sensorElementSize, sensorElementCount), sectionEnd(entrySectionOffset, entryElementSize, entryElementCount));
+		if (sensorElementCount > MAX_ELEMENT_COUNT || entryElementCount > MAX_ELEMENT_COUNT || extent > buf.length) {
+			throw new HwinfoError("invalid", `Snapshot sections need ${extent} bytes; the buffer holds ${buf.length}.`);
+		}
 
 		const sensorHasUtf8 = sensorElementSize >= SENSOR_UTF8_SIZE;
 		const entryHasUtf8 = entryElementSize >= ENTRY_UTF8_SIZE;
@@ -352,6 +366,7 @@ export class SnapshotParser {
 			const old = previous.byKey.get(reading.key);
 			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
 		});
+		this.extent = extent;
 		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}

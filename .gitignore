@@ -24,6 +24,7 @@ com.lawrensen.hwinfo.sdPlugin/logs/
 /.claude/
 /docs/release/
 /.private/
+/review/
 
 # Maker Console brand assets: not plugin content; originals ride the private
 # mirror (.private/backup.ps1).

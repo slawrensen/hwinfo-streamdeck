@@ -8,10 +8,12 @@
  */
 import streamDeck from "@elgato/streamdeck";
 
+import { readGlobalSettings } from "../global-settings";
 import type { DecimalsSetting } from "./format";
 import { parseDataUnitsPref, type DataUnitsPref, type MeasureOptions } from "./measure";
 import { effectiveTextSettings, parseTextSettings, type TextSettings } from "./text-colors";
 import { loadThemes } from "./themes";
+import { faceFont, parseFaceFont, setFaceFont } from "./face-font";
 
 let deckTheme: string | undefined;
 let typeAccentsOn = true;
@@ -77,13 +79,14 @@ function notify(): void {
 }
 
 /** Ingests the global settings (startup read and every later change). */
-export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccents?: unknown; textMode?: unknown; textColor?: unknown; textDimSecondary?: unknown; dataUnits?: unknown }): void {
+export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccents?: unknown; textMode?: unknown; textColor?: unknown; textDimSecondary?: unknown; dataUnits?: unknown; textFont?: unknown }): void {
 	const config = loadThemes();
 	const themeValid = typeof settings.theme === "string" && Object.hasOwn(config.themes, settings.theme);
 	const nextTheme = themeValid ? (settings.theme as string) : deckTheme;
 	const nextAccents = settings.typeAccents !== "off";
 	const nextText = parseTextSettings(settings);
 	const nextUnits = parseDataUnitsPref(settings.dataUnits);
+	const nextFont = parseFaceFont(settings.textFont);
 	// Only a VALID stored theme counts as "the user (or migration) decided" —
 	// an empty/invalid value must not lock out the legacy migration while
 	// silently failing to apply.
@@ -91,14 +94,15 @@ export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccent
 		migrationDecided = true;
 	}
 	const textChanged = JSON.stringify(nextText) !== JSON.stringify(deckText);
-	if (nextTheme === deckTheme && nextAccents === typeAccentsOn && !textChanged && nextUnits === dataUnits) {
+	if (nextTheme === deckTheme && nextAccents === typeAccentsOn && !textChanged && nextUnits === dataUnits && nextFont === faceFont().id) {
 		return;
 	}
 	deckTheme = nextTheme;
 	typeAccentsOn = nextAccents;
 	deckText = nextText;
 	dataUnits = nextUnits;
-	streamDeck.logger.info(`Deck theme = ${getDeckTheme()} (type accents ${typeAccentsOn ? "on" : "off"}, text ${deckText?.mode ?? "theme"}, data units ${dataUnits}, source: global settings)`);
+	setFaceFont(nextFont);
+	streamDeck.logger.info(`Deck theme = ${getDeckTheme()} (type accents ${typeAccentsOn ? "on" : "off"}, text ${deckText?.mode ?? "theme"}, data units ${dataUnits}, text font ${nextFont}, source: global settings)`);
 	notify();
 }
 
@@ -128,7 +132,9 @@ export function decideLegacyDefault(hasExistingConfig: boolean): void {
 
 async function persistTheme(theme: string): Promise<void> {
 	try {
-		const globals = await streamDeck.settings.getGlobalSettings();
+		// The latest document, not the reply: one delivered behind it must
+		// not be written over with the older one (external review AX61).
+		const globals = await readGlobalSettings();
 		// Async race guard: if a PI wrote a theme while we awaited, the user's
 		// explicit choice wins — never clobber it with the migration result.
 		if (typeof globals.theme === "string" && globals.theme !== "") {

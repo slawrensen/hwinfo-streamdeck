@@ -12,6 +12,7 @@
 // never needs them, and refusing keeps the parser honest about what it
 // understood. The writer exists for tests (fixtures that must be wrong in
 // exactly one way) and mirrors what the reader accepts.
+import { constants as bufferConstants } from "node:buffer";
 import { inflateRawSync, deflateRawSync } from "node:zlib";
 
 const LOCAL_SIG = 0x04034b50;
@@ -86,7 +87,9 @@ export function listZip(buffer) {
 		// information field (id 0x0001), even for a 300 KB archive. Read that
 		// field for exactly the values marked that way, in the order the
 		// specification fixes; anything above what a Buffer can address is
-		// refused rather than truncated.
+		// refused rather than truncated. Offsets and compressed sizes lie
+		// inside the archive; an expanded size need not, since compression
+		// can make an archive smaller than one member (external review AX54).
 		const sizes = { compressedSize, uncompressedSize, localHeaderOffset };
 		const extra = buffer.subarray(p + 46 + nameLength, p + 46 + nameLength + extraLength);
 		for (let x = 0; x + 4 <= extra.length;) {
@@ -100,7 +103,8 @@ export function listZip(buffer) {
 					if (f + 8 > field.length) { problems.push(`central directory entry ${i} has a short ZIP64 field`); return; }
 					const wide = field.readBigUInt64LE(f);
 					f += 8;
-					if (wide > BigInt(buffer.length)) { problems.push(`central directory entry ${i} claims ${key} ${wide} beyond the archive`); return; }
+					const bound = key === "uncompressedSize" ? bufferConstants.MAX_LENGTH : buffer.length;
+					if (wide > BigInt(bound)) { problems.push(`central directory entry ${i} claims ${key} ${wide} beyond ${key === "uncompressedSize" ? "what a Buffer can hold" : "the archive"}`); return; }
 					sizes[key] = Number(wide);
 				};
 				take("uncompressedSize");

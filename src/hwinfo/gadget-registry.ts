@@ -287,7 +287,9 @@ export class GadgetRegistryProvider {
 			// contradiction in THIS row. What happens to it is decided
 			// after the scan (see below): never publish the row.
 			if (!gadgetValueAgrees(formatted, value)) {
-				contradictions.push({ slot: i, identity: `${sensorName}\u0000${label}`, notice: `Gadget slot ${i} withheld: formatted value "${formatted}" does not agree with raw value "${raw}" (${sensorName} / ${label}).` });
+				// HWiNFO's text is quoted: a line break in a sensor name must
+				// not start what reads as another log entry (external review AX50).
+				contradictions.push({ slot: i, identity: `${sensorName}\u0000${label}`, notice: `Gadget slot ${i} withheld: formatted value ${JSON.stringify(formatted)} does not agree with raw value ${JSON.stringify(raw)} (${JSON.stringify(sensorName)} / ${JSON.stringify(label)}).` });
 				continue;
 			}
 
@@ -420,7 +422,7 @@ export class GadgetRegistryProvider {
 			this.reportedNames.add(key);
 			const slots = rows.map((row) => row.slot);
 			const remedy = slots.length === 2 ? "Untick or relabel one of them in HWiNFO and the other comes back on its own." : "Untick or relabel them in HWiNFO until one is left, and it comes back on its own.";
-			this.pendingNotices.set(key, `Gadget slots ${slots.slice(0, -1).join(", ")} and ${slots.at(-1)} withheld while they report one name (${named.sensor} / ${named.label}). ${remedy}`);
+			this.pendingNotices.set(key, `Gadget slots ${slots.slice(0, -1).join(", ")} and ${slots.at(-1)} withheld while they report one name (${JSON.stringify(named.sensor)} / ${JSON.stringify(named.label)}). ${remedy}`);
 		}
 
 		const safeReadings = readings.filter((reading) => !blocked.has(reading.key));

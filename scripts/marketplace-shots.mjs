@@ -4,7 +4,10 @@
 // Multi-row dials use the runtime action composer and fixed sample data.
 // Emits gallery boards; shot 2 is the photograph from shot2-hardware.mjs.
 // and a dedicated thumbnail.png.
-// Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir]
+// Usage: npx tsx scripts/marketplace-shots.mjs <outputDir> [piCaptureDir] [--only-settings]
+// --only-settings renders shot 4 alone, from the panel captures. Loading the
+// script still opens HWiNFO Shared Memory and resolves two readings named in
+// K (the CPU temperature and the pump), so those must exist.
 import "./lib/script-failures.mjs";
 import path from "node:path";
 import sharp from "sharp";
@@ -33,7 +36,7 @@ const dialCaption = sensorValueColors
 const provider = SharedMemoryProvider.open();
 const snapshot = provider.read();
 if (snapshot === null) {
-	throw new Error("shared memory mid-update — rerun");
+	throw new Error("shared memory mid-update; rerun");
 }
 const byKey = (key) => {
 	const r = snapshot.byKey.get(key);
@@ -130,7 +133,10 @@ const K = {
 	cpuLoad: "f0000300:0:7000021",
 	memLoad: "f0000301:0:8000005",
 	gpuTemp: "e0002000:0:1000000",
-	gpuHot: "e0002000:0:1000005",
+	// The bench GPU (an RTX 5080 since September 2026) reports no hot spot;
+	// its memory junction stands in (same unit and type). Faces that force a
+	// sample value keep the "GPU Hot Spot" label most GPUs show.
+	gpuHot: "e0002000:0:1000004",
 	gpuPower: "e0002000:0:5000000",
 	gpuLoad: "e0002000:0:7000000",
 	vram: "e0002000:0:80000fc",
@@ -199,7 +205,7 @@ const multi = {
 
 // ---------- shot 1: hero ----------
 async function hero() {
-	// An "under load" scenario — every face is still drawn by the real renderer.
+	// An "under load" scenario: every face is still drawn by the real renderer.
 	// The wall deliberately MIXES layouts: gallery slot 1 is the only image
 	// many people look at, and a grid of single readings would sell the
 	// commodity claim instead of the product. A dual, a triple and a quad sit
@@ -458,7 +464,11 @@ async function multiKeys() {
 // the detail view's own face renderers from a live group.
 async function drilldown() {
 	const primary = byKey(K.gpuTemp);
-	const group = resolveDetailGroup(snapshot, { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" });
+	const group = resolveDetailGroup(snapshot, { readingKey: primary.key, detailMode: "filter", detailFilter: "*5080*", detailTitle: "GPU" });
+	// A stale filter (the bench GPU changed) drew an empty page; refuse it.
+	if (group.keys.length === 0) {
+		throw new Error("the drill-down filter *5080* matches no reading on this bench");
+	}
 	if (group === null) {
 		throw new Error("drilldown shot: the filter resolved nothing");
 	}
@@ -475,7 +485,7 @@ async function drilldown() {
 		deviceId: "marketing",
 		pageSize: profile.layout.readings.length,
 		primaryKey: primary.key,
-		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*4090*", detailTitle: "GPU" },
+		groupSettings: { readingKey: primary.key, detailMode: "filter", detailFilter: "*5080*", detailTitle: "GPU" },
 		presentation: {},
 		group,
 		offset: 0,
@@ -514,9 +524,9 @@ async function drilldown() {
 		`<text x="960" y="204" text-anchor="middle" font-family="${FONT}" font-size="24" fill="${BODY}">A key can open a page of related readings, with paging and a way back. Each key decides its own group.</text>`,
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">press</text>`,
 		`<text x="${openerX + OPEN_KEY / 2}" y="${openerY + OPEN_KEY + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">any Sensor Reading key</text>`,
-		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *4090*, paged</text>`,
+		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 52}" text-anchor="middle" font-family="${FONT}" font-size="26" font-weight="600" fill="${HEADLINE}">everything matching *5080*, paged</text>`,
 		`<text x="${boardX + boardW / 2}" y="${boardY + boardH + 88}" text-anchor="middle" font-family="${MONO}" font-size="16" fill="${MUTED}">or one source, or a list you order by hand</text>`,
-		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D + RTX 4090</text>`
+		`<text x="960" y="880" text-anchor="middle" font-family="${MONO}" font-size="17" fill="${MUTED}">drawn by the plugin's own renderers from live HWiNFO readings · Ryzen 9 9950X3D2 + RTX 5080</text>`
 	];
 	// The arrow between the two, on the shared centre line.
 	const arrowY = openerY + OPEN_KEY / 2;
@@ -607,7 +617,7 @@ async function settings(piDir) {
 	const captionY = 908;
 
 	const chrome = [
-		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">Set up in seconds.</text>`,
+		`<text x="960" y="84" text-anchor="middle" font-family="${FONT}" font-size="50" font-weight="700" fill="${HEADLINE}">The settings panel, live.</text>`,
 		`<text x="960" y="130" text-anchor="middle" font-family="${FONT}" font-size="22" fill="${BODY}">The real settings panel, not a mockup: search with live values, stack up to four, aim a drill-down key.</text>`
 	];
 	const composites = [];
@@ -634,7 +644,7 @@ async function settings(piDir) {
 // ---------- thumbnail (dedicated 1920×960 listing card) ----------
 async function thumbnail() {
 	// Purpose-built per the guidelines: depicts real functionality with large
-	// legible text — one row of real key faces + a real dial slot.
+	// legible text: one row of real key faces + a real dial slot.
 	const KEY = 220;
 	const GAP = 18;
 	// One single, one alerting, then the three multi-reading layouts: the card
@@ -688,6 +698,16 @@ async function thumbnail() {
 	await sharp(Buffer.from(pageBase(W, H, chrome))).composite(composites).png().toFile(path.join(outDir, "thumbnail.png"));
 }
 
+const piDir = process.argv[3]?.startsWith("--") ? undefined : process.argv[3];
+const onlySettings = process.argv.includes("--only-settings");
+if (onlySettings && piDir === undefined) {
+	throw new Error("--only-settings needs a capture directory from scripts/capture-pi.mjs");
+}
+if (onlySettings) {
+	await settings(piDir);
+	console.log(`Rendered shot 4 (${W}x${H}) to ${outDir}/`);
+	process.exit(0);
+}
 await hero();
 await themes();
 await dials();
@@ -695,7 +715,6 @@ await multiKeys();
 await dialViews();
 await drilldown();
 await thumbnail();
-const piDir = process.argv[3]?.startsWith("--") ? undefined : process.argv[3];
 if (piDir !== undefined) {
 	await settings(piDir);
 	console.log(`Rendered thumbnail + shots 1, 3, 4, 5 (${W}x${H}) to ${outDir}/`);

@@ -25,7 +25,7 @@ dated rows below say what ran on which build.
 | Stream Deck Studio, Galleon 100 SD | Untested | Not claimed | No support is claimed for either, and the reasons differ. Studio (32 keys 16x2, 2 dials): the Stream Deck app ships encoder strip backgrounds for the +, the + XL and the Galleon, but not the Studio, so its dials have no drawable strip and a Sensor Dial there would render nowhere. Galleon 100 SD (a gaming keyboard with a built-in 12-key 3x4 deck, a screen and 2 dials): its screen does take encoder backgrounds, but at 720x384, a different class from the 200x100 per-encoder faces this plugin draws, and it has no touch input; supporting it properly is a rendering task, not a compatibility row. Both take the unknown-device fallback (keys and input still handled, "Unknown device" in logs and reports). A [hardware report](#hardware-test-procedure) is the first step. |
 | Unknown future devices | Fallback | Fallback | Nothing is claimed in advance: capabilities derive from the reported grid, input events are always handled, and rendering degrades to a no-op where there is no display. |
 
-Stream Deck software floor is **6.9**. Features from newer apps are detected at runtime and degrade: dynamic gesture hints use a 6.4-era API, `deviceDidChange` (7.0) falls back to connect-time device info, Key Logic (7.0) simply appears when the app supports it. Basic monitoring depends on none of them.
+Stream Deck software floor is **6.9**. Features from newer apps are detected at runtime and degrade: dynamic gesture hints use a 6.4-era API, `deviceDidChange` (7.0) falls back to connect-time device info, Key Logic (7.0) appears when the app supports it. Basic monitoring depends on none of them.
 
 ## Sensor details (drill-down) support
 
@@ -33,9 +33,9 @@ The [sensor detail view](sensor-details.md) ships one bundled profile per deck t
 
 ![Six dial faces rendered by the plugin at the Stream Deck + XL's six-encoder strip geometry (one 200 by 100 segment per encoder): CPU temperature, GPU temperature, a pinned CPU fan, CPU power, CPU load, and a GPU hot spot at a forced critical value with a red bar, with drawn knob markers beneath.]({{ '/assets/img/plusxl-dials.png' | relative_url }})
 
-And the same claim as a photograph, not a render: my Stream Deck + XL running the validation page, 36 keys and six dial readouts live from HWiNFO (Sony A7 III, 85mm at f/2.5, developed once in Camera Raw; no compositing).
+And the same claim as a photograph, not a render: my Stream Deck + XL running the validation page in July 2026, on an earlier version, 36 keys and six dial readouts live from HWiNFO (Sony A7 III, 85mm at f/2.5, developed once in Camera Raw; no compositing). Its text is Tahoma Bold, the default Text font; some 1.7 faces lay out differently.
 
-![Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including pump RPM and CPU package power, and six metal knobs below.]({{ '/assets/img/plusxl-photo.jpg' | relative_url }})
+![Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including physical memory, DIMM temperatures and CPU package power, and six metal knobs below.]({{ '/assets/img/plusxl-photo.jpg' | relative_url }})
 
 ## Page swipe
 
@@ -60,7 +60,7 @@ To verify a device and have it listed as community verified:
 2. Quit the Stream Deck app, then start it with the recorder armed so the plugin process inherits it: set the user environment variable `HWINFO_TRACE_EVENTS=1` and restart the app.
 3. Perform, in order: two slow turns each way, one fast spin, a short press, a half-second press, press+turn, a tap, a long touch, a page swipe away and back.
 4. Note what the dial did for each step (the [controls page](controls.md) says what it should do for your preset).
-5. Collect `logs/trace-<pid>.jsonl` from the plugin folder (`%APPDATA%\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\logs`) and the "Copy support report" output from the settings panel.
+5. Collect `logs/trace-<pid>.jsonl` from the plugin folder (`%APPDATA%\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\logs`) and the "Copy support report" output from the settings panel (*Advanced → Support*).
 6. Open a GitHub issue titled "Hardware report: <device>" with the notes, the trace and the report.
 
 The trace is redacted at the source: device identifiers are hashed, and no sensor values, sensor names, computer names or file paths are recorded. It exists so a capture from your hardware can be replayed, event for event, through the same state machine the test suite uses (`test/traces/` holds the synthetic versions a real capture can replace).
@@ -71,4 +71,4 @@ For development: `HWINFO_TRACE_EVENTS=1` makes the plugin append one JSON line p
 
 ## Support report
 
-Every settings panel has **Copy support report**: under **Advanced** on a key, under **Dial gestures & advanced** on a dial, and under **Support** on an HWiNFO Control key. It builds a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, sample age, Sensor Dial and HWiNFO Control action state, recent input events) and copies it to the clipboard. Nothing is uploaded anywhere: the plugin makes no network requests, and its only connection is the local WebSocket to the Stream Deck app.
+The Sensor Reading, Sensor Dial and HWiNFO Control panels have **Copy support report**: under **Advanced → Support** on a key or dial, and under **Advanced** on an HWiNFO Control key. It builds a local JSON summary (plugin and app version, devices by model and hashed ID, data-source state, sample age, Sensor Dial and HWiNFO Control action state, recent input events) and copies it to the clipboard. Nothing is uploaded anywhere: the plugin makes no network requests, and its only connection is the local WebSocket to the Stream Deck app. The tiles of the sensor detail view have no settings of their own and no report button.

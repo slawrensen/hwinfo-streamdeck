@@ -32,6 +32,35 @@ function timerBed(): { deps: { setTimer: (fn: () => void, ms: number) => ReturnT
 	};
 }
 
+/** A clock-driven bed: a timer fires when the clock reaches it, and a
+ * forgetful clear leaves a stale callback to run anyway. */
+function clockBed(forgetfulClear = false) {
+	let now = 0;
+	let next = 1;
+	const timers = new Map<number, { at: number; fn: () => void }>();
+	const outcomes: PressOutcome[] = [];
+	const engine = new PressEngine((_id, outcome) => outcomes.push(outcome), 500, {
+		setTimer: (fn, ms) => {
+			timers.set(next, { at: now + ms, fn });
+			return next++ as unknown as ReturnType<typeof setTimeout>;
+		},
+		clearTimer: (h) => {
+			if (!forgetfulClear) timers.delete(h as unknown as number);
+		},
+		now: () => now
+	});
+	const advanceTo = (t: number): void => {
+		now = t;
+		for (const [id, timer] of [...timers].sort((a, b) => a[1].at - b[1].at)) {
+			if (timer.at <= now) {
+				timers.delete(id);
+				timer.fn();
+			}
+		}
+	};
+	return { engine, outcomes, advanceTo };
+}
+
 function harness(): { engine: PressEngine; outcomes: Array<{ id: string; outcome: PressOutcome }>; fire: () => void; pending: () => number } {
 	const outcomes: Array<{ id: string; outcome: PressOutcome }> = [];
 	const bed = timerBed();
@@ -81,19 +110,92 @@ describe("press engine", () => {
 		assert.equal(pending(), 0);
 	});
 
-	it("a replayed keyDown replaces the session; the superseded timer cannot fire", () => {
-		const bed = timerBed();
-		const outcomes: Array<{ id: string; outcome: PressOutcome }> = [];
-		// Keep the first session's timer handle alive past clearTimer by using
-		// an evil clear that forgets: the generation check must still refuse.
-		const engine = new PressEngine((id, outcome) => outcomes.push({ id, outcome }), 500, {
-			setTimer: bed.deps.setTimer,
-			clearTimer: () => {}
-		});
+	// The contract this replaces had a replayed keyDown REPLACE the session,
+	// which reset its deadline and let one held press fire a second hold, or
+	// act again after settings consumed it (external review AX67). A
+	// replayed keyDown is now the same press; the generation check still
+	// guards a cancelled session's timer against the next press.
+	it("a cancelled session's timer cannot fire into the next press", () => {
+		// The first press's timer outlives its clear (a forgetful clear), and
+		// comes due while the second press is held: the generation check must
+		// refuse it, or the second press would hold 400 ms early.
+		const { engine, outcomes, advanceTo } = clockBed(true);
+		engine.keyDown("ctx");
+		advanceTo(100);
+		engine.cancel("ctx");
+		advanceTo(400);
+		engine.keyDown("ctx");
+		advanceTo(500);
+		assert.deepEqual(outcomes, [], "the stale timer came due and did nothing");
+		advanceTo(900);
+		assert.deepEqual(outcomes, ["hold"], "the live press holds at its own deadline");
+	});
+
+	it("a release long after a hold or a consume adds nothing", () => {
+		for (const consumed of [false, true]) {
+			const { engine, outcomes, advanceTo } = clockBed(true);
+			engine.keyDown("ctx");
+			if (consumed) engine.consume("ctx");
+			advanceTo(600);
+			engine.keyUp("ctx");
+			advanceTo(2000);
+			assert.deepEqual(outcomes, consumed ? [] : ["hold"], consumed ? "consumed" : "held");
+		}
+	});
+
+	it("a repeated keyDown is the same press: one deadline, one hold", () => {
+		const { engine, outcomes, fire, pending } = harness();
 		engine.keyDown("ctx");
 		engine.keyDown("ctx");
-		bed.fire(); // both timers fire; only the live generation may act
+		assert.equal(pending(), 1, "no second timer");
+		fire();
+		engine.keyDown("ctx"); // still held after the hold
+		assert.equal(pending(), 0, "the held press cannot re-arm");
+		fire();
+		engine.keyUp("ctx");
 		assert.deepEqual(outcomes, [{ id: "ctx", outcome: "hold" }]);
+	});
+
+	it("consume ends a held press with no outcome and keeps it held until its release", () => {
+		const { engine, outcomes, fire, pending } = harness();
+		engine.keyDown("ctx");
+		engine.consume("ctx");
+		assert.equal(pending(), 0);
+		assert.equal(engine.isDown("ctx"), true);
+		engine.keyDown("ctx"); // a repeated down cannot start it again
+		fire();
+		engine.keyUp("ctx");
+		assert.equal(engine.isDown("ctx"), false);
+		assert.deepEqual(outcomes, []);
+		engine.keyDown("ctx");
+		engine.keyUp("ctx");
+		assert.deepEqual(outcomes, [{ id: "ctx", outcome: "tap" }], "the next press is a new one");
+		engine.consume("idle"); // nothing held: nothing to consume
+		assert.equal(engine.isDown("idle"), false);
+	});
+
+	// A busy or suspended event loop can deliver the release before the hold
+	// timer runs; the time held decides, and the late timer stays silent
+	// (external review AX62).
+	it("a release at or past the threshold is a hold even if its timer has not run", () => {
+		for (const [held, expected] of [
+			[0, "tap"],
+			[499, "tap"],
+			[500, "hold"],
+			[501, "hold"],
+			[600, "hold"],
+			[3_600_000, "hold"]
+		] as const) {
+			let now = 1000;
+			const bed = timerBed();
+			const outcomes: PressOutcome[] = [];
+			const engine = new PressEngine((_id, outcome) => outcomes.push(outcome), 500, { setTimer: bed.deps.setTimer, clearTimer: () => {}, now: () => now });
+			engine.keyDown("ctx");
+			now += held;
+			engine.keyUp("ctx");
+			bed.fire(); // the late callback runs after the release
+			assert.deepEqual(outcomes, [expected], `${held} ms`);
+		}
 	});
 
 	it("two contexts stay independent", () => {

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
-import { compose, type ReadingSettings } from "../src/actions/sensor-reading";
+import { compose, SensorReadingAction, type ReadingSettings } from "../src/actions/sensor-reading";
 import { composeDialSvg, SensorDialAction, type InstanceState } from "../src/actions/sensor-dial";
 import { composeChunkFace, type DetailFaceContext } from "../src/detail/detail-faces";
 import type { DeviceDetailState } from "../src/detail/navigation";
+import { PressEngine } from "../src/detail/press-engine";
 import { IDLE_GESTURE } from "../src/gestures";
 import { gadgetReadingKey } from "../src/hwinfo/gadget-identity";
 import { applyReadingLinks, parseReadingLinks } from "../src/hwinfo/reading-links";
@@ -11,23 +12,39 @@ import type { Reading, SensorSnapshot } from "../src/hwinfo/types";
 import { poller, type PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
 import { convertUnit, readingStatBadge, statValue } from "../src/ui/format";
-import { applyGlobalThemeSettings, effectiveTextFor } from "../src/ui/theme-store";
+import { applyGlobalThemeSettings as applyDeckSettings, effectiveTextFor } from "../src/ui/theme-store";
 import { alertValueColor, loadThemes } from "../src/ui/themes";
 import { contrast } from "./wcag";
+
+import { setFaceFont } from "../src/ui/face-font";
+
+// These tests hold the Segoe UI calibration and its goldens (the Text font
+// option); the Tahoma default has its own suite in test/face-font.test.ts.
+setFaceFont("segoe-ui");
+// Every deck write here keeps Segoe UI, so a settings object without
+// textFont (which means Tahoma) cannot switch the font under these goldens.
+const applyGlobalThemeSettings = (settings: Parameters<typeof applyDeckSettings>[0]): void => applyDeckSettings({ textFont: "segoe-ui", ...settings });
 
 describe("dial press replay through the production action", () => {
 	type Down = Parameters<SensorDialAction["onDialDown"]>[0];
 	type Up = Parameters<SensorDialAction["onDialUp"]>[0];
+	type Received = Parameters<SensorDialAction["onDidReceiveSettings"]>[0];
 	type ActionBoundary = {
 		instances: Map<string, InstanceState>;
 		hidden: Map<string, { at: number; state: InstanceState }>;
 		traceGesture(): void;
 		renderAll(): void;
+		pushTriggerDescriptions(): void;
+		pushPanelPreview(): void;
 		onDialDown(event: Down): Promise<void>;
 		onDialUp(event: Up): Promise<void>;
+		onDidReceiveSettings(event: Received): void;
+		onWillAppear(event: Parameters<SensorDialAction["onWillAppear"]>[0]): void;
+		onDialRotate(event: Parameters<SensorDialAction["onDialRotate"]>[0]): Promise<void>;
+		executeCommand(action: unknown, state: InstanceState, command: string, ticks: number): Promise<void>;
 	};
 	function fixture() {
-		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: InstanceState = { settings: { readingKey: "fixture:0:1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		// Call the real handlers and reset command; replace only the SDK render
 		// sink, tracing, acquisition and clock boundaries. No native source is
 		// opened, and host scheduling cannot turn a short press into a hold.
@@ -36,6 +53,8 @@ describe("dial press replay through the production action", () => {
 		action.hidden = new Map();
 		action.traceGesture = () => {};
 		action.renderAll = () => {};
+		action.pushTriggerDescriptions = () => {};
+		action.pushPanelPreview = () => {};
 		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
 		let eventAt = 1000;
 		const now = mock.method(performance, "now", () => eventAt);
@@ -45,6 +64,13 @@ describe("dial press replay through the production action", () => {
 			state,
 			down: (afterMs = 0) => { eventAt += afterMs; return action.onDialDown(down); },
 			up: (afterMs = 0) => { eventAt += afterMs; return action.onDialUp(up); },
+			receive: (settings: InstanceState["settings"]) => action.onDidReceiveSettings({ action: { id: "ctx", isDial: () => true, setSettings: async () => {} }, payload: { settings } } as unknown as Received),
+			appear: (settings: InstanceState["settings"]) => action.onWillAppear({ action: { id: "ctx", device: { id: "fixture", name: "Fixture" }, isDial: () => false }, payload: { settings } } as unknown as Parameters<SensorDialAction["onWillAppear"]>[0]),
+			action,
+			rotate: (pressed: boolean, afterMs = 0) => {
+				eventAt += afterMs;
+				return action.onDialRotate({ action: { id: "ctx" }, payload: { ticks: 1, pressed } } as unknown as Parameters<SensorDialAction["onDialRotate"]>[0]);
+			},
 			close: () => { if (state.overlayTimer !== null) clearTimeout(state.overlayTimer); getStatus.mock.restore(); now.mock.restore(); }
 		};
 	}
@@ -66,6 +92,30 @@ describe("dial press replay through the production action", () => {
 			assert.equal(f.state.stats.get("fixture:0:1"), undefined, "a new press after release still resets");
 		} finally { f.close(); }
 	});
+	it("a held press whose settings change to another command or reach does nothing on release; an unchanged echo keeps it", async () => {
+		// external review AX26: an Elite press (Pause/resume on release) held
+		// while the panel switched to Custom with a reset of every dial used to
+		// reset every dial on release.
+		for (const change of ["new command", "echo"] as const) {
+			const f = fixture();
+			try {
+				f.state.settings = { ...f.state.settings, controlPreset: "elite" };
+				f.state.stats.sample("fixture:0:1", 50);
+				await f.down();
+				f.receive(change === "echo" ? { ...f.state.settings } : { ...f.state.settings, controlPreset: "custom", gestureShortPress: "resetStats", resetScope: "all" });
+				await f.up(100);
+				if (change === "echo") {
+					assert.equal(f.state.cyclePaused, true, "an unchanged echo keeps the press: Pause/resume runs");
+					continue;
+				}
+				assert.equal(f.state.stats.get("fixture:0:1")?.count, 1, "the held press did not become a reset");
+				assert.equal(f.state.cyclePaused, false, "nor did it run its old command");
+				await f.down(100);
+				await f.up(100);
+				assert.equal(f.state.stats.get("fixture:0:1"), undefined, "a fresh press runs the new command");
+			} finally { f.close(); }
+		}
+	});
 	it("a consumed legacy press cannot fire again after switching to Elite before release", async () => {
 		const f = fixture();
 		try {
@@ -81,6 +131,92 @@ describe("dial press replay through the production action", () => {
 			await f.up(100);
 			assert.equal(f.state.cyclePaused, true, "a new Elite press, including a duplicate down, toggles once on release");
 		} finally { f.close(); }
+	});
+	// A replayed appear consumes a held press through its release, a
+	// repeated down included, the way a settings change does (external
+	// review AX68); the next press after the release is new.
+	it("a replayed appear consumes a held press, repeated downs included", async () => {
+		for (const change of ["new command", "unchanged"] as const) {
+			for (const repeats of [0, 1, 2]) {
+				const f = fixture();
+				const retain = mock.method(poller, "retain", () => {});
+				const commands: string[] = [];
+				f.action.executeCommand = async (_action, state, command) => void commands.push(`${command}/${String(state.settings.resetScope ?? "current")}`);
+				try {
+					const settings = { ...f.state.settings, controlPreset: "custom", gestureShortPress: "pauseResume", gestureLongPress: "pauseResume" };
+					f.state.settings = settings;
+					await f.down();
+					f.appear(change === "unchanged" ? { ...settings } : { ...settings, gestureShortPress: "resetStats", gestureLongPress: "resetStats", resetScope: "all" });
+					for (let i = 0; i < repeats; i++) await f.down(10);
+					await f.up(100);
+					assert.deepEqual(commands, [], `${change}, ${repeats} repeated down(s): the held press runs nothing`);
+					await f.down(100);
+					await f.up(100);
+					assert.deepEqual(commands, [change === "unchanged" ? "pauseResume/current" : "resetStats/all"], "a fresh press runs once, under the current settings");
+				} finally {
+					retain.mock.restore();
+					f.close();
+				}
+			}
+		}
+	});
+	// A press kept through a replayed appear may have lost its release in
+	// the replay: a turn the app reports as not pressed ends it, so plain
+	// turns stay plain and the next press is new (review of d15).
+	it("a press kept through a replayed appear ends at the first turn the app reports as not pressed", async () => {
+		const f = fixture();
+		const retain = mock.method(poller, "retain", () => {});
+		const commands: string[] = [];
+		f.action.executeCommand = async (_action, _state, command, ticks) => void commands.push(ticks === 0 ? command : `${command}(${ticks})`);
+		try {
+			const settings = { ...f.state.settings, controlPreset: "elite" };
+			f.state.settings = settings;
+			await f.down();
+			f.appear({ ...settings });
+			for (let i = 0; i < 3; i++) await f.rotate(false, 50);
+			await f.down(100);
+			await f.up(2000);
+			await f.rotate(false, 50);
+			assert.deepEqual(commands, ["step(1)", "step(1)", "step(1)", "resetStats", "step(1)"]);
+			commands.length = 0;
+			await f.down(100);
+			f.appear({ ...settings });
+			await f.rotate(true, 50); // still held: a pressed turn stays pressed
+			await f.up(100);
+			assert.deepEqual(commands, ["stepGroup(1)"], "a held press kept through the replay, turned while held, runs nothing on release");
+		} finally {
+			retain.mock.restore();
+			f.close();
+		}
+	});
+	// Only a press kept through a replay ends at an unpressed turn. A press
+	// the dial saw go down stays pressed through one (the tracked down backs
+	// up the app's flag), also once a replayed press has ended.
+	it("an unpressed turn inside a press the dial saw go down is a pressed turn", async () => {
+		for (const before of ["no replay", "a replayed press ended by a turn", "a replayed press ended by its release"] as const) {
+			const f = fixture();
+			const retain = mock.method(poller, "retain", () => {});
+			const commands: string[] = [];
+			f.action.executeCommand = async (_action, _state, command, ticks) => void commands.push(ticks === 0 ? command : `${command}(${ticks})`);
+			try {
+				const settings = { ...f.state.settings, controlPreset: "elite" };
+				f.state.settings = settings;
+				if (before !== "no replay") {
+					await f.down();
+					f.appear({ ...settings });
+					if (before === "a replayed press ended by a turn") await f.rotate(false, 50);
+					else await f.up(100);
+				}
+				commands.length = 0;
+				await f.down(100);
+				await f.rotate(false, 50);
+				await f.up(100);
+				assert.deepEqual(commands, ["stepGroup(1)"], before);
+			} finally {
+				retain.mock.restore();
+				f.close();
+			}
+		}
 	});
 	it("a repeated Elite down retains the original long-press boundary", async () => {
 		const f = fixture();
@@ -108,7 +244,7 @@ describe("readability through production action composition", () => {
 				for (const level of ["normal", "warn", "crit"] as const) {
 					const state: InstanceState = {
 						settings: { readingKey: reading.key, dialView, theme, textMode: "dim", warnValue: level === "normal" ? "50" : "30", critValue: level === "crit" ? "35" : "60", alertUnit: "°C" },
-						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+						stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false
 					};
 					const svg = composeDialSvg(state, { state: "ok", source: "shared-memory", snapshot: snapshot() });
 					const value = svg.match(/<text[^>]*font-weight="700" fill="(#[A-Fa-f0-9]{6})">40(?:\.0)?(?:<tspan|<\/text>)/);
@@ -157,7 +293,7 @@ describe("an alert changes colors and nothing else: no severity mark, no text mo
 	function dial(dialView: string, level: keyof typeof THRESHOLDS): string {
 		const state: InstanceState = {
 			settings: { readingKey: hot.key, rotationKeys: [hot.key, calm.key], dialView, theme: "void", alertUnit: "°C", ...THRESHOLDS[level] },
-			stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set()
+			stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false
 		};
 		return composeDialSvg(state, ok, () => [1, 2, 3, 2, 4]);
 	}
@@ -171,7 +307,7 @@ describe("an alert changes colors and nothing else: no severity mark, no text mo
 
 		it(`${level}: an alerting overview row's label starts at the same x as the calm row under it`, () => {
 			const svg = dial("overview", level);
-			const labelXs = [...svg.matchAll(/<text x="([0-9.]+)" y="[0-9.]+" text-anchor="start" [^>]*letter-spacing="0\.4"/g)].map((m) => m[1]);
+			const labelXs = [...svg.matchAll(/<text x="([0-9.]+)" y="[0-9.]+" text-anchor="start" [^>]*>[^<]*<\/text><rect /g)].map((m) => m[1]);
 			assert.deepEqual(labelXs, ["12", "12"], "one label per row, both on the shared left edge");
 			assert.match(svg, new RegExp(`fill="${alertValueColor(config, level, config.themes.void!.bg)}">40\\.0</text>`), "the alerting row still takes the alert value color");
 			assert.equal(geometryOf(svg), geometryOf(dial("overview", "normal")), "the alerting row keeps the calm row's label fit, mask and columns");
@@ -272,11 +408,11 @@ describe("dial appearance synchronizes history before its first frame", () => {
 		// makes the new snapshot available before the state is restored.
 		applyGlobalThemeSettings({ theme: "void" });
 		const settings = Object.freeze({ readingKey: reading.key, dialView, label: "My CPU", decimals: "1" as const });
-		const previous: DialState = { settings, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "old frame", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const previous: DialState = { settings, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "old frame", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		previous.stats.observe({ ...reading, value: 45 }, snapshot({ ...reading, value: 45 }), "shared-memory");
 		const action = Object.create(SensorDialAction.prototype) as Lifecycle;
 		action.instances = new Map(retained === "replayed" ? [["ctx", previous]] : []);
-		action.hidden = new Map(retained === "hidden" ? [["ctx", { at: Date.now(), state: previous }]] : []);
+		action.hidden = new Map(retained === "hidden" ? [["ctx", { at: performance.now(), state: previous }]] : []);
 		action.traceLifecycle = () => {};
 		action.pushTriggerDescriptions = () => {};
 		let svg = "";
@@ -352,12 +488,14 @@ describe("dial appearance synchronizes history before its first frame", () => {
 describe("a data gap ends dial sessions and says so once on the first live frame", () => {
 	type Tick = { instances: Map<string, InstanceState>; hidden: Map<string, { at: number; state: InstanceState }>; renderAll(): void; onPollerTick(status: PollerStatus): void };
 	function dial(): { action: Tick; state: InstanceState } {
-		const state: InstanceState = { settings: { readingKey: reading.key }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: InstanceState = { settings: { readingKey: reading.key }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		const action = Object.create(SensorDialAction.prototype) as Tick;
 		action.instances = new Map([["ctx", state]]);
 		action.hidden = new Map();
-		action.renderAll = () => {};
-		Object.defineProperty(action, "actions", { get: () => [] });
+		// The production renderAll samples a visible dial once per tick
+		// (MS02); only the SDK's send is replaced.
+		const handle = { id: "ctx", isDial: () => true, setFeedback: () => Promise.resolve() };
+		Object.defineProperty(action, "actions", { get: () => (action.instances.has("ctx") ? [handle] : []) });
 		return { action, state };
 	}
 	const ok = (value: number, pollTime: number): PollerStatus => ({ state: "ok", source: "shared-memory", snapshot: snapshot({ ...reading, value }, pollTime) });
@@ -477,7 +615,7 @@ describe("dial selection validates retained history before rendering", () => {
 	function fixture() {
 		const second = { ...reading, key: "f0001234:0:1000002", id: 2, value: 70 };
 		const complete = (current: Reading, pollTime = 3): SensorSnapshot => ({ ...snapshot(current, pollTime), readings: [current, second], byKey: new Map([[current.key, current], [second.key, second]]) });
-		const state: DialState = { settings: { readingKey: reading.key, decimals: "1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set() };
+		const state: DialState = { settings: { readingKey: reading.key, decimals: "1" }, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
 		const action = Object.create(SensorDialAction.prototype) as Selection;
 		action.instances = new Map([["ctx", state]]);
 		action.hidden = new Map();
@@ -723,6 +861,33 @@ describe("refutation: historical and local statistics", () => {
 });
 
 describe("measurement truth through production renderers", () => {
+	// A member's name is an own, non-empty string under the key it shows as,
+	// else under a confirmed alias, trimmed; the diagnostics count only such
+	// names (external review MS07 kept each of these).
+	it("a dial draws a member's name from its alias when its own entry is not a name", () => {
+		const linked: Reading = { ...reading, linkedKeys: [link.sharedMemory, link.gadget] };
+		const status = { state: "ok", source: "shared-memory", snapshot: snapshot(linked) } as const;
+		const face = (rotationNames: unknown): string => composeDialSvg({ settings: { readingKey: linked.key, rotationNames }, stats: new SessionStatsStore(), statMode: "current", overlay: null, pinned: false, cyclePaused: false } as unknown as Parameters<typeof composeDialSvg>[0], status);
+		assert.match(face({ [link.sharedMemory]: 5, [link.gadget]: "  Named  " }), />Named</);
+		assert.match(face({ [link.sharedMemory]: "  Own  ", [link.gadget]: "Named" }), />Own</);
+		assert.match(face({ [link.sharedMemory]: " ", [link.gadget]: 7 }), />Temperature</);
+		assert.match(face(JSON.parse(`{"__proto__":"x","${link.sharedMemory}":"Kept"}`)), />Kept</);
+		const action = Object.create(SensorDialAction.prototype) as { instances: Map<string, unknown>; hidden: Map<string, unknown>; diagnostics(): { visible: Array<{ rotationNames: number }> } };
+		action.instances = new Map([["ctx", { settings: { readingKey: linked.key, rotationNames: { a: 5, b: "  Named  ", c: " ", d: "Two" } }, stats: new SessionStatsStore(), statMode: "current", cyclePaused: false, pinned: false, deviceId: "d" }]]);
+		action.hidden = new Map();
+		assert.equal(action.diagnostics().visible[0]?.rotationNames, 2);
+	});
+
+	it("a dial's AVG stays the session average when finite samples overflow the sum (external review AX64)", () => {
+		const huge: Reading = { ...reading, unit: "W", value: 1e308, valueMin: 0, valueMax: 1e308, valueAvg: 1 };
+		const status = { state: "ok", source: "shared-memory", snapshot: snapshot(huge) } as const;
+		const stats = new SessionStatsStore();
+		for (let i = 0; i < 3; i++) stats.sample(huge.key, 1e308);
+		const valueText = (statMode: "avg" | "max"): string | undefined => composeDialSvg({ settings: { readingKey: huge.key }, stats, statMode, overlay: null, pinned: false, cyclePaused: false } as unknown as Parameters<typeof composeDialSvg>[0], status).match(/>([^<]+)</g)?.[1];
+		assert.ok(valueText("max") !== undefined);
+		assert.equal(valueText("avg"), valueText("max"), "every sample was 1e308, so AVG draws what MAX draws");
+	});
+
 	it("45 to 65 to 50 Gadget values stay unavailable under every historical key/detail layout", () => {
 		const config = loadThemes();
 		const ctx: DetailFaceContext = { config, deckThemeId: config.defaultTheme, typeAccents: false, measure: { decimals: "auto", fahrenheit: false, dataUnits: "decimal" }, text: effectiveTextFor({}) };
@@ -751,7 +916,7 @@ describe("measurement truth through production renderers", () => {
 		// a poller or registering live SDK listeners.
 		const action = Object.create(SensorDialAction.prototype) as DialSeam;
 		for (const dialView of ["single", "overview", "tworow"]) {
-			const state: DialState = { settings: { readingKey: reading.key, dialView }, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false, rowSeries: new Set() };
+			const state: DialState = { settings: { readingKey: reading.key, dialView }, stats: new SessionStatsStore(), statMode: "min", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "test", pendingAlertUnitStamp: false };
 			try {
 				const celsius = { ...reading, value: 45 };
 				action.sampleStats(state, snapshot(celsius), "shared-memory");
@@ -766,6 +931,368 @@ describe("measurement truth through production renderers", () => {
 				assert.match(composeDialSvg(state, { state: "ok", source: "gadget", snapshot: next }), /stats reset: source changed/);
 			} finally {
 				if (state.overlayTimer !== null) clearTimeout(state.overlayTimer);
+			}
+		}
+	});
+	// The two-row view draws each row's trend from the poller's series: each
+	// tick subscribes exactly the rows on screen, and nothing for the other
+	// views or for a selection the snapshot lacks (external review MS05).
+	it("the two-row view subscribes the series of exactly the rows it shows", () => {
+		const set = ["fixture:0:1", "fixture:0:2", "fixture:0:3"];
+		const rows = set.map((key, i) => ({ ...reading, key, id: i + 1, label: `Row ${i + 1}` }));
+		const shown: SensorSnapshot = { pollTime: 1, valueRevision: 1, version: 1, revision: 0, sensors: [{ index: 0, id: 1, instance: 0, name: "GPU" }], readings: rows, byKey: new Map(rows.map((r) => [r.key, r])) };
+		const action = Object.create(SensorDialAction.prototype) as { syncRowSeries(state: InstanceState, snapshot: SensorSnapshot): void };
+		const subscribed: string[] = [];
+		const subscribe = mock.method(poller, "subscribeSeries", (key: string) => void subscribed.push(key));
+		try {
+			const cases: Array<[InstanceState["settings"], string[]]> = [
+				[{ dialView: "tworow", readingKey: set[0], rotationKeys: set }, [set[0]!, set[1]!]],
+				[{ dialView: "tworow", readingKey: set[2], rotationKeys: set }, [set[1]!, set[2]!]],
+				[{ dialView: "tworow", readingKey: set[1], rotationKeys: ["gone:0:9"] }, [set[1]!]],
+				[{ dialView: "tworow", readingKey: "gone:0:9", rotationKeys: set }, []],
+				[{ dialView: "tworow", rotationKeys: set }, []],
+				[{ dialView: "overview", readingKey: set[0], rotationKeys: set }, []],
+				[{ readingKey: set[0], rotationKeys: set }, []]
+			];
+			for (const [settings, expected] of cases) {
+				subscribed.length = 0;
+				action.syncRowSeries({ settings } as InstanceState, shown);
+				assert.deepEqual(subscribed, expected, JSON.stringify(settings));
+			}
+		} finally {
+			subscribe.mock.restore();
+		}
+	});
+});
+
+describe("a held key keeps the document it was pressed under (external review AX27)", () => {
+	type Handle = { id: string; device: { id: string; name: string }; isKey(): boolean };
+	type KeyBoundary = {
+		instances: Map<string, { settings: ReadingSettings; subscribedKey?: string; lastSvg: string }>;
+		presses: PressEngine;
+		renderAll(): void;
+		pushPanelPreview(): void;
+		openDetails(id: string): Promise<void>;
+		cycleStat(id: string): Promise<void>;
+		detailNavigator: { leave(deviceId: string): Promise<void> };
+		onKeyDown(ev: { action: Handle }): Promise<void>;
+		onKeyUp(ev: { action: Handle }): void;
+		onDidReceiveSettings(ev: { action: Handle; payload: { settings: ReadingSettings } }): void;
+		onWillAppear(ev: { action: Handle; payload: { settings: ReadingSettings } }): void;
+	};
+	const initial: ReadingSettings = { readingKey: "a:0:1", pressBehavior: "tap-cycle-hold-details" };
+	const changes: Record<string, ReadingSettings> = {
+		reading: { ...initial, readingKey: "b:0:1" },
+		behavior: { ...initial, pressBehavior: "cycle-stat" },
+		detail: { ...initial, detailMode: "custom", detailKeys: ["c:0:1"] } as ReadingSettings,
+		echo: { ...initial },
+		// The same document with its keys in another order (the app sorts).
+		reordered: { pressBehavior: "tap-cycle-hold-details", readingKey: "a:0:1" }
+	};
+	function fixture() {
+		const action = Object.create(SensorReadingAction.prototype) as KeyBoundary;
+		action.instances = new Map([["ctx", { settings: initial, subscribedKey: initial.readingKey, lastSvg: "" }]]);
+		action.renderAll = () => {};
+		action.pushPanelPreview = () => {};
+		const outcomes: Array<{ outcome: string; readingKey: unknown }> = [];
+		const record = (outcome: string) => async (id: string): Promise<void> => void outcomes.push({ outcome, readingKey: action.instances.get(id)?.settings.readingKey });
+		action.openDetails = record("hold");
+		action.cycleStat = record("tap");
+		action.detailNavigator = { leave: async () => void outcomes.push({ outcome: "back", readingKey: action.instances.get("ctx")?.settings.readingKey }) };
+		// The production dispatch, with the hold timer under the test's hand.
+		const timers = new Map<number, () => void>();
+		let next = 0;
+		action.presses = new PressEngine((id, outcome) => void (outcome === "hold" ? action.openDetails(id) : action.cycleStat(id)), 500, {
+			setTimer: (fn) => {
+				timers.set(++next, fn);
+				return next as unknown as ReturnType<typeof setTimeout>;
+			},
+			clearTimer: (h) => void timers.delete(h as unknown as number)
+		});
+		const handle: Handle = { id: "ctx", device: { id: "dev", name: "fixture" }, isKey: () => true };
+		const hold = (): void => {
+			for (const fn of [...timers.values()]) fn();
+		};
+		return { action, outcomes, handle, hold };
+	}
+	for (const route of ["settings", "replayed appear"] as const) {
+		for (const [name, settings] of Object.entries(changes)) {
+			for (const end of ["tap", "hold"] as const) {
+				const keeps = route === "settings" && (name === "echo" || name === "reordered");
+				it(`${route}, ${name}: a ${end} ${keeps ? "still resolves" : "is consumed"}`, async () => {
+					const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+					const subscribe = mock.method(poller, "subscribeSeries", () => {});
+					try {
+						const f = fixture();
+						await f.action.onKeyDown({ action: f.handle });
+						if (route === "settings") f.action.onDidReceiveSettings({ action: f.handle, payload: { settings } });
+						else f.action.onWillAppear({ action: f.handle, payload: { settings } });
+						if (end === "hold") f.hold();
+						else f.action.onKeyUp({ action: f.handle });
+						if (keeps) {
+							assert.deepEqual(f.outcomes, [{ outcome: end, readingKey: "a:0:1" }]);
+							return;
+						}
+						assert.equal(f.outcomes.length, 0, "nothing runs under the replacement settings");
+						f.action.onKeyUp({ action: f.handle });
+						await f.action.onKeyDown({ action: f.handle });
+						f.action.onKeyUp({ action: f.handle });
+						assert.equal(f.outcomes.length, 1, "the next press runs once, under the new settings");
+						assert.equal(f.outcomes[0]?.readingKey, settings.readingKey);
+					} finally {
+						getStatus.mock.restore();
+						subscribe.mock.restore();
+					}
+				});
+			}
+		}
+	}
+	// A repeated down (replayed events) belongs to the press already held,
+	// consumed or not: it must not act under the replacement settings, nor
+	// arm a second hold (external review AX67).
+	const repeated: Record<string, ReadingSettings> = { reading: { ...initial, readingKey: "b:0:1" }, behavior: { ...initial, pressBehavior: "cycle-stat" }, back: { ...initial, detailRole: "back" } as ReadingSettings, echo: { ...initial } };
+	for (const route of ["settings", "replayed appear"] as const) {
+		for (const [name, settings] of Object.entries(repeated)) {
+			for (const repeats of [1, 2]) {
+				const keeps = route === "settings" && name === "echo";
+				it(`${route}, ${name}, ${repeats} repeated down(s): ${keeps ? "the press still resolves once" : "nothing runs until a new press"}`, async () => {
+					const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+					const subscribe = mock.method(poller, "subscribeSeries", () => {});
+					try {
+						const f = fixture();
+						await f.action.onKeyDown({ action: f.handle });
+						if (route === "settings") f.action.onDidReceiveSettings({ action: f.handle, payload: { settings } });
+						else f.action.onWillAppear({ action: f.handle, payload: { settings } });
+						for (let i = 0; i < repeats; i++) await f.action.onKeyDown({ action: f.handle });
+						f.action.onKeyUp({ action: f.handle });
+						if (keeps) {
+							assert.deepEqual(f.outcomes, [{ outcome: "tap", readingKey: "a:0:1" }]);
+							return;
+						}
+						assert.deepEqual(f.outcomes, [], "nothing runs under the replacement settings");
+						await f.action.onKeyDown({ action: f.handle });
+						f.hold();
+						f.action.onKeyUp({ action: f.handle });
+						assert.equal(f.outcomes.length, 1, "the next press runs once, under the new settings");
+					} finally {
+						getStatus.mock.restore();
+						subscribe.mock.restore();
+					}
+				});
+			}
+		}
+	}
+	it("a down repeated after the hold fired cannot fire a second hold", async () => {
+		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
+		try {
+			const f = fixture();
+			await f.action.onKeyDown({ action: f.handle });
+			f.hold();
+			await f.action.onKeyDown({ action: f.handle });
+			f.hold();
+			f.action.onKeyUp({ action: f.handle });
+			assert.deepEqual(f.outcomes, [{ outcome: "hold", readingKey: "a:0:1" }]);
+		} finally {
+			getStatus.mock.restore();
+		}
+	});
+});
+
+describe("dial settings edge cases through the production action", () => {
+	type Writes = Array<Record<string, unknown>>;
+	type DialBoundary = {
+		instances: Map<string, InstanceState>;
+		hidden: Map<string, { at: number; state: InstanceState }>;
+		renderAll(): void;
+		pushPanelPreview(): void;
+		pushTriggerDescriptions(): void;
+		onDidReceiveSettings(ev: unknown): void;
+		onWillAppear(ev: unknown): void;
+		onWillDisappear(ev: unknown): void;
+		traceLifecycle(): void;
+		onPollerTick(status: PollerStatus): void;
+		autoCycle(status: PollerStatus, now: number): void;
+	};
+	const temp: Reading = { ...reading, key: "a:0:1", id: 1, unit: "°C" };
+	const fan: Reading = { ...reading, key: "a:0:2", id: 2, unit: "RPM", value: 900 };
+	const live: PollerStatus = { state: "ok", source: "shared-memory", snapshot: { ...snapshot(temp), readings: [temp, fan], byKey: new Map([[temp.key, temp], [fan.key, fan]]) } };
+	const away: PollerStatus = { state: "unavailable", reason: "not-running", message: "fixture" };
+	function dial(settings: InstanceState["settings"]) {
+		const state: InstanceState = { settings, stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false };
+		const action = Object.create(SensorDialAction.prototype) as DialBoundary;
+		action.instances = new Map([["d", state]]);
+		action.hidden = new Map();
+		action.renderAll = () => {};
+		action.pushPanelPreview = () => {};
+		action.pushTriggerDescriptions = () => {};
+		action.traceLifecycle = () => {};
+		const writes: Writes = [];
+		const handle = { id: "d", device: { id: "fixture", name: "Fixture" }, coordinates: { column: 0, row: 0 }, isDial: () => true, setFeedback: () => Promise.resolve(), setSettings: async (s: Record<string, unknown>): Promise<void> => void writes.push({ ...s }) };
+		Object.defineProperty(action, "actions", { get: () => (action.instances.has("d") ? [handle] : []) });
+		const receive = (next: InstanceState["settings"]): void => action.onDidReceiveSettings({ action: handle, payload: { settings: next } });
+		return { action, state, writes, receive, handle };
+	}
+
+	it("a threshold edit made while data is away stamps the unit of the reading it was typed for (AX28)", () => {
+		let status: PollerStatus = away;
+		const getStatus = mock.method(poller, "getStatus", () => status);
+		try {
+			const f = dial({ readingKey: temp.key, warnValue: "50", alertUnit: "°C" });
+			f.receive({ ...f.state.settings, warnValue: "60" });
+			assert.equal(f.state.settings.alertUnit, undefined, "the old anchor is cleared at once");
+			f.receive({ ...f.state.settings, readingKey: fan.key });
+			status = live;
+			f.action.onPollerTick(live);
+			assert.equal(f.state.settings.alertUnit, "°C", "the temperature threshold never becomes an RPM one");
+			assert.equal(f.writes.at(-1)?.alertUnit, "°C");
+			assert.equal(f.state.pendingAlertUnitStamp, false);
+			// With no reading chosen yet, the first one chosen anchors it.
+			status = away;
+			const g = dial({ warnValue: "" });
+			g.receive({ warnValue: "70" });
+			g.receive({ ...g.state.settings, readingKey: fan.key });
+			status = live;
+			g.action.onPollerTick(live);
+			assert.equal(g.state.settings.alertUnit, "RPM");
+		} finally {
+			getStatus.mock.restore();
+		}
+	});
+
+	it("a threshold typed while the dial showed its reading missing is anchored by the next reading chosen (AX28)", () => {
+		const getStatus = mock.method(poller, "getStatus", () => live);
+		try {
+			const f = dial({ readingKey: "gone:0:9", warnValue: "" });
+			f.receive({ ...f.state.settings, warnValue: "2000" });
+			f.receive({ ...f.state.settings, readingKey: fan.key });
+			f.action.onPollerTick(live);
+			assert.equal(f.state.settings.alertUnit, "RPM");
+		} finally {
+			getStatus.mock.restore();
+		}
+	});
+
+	it("the anchor survives the dial leaving and returning before data does (AX28)", () => {
+		let status: PollerStatus = away;
+		const getStatus = mock.method(poller, "getStatus", () => status);
+		const retain = mock.method(poller, "retain", () => {});
+		const release = mock.method(poller, "release", () => {});
+		try {
+			const f = dial({ readingKey: temp.key, warnValue: "50", alertUnit: "°C" });
+			f.receive({ ...f.state.settings, warnValue: "60" });
+			f.receive({ ...f.state.settings, readingKey: fan.key });
+			const stored = f.state.settings;
+			f.action.onWillDisappear({ action: f.handle });
+			f.action.onWillAppear({ action: f.handle, payload: { settings: stored } });
+			status = live;
+			f.action.onPollerTick(live);
+			assert.equal(f.action.instances.get("d")?.settings.alertUnit, "°C");
+		} finally {
+			getStatus.mock.restore();
+			retain.mock.restore();
+			release.mock.restore();
+		}
+	});
+
+	it("an auto-cycle move keeps the outgoing reading's sample for that tick (MS02)", () => {
+		let mono = 10_000;
+		const perfNow = mock.method(performance, "now", () => mono);
+		const at = (value: number, pollTime: number): PollerStatus => {
+			const t = { ...temp, value };
+			return { state: "ok", source: "shared-memory", snapshot: { ...snapshot(t, pollTime), readings: [t, fan], byKey: new Map([[t.key, t], [fan.key, fan]]) } };
+		};
+		let status = at(40, 1);
+		const getStatus = mock.method(poller, "getStatus", () => status);
+		try {
+			const f = dial({ readingKey: temp.key, autoCycleMs: "5000" }); // single view, no rotation set
+			delete (f.action as { renderAll?: unknown }).renderAll; // the production render samples
+			f.action.onPollerTick(status);
+			mono += 6000;
+			status = at(50, 2);
+			f.action.onPollerTick(status);
+			assert.deepEqual(f.writes.map((w) => w.readingKey), [fan.key], "the dial moved on this tick");
+			assert.deepEqual(f.state.stats.get(temp.key), { min: 40, max: 50, sum: 90, count: 2 }, "the move tick's value still counts for the reading it left");
+		} finally {
+			perfNow.mock.restore();
+			getStatus.mock.restore();
+		}
+	});
+
+	it("a reading saved as __proto__ shows its own name on the dial (AX35)", () => {
+		applyGlobalThemeSettings({ theme: "void" });
+		const r: Reading = { ...reading, key: "__proto__", label: "HWiNFO label" };
+		const status: PollerStatus = { state: "ok", source: "shared-memory", snapshot: { ...snapshot(r), readings: [r], byKey: new Map([[r.key, r]]) } };
+		const settings = JSON.parse('{"readingKey":"__proto__","rotationNames":{"__proto__":"Named here"}}') as InstanceState["settings"];
+		const state = { settings, stats: new SessionStatsStore(), statMode: "current", overlay: null, pinned: false, cyclePaused: false } as unknown as InstanceState;
+		const svg = composeDialSvg(state, status);
+		assert.ok(svg.includes("Named here") && !svg.includes("HWiNFO label"), svg.slice(0, 400));
+	});
+
+	it("auto cycle reads only a string or number; anything else is off and never throws (AX31)", () => {
+		const cases: Array<[unknown, boolean]> = [[true, false], [[5000], false], [{ toString: 7, valueOf: 8 }, false], [false, false], ["off", false], ["", false], ["5000", true], [5000, true]];
+		for (const [raw, moves] of cases) {
+			const f = dial({ readingKey: temp.key, rotationKeys: [temp.key, fan.key], autoCycleMs: raw as string });
+			assert.doesNotThrow(() => {
+				for (const t of [100, 5100, 10100]) f.action.autoCycle(live, t);
+			}, JSON.stringify(raw));
+			assert.deepEqual(f.writes.map((w) => w.readingKey), moves ? [fan.key] : [], JSON.stringify(raw));
+		}
+	});
+
+	it("a hidden dial's remembered state lasts 30 minutes of elapsed time, whatever the wall clock does", () => {
+		let wall = 100_000_000;
+		let mono = 10_000;
+		const dateNow = mock.method(Date, "now", () => wall);
+		const perfNow = mock.method(performance, "now", () => mono);
+		const getStatus = mock.method(poller, "getStatus", () => away);
+		const retain = mock.method(poller, "retain", () => {});
+		const release = mock.method(poller, "release", () => {});
+		try {
+			const f = dial({ readingKey: temp.key });
+			f.state.pinned = true;
+			const back = (): boolean | undefined => {
+				f.action.onWillAppear({ action: f.handle, payload: { settings: f.state.settings } });
+				return f.action.instances.get("d")?.pinned;
+			};
+			f.action.onWillDisappear({ action: f.handle });
+			wall += 31 * 60_000;
+			mono += 2000;
+			assert.equal(back(), true, "2 s away keeps the pin although the wall clock jumped 31 minutes");
+			f.action.onWillDisappear({ action: f.handle });
+			wall -= 2 * 3_600_000;
+			mono += 40 * 60_000;
+			assert.equal(back(), false, "40 minutes away forgets it although the wall clock went back");
+		} finally {
+			dateNow.mock.restore();
+			perfNow.mock.restore();
+			getStatus.mock.restore();
+			retain.mock.restore();
+			release.mock.restore();
+		}
+	});
+
+	it("a wall-clock correction neither hurries nor stalls the interval (AX43)", () => {
+		for (const jump of [-3_600_000, 0, 3_600_000]) {
+			let wall = 100_000_000;
+			let mono = 10_000;
+			const dateNow = mock.method(Date, "now", () => wall);
+			const perfNow = mock.method(performance, "now", () => mono);
+			const getStatus = mock.method(poller, "getStatus", () => live);
+			try {
+				const f = dial({ readingKey: temp.key, rotationKeys: [temp.key, fan.key], autoCycleMs: "5000" });
+				f.action.onPollerTick(live);
+				wall += jump + 1000;
+				mono += 1000;
+				f.action.onPollerTick(live);
+				assert.equal(f.writes.length, 0, `${jump}: nothing moves 1 s in`);
+				wall += 5000;
+				mono += 5000;
+				f.action.onPollerTick(live);
+				assert.deepEqual(f.writes.map((w) => w.readingKey), [fan.key], `${jump}: one move once 5 s have passed`);
+			} finally {
+				dateNow.mock.restore();
+				perfNow.mock.restore();
+				getStatus.mock.restore();
 			}
 		}
 	});

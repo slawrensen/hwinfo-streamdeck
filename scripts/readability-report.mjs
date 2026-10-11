@@ -64,7 +64,7 @@ await sheet("keys-72", 72, 72, rows.map(([name]) => name), (theme, row) => compo
 const dialRows = ["Single warning", "Single critical", "Overview", "Selected two-row", "Dim two-row"];
 await sheet("dials-200", 200, 100, dialRows, (theme, row) => composeDialSvg({
 	settings: { readingKey: readings[0].key, theme, rotationKeys: readings.map((reading) => reading.key), dialView: row < 2 ? "single" : row === 2 ? "overview" : "tworow", warnValue: row === 4 ? "200" : "50", critValue: row === 1 ? "55" : "70", alertUnit: "°C", textMode: row === 4 ? "dim" : "theme" },
-	stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false, rowSeries: new Set()
+	stats: new SessionStatsStore(), statMode: "current", lastFeedback: "", nextCycleAt: null, cyclePaused: false, pinned: false, gesture: IDLE_GESTURE, overlay: null, overlayTimer: null, deviceId: "fixture", pendingAlertUnitStamp: false
 }, status));
 
 const matrix = themes.map((theme) => {

@@ -27,6 +27,84 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-10-11: the 1.7.0.0 soak closed clean
+
+`node scripts/soak-monitor.mjs --summary release/soak-1.7.0.0-d26-20261010-1220.csv`.
+The subject was the installed 1.7.0.0 candidate under a day of desk
+use, sampled from outside the process once a minute. Its
+`bin/plugin.js` (`c35a5224…`) is the one the candidate pack
+(`0315f978…`, 380,443 B) carries. Two settings-panel updates landed
+inside the window (panel builds 1.7.0.0-d27 and -d28, at
+2026-10-10T20:01Z and 20:15Z) as file copies with the plugin running,
+so one PID carried the whole window, and the install now matches that
+pack file for file.
+
+| Soak | Value |
+| --- | ---: |
+| Window | 2026-10-10T19:20:07Z to 2026-10-11T19:21:00Z (24.0 h, 1443 samples) |
+| RSS slope, longest same-PID run (1443 samples, PID 3192) | +0.01 MB/30 min |
+| Private bytes slope, same run | +0.02 MB/30 min |
+| RSS, start to close | 51.2 MB to 50.9 MB (min 45.2, max 53.1) |
+| Handles | 191 to 191 (max 191) |
+| Avg CPU, same run | 0.21% |
+| Stream Deck restarts | 0 |
+| Plugin restarts / HWiNFO-absent samples | 0 / 0 |
+| New log WARN / ERROR lines | 0 / 0 |
+| Sampling gaps over 90 s | 0 |
+
+Both slopes sit far inside the 1 MB/30 min gate. A local test run
+started a second `plugin.js` for two samples (2026-10-10T19:35Z and
+19:36Z); the sampler stayed on PID 3192 throughout.
+
+No HWiNFO restart, Stream Deck restart or sleep/wake fell inside this
+window, so a follow-up window on the same installed bytes
+(`release/soak-1.7.0.0-d28-20261011-1236.csv`, 2026-10-11T19:36Z to
+19:51Z) took all three at the desk:
+
+- **Stream Deck restart**, 19:44:47Z: plugin PID 3192 to 89788, and
+  the new plugin opened shared memory in its first second.
+- **HWiNFO restart**: HWiNFO quit at 19:45:04Z. The plugin held values
+  for 13 s, then logged HWiNFO as not running. HWiNFO started again at
+  19:45:20Z, and the plugin logged one busy-mutex WARN while it came up.
+  It reopened 8 s after HWiNFO returned and took HWiNFO's startup layout
+  growth in place.
+- **Sleep**: S3 from 19:46:39Z for about two minutes (a 176 s sampling
+  gap). PID 89788 kept running and logged no WARN or ERROR after resume.
+
+The window's two WARN lines are the two HWiNFO-restart states above;
+it logged zero ERROR. Rows 11 to 13 of `native/hwsm/TESTING.md` cite
+this run.
+
+### 2026-09-24: settings-panel reading picker without a row cap (1.7.0.0 candidate)
+
+Harness: `npx tsx scripts/pi-lab.mjs perf <out.json>`, a headless Chromium
+on Linux x64 (Node 22) driving the shipped `sensor-reading.html` against
+the simulated Stream Deck host (`scripts/lib/pi-sim.mjs`) with generated
+trees of 0, 1, 500 and 5,000 readings, the saved reading placed near the
+end. Each run: 3 warm-up queries, then 11 timed queries, each measured
+from the input event to the next frame (so ~16.7 ms, one frame, is the
+floor); 3 runs per size. Not the Stream Deck app's webview and not live
+HWiNFO; the embedded-host timing is a remaining gate.
+
+| Readings | main 2ca44e9 p50 / p95 | rows rendered | candidate p50 / p95 | rows rendered | saved reading visible on open (main / candidate) | open, worst (candidate) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 16.8 / 17.3 ms | 0 | 16.8 / 17.2 ms | 0 | n/a | 4.4 ms |
+| 1 | 16.6 / 18.0 ms | 1 | 16.8 / 17.7 ms | 1 | yes / yes | 8.2 ms |
+| 500 | 15.3 / 21.2 ms | 150 | 16.9 / 21.8 ms | 500 | no / yes | 18.4 ms |
+| 5,000 | 20.5 / 28.6 ms | 150 | 17.1 / 26.7 ms | 5,000 | no / yes | 62.6 ms |
+
+The 150-row cap is gone at the same filtering cost: the list is built
+once per sensor tree and filtered in place by toggling `hidden`, and
+groups off screen skip layout (`content-visibility: auto` with a
+per-group size estimate). The target was p95 ≤ 100 ms per query; the
+worst open (building 5,000 rows) is 62.6 ms. With no settings panel
+visible the plugin builds no preview at all. I keep the raw samples
+with my private review records.
+
+The baseline is 1.6.0.0. The 1.7 line lifted the cap on its own before
+this picker was merged into it; that intermediate picker was not
+measured, and the combined release ships the one measured here.
+
 ### 2026-09-20: what a Gadget scan costs as the selection grows
 
 Harnesses: `node --import tsx scripts/gadget-scan-benchmark.mjs` on a

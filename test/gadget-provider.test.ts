@@ -1220,7 +1220,7 @@ describe("integrity: a doubled Gadget name is withheld only while it stands", { 
 			const lines = first.notices();
 			assert.equal(lines.length, 1);
 			assert.match(lines[0] ?? "", /slots 1 and 2/);
-			assert.match(lines[0] ?? "", /GPU \[#0\]: Example GPU \/ GPU Fan1/);
+			assert.match(lines[0] ?? "", /"GPU \[#0\]: Example GPU" \/ "GPU Fan1"/);
 			assert.match(lines[0] ?? "", /[Uu]ntick or relabel one/);
 			readVerified(first);
 			assert.deepEqual(first.notices(), [], "said once while the pair stands");
@@ -1892,4 +1892,42 @@ describe("integrity: a Yes/No reading's flip is value evidence", { skip: !onWind
 			provider.close();
 		}
 	});
+});
+
+// A notice quotes HWiNFO's text: a sensor or label holding a line break
+// cannot start what reads as a separate log entry (external review AX50).
+describe("integrity: a Gadget notice stays one log line", { skip: !onWindows ? "win32-x64 only" : false }, () => {
+	const FORGED = "\n2026-09-27T00:00:00.000Z ERROR forged\r";
+	function fed(rows: Record<string, string>): ReturnType<typeof GadgetRegistryProvider.open> {
+		shape([0]);
+		const provider = GadgetRegistryProvider.open();
+		const nativeKey = Reflect.get(provider, "key") as HwsmGadgetKey;
+		Reflect.set(provider, "key", { queryString: (name: string) => rows[name] ?? null, close: () => nativeKey.close() });
+		return provider;
+	}
+	const noticesAfter = (provider: ReturnType<typeof GadgetRegistryProvider.open>): string[] => {
+		provider.notices();
+		const lines: string[] = [];
+		for (let scan = 0; scan < 4; scan++) {
+			provider.read();
+			lines.push(...provider.notices());
+		}
+		return lines;
+	};
+	for (const [what, rows, text] of [
+		["a contradiction", { Sensor0: `CPU${FORGED}`, Label0: `Temp "one"${FORGED}`, Value0: "100 °C", ValueRaw0: "40" }, `Temp "one"${FORGED}`],
+		["a doubled name", { Sensor0: `CPU${FORGED}`, Label0: "T", Value0: "40 °C", ValueRaw0: "40", Sensor1: `CPU${FORGED}`, Label1: "T", Value1: "41 °C", ValueRaw1: "41" }, `CPU${FORGED}`]
+	] as const) {
+		test(`${what}: the notice keeps the text, escaped, on one line`, () => {
+			const provider = fed(rows);
+			try {
+				const lines = noticesAfter(provider);
+				assert.equal(lines.length, 1, JSON.stringify(lines));
+				assert.doesNotMatch(lines[0] ?? "", /[\r\n]/);
+				assert.ok(lines[0]?.includes(JSON.stringify(text)), lines[0]);
+			} finally {
+				provider.close();
+			}
+		});
+	}
 });

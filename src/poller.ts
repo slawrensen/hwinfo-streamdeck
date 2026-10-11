@@ -145,6 +145,13 @@ class HwinfoPoller extends EventEmitter {
 		return this.status;
 	}
 
+	/** True while a transient failure is being ridden out on the last
+	 * values (the status still reads as it did before the failure). Read by
+	 * the settings panel only, so it never calls held values live. */
+	isHolding(): boolean {
+		return this.holdingSince !== 0;
+	}
+
 	/**
 	 * Adopts the deck's explicit cross-provider pairs. The list is compared
 	 * by meaning (readingLinksSignature), so re-applying or reordering the

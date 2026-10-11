@@ -65,8 +65,15 @@ describe("the dial color panel capture matches its recorded provenance", () => {
 	// holds the PNG's hash and the hashes of the panel sources it was taken
 	// from; bin/plugin.js is recorded too but not held here, because every
 	// bundle rebuild changes it while the panel it feeds does not.
-	type Capture = { file: string; sha256: string; sourceSha256: Record<string, string> };
+	type Capture = { evidence: { build: string }; file: string; sha256: string; sourceSha256: Record<string, string> };
 	const capture = JSON.parse(fs.readFileSync(path.join(IMG, "pi-dial-reading-colors-1.7.provenance.json"), "utf8")) as Capture;
+
+	// A retake left its caption naming an older build (external review AX71).
+	it("its caption names the captured panel build", () => {
+		const page = fs.readFileSync(path.join(ROOT, "docs", "sensor-dial.md"), "utf8");
+		const named = [...page.matchAll(/panel build (\d+(?:\.\d+){3}-[a-z]*\d+)(?![\w-])/g)].map((match) => match[1]);
+		assert.deepEqual(named, [capture.evidence.build], "docs/sensor-dial.md names the build in the capture record, once");
+	});
 
 	it("the committed PNG is the recorded capture", () => {
 		assert.equal(sha256(fs.readFileSync(path.join(IMG, capture.file))), capture.sha256, capture.file);

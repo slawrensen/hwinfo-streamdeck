@@ -80,8 +80,8 @@
 		}
 	},
 	"alertValues": {
-		"warn": "#E8A43C",
-		"crit": "#FF7568"
+		"warn": "#E8940D",
+		"crit": "#FF3B30"
 	},
 	"typeAccents": {
 		"temperature": "#FF7E8E",

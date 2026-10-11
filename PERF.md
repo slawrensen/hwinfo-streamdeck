@@ -57,18 +57,23 @@ started a second `plugin.js` for two samples (2026-10-10T19:35Z and
 19:36Z); the sampler stayed on PID 3192 throughout.
 
 No HWiNFO restart, Stream Deck restart or sleep/wake fell inside this
-window. `src/poller.ts`, `src/hwinfo/` and `native/` are unchanged
-since 2026-09-27, and two earlier soaks of that same source covered all
-three. `release/soak-1.7.0.0-d16-20260928-0144.csv` holds a HWiNFO
-restart (HWiNFO absent 2026-09-28T21:51Z to 21:54Z, plugin PID kept,
-one WARN) and a Stream Deck restart at 2026-09-29T14:17Z.
-`release/soak-1.7.0.0-d19-20260930-2227.csv` holds a Stream Deck
-restart at 2026-10-02T05:00Z and one 36 s sleep (Windows logs
-19:39:04Z to 19:39:40Z; plugin PID 49804 kept, zero WARN, zero ERROR).
-The plugin was back within a minute of both app restarts. The sleep
-was shorter than the sampling interval, so it left no gap in the CSV,
-and the WARN line from the HWiNFO restart has rotated out of the
-plugin log.
+window, so a follow-up window on the same installed bytes
+(`release/soak-1.7.0.0-d28-20261011-1236.csv`, 2026-10-11T19:36Z to
+19:51Z) took all three at the desk:
+
+- **Stream Deck restart**, 19:44:47Z: plugin PID 3192 to 89788, and
+  the new plugin opened shared memory in its first second.
+- **HWiNFO restart**: HWiNFO quit at 19:45:04Z. The plugin held values
+  for 13 s, then logged HWiNFO as not running. HWiNFO started again at
+  19:45:20Z, and the plugin logged one busy-mutex WARN while it came up.
+  It reopened 8 s after HWiNFO returned and took HWiNFO's startup layout
+  growth in place.
+- **Sleep**: S3 from 19:46:39Z for about two minutes (a 176 s sampling
+  gap). PID 89788 kept running and logged no WARN or ERROR after resume.
+
+The window's two WARN lines are the two HWiNFO-restart states above;
+it logged zero ERROR. Rows 11 to 13 of `native/hwsm/TESTING.md` cite
+this run.
 
 ### 2026-09-24: settings-panel reading picker without a row cap (1.7.0.0 candidate)
 

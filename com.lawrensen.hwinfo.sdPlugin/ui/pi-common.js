@@ -1238,12 +1238,29 @@
 	let detailKeyRaw = new Map();
 	// This key's own sensor: the runtime shows it on the Back tile and
 	// filters it out of the list, so the panel must refuse to add it and
-	// must park an adopted copy (hand-edited, or the opener re-picked onto
-	// a listed sensor) outside the tile walk instead of dressing chips the
-	// deck will not list. Followed via followSetting at init: the primary
-	// picker's own re-pick is never echoed back, so a subscription alone
-	// goes stale the moment the user re-picks in this very panel.
+	// must park an adopted copy (hand-edited, a link, or the opener
+	// re-picked onto a listed sensor) instead of dressing a chip the deck
+	// will not list. Under the 1.7.0 walk it is outside the tile walk;
+	// under version 2 it keeps a hidden cell there (detailWalkEvery).
+	// Followed via followSetting at init: the primary picker's own re-pick
+	// is never echoed back, so a subscription alone goes stale the moment
+	// the user re-picks in this very panel.
 	let detailPrimaryKey = "";
+	// The stored plan's walk (detailTilesVersion): true gives every listed
+	// key a cell, the opener's own reading included (hidden in place), as
+	// customKeys in detail-group.ts does; false is the 1.7.0 walk, which
+	// skips every key naming the opener's reading.
+	let detailWalkEvery = false;
+	// Each listed spelling of the opener's reading that holds a hidden cell
+	// in the current source plan: { spec, cell, whole }, whole when that
+	// cell is already a one-cell tile leading the list (the version 2
+	// normal form). The next write dresses its leading tile, or puts the
+	// cell back in place, from here: the plan as last read or written, so a
+	// label set in this session is kept.
+	let detailHiddenCells = new Map();
+	// A hidden opener cell has a listed reading after it inside the plan,
+	// so the next edit moves it to the front (the note says so).
+	let detailPrimaryMoves = false;
 	const detailBinding = detailListEl === null ? null : useSettings("detailKeys", adoptDetailKeys, null);
 	// The hand-grouped tile plan (detailTiles) and the uniform density it
 	// falls back to past its end. The plan is POSITIONAL: sizes stay put
@@ -1274,6 +1291,7 @@
 	// frame. Two staggered frames leave a window where only one half of a
 	// list edit survives (a torn pair is exactly the restaffed-quad bug).
 	const detailTilesStage = detailListEl === null ? null : useSettings("detailTiles", undefined, null, false);
+	const detailVersionStage = detailListEl === null ? null : useSettings("detailTilesVersion", undefined, null, false);
 
 	// Entries past the parser's cap, kept exactly as stored behind every write.
 	let detailTilesKept = [];
@@ -1420,7 +1438,9 @@
 
 	/** Whether a key is the opener's own reading, by the key itself or by
 	 * an alias of it: the runtime shows that reading on the Back tile and
-	 * filters every key resolving to it out of the list (detail-group.ts). */
+	 * filters every key resolving to it out of the list (detail-group.ts).
+	 * A version 2 plan still gives it a cell, hidden in place; the visible
+	 * walk, cell indices and the note never count it. */
 	function isDetailPrimary(key) {
 		return detailPrimaryKey !== "" && sameReading(key, detailPrimaryKey);
 	}
@@ -1439,10 +1459,179 @@
 		return detailKeys.filter((k) => !isDetailPrimary(k));
 	}
 
-	/** Mirror projectDetailTiles and customKeys in detail-group.ts. Keep
-	 * saved source copies so a tree/link update is read-only and unlinking
-	 * restores the authored layout. Only an explicit detail edit commits
-	 * the visible projection through writeDetailState. */
+	/** The keys the STORED plan's cells walk over (customKeys' sourceKeys):
+	 * every key under version 2, the list minus the opener's reading under
+	 * the 1.7.0 walk. */
+	function walkKeysOf(keys) {
+		return detailWalkEvery ? keys : keys.filter((k) => !isDetailPrimary(k));
+	}
+
+	/** The one-cell tile an opener's reading leads the list in, or goes
+	 * back to in place: its own stored tile when it already had one (the
+	 * normal form, or a one-cell tile anywhere), else a fresh tile wearing
+	 * the label, color and automatic flag of the cell it held in the
+	 * current source plan, neutral when it held none. */
+	function hiddenCellTile(key) {
+		const at = detailHiddenCells.get(key);
+		if (at?.spec.size === 1) return at.spec;
+		const spec = at?.spec;
+		const i = at?.cell ?? 0;
+		return { size: 1, labels: [spec?.labels[i] ?? ""], colors: [spec?.colors[i] ?? null], automaticColors: [spec?.automaticColors[i] === true], cellLabels: true };
+	}
+
+	/** Whether a hidden cell's tile wears nothing a write must keep: never
+	 * stored, no label, no color, and no stored cell entry this build would
+	 * not restate. */
+	function neutralHiddenTile(tile, key) {
+		return tile.raw === undefined && tile.labels[0] === "" && tile.colors[0] === null && !cellCarriesData(key);
+	}
+
+	/** Where a write that saves the shown layout puts each listed spelling
+	 * of the opener's reading. One with a listed reading after it inside
+	 * the plan leads the list in a one-cell tile of its own, wearing the
+	 * label and color of the cell it held, so no visible cell moves now or
+	 * when a link or the opener's pick changes later (one already in that
+	 * normal form keeps it). Every other one keeps its place, since no
+	 * visible cell follows it in the plan: the hidden cell it held goes
+	 * back where it walks (placeHiddenCell), and one that held none gets a
+	 * cell there (under the 1.7.0 walk the very cell 1.7.0 gives it, so no
+	 * stored size changes; under version 2 one added to the tile an edit
+	 * grew over it), or none past the plan. Returns the leading keys, the
+	 * order to store, and a copy of the plan with the kept cells in place,
+	 * each cell's key beside it, so the note and the write follow one rule. */
+	function planDetailWrite() {
+		const listed = listedDetailKeys();
+		const tiles = cloneTiles(detailTiles);
+		const cellKeys = [];
+		let cells = 0;
+		for (const tile of tiles) {
+			cellKeys.push(Array.from({ length: tile.size }, (_, i) => listed[cells + i]));
+			cells += tile.size;
+		}
+		const inside = Math.min(cells, listed.length);
+		const leading = [];
+		const owned = [];
+		let keeps = false;
+		let listedBefore = 0;
+		let staying = 0;
+		let past = false;
+		// 1.7.0 never walks the opener's own key, so on its plan that key
+		// walks after the last alias of it listed later: once the link goes,
+		// the alias still takes the cell 1.7.0 gives it.
+		let order = detailKeys;
+		if (!detailWalkEvery) {
+			const at = detailKeys.indexOf(detailPrimaryKey);
+			const lastAlias = detailKeys.reduce((last, key, i) => (key !== detailPrimaryKey && isDetailPrimary(key) ? i : last), -1);
+			if (at >= 0 && lastAlias > at) {
+				order = [...detailKeys];
+				order.splice(at, 1);
+				order.splice(lastAlias, 0, detailPrimaryKey);
+			}
+		}
+		for (const key of order) {
+			if (!isDetailPrimary(key)) {
+				listedBefore++;
+				continue;
+			}
+			const at = detailHiddenCells.get(key);
+			const tile = hiddenCellTile(key);
+			const neutral = neutralHiddenTile(tile, key);
+			const p = listedBefore + staying;
+			if (!neutral && !past) {
+				// A hidden cell wearing something that the edit left past the
+				// plan's end (a cleared tile before it pruned away) keeps its
+				// place: the fill tiles before it come back as default tiles.
+				// (Inside the plan this adds nothing.)
+				for (let end = tiles.reduce((sum, t) => sum + t.size, 0); end < p; end += detailUniform) {
+					tiles.push({ size: detailUniform, labels: Array.from({ length: detailUniform }, () => ""), colors: Array.from({ length: detailUniform }, () => null), cellLabels: true, automaticColors: Array.from({ length: detailUniform }, () => false) });
+					cellKeys.push(Array.from({ length: detailUniform }, (_, i) => listed[end - staying + i]));
+				}
+			}
+			const placed = listedBefore < inside ? "lead" : placeHiddenCell(tiles, cellKeys, key, p, at, tile, neutral, owned);
+			keeps ||= !neutral;
+			if (placed === "lead") leading.push(key);
+			else staying++;
+			past ||= placed === "past";
+		}
+		return { leading, tiles, cellKeys, owned, order, planned: detailTiles.length > 0 || keeps };
+	}
+
+	/** Puts the cell of the opener's reading `key`, which walks to plan
+	 * position `p` with no listed reading after it inside the plan, into
+	 * `tiles`: "cell" when it holds a cell there, "past" when it holds none
+	 * past the plan and wears nothing, "lead" when staying would lose what
+	 * it wears or hand it a cell that is not its own. A hidden cell goes
+	 * back where it walks, into the tile it came from (`origin`, set by
+	 * projectDetailState) or a tile of its own, so unlinking or picking
+	 * back shows its tile as it was. */
+	function placeHiddenCell(tiles, cellKeys, key, p, at, tile, neutral, owned) {
+		let head = 0;
+		let t = 0;
+		while (t < tiles.length && head + tiles[t].size <= p) head += tiles[t++].size;
+		const end = t === tiles.length;
+		const i = p - head;
+		const room = !end && tiles[t].size < 4;
+		if (at === undefined) {
+			// No hidden cell: the 1.7.0 walk gives it none, and under version 2
+			// it sat past the stored plan. Under the 1.7.0 walk the unfilled
+			// cell it walks to is its own, as 1.7.0 shows it there once the
+			// link goes or the pick goes back: it takes that cell, with
+			// whatever is stored there, so every stored size stays the one
+			// 1.7.0 keeps and the tile shows one reading fewer while it is
+			// hidden. Under version 2 an edit grew a tile over it: a cell of
+			// its own goes in there, so the tile keeps the size picked for the
+			// readings shown (with no room left, it leads).
+			if (!neutral) return "lead";
+			if (end) return "past";
+			if (!detailWalkEvery) {
+				cellKeys[t][i] = key;
+				const dormant = tiles[t].dormantCells?.[i];
+				if (dormant !== undefined) {
+					owned.push([key, dormant]);
+					tiles[t].dormantCells[i] = undefined;
+				}
+				return "cell";
+			}
+			return room ? insertHiddenCell(tiles, cellKeys, t, i, key, tile) : "lead";
+		}
+		if (end && i > 0) return neutral ? "past" : "lead";
+		// Inside a tile (the unfilled end of one an edit left or grew), it
+		// goes back in while the tile has room.
+		if (i > 0) return room ? insertHiddenCell(tiles, cellKeys, t, i, key, tile) : "lead";
+		// At a tile boundary: back into the tile its cell came from, after
+		// the cells before it or before the cells after it, else a tile of
+		// its own (its stored one when it had one).
+		if (t > 0 && tiles[t - 1].origin === at.spec && tiles[t - 1].size < 4) return insertHiddenCell(tiles, cellKeys, t - 1, tiles[t - 1].size, key, tile);
+		if (room && tiles[t].origin === at.spec) return insertHiddenCell(tiles, cellKeys, t, 0, key, tile);
+		// The tile of its own stands in for the stored tile its cell came
+		// from, so the next spelling from that tile joins it, as it was
+		// stored. A stored tile whose every cell held a spelling of the
+		// opener's reading (so none of it showed) comes back as that tile,
+		// stored entry and all: a write rewrites nothing in it, or, when the
+		// edit removed one of those spellings, only what a removal rewrites.
+		let own = tile;
+		if (own !== at.spec) {
+			if ([...detailHiddenCells.values()].filter((held) => held.spec === at.spec).length === at.spec.size) own = subsetTile(at.spec, [at.cell]);
+			else own.origin = at.spec;
+		}
+		tiles.splice(t, 0, own);
+		cellKeys.splice(t, 0, [key]);
+		return "cell";
+	}
+
+	/** One hidden cell back into tile `t` at cell `i`, its stored entries
+	 * and the stored lists' ends moving with the cells after it. */
+	function insertHiddenCell(tiles, cellKeys, t, i, key, cell) {
+		const tile = tiles[t];
+		spliceStored(tile, i, 1);
+		tile.size += 1;
+		tile.labels.splice(i, 0, cell.labels[0]);
+		tile.colors.splice(i, 0, cell.colors[0]);
+		tile.automaticColors.splice(i, 0, cell.automaticColors[0]);
+		cellKeys[t].splice(i, 0, key);
+		return "cell";
+	}
+
 	/** What this build parses from one stored cell entry. */
 	function cellParsed(tile, field, i) {
 		return field === "automaticColors" ? tile.automaticColors[i] === true : tile[field][i];
@@ -1450,7 +1639,7 @@
 
 	function captureDetailCells() {
 		detailCellRaw = new Map();
-		const listed = detailSourceKeys.filter((k) => !isDetailPrimary(k));
+		const listed = walkKeysOf(detailSourceKeys);
 		let head = 0;
 		for (const tile of detailSourceTiles) {
 			// Cells no reading fills as stored are dormant, and so are entries
@@ -1485,9 +1674,27 @@
 		return entry !== undefined && CELL_FIELDS.some((field) => entry[field] !== undefined && entry[field].raw !== entry[field].parsed);
 	}
 
+	/** The cells `cells` (indices, in order) of source tile `spec`, keeping
+	 * its stored entry (raw, base), the stored entries of the cells past its
+	 * end and the stored lists' ends, so a write rewrites only what changed
+	 * in it. `origin` names the tile it came from. */
+	function subsetTile(spec, cells) {
+		return { origin: spec, size: cells.length, labels: cells.map((i) => spec.labels[i]), colors: cells.map((i) => spec.colors[i]), cellLabels: spec.cellLabels, automaticColors: cells.map((i) => spec.automaticColors[i]), raw: spec.raw, base: spec.base, dormantCells: [...cells.map((i) => spec.dormantCells?.[i]), ...(spec.dormantCells?.slice(spec.size) ?? [])], storedLengths: spec.storedLengths === undefined ? undefined : Object.fromEntries(CELL_FIELDS.map((field) => [field, spec.storedLengths[field] - Array.from({ length: spec.size }, (_, i) => i).filter((i) => !cells.includes(i) && i < spec.storedLengths[field]).length])) };
+	}
+
+	/** Mirror projectDetailTiles and customKeys in detail-group.ts: the
+	 * stored plan walks detailSourceKeys (every key under version 2, the
+	 * list minus the opener's reading under the 1.7.0 walk), and a cell
+	 * whose key is a hidden linked duplicate, or under version 2 the
+	 * opener's own reading, drops out of its tile in place. Keep saved
+	 * source copies so a tree, link or pick update is read-only and
+	 * unlinking restores the authored layout. Only an explicit detail edit
+	 * commits the visible projection through writeDetailState. */
 	function projectDetailState() {
 		if (detailFromStorage) captureDetailCells();
 		const before = JSON.stringify([detailKeys, detailTiles.map((t) => t.size)]);
+		detailHiddenCells = new Map();
+		const walk = walkKeysOf(detailSourceKeys);
 		const source = detailSourceKeys.filter((k) => !isDetailPrimary(k));
 		const seen = new Set();
 		const kept = new Set(source.filter((key) => {
@@ -1499,14 +1706,31 @@
 		detailDuplicatesHidden = kept.size !== source.length;
 		detailKeys = detailSourceKeys.filter((key) => isDetailPrimary(key) || kept.has(key));
 		detailTiles = cloneTiles(detailSourceTiles);
-		if (detailDuplicatesHidden) {
+		// A version 2 opener cell is in its normal form when it is a one-cell
+		// tile in the run of opener keys leading the list: an edit keeps it
+		// there as stored.
+		const firstListed = detailSourceKeys.findIndex((k) => !isDetailPrimary(k));
+		const leadEnd = firstListed < 0 ? detailSourceKeys.length : firstListed;
+		const normal = (j) => j < leadEnd && detailSourceTiles.slice(0, j + 1).every((t) => t.size === 1);
+		if (walk.some((key) => !kept.has(key))) {
 			let head = 0;
 			detailTiles = detailTiles.flatMap((spec) => {
-				const cells = Array.from({ length: spec.size }, (_, i) => i).filter((i) => source[head + i] === undefined || kept.has(source[head + i]));
+				const cells = Array.from({ length: spec.size }, (_, i) => i).filter((i) => walk[head + i] === undefined || kept.has(walk[head + i]));
+				if (detailWalkEvery) {
+					for (let i = 0; i < spec.size; i++) {
+						const key = walk[head + i];
+						if (key !== undefined && isDetailPrimary(key)) detailHiddenCells.set(key, { spec, cell: i, whole: spec.size === 1 && normal(head) });
+					}
+				}
 				head += spec.size;
-				return cells.length === 0 ? [] : [{ size: cells.length, labels: cells.map((i) => spec.labels[i]), colors: cells.map((i) => spec.colors[i]), cellLabels: spec.cellLabels, automaticColors: cells.map((i) => spec.automaticColors[i]), raw: spec.raw, base: spec.base, dormantCells: [...cells.map((i) => spec.dormantCells?.[i]), ...(spec.dormantCells?.slice(spec.size) ?? [])], storedLengths: spec.storedLengths === undefined ? undefined : Object.fromEntries(CELL_FIELDS.map((field) => [field, spec.storedLengths[field] - Array.from({ length: spec.size }, (_, i) => i).filter((i) => !cells.includes(i) && i < spec.storedLengths[field]).length])) }];
+				return cells.length === 0 ? [] : [subsetTile(spec, cells)];
 			});
 		}
+		// The note forecasts an edit that keeps the shown sizes, by the rule
+		// the write applies (planDetailWrite): a key naming the opener's
+		// reading, not already in its normal form, that the write leads the
+		// list with. Only a version 2 plan keeps such a cell hidden in place.
+		detailPrimaryMoves = detailWalkEvery && planDetailWrite().leading.some((key) => !detailHiddenCells.get(key)?.whole);
 		if (before !== JSON.stringify([detailKeys, detailTiles.map((t) => t.size)])) {
 			// Numeric tile targets cannot survive a changed projection. A
 			// held press can keep its old DOM until mouseup; reject that
@@ -1565,7 +1789,7 @@
 	/** One deep copy of a tile plan: materialization and the staged write
 	 * both need one, and the model must never be mutated in place. */
 	function cloneTiles(tiles) {
-		return tiles.map((t) => ({ size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base, dormantCells: t.dormantCells?.slice(), storedLengths: t.storedLengths === undefined ? undefined : { ...t.storedLengths } }));
+		return tiles.map((t) => ({ origin: t.origin, size: t.size, labels: [...t.labels], colors: [...t.colors], cellLabels: t.cellLabels, automaticColors: [...t.automaticColors], raw: t.raw, base: t.base, dormantCells: t.dormantCells?.slice(), storedLengths: t.storedLengths === undefined ? undefined : { ...t.storedLengths } }));
 	}
 
 	/** A structural edit at `cell` of a tile: a removal (delta -1) or an
@@ -1589,7 +1813,7 @@
 	function occupancySpec(tile, occupied) {
 		const spec = tile.spec !== null ? tile.spec : { size: tile.size, labels: Array.from({ length: tile.size }, () => ""), colors: Array.from({ length: tile.size }, () => null), cellLabels: true };
 		const size = Math.min(spec.size, occupied);
-		return { size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base, dormantCells: spec.dormantCells?.slice(), storedLengths: spec.storedLengths === undefined ? undefined : { ...spec.storedLengths } };
+		return { origin: spec.origin, size, labels: spec.labels.slice(0, size), colors: spec.colors.slice(0, size), cellLabels: spec.cellLabels, automaticColors: Array.from({ length: size }, (_, i) => spec.automaticColors?.[i] === true), raw: spec.raw, base: spec.base, dormantCells: spec.dormantCells?.slice(), storedLengths: spec.storedLengths === undefined ? undefined : { ...spec.storedLengths } };
 	}
 
 	/** Extends the plan with default entries (at the uniform fill size,
@@ -1660,22 +1884,55 @@
 			}
 			at += tile.size;
 		}
+		// Version 2: while a plan exists, every key naming the opener's
+		// reading holds a cell in it, hidden on the deck (planDetailWrite).
+		// One with a listed reading after it inside the plan leads the list in
+		// a one-cell tile of its own, wearing the label and color of the cell
+		// it held, so no visible cell moves now or when a link or the opener's
+		// pick changes later. One with none after it keeps its place and,
+		// while the plan has room for it, its cell, as 1.7.0 kept it:
+		// unlinking or picking back shows that reading where it was, in the
+		// tile it held. On a plan saved by 1.7.0 that cell is the one 1.7.0
+		// gives it, so every stored size stays the one 1.7.0 keeps. A flat
+		// list whose hidden keys wear nothing stays as it is, unmarked and in
+		// its own order.
+		const plan = planDetailWrite();
+		const { leading, planned } = plan;
+		const hidden = leading.map(hiddenCellTile);
+		if (planned) {
+			detailKeys = [...leading, ...plan.order.filter((key) => !leading.includes(key))];
+			detailWalkEvery = true;
+			// A kept key taking an unfilled cell owns that cell's stored entry.
+			for (const [key, entry] of plan.owned) detailCellRaw.set(key, entry);
+		}
+		const written = planned ? plan.tiles : detailTiles;
 		// An explicit edit accepts the shown layout. Update both source
-		// copies before publishing so a later tree cannot resurrect it.
+		// copies before publishing so a later tree cannot resurrect it, then
+		// read them back the way the deck walks them: every hidden cell drops
+		// out of the shown plan again, where the next write finds it.
 		detailSourceKeys = [...detailKeys];
-		detailSourceTiles = cloneTiles(detailTiles);
+		detailSourceTiles = cloneTiles(planned ? [...hidden, ...written] : written);
 		detailDuplicatesHidden = false;
 		detailFromStorage = false;
+		projectDetailState();
 		// An edit can shorten the walk out from under a standing aim (a
 		// shrink consuming the last tile, a size cycle swallowing the
 		// fill) or grow the aimed tile past what any marker paints.
 		revalidateDetailAim();
 		let head = 0;
-		const serialized = detailTiles.map((tile) => {
-			const keys = listed.slice(head, head + tile.size);
+		const serialized = written.map((tile, t) => {
+			const keys = planned ? plan.cellKeys[t] : listed.slice(head, head + tile.size);
 			head += tile.size;
+			// A hidden cell in a tile of its own that wears nothing.
+			if (tile.raw === undefined && keys.length === 1 && isDetailPrimary(keys[0]) && neutralHiddenTile(tile, keys[0])) return { size: 1 };
 			return serializeTile(tile, keys);
 		});
+		// The marker and the tiles are staged, then detailKeys is saved: one
+		// frame carries all three.
+		if (planned) {
+			serialized.unshift(...hidden.map((tile, i) => (neutralHiddenTile(tile, leading[i]) ? { size: 1 } : serializeTile(tile, [leading[i]]))));
+			detailVersionStage[1](2);
+		}
 		detailTilesStage[1]([...serialized, ...detailTilesKept]);
 		detailBinding[1](model.mergeKept(detailKeys.map((key) => detailKeyRaw.get(key) ?? key), detailKeysKept, detailKeysKeptAt));
 		// A person's edit: its note (the count, the cap) is spoken, like the
@@ -1782,6 +2039,19 @@
 		revalidateDetailAim();
 		renderDetailList();
 		detailPicker?.renderList(); // membership ticks follow external writes too
+	}
+
+	/** The stored plan's walk follows its marker. A Reading pick never
+	 * writes one: an unmarked plan cannot say which walk saved it, so a
+	 * pick leaves it as stored (picking back shows it as saved), and only
+	 * an explicit list or tile edit stores the version 2 form. */
+	function adoptDetailVersion(value) {
+		const next = value === 2 || value === "2";
+		if (next === detailWalkEvery) return;
+		detailWalkEvery = next;
+		projectDetailState();
+		revalidateDetailAim();
+		renderDetailList();
 	}
 
 	function adoptDetailPrimary(value) {
@@ -2177,8 +2447,11 @@
 	/** Drag reorder: move `key` so it sits at LISTED position `to` (the
 	 * indices the chips render at). The parked primary is itself never
 	 * movable (listed index -1); a move crossing it may shift its raw
-	 * detailKeys slot by one, which nothing observes (the runtime
-	 * filters it out wherever it sits, the panel parks it first). Tile
+	 * detailKeys slot by one, which the write normalizes (a plan's write
+	 * leads the list with it in its own hidden tile when a listed reading
+	 * after that slot falls inside the plan, and otherwise keeps it in
+	 * place with its cell; a flat list has no cells to shift, and the
+	 * panel parks it first). Tile
 	 * sizes never change here, but a cell's label and color belong to
 	 * the CHIP in it, so the dressing rides the same splice the keys do,
 	 * through in-tile reorders and boundary-crossing walks alike. */
@@ -2512,11 +2785,15 @@
 	}
 
 	/** The adopted primary's chip, parked in its own holder OUTSIDE the
-	 * tile flow: the deck shows this reading on the Back tile and builds
-	 * the tiles over the list WITHOUT it, so it may not occupy a cell,
-	 * shift any dressing or count in the note. Remove works (no tile
+	 * tile flow: the deck shows this reading on the Back tile and never
+	 * shows a cell for it, so it may not occupy a visible cell, shift any
+	 * dressing or count in the note. Under the 1.7.0 walk it has no cell;
+	 * under version 2 it holds a hidden cell, which the next write leads
+	 * the list with in a one-cell tile wearing that cell's label and color
+	 * when a listed reading after it falls inside the plan, and otherwise
+	 * keeps its place and that cell (planDetailWrite). Remove works (no visible tile
 	 * shrinks; see removeDetailKey); rename stays refused and reorder,
-	 * overrides and colors do not apply (it has no cell). */
+	 * overrides and colors do not apply (it has no visible cell). */
 	function parkedPrimaryChip(key) {
 		const label = readingLabelOf(key);
 		const holder = document.createElement("span");
@@ -2703,6 +2980,7 @@
 		const listed = listedDetailKeys();
 		const walk = detailTileWalk();
 		if (detailDuplicatesHidden) frag.appendChild(setNote("Linked duplicate entries are hidden. Editing this list saves the shown layout; unlinking before an edit restores the original."));
+		if (detailPrimaryMoves) frag.appendChild(setNote("This key's own reading is in the list, so its cell is hidden while that reading shows on the Back tile. Editing the list can move it to the front with its label and stored color; unlinking or picking the earlier Reading before an edit restores the original."));
 		// The parked primary leads, the way the Back tile leads the view: the
 		// opener's own key, or an alias of it, wherever the list holds one.
 		for (const key of detailKeys) {
@@ -4954,6 +5232,7 @@
 				setTimeout(() => detailListEl.querySelector(`.hw-set-chip[data-key="${CSS.escape(key)}"] .hw-set-name[role="button"]`)?.focus({ preventScroll: true }), 0);
 			}
 		});
+		followSetting("detailTilesVersion", adoptDetailVersion);
 		detailBinding[0]().then(adoptDetailKeys);
 		detailTilesBinding[0]().then(adoptDetailTiles);
 		// The opener's sensor and the uniform density are edited by OTHER

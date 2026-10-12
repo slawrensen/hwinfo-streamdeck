@@ -6,7 +6,7 @@
  */
 import type { SensorSnapshot } from "../hwinfo/types";
 import { liveKeyOf, readingMatchesKey } from "../hwinfo/reading-links";
-import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTitleOf, type DetailDensity, type DetailMode, type DetailTileSpec } from "./detail-settings";
+import { compileDetailFilter, detailFilterOf, detailKeysOf, detailModeOf, detailTilesVersionOf, detailTitleOf, type DetailDensity, type DetailMode, type DetailTileSpec } from "./detail-settings";
 
 /**
  * A resolved detail group. `keys` never contains the primary (the opener's
@@ -19,8 +19,10 @@ export type DetailGroup = {
 	readonly primaryKey: string;
 	readonly title: string;
 	readonly keys: readonly string[];
-	/** Custom-list cells before linked duplicates were suppressed, with the
-	 * primary already excluded. Present only when tile dressing needs the
+	/** The custom-list cells the tile plan walks, before linked duplicates
+	 * were suppressed. A version 2 plan (detailTilesVersion) keeps the
+	 * opener's own reading here too, so its cell is hidden in place; the
+	 * 1.7.0 walk leaves it out. Present only when tile dressing needs the
 	 * same projection as the keys; the saved settings remain untouched. */
 	readonly sourceKeys?: readonly string[];
 };
@@ -32,6 +34,7 @@ export type DetailGroupSettings = {
 	detailKeys?: unknown;
 	detailTitle?: unknown;
 	detailFilter?: unknown;
+	detailTilesVersion?: unknown;
 };
 
 function primaryKeyOf(settings: DetailGroupSettings): string | undefined {
@@ -60,7 +63,7 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
 			mode,
 			primaryKey,
 			title: customTitle ?? "Custom set",
-			...customKeys(snapshot, primaryKey, detailKeysOf(settings))
+			...customKeys(snapshot, primaryKey, detailKeysOf(settings), detailTilesVersionOf(settings) === 2)
 		};
 	}
 	if (snapshot === null) {
@@ -128,30 +131,36 @@ export function resolveDetailGroup(snapshot: SensorSnapshot | null, settings: De
  * keys resolving to one measurement keep only the first (one reading, one
  * tile). Unresolvable keys keep their position: the list never shifts
  * because a sensor is asleep, and the saved keys are never rewritten.
+ * `everyKey` (a version 2 plan) keeps every spelling of the opener's
+ * reading in `sourceKeys`, so the plan's cells stay with their readings
+ * when a link or a re-pick changes which key that is; without it the
+ * 1.7.0 walk skips them.
  */
-function customKeys(snapshot: SensorSnapshot | null, primaryKey: string, keys: readonly string[]): Pick<DetailGroup, "keys" | "sourceKeys"> {
+function customKeys(snapshot: SensorSnapshot | null, primaryKey: string, keys: readonly string[], everyKey: boolean): Pick<DetailGroup, "keys" | "sourceKeys"> {
 	const primary = snapshot?.byKey.get(primaryKey);
 	const seen = new Set<string>();
 	const out: string[] = [];
 	const sourceKeys: string[] = [];
 	for (const key of keys) {
-		if (key === primaryKey) continue;
 		const reading = snapshot?.byKey.get(key);
+		const isPrimary = key === primaryKey || (reading !== undefined && primary !== undefined && liveKeyOf(reading) === liveKeyOf(primary));
+		if (isPrimary) {
+			if (everyKey) sourceKeys.push(key);
+			continue;
+		}
+		sourceKeys.push(key);
 		if (reading !== undefined) {
 			const identity = liveKeyOf(reading);
-			if (primary !== undefined && identity === liveKeyOf(primary)) continue;
-			sourceKeys.push(key);
 			if (seen.has(identity)) continue;
 			seen.add(identity);
-		} else {
-			sourceKeys.push(key);
 		}
 		out.push(key);
 	}
 	return sourceKeys.length === out.length ? { keys: out } : { keys: out, sourceKeys };
 }
 
-/** Removes suppressed linked cells from their authored tiles in parallel
+/** Removes suppressed cells (a linked duplicate, or under a version 2
+ * plan the opener's own reading) from their authored tiles in parallel
  * with the keys. Surviving cells keep labels, hues and color provenance;
  * empty tiles dissolve, and the uniform tail still follows density. No
  * settings are rewritten, so unlinking restores the original plan. */

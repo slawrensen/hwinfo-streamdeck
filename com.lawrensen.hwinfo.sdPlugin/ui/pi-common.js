@@ -1709,11 +1709,9 @@
 			let head = 0;
 			detailTiles = detailTiles.flatMap((spec) => {
 				const cells = Array.from({ length: spec.size }, (_, i) => i).filter((i) => walk[head + i] === undefined || kept.has(walk[head + i]));
-				if (detailWalkEvery) {
-					for (let i = 0; i < spec.size; i++) {
-						const key = walk[head + i];
-						if (key !== undefined && isDetailPrimary(key)) detailHiddenCells.set(key, { spec, cell: i, whole: spec.size === 1 && normal(head) });
-					}
+				for (let i = 0; i < spec.size; i++) {
+					const key = walk[head + i];
+					if (key !== undefined && isDetailPrimary(key)) detailHiddenCells.set(key, { spec, cell: i, whole: spec.size === 1 && normal(head) });
 				}
 				head += spec.size;
 				return cells.length === 0 ? [] : [subsetTile(spec, cells)];
@@ -1877,18 +1875,8 @@
 			}
 			at += tile.size;
 		}
-		// Version 2: while a plan exists, every key naming the opener's
-		// reading holds a cell in it, hidden on the deck (planDetailWrite).
-		// One with a listed reading after it inside the plan leads the list in
-		// a one-cell tile of its own, wearing the label and color of the cell
-		// it held, so no visible cell moves now or when a link or the opener's
-		// pick changes later. One with none after it keeps its place and,
-		// while the plan has room for it, its cell, as 1.7.0 kept it:
-		// unlinking or picking back shows that reading where it was, in the
-		// tile it held. On a plan saved by 1.7.0 that cell is the one 1.7.0
-		// gives it, so every stored size stays the one 1.7.0 keeps. A flat
-		// list whose hidden keys wear nothing stays as it is, unmarked and in
-		// its own order.
+		// planDetailWrite places each spelling of the opener's reading. A flat
+		// list whose hidden keys wear nothing stays unmarked, in its own order.
 		const plan = planDetailWrite();
 		const { leading, planned } = plan;
 		const hidden = leading.map(hiddenCellTile);
@@ -1917,7 +1905,7 @@
 			const keys = planned ? plan.cellKeys[t] : listed.slice(head, head + tile.size);
 			head += tile.size;
 			// A hidden cell in a tile of its own that wears nothing.
-			if (tile.raw === undefined && keys.length === 1 && isDetailPrimary(keys[0]) && neutralHiddenTile(tile, keys[0])) return { size: 1 };
+			if (keys.length === 1 && isDetailPrimary(keys[0]) && neutralHiddenTile(tile, keys[0])) return { size: 1 };
 			return serializeTile(tile, keys);
 		});
 		// The marker and the tiles are staged, then detailKeys is saved: one
@@ -2440,11 +2428,8 @@
 	/** Drag reorder: move `key` so it sits at LISTED position `to` (the
 	 * indices the chips render at). The parked primary is itself never
 	 * movable (listed index -1); a move crossing it may shift its raw
-	 * detailKeys slot by one, which the write normalizes (a plan's write
-	 * leads the list with it in its own hidden tile when a listed reading
-	 * after that slot falls inside the plan, and otherwise keeps it in
-	 * place with its cell; a flat list has no cells to shift, and the
-	 * panel parks it first). Tile
+	 * detailKeys slot by one, which the write normalizes (planDetailWrite;
+	 * a flat list has no cells to shift, and the panel parks it first). Tile
 	 * sizes never change here, but a cell's label and color belong to
 	 * the CHIP in it, so the dressing rides the same splice the keys do,
 	 * through in-tile reorders and boundary-crossing walks alike. */
@@ -2781,10 +2766,8 @@
 	 * tile flow: the deck shows this reading on the Back tile and never
 	 * shows a cell for it, so it may not occupy a visible cell, shift any
 	 * dressing or count in the note. Under the 1.7.0 walk it has no cell;
-	 * under version 2 it holds a hidden cell, which the next write leads
-	 * the list with in a one-cell tile wearing that cell's label and color
-	 * when a listed reading after it falls inside the plan, and otherwise
-	 * keeps its place and that cell (planDetailWrite). Remove works (no visible tile
+	 * under version 2 it holds a hidden cell the next write places
+	 * (planDetailWrite). Remove works (no visible tile
 	 * shrinks; see removeDetailKey); rename stays refused and reorder,
 	 * overrides and colors do not apply (it has no visible cell). */
 	function parkedPrimaryChip(key) {

@@ -55,6 +55,14 @@ self.hwModel = (() => {
 		return settings.dialView === "overview" ? "overview" : settings.dialView === "tworow" ? "tworow" : "single";
 	}
 
+	/** The dial's background look (issue #41), read the way the plugin reads
+	 * it (dialBackgroundOf): only the exact stored values count, anything
+	 * else draws Theme. */
+	function dialBackground(settings) {
+		const v = settings.dialBackground;
+		return v === "glass" || v === "outline" || v === "clear" ? v : "theme";
+	}
+
 	function pressBehavior(settings) {
 		const v = settings.pressBehavior;
 		return v === "open-details" || v === "tap-cycle-hold-details" ? v : "cycle-stat";
@@ -131,6 +139,9 @@ self.hwModel = (() => {
 			parts.push(m === "theme" || m === "dim" || m === "custom" ? TEXT_NAMES[m].toLowerCase() : "shared text");
 		}
 		if (settings.fahrenheit === true) parts.push("°F");
+		// A dial drawn over the touch strip picture names its look; Theme,
+		// the default, says nothing.
+		if (kind === "dial" && dialBackground(settings) !== "theme") parts.push(dialBackground(settings));
 		// The key's graph strip draws on the one-reading layout only; the
 		// stored mode wins, else the legacy sparkline flag (the panel's rule).
 		if (kind === "key" && (preview?.effective?.layout?.drawn ?? storedKeyLayout(settings)) === "single") {
@@ -418,6 +429,7 @@ self.hwModel = (() => {
 		themeName,
 		storedKeyLayout,
 		dialView,
+		dialBackground,
 		pressBehavior,
 		detailMode,
 		detailDensity,

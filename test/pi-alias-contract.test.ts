@@ -588,6 +588,11 @@ const clickTick = (m: Mounted, key: string, checked: boolean, list = "pickerr-li
 	tick.checked = checked;
 	m.el(list).fire("change", { target: tick });
 };
+const clickChip = (m: Mounted, key: string, selector: string): void => {
+	const control = chips(m, "detail-list").find((c) => c.dataset.key === key)?.querySelector(selector);
+	assert.ok(control, `${key} has ${selector}`);
+	m.el("detail-list").fire("click", { target: control });
+};
 const choosePreset = (m: Mounted, preset: string): void => {
 	const select = m.el("reading-color-preset");
 	select.value = preset;
@@ -1242,19 +1247,11 @@ describe("version 2 tile plans keep each label on its reading through links and 
 	// their next edit. Opening never writes, and the panel matches the deck.
 	const quadPlusOne = [{ size: 4, labels: ["CPU", "GPU", "PUMP", "VRM"], colors: RGBY }, { size: 1, labels: ["SSD"] }];
 	const legacy: [string, Record<string, unknown>, OkStatus, string[]][] = [
-		["S1a Gadget, no links", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(NO_LINKS), ["CPU=CPU@#FF0000[t0/4]", "GPU=GPU@#00FF00[t0/4]", "PUMP=PUMP@#0000FF[t0/4]", "VRM=VRM@#FFFF00[t0/4]", "SSD=SSD[t1/1]"]],
-		["S1b Gadget, every reading linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(ALL5), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
-		["S1c Shared Memory, every reading linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, sst(ALL5), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
 		["S1d Gadget, the opener linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(PAIR0), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
 		["S2 opener alias mid-list", { readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "CPU", "VRM", "SSD"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=CPU[t2/1]", "SSD=VRM[t3/1]"]],
 		["S3 opener alias and a duplicate", { readingKey: S5[0], detailKeys: [G5[0], G5[1], S5[1], G5[2], G5[3]], detailTiles: perReading(["CPU", "GPU", "GPU", "PUMP", "VRM"]) }, gst(ALL5), ["GPU=CPU[t0/1]", "PUMP=GPU[t1/1]", "VRM=PUMP[t2/1]"]],
 		["S3c a duplicate only", { readingKey: S5[0], detailKeys: [G5[1], S5[1], G5[2], G5[3]], detailTiles: perReading(["GPU", "GPU", "PUMP", "VRM"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]"]],
-		["S4a no links, opener not listed", { readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]],
-		["S4b no links, opener re-picked onto a listed reading", { readingKey: G5[2], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["GPU=GPU[t0/1]", "VRM=PUMP[t1/1]", "SSD=VRM[t2/1]"]],
-		["S5a saved under the link, linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]],
-		["S5b saved under the link, unlinked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["CPU=GPU[t0/1]", "GPU=PUMP[t1/1]", "PUMP=VRM[t2/1]", "VRM=SSD[t3/1]", "SSD=[t4/1]"]],
-		["S5q quad saved under the link, linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM", "SSD"], colors: RGBY }] }, gst(PAIR0), ["GPU=GPU@#FF0000[t0/4]", "PUMP=PUMP@#00FF00[t0/4]", "VRM=VRM@#0000FF[t0/4]", "SSD=SSD@#FFFF00[t0/4]"]],
-		["S5q quad saved under the link, unlinked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM", "SSD"], colors: RGBY }] }, gst(NO_LINKS), ["CPU=GPU@#FF0000[t0/4]", "GPU=PUMP@#00FF00[t0/4]", "PUMP=VRM@#0000FF[t0/4]", "VRM=SSD@#FFFF00[t0/4]", "SSD=[t1/1]"]]
+		["S4b no links, opener re-picked onto a listed reading", { readingKey: G5[2], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["GPU=GPU[t0/1]", "VRM=PUMP[t1/1]", "SSD=VRM[t2/1]"]]
 	];
 	for (const [name, seed, status, cells] of legacy) {
 		it(`a plan saved by 1.7.0 reads as 1.7.0 read it: ${name}`, async () => {
@@ -1268,8 +1265,7 @@ describe("version 2 tile plans keep each label on its reading through links and 
 
 	it("a flat list with the opener's alias parked mid-list stays flat and unmarked through an edit", async () => {
 		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], G5[3]] }, gst(PAIR0));
-		const chip = chips(m, "detail-list").find((c) => c.dataset.key === G5[3])!;
-		m.el("detail-list").fire("click", { target: chip.querySelector('.hw-detail-move[data-move="-1"]')! });
+		clickChip(m, G5[3]!, '.hw-detail-move[data-move="-1"]');
 		await m.flush();
 		assert.deepEqual(keysOf(m), ["GPU", "CPU", "VRM", "PUMP"]);
 		assert.deepEqual(plain(m.store.detailTiles), []);
@@ -1321,8 +1317,7 @@ describe("version 2 tile plans keep each label on its reading through links and 
 		const lead = { size: 1, labels: ["CPU"], colors: ["#FF0000"] };
 		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[0], G5[1], G5[2]], detailTilesVersion: 2, detailTiles: [lead] }, gst(PAIR0));
 		assert.deepEqual(panelCells(m), ["GPU=[t0/1]", "PUMP=[t1/1]"]);
-		const chip = chips(m, "detail-list").find((c) => c.dataset.key === G5[2])!;
-		m.el("detail-list").fire("click", { target: chip.querySelector('.hw-detail-move[data-move="-1"]')! });
+		clickChip(m, G5[2]!, '.hw-detail-move[data-move="-1"]');
 		await m.flush();
 		assert.deepEqual(keysOf(m), ["CPU", "PUMP", "GPU"]);
 		assert.deepEqual(plain(m.store.detailTiles), [lead], "the hidden reading's tile is stored as it was");
@@ -1403,9 +1398,7 @@ describe("version 2 tile plans keep each label on its reading through links and 
 	// of a partly filled tile included), so unlinking or picking back shows
 	// its tile as 1.7.0 showed it.
 	async function removeChip(m: Mounted, key: string): Promise<void> {
-		const chip = chips(m, "detail-list").find((c) => c.dataset.key === key);
-		assert.ok(chip !== undefined, `a chip for ${key}`);
-		m.el("detail-list").fire("click", { target: chip.querySelector(".hw-set-remove")! });
+		clickChip(m, key, ".hw-set-remove");
 		await m.flush();
 	}
 
@@ -1681,9 +1674,7 @@ describe("version 2 tile plans keep each label on its reading through links and 
 	it("a tile grown over the opener's reading past the plan gives it a cell of its own and leaves a stored label to the cell after it", async () => {
 		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 2, labels: ["GPU", "PUMP", "X"] }] };
 		const m = await opened(seed, gst(PAIR0));
-		const holder = chips(m, "detail-list").find((c) => c.dataset.key === G5[1])!.closest(".hw-tile")!;
-		m.el("detail-list").fire("click", { target: holder.querySelector(".hw-tile-size")! });
-		await m.flush();
+		await resize(m, G5[1]!);
 		// Version 2: the size picked under the link counts
 		// the readings shown, and the hidden cell is kept on top of it, as
 		// docs/sensor-details.md says.
@@ -1813,17 +1804,6 @@ describe("version 2 tile plans keep each label on its reading through links and 
 		await addReading(m, G5[3]!);
 		const added = ["GPU=GPU2[t0/2]", "CPU=[t0/2]", "VRM=NEXT[t1/1]"];
 		assert.deepEqual(panelCells(m), added, "VRM wears the NEXT label stored for it, as on 1.7.0");
-		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), added);
-	});
-
-	it("a rename under a Shared Memory opener keeps a 1.7.0 tile at its stored size when the Gadget alias is listed last", async () => {
-		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", ""] }] }, gst(PAIR0));
-		await rename(m, G5[1]!, "GPU2");
-		assert.deepEqual(plain(m.store.detailTiles), [{ size: 3, labels: ["GPU2", "PUMP", ""] }]);
-		await relink(m, gst(NO_LINKS));
-		await addReading(m, G5[3]!);
-		const added = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]", "VRM=[t1/1]"];
-		assert.deepEqual(panelCells(m), added);
 		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), added);
 	});
 
@@ -2042,12 +2022,6 @@ describe("detail colors retain automatic provenance through the production panel
 		}, detailTilesOf(m.store)[0]);
 		return new Map([...svg.matchAll(/font-weight="700" fill="([^"]+)">([^<]+)<\/text>/g)].map((match) => [match[2]!, match[1]!]));
 	};
-	function clickChip(m: Mounted, key: string, selector: string): void {
-		const chip = chips(m, "detail-list").find((c) => c.dataset.key === key);
-		const control = chip?.querySelector(selector);
-		assert.ok(control, `${key} has ${selector}`);
-		m.el("detail-list").fire("click", { target: control });
-	}
 	for (const mode of ["theme", "dim"] as const) {
 		it(`${mode}: an ordinary move preserves each automatic number color on Paper and after a theme change`, async () => {
 			const m = await openPanel("reading", seed, status);

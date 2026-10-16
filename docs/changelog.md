@@ -30,11 +30,9 @@ release.
   and the theme's background on Paper. **Clear** draws no background and
   no outline, like Stream Deck's own dials. **Theme**, the default, draws
   every dial exactly as before. Keys are unchanged.
-- None of the three draws a mask or a second copy of a word. Outline's
-  edge comes from one SVG filter pass over the whole face, so an Outline
-  face takes about twice the render time of a Theme face in the Stream
-  Deck app's SVG engine; Glass and Clear take about the same as Theme.
-  Measured on my PC; see PERF.md.
+- An Outline face takes about twice the render time of a Theme face in
+  the Stream Deck app's SVG engine; Glass and Clear take about the same
+  as Theme. Measured on my PC; see PERF.md.
 - A custom detail list keeps each label, color and tile on its own reading
   when a confirmed source link or a new **Reading** pick makes a listed key
   this key's own reading

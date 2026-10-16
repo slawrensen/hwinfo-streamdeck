@@ -16,20 +16,12 @@
 import { HISTORY_LENGTH } from "../series";
 import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextFitOptions, type TextRun } from "./format";
 import { faceFont, isTahoma } from "./face-font";
-import { dialBackgroundTraits, dialFaceOpen, dialTextColors, dialTextPalette, HALO_CLOSE, HALO_GROUP, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, structureFill, type DialBackground } from "./dial-background";
+import { dialBackgroundTraits, dialFaceOpen, HALO_CLOSE, HALO_GROUP, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, structureFill, type DialBackground } from "./dial-background";
 import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, type DrawnZone } from "./key-renderer";
-import { noDimmerThan, type TextColors, type TextSettings } from "./text-colors";
+import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
-
-/** The resolution a face gets when its caller passes no text colors: the
- * theme's own text for the look it is drawn in (exactly the theme's tokens
- * on a Theme face). */
-const THEME_TEXT: TextSettings = { mode: "theme", color: undefined, dimSecondary: false };
-function defaultText(background: DialBackground | undefined, palette: Palette): TextColors {
-	return dialTextColors(background, palette, THEME_TEXT);
-}
 
 /**
  * Cut, not mask (issue #41): a run fitted for a face with no overflow rect.
@@ -257,7 +249,7 @@ function wideContextLine(baseline: number, contextText: string, statsText: strin
 export function renderDialOverview(opts: DialOverviewOptions): string {
 	const { palette, background } = opts;
 	const traits = dialBackgroundTraits(background);
-	const text = opts.text ?? defaultText(background, palette);
+	const text = opts.text ?? themeTextColors(palette);
 	const structure = structureFill(background, palette);
 	const g = WIDE_GEO[opts.header === "bottom" ? "bottom" : "top"];
 	const separators = opts.separators !== false;
@@ -310,8 +302,7 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// booking counts characters, which a wide text value outruns (numbers
 		// book wider already and keep their bytes).
 		const valueInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: fit.size, fontWeight: 700, fallbackAdvance12: seeThrough }], "end", valueRight).left : 0;
-		const valueW = wideValueWidth(row.valueText, fit.size);
-		const labelRight = isTahoma() ? valueInk - 1.5 : valueRight - (traits.overflowRects ? valueW : Math.max(valueW, estimateKeyTextWidth(row.valueText, fit.size, { fontWeight: 700 }))) - WIDE_LABEL_GAP;
+		const labelRight = isTahoma() ? valueInk - 1.5 : valueRight - Math.max(wideValueWidth(row.valueText, fit.size), traits.overflowRects ? 0 : estimateKeyTextWidth(row.valueText, fit.size, { fontWeight: 700 })) - WIDE_LABEL_GAP;
 		// Both fonts price the label on their measured tables, with no
 		// letter-spacing: the app's QtSvg draws none (measured even at 3 px),
 		// so writing it only made previews wider than the device. Segoe UI's
@@ -415,10 +406,7 @@ export interface DialTwoRowOptions {
 export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	const { palette, background } = opts;
 	const traits = dialBackgroundTraits(background);
-	// Text resolves on the look's own surfaces (Glass: its hardest panel and
-	// band); drawing keeps the theme's real palette.
-	const textPalette = dialTextPalette(background, palette);
-	const text = opts.text ?? defaultText(background, palette);
+	const text = opts.text ?? themeTextColors(palette);
 	const structure = structureFill(background, palette);
 	const seeThrough = traits.overflowRects ? undefined : SEE_THROUGH_FALLBACK_ADVANCE_12;
 	const rows = opts.rows.slice(0, 2).map((row) => {
@@ -442,19 +430,18 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	// values outrun.
 	const maxValueW = Math.max(
 		0,
-		...rows.map((row) => {
-			const booked = isTahoma()
+		...rows.map((row) =>
+			isTahoma()
 				? estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }) + (Array.from(row.valueText).length % 2 === 1 ? estimateKeyTextWidth("0", row.size, { fontWeight: 700 }) : 0)
-				: Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size];
-			return traits.overflowRects ? booked : Math.max(booked, estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }));
-		})
+				: Math.max(Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size], traits.overflowRects ? 0 : estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }))
+		)
 	);
 	const valueStartEst = valueEndX - maxValueW;
 	const line2Max = Math.max(ROW_LABEL_MIN, Math.floor((valueStartEst - 20) / EST_LABEL_CHAR));
 	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), HALO_GROUP] : dialFaceOpen(background, palette);
 	rows.forEach((row, i) => {
 		const top = TWO_ROW.tops[i] as number;
-		const rowBg = row.selected ? textPalette.track : textPalette.bg;
+		const rowBg = row.selected ? palette.track : palette.bg;
 		if (row.selected) {
 			// Over a picture with no panel the 200 x 40 band would be a slab
 			// across it; the rail and the label token mark the row there, the
@@ -488,12 +475,11 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 			`<text x="12" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[0] as string)}</text>`
 		);
 		if (lines.length > 1) {
-			// With no overflow rect the second line is cut by measured width to
-			// the room the value leaves (the Segoe UI wrap counts code points),
+			// With no overflow rect Segoe UI's line (its wrap counts code
+			// points) is cut by measured width to the room the value leaves,
 			// fallback glyphs priced wide, and left off if not even an ellipsis
-			// fits. Tahoma's ink wrap already priced them, so its line stays as
-			// wrapped while its ink clears the value.
-			const line2 = traits.overflowRects ? (lines[1] as string) : isTahoma() ? (line2Fits(lines[1] as string) ? (lines[1] as string) : "") : fitOrDrop(lines[1] as string, room2, 13, { fallbackAdvance12: seeThrough });
+			// fits. Tahoma's ink wrap already fit line two to that room.
+			const line2 = traits.overflowRects || isTahoma() ? (lines[1] as string) : fitOrDrop(lines[1] as string, room2, 13, { fallbackAdvance12: seeThrough });
 			if (traits.overflowRects || line2 !== "") {
 				parts.push(
 					`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(line2)}</text>`
@@ -626,7 +612,7 @@ const SINGLE_HALO = { top: 4, height: 80 } as const;
 export function renderDial(opts: DialRenderOptions): string {
 	const { palette, barColor, background } = opts;
 	const traits = dialBackgroundTraits(background);
-	const text = opts.text ?? defaultText(background, palette);
+	const text = opts.text ?? themeTextColors(palette);
 	const texts: string[] = [
 		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitDialLine(opts.title, 12, 18) : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];

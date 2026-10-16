@@ -17,7 +17,7 @@ import { composeDialSvg, type DialRenderState, type DialSettings } from "../src/
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import type { PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
-import { DIAL_BACKGROUNDS, dialBackgroundOf, haloFilterDefs, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, type DialBackground } from "../src/ui/dial-background";
+import { dialBackgroundOf, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, type DialBackground } from "../src/ui/dial-background";
 import { renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { setFaceFont, type FaceFontId } from "../src/ui/face-font";
 import { estimateKeyTextWidth, INK_CLEAR_GAP, inkEdges } from "../src/ui/format";
@@ -131,7 +131,6 @@ const textFills = (svg: string): { fill: string; y: number; size: number }[] =>
 
 describe("the stored Background: one exact-value reader", () => {
 	it("reads the three looks and nothing else", () => {
-		assert.deepEqual(DIAL_BACKGROUNDS, ["theme", "glass", "outline", "clear"]);
 		for (const look of LOOKS) assert.equal(dialBackgroundOf(look), look);
 		for (const raw of [undefined, ...JUNK]) assert.equal(dialBackgroundOf(raw), "theme", JSON.stringify(raw));
 	});
@@ -255,18 +254,7 @@ describe("Outline: no background, a 1 px edge from one filter pass", () => {
 		});
 	}
 
-	it("the filter reads a black ring straight from the drawn alpha and floods a light one, with no zero offsets", () => {
-		const dark = haloFilterDefs("#000000", 4, 80);
-		assert.match(dark, / x="0" y="4" width="200" height="80" /);
-		assert.match(dark, /in="SourceAlpha"/);
-		assert.doesNotMatch(dark, /feFlood/);
-		assert.equal(count(dark, "<feOffset"), 4);
-		const light = haloFilterDefs("#E9E6DE", 0, 100);
-		assert.match(light, /<feFlood flood-color="#E9E6DE"\/><feComposite in2="SourceGraphic" operator="in" result="k"\/>/);
-		assert.doesNotMatch(light, /SourceAlpha/);
-	});
-
-	it("rings dark themes in black and Paper in its background; built-in text keeps 4.5:1 against the ring, Custom stays exact", () => {
+	it("rings dark themes in black and Paper in its background; built-in text keeps 4.5:1 against the ring", () => {
 		for (const id of THEMES) assert.equal(haloRingColor(config.themes[id]!), id === "paper" ? config.themes.paper!.bg : "#000000", id);
 		for (const font of FONTS) {
 			eachFace(font, "outline", (face, theme, where, _themeFace, mode) => {

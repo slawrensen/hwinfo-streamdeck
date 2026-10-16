@@ -36,6 +36,7 @@ import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
 import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
+import { dialBackgroundOf, dialPictureText, dialTextColors, dialTextPalette } from "../ui/dial-background";
 import { footerFits, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
 import { dialViewOf, overviewRowColors, rotationKeysOf, stepListOf } from "../ui/dial-overview";
 import { alertLevel, convertUnit, dedupeSharedLabelPrefix, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, type DecimalsSetting, type StatMode } from "../ui/format";
@@ -144,6 +145,15 @@ export type DialSettings = {
 	 * between rows (and the bottom-mode rule); anything else keeps them.
 	 */
 	overviewSeparators?: string;
+	/**
+	 * What the dial draws behind its readout (issue #41): the exact "glass",
+	 * "outline" or "clear" lets the touch strip picture set in the Stream
+	 * Deck app show behind the dial; anything else (absent, "theme", junk, a
+	 * newer version's value) keeps today's face byte for byte, so a rollback
+	 * or a hand edit degrades to the theme background. Read only through
+	 * dialBackgroundOf.
+	 */
+	dialBackground?: string;
 };
 
 export type InstanceState = {
@@ -1044,25 +1054,28 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 	const themeId = effectiveThemeFor(settings);
 	// Dial faces stay themed while alerting, so the Text setting resolves at
 	// level "normal" here; the alert expression (bar fill, alerting row
-	// values) is fixed separately and custom text never recolors it.
-	const textOf = (palette: Parameters<typeof resolveTextColors>[0]): TextColors => resolveTextColors(palette, effectiveTextFor(settings), "normal");
+	// values) is fixed separately and custom text never recolors it. The
+	// dial's background look (issue #41) decides the surface text resolves
+	// on; the renderers still draw with the theme's real palette.
+	const background = dialBackgroundOf(settings.dialBackground);
+	const textOf = (palette: Parameters<typeof resolveTextColors>[0]): TextColors => dialTextColors(background, palette, effectiveTextFor(settings));
 
 	const problem = statusDialText(status);
 	if (problem !== null) {
 		const palette = resolvePalette(config, themeId, null, "normal");
-		return renderDial({ title: problem.title, valueText: problem.value, unitText: "", statsText: "", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette) });
+		return renderDial({ title: problem.title, valueText: problem.value, unitText: "", statsText: "", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette), background });
 	}
 	const { snapshot } = status as Extract<PollerStatus, { state: "ok" }>;
 	if (settings.readingKey === undefined || settings.readingKey === "") {
 		const palette = resolvePalette(config, themeId, null, "normal");
-		return renderDial({ title: "HWiNFO", valueText: "rotate to pick", unitText: "", statsText: "or use the settings panel", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette) });
+		return renderDial({ title: "HWiNFO", valueText: "rotate to pick", unitText: "", statsText: "or use the settings panel", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette), background });
 	}
 	const reading = snapshot.byKey.get(settings.readingKey);
 	if (reading === undefined) {
 		// Turns are ignored here on purpose (see advance): the saved selection
 		// survives a transient HWiNFO outage instead of being rotated away.
 		const palette = resolvePalette(config, themeId, null, "normal");
-		return renderDial({ title: "Sensor missing", valueText: "waiting", unitText: "", statsText: "reselect in settings", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette) });
+		return renderDial({ title: "Sensor missing", valueText: "waiting", unitText: "", statsText: "reselect in settings", fraction: NaN, palette, barColor: palette.accent, text: textOf(palette), background });
 	}
 
 	// Status, no-selection and missing faces above are shared with the single
@@ -1132,7 +1145,8 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 		palette,
 		barColor: level !== "normal" ? config.alerts[level].bg : palette.accent,
 		zones: drawnZones(gauge.zones, config.alerts, palette.bg),
-		text: textOf(palette)
+		text: textOf(palette),
+		background
 	});
 }
 
@@ -1209,13 +1223,20 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 	const accent = typeAccentsEnabled() ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = resolvePalette(config, themeId, accent, "normal");
 	const textSettings = effectiveTextFor(settings);
-	const text = resolveTextColors(palette, textSettings, "normal");
+	// The background look (issue #41): Glass resolves every row on its
+	// hardest panel and band, so alert, sensor-type and Dim numbers keep
+	// their floor over any picture; Outline and Clear recolor labels and
+	// units on each row's own surface. Theme resolves exactly as before.
+	const background = dialBackgroundOf(settings.dialBackground);
+	const textPalette = dialTextPalette(background, palette);
+	const text = dialPictureText(background, resolveTextColors(textPalette, textSettings, "normal"), textPalette.bg, textSettings);
 	const overviewRows: (OverviewRow & { history?: readonly number[] })[] = rows.map((member, index) => {
 		const selected = index === selectedIndex;
 		const nativeShown = rowStatValue(member.value, state.stats.get(member.key), state.statMode);
 		const shown = formatMeasurement(nativeShown, member.unit, measureOpts);
 		const colors = overviewRowColors({ settings, reading: member, shownValue: nativeShown, selected, rowCount,
-			palette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
+			palette: textPalette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
+		const rowText = dialPictureText(background, colors.text, colors.background, textSettings);
 		return {
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,
@@ -1225,8 +1246,8 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 			// custom text never recolors it.
 			valueColor: colors.value,
 			// The selected two-row band resolves its label on the track like its unit.
-			selectedLabelColor: colors.text.label,
-			unitColor: colors.text.unit,
+			selectedLabelColor: rowText.label,
+			unitColor: rowText.unit,
 			// The two-row view draws each visible reading's trend from the
 			// poller's series store, which syncRowSeries keeps subscribed.
 			...(rowCount === 2 ? { history: historyOf(member.key) } : {})
@@ -1252,7 +1273,7 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 		const roomy = [`▼ ${minText}`, `▲ ${maxText}`, tags, context].filter((part) => part !== "").join("  ");
 		const tight = [`▼${minText}`, `▲${maxText}`, tags, context].filter((part) => part !== "").join(" ");
 		const footer = overlayActive ? overlay.text : footerFits(roomy) ? roomy : tight;
-		return renderDialTwoRow({ rows: overviewRows, footerText: footer, palette, text });
+		return renderDialTwoRow({ rows: overviewRows, footerText: footer, palette, text, background });
 	}
 	// The three-row wide tile splits that line: the stats are their own
 	// right-anchored element the renderer never clips, and the left region
@@ -1267,7 +1288,8 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 		header: settings.overviewHeader === "bottom" ? "bottom" : "top",
 		separators: settings.overviewSeparators !== "off",
 		palette,
-		text
+		text,
+		background
 	});
 }
 

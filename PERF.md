@@ -75,6 +75,54 @@ The window's two WARN lines are the two HWiNFO-restart states above;
 it logged zero ERROR. Rows 11 to 13 of `native/hwsm/TESTING.md` cite
 this run.
 
+### 2026-10-09: dial backgrounds (issue #41), what an outline costs to draw
+
+Harness: the Stream Deck app's own QtSvg 6.9.3 DLLs (read-only copies)
+called from Node through koffi. One pass parses a face (a QSvgRenderer
+from its bytes) and renders it into a transparent 200 x 100 ARGB32 image.
+The faces come from `composeDialSvg` on the 1.7.1 branch: one reading at
+normal, warn and critical; three rows with the context line on top and at
+the bottom; two rows with trends and with wrapped labels; and the
+**Start HWiNFO**, rotate-to-pick and **Sensor missing** faces, each in Void
+and Paper, Theme text, Tahoma and Segoe UI. Each background ran in its own
+process with the Theme faces interleaved pass by pass, pinned to one core
+at High priority: 3 runs on three cores, 5 rounds of 40 passes per face
+after 10 warm-up passes. A cell is the median of the three run medians; a
+ratio is the median of the three per-run ratios to the Theme face drawn in
+the same process. This is not the app's own frame loop and not the device;
+the app's CPU with six dials is still to be watched on the + XL.
+
+| View | Theme | Glass | Outline | Clear |
+| --- | --- | --- | --- | --- |
+| One reading | 0.10-0.14 ms | 1.10-1.13x (0.14-0.16 ms) | 2.13-2.84x (0.23-0.32 ms) | 0.90-0.95x (0.09-0.10 ms) |
+| Three rows | 0.20-0.25 ms | 1.00-1.04x (0.25-0.26 ms) | 1.97-2.41x (0.41-0.50 ms) | 0.91-0.92x (0.18-0.19 ms) |
+| Two rows | 0.20-0.40 ms | 0.92-1.03x (0.26-0.38 ms) | 1.47-2.34x (0.41-0.59 ms) | 0.92-0.95x (0.19-0.30 ms) |
+| Status faces | 0.07-0.11 ms | 1.10-1.20x (0.11-0.13 ms) | 2.14-3.08x (0.18-0.23 ms) | 0.84-0.87x (0.06-0.08 ms) |
+
+Theme's own times moved by up to 25% between the three processes, so
+compare ratios, not milliseconds across columns. Bytes per face: Theme 462
+to 3,213, Glass 909 to 3,532, Outline 1,020 to 2,829, Clear 349 to 3,043.
+
+Why the first outline cost 7 to 13 times Theme, measured on the same
+harness during the issue #41 study: every extra copy of a word is a full
+text layout (about 16 µs per run), every masked row an offscreen pass (45
+to 170 µs), a stroke wider than 1 px goes through the path renderer (7 to
+28x), translucent text is drawn as paths (2 to 8x), and a blur costs 4 to
+15x. That outline drew each word nine times and put rows in masks.
+Outline now draws every word once and grows the finished drawing by 1 px
+in one SVG filter pass (a 3 x 3 dilation done across and then down), about
+one extra full-face draw whatever the amount of text. No background draws
+a mask: the overflow windows a Theme face covers with background-colored
+rects stay empty, because every run that could reach one is cut to fit.
+
+Three details measured on the built faces, each against its alternative in
+the same process (median over 40 faces): leaving the filter's zero offsets
+to their default saved about 6% (pixel-identical); drawing Glass's panel as
+a flat two-stop gradient instead of `fill-opacity` saved about 7% (the
+panel lands one alpha level stronger, 204 of 255); and drawing its track
+ink the same way saved about 2% more, 15% on a two-row face with trends,
+where the shaded area is a filled path (pixel-identical).
+
 ### 2026-09-24: settings-panel reading picker without a row cap (1.7.0.0 candidate)
 
 Harness: `npx tsx scripts/pi-lab.mjs perf <out.json>`, a headless Chromium

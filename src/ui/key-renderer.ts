@@ -232,13 +232,14 @@ export function sparklinePoints(values: readonly number[], x: number, y: number,
 
 /** Composes the sparkline triple (track under-fill, accent line, end dot)
  * from placed points. Exported for the dial's two-row view, which draws the
- * same idiom at its own bottom edge, stroke and dot radius. */
-export function sparklineSvg(points: ReadonlyArray<{ px: number; py: number }>, bottom: number, stroke: number, dotR: number, palette: Palette): string[] {
+ * same idiom at its own bottom edge, stroke and dot radius, and on a Glass
+ * dial its under-fill in structure ink (`underFill`, a fill attribute). */
+export function sparklineSvg(points: ReadonlyArray<{ px: number; py: number }>, bottom: number, stroke: number, dotR: number, palette: Palette, underFill = `fill="${palette.track}"`): string[] {
 	const line = points.map((p) => `${p.px.toFixed(1)},${p.py.toFixed(1)}`).join(" ");
 	const first = points[0] as { px: number; py: number };
 	const last = points[points.length - 1] as { px: number; py: number };
 	return [
-		`<path d="M${first.px.toFixed(1)},${bottom} L${line.split(" ").join(" L")} L${last.px.toFixed(1)},${bottom} Z" fill="${palette.track}"/>`,
+		`<path d="M${first.px.toFixed(1)},${bottom} L${line.split(" ").join(" L")} L${last.px.toFixed(1)},${bottom} Z" ${underFill}/>`,
 		`<polyline points="${line}" fill="none" stroke="${palette.accent}" stroke-width="${stroke}" stroke-linejoin="round" stroke-linecap="round"/>`,
 		`<circle cx="${last.px.toFixed(1)}" cy="${last.py.toFixed(1)}" r="${dotR}" fill="${palette.accent}"/>`
 	];

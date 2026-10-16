@@ -198,14 +198,13 @@ The Stream Deck app can show a picture behind the touch strip: right-click the s
 
 **Clear.** Labels, units and statistics take the value color. Text reads well on a dark, even picture with a dark theme, or on a light one with **Paper**. On a bright, mid-tone or busy picture words can get lost; pick Glass or Outline there. The range bar, the three-row rail and the two-row rail keep a track 1 px wider than themselves, and trend lines keep their shaded area.
 
-On every background:
+On Glass, Outline and Clear:
 
 - Status screens such as **Start HWiNFO** show their text without the empty range bar on Outline and Clear. Glass keeps it as a faint groove.
-- Alerts work as with Theme: the bar fill turns amber or red in the one-reading view, and an overview row's value takes the alert color.
 - A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
 - With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, so a label with emoji or symbols the face font does not have is shortened a little sooner.
 - The settings panel header shows a transparent dial over a checkerboard, not over your picture. Sensor Reading keys are not affected.
-- The contrast figures are calculations. I have checked these backgrounds in the Stream Deck app's own SVG engine on a PC, not yet on a device.
+- I have checked these backgrounds in the Stream Deck app's own SVG engine on a PC, not yet on a device.
 
 ## Alerts on a dial
 

@@ -10,9 +10,7 @@
  *   Clear    no background and no edge; every word in one ink.
  *
  * One exact-value reader decides, and anything it does not know draws Theme
- * byte for byte, so a rollback or a hand edit degrades to today's face. The
- * renderers branch on the traits below, not on the names, so another look
- * is one row.
+ * byte for byte, so a rollback or a hand edit degrades to today's face.
  *
  * Cost on the app's QtSvg (the issue #41 study, measured): a text element
  * costs one full layout and draw, a masked group one offscreen pass, and a
@@ -32,9 +30,6 @@ import type { Palette } from "./themes";
 
 export type DialBackground = "theme" | "glass" | "outline" | "clear";
 
-/** The panel's order, from no picture to the picture untouched. */
-export const DIAL_BACKGROUNDS: readonly DialBackground[] = ["theme", "glass", "outline", "clear"];
-
 /** The one reader of DialSettings.dialBackground. Settings are untyped JSON:
  * only the exact stored strings count; absent, "theme", a case or space
  * variant, a retired or newer name and every non-string draw Theme. */
@@ -43,9 +38,6 @@ export function dialBackgroundOf(raw: unknown): DialBackground {
 }
 
 export type DialBackgroundTraits = {
-	/** What fills the slot: the theme's opaque rect, the glass panel, or
-	 * nothing (the picture). */
-	readonly base: "opaque" | "panel" | "none";
 	/** Track-token structure (bar track, rail groove, separators, the
 	 * selected two-row band, the trend's shaded area and a status face's
 	 * empty bar) draws in the label token at 20 % instead. */
@@ -68,10 +60,10 @@ export type DialBackgroundTraits = {
 };
 
 const TRAITS: Readonly<Record<DialBackground, DialBackgroundTraits>> = {
-	theme: { base: "opaque", ink: false, overflowRects: true, halo: false, band: true, underFill: true, statusBar: true, backings: false },
-	glass: { base: "panel", ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false },
-	outline: { base: "none", ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
-	clear: { base: "none", ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true }
+	theme: { ink: false, overflowRects: true, halo: false, band: true, underFill: true, statusBar: true, backings: false },
+	glass: { ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false },
+	outline: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
+	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true }
 };
 
 export function dialBackgroundTraits(background: DialBackground | undefined): DialBackgroundTraits {
@@ -114,7 +106,7 @@ export function haloRingColor(palette: { bg: string }): string {
  * cheaper and pixel-identical). The region, in user units, must hold
  * everything the group draws plus its ring: nothing outside it is drawn.
  */
-export function haloFilterDefs(ring: string, top: number, height: number): string {
+function haloFilterDefs(ring: string, top: number, height: number): string {
 	const black = ring === "#000000";
 	const src = black ? "SourceAlpha" : "k";
 	const node = (input: string): string => `<feMergeNode in="${input}"/>`;

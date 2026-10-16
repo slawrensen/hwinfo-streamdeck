@@ -207,7 +207,9 @@ export const DETAIL_TILES_MAX = 128;
  * junk entries salvage per field (size to 1, labels to "", colors to
  * null, cellLabels to true), a non-array is no plan at all, and nothing
  * is ever rewritten. Positional by design: the pattern stays put while
- * keys flow through it, exactly like the list's own ordering.
+ * keys flow through it, exactly like the list's own ordering. Under
+ * version 2 (detailTilesVersionOf) the opener's own reading keeps its
+ * cell in that walk, hidden, so a link or a re-pick moves no cell.
  */
 export function detailTilesOf(settings: { detailTiles?: unknown }): readonly DetailTileSpec[] {
 	const raw = settings.detailTiles;
@@ -232,6 +234,19 @@ export function detailTilesOf(settings: { detailTiles?: unknown }): readonly Det
 		tiles.push({ size, labels, colors, ...(automaticColors.some(Boolean) ? { automaticColors } : {}), cellLabels: record.cellLabels !== false });
 	}
 	return tiles;
+}
+
+/**
+ * Which cells the hand-grouped tile plan walks. 2 (or "2"): every listed
+ * key holds a cell, and the opener's own reading is hidden in place, so a
+ * link or a re-pick never moves the walk. Anything else, absent on every
+ * plan saved by 1.7.0, is the 1.7.0 walk, which skips every key that
+ * currently names the opener's reading. The panel writes 2 with every
+ * list or tile edit that stores a plan; nothing rewrites it.
+ */
+export function detailTilesVersionOf(settings: { detailTilesVersion?: unknown }): 1 | 2 {
+	const raw = settings.detailTilesVersion;
+	return raw === 2 || raw === "2" ? 2 : 1;
 }
 
 /**

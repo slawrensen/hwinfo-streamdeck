@@ -119,6 +119,16 @@
 					</div>
 					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
 				</div>
+				<div class="hw-field">
+					<label for="f-background">Background</label>
+					<select id="f-background" data-setting="dialBackground" data-default="theme" aria-describedby="background-help">
+						<option value="theme">Theme</option>
+						<option value="glass">Glass</option>
+						<option value="outline">Outline</option>
+						<option value="clear">Clear</option>
+					</select>
+					<p class="hw-help" id="background-help">Glass, Outline and Clear show the touch strip picture set in the Stream Deck app behind this dial. Glass (a panel at 80%) and Outline (a 1 px edge around every word) keep built-in text at 4.5:1 contrast over any picture; Clear reads best on a dark, even picture, or a light one with Paper.</p>
+				</div>
 
 				<div class="hw-field">
 					<label for="f-view">View</label>

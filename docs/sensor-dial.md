@@ -151,6 +151,7 @@ Reading and Display start open; each folded section's title line summarizes what
 | Reading | **Title on the dial** | Custom title; blank falls back to the reading's own (renamed) label. |
 | Reading | **Title when the dial moves on** | **Clears** (default): a custom title clears whenever the dial moves on to another reading, by a turn, a press or touch set to step, a Control key or the auto cycle; picking a reading in the settings panel keeps it. **Stays for this dial** keeps it as a fixed title. |
 | Display | **Text color** | **Default** (follows the shared Text color and names it, for example *Default (shared: Theme text)*), **Theme text**, **Dimmed**, or **Custom color** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
+| Display | **Background** | **Theme** (default) fills the dial's part of the touch strip with the theme's background. **Glass**, **Outline** and **Clear** show the touch strip picture set in the Stream Deck app behind the dial. See [Transparent background](#transparent-background). |
 | Display | **View** | **One reading** (default), or an [overview](#overview-view) of the rotation list: **Overview, two rows (big values and trend)** or **Overview, three rows**. |
 | Display | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the shared **Data units** preference instead. |
 | Display | **°F** (under Temperature) | Temperatures in °F instead of °C. |
@@ -179,6 +180,32 @@ Thresholds and the manual bar range are **unit-scoped**: they only apply to read
 By default (both fields blank) the bar spans the **session low → high**, so the fill grows as new extremes appear and always uses the full width of the range you've actually seen. Set **Bar from** / **Bar to** (Display) to pin the bar to a fixed scale instead (e.g. `0` and `100` for a usage percentage, or `30` and `90` for a CPU temperature) so the fill position means the same thing every time you glance at it. You can set just one end; the other stays automatic.
 
 With **Warn at** or **Critical at** set, the bar's track also marks the threshold zones in muted amber and red, escalating toward the alarmed end (the low side when alerts fire on a drop), the same zones a key's [Bar or Ring display](sensor-reading.md#display-sparkline-bar-ring) draws, and an automatic range widens just enough to keep them visible. A manual Bar from / Bar to is never widened; zones outside it are simply clipped. The zones are fixed landmarks; the **fill** is the live value, at full strength (accent normally, amber/red while alerting) so it always reads over them.
+
+### Transparent background
+
+The Stream Deck app can show a picture behind the touch strip: right-click the strip in the app and choose **Set from File...** or **Open Background Library**. A page, a folder and a single dial can each have their own. A Sensor Dial fills its 200 x 100 part of the strip with the theme's background, which hides that picture. **Background** (Display) chooses what the dial draws instead:
+
+| Background | What the dial draws | Text over the picture |
+| --- | --- | --- |
+| **Theme** (default) | The theme's background, exactly as before. | The picture does not show. |
+| **Glass** | The theme's background as a panel at 80% opacity, so the picture shows through at 20%. | Built-in text keeps 4.5:1 contrast over any picture (a calculation). |
+| **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
+| **Clear** | No background and no outline, the way Stream Deck's own dials draw over a strip picture. | Depends on the picture. |
+
+**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert shows a lighter amber or red. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
+
+**Outline.** Labels take the value color, and units and statistics a dimmer step of it, so a gray word does not merge with its dark outline over a light picture. The two-row view draws no band behind the selected row (the accent rail and the brighter label mark it) and draws trend lines without the shaded area under them. Separators stay thin lines in the theme's track color.
+
+**Clear.** Labels, units and statistics take the value color. Text reads well on a dark, even picture with a dark theme, or on a light one with **Paper**. On a bright, mid-tone or busy picture words can get lost; pick Glass or Outline there. The range bar, the three-row rail and the two-row rail keep a track 1 px wider than themselves, and trend lines keep their shaded area.
+
+On every background:
+
+- Status screens such as **Start HWiNFO** show their text without the empty range bar on Outline and Clear. Glass keeps it as a faint groove.
+- Alerts work as with Theme: the bar fill turns amber or red in the one-reading view, and an overview row's value takes the alert color.
+- A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
+- With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, so a label with emoji or symbols the face font does not have is shortened a little sooner.
+- The settings panel header shows a transparent dial over a checkerboard, not over your picture. Sensor Reading keys are not affected.
+- The contrast figures are calculations. I have checked these backgrounds in the Stream Deck app's own SVG engine on a PC, not yet on a device.
 
 ## Alerts on a dial
 

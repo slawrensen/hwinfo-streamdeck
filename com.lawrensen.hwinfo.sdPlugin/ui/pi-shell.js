@@ -634,17 +634,36 @@ self.hwShell = (() => {
 	}
 
 	/** The words a face SVG draws, in document order. Parsed as inert XML
-	 * data (a parsed document runs no script and is never inserted). */
+	 * data (a parsed document runs no script and is never inserted). Text
+	 * inside a container that is never drawn by itself (defs, a clip path, a
+	 * mask, a symbol, a pattern or a marker) is not a drawn word, so a face
+	 * that keeps reusable text there is not read twice. */
 	let faceText = "";
 	function drawnText(svg) {
 		try {
 			const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
 			if (doc.getElementsByTagName("parsererror").length > 0) return "";
-			const words = Array.from(doc.getElementsByTagName("text"), (t) => t.textContent.replace(/\s+/g, " ").trim()).filter((w) => w !== "");
+			const drawn = Array.from(doc.getElementsByTagName("text")).filter((t) => t.closest("defs, clipPath, mask, symbol, pattern, marker") === null);
+			const words = drawn.map((t) => t.textContent.replace(/\s+/g, " ").trim()).filter((w) => w !== "");
 			return words.join(" ").slice(0, 200);
 		} catch {
 			return "";
 		}
+	}
+
+	/**
+	 * A dial face drawn without the opaque full-slot background (issue #41:
+	 * Glass, Outline and Clear) previews over a checkerboard, since the panel
+	 * cannot show the picture the app draws behind the strip: "dark" under
+	 * light text, "light" under dark text (Paper, a dark Custom color), so the
+	 * words stay visible. Read from the face the plugin drew, so a plugin that
+	 * draws an opaque face never shows one. Null for an opaque face.
+	 */
+	function seeThroughTone(svg) {
+		if (kind !== "dial" || !/^<svg\b/.test(svg) || /^<svg\b[^>]*><rect width="200" height="100" fill="#[0-9A-Fa-f]{6}"\/>/.test(svg)) return null;
+		const ink = /<text\b[^>]*\bfill="#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"/.exec(svg);
+		const dark = ink !== null && 0.299 * parseInt(ink[1], 16) + 0.587 * parseInt(ink[2], 16) + 0.114 * parseInt(ink[3], 16) < 128;
+		return dark ? "light" : "dark";
 	}
 
 	// One persistent polite region for notes that are rebuilt with their
@@ -720,6 +739,9 @@ self.hwShell = (() => {
 				img.dataset.face = state.face;
 				img.src = `data:image/svg+xml,${encodeURIComponent(state.face)}`;
 				faceText = drawnText(state.face);
+				const tone = seeThroughTone(state.face);
+				if (tone === null) img.removeAttribute("data-clear");
+				else img.dataset.clear = tone;
 			}
 			figure.hidden = state.face === "";
 			// The alt text reads what the face itself draws (a status screen

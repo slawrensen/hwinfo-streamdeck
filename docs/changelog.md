@@ -15,6 +15,27 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
+## 1.7.1.0 - Unreleased
+
+A Background setting for Sensor Dials, so the touch strip picture can show
+behind them.
+
+- Sensor Dials have a **Background** setting under Display
+  ([issue #41](https://github.com/slawrensen/hwinfo-streamdeck/issues/41)).
+  **Glass** draws the theme's background as a panel at 80% opacity, so the
+  touch strip picture set in the Stream Deck app shows through it, and
+  draws labels and units lighter (darker on Paper) so built-in text keeps
+  its 4.5:1 floor over any picture. **Outline** draws no background and
+  gives every word, bar and mark a 1 px outline, black on the dark themes
+  and the theme's background on Paper. **Clear** draws no background and
+  no outline, like Stream Deck's own dials. **Theme**, the default, draws
+  every dial exactly as before. Keys are unchanged.
+- None of the three draws a mask or a second copy of a word. Outline's
+  edge comes from one SVG filter pass over the whole face, so an Outline
+  face takes about twice the render time of a Theme face in the Stream
+  Deck app's SVG engine; Glass and Clear take about the same as Theme.
+  Measured on my PC; see PERF.md.
+
 ## 1.7.0.0 - 2026-10-11
 
 Redesigned settings panels, per-reading dial colors and reliability

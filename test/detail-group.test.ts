@@ -531,18 +531,18 @@ describe("hand-grouped pagination (mixed tile sizes)", () => {
 	});
 });
 
+const sm = (n: number): Reading => ({ key: `f0001234:0:100000${n}`, type: SensorType.Temperature, sensorIndex: 0, id: n, label: `Reading ${n}`, unit: "°C", value: 40 + n, valueMin: 40, valueMax: 60, valueAvg: 50 });
+const readings = [sm(1), sm(2), sm(3)];
+const raw: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0xf0001234, instance: 0, name: "Test Source" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+const links = [1, 2, 3].map((n) => ({ sharedMemory: `f0001234:0:100000${n}`, gadget: `g:Test Source:Reading ${n}`, unit: "°C", sensorType: 1 }));
+const linked = applyReadingLinks(raw, links, 1);
+const settings = { readingKey: "f0001234:0:1000001", detailMode: "custom", detailKeys: ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"] };
+
 describe("custom lists over confirmed aliases", () => {
 	// A confirmed cross-provider pair makes two saved keys one measurement.
 	// The opener's own reading lives on the Back tile whichever spelling the
 	// list carries, and one measurement fills one tile, however many of its
 	// spellings were picked. With no snapshot the list stays positional.
-	const sm = (n: number): Reading => ({ key: `f0001234:0:100000${n}`, type: SensorType.Temperature, sensorIndex: 0, id: n, label: `Reading ${n}`, unit: "°C", value: 40 + n, valueMin: 40, valueMax: 60, valueAvg: 50 });
-	const readings = [sm(1), sm(2), sm(3)];
-	const raw: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0xf0001234, instance: 0, name: "Test Source" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
-	const links = [1, 2, 3].map((n) => ({ sharedMemory: `f0001234:0:100000${n}`, gadget: `g:Test Source:Reading ${n}`, unit: "°C", sensorType: 1 }));
-	const linked = applyReadingLinks(raw, links, 1);
-	const settings = { readingKey: "f0001234:0:1000001", detailMode: "custom", detailKeys: ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"] };
-
 	it("excludes the opener's measurement under its other spelling and lists one tile per measurement", () => {
 		assert.deepEqual(resolveDetailGroup(linked, settings)?.keys, ["f0001234:0:1000002", "f0001234:0:1000003", "gone:0:1"]);
 	});
@@ -562,14 +562,8 @@ describe("version 2 tile plans: the opener's reading keeps a hidden cell", () =>
 	// makes a listed key the opener's reading hides that cell in place
 	// instead of handing its label and color to the next reading. Plans
 	// saved by 1.7.0 carry no marker and keep the older walk, pinned here.
-	const sm = (n: number): Reading => ({ key: `f0001234:0:100000${n}`, type: SensorType.Temperature, sensorIndex: 0, id: n, label: `Reading ${n}`, unit: "°C", value: 40 + n, valueMin: 40, valueMax: 60, valueAvg: 50 });
-	const readings = [sm(1), sm(2), sm(3)];
-	const raw: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0xf0001234, instance: 0, name: "Test Source" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
-	const links = [1, 2, 3].map((n) => ({ sharedMemory: `f0001234:0:100000${n}`, gadget: `g:Test Source:Reading ${n}`, unit: "°C", sensorType: 1 }));
-	const linked = applyReadingLinks(raw, links, 1);
 	const [S1, S2, S3] = [1, 2, 3].map((n) => `f0001234:0:100000${n}`) as [string, string, string];
 	const [G1, G2] = [1, 2].map((n) => `g:Test Source:Reading ${n}`) as [string, string];
-	const fixture = { readingKey: S1, detailMode: "custom", detailKeys: [G1, S2, G2, S3, "gone:0:1"] };
 	const perReading = (labels: string[]): DetailTileSpec[] => labels.map((l) => ({ size: 1, labels: [l], colors: [null], cellLabels: true }));
 	const dressed = (snap: SensorSnapshot | null, settings: Record<string, unknown>, plan: DetailTileSpec[]): string[][] => {
 		const group = resolveDetailGroup(snap, settings);
@@ -585,11 +579,10 @@ describe("version 2 tile plans: the opener's reading keeps a hidden cell", () =>
 	});
 
 	it("sourceKeys is the whole list under version 2 while keys stay the same; unmarked stays the 1.7.0 walk", () => {
-		const v2 = resolveDetailGroup(linked, { ...fixture, detailTilesVersion: 2 });
+		const v2 = resolveDetailGroup(linked, { ...settings, detailTilesVersion: 2 });
 		assert.deepEqual(v2?.keys, [S2, S3, "gone:0:1"]);
 		assert.deepEqual(v2?.sourceKeys, [G1, S2, G2, S3, "gone:0:1"]);
-		const unmarked = resolveDetailGroup(linked, fixture);
-		assert.deepEqual(unmarked?.keys, [S2, S3, "gone:0:1"]);
+		const unmarked = resolveDetailGroup(linked, settings);
 		assert.deepEqual(unmarked?.sourceKeys, [S2, G2, S3, "gone:0:1"]);
 	});
 
@@ -604,7 +597,7 @@ describe("version 2 tile plans: the opener's reading keeps a hidden cell", () =>
 
 	it("labels stay on their readings with an alias of the opener and a linked duplicate in one list", () => {
 		const plan = perReading(["ONE", "TWO", "TWO AGAIN", "THREE", "GONE"]);
-		assert.deepEqual(dressed(linked, { ...fixture, detailTilesVersion: 2 }, plan), [["TWO"], ["THREE"], ["GONE"]]);
+		assert.deepEqual(dressed(linked, { ...settings, detailTilesVersion: 2 }, plan), [["TWO"], ["THREE"], ["GONE"]]);
 	});
 
 	it("an exact-key re-pick hides that cell in place under version 2; unmarked keeps the 1.7.0 shift", () => {

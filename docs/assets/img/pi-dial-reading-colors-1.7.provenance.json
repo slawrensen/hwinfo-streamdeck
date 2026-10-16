@@ -2,7 +2,7 @@
 	"command": "node scripts/capture-pi-reading-colors.mjs",
 	"kind": "Real property-inspector screenshot",
 	"note": "The shipped panel files, served byte for byte by a mock Stream Deck harness that adds only a page background style and the registration bootstrap the app would perform; cropped to the Display section. The external title bar reports the running page's build marker. Live HWiNFO Shared Memory readings. No installed app changes, hardware screenshot claim or sample readings.",
-	"captureTime": "2026-10-12T06:09:13.973Z",
+	"captureTime": "2026-10-16T02:22:14.851Z",
 	"panelSha256": "eea38f4a9e20cf4247c4753adf85ed8e33b8bb52f347c0a98ec77f32a7ccd317",
 	"file": "pi-dial-reading-colors-1.7.png",
 	"sha256": "b06bfe6581701d01312d4e365d0f0ca7c59cf41755b807be25afcf072743b3c4",
@@ -75,14 +75,14 @@
 			"textMode": "theme",
 			"source": "shared-memory"
 		},
-		"liveDialSha256": "4fb15d4a88deafab04c22c65db802ea9efdaac865b4937a9aed54acead4e4eaa"
+		"liveDialSha256": "c6208847e00074e08d6868bfea265391ede04aa83fc6fdd73f43756f955f0da8"
 	},
 	"sourceSha256": {
 		"com.lawrensen.hwinfo.sdPlugin/ui/sensor-dial.html": "b2f3f85c65c9644a2082da9460c5a5f86275b078ef9250db031e3be5df88878c",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js": "ac94d3075a394e16de6142410d63603aab51c3fd4548444551d625b6c0e82156",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi-shell.js": "1cdbd26576a0ec8f2b677779753f4578106e8f05efb9b962e9184aba51078c50",
-		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "d4275f076a5a94caf031712d2a246b3b000fbc237389347a09e7c2749fe2a9e0",
+		"com.lawrensen.hwinfo.sdPlugin/ui/pi-common.js": "f66bfd342e9408f5a5ceb83b2e1410ea55886a37d8dfa233d35564bf78513f7c",
 		"com.lawrensen.hwinfo.sdPlugin/ui/pi.css": "2e47df1ec6f8ec8a1bc61f4f118a4bcdd2b25e0754ac155fd6030c5dad3c9246",
-		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "8ec1e5b60b9e076df904764a05edf9f4fcb2874d76bfe80823277170e968e9cd"
+		"com.lawrensen.hwinfo.sdPlugin/bin/plugin.js": "29e78ac29ce2c2a51cb6076770c733f30240532814ad49d88fba4195653c4d57"
 	}
 }

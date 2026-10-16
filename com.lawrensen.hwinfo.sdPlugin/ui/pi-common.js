@@ -1496,9 +1496,9 @@
 	 * back where it walks (placeHiddenCell), and one that held none gets a
 	 * cell there (under the 1.7.0 walk the very cell 1.7.0 gives it, so no
 	 * stored size changes; under version 2 one added to the tile an edit
-	 * grew over it), or none past the plan. Returns the leading keys, the
-	 * order to store, and a copy of the plan with the kept cells in place,
-	 * each cell's key beside it, so the note and the write follow one rule. */
+	 * grew over it), or none past the plan. Returns the leading keys and a
+	 * copy of the plan with the kept cells in place, each cell's key beside
+	 * it, so the note and the write follow one rule. */
 	function planDetailWrite() {
 		const listed = listedDetailKeys();
 		const tiles = cloneTiles(detailTiles);
@@ -1515,20 +1515,7 @@
 		let listedBefore = 0;
 		let staying = 0;
 		let past = false;
-		// 1.7.0 never walks the opener's own key, so on its plan that key
-		// walks after the last alias of it listed later: once the link goes,
-		// the alias still takes the cell 1.7.0 gives it.
-		let order = detailKeys;
-		if (!detailWalkEvery) {
-			const at = detailKeys.indexOf(detailPrimaryKey);
-			const lastAlias = detailKeys.reduce((last, key, i) => (key !== detailPrimaryKey && isDetailPrimary(key) ? i : last), -1);
-			if (at >= 0 && lastAlias > at) {
-				order = [...detailKeys];
-				order.splice(at, 1);
-				order.splice(lastAlias, 0, detailPrimaryKey);
-			}
-		}
-		for (const key of order) {
+		for (const key of detailKeys) {
 			if (!isDetailPrimary(key)) {
 				listedBefore++;
 				continue;
@@ -1553,7 +1540,13 @@
 			else staying++;
 			past ||= placed === "past";
 		}
-		return { leading, tiles, cellKeys, owned, order, planned: detailTiles.length > 0 || keeps };
+		// On a plan saved by 1.7.0, two spellings that keep their place both
+		// want the one cell 1.7.0 shows whichever of them is visible in, and a
+		// version 2 cell holds one key: no plan reads as 1.7.0 for both, so
+		// the write keeps the 1.7.0 rule until an edit made while at most one
+		// of them stays hidden.
+		const exact = detailWalkEvery || staying < 2;
+		return { leading, tiles, cellKeys, owned, planned: exact && (detailTiles.length > 0 || keeps) };
 	}
 
 	/** Puts the cell of the opener's reading `key`, which walks to plan
@@ -1900,7 +1893,7 @@
 		const { leading, planned } = plan;
 		const hidden = leading.map(hiddenCellTile);
 		if (planned) {
-			detailKeys = [...leading, ...plan.order.filter((key) => !leading.includes(key))];
+			detailKeys = [...leading, ...detailKeys.filter((key) => !leading.includes(key))];
 			detailWalkEvery = true;
 			// A kept key taking an unfilled cell owns that cell's stored entry.
 			for (const [key, entry] of plan.owned) detailCellRaw.set(key, entry);

@@ -1933,12 +1933,11 @@ describe("version 2 tile plans keep each label on its reading through links and 
 		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
 	});
 
-	// A plan saved by 1.7.0 that lists the
-	// opener's own key BEFORE a link alias of it, both after the plan's last
-	// reading. 1.7.0 never walks the opener's own key, so once the link goes
-	// the alias takes the cell, label, color and tile it had before the link.
-	// The first edit made under the link must store a plan that still reads
-	// that way under version 2.
+	// A plan saved by 1.7.0 that lists two spellings of the opener's reading
+	// after its last shown reading: 1.7.0 shows whichever one is visible in
+	// the same cell, and a version 2 cell holds one key. An edit made while
+	// both are hidden keeps the 1.7.0 rule, so unlinking, and then picking
+	// the other spelling, read as 1.7.0 reads them.
 	it("a 1.7.0 plan listing the opener's own key before its alias: after an edit under the link, unlinking shows the alias as 1.7.0 does", async () => {
 		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], S5[0], G5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "CPU"] }] };
 		const m = await opened(seed, gst(NO_LINKS));
@@ -1946,9 +1945,15 @@ describe("version 2 tile plans keep each label on its reading through links and 
 		await relink(m, gst(PAIR0));
 		await rename(m, G5[1]!, "GPU2");
 		await relink(m, gst(NO_LINKS));
+		assert.equal(m.store.detailTilesVersion, undefined, "the edit keeps the 1.7.0 rule");
 		const back = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"];
 		assert.deepEqual(panelCells(m), back, "1.7.0 shows CPU with its own label, in its own tile");
 		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		const picked = panelCells(m);
+		assert.deepEqual(picked, ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"], "picking the other spelling shows it as 1.7.0 does");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), picked);
 	});
 
 	it("a 1.7.0 plan listing the opener's own key before its alias, with the alias's own labelled one-cell tile after the plan's readings", async () => {

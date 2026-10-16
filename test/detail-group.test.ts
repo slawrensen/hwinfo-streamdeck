@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { pageOf, resolveDetailGroup } from "../src/detail/detail-group";
-import { compileDetailFilter, DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
+import { pageOf, projectDetailTiles, resolveDetailGroup } from "../src/detail/detail-group";
+import { compileDetailFilter, DETAIL_FILTER_MAX, DETAIL_KEYS_MAX, DETAIL_TILES_MAX, detailDensityOf, detailFilterOf, detailKeysOf, detailModeOf, detailTilesOf, detailTilesVersionOf, detailTitleOf, pressBehaviorOf, type DetailDensity, type DetailTileSpec } from "../src/detail/detail-settings";
 import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
@@ -553,5 +553,87 @@ describe("custom lists over confirmed aliases", () => {
 
 	it("without links the same list keeps both spellings, as before", () => {
 		assert.deepEqual(resolveDetailGroup(raw, settings)?.keys, ["g:Test Source:Reading 1", "f0001234:0:1000002", "g:Test Source:Reading 2", "f0001234:0:1000003", "gone:0:1"]);
+	});
+});
+
+describe("version 2 tile plans: the opener's reading keeps a hidden cell", () => {
+	// A plan the panel saves with detailTilesVersion 2 gives every listed key
+	// a cell, the opener's own reading included, so a link or a re-pick that
+	// makes a listed key the opener's reading hides that cell in place
+	// instead of handing its label and color to the next reading. Plans
+	// saved by 1.7.0 carry no marker and keep the older walk, pinned here.
+	const sm = (n: number): Reading => ({ key: `f0001234:0:100000${n}`, type: SensorType.Temperature, sensorIndex: 0, id: n, label: `Reading ${n}`, unit: "°C", value: 40 + n, valueMin: 40, valueMax: 60, valueAvg: 50 });
+	const readings = [sm(1), sm(2), sm(3)];
+	const raw: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [{ index: 0, id: 0xf0001234, instance: 0, name: "Test Source" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	const links = [1, 2, 3].map((n) => ({ sharedMemory: `f0001234:0:100000${n}`, gadget: `g:Test Source:Reading ${n}`, unit: "°C", sensorType: 1 }));
+	const linked = applyReadingLinks(raw, links, 1);
+	const [S1, S2, S3] = [1, 2, 3].map((n) => `f0001234:0:100000${n}`) as [string, string, string];
+	const [G1, G2] = [1, 2].map((n) => `g:Test Source:Reading ${n}`) as [string, string];
+	const fixture = { readingKey: S1, detailMode: "custom", detailKeys: [G1, S2, G2, S3, "gone:0:1"] };
+	const perReading = (labels: string[]): DetailTileSpec[] => labels.map((l) => ({ size: 1, labels: [l], colors: [null], cellLabels: true }));
+	const dressed = (snap: SensorSnapshot | null, settings: Record<string, unknown>, plan: DetailTileSpec[]): string[][] => {
+		const group = resolveDetailGroup(snap, settings);
+		assert.ok(group !== null);
+		return projectDetailTiles(group, plan).map((s) => [...s.labels]);
+	};
+
+	it("detailTilesVersionOf reads 2 or \"2\" as version 2 and anything else as the 1.7.0 walk", () => {
+		assert.equal(detailTilesVersionOf({ detailTilesVersion: 2 }), 2);
+		assert.equal(detailTilesVersionOf({ detailTilesVersion: "2" }), 2);
+		for (const value of [undefined, 1, 3, "x", true, null]) assert.equal(detailTilesVersionOf({ detailTilesVersion: value }), 1, JSON.stringify(value));
+		assert.equal(detailTilesVersionOf({}), 1);
+	});
+
+	it("sourceKeys is the whole list under version 2 while keys stay the same; unmarked stays the 1.7.0 walk", () => {
+		const v2 = resolveDetailGroup(linked, { ...fixture, detailTilesVersion: 2 });
+		assert.deepEqual(v2?.keys, [S2, S3, "gone:0:1"]);
+		assert.deepEqual(v2?.sourceKeys, [G1, S2, G2, S3, "gone:0:1"]);
+		const unmarked = resolveDetailGroup(linked, fixture);
+		assert.deepEqual(unmarked?.keys, [S2, S3, "gone:0:1"]);
+		assert.deepEqual(unmarked?.sourceKeys, [S2, G2, S3, "gone:0:1"]);
+	});
+
+	it("labels stay on their readings when a link makes a listed key the opener's reading", () => {
+		const alias = { readingKey: S1, detailMode: "custom", detailKeys: [G1, S2, S3, "gone:0:1"] };
+		const plan = perReading(["ONE", "TWO", "THREE", "GONE"]);
+		assert.deepEqual(dressed(linked, { ...alias, detailTilesVersion: 2 }, plan), [["TWO"], ["THREE"], ["GONE"]]);
+		assert.deepEqual(dressed(raw, { ...alias, detailTilesVersion: 2 }, plan), [["ONE"], ["TWO"], ["THREE"], ["GONE"]], "unlinked, the alias shows in its own cell again");
+		// The same plan unmarked is read with the 1.7.0 walk: one cell off.
+		assert.deepEqual(dressed(linked, alias, plan).slice(0, 3), [["ONE"], ["TWO"], ["THREE"]]);
+	});
+
+	it("labels stay on their readings with an alias of the opener and a linked duplicate in one list", () => {
+		const plan = perReading(["ONE", "TWO", "TWO AGAIN", "THREE", "GONE"]);
+		assert.deepEqual(dressed(linked, { ...fixture, detailTilesVersion: 2 }, plan), [["TWO"], ["THREE"], ["GONE"]]);
+	});
+
+	it("an exact-key re-pick hides that cell in place under version 2; unmarked keeps the 1.7.0 shift", () => {
+		const repicked = { readingKey: S2, detailMode: "custom", detailKeys: [S1, S2, S3] };
+		const plan = perReading(["A", "B", "C"]);
+		assert.deepEqual(dressed(raw, { ...repicked, detailTilesVersion: 2 }, plan), [["A"], ["C"]]);
+		assert.deepEqual(dressed(raw, repicked, plan).slice(0, 2), [["A"], ["B"]], "the two readings left wear the first two cells");
+	});
+
+	it("with no snapshot the exact key is hidden in place and an unresolved alias keeps its cell", () => {
+		const plan = perReading(["ONE", "OPENER", "TWO"]);
+		assert.deepEqual(dressed(null, { readingKey: S1, detailMode: "custom", detailKeys: [G1, S1, S2], detailTilesVersion: 2 }, plan), [["ONE"], ["TWO"]]);
+		const group = resolveDetailGroup(null, { readingKey: S1, detailMode: "custom", detailKeys: [G1, S2], detailTilesVersion: 2 });
+		assert.deepEqual(group?.keys, [G1, S2]);
+		assert.equal(group?.sourceKeys, undefined, "nothing is hidden, so the plan walks as stored");
+	});
+
+	it("a quad holding the hidden reading becomes a triple, and a tile whose only cell is hidden dissolves", () => {
+		const settings = { readingKey: S1, detailMode: "custom", detailKeys: [S2, G1, S3, "gone:0:1", "x:0:1"], detailTilesVersion: 2 };
+		const quad: DetailTileSpec = { size: 4, labels: ["TWO", "ONE", "THREE", "GONE"], colors: ["#111111", "#222222", null, "#444444"], automaticColors: [false, true, false, true], cellLabels: false };
+		const group = resolveDetailGroup(linked, settings);
+		assert.ok(group !== null);
+		assert.deepEqual(group.keys, [S2, S3, "gone:0:1", "x:0:1"]);
+		assert.deepEqual(projectDetailTiles(group, [quad, { size: 1, labels: ["X"], colors: [null], cellLabels: true }]), [
+			{ size: 3, labels: ["TWO", "THREE", "GONE"], colors: ["#111111", null, "#444444"], automaticColors: [false, false, true], cellLabels: false },
+			{ size: 1, labels: ["X"], colors: [null], cellLabels: true }
+		]);
+		const lead = resolveDetailGroup(linked, { ...settings, detailKeys: [G1, S2, S3] });
+		assert.ok(lead !== null);
+		assert.deepEqual(projectDetailTiles(lead, perReading(["ONE", "TWO", "THREE"])).map((s) => s.labels), [["TWO"], ["THREE"]]);
 	});
 });

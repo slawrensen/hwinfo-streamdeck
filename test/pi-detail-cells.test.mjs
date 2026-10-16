@@ -61,6 +61,9 @@ function editor(doc, treeEntryOf = () => null) {
 	const resize = slice("\t\t\t\teditTile(Number(size.dataset.tile)", "\n\t\t\t\t// Same follow").replace("Number(size.dataset.tile)", "i");
 	vm.runInContext(`function resize(i) { ${resize} }
 function shown() { return detailTiles; }`, context);
+	// The plan's walk first, as the panel adopts it: a reload of a plan
+	// this editor marked reads with the version 2 walk.
+	context.adoptDetailVersion(doc.detailTilesVersion);
 	context.adoptDetailKeys(doc.detailKeys);
 	context.adoptDetailTiles(doc.detailTiles);
 	return context;
@@ -314,5 +317,38 @@ describe("entries rebuilt through two moves", () => {
 		assert.equal(stored.detailTiles.length, 2);
 		assert.deepEqual(plain(stored.detailTiles[1]), { size: 1, labels: [""], colors: [{ future: "kept" }], cellLabels: true, automaticColors: [false] });
 		assert.equal(JSON.stringify(stored.detailTiles).split('"future"').length - 1, 1, "c's color is stored once");
+	});
+});
+
+// Under a version 2 plan the opener's own reading keeps a hidden cell. An
+// edit while it is hidden leads the list with it in a one-cell tile, and
+// that tile carries its stored entries, unreadable ones included, exactly
+// once: the tile it left keeps only the other readings' entries.
+describe("an opener reading's hidden cell", () => {
+	it("keeps its unreadable entries through an edit while it is hidden, written once in its leading tile", () => {
+		const stored = { detailKeys: ["a", "b", "c"], detailTiles: [tile(3, [1, 2, 3])], detailTilesVersion: 2, futureTop: { keep: "yes" } };
+		const c = editor(stored);
+		c.adoptDetailPrimary("b"); // a re-pick onto a listed reading
+		assert.deepEqual(plain(c.listedDetailKeys()), ["a", "c"]);
+		c.editTile(0, (t) => (t.cellLabels = false));
+		assert.deepEqual(plain(stored.detailKeys), ["b", "a", "c"]);
+		assert.equal(stored.detailTilesVersion, 2);
+		assert.equal(stored.detailTiles.length, 2);
+		for (const field of FIELDS) {
+			assert.deepEqual(ids(stored.detailTiles[0][field]), [2], `${field}: b's entry leads`);
+			assert.deepEqual(ids(stored.detailTiles[1][field]), [1, 3], `${field}: a and c keep theirs`);
+			assert.deepEqual(tokens(stored, field), [1, 2, 3].map((n) => PREFIX[field] + n), `${field}: each entry once`);
+		}
+		assert.equal(stored.detailTiles[1].cellLabels, false);
+		assert.deepEqual(plain(stored.detailTiles[1].future), { keep: ["exact ", { nested: 1 }] });
+		// After a reload the leading tile is stored as it was written, and a
+		// second edit keeps every entry where it is.
+		const again = editor(stored);
+		again.adoptDetailPrimary("b");
+		again.editTile(0, (t) => (t.cellLabels = true));
+		for (const field of FIELDS) assert.deepEqual(tokens(stored, field), [1, 2, 3].map((n) => PREFIX[field] + n), `${field}: each entry once after a reload`);
+		assert.deepEqual(ids(stored.detailTiles[0].labels), [2]);
+		assert.deepEqual(plain(stored.detailKeys), ["b", "a", "c"]);
+		assert.deepEqual(stored.futureTop, { keep: "yes" });
 	});
 });

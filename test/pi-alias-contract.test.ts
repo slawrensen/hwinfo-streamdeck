@@ -755,7 +755,7 @@ describe("remaining PI review regressions", () => {
 		nav.shutdown();
 	});
 
-	it("unlinking before an edit restores source cells and styles without writing settings", async () => {
+	it("a plan saved by 1.7.0 (no detailTilesVersion): unlinking before an edit restores source cells and styles without writing settings", async () => {
 		const status = linkedStatus();
 		const seed = { readingKey: SM[0], detailMode: "custom", detailKeys: [G[0], SM[1], G[1], SM[2], "gone:0:1"], detailTiles: [{ size: 4, labels: ["GPU", "DUPLICATE", "PUMP", "MISSING"], colors: ["#AAAA11", "#FF0000", "#00FF00", "#0000FF"], automaticColors: [true, false, false, true], cellLabels: false }] };
 		const m = await openPanel("reading", seed, status);
@@ -831,6 +831,1200 @@ describe("remaining PI review regressions", () => {
 			assert.deepEqual(plain(m.store.detailKeys), seed.detailKeys);
 		});
 	}
+});
+
+// A version 2 tile plan (detailTilesVersion) gives every listed key a cell,
+// the opener's own reading included, hidden in place while it is the
+// opener's reading. A link that makes a listed key the opener's reading,
+// or a Reading pick onto a listed reading, then moves no label or color in
+// the panel or on the deck. Plans saved by 1.7.0 carry no marker and read
+// exactly as 1.7.0 read them until their next edit.
+describe("version 2 tile plans keep each label on its reading through links and picks", () => {
+	const NAMES = ["CPU", "GPU", "PUMP", "VRM", "SSD"] as const;
+	const L5 = NAMES.map((n) => `${n} Temp`);
+	const G5 = L5.map((l) => `g:Sample sensors:${l}`);
+	const S5 = NAMES.map((_, i) => `f0000501:0:100000${i}`);
+	const RGBY = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00"];
+	const QUAD = ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33"];
+	const pair = (i: number): unknown => ({ sharedMemory: S5[i], gadget: G5[i], unit: "°C", sensorType: SensorType.Temperature });
+	const NO_LINKS: unknown[] = [];
+	const PAIR0 = [pair(0)];
+	const ALL5 = [0, 1, 2, 3, 4].map(pair);
+	function snap5(keys: readonly string[]): SensorSnapshot {
+		const readings = keys.map((k, i) => sample(k, i + 1, L5[i]!, SensorType.Temperature, "°C", 40 + i * 7));
+		return { pollTime: 1, valueRevision: 1, version: 2, revision: 0, sensors: [{ index: 0, id: 0x31, instance: 0, name: "Sample sensors" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+	}
+	const gst = (links: unknown[]): OkStatus => ({ state: "ok", source: "gadget", snapshot: applyReadingLinks(snap5(G5), parseReadingLinks(links), links.length === 0 ? 0 : 1) });
+	const sst = (links: unknown[]): OkStatus => ({ state: "ok", source: "shared-memory", snapshot: applyReadingLinks(snap5(S5), parseReadingLinks(links), links.length === 0 ? 0 : 1) });
+	const nameOf = (key: string): string => NAMES[G5.indexOf(key)] ?? NAMES[S5.indexOf(key)] ?? key;
+	const base = { pressBehavior: "open-details", detailMode: "custom" };
+	const perReading = (labels: string[]): { size: number; labels: string[] }[] => labels.map((l) => ({ size: 1, labels: [l] }));
+
+	/** Each visible cell in order: the reading, the label it wears, its
+	 * quad color and its tile, the way the panel shows it. */
+	function panelCells(m: Mounted): string[] {
+		const cells = chips(m, "detail-list").filter((c) => c.dataset.tile !== undefined);
+		return cells.map((c) => {
+			const nameEl = c.querySelector(".hw-set-name")!;
+			const well = c.querySelector(".hw-tile-color");
+			const label = nameEl.classList.contains("renamed") ? nameEl.textContent : "";
+			const size = cells.filter((d) => d.dataset.tile === c.dataset.tile).length;
+			return `${nameOf(c.dataset.key!)}=${label}${well !== null ? `@${well.value}` : ""}[t${c.dataset.tile}/${size}]`;
+		});
+	}
+	/** The same cells as a detail session the deck enters with `settings`. */
+	async function deckCells(settings: Record<string, unknown>, status: OkStatus, refreshTo?: OkStatus): Promise<string[]> {
+		const nav = new DetailNavigator({ switchProfile: async () => {} });
+		assert.equal(await nav.enter({ deviceId: "v2", deviceType: 0, settings: plain(settings), snapshot: status.snapshot }), "entered");
+		if (refreshTo !== undefined) nav.refresh("v2", refreshTo.snapshot);
+		const page = nav.pageFor(nav.stateFor("v2")!);
+		nav.shutdown();
+		return page.chunks.flatMap((chunk, t) => chunk.map((key, i) => `${nameOf(key)}=${page.specs[t]?.labels[i] ?? ""}${chunk.length === 4 ? `@${page.specs[t]?.colors[i] ?? QUAD[i]}` : ""}[t${t}/${chunk.length}]`));
+	}
+	const parked = (m: Mounted): string[] => chips(m, "detail-list").filter((c) => c.dataset.tile === undefined).map((c) => nameOf(c.dataset.key!));
+	const notes = (m: Mounted): string[] => m.el("detail-list").querySelectorAll(".hw-set-note").map((n) => n.textContent);
+	const ownNote = (m: Mounted): boolean => notes(m).some((n) => n.startsWith("This key's own reading is in the list"));
+	const keysOf = (m: Mounted): string[] => (plain(m.store.detailKeys) as string[]).map(nameOf);
+	async function rename(m: Mounted, key: string, value: string): Promise<void> {
+		const chip = chips(m, "detail-list").find((c) => c.dataset.key === key);
+		assert.ok(chip !== undefined, `a chip for ${key}`);
+		m.el("detail-list").fire("click", { target: chip.querySelector(".hw-set-name")! });
+		const input = chip.querySelector(".hw-cell-rename");
+		assert.ok(input !== null, `a rename field for ${key}`);
+		input.value = value;
+		m.el("detail-list").fire("change", { target: input });
+		input.blur();
+		m.el("detail-list").fire("focusout", { target: input });
+		await m.flush();
+	}
+	async function relink(m: Mounted, status: OkStatus): Promise<void> {
+		m.feed(buildSensorTree(status));
+		await m.flush();
+	}
+	/** A Reading pick through the primary picker's own list. */
+	async function pick(m: Mounted, key: string): Promise<void> {
+		m.el("picker-search").fire("focus");
+		const row = pickerRows(m).find((r) => r.dataset.key === key);
+		assert.ok(row !== undefined, `a primary picker row for ${key}`);
+		m.el("picker-list").fire("mousedown", { target: row });
+		await m.flush();
+	}
+	/** Opens `seed` under `status`; the panel and a deck session agree and
+	 * nothing is written. */
+	async function opened(seed: Record<string, unknown>, status: OkStatus): Promise<Mounted> {
+		const m = await openPanel("reading", seed, status);
+		assert.equal(m.writes.length, 0, "opening the panel writes nothing");
+		assert.deepEqual(panelCells(m), await deckCells(m.store, status));
+		return m;
+	}
+
+	it("authored before the link: the first edit marks the plan, a link writes nothing and unlinking restores every cell", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5] }, gst(NO_LINKS));
+		await rename(m, G5[0]!, "CPU");
+		assert.equal(m.store.detailTilesVersion, 2, "the first rename writes the marker");
+		assert.deepEqual(plain(m.store.detailKeys), G5, "and leaves the keys as they were");
+		for (const i of [1, 2, 3, 4]) await rename(m, G5[i]!, NAMES[i]!);
+		const authored = ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]", "SSD=SSD[t4/1]"];
+		assert.deepEqual(panelCells(m), authored);
+		const writes = m.writes.length;
+		const stored = JSON.stringify(m.store);
+		for (const status of [gst(PAIR0), gst(ALL5), sst(ALL5)]) {
+			await relink(m, status);
+			const linked = ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"];
+			assert.deepEqual(panelCells(m), linked);
+			assert.deepEqual(parked(m), ["CPU"]);
+			assert.deepEqual(await deckCells(m.store, status), linked);
+			assert.deepEqual(await deckCells(m.store, gst(NO_LINKS), status), linked, "an open session refreshed onto the link agrees");
+		}
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(panelCells(m), authored);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), authored);
+		assert.equal(m.writes.length, writes, "links and unlinking write nothing");
+		assert.equal(JSON.stringify(m.store), stored);
+	});
+
+	it("a quad holding the opener's reading shows a triple and the note under the link, and the quad comes back unlinked", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["CPU", "GPU", "PUMP", "VRM"], colors: RGBY }, { size: 1, labels: ["SSD"] }] };
+		const quad = ["CPU=CPU@#FF0000[t0/4]", "GPU=GPU@#00FF00[t0/4]", "PUMP=PUMP@#0000FF[t0/4]", "VRM=VRM@#FFFF00[t0/4]", "SSD=SSD[t1/1]"];
+		const unlinked = await opened(seed, gst(NO_LINKS));
+		assert.deepEqual(panelCells(unlinked), quad);
+		assert.ok(!ownNote(unlinked));
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]", "SSD=SSD[t1/1]"]);
+		assert.ok(ownNote(m), JSON.stringify(notes(m)));
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(panelCells(m), quad);
+		assert.ok(!ownNote(m));
+		assert.equal(m.writes.length, 0);
+		// An edit under the link saves the shown layout: the hidden reading
+		// leads the list in a tile of its own, wearing its label and color.
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[4]!, "NVME");
+		assert.deepEqual(plain(m.store.detailKeys), G5);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["CPU"], colors: ["#FF0000"], cellLabels: true }, { size: 3, labels: ["GPU", "PUMP", "VRM"], colors: ["#00FF00", "#0000FF", "#FFFF00"] }, { size: 1, labels: ["NVME"] }]);
+		assert.ok(!ownNote(m), "the hidden cell is in its normal form now");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), ["CPU=CPU[t0/1]", "GPU=GPU[t1/3]", "PUMP=PUMP[t1/3]", "VRM=VRM[t1/3]", "SSD=NVME[t2/1]"]);
+	});
+
+	it("authored under the link: unlinking shows the opener's reading first with no label and the rest unchanged", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [{ size: 1 }, ...perReading(["GPU", "PUMP", "VRM", "SSD"])] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]);
+		assert.ok(!ownNote(m));
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["CPU=[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]", "SSD=SSD[t4/1]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+		assert.equal(m.writes.length, 0);
+		// The panel writes the same shape when the list is authored under the link.
+		const fresh = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], G5[3], G5[4]] }, gst(PAIR0));
+		for (const i of [1, 2, 3, 4]) await rename(fresh, G5[i]!, NAMES[i]!);
+		assert.deepEqual(plain(fresh.store.detailKeys), G5);
+		assert.deepEqual(plain(fresh.store.detailTiles), [{ size: 1 }, ...["GPU", "PUMP", "VRM", "SSD"].map((l) => ({ size: 1, labels: [l], colors: [null], cellLabels: true }))]);
+		assert.equal(fresh.store.detailTilesVersion, 2);
+	});
+
+	it("a label set in this session survives an edit made while its reading is hidden by a link", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3], G5[4]] }, gst(NO_LINKS));
+		for (const i of [1, 2, 0, 3, 4]) await rename(m, G5[i]!, NAMES[i]!);
+		await relink(m, gst(PAIR0));
+		assert.ok(ownNote(m), "the hidden cell sits mid-list");
+		await rename(m, G5[3]!, "VRM2");
+		assert.deepEqual(keysOf(m), ["CPU", "GPU", "PUMP", "VRM", "SSD"], "the edit moves it to the front");
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.labels[0]), ["CPU", "GPU", "PUMP", "VRM2", "SSD"]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM2[t3/1]", "SSD=SSD[t4/1]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a label set in this session survives an edit made while a re-pick hides its reading", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) };
+		const m = await opened(seed, gst(NO_LINKS));
+		await rename(m, G5[2]!, "PUMPX");
+		m.echo("readingKey", G5[2]);
+		await m.flush();
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(m), ["PUMP", "GPU", "VRM", "SSD"]);
+		assert.deepEqual(panelCells(m), ["GPU=GPU2[t0/1]", "VRM=VRM[t1/1]", "SSD=SSD[t2/1]"]);
+		const writes = m.writes.length;
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		const back = ["PUMP=PUMPX[t0/1]", "GPU=GPU2[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+		assert.equal(m.writes.length, writes);
+	});
+
+	it("a re-pick by settings echo on a version 2 plan hides the cell in place, writes nothing, and picking back restores it", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTilesVersion: 2, detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) };
+		const m = await opened(seed, gst(NO_LINKS));
+		m.echo("readingKey", G5[2]);
+		await m.flush();
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "VRM=VRM[t1/1]", "SSD=SSD[t2/1]"]);
+		assert.deepEqual(parked(m), ["PUMP"]);
+		assert.ok(ownNote(m));
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]);
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("an opener reading past the plan's cells shows no note, an edit leaves it in place, and picking back shows it there", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTilesVersion: 2, detailTiles: perReading(["GPU"]) };
+		const m = await opened(seed, gst(NO_LINKS));
+		m.echo("readingKey", G5[3]);
+		await m.flush();
+		const shown = ["GPU=GPU[t0/1]", "PUMP=[t1/1]", "SSD=[t2/1]"];
+		assert.deepEqual(panelCells(m), shown);
+		assert.ok(!ownNote(m), "nothing moves on the next edit, so there is nothing to say");
+		// The rename grows the plan to two cells, and VRM still has two
+		// listed readings before it: past the plan, it keeps its place.
+		await rename(m, G5[2]!, "PUMP");
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "SSD=[t2/1]"]);
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "SSD"]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["PUMP"], colors: [null], cellLabels: true }]);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+		const writes = m.writes.length;
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		const back = ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=[t2/1]", "SSD=[t3/1]"];
+		assert.deepEqual(panelCells(m), back, "VRM shows where it was, as 1.7.0 showed it");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+		assert.equal(m.writes.length, writes);
+	});
+
+	// An opener spelling listed past the plan stays in
+	// place through an edit, so unlinking or picking back shows that reading
+	// where it was, as 1.7.0 showed it, in the panel and on the deck.
+	it("a linked alias past the plan stays in place through an edit, and unlinking shows it where it was", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[0]], detailTilesVersion: 2, detailTiles: perReading(["GPU", "PUMP"]) }, gst(NO_LINKS));
+		await relink(m, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=[t2/1]"]);
+		assert.ok(!ownNote(m));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "CPU"], "the alias keeps its place");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 1, labels: ["PUMP"] }]);
+		assert.equal(m.store.detailTilesVersion, 2);
+		const writes = m.writes.length;
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU2[t0/1]", "PUMP=PUMP[t1/1]", "VRM=[t2/1]", "CPU=[t3/1]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+		assert.equal(m.writes.length, writes, "unlinking writes nothing");
+	});
+
+	it("a Reading pick through this panel past a 1.7.0 plan, an edit, and picking back show the list in its own order", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU"]) }, gst(NO_LINKS));
+		await pick(m, G5[3]!);
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=[t1/1]", "SSD=[t2/1]"]);
+		await rename(m, G5[2]!, "PUMP");
+		assert.equal(m.store.detailTilesVersion, 2);
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "SSD"]);
+		await pick(m, G5[0]!);
+		const back = ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=[t2/1]", "SSD=[t3/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	// The note says the next edit can move the hidden reading to the front,
+	// so it shows exactly when an edit that keeps the shown sizes does that:
+	// a hidden cell with a grouped reading after it. One at the end of its
+	// group keeps its place and its cell, label or not, so unlinking shows
+	// the group as it was.
+	const noteCases: { name: string; keys: string[]; tiles: unknown[]; note: boolean; after: string[]; unlinked: string[] }[] = [
+		{
+			name: "wearing nothing at the end of a triple",
+			keys: [G5[1]!, G5[2]!, G5[0]!, G5[3]!],
+			tiles: [{ size: 3, labels: ["GPU", "PUMP", ""] }],
+			note: false,
+			after: ["GPU", "PUMP", "CPU", "VRM"],
+			unlinked: ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]", "VRM=[t1/1]"]
+		},
+		{
+			name: "wearing a label at the end of a triple",
+			keys: [G5[1]!, G5[2]!, G5[0]!, G5[3]!],
+			tiles: [{ size: 3, labels: ["GPU", "PUMP", "CPU"] }],
+			note: false,
+			after: ["GPU", "PUMP", "CPU", "VRM"],
+			unlinked: ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]", "VRM=[t1/1]"]
+		},
+		{
+			name: "wearing nothing mid-triple",
+			keys: [G5[1]!, G5[0]!, G5[2]!, G5[3]!],
+			tiles: [{ size: 3, labels: ["GPU", "", "PUMP"] }],
+			note: true,
+			after: ["CPU", "GPU", "PUMP", "VRM"],
+			unlinked: ["CPU=[t0/1]", "GPU=GPU2[t1/2]", "PUMP=PUMP[t1/2]", "VRM=[t2/1]"]
+		},
+		{
+			name: "wearing a label mid-triple",
+			keys: [G5[1]!, G5[0]!, G5[2]!, G5[3]!],
+			tiles: [{ size: 3, labels: ["GPU", "CPU", "PUMP"] }],
+			note: true,
+			after: ["CPU", "GPU", "PUMP", "VRM"],
+			unlinked: ["CPU=CPU[t0/1]", "GPU=GPU2[t1/2]", "PUMP=PUMP[t1/2]", "VRM=[t2/1]"]
+		}
+	];
+	for (const { name, keys, tiles, note, after, unlinked } of noteCases) {
+		it(`the hidden-cell note forecasts the next edit: ${name}`, async () => {
+			const m = await opened({ ...base, readingKey: S5[0], detailKeys: keys, detailTilesVersion: 2, detailTiles: tiles }, gst(PAIR0));
+			assert.equal(ownNote(m), note, JSON.stringify(notes(m)));
+			await rename(m, G5[1]!, "GPU2");
+			assert.deepEqual(keysOf(m), after);
+			await relink(m, gst(NO_LINKS));
+			assert.deepEqual(panelCells(m), unlinked);
+			assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+		});
+	}
+
+	// A Reading pick never converts a plan saved by 1.7.0. An unmarked plan
+	// cannot say which walk saved it, so a pick writes the reading alone, as
+	// 1.7.0 did, and leaves the stored list and plan exactly as they were.
+	// The labels can sit one reading off while the pick lasts; picking back,
+	// or unlinking, shows the plan as saved. Only an explicit list or tile
+	// edit stores the version 2 form.
+	const pickCases: { name: string; seed: Record<string, unknown>; links: unknown[]; open: string[]; picks: [string, string[]][]; unlinked?: string[] }[] = [
+		{
+			name: "the opener listed, picking a listed reading and back",
+			seed: { readingKey: G5[0], detailKeys: [G5[0], G5[1], G5[2], G5[3]], detailTiles: [{ size: 2, labels: ["L1", "L2"] }, { size: 2, labels: ["L3", "L4"] }] },
+			links: NO_LINKS,
+			open: ["GPU=L1[t0/2]", "PUMP=L2[t0/2]", "VRM=L3[t1/1]"],
+			picks: [
+				[G5[2]!, ["CPU=L1[t0/2]", "GPU=L2[t0/2]", "VRM=L3[t1/1]"]],
+				[G5[0]!, ["GPU=L1[t0/2]", "PUMP=L2[t0/2]", "VRM=L3[t1/1]"]]
+			]
+		},
+		{
+			// The reported case: authored before the pair, which now hides CPU.
+			name: "a pair hides a listed key, picking an unlisted reading",
+			seed: { readingKey: S5[0], detailKeys: [G5[0], G5[1], G5[2], G5[3]], detailTiles: perReading(["CPU", "GPU", "PUMP", "VRM"]) },
+			links: PAIR0,
+			open: ["GPU=CPU[t0/1]", "PUMP=GPU[t1/1]", "VRM=PUMP[t2/1]"],
+			picks: [[G5[4]!, ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]"]]],
+			unlinked: ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]"]
+		},
+		{
+			// 1.7.0 re-picked the opener onto a listed reading; picking the
+			// earlier Reading brings the quad back as stored.
+			name: "a re-pick shifted the quad, picking the earlier Reading back",
+			seed: { readingKey: G5[2], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM", "SSD"], colors: RGBY }] },
+			links: NO_LINKS,
+			open: ["GPU=GPU[t0/3]", "VRM=PUMP[t0/3]", "SSD=VRM[t0/3]"],
+			picks: [[G5[0]!, ["GPU=GPU@#FF0000[t0/4]", "PUMP=PUMP@#00FF00[t0/4]", "VRM=VRM@#0000FF[t0/4]", "SSD=SSD@#FFFF00[t0/4]"]]]
+		},
+		{
+			// A hidden linked duplicate keeps its key and its own cell in storage.
+			name: "a hidden linked duplicate, picking a listed reading and back",
+			seed: { readingKey: G5[0], detailKeys: [G5[1], S5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "GPU-S", "PUMP", "VRM", "SSD"]) },
+			links: [pair(1)],
+			open: ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"],
+			picks: [
+				[G5[2]!, ["GPU=GPU[t0/1]", "VRM=PUMP[t1/1]", "SSD=VRM[t2/1]"]],
+				[G5[0]!, ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]]
+			],
+			unlinked: ["GPU=GPU[t0/1]", "GPU=GPU-S[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]", "SSD=SSD[t4/1]"]
+		},
+		{
+			// The old opener sits past the plan's cells: nothing moves at all.
+			name: "the opener past the plan, picking an unlisted reading",
+			seed: { readingKey: G5[3], detailKeys: [G5[0], G5[1], G5[2], G5[3]], detailTiles: perReading(["CPU", "GPU"]) },
+			links: NO_LINKS,
+			open: ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=[t2/1]"],
+			picks: [[G5[4]!, ["CPU=CPU[t0/1]", "GPU=GPU[t1/1]", "PUMP=[t2/1]", "VRM=[t3/1]"]]]
+		}
+	];
+	for (const { name, seed, links, open, picks, unlinked } of pickCases) {
+		it(`a Reading pick on a plan saved by 1.7.0 writes the reading alone: ${name}`, async () => {
+			const m = await opened({ ...base, ...seed }, gst(links));
+			assert.deepEqual(panelCells(m), open);
+			const stored = JSON.stringify({ detailKeys: m.store.detailKeys, detailTiles: m.store.detailTiles });
+			for (const [key, cells] of picks) {
+				const writes = m.writes.length;
+				await pick(m, key);
+				assert.deepEqual(m.writes.slice(writes).map((w) => w.name), ["readingKey"], `picking ${nameOf(key)} writes the reading alone`);
+				assert.equal(m.store.readingKey, key);
+				assert.equal(m.store.detailTilesVersion, undefined, "no marker");
+				assert.equal(JSON.stringify({ detailKeys: m.store.detailKeys, detailTiles: m.store.detailTiles }), stored, "the list and the plan stay as stored");
+				assert.deepEqual(panelCells(m), cells, `after picking ${nameOf(key)}`);
+				assert.deepEqual(await deckCells(m.store, gst(links)), cells, "the deck agrees");
+			}
+			if (unlinked !== undefined) {
+				const writes = m.writes.length;
+				await relink(m, gst(NO_LINKS));
+				assert.deepEqual(panelCells(m), unlinked);
+				assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+				assert.equal(m.writes.length, writes, "unlinking writes nothing");
+			}
+		});
+	}
+
+	it("picking the same reading, or picking with a flat list, writes only the reading", async () => {
+		const plan = { ...base, readingKey: G5[0], detailKeys: [G5[0], G5[1], G5[2]], detailTiles: perReading(["L1", "L2"]) };
+		const same = await opened(plan, gst(NO_LINKS));
+		await pick(same, G5[0]!);
+		assert.ok(same.writes.every((w) => w.name === "readingKey"), JSON.stringify(same.writes.map((w) => w.name)));
+		assert.equal(same.store.detailTilesVersion, undefined);
+		const flat = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[0], G5[1], G5[2]] }, gst(NO_LINKS));
+		await pick(flat, G5[2]!);
+		assert.deepEqual(flat.writes.map((w) => w.name), ["readingKey"]);
+		assert.equal(flat.store.detailTilesVersion, undefined);
+		assert.deepEqual(plain(flat.store.detailKeys), [G5[0], G5[1], G5[2]]);
+		const filter = await openPanel("reading", { ...plan, detailMode: "filter", detailFilter: "Temp" }, gst(NO_LINKS));
+		assert.equal(filter.writes.length, 0);
+		await pick(filter, G5[2]!);
+		assert.deepEqual(filter.writes.map((w) => w.name), ["readingKey"], "a filter view writes the reading alone");
+	});
+
+	// Plans saved by 1.7.0 render exactly as 1.7.0 rendered them, labels one
+	// cell off included where a link or a re-pick hides a listed key, until
+	// their next edit. Opening never writes, and the panel matches the deck.
+	const quadPlusOne = [{ size: 4, labels: ["CPU", "GPU", "PUMP", "VRM"], colors: RGBY }, { size: 1, labels: ["SSD"] }];
+	const legacy: [string, Record<string, unknown>, OkStatus, string[]][] = [
+		["S1a Gadget, no links", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(NO_LINKS), ["CPU=CPU@#FF0000[t0/4]", "GPU=GPU@#00FF00[t0/4]", "PUMP=PUMP@#0000FF[t0/4]", "VRM=VRM@#FFFF00[t0/4]", "SSD=SSD[t1/1]"]],
+		["S1b Gadget, every reading linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(ALL5), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
+		["S1c Shared Memory, every reading linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, sst(ALL5), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
+		["S1d Gadget, the opener linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(PAIR0), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]],
+		["S2 opener alias mid-list", { readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "CPU", "VRM", "SSD"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=CPU[t2/1]", "SSD=VRM[t3/1]"]],
+		["S3 opener alias and a duplicate", { readingKey: S5[0], detailKeys: [G5[0], G5[1], S5[1], G5[2], G5[3]], detailTiles: perReading(["CPU", "GPU", "GPU", "PUMP", "VRM"]) }, gst(ALL5), ["GPU=CPU[t0/1]", "PUMP=GPU[t1/1]", "VRM=PUMP[t2/1]"]],
+		["S3c a duplicate only", { readingKey: S5[0], detailKeys: [G5[1], S5[1], G5[2], G5[3]], detailTiles: perReading(["GPU", "GPU", "PUMP", "VRM"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]"]],
+		["S4a no links, opener not listed", { readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]],
+		["S4b no links, opener re-picked onto a listed reading", { readingKey: G5[2], detailKeys: [G5[1], G5[2], G5[3], G5[4]], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["GPU=GPU[t0/1]", "VRM=PUMP[t1/1]", "SSD=VRM[t2/1]"]],
+		["S5a saved under the link, linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(ALL5), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=VRM[t2/1]", "SSD=SSD[t3/1]"]],
+		["S5b saved under the link, unlinked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(NO_LINKS), ["CPU=GPU[t0/1]", "GPU=PUMP[t1/1]", "PUMP=VRM[t2/1]", "VRM=SSD[t3/1]", "SSD=[t4/1]"]],
+		["S5q quad saved under the link, linked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM", "SSD"], colors: RGBY }] }, gst(PAIR0), ["GPU=GPU@#FF0000[t0/4]", "PUMP=PUMP@#00FF00[t0/4]", "VRM=VRM@#0000FF[t0/4]", "SSD=SSD@#FFFF00[t0/4]"]],
+		["S5q quad saved under the link, unlinked", { readingKey: S5[0], detailKeys: [...G5], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM", "SSD"], colors: RGBY }] }, gst(NO_LINKS), ["CPU=GPU@#FF0000[t0/4]", "GPU=PUMP@#00FF00[t0/4]", "PUMP=VRM@#0000FF[t0/4]", "VRM=SSD@#FFFF00[t0/4]", "SSD=[t1/1]"]]
+	];
+	for (const [name, seed, status, cells] of legacy) {
+		it(`a plan saved by 1.7.0 reads as 1.7.0 read it: ${name}`, async () => {
+			const m = await opened({ ...base, ...seed }, status);
+			assert.deepEqual(panelCells(m), cells);
+			assert.equal(m.store.detailTilesVersion, undefined);
+			// Its hidden cell is not kept in place, so the note would be false.
+			assert.ok(!ownNote(m), JSON.stringify(notes(m)));
+		});
+	}
+
+	it("a flat list with the opener's alias parked mid-list stays flat and unmarked through an edit", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], G5[3]] }, gst(PAIR0));
+		const chip = chips(m, "detail-list").find((c) => c.dataset.key === G5[3])!;
+		m.el("detail-list").fire("click", { target: chip.querySelector('.hw-detail-move[data-move="-1"]')! });
+		await m.flush();
+		assert.deepEqual(keysOf(m), ["GPU", "CPU", "VRM", "PUMP"]);
+		assert.deepEqual(plain(m.store.detailTiles), []);
+		assert.equal(m.store.detailTilesVersion, undefined);
+		assert.ok(m.writes.every((w) => w.name !== "detailTilesVersion"));
+	});
+
+	it("the filter view leaves out the opener on the deck and in the panel's count, after a re-pick too", async () => {
+		// "U Temp" matches CPU Temp and GPU Temp only, so each opener leaves a
+		// different count: a count that did not follow the pick would show.
+		const seed = { ...base, detailMode: "filter", detailFilter: "U Temp", readingKey: S5[0] };
+		const status = gst(PAIR0);
+		const m = await openPanel("reading", seed, status);
+		const deckKeys = async (readingKey: string): Promise<string[]> => {
+			const nav = new DetailNavigator({ switchProfile: async () => {} });
+			assert.equal(await nav.enter({ deviceId: "f", deviceType: 0, settings: { ...seed, readingKey }, snapshot: status.snapshot }), "entered");
+			const keys = nav.stateFor("f")!.group.keys.map(nameOf);
+			assert.deepEqual(nav.stateFor("f")!.tilePlan, [], "a filter view has no tile plan");
+			nav.shutdown();
+			return keys;
+		};
+		const counted = (n: number): string => `Matches ${n} reading${n === 1 ? "" : "s"} right now.`;
+		const count = (): string => m.el("detail-filter-count").textContent;
+		const first = await deckKeys(S5[0]!);
+		assert.deepEqual(first, ["GPU"], "the linked opener CPU is left out");
+		assert.equal(count(), counted(first.length));
+		// A re-pick another panel or the app delivers as a settings echo.
+		m.echo("readingKey", G5[2]);
+		await m.flush();
+		const echoed = await deckKeys(G5[2]!);
+		assert.deepEqual(echoed, ["CPU", "GPU"], "PUMP is not a match, so nothing is left out");
+		assert.equal(count(), counted(echoed.length));
+		assert.equal(m.writes.length, 0);
+		// This panel's own pick, which the app never echoes back.
+		await pick(m, G5[1]!);
+		const own = await deckKeys(G5[1]!);
+		assert.deepEqual(own, ["CPU"]);
+		assert.equal(count(), counted(own.length));
+		assert.deepEqual(m.writes.map((w) => w.name), ["readingKey"]);
+	});
+
+	it("a plan marked with the string \"2\" reads as version 2 in the panel and on the deck", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: "2", detailTiles: quadPlusOne }, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]", "SSD=SSD[t1/1]"]);
+		assert.ok(ownNote(m));
+	});
+
+	it("a flat move under the link keeps the hidden reading's label and color, and unlinking shows them", async () => {
+		const lead = { size: 1, labels: ["CPU"], colors: ["#FF0000"] };
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[0], G5[1], G5[2]], detailTilesVersion: 2, detailTiles: [lead] }, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=[t0/1]", "PUMP=[t1/1]"]);
+		const chip = chips(m, "detail-list").find((c) => c.dataset.key === G5[2])!;
+		m.el("detail-list").fire("click", { target: chip.querySelector('.hw-detail-move[data-move="-1"]')! });
+		await m.flush();
+		assert.deepEqual(keysOf(m), ["CPU", "PUMP", "GPU"]);
+		assert.deepEqual(plain(m.store.detailTiles), [lead], "the hidden reading's tile is stored as it was");
+		assert.equal(m.store.detailTilesVersion, 2);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["CPU=CPU[t0/1]", "PUMP=[t1/1]", "GPU=[t2/1]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+		assert.deepEqual(detailTilesOf(m.store)[0]?.colors, ["#FF0000"]);
+	});
+
+	it("an edit under the link stores the hidden reading's leading tile byte for byte, unknown fields included", async () => {
+		const lead = { size: 1, labels: ["CPU"], futureTile: { keep: 1 } };
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [lead, ...perReading(["GPU", "PUMP", "VRM", "SSD"])] }, gst(PAIR0));
+		await rename(m, G5[4]!, "NVME");
+		const stored = plain(m.store.detailTiles) as Record<string, unknown>[];
+		assert.deepEqual(stored[0], lead);
+		assert.deepEqual(stored.slice(1).map((t) => (t.labels as string[])[0]), ["GPU", "PUMP", "VRM", "NVME"]);
+		assert.deepEqual(plain(m.store.detailKeys), G5);
+	});
+
+	it("two edits under the link keep the hidden reading's label and color", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: quadPlusOne };
+		const m = await opened(seed, gst(PAIR0));
+		const lead = { size: 1, labels: ["CPU"], colors: ["#FF0000"], cellLabels: true };
+		await rename(m, G5[4]!, "NVME");
+		assert.deepEqual((plain(m.store.detailTiles) as unknown[])[0], lead, "after the first edit");
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual((plain(m.store.detailTiles) as unknown[])[0], lead, "after the second edit");
+		await relink(m, gst(NO_LINKS));
+		assert.equal(panelCells(m)[0], "CPU=CPU[t0/1]");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+	});
+
+	it("an automatic hue on the hidden cell stays automatic through an edit under the link", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["CPU", "GPU", "PUMP", "VRM"], colors: ["#4CC2FF", "#00FF00", "#0000FF", "#FFFF00"], automaticColors: [true, false, false, false] }, { size: 1, labels: ["SSD"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		await rename(m, G5[4]!, "NVME");
+		const lead = detailTilesOf(m.store)[0];
+		assert.deepEqual(lead?.colors, ["#4CC2FF"]);
+		assert.deepEqual(lead?.automaticColors, [true], JSON.stringify((plain(m.store.detailTiles) as unknown[])[0]));
+	});
+
+	it("a hidden cell past a tile's first cell leads with its own label and color after an edit", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], G5[3], G5[4]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "CPU", "PUMP", "VRM"], colors: RGBY }, { size: 1, labels: ["SSD"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]", "SSD=SSD[t1/1]"]);
+		await rename(m, G5[4]!, "NVME");
+		assert.deepEqual((plain(m.store.detailTiles) as unknown[])[0], { size: 1, labels: ["CPU"], colors: ["#00FF00"], cellLabels: true });
+		await relink(m, gst(NO_LINKS));
+		assert.equal(panelCells(m)[0], "CPU=CPU[t0/1]");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+	});
+
+	it("the documented remedy: an edit made while a 1.7.0 plan's labels sit right stores version 2, and the pair then moves nothing", async () => {
+		// Authored before the pair: remove it, edit, add it again.
+		const before = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5], detailTiles: quadPlusOne }, gst(PAIR0));
+		assert.deepEqual(panelCells(before), ["GPU=CPU@#FF0000[t0/4]", "PUMP=GPU@#00FF00[t0/4]", "VRM=PUMP@#0000FF[t0/4]", "SSD=VRM@#FFFF00[t0/4]"]);
+		await relink(before, gst(NO_LINKS));
+		await rename(before, G5[4]!, "SSD2");
+		assert.equal(before.store.detailTilesVersion, 2);
+		await relink(before, gst(PAIR0));
+		const linked = ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]", "SSD=SSD2[t1/1]"];
+		assert.deepEqual(panelCells(before), linked);
+		assert.deepEqual(await deckCells(before.store, gst(PAIR0)), linked);
+		// Authored under the pair: edit while it stands, then remove it.
+		const under = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5], detailTiles: perReading(["GPU", "PUMP", "VRM", "SSD"]) }, gst(PAIR0));
+		await rename(under, G5[4]!, "SSD2");
+		assert.equal(under.store.detailTilesVersion, 2);
+		await relink(under, gst(NO_LINKS));
+		const unlinked = ["CPU=[t0/1]", "GPU=GPU[t1/1]", "PUMP=PUMP[t2/1]", "VRM=VRM[t3/1]", "SSD=SSD2[t4/1]"];
+		assert.deepEqual(panelCells(under), unlinked);
+		assert.deepEqual(await deckCells(under.store, gst(NO_LINKS)), unlinked);
+	});
+
+	// A hidden opener spelling with no listed reading after it inside the
+	// plan keeps its place and its cell through every edit (the unfilled end
+	// of a partly filled tile included), so unlinking or picking back shows
+	// its tile as 1.7.0 showed it.
+	async function removeChip(m: Mounted, key: string): Promise<void> {
+		const chip = chips(m, "detail-list").find((c) => c.dataset.key === key);
+		assert.ok(chip !== undefined, `a chip for ${key}`);
+		m.el("detail-list").fire("click", { target: chip.querySelector(".hw-set-remove")! });
+		await m.flush();
+	}
+
+	it("a 1.7.0 quad whose last cell the opener's alias fills keeps that reading in the quad through edits under the link and a reopen", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[0]], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "VRM"] }] }, gst(NO_LINKS));
+		assert.deepEqual(panelCells(m), ["GPU=GPU@#4CC2FF[t0/4]", "PUMP=PUMP@#FF7E8E[t0/4]", "VRM=VRM@#38CD89[t0/4]", "CPU=@#D4AB33[t0/4]"]);
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "CPU"], "the alias keeps its place, as 1.7.0 kept it");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP", "VRM"] }]);
+		assert.equal(m.store.detailTilesVersion, 2);
+		assert.ok(!ownNote(m), "the next edit moves nothing either");
+		await rename(m, G5[2]!, "PUMP2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP2", "VRM"] }], "a second edit keeps the quad");
+		const again = await opened(plain(m.store) as Record<string, unknown>, gst(PAIR0));
+		await rename(again, G5[3]!, "VRM2");
+		assert.deepEqual(keysOf(again), ["GPU", "PUMP", "VRM", "CPU"]);
+		await relink(again, gst(NO_LINKS));
+		const back = ["GPU=GPU2@#4CC2FF[t0/4]", "PUMP=PUMP2@#FF7E8E[t0/4]", "VRM=VRM2@#38CD89[t0/4]", "CPU=@#D4AB33[t0/4]"];
+		assert.deepEqual(panelCells(again), back, "unlinking shows the quad as 1.7.0 shows it");
+		assert.deepEqual(await deckCells(again.store, gst(NO_LINKS)), back);
+	});
+
+	it("a Reading pick onto a 1.7.0 quad's last reading, two edits and picking back keep that reading's label and color in the quad", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[4], G5[3]], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "SSD", "VRM"], colors: RGBY }] }, gst(NO_LINKS));
+		await pick(m, G5[3]!);
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "SSD=SSD[t0/3]"], "the labels sit right while VRM is the opener");
+		await rename(m, G5[1]!, "GPU2");
+		assert.ok(!ownNote(m));
+		await rename(m, G5[2]!, "PUMP2");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "SSD", "VRM"]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP2", "SSD", "VRM"], colors: RGBY }]);
+		await pick(m, G5[0]!);
+		const back = ["GPU=GPU2@#FF0000[t0/4]", "PUMP=PUMP2@#00FF00[t0/4]", "SSD=SSD@#0000FF[t0/4]", "VRM=VRM@#FFFF00[t0/4]"];
+		assert.deepEqual(panelCells(m), back, "VRM wears its own label and color in its own cell, as on 1.7.0");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("a 1.7.0 quad's last reading keeps its stored entries this build cannot read through two edits while it is the opener", async () => {
+		const tile = { size: 4, labels: ["GPU", "PUMP", "SSD", " VRM "], colors: [null, null, null, "red"] };
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[4], G5[3]], detailTiles: [tile] }, gst(NO_LINKS));
+		await pick(m, G5[3]!);
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ ...tile, labels: ["GPU2", "PUMP", "SSD", " VRM "] }], "the first edit keeps them in VRM's cell");
+		await rename(m, G5[2]!, "PUMP2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ ...tile, labels: ["GPU2", "PUMP2", "SSD", " VRM "] }], "and so does the second");
+		await pick(m, G5[0]!);
+		assert.equal(panelCells(m)[3], "VRM=VRM@#D4AB33[t0/4]");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+	});
+
+	it("a version 2 quad whose last reading becomes the opener keeps it in the quad through an edit, with no note", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[4], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "SSD", "VRM"], colors: RGBY }] };
+		const m = await opened(seed, gst(NO_LINKS));
+		m.echo("readingKey", G5[3]);
+		await m.flush();
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "SSD=SSD[t0/3]"]);
+		assert.ok(!ownNote(m), "nothing moves on the next edit, so there is nothing to say");
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), seed.detailKeys);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP", "SSD", "VRM"], colors: RGBY }]);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		const back = ["GPU=GPU2@#FF0000[t0/4]", "PUMP=PUMP@#00FF00[t0/4]", "SSD=SSD@#0000FF[t0/4]", "VRM=VRM@#FFFF00[t0/4]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("a hidden cell before its tile's unfilled cell keeps its place through an edit, and unlinking shows the tile as before", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP"] }] };
+		const m = await opened(seed, gst(NO_LINKS));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"]);
+		await relink(m, gst(PAIR0));
+		assert.ok(!ownNote(m));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "CPU"]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP"] }]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a hidden cell before an unfilled cell's stored label keeps its place and never wears that label", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "", "X"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "CPU"]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP", "", "X"] }]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a hidden cell that had a tile of its own gets it back in place, at the plan's end or before tiles past the list", async () => {
+		const end = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3]], detailTilesVersion: 2, detailTiles: perReading(["GPU", "PUMP", "CPU"]) }, gst(PAIR0));
+		await rename(end, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(end), ["GPU", "PUMP", "CPU", "VRM"]);
+		assert.deepEqual(detailTilesOf(end.store).map((t) => t.labels), [["GPU2"], ["PUMP"], ["CPU"]]);
+		await relink(end, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU2[t0/1]", "PUMP=PUMP[t1/1]", "CPU=CPU[t2/1]", "VRM=[t3/1]"];
+		assert.deepEqual(panelCells(end), unlinked);
+		assert.deepEqual(await deckCells(end.store, gst(NO_LINKS)), unlinked);
+		const before = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["CPU"] }, { size: 2 }] }, gst(PAIR0));
+		await rename(before, G5[1]!, "GPU2");
+		assert.deepEqual(plain(before.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 1, labels: ["CPU"] }, { size: 2 }]);
+	});
+
+	const sizesShown = (m: Mounted): string[] => m.el("detail-list").querySelectorAll(".hw-tile-size").map((b) => b.textContent);
+	async function resize(m: Mounted, key: string): Promise<void> {
+		const holder = chips(m, "detail-list").find((c) => c.dataset.key === key)!.closest(".hw-tile")!;
+		m.el("detail-list").fire("click", { target: holder.querySelector(".hw-tile-size")! });
+		await m.flush();
+	}
+
+	// The edit that moves a 1.7.0 plan to version 2 gives the
+	// hidden alias the empty cell it walks into, the cell 1.7.0 shows it in
+	// once unlinked, so the stored size stays the one 1.7.0 keeps. Under the
+	// link that tile shows one reading fewer; unlinked, its size control and
+	// the next reading added read exactly as on 1.7.0.
+	it("an edit on a 1.7.0 plan keeps the tile size 1.7.0 stored when the hidden alias walks into an empty cell of it", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP"] }] }, gst(PAIR0));
+		assert.deepEqual(sizesShown(m), ["×3"]);
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 3, labels: ["GPU2", "PUMP"] }], "the rename stores the size 1.7.0 stores");
+		assert.equal(m.store.detailTilesVersion, 2);
+		assert.deepEqual(sizesShown(m), ["×2"], "the hidden alias holds the third cell, so the tile shows one reading fewer");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "CPU"]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(sizesShown(m), ["×3"], "unlinked, the size control reads x3, as on 1.7.0");
+		const unlinked = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"];
+		assert.deepEqual(panelCells(m), unlinked, "as 1.7.0 shows it unlinked");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("an edit on a 1.7.0 plan gives the hidden reading the stored cell 1.7.0 gives it, even in a tile with room", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[3]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "VRM"], colors: [null, null, "#FFFF00"] }] }, gst(NO_LINKS));
+		await pick(m, G5[3]!);
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 3, labels: ["GPU2", "PUMP", "VRM"], colors: [null, null, "#FFFF00"] }]);
+		await pick(m, G5[0]!);
+		const back = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]"];
+		assert.deepEqual(panelCells(m), back, "VRM wears its own label, as on 1.7.0");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("a hidden cell that led its tile goes back at the head of what is left of it", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 3, labels: ["CPU"] }] }, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 3, labels: ["CPU"] }]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+	});
+
+	it("moving another tile keeps a hidden cell in the tile it came from", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[4], G5[3], G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["S"] }, { size: 1, labels: ["V"] }, { size: 3, labels: ["GPU", "PUMP", "CPU"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		const grip = m.el("detail-list").querySelector('.hw-tile-grip[data-tile="0"]');
+		assert.ok(grip);
+		m.el("detail-list").fire("keydown", { target: grip, key: "ArrowDown" });
+		await m.flush();
+		assert.deepEqual(keysOf(m), ["VRM", "SSD", "GPU", "PUMP", "CPU"]);
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.labels), [["V"], ["S"], ["GPU", "PUMP", "CPU"]]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["VRM=V[t0/1]", "SSD=S[t1/1]", "GPU=GPU[t2/3]", "PUMP=PUMP[t2/3]", "CPU=CPU[t2/3]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("growing the tile a hidden cell sits in to four cells keeps the size you chose and moves that reading to the front", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(sizesShown(m), ["×3"]);
+		await resize(m, G5[1]!);
+		assert.deepEqual(sizesShown(m), ["×4"], "the tile keeps the size you chose");
+		assert.deepEqual(keysOf(m), ["CPU", "GPU", "PUMP"], "its cell has no room left in the tile");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1 }, { size: 4, labels: ["GPU", "PUMP"] }]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+	});
+
+	it("growing a tile over the opener's reading past the plan to four cells moves that reading to the front and leaves the stored label where it was", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "VRM", "X"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		await resize(m, G5[1]!);
+		assert.deepEqual(sizesShown(m), ["×4"]);
+		assert.deepEqual(keysOf(m), ["CPU", "GPU", "PUMP", "VRM"]);
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.labels), [[""], ["GPU", "PUMP", "VRM", "X"]]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["CPU=[t0/1]", "GPU=GPU[t1/3]", "PUMP=PUMP[t1/3]", "VRM=VRM[t1/3]"];
+		assert.deepEqual(panelCells(m), unlinked, "CPU does not wear the stored X");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("clearing the tile before a hidden cell keeps the hidden reading in place, labelled or not", async () => {
+		// The cleared tile is pruned from the shown plan; a hidden cell that
+		// wears a label keeps its place behind a default tile in its stead.
+		const labelled = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3]], detailTilesVersion: 2, detailTiles: perReading(["GPU", "PUMP", "CPU"]) }, gst(PAIR0));
+		assert.ok(!ownNote(labelled));
+		await rename(labelled, G5[2]!, "");
+		assert.deepEqual(keysOf(labelled), ["GPU", "PUMP", "CPU", "VRM"]);
+		assert.deepEqual(plain(labelled.store.detailTiles), [{ size: 1, labels: ["GPU"] }, { size: 1, labels: [""], colors: [null], cellLabels: true }, { size: 1, labels: ["CPU"] }]);
+		assert.deepEqual(await deckCells(labelled.store, gst(PAIR0)), panelCells(labelled));
+		assert.ok(!ownNote(labelled));
+		await relink(labelled, gst(NO_LINKS));
+		const back = ["GPU=GPU[t0/1]", "PUMP=[t1/1]", "CPU=CPU[t2/1]", "VRM=[t3/1]"];
+		assert.deepEqual(panelCells(labelled), back);
+		assert.deepEqual(await deckCells(labelled.store, gst(NO_LINKS)), back);
+		// A second spelling wearing a label behind one that went past the plan
+		// has no place to keep, so it leads.
+		const two = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["PUMP"] }, { size: 2, labels: ["", "SM"] }] }, gst(PAIR0));
+		await rename(two, G5[2]!, "");
+		assert.deepEqual(plain(two.store.detailKeys), [S5[0], G5[1], G5[2], G5[0]]);
+		assert.deepEqual(detailTilesOf(two.store).map((t) => t.labels), [["SM"], ["GPU"]]);
+		assert.deepEqual(await deckCells(two.store, gst(PAIR0)), panelCells(two));
+		const plainCell = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["PUMP"] }, { size: 2 }] }, gst(PAIR0));
+		await rename(plainCell, G5[2]!, "");
+		assert.deepEqual(keysOf(plainCell), ["GPU", "PUMP", "CPU"], "a cell wearing nothing needs no room");
+		assert.deepEqual(plain(plainCell.store.detailTiles), [{ size: 1, labels: ["GPU"] }]);
+		assert.deepEqual(await deckCells(plainCell.store, gst(PAIR0)), panelCells(plainCell));
+		await relink(plainCell, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU[t0/1]", "PUMP=[t1/1]", "CPU=[t2/1]"];
+		assert.deepEqual(panelCells(plainCell), unlinked, "CPU shows in its place");
+		assert.deepEqual(await deckCells(plainCell.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a hidden cell whose tile an edit removed gets a tile of its own in place, written plain when it wears nothing", async () => {
+		const shared = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "VRM"] }, { size: 2, labels: ["SSD", "CPU"] }] }, gst(PAIR0));
+		await removeChip(shared, G5[4]!);
+		assert.deepEqual(keysOf(shared), ["GPU", "PUMP", "VRM", "CPU"]);
+		assert.deepEqual(detailTilesOf(shared.store).map((t) => t.labels), [["GPU", "PUMP", "VRM"], ["CPU"]], "CPU does not join the triple");
+		await relink(shared, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "VRM=VRM[t0/3]", "CPU=CPU[t1/1]"];
+		assert.deepEqual(panelCells(shared), unlinked);
+		assert.deepEqual(await deckCells(shared.store, gst(NO_LINKS)), unlinked);
+		const pruned = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 2 }] }, gst(PAIR0));
+		await rename(pruned, G5[1]!, "GPU2");
+		assert.deepEqual(plain(pruned.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 1 }]);
+	});
+
+	it("two spellings at a tile's end keep their places and cells in order", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "G", "S"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.ok(!ownNote(m));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), seed.detailKeys);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 4, labels: ["GPU2", "PUMP", "G", "S"] }]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+	});
+
+	it("a hidden cell's automatic hue stays automatic when it goes back in place", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], G5[4], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "SSD", "VRM"], colors: [null, null, null, "#D4AB33"], automaticColors: [false, false, false, true] }] };
+		const m = await opened(seed, gst(NO_LINKS));
+		m.echo("readingKey", G5[3]);
+		await m.flush();
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(detailTilesOf(m.store)[0]?.automaticColors, [false, false, false, true]);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), panelCells(m));
+	});
+
+	it("removing a fill tile's last reading under the link keeps the alias after it in place", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[4], G5[0]], detailDensity: "3" }, gst(PAIR0));
+		await removeChip(m, G5[4]!);
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "CPU"], "CPU stays last, as 1.7.0 kept it");
+		assert.equal(m.store.detailTilesVersion, 2);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["GPU=[t0/3]", "PUMP=[t0/3]", "VRM=[t0/3]", "CPU=[t1/1]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a tile grown over the opener's reading past the plan gives it a cell of its own and leaves a stored label to the cell after it", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 2, labels: ["GPU", "PUMP", "X"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		const holder = chips(m, "detail-list").find((c) => c.dataset.key === G5[1])!.closest(".hw-tile")!;
+		m.el("detail-list").fire("click", { target: holder.querySelector(".hw-tile-size")! });
+		await m.flush();
+		// Version 2: the size picked under the link counts
+		// the readings shown, and the hidden cell is kept on top of it, as
+		// docs/sensor-details.md says.
+		assert.deepEqual(sizesShown(m), ["×3"], "the tile shows the size picked");
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.size), [4], "the hidden cell is stored on top of it");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "CPU"], "CPU keeps its place");
+		assert.deepEqual(detailTilesOf(m.store)[0]?.labels, ["GPU", "PUMP", "", "X"]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(sizesShown(m), ["×4"], "unlinked, the tile shows the hidden cell again");
+		const unlinked = ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"];
+		assert.deepEqual(panelCells(m), unlinked, "CPU does not wear the stored X");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	// Two spellings of the opener's reading, both inside the plan, both lead:
+	// the count is listed readings, never raw positions.
+	it("two spellings of the opener's reading inside the plan both lead, and the deck agrees after the edit", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], S5[0], G5[2]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "", "", "PUMP"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/2]", "PUMP=PUMP[t0/2]"]);
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), [G5[0], S5[0], G5[1], G5[2]]);
+		assert.deepEqual(panelCells(m), ["GPU=GPU2[t0/2]", "PUMP=PUMP[t0/2]"]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m), "the deck shows what the panel shows");
+		const again = await opened(plain(m.store) as Record<string, unknown>, gst(PAIR0));
+		assert.deepEqual(panelCells(again), ["GPU=GPU2[t0/2]", "PUMP=PUMP[t0/2]"], "a reopen shows the same layout");
+	});
+
+	it("one spelling leads from mid-tile while another keeps its place at the tile's end in the same edit", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["GPU", "", "PUMP", "SM"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/2]", "PUMP=PUMP[t0/2]"]);
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), [G5[0], G5[1], G5[2], S5[0]], "G0 leads, S0 keeps its place");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1 }, { size: 3, labels: ["GPU2", "PUMP", "SM"], colors: [null, null, null] }]);
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		const again = await opened(plain(m.store) as Record<string, unknown>, gst(PAIR0));
+		assert.deepEqual(panelCells(again), ["GPU=GPU2[t0/2]", "PUMP=PUMP[t0/2]"]);
+	});
+
+	it("the note counts listed readings when a spelling in its normal form leads the list", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[0], G5[1], S5[0], G5[2]], detailTilesVersion: 2, detailTiles: [{ size: 1 }, { size: 3, labels: ["GPU", "", "PUMP"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/2]", "PUMP=PUMP[t0/2]"]);
+		assert.ok(ownNote(m), "S0 sits mid-pair, so the next edit moves it");
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), [G5[0], S5[0], G5[1], G5[2]], "the edit moved it, as the note said");
+	});
+
+	it("the note counts listed readings past a hidden linked duplicate", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], S5[1], G5[0], G5[2], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 3, labels: ["GPU", "GPU-S", ""] }, { size: 1, labels: ["PUMP"] }] };
+		const m = await opened(seed, gst([pair(0), pair(1)]));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/1]", "PUMP=PUMP[t1/1]", "VRM=[t2/1]"]);
+		assert.ok(ownNote(m), JSON.stringify(notes(m)));
+		await rename(m, G5[2]!, "PUMP2");
+		assert.deepEqual(keysOf(m), ["CPU", "GPU", "PUMP", "VRM"], "the edit moved it, as the note said");
+	});
+
+	it("a hidden cell wearing only a color keeps that color through an edit under the link", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [{ size: 4, labels: ["", "GPU", "PUMP", "VRM"], colors: RGBY }, { size: 1, labels: ["SSD"] }] };
+		const unlinked = await opened(seed, gst(NO_LINKS));
+		assert.equal(panelCells(unlinked)[0], "CPU=@#FF0000[t0/4]", "CPU shows red in the quad");
+		const m = await opened(seed, gst(PAIR0));
+		await rename(m, G5[4]!, "NVME");
+		assert.deepEqual((plain(m.store.detailTiles) as unknown[])[0], { size: 1, labels: [""], colors: ["#FF0000"], cellLabels: true });
+		await relink(m, gst(NO_LINKS));
+		assert.equal(panelCells(m)[0], "CPU=[t0/1]");
+		assert.deepEqual(detailTilesOf(m.store)[0]?.colors, ["#FF0000"]);
+	});
+
+	it("an unlabelled stored lead tile keeps its unknown fields through an edit under the link", async () => {
+		const lead = { size: 1, futureTile: { keep: 1 } };
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [...G5], detailTilesVersion: 2, detailTiles: [lead, ...perReading(["GPU", "PUMP", "VRM", "SSD"])] }, gst(PAIR0));
+		await rename(m, G5[4]!, "NVME");
+		assert.deepEqual((plain(m.store.detailTiles) as unknown[])[0], lead);
+	});
+
+	// A stored entry this build cannot read travels with its hidden reading,
+	// whether it keeps its place or leads.
+	it("a hidden cell holding only an unreadable stored entry keeps it, in place at its tile's end or leading from mid-tile", async () => {
+		const end = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 3, labels: ["GPU", "PUMP", ""], colors: [null, null, "red"] }] }, gst(PAIR0));
+		await rename(end, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(end), ["GPU", "PUMP", "CPU", "VRM"]);
+		assert.deepEqual(plain(end.store.detailTiles), [{ size: 3, labels: ["GPU2", "PUMP", ""], colors: [null, null, "red"] }]);
+		const mid = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 3, labels: ["GPU", "", "PUMP"], colors: [null, "red", null] }] }, gst(PAIR0));
+		await rename(mid, G5[1]!, "GPU2");
+		assert.deepEqual(keysOf(mid), ["CPU", "GPU", "PUMP", "VRM"]);
+		assert.deepEqual((plain(mid.store.detailTiles) as unknown[])[0], { size: 1, labels: [""], colors: ["red"], cellLabels: true });
+	});
+
+	it("removing the last visible reading keeps a hidden cell's unreadable stored entry", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], G5[2]], detailTilesVersion: 2, detailTiles: [{ size: 2, labels: ["", ""], colors: [null, "red"] }] }, gst(PAIR0));
+		await removeChip(m, G5[1]!);
+		assert.deepEqual(keysOf(m), ["CPU", "PUMP"]);
+		assert.equal(m.store.detailTilesVersion, 2);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: [""], colors: ["red"], cellLabels: true }]);
+	});
+
+	// An edit that keeps the sizes on a 1.7.0
+	// plan whose alias is listed last stores the sizes 1.7.0 stores, so after
+	// unlinking the size control and the next reading added land as on 1.7.0.
+	async function addReading(m: Mounted, key: string): Promise<void> {
+		m.el("pickerd-search").fire("focus");
+		await m.flush();
+		clickTick(m, key, true, "pickerd-list");
+		await m.flush();
+	}
+
+	it("a rename under the link keeps a 1.7.0 tile at its stored size, so the next reading after unlinking gets its own tile as on 1.7.0", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], S5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", ""] }] }, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.size), [3], "the rename keeps the size 1.7.0 keeps");
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(sizesShown(m), ["×3"], "unlinked, the tile is the x3 the plan stored, as on 1.7.0");
+		await addReading(m, G5[3]!);
+		const added = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]", "VRM=[t1/1]"];
+		assert.deepEqual(panelCells(m), added, "VRM gets a tile of its own, as on 1.7.0");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), added);
+	});
+
+	it("a rename under the link leaves the next reading on the labelled tile 1.7.0 gives it", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], S5[0]], detailTiles: [{ size: 2, labels: ["GPU", ""] }, { size: 1, labels: ["NEXT"] }] }, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 2, labels: ["GPU2", ""] }, { size: 1, labels: ["NEXT"] }]);
+		await relink(m, gst(NO_LINKS));
+		await addReading(m, G5[3]!);
+		const added = ["GPU=GPU2[t0/2]", "CPU=[t0/2]", "VRM=NEXT[t1/1]"];
+		assert.deepEqual(panelCells(m), added, "VRM wears the NEXT label stored for it, as on 1.7.0");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), added);
+	});
+
+	it("a rename under a Shared Memory opener keeps a 1.7.0 tile at its stored size when the Gadget alias is listed last", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", ""] }] }, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 3, labels: ["GPU2", "PUMP", ""] }]);
+		await relink(m, gst(NO_LINKS));
+		await addReading(m, G5[3]!);
+		const added = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]", "VRM=[t1/1]"];
+		assert.deepEqual(panelCells(m), added);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), added);
+	});
+
+	// The cost of keeping 1.7.0's sizes, pinned on purpose: on the edit that
+	// moves a 1.7.0 plan to version 2, a tile grown over the alias listed last
+	// gives it the new cell, as 1.7.0 does once unlinked, so under the link
+	// that tile shows the size it had. The next size click grows it.
+	it("a size click under the link on a 1.7.0 plan stores the size 1.7.0 stores, and the hidden alias takes the new cell", async () => {
+		const m = await opened({ ...base, readingKey: G5[0], detailKeys: [G5[1], G5[2], S5[0]], detailTiles: [{ size: 2, labels: ["GPU", "PUMP"] }] }, gst(PAIR0));
+		await resize(m, G5[1]!);
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.size), [3], "x3, as 1.7.0 stores the click");
+		assert.equal(m.store.detailTilesVersion, 2);
+		assert.deepEqual(sizesShown(m), ["×2"], "the hidden alias holds the new cell");
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await resize(m, G5[1]!);
+		assert.deepEqual(sizesShown(m), ["×3"], "the next click grows the tile you see");
+		assert.deepEqual(detailTilesOf(m.store).map((t) => t.size), [4]);
+		await relink(m, gst(NO_LINKS));
+		const unlinked = ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "CPU=[t0/3]"];
+		assert.deepEqual(panelCells(m), unlinked);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), unlinked);
+	});
+
+	it("a three-cell tile made in this session that the hidden cell led keeps its size through an edit under the link", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }] }, gst(NO_LINKS));
+		await resize(m, G5[0]!);
+		await resize(m, G5[0]!);
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 3, labels: ["", "", ""], colors: [null, null, null], cellLabels: true }], "the hidden cell goes back at the head of its tile, which keeps its size");
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(sizesShown(m), ["×1", "×3"]);
+	});
+
+	it("at two readings per tile, clearing the tile before a labelled hidden cell keeps the hidden reading in place", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailDensity: "2", detailKeys: [G5[1], G5[2], G5[0], G5[3]], detailTilesVersion: 2, detailTiles: [{ size: 2, labels: ["GPU", "PUMP"] }, { size: 1, labels: ["CPU"] }] }, gst(PAIR0));
+		await rename(m, G5[1]!, "");
+		await rename(m, G5[2]!, "");
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "CPU", "VRM"], "CPU keeps its place");
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await relink(m, gst(NO_LINKS));
+		const back = ["GPU=[t0/2]", "PUMP=[t0/2]", "CPU=CPU[t1/1]", "VRM=[t2/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("a label cleared while unlinked stays cleared through an edit after relinking", async () => {
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["CPU"] }] }, gst(PAIR0));
+		await relink(m, gst(NO_LINKS));
+		await rename(m, G5[0]!, "");
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }]);
+		await relink(m, gst(NO_LINKS));
+		const back = ["GPU=GPU2[t0/1]", "CPU=[t1/1]"];
+		assert.deepEqual(panelCells(m), back, "the cleared label stays cleared");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	// Two spellings of the opener's reading that share
+	// a tile at a 1.7.0 plan's end stay one tile through every later edit
+	// made while both are hidden, as 1.7.0 kept them, stored entry and all.
+	it("two spellings of the opener's reading sharing a pair tile at a 1.7.0 plan's end stay one tile through two edits, as 1.7.0 kept them", async () => {
+		const pairTile = { size: 2, labels: ["G", "S"], futureTile: { keep: 1 } };
+		const seed = { ...base, readingKey: G5[4], detailKeys: [G5[1], G5[2], G5[0], S5[0]], detailTiles: [{ size: 2, labels: ["GPU", "PUMP"] }, pairTile] };
+		const m = await opened(seed, gst(NO_LINKS));
+		m.echo("readingKey", S5[0]);
+		await m.flush();
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 2, labels: ["GPU2", "PUMP"] }, pairTile], "the first edit keeps the pair tile as stored");
+		await rename(m, G5[2]!, "PUMP2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 2, labels: ["GPU2", "PUMP2"] }, pairTile], "and so does the second, unknown field included");
+		assert.deepEqual(await deckCells(m.store, gst(PAIR0)), panelCells(m));
+		await relink(m, gst(NO_LINKS));
+		m.echo("readingKey", G5[4]);
+		await m.flush();
+		const back = ["GPU=GPU2[t0/2]", "PUMP=PUMP2[t0/2]", "CPU=G[t1/2]", "CPU=S[t1/2]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("two spellings of the opener's reading that shared a tile with a hidden linked duplicate stay one tile through an edit", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], S5[0], S5[1]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 3, labels: ["G", "S", "D"] }] };
+		const m = await opened(seed, gst([pair(0), pair(1)]));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailKeys), [G5[1], G5[0], S5[0]], "the edit saves the shown layout, without the duplicate");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, { size: 2, labels: ["G", "S"], colors: [null, null], cellLabels: true }], "G and S stay in one tile");
+		await relink(m, gst(NO_LINKS));
+		m.echo("readingKey", G5[4]);
+		await m.flush();
+		const back = ["GPU=GPU2[t0/1]", "CPU=G[t1/2]", "CPU=S[t1/2]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("removing one of two hidden spellings that share a stored tile keeps that tile's stored entry for the other", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 2, labels: ["G", "S"], futureTile: { keep: 1 } }] };
+		const m = await opened(seed, gst(PAIR0));
+		await removeChip(m, S5[0]!);
+		assert.deepEqual(plain(m.store.detailKeys), [G5[1], G5[0]]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["G"], colors: [null], futureTile: { keep: 1 } }], "the tile loses the removed cell and keeps the rest of its stored entry");
+		await relink(m, gst(NO_LINKS));
+		const back = ["GPU=GPU[t0/1]", "CPU=G[t1/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	// A plan saved by 1.7.0 that lists two spellings of the opener's reading
+	// after its last shown reading: 1.7.0 shows whichever one is visible in
+	// the same cell, and a version 2 cell holds one key. An edit made while
+	// both are hidden keeps the 1.7.0 rule, so unlinking, and then picking
+	// the other spelling, read as 1.7.0 reads them.
+	it("a 1.7.0 plan listing the opener's own key before its alias: after an edit under the link, unlinking shows the alias as 1.7.0 does", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], S5[0], G5[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "CPU"] }] };
+		const m = await opened(seed, gst(NO_LINKS));
+		assert.deepEqual(panelCells(m), ["GPU=GPU[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"], "as authored in 1.7.0");
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		await relink(m, gst(NO_LINKS));
+		assert.equal(m.store.detailTilesVersion, undefined, "the edit keeps the 1.7.0 rule");
+		const back = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"];
+		assert.deepEqual(panelCells(m), back, "1.7.0 shows CPU with its own label, in its own tile");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+		m.echo("readingKey", G5[0]);
+		await m.flush();
+		const picked = panelCells(m);
+		assert.deepEqual(picked, ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"], "picking the other spelling shows it as 1.7.0 does");
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), picked);
+	});
+
+	it("a 1.7.0 plan listing the opener's own key before its alias, with the alias's own labelled one-cell tile after the plan's readings", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], S5[0], G5[0]], detailTiles: [{ size: 2, labels: ["GPU", "PUMP"] }, { size: 1, labels: ["CPU"], colors: ["#FF0000"] }] };
+		const m = await opened(seed, gst(NO_LINKS));
+		await relink(m, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		await relink(m, gst(NO_LINKS));
+		const back = ["GPU=GPU2[t0/2]", "PUMP=PUMP[t0/2]", "CPU=CPU[t1/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("a 1.7.0 plan listing a Gadget opener before its Shared Memory alias, under a Shared Memory source", async () => {
+		const seed = { ...base, readingKey: G5[0], detailKeys: [S5[1], S5[2], G5[0], S5[0]], detailTiles: [{ size: 4, labels: ["GPU", "PUMP", "CPU", ""], colors: ["#FF0000", "#00FF00", "#0000FF", null] }] };
+		const m = await opened(seed, sst(NO_LINKS));
+		await relink(m, sst(PAIR0));
+		await rename(m, S5[1]!, "GPU2");
+		await relink(m, sst(NO_LINKS));
+		const back = ["GPU=GPU2[t0/3]", "PUMP=PUMP[t0/3]", "CPU=CPU[t0/3]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, sst(NO_LINKS)), back);
+	});
+
+	it("removing the first of two hidden spellings that share a stored tile leaves the other its own label", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, { size: 2, labels: ["G", "S"], futureTile: { keep: 1 } }] };
+		const m = await opened(seed, gst(PAIR0));
+		await removeChip(m, G5[0]!);
+		assert.deepEqual(plain(m.store.detailKeys), [G5[1], S5[0]]);
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU"] }, { size: 1, labels: ["S"], futureTile: { keep: 1 }, colors: [null] }], "S keeps its own label and the tile's stored entry");
+		await relink(m, gst(NO_LINKS));
+		m.echo("readingKey", G5[4]);
+		await m.flush();
+		const back = ["GPU=GPU[t0/1]", "CPU=S[t1/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("moving a hidden cell's visible tile-mate away leaves the stored tile entry on that tile alone", async () => {
+		const seed = { ...base, readingKey: S5[0], detailKeys: [G5[2], G5[1], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["P"] }, { size: 2, labels: ["X", "G"], futureTile: { keep: 1 } }, { size: 1, labels: ["S"] }] };
+		const m = await opened(seed, gst(PAIR0));
+		const grip = m.el("detail-list").querySelector('.hw-tile-grip[data-tile="1"]');
+		assert.ok(grip);
+		m.el("detail-list").fire("keydown", { target: grip, key: "ArrowUp" });
+		await m.flush();
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["X"], futureTile: { keep: 1 }, colors: [null] }, { size: 1, labels: ["P"] }, { size: 1, labels: ["G"], colors: [null], cellLabels: true }, { size: 1, labels: ["S"] }]);
+		await relink(m, gst(NO_LINKS));
+		m.echo("readingKey", G5[4]);
+		await m.flush();
+		const back = ["GPU=X[t0/1]", "PUMP=P[t1/1]", "CPU=G[t2/1]", "CPU=S[t3/1]"];
+		assert.deepEqual(panelCells(m), back);
+		assert.deepEqual(await deckCells(m.store, gst(NO_LINKS)), back);
+	});
+
+	it("an all-hidden pair tile keeps its stored entries past its end byte for byte through an edit", async () => {
+		const pairTile = { size: 2, labels: ["G", "S", "EXTRA"], colors: [null, null, "#123456"] };
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[0], S5[0]], detailTilesVersion: 2, detailTiles: [{ size: 1, labels: ["GPU"] }, pairTile] }, gst(PAIR0));
+		await rename(m, G5[1]!, "GPU2");
+		assert.deepEqual(plain(m.store.detailTiles), [{ size: 1, labels: ["GPU2"] }, pairTile]);
+	});
+
+	it("a bare-values quad holding the hidden reading keeps its 123 setting through an edit under the link", async () => {
+		const quad = { size: 4, labels: ["GPU", "PUMP", "VRM", "CPU"], colors: RGBY, cellLabels: false };
+		const m = await opened({ ...base, readingKey: S5[0], detailKeys: [G5[1], G5[2], G5[3], G5[0]], detailTilesVersion: 2, detailTiles: [quad] }, gst(PAIR0));
+		await addReading(m, G5[4]!);
+		assert.deepEqual(keysOf(m), ["GPU", "PUMP", "VRM", "CPU", "SSD"]);
+		assert.deepEqual(plain(m.store.detailTiles), [quad]);
+		await relink(m, gst(NO_LINKS));
+		assert.deepEqual(m.el("detail-list").querySelectorAll(".hw-tile-abc").map((b) => b.textContent), ["123"], "the quad still shows bare values once the reading is back");
+	});
+
 });
 
 describe("detail colors retain automatic provenance through the production panel", () => {
@@ -1285,7 +2479,7 @@ describe("the reading panel's detail editor under a link", () => {
 		assert.deepEqual(m.lastWrite("detailKeys"), [G[2]], "unticking the live row removes the listed alias");
 	});
 
-	it("a listed alias of the primary parks as the Back tile chip and never occupies a cell", async () => {
+	it("a listed alias of the primary parks as the Back tile chip and never occupies a visible cell", async () => {
 		const m = await openPanel("reading", { readingKey: SM[0], pressBehavior: "open-details", detailMode: "custom", detailKeys: [G[0], SM[1]] }, status);
 		const all = chips(m, "detail-list");
 		assert.equal(all.length, 2);

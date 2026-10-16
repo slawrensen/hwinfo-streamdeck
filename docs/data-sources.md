@@ -148,8 +148,16 @@ rotation set or group that holds both endpoints of one pair steps through it
 as one reading, and a custom detail list shows one cell per measurement. If
 the list already contains both keys, the first wins. The duplicate cell and
 its own label and color are hidden together, so later readings keep their
-tile styling. Unlinking restores the original layout unless you edit the
-detail list or one of its tiles: that explicit edit saves the shown layout.
+labels and stored colors. A pair that makes a listed key this key's own reading hides
+that key's cell the same way. Unlinking restores the original layout unless
+you edit the detail list or one of its tiles: that explicit edit saves the
+shown layout. A tile plan last saved by version 1.7.0 keeps the older rule
+until its next edit, so its labels can sit one reading off when a pair or a
+new **Reading** pick makes a listed key this key's own reading, or stops
+doing so. Undoing that pair or pick shows the plan as saved, and an edit to
+the list or a tile made while the labels sit right moves the plan to the new
+rule ([Sensor details](sensor-details.md#choosing-the-list) has the one case
+that waits for a later edit).
 Opening the panel, refreshing sensors, or changing other settings does not
 rewrite the saved list or tile plan. The
 settings panel shows a linked saved key as present, with its label, tick and

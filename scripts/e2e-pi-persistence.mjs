@@ -887,11 +887,16 @@ try {
 			x.click();
 			return "ok";
 		})()`)).result?.value;
-	const atomic = (name, fresh) => {
+	const atomic = (name, fresh, { editorPlan = true } = {}) => {
 		check(`${name}: exactly one frame`, fresh.length === 1, `${fresh.length} frames`);
 		const frame = fresh.at(-1) ?? {};
 		check(`${name}: frame carries both fields`, Array.isArray(frame.detailKeys) && Array.isArray(frame.detailTiles), Object.keys(frame).join(","));
 		check(`${name}: unknown nested field preserved`, deepEqual(frame.futureBlob, FUTURE_BLOB), JSON.stringify(frame.futureBlob));
+		// A plan the editor stores is always a version 2 plan: every listed key
+		// holds a cell, the opener's own reading included (hidden), so a later
+		// link or Reading pick moves no label or color. Apply stores the pasted
+		// document as written instead (editorPlan false).
+		if (editorPlan && Array.isArray(frame.detailTiles) && frame.detailTiles.length > 0) check(`${name}: the plan carries detailTilesVersion 2`, frame.detailTilesVersion === 2, JSON.stringify(frame.detailTilesVersion));
 		return frame;
 	};
 
@@ -2071,16 +2076,21 @@ try {
 	})()`);
 	await sleep(700);
 	frame = atomic("adopted rename", writes.slice(mark));
+	// The first edit saves the plan in the version 2 form: the parked
+	// primary leads the list in a one-cell tile of its own (hidden on the
+	// deck), so the listed readings keep their cells if a link or a Reading
+	// pick changes which key is the opener's reading later.
+	check("adopted: the parked primary leads the plan in a plain one-cell tile", deepEqual(frame.detailTiles?.[0], { size: 1 }), JSON.stringify(frame.detailTiles?.[0]));
 	// Lossless tile writes (F01): a stored tile rewrites only the field an
 	// edit changed. The seed's tiles carry no colors and no cellLabels, and
 	// they gain none: absent stays absent, which the runtime reads the same.
-	check("adopted: the rename landed on labels[0]", deepEqual(frame.detailTiles?.[0], { size: 2, labels: ["Renamed A", "L2"] }), JSON.stringify(frame.detailTiles?.[0]));
-	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["L3", "L4"] }), JSON.stringify(frame.detailTiles?.[1]));
+	check("adopted: the rename landed on the first listed reading's label", deepEqual(frame.detailTiles?.[1], { size: 2, labels: ["Renamed A", "L2"] }), JSON.stringify(frame.detailTiles?.[1]));
+	check("adopted: the second tile is byte-equal", deepEqual(frame.detailTiles?.[2], { size: 2, labels: ["L3", "L4"] }), JSON.stringify(frame.detailTiles?.[2]));
 	check("adopted: the parked key stays in the stored list", frame.detailKeys?.length === 4 && frame.detailKeys?.[0] === "bench:0:0", JSON.stringify(frame.detailKeys));
 
-	// Removing the PARKED chip edits the list only: no tile held it, so
-	// shrinking tile 1 for it (the pre-fix behavior) stole a cell from a
-	// listed reading.
+	// Removing the PARKED chip edits the list and drops only its own hidden
+	// one-cell tile: shrinking a listed tile for it (the pre-fix behavior)
+	// stole a cell from a listed reading.
 	mark = writes.length;
 	const parkedRemove = await evaluate(`(() => {
 		const chip = document.querySelector('#detail-list .hw-set-chip[data-key="bench:0:0"]');
@@ -2115,9 +2125,10 @@ try {
 	check("leg O: the listed order changed and the parked primary kept its slot", deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:3", "bench:0:1", "bench:0:2"]), JSON.stringify(frame.detailKeys));
 	check(
 		"leg O: every label rode its own reading and the emptied tile left the plan",
-		// The grown tile rewrites the fields that changed (size, labels,
-		// colors); its untouched, absent cellLabels stays absent.
-		deepEqual(frame.detailTiles, [{ size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null] }]),
+		// The parked primary leads in its own hidden one-cell tile. The grown
+		// tile rewrites the fields that changed (size, labels, colors); its
+		// untouched, absent cellLabels stays absent.
+		deepEqual(frame.detailTiles, [{ size: 1 }, { size: 3, labels: ["L3", "L1", "L2"], colors: [null, null, null] }]),
 		JSON.stringify(frame.detailTiles)
 	);
 	check(
@@ -2125,6 +2136,83 @@ try {
 		(await evaluate(`document.querySelectorAll("#detail-list .hw-tile:not(.ghost)").length`)).result?.value === 1,
 		String((await evaluate(`document.querySelectorAll("#detail-list .hw-tile:not(.ghost)").length`)).result?.value)
 	);
+
+	// ---- run 6c: a Reading pick leaves a 1.7.0 plan as stored (leg K.3) ---
+	// The adopted seed is a plan 1.7.0 saved: no detailTilesVersion, the
+	// opener's own sensor listed first and walked around. An unmarked plan
+	// cannot say which walk saved it, so a Reading pick writes the pick and
+	// nothing else, as 1.7.0 did: the labels may sit one reading off while
+	// the new opener is listed, and picking the earlier Reading back shows
+	// the stored layout again. Only an explicit list or tile edit stores
+	// the version 2 form.
+	await fetch(`http://127.0.0.1:${HTTP_PORT}/seed/adopted`);
+	await cdp("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/ui/sensor-reading.html` });
+	await settlePanel();
+	check("leg K.3: opening wrote nothing", writes.length === 0, `${writes.length} writes`);
+	const k3Pick = async (name, key) => {
+		const opened = await evaluate(`(() => {
+			const input = document.getElementById("picker-search");
+			if (!input) return "no search input";
+			input.focus();
+			input.dispatchEvent(new Event("focus")); // headless focus stand-in
+			return "ok";
+		})()`);
+		check(`leg K.3: ${name}: primary picker opened`, opened.result?.value === "ok", String(opened.result?.value));
+		await sleep(600);
+		const row = await evaluate(`(() => {
+			const row = document.querySelector('#picker-list .hw-row[data-key="${key}"]');
+			if (!row) return "missing";
+			row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+			return "ok";
+		})()`);
+		check(`leg K.3: ${name}: picked ${key} as the Reading`, row.result?.value === "ok", String(row.result?.value));
+		await waitDom(
+			`leg K.3: ${name}: the Back-tile mark moved to ${key}`,
+			`(() => { const n = document.querySelector('#detail-list .hw-set-chip[data-key="${key}"] .hw-set-name'); return n !== null && n.textContent.includes("(Back tile)"); })()`,
+			1200,
+			`document.querySelector('#detail-list .hw-set-chip[data-key="${key}"] .hw-set-name')?.textContent ?? "gone"`
+		);
+		await sleep(700); // the pick's settings write settles
+	};
+	const k3Cells = async () =>
+		JSON.parse(
+			(await evaluate(`JSON.stringify(["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"].map((k) => {
+			const c = document.querySelector('#detail-list .hw-set-chip[data-key="' + k + '"]');
+			const n = c?.querySelector(".hw-set-name");
+			return c ? { tile: c.dataset.tile ?? null, cell: c.dataset.cell ?? null, text: n?.classList.contains("renamed") === true ? n.textContent : null, inTile: c.closest(".hw-tile") !== null } : null;
+		}))`)).result?.value ?? "[]"
+		);
+	const k3Stored = await k3Cells();
+	const k3Parked = { tile: null, cell: null, text: null, inTile: false };
+	check(
+		"leg K.3: the stored layout dresses the listed readings L1, L2, L3",
+		deepEqual(k3Stored, [k3Parked, { tile: "0", cell: "0", text: "L1", inTile: true }, { tile: "0", cell: "1", text: "L2", inTile: true }, { tile: "1", cell: "0", text: "L3", inTile: true }]),
+		JSON.stringify(k3Stored)
+	);
+	const k3Untouched = (name, frame, readingKey) => {
+		check(`leg K.3: ${name}: the frame carries the pick`, frame.readingKey === readingKey, JSON.stringify(frame.readingKey));
+		check(`leg K.3: ${name}: the list is as stored`, deepEqual(frame.detailKeys, ["bench:0:0", "bench:0:1", "bench:0:2", "bench:0:3"]), JSON.stringify(frame.detailKeys));
+		check(`leg K.3: ${name}: the tile plan is as stored`, deepEqual(frame.detailTiles, [{ size: 2, labels: ["L1", "L2"] }, { size: 2, labels: ["L3", "L4"] }]), JSON.stringify(frame.detailTiles));
+		check(`leg K.3: ${name}: no detailTilesVersion is written`, !("detailTilesVersion" in frame), JSON.stringify(frame.detailTilesVersion));
+		check(`leg K.3: ${name}: unknown nested field preserved`, deepEqual(frame.futureBlob, FUTURE_BLOB), JSON.stringify(frame.futureBlob));
+	};
+	mark = writes.length;
+	await k3Pick("pick", "bench:0:2");
+	let k3Fresh = writes.slice(mark);
+	check("leg K.3: the pick is exactly one frame", k3Fresh.length === 1, `${k3Fresh.length} frames`);
+	k3Untouched("pick", k3Fresh.at(-1) ?? {}, "bench:0:2");
+	const k3Picked = await k3Cells();
+	check(
+		"leg K.3: the 1.7.0 walk now skips the new opener, as 1.7.0 shows it",
+		deepEqual(k3Picked, [{ tile: "0", cell: "0", text: "L1", inTile: true }, { tile: "0", cell: "1", text: "L2", inTile: true }, k3Parked, { tile: "1", cell: "0", text: "L3", inTile: true }]),
+		JSON.stringify(k3Picked)
+	);
+	mark = writes.length;
+	await k3Pick("pick back", "bench:0:0");
+	k3Fresh = writes.slice(mark);
+	check("leg K.3: picking back is exactly one frame", k3Fresh.length === 1, `${k3Fresh.length} frames`);
+	k3Untouched("pick back", k3Fresh.at(-1) ?? {}, "bench:0:0");
+	check("leg K.3: picking the earlier Reading back shows the stored layout again", deepEqual(await k3Cells(), k3Stored), JSON.stringify(await k3Cells()));
 
 	// ---- run 7: a live primary re-pick moves the Back-tile gates (leg K.2)
 	// Re-picking the opener's sensor onto a listed reading used to leave
@@ -2279,7 +2367,7 @@ try {
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
-	frame = atomic("config apply", writes.slice(mark));
+	frame = atomic("config apply", writes.slice(mark), { editorPlan: false });
 	check("config: Apply replaced the whole document in one frame", frame.label === "Restored" && deepEqual(frame.cfgBlob, { keep: "yes" }) && frame.detailTiles?.[0]?.labels?.[0] === "A", JSON.stringify(frame).slice(0, 160));
 	await sleep(1400); // the panel reloads itself after an apply
 	check("config: the reloaded panel adopted the applied document", (await evaluate(`(() => {
@@ -2318,7 +2406,7 @@ try {
 		document.getElementById("config-key-apply").click();
 	})()`);
 	await sleep(700);
-	frame = atomic("leg S named apply", writes.slice(mark));
+	frame = atomic("leg S named apply", writes.slice(mark), { editorPlan: false });
 	check("leg S: the reordered list landed in the pasted order", deepEqual(frame.detailKeys, ["bench:0:2", "bench:0:0", "bench:0:5"]), JSON.stringify(frame.detailKeys));
 	check("leg S: settings store keys alone, never a name that could go stale", JSON.stringify(frame.detailKeys ?? []).includes("Bench") === false, JSON.stringify(frame.detailKeys));
 	check("leg S: the opener's key shed its name too", frame.readingKey === "cpu:0:0", JSON.stringify(frame.readingKey));

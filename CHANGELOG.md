@@ -4,7 +4,7 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
-## 1.7.0.1 - 2026-10-15
+## 1.7.0.2 - 2026-10-16
 
 A GitHub preview of 1.7.1, based on released 1.7.0. Not a Marketplace
 release.

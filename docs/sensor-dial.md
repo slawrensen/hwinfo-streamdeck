@@ -28,7 +28,7 @@ The bar always tracks the live value, even while you're touching through MIN / M
 
 **View** offers two multi-row layouts besides the single readout, both listing what rotation moves through:
 
-- **Overview, two rows (big values and trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection. Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
+- **Overview, two rows (big values and trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection (the band only on the **Theme** and **Glass** backgrounds). Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
 - **Overview, three rows**: one line per reading. A marker on the left shows the selection and window position. The context line contains the shared name and session `▼ low ▲ high`; names shorten before statistics. Put it above or below the rows with **Context line**, and show or hide row dividers with **Separators**. Pause, pin and stat badges share the name area. Temporary messages briefly replace the context line.
 
 ![The dial's View select on Overview, three rows, with Decimals on Auto and the Temperature °F box under it, then the Row labels, Context line and Separators selects that the overview reveals.]({{ '/assets/img/pi-dial-overview.png' | relative_url }})
@@ -194,7 +194,7 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 | **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
 | **Clear** | No background and no outline. | Depends on the picture. |
 
-**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert shows a lighter amber or red. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
+**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert can draw a lighter amber or red (a darker one on Paper) where the theme's own falls short there. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
 
 **Tint.** The panel is the theme's background at 50%, so more of the picture shows than on Glass. Over a white picture (black on **Paper**) that panel leaves the theme's own text below 4.5:1, so Tint does not rely on it: it draws Outline's 1 px outline and uses Outline's text colors, described next.
 
@@ -208,6 +208,7 @@ Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (
 
 On Glass, Tint, Outline and Clear:
 
+- In the two-row view only Glass draws the band behind the selected row. Tint, Outline and Clear mark that row with the accent rail and the brighter label.
 - Status screens such as **Start HWiNFO** show their text without the empty range bar on Tint, Outline and Clear. Glass keeps it as a faint groove.
 - A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
 - With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, or left off when not even an ellipsis fits, so a label with emoji or symbols the face font does not have is shortened a little sooner.

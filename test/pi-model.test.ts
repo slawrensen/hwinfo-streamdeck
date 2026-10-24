@@ -116,6 +116,14 @@ describe("display summary", () => {
 		}
 		assert.equal(model.displaySummary("dial", { dialView: "overview", fahrenheit: true, dialBackground: "outline" }, {}, null), "Overview, three rows · auto decimals · shared text · °F · outline");
 	});
+	it("leaves accent words out of the summary where a Custom text color makes the box draw nothing", () => {
+		const on = { dialBackground: "tint", dialAccentWords: true };
+		assert.doesNotMatch(model.displaySummary("dial", { ...on, textMode: "custom", textColor: "#123456" }, {}, null), /accent words/, "the dial's own Custom color");
+		assert.doesNotMatch(model.displaySummary("dial", on, { textMode: "custom", textColor: "#123456" }, null), /accent words/, "the shared Custom color");
+		assert.doesNotMatch(model.displaySummary("dial", on, {}, { effective: { text: { applied: "custom", color: "#123456", own: false } } } as never), /accent words/, "the plugin's own answer");
+		assert.match(model.displaySummary("dial", { ...on, textMode: "custom", textColor: "blue" }, {}, null), /accent words/, "an invalid Custom color draws theme text");
+		assert.match(model.displaySummary("dial", { ...on, textMode: "dim" }, { textMode: "custom", textColor: "#123456" }, null), /accent words/, "the dial's own Dimmed wins over the shared Custom");
+	});
 	it("says accent words only for the exact true on a look that draws them, as the plugin reads it", () => {
 		for (const look of ["glass", "tint", "outline"]) {
 			assert.equal(model.accentWordsLook({ dialBackground: look }), true, look);

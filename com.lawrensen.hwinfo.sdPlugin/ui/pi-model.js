@@ -156,7 +156,8 @@ self.hwModel = (() => {
 		// A dial drawn over the touch strip picture names its look; Theme,
 		// the default, says nothing.
 		if (kind === "dial" && dialBackground(settings) !== "theme") parts.push(dialBackground(settings));
-		if (kind === "dial" && dialAccentWords(settings)) parts.push("accent words");
+		// Under a Custom text color the box changes nothing (Custom stays exact).
+		if (kind === "dial" && dialAccentWords(settings) && appliedTextMode(settings, globals, preview) !== "custom") parts.push("accent words");
 		// The key's graph strip draws on the one-reading layout only; the
 		// stored mode wins, else the legacy sparkline flag (the panel's rule).
 		if (kind === "key" && (preview?.effective?.layout?.drawn ?? storedKeyLayout(settings)) === "single") {
@@ -164,6 +165,17 @@ self.hwModel = (() => {
 			if (mode !== "none") parts.push(mode === "bar" ? "bar" : mode === "ring" ? "ring" : "sparkline");
 		}
 		return parts.join(" · ");
+	}
+
+	/** The text mode a face draws in: the plugin's own answer when the panel
+	 * has one, else the action's valid mode, else the shared one. Custom
+	 * counts only with a #RRGGBB color, as the plugin reads it. */
+	function appliedTextMode(settings, globals, preview) {
+		const applied = preview?.effective?.text?.applied;
+		if (applied !== undefined) return applied;
+		const own = ["theme", "dim", "custom"].includes(settings.textMode) ? settings : globals ?? {};
+		if (own.textMode === "custom") return /^#[0-9A-Fa-f]{6}$/.test(own.textColor ?? "") ? "custom" : "theme";
+		return own.textMode === "dim" ? "dim" : "theme";
 	}
 
 	/** Alerts: the real operator, display units, and what they apply to. */

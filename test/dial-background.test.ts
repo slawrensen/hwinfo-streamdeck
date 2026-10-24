@@ -534,6 +534,22 @@ describe("cut, not mask: the see-through looks draw no overflow rect", () => {
 });
 
 describe("every look", () => {
+	it("draws the two-row trend lines and end dots exactly as Theme does; the shaded areas only where the look keeps them", () => {
+		for (const font of FONTS) {
+			useFont(font);
+			for (const key of goldenKeys.filter((k) => k.startsWith("tworow/"))) {
+				const themeFace = composeGallery(key);
+				const marks = themeFace.match(/<polyline[^>]*\/>|<circle[^>]*\/>/g) ?? [];
+				assert.equal(marks.length, 4, `${font} ${key}: Theme draws two trend lines and two end dots`);
+				for (const look of LOOKS) {
+					const face = composeGallery(key, look);
+					for (const mark of marks) assert.ok(face.includes(mark), `${font} ${key} ${look}: ${mark.slice(0, 48)}`);
+					assert.equal(count(face, "<path "), dialBackgroundTraits(look).underFill ? count(themeFace, "<path ") : 0, `${font} ${key} ${look}: shaded areas`);
+				}
+			}
+		}
+	});
+
 	it("composes the same bytes twice, so the feedback dedupe still skips unchanged frames", () => {
 		for (const look of LOOKS) for (const s of SCENARIOS) assert.equal(composeScenario(s, "midnight", "dim", look), composeScenario(s, "midnight", "dim", look), `${look} ${s.id}`);
 	});

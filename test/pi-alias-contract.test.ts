@@ -624,6 +624,25 @@ describe("the dial's Words in the accent color box", () => {
 		assert.equal(m.writes.length, 0, "showing and hiding the box never saves");
 		assert.equal(m.store.dialAccentWords, true, "a hidden box keeps its value");
 	})
+	it("previews a see-through face over the board its drawn theme calls for, Dimmed and accent words included", async () => {
+		const status = linkedStatus();
+		const config = loadThemes();
+		for (const [theme, textMode, accent, tone] of [["midnight", "dim", true, "dark"], ["void", "dim", true, "dark"], ["ember", "dim", false, "dark"], ["ember", "dim", true, "dark"], ["graphite", "theme", true, "dark"], ["paper", "theme", false, "light"], ["paper", "dim", true, "light"]] as const) {
+			for (const dialBackground of ["glass", "tint", "outline", "clear"]) {
+				const where = `${theme} ${textMode}${accent ? " accent words" : ""} ${dialBackground}`;
+				const seed = { readingKey: SM[0], theme, textMode, dialBackground, ...(accent ? { dialAccentWords: true } : {}) };
+				const m = await openPanel("dial", seed, status);
+				const face = composeDialSvg(dialState(m.store), status, () => []);
+				m.feed(buildPreview(status, m.store as { readingKey?: string }, false, { kind: "dial", face }));
+				await m.flush();
+				// The palettes arrive after the first face: the board follows.
+				m.feed({ event: "themes", ...config });
+				await m.flush();
+				assert.equal(m.el("face-img").dataset.clear, tone, where);
+			}
+		}
+	});
+
 	it("ticks only for the exact true the plugin reads, saves nothing on open, and a click saves the boolean", async () => {
 		for (const [raw, ticked] of [[true, true], ["true", false], [1, false], [false, false], [undefined, false]] as const) {
 			const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "tint", ...(raw === undefined ? {} : { dialAccentWords: raw }) });

@@ -1,94 +1,82 @@
 ---
-title: Installation & requirements
+title: Install
 nav_order: 2
+description: Requirements, stable downloads and HWiNFO sharing setup.
 ---
 
-You need three things: the Stream Deck plugin, a running copy of HWiNFO, and a one-time setup in HWiNFO that lets the plugin read its sensors.
-
-> **Windows only.** HWiNFO is a Windows application and this plugin reads its shared-memory or Gadget-registry interface locally. There is no macOS or Windows-on-ARM build; the plugin needs 64-bit (x64) Windows. No ads, no telemetry, MIT licensed.
+Install the plugin, then enable HWiNFO sharing on the same PC. Already installed? [Get your first reading](getting-started.md).
 
 ## System requirements
 
-| Requirement | Notes |
+| Requirement | Details |
 | --- | --- |
-| **Windows 10 or later**, 64-bit (x64) | Windows-on-ARM is not supported (keys show **Needs x64 / Windows**). There is no macOS build; the plugin doesn't install there at all. |
-| **Stream Deck software 6.9+** | The Elgato desktop app that hosts plugins. Update it from within the app if you are on an older build. |
-| **HWiNFO** (free or Pro) | Installer or portable. Download from [hwinfo.com](https://www.hwinfo.com/download/). The plugin does not bundle HWiNFO; you run it yourself. The free version works; [Pro](https://www.hwinfo.com/licenses/) removes the 12-hour Shared Memory limit, and I recommend it if HWiNFO runs all day. |
+| **Windows 10 or later, x64** | macOS, Linux and Windows-on-ARM are unsupported. |
+| **Stream Deck software 6.9+** | The Elgato desktop app hosts the plugin. |
+| **HWiNFO running locally** | [Free or Pro](https://www.hwinfo.com/download/), installed or portable. Enable Shared Memory Support or Gadget reporting. |
+| **A supported display key or dial** | Sensor Reading uses display keys. Sensor Dial requires Stream Deck + or + XL. See the [compatibility matrix](hardware.md#compatibility-matrix) for tested, simulated and expected support. |
 
-Any Stream Deck hardware works for the **Sensor Reading** key action. The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL (the models with dials and a touchscreen). The **HWiNFO Control** key action goes anywhere a key action can, including the Stream Deck Pedal and Corsair G-keys, and drives Sensor Dials on other connected decks. The full device matrix is on [Hardware compatibility](hardware.md).
+Devices without displays, including Pedal and Corsair G-Keys, can use **HWiNFO Control** to operate dials on another connected deck. Support is not claimed for every Stream Deck model.
 
 ## Install the plugin
 
-There are two ways to install, depending on where you got the plugin.
+### GitHub release
 
-**From a GitHub Release (`.streamDeckPlugin` file)**
+1. Download [com.lawrensen.hwinfo.streamDeckPlugin, version 1.7.1](https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin). [Release notes and hashes](https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1).
+2. To verify the download, compare its SHA-256 with the **pack** hash in that release's notes:
 
-1. Download `com.lawrensen.hwinfo.streamDeckPlugin` from the [releases page](https://github.com/slawrensen/hwinfo-streamdeck/releases).
-2. Optional: the native addon inside is unsigned, so verify the download against the pack SHA-256 printed in the release notes. In PowerShell: `Get-FileHash com.lawrensen.hwinfo.streamDeckPlugin -Algorithm SHA256`. More in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md).
-3. Double-click the file. The Stream Deck app opens and asks you to confirm the install.
-4. Confirm. **HWiNFO Sensors** appears in the actions list on the right, under its own **HWiNFO Sensors** category.
+   ```powershell
+   Get-FileHash .\com.lawrensen.hwinfo.streamDeckPlugin -Algorithm SHA256
+   ```
 
-**From the Elgato Marketplace**
+3. Double-click the package and confirm installation in Stream Deck. **HWiNFO Sensors** appears in the actions list.
 
-The plugin is on the [Elgato Marketplace](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). Install it from there in one click and the Marketplace hands the package to the Stream Deck app. I publish each version to GitHub Releases first, so while an update is in review the Marketplace can be a version behind. Check the version shown on the listing if you want the newest build.
+The native addon is **unsigned**. A matching checksum identifies the published bytes; it does not establish safety. See [installation verification](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed) and [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md).
 
-> **Note:** No admin rights are needed to install the plugin. If a key later shows **Access denied**, Windows refused access needed to read the sensor source. That error alone does not identify an account, session or privilege mismatch. Open the key or dial settings and choose **Copy support report** under *Advanced → Support*; see [Troubleshooting](troubleshooting.md).
+### Elgato Marketplace
+
+Install from the [Marketplace listing](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). It hands the package to Stream Deck. Checked 24 October 2026: the listing shows **1.7**, with notes for **1.7.0.0**. GitHub's stable release is **1.7.1**, which adds transparent dial backgrounds. Marketplace packaging applies DRM, so do not compare its package hash with the GitHub package hash.
+
+No administrator rights are required to install the plugin. If reading sensors later produces **Access denied**, follow the [access checks](troubleshooting.md#keys-show-access-denied).
 
 ### Updating and removing
 
-- **Update:** double-click a newer `.streamDeckPlugin` (or install the newer version from the Marketplace) and the Stream Deck app replaces the old copy **in place**. Your keys keep their sensors, themes and thresholds.
-- **Uninstall:** in the Stream Deck app, right-click the **HWiNFO Sensors** category (or any of its keys) in the actions list on the right and choose **Uninstall**, or manage it under the app's **Preferences → Plugins**. HWiNFO is a separate program; remove it on its own if you no longer need it.
+- **Update:** install the newer package from your chosen channel. Stream Deck replaces the plugin; saved readings and settings remain.
+- **Remove:** use Stream Deck's **Preferences → Plugins** or the plugin's **Uninstall** command. HWiNFO is a separate application.
 
 ## One-time HWiNFO setup
 
-The plugin reads HWiNFO through one of two interfaces. You only need to enable **one**; the plugin picks the best available source automatically and falls back on its own (see [Data sources](data-sources.md)).
+Enable at least one source. **Auto** prefers Shared Memory when readable.
 
 ### Recommended: Shared Memory Support
 
-Shared Memory exposes **every** reading HWiNFO measures, with min / max / average. It is the preferred source.
+1. Start HWiNFO in **Sensors-only** mode.
+2. Open **Settings**, enable **Shared Memory Support**, and click **OK**.
+3. Keep HWiNFO running and polling sensors. Optionally enable **Auto Start** and **Minimize Sensors on Startup**.
 
-1. Install and start **HWiNFO**. On the startup dialog, choose **Sensors-only** (you don't need the summary window).
-2. Open **Settings** (the gear icon).
-3. Turn on **Shared Memory Support**.
-4. Recommended, so HWiNFO is always feeding the deck without a window in your way:
-   - **Auto Start**: HWiNFO launches with Windows.
-   - **Minimize Sensors on Startup**: the Sensors window starts minimized.
-   - (Combined with Sensors-only, HWiNFO runs in the background with its window minimized.)
-5. Click **OK**.
+Shared Memory supplies HWiNFO's published readings and min/max/average.
 
-> **Free version: 12-hour limit.** Shared Memory Support switches off after 12 hours; [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes the limit. Re-enable sharing or restart HWiNFO to resume it. Auto can use Gadget if reporting is enabled, but saved Shared Memory readings do not automatically match Gadget readings. 1.7 adds [explicit provider links](data-sources.md#link-readings-across-providers).
+**Free HWiNFO disables Shared Memory after 12 hours.** Re-enable sharing or restart HWiNFO to resume. [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes that timer. Auto can fall back to Gadget, but saved selections need [explicit provider links](data-sources.md#link-readings-across-providers) to identify the same reading on another source.
 
 ### Free path: Gadget reporting
 
-Gadget reporting never expires on the free version, but it only exposes the sensors **you tick**, and only their current value (no min / max / average).
+1. In HWiNFO's Sensors window, open **Configure Sensors → HWiNFO Gadget**.
+2. Enable **Enable reporting to Gadget**.
+3. Tick **Report value in Gadget** for each reading you need, then click **OK**.
 
-1. Start **HWiNFO** in Sensors mode.
-2. In the HWiNFO **sensor window**, click **Configure Sensors** and open the **HWiNFO Gadget** tab.
-3. Tick **"Enable reporting to Gadget"**, then tick **"Report value in Gadget"** for each value you want on the deck, and click OK. Tick only the readings you put on the deck: each one adds to every scan, and a Shift-click range can tick a reading HWiNFO reports twice under one name, which 1.7 withholds.
+Gadget has no 12-hour timer. It exposes only ticked readings and current values, with no HWiNFO min/max/average or producer timestamp. The plugin shows **Age unknown** until it observes a value change, and again after 15 seconds without another. Steady values can be live or left behind by a stopped HWiNFO.
 
-The plugin reads these from `HKCU\Software\HWiNFO64\VSB`. HWiNFO 8.48 creates that key only once a reading is ticked: with reporting enabled and nothing ticked, keys show **Start HWiNFO / not detected** while HWiNFO is running. **Tick sensors / in Gadget** appears when the key is there but holds no rows, which unticking everything can leave.
+Tick only the readings you use. Duplicate source-name/reading-label pairs are withheld; untick or rename the unwanted duplicate in HWiNFO. Enabling reporting without ticking a reading may leave no registry data and show **Start HWiNFO / not detected**. A present but empty store shows **Tick sensors / in Gadget**. [Data sources](data-sources.md#enabling-gadget-reporting) explains these limits.
 
-You can enable **both** interfaces. Auto prefers Shared Memory and can switch to Gadget when needed. To configure only Gadget readings, set **Data source** to **Gadget registry only** under *Advanced → Connection* before choosing them. Since 1.7, Gadget shows **Age unknown** until a value change is observed, and again after 15 seconds without another. Gadget supplies no historical min/max/average.
+To select Gadget readings directly, choose **Advanced → Connection → Data source → Gadget registry only** first.
 
 ## Portable HWiNFO caveats
 
-The portable build of HWiNFO works identically, but there is no installer to wire things up for you:
-
-- **Keep HWiNFO running and publishing sensors.** Exiting it stops new data, and keys show **Start HWiNFO**. A killed or crashed HWiNFO can leave old Gadget values behind, which 1.7 shows as **Age unknown**.
-- **Add it to autostart yourself.** There's no installer to register Auto Start, so if you want it running at login you must add the executable to your own startup (e.g. a Startup-folder shortcut or Task Scheduler).
-- **Review access settings if needed.** **Access denied / open settings** means Windows refused access needed to read the sensor source. Review the Windows account, session and privilege settings used to launch HWiNFO and Stream Deck; the error alone does not identify which access rule failed. See [Troubleshooting](troubleshooting.md#keys-show-access-denied).
+Keep the portable application running and publishing. Add it to Windows startup yourself if needed. A crash can leave Gadget values behind; **Age unknown** does not establish whether they are current. For **Access denied**, check the launch account, session and permissions; matching elevation alone does not guarantee access.
 
 ## Verify it works
 
-1. Drag **HWiNFO Sensors → Sensor Reading** onto a key.
-2. In the settings panel (property inspector), click the **Reading** search box and choose a reading. The list groups readings by source (CPU, GPU, drives, …) and shows live values; type to filter. The panel's header then shows the key's face and its state: **Live** with the data source while data arrives.
-3. With a readable source, the key shows the value. Since 1.7, Gadget can show **Age unknown** until a value change is observed; see [Status screens](status-screens.md).
-
-If instead the key shows a status screen like **Start HWiNFO** or **Shared Memory off**, HWiNFO isn't publishing yet; recheck the setup above, or see [Troubleshooting](troubleshooting.md) for what each screen means and how to fix it.
+Drag **Sensor Reading** onto a key, choose a **Reading**, and compare its value with HWiNFO. Fresh Shared Memory data shows **Live · Shared Memory** in the settings header. Follow the [five-step guide](getting-started.md) or find the exact message in [Troubleshooting](troubleshooting.md).
 
 ## Next steps
 
-- [Sensor Reading (keys)](sensor-reading.md): every key setting (label, theme, value shown, decimals, sparkline, thresholds).
-- [Sensor Dial (Stream Deck +)](sensor-dial.md): the dial and touchscreen action.
-- [Data sources](data-sources.md): Shared Memory vs. Gadget, and how auto-fallback works.
-- [Themes](themes.md): the seven presets, accent colors, and alert colors.
+[Get started](getting-started.md) · [Sensor Reading](sensor-reading.md) · [Sensor Dial](sensor-dial.md) · [Data sources](data-sources.md)

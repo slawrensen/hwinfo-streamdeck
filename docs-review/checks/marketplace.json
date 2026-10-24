@@ -1,0 +1,12 @@
+{
+  "url": "https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54",
+  "http_status": 200,
+  "http_date": "Sat, 24 Oct 2026 21:44:59 GMT",
+  "cache_control": "private, no-cache, no-store, max-age=0, must-revalidate",
+  "certificate_validation": "standard enabled",
+  "visible_version": "1.7",
+  "structured_softwareVersion": "1.7",
+  "release_notes_version": "1.7.0.0",
+  "visible_release_date": "Oct 13, 2026",
+  "html_sha256": "b1685fd27fdbaabf989ad25ad457a9d85be3de6948f83d788f3749acb87860a2"
+}

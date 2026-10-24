@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { createServer as createRawServer } from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
@@ -11,8 +15,10 @@ async function fixture(t, pages) {
 	const server = createServer((req, res) => {
 		const pathname = new URL(req.url, "http://127.0.0.1").pathname;
 		requests.set(pathname, (requests.get(pathname) ?? 0) + 1);
-		const page = pages[pathname] ?? { status: 404, html: "Not found" };
-		res.writeHead(page.status ?? 200, { "content-type": "text/html; charset=utf-8" });
+		const searchPrefix = pathname.endsWith("/assets/js/search-data.json") ? pathname.slice(0, -"assets/js/search-data.json".length) : null;
+		const defaultSearch = searchPrefix === null ? null : { type: "application/json", html: JSON.stringify({ home: { title: "Home", content: "Public docs", url: searchPrefix } }) };
+		const page = pages[pathname] ?? defaultSearch ?? { status: 404, html: "Not found" };
+		res.writeHead(page.status ?? 200, { "content-type": page.type ?? "text/html; charset=utf-8" });
 		res.end(page.html);
 	});
 	await new Promise((resolve, reject) => {
@@ -90,5 +96,192 @@ describe("docs crawler inspects every reachable page and proves private 404s", (
 		assert.match(result.stdout, /DOCS CRAWL: no broken links/);
 		assert.equal(requests.get("/"), 1);
 		assert.equal(requests.get("/target.html"), 1);
+	});
+});
+
+function manifest(t, routes) {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "docs-route-contract-test-"));
+	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	const file = path.join(directory, "routes.json");
+	fs.writeFileSync(file, JSON.stringify({ schema: 1, routes }));
+	return file;
+}
+
+const sourceSha = "a".repeat(40);
+const buildId = `docs-${sourceSha.slice(0, 12)}`;
+const buildJson = JSON.stringify({ kind: "documentation-preview", build_id: buildId, source_commit: sourceSha });
+const previewHtml = content => `<meta name="robots" content="noindex, nofollow"><meta name="docs-build-id" content="${buildId}"><meta name="docs-source-sha" content="${sourceSha}"><aside>Documentation preview</aside>${content}`;
+
+describe("docs crawler catches redesigned-site and deployment regressions", () => {
+	it("checks an unlinked legacy route and a removed fragment from the route contract", async t => {
+		const { root, requests } = await fixture(t, {
+			"/preview/": { html: "New navigation" },
+			"/preview/old-guide.html": { html: '<h1 id="new-heading">Old guide</h1>' }
+		});
+		const contract = manifest(t, [
+			{ path: "/", anchors: [] },
+			{ path: "old-guide.html", anchors: ["original-heading"] },
+			{ path: "lost-page.html", anchors: [] }
+		]);
+		const result = await crawl(`${root}preview/`, "--manifest", contract);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /old-guide\.html: required legacy anchor #original-heading/);
+		assert.match(result.stderr, /lost-page\.html: HTTP 404/);
+		assert.equal(requests.get("/preview/old-guide.html"), 1);
+	});
+
+	it("verifies a consistent preview build and canonical-host search links under a local subpath", async t => {
+		const { root, requests } = await fixture(t, {
+			"/preview/": { html: previewHtml('<link rel="canonical" href="https://docs.example.test/preview/"><a href="guide.html#ready">Guide</a>') },
+			"/preview/guide.html": { html: previewHtml('<h1 id="ready">Guide</h1>') },
+			"/preview/docs-build.json": { type: "application/json", html: buildJson },
+			"/preview/assets/js/search-data.json": { type: "application/json", html: JSON.stringify({ guide: { title: "Guide", content: "Searchable content", url: "https://docs.example.test/preview/guide.html#ready" } }) }
+		});
+		const contract = manifest(t, [{ path: "/guide.html", anchors: ["ready"] }]);
+		const result = await crawl(`${root}preview/`, "--preview", "--build-id", buildId, "--manifest", contract);
+		assert.equal(result.code, 0, result.stderr);
+		assert.match(result.stdout, /preview build docs-aaaaaaaaaaaa checked/);
+		assert.equal(requests.get("/preview/guide.html"), 1);
+		assert.equal(requests.get("/preview/docs-build.json"), 1);
+	});
+
+	it("rejects a cached page from a different build and missing preview noindex", async t => {
+		const { root } = await fixture(t, {
+			"/preview/": { html: `<meta name="docs-build-id" content="docs-bbbbbbbbbbbb"><meta name="docs-source-sha" content="${"b".repeat(40)}"><aside>Documentation preview</aside>` },
+			"/preview/docs-build.json": { type: "application/json", html: buildJson }
+		});
+		const result = await crawl(`${root}preview/`, "--preview");
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /preview robots meta is missing noindex/);
+		assert.match(result.stderr, /preview build meta does not match/);
+		assert.match(result.stderr, /preview source meta does not match/);
+	});
+
+	it("rejects a mismatched externally expected deployment build", async t => {
+		const { root } = await fixture(t, {
+			"/preview/": { html: previewHtml("Complete preview") },
+			"/preview/docs-build.json": { type: "application/json", html: buildJson }
+		});
+		const result = await crawl(`${root}preview/`, "--preview", "--build-id", "docs-bbbbbbbbbbbb");
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /expected build docs-bbbbbbbbbbbb, got docs-aaaaaaaaaaaa/);
+	});
+
+	it("checks every picture and img srcset candidate rather than only the fallback image", async t => {
+		const { root, requests } = await fixture(t, {
+			"/preview/": { html: '<picture><source srcset="assets/small.webp 400w, assets/missing.webp 800w"><img src="assets/fallback.png" srcset="assets/fallback.png 1x, assets/retina.png 2x" alt="Deck"></picture>' },
+			"/preview/assets/small.webp": { type: "image/webp", html: "small" },
+			"/preview/assets/fallback.png": { type: "image/png", html: "fallback" },
+			"/preview/assets/retina.png": { type: "image/png", html: "retina" }
+		});
+		const result = await crawl(`${root}preview/`);
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /asset \/preview\/assets\/missing\.webp HTTP 404/);
+		assert.equal(requests.get("/preview/assets/fallback.png"), 1);
+		assert.equal(requests.get("/preview/assets/retina.png"), 1);
+	});
+
+	it("rejects a root-relative image that escapes the project base even if that image exists", async t => {
+		const { root } = await fixture(t, {
+			"/preview/": { html: '<img src="/assets/deck.png" alt="Deck">' },
+			"/assets/deck.png": { type: "image/png", html: "wrong base" }
+		});
+		const result = await crawl(`${root}preview/`);
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /asset escapes site base \/assets\/deck\.png/);
+	});
+
+	it("finds private material in the JSON search index even when every HTML page is clean", async t => {
+		const { root } = await fixture(t, {
+			"/": { html: "Clean public page" },
+			"/assets/js/search-data.json": { type: "application/json", html: JSON.stringify({ leak: { title: "Release notes", content: "COPY_RULES private text", url: "/release/private.html" } }) }
+		});
+		const result = await crawl(root);
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /search-data\.json: leaks \/COPY_RULES\//);
+		assert.match(result.stderr, /indexes private path \/release\/private\.html/);
+	});
+
+	it("rejects broken search-result fragments and results pointing at the other base path", async t => {
+		const { root } = await fixture(t, {
+			"/preview/": { html: "Clean preview" },
+			"/preview/guide.html": { html: '<h1 id="current">Guide</h1>' },
+			"/preview/assets/js/search-data.json": { type: "application/json", html: JSON.stringify({ missing: { title: "Guide", url: "/preview/guide.html#removed" }, wrongSite: { title: "Wrong site", url: "/production/guide.html" } }) }
+		});
+		const result = await crawl(`${root}preview/`);
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /search anchor \/preview\/guide\.html#removed not on that page/);
+		assert.match(result.stderr, /search result escapes site base \/production\/guide\.html/);
+	});
+
+	it("requires a real, nonempty JSON search index", async t => {
+		const { root } = await fixture(t, {
+			"/": { html: "Clean public page" },
+			"/assets/js/search-data.json": { html: "An HTML error disguised as success" }
+		});
+		const result = await crawl(root);
+		assert.equal(result.code, 1);
+		assert.match(result.stderr, /invalid JSON search index/);
+	});
+});
+
+// A closing HTTP/1.0 peer exercises the response-stream failure seen with the
+// actual Python-hosted Jekyll build, rather than just tiny HTTP/1.1 fixtures.
+async function closingPeer(t, truncated = false) {
+	const sockets = new Set();
+	const asset = Buffer.alloc(2 * 1024 * 1024, 1);
+	const server = createRawServer(socket => {
+		sockets.add(socket);
+		socket.on("close", () => sockets.delete(socket));
+		socket.on("error", () => { /* Client failures are asserted through crawler output. */ });
+		let request = "";
+		const receive = data => {
+			request += data.toString();
+			if (!request.includes("\r\n\r\n")) return;
+			socket.removeListener("data", receive);
+			const route = request.split(" ")[1];
+			let status = 200;
+			let type = "text/html";
+			let body;
+			let declaredLength;
+			if (route === "/") body = Buffer.from('<h1>Docs</h1><img src="large.png" alt="Deck">');
+			else if (route === "/assets/js/search-data.json") {
+				type = "application/json";
+				body = Buffer.from(JSON.stringify({ home: { title: "Home", url: "/" } }));
+			} else if (route === "/large.png") {
+				type = "image/png";
+				body = truncated ? asset.subarray(0, 1024) : asset;
+				declaredLength = asset.length;
+			} else { status = 404; body = Buffer.from("Not found"); }
+			const headers = Buffer.from(`HTTP/1.0 ${status} ${status === 200 ? "OK" : "Not Found"}\r\nContent-Type: ${type}\r\nContent-Length: ${declaredLength ?? body.length}\r\nConnection: close\r\n\r\n`);
+			socket.end(Buffer.concat([headers, body]));
+		};
+		socket.on("data", receive);
+	});
+	await new Promise((resolve, reject) => {
+		server.once("error", reject);
+		server.listen(0, "127.0.0.1", resolve);
+	});
+	t.after(async () => {
+		for (const socket of sockets) socket.destroy();
+		await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+	});
+	return `http://127.0.0.1:${server.address().port}/`;
+}
+
+describe("docs crawler consumes closing response streams", () => {
+	it("finishes large image bodies from an HTTP/1.0 server without an undici parser crash", async t => {
+		const root = await closingPeer(t);
+		const result = await crawl(root);
+		assert.equal(result.code, 0, result.stderr);
+		assert.match(result.stdout, /DOCS CRAWL: no broken links/);
+	});
+
+	it("reports a truncated asset transfer as a failed check instead of claiming success", async t => {
+		const root = await closingPeer(t, true);
+		const result = await crawl(root);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /asset \/large\.png HTTP -1/);
+		assert.doesNotMatch(result.stderr, /AssertionError|Parser\.finish/);
 	});
 });

@@ -1,0 +1,86 @@
+[
+  {
+    "page": "sensor-dial.html",
+    "before": {
+      "regionWidth": 333,
+      "tableWidth": 820,
+      "rows": [
+        40,
+        58,
+        92,
+        127,
+        40,
+        75,
+        58,
+        58,
+        58,
+        58,
+        58,
+        40,
+        40,
+        40,
+        40,
+        58,
+        40,
+        58,
+        75,
+        75,
+        58,
+        75,
+        40,
+        40,
+        40,
+        40,
+        39
+      ],
+      "focus": true,
+      "role": "region",
+      "label": "Settings table 4, scroll horizontally",
+      "tabindex": 0,
+      "pageOverflow": false,
+      "left": 0
+    },
+    "after": {
+      "left": 487,
+      "focus": true,
+      "pageOverflow": false
+    }
+  },
+  {
+    "page": "hardware.html",
+    "before": {
+      "regionWidth": 333,
+      "tableWidth": 822,
+      "rows": [
+        40,
+        127,
+        92,
+        92,
+        75,
+        127,
+        110,
+        196,
+        74
+      ],
+      "focus": true,
+      "role": "region",
+      "label": "Compatibility matrix table 1, scroll horizontally",
+      "tabindex": 0,
+      "pageOverflow": false,
+      "left": 0
+    },
+    "after": {
+      "left": 489,
+      "focus": true,
+      "pageOverflow": false
+    }
+  },
+  {
+    "page": "data-sources.html#legacy-gadget-selections",
+    "result": {
+      "open": true,
+      "top": 205.40625,
+      "scrollBehavior": "auto"
+    }
+  }
+]

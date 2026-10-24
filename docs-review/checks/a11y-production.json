@@ -1,0 +1,815 @@
+{
+  "date": "2026-10-24T21:37:29.732Z",
+  "base": "http://127.0.0.1:4173/hwinfo-streamdeck/",
+  "engine": "axe-core 4.14.0",
+  "browser": "156.0.8078.47",
+  "reports": [
+    {
+      "route": "",
+      "width": 390,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              ".button-primary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".button-secondary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".image-hint"
+            ],
+            [
+              "figure:nth-child(1) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(2) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(3) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "a[href$=\"themes.html\"] > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(2) > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(3) > a > span[aria-hidden=\"true\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "HWiNFO Sensors for Stream Deck"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ],
+            [
+              ".button-primary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".button-secondary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".image-hint"
+            ],
+            [
+              "figure:nth-child(1) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(2) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(3) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "a[href$=\"themes.html\"] > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(2) > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(3) > a > span[aria-hidden=\"true\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "HWiNFO Sensors for Stream Deck"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "installation.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Install"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "getting-started.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Get started"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "installation.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Install"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "getting-started.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Get started"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-reading.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor Reading"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-reading.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor Reading"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-dial.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor Dial"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-details.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor details"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-details.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor details"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "sensor-dial.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor Dial"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "themes.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Themes & colors"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "themes.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Themes & colors"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "thresholds-alerts.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Thresholds & alerts"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "thresholds-alerts.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Thresholds & alerts"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "controls.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Dial controls"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "controls.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Dial controls"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "data-sources.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Data sources"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "hardware.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Hardware compatibility"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "data-sources.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Data sources"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "hardware.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Hardware compatibility"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "whats-new-1.7.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "What changed in 1.7"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "whats-new-1.7.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "What changed in 1.7"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "changelog.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Changelog"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "changelog.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Changelog"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "troubleshooting.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Troubleshooting"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "status-screens.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Status screens"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "status-screens.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Status screens"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "troubleshooting.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Troubleshooting"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "faq.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#nav-start"
+            ],
+            [
+              ".nav-list-link[href$=\"hwinfo-streamdeck/\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "FAQ"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "404.html",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              "section[aria-labelledby=\"nav-reference\"] > .nav-list > .nav-list-item:nth-child(4) > .nav-list-link"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Page not found"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "faq.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "FAQ"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "route": "404.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Page not found"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "state": "phone-viewer",
+      "route": "sensor-dial.html",
+      "width": 390,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "Sensor Dial"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "state": "desktop-viewer",
+      "route": "",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "HWiNFO Sensors for Stream Deck"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "state": "phone-nav",
+      "route": "",
+      "width": 360,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              ".button-primary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".button-secondary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".image-hint"
+            ],
+            [
+              "figure:nth-child(1) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(2) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(3) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "a[href$=\"themes.html\"] > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(2) > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(3) > a > span[aria-hidden=\"true\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "HWiNFO Sensors for Stream Deck"
+        ],
+        "searchVisible": true
+      }
+    },
+    {
+      "state": "desktop-search",
+      "route": "",
+      "width": 1280,
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodes": [
+            [
+              "#search-results"
+            ]
+          ]
+        },
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": [
+            [
+              ".button-primary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".button-secondary > span[aria-hidden=\"true\"]"
+            ],
+            [
+              ".image-hint"
+            ],
+            [
+              "figure:nth-child(1) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(2) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "figure:nth-child(3) > figcaption > h3 > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "a[href$=\"themes.html\"] > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(2) > a > span[aria-hidden=\"true\"]"
+            ],
+            [
+              "li:nth-child(3) > a > span[aria-hidden=\"true\"]"
+            ]
+          ]
+        }
+      ],
+      "metrics": {
+        "overflow": false,
+        "h1": [
+          "HWiNFO Sensors for Stream Deck"
+        ],
+        "searchVisible": true
+      }
+    }
+  ]
+}

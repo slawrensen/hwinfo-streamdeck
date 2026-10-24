@@ -1,11 +1,12 @@
 ---
-title: Thresholds & Alerts
+title: Thresholds & alerts
 nav_order: 7
+description: Set warning and critical limits for readings on keys and dials.
 ---
 
 Set **Warn at** and/or **Critical at** to change the display when the current value reaches a limit: amber for warning, red for critical.
 
-> This page includes the color changes in 1.7. See [what changed from 1.6](whats-new-1.7.md).
+Open **Alerts** in the key or dial settings. Thresholds use the current value, even while the face displays MIN, MAX or AVG.
 
 Both fields are optional and independent: set one, the other, or neither. A key with no thresholds just shows its themed value.
 
@@ -17,15 +18,18 @@ Both fields are optional and independent: set one, the other, or neither. A key 
 | **Critical at** | Whole face flips to red field / white text | Range bar fill turns red (single view), or the alerting row's value (overview views) |
 | **Alert when the value drops to or below these numbers** (the direction checkbox) | Flips the comparison so a *low* value is the alarm | Same |
 
-An alert recolors the whole key. On a single-reading dial it recolors the range bar fill; on a two-row or three-row dial it recolors the alerting row's value. The rest of the dial keeps its theme. See [Sensor Dial](sensor-dial.md).
-
 Thresholds have a second, quieter effect on any face that draws a range. A key whose **Graph under the value** is set to **Bar** or **Ring** (a one-reading-layout setting) marks the same limits on its track: muted amber from **Warn at** and muted red from **Critical at**, running toward the alarmed end, the low end when the direction checkbox alerts on a drop. The dial's range bar marks them the same way. The zones are blended toward the face background and the live fill draws over them in full color, and a key's range, which is always automatic, widens just enough to keep a zone visible. A dial pinned with **Bar from** / **Bar to** is never widened; a zone outside those bounds is clipped. See [Display: sparkline, bar, ring](sensor-reading.md#display-sparkline-bar-ring).
 
-![The whole settings panel with every section open, Alerts among them: Warn at 80, Critical at 89 and the checkbox that alerts on a drop, with the help line under them.]({{ '/assets/img/settings-panel.png' | relative_url }})
+<details markdown="1">
+<summary>See the Alerts controls in the settings panel</summary>
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/settings-panel.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/settings-panel.png' | relative_url }}" width="800" height="4310" loading="lazy" decoding="async" alt="The whole settings panel with every section open, Alerts among them: Warn at 80, Critical at 89 and the checkbox that alerts on a drop, with the help line under them."></a>
+
+</details>
 
 ## How the comparison works
 
-Two rules matter, and both are easy to get wrong:
+Use the correct unit and comparison:
 
 **1. Thresholds are in the *displayed* unit.** The value compared against your thresholds is the **live (current) reading in whatever unit the key shows**, after the °C→°F conversion, not before. So if you tick **°F**, a **Warn at** of `100` fires on a 40 °C core (which displays as 104 °F). Leave °F off and the same sensor is compared in °C. Match your numbers to the unit on the face. One exception: the shared **Data units** setting re-tiers byte and rate readings for display only. Thresholds still compare against the number HWiNFO reports, so a `12345.6 MB` reading is compared as `12345.6` while the key shows `12.3 GB`, and a `12000000 B/s` reading is compared as `12000000` while the key shows `96.0 Mbps`. Switching Decimal to Binary never re-arms an alert. See [Data units](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
 
@@ -85,13 +89,13 @@ Above 500 RPM the key is normal; at 500 or under it warns; at 300 or under it go
 
 ### Free disk space: alert on a low floor
 
-Free space in GB, so you notice before a drive fills:
+For a free-space reading that HWiNFO itself reports in **GB**:
 
 - **Warn at** `50`
 - **Critical at** `20`
 - **Alert when the value drops**: **ticked**
 
-Drops to 50 GB → amber; drops to 20 GB → red.
+Drops to 50 GB → amber; drops to 20 GB → red. If HWiNFO reports the reading in MB, enter limits in MB even when **Data units** displays GB.
 
 > **Tip:** When you use the *below* direction, set **Critical at** *lower* than **Warn at** (crit is the worse, deeper floor). Because critical is evaluated first, an inverted pair (e.g. warn 300, crit 500 with below on) makes the reading go straight to critical without ever showing warn.
 

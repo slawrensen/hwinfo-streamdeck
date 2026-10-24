@@ -1,6 +1,7 @@
 ---
 title: What changed in 1.7
 nav_order: 1.5
+description: Changes in 1.7 and 1.7.1, including backgrounds and source behavior.
 ---
 
 **1.7.0.0 redesigns the settings panels, adds individual dial colors and
@@ -22,22 +23,11 @@ rewrites no stored settings. The tables below say where a change needs you to ac
 
 ## UX improvements in the settings panels
 
-The Sensor Reading, Sensor Dial and HWiNFO Control panels share one layout.
-On a key or dial, a header stays at the top while you scroll: the face
-exactly as the plugin last drew it, the reading's name and source, and the
-data state, in the face's own words when there is a problem:
-**Live · Shared Memory**, **Not updating for 42 s** or **Age unknown**.
+The key, dial and Control panels use the same section layout. On keys and dials, the header shows the last rendered face, reading and data state. Problems have a next-step button, such as **Check again**, **HWiNFO setup steps** or **Pick another reading**.
 
-Under the header, the theme strip opens on a first visit and folds like
-the sections. Its line names the theme the key draws and where it comes
-from, such as **Default (shared: Void)** with **Change** beside it. Eight
-chips follow: **Default** and the seven themes, each drawn in its own colors
-with its name on it. When a key's own theme differs from the shared one,
-**Make shared** takes Change's place: it makes that theme the shared theme
-and sets the key back to Default. Folded, the strip keeps the checked theme
-as a small chip in its own colors. See [Themes](themes.md).
+The theme strip names the current theme and whether it is local or shared. **Default** follows the shared theme. **Make shared** applies a local theme to all keys and dials that follow Default. [Themes & colors](themes.md) explains the choices.
 
-![The top of the key's settings panel: the header with the key's live face, the reading's name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper.]({{ '/assets/img/pi-theme-strip.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-theme-strip.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-theme-strip.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The top of the key&#x27;s settings panel: the header with the key&#x27;s live face, the reading&#x27;s name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper."></a>
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host. This is not a photograph of the physical deck.*
@@ -47,49 +37,14 @@ The sections follow: **Reading**, **Display**, **Alerts**, **Press**
 **Connection**, **Support** and **Configuration documents**. The HWiNFO
 Control key has **Command** and **Advanced**.
 
-- **Folding.** Reading and Display start open. A folded section's title line
-  summarizes what it holds. A section you open or fold stays that way on the
-  next panel of the same kind (key, dial or Control key) while the plugin
-  runs; after a Stream Deck app restart the defaults come back. The two
-  chevron buttons at the top right of the header open or fold every section,
-  and so does Alt-click on a section title. Folding writes nothing to your
-  keys.
-- **Status and repairs.** When something needs fixing, a message sits right
-  under the header with the fix as a button: **Check again**, **HWiNFO setup
-  steps**, **Reload sensor list**, **Pick another reading**, or **Data source
-  setting** when **Data source** is set to one provider only. See
-  [Status screens](status-screens.md#in-the-settings-panel).
-- **Reading list.** The picker lists every reading; 1.6.0 stopped after 150
-  rows, so a later source such as the GPU only appeared when searched for.
-  Arrow keys browse, Enter picks, and Tab or a click elsewhere closes the list
-  without changing anything.
-- **Rotation on a dial.** Tick readings under **Readings to rotate through**.
-  The rotation shows as one list with the reading on the dial highlighted.
-  Select a reading, then use **Earlier**, **Later**, **Rename** or
-  **Remove**; at a group's edge, Earlier and Later move it into the
-  neighboring group. **Split into groups**, **Add group** and **Merge back
-  into one set** manage [rotation groups](controls.md#rotation-groups).
-  Ticking a reading never changes the reading on the dial.
-- **Detail settings on a key.** With **A press** set to open details, the
-  Press section shows **Readings per tile**, **Title tile text**, **Also go
-  back from this key's own position** and **Details list**. See
-  [Sensor details](sensor-details.md).
-- **Second press.** Replacing the shared settings document, removing a
-  rotation group that holds readings, and a merge that drops group names or
-  joins two or more groups of readings each ask for a second press.
-- **Nothing written on open.** Opening a panel saves nothing, and an edit
-  changes only the field it touched. A stored choice this version does not
-  know shows as kept instead of being replaced.
-- **Keyboard and size.** Every control has a name and a visible focus ring,
-  fields and buttons are 28 px tall, small marks such as checkboxes have at
-  least a 24 px target, and the panels reflow at 320 px wide without
-  horizontal scrolling.
-- **Stream Deck app limits.** The app keeps the Escape key and most of its own
-  clicks from reaching a panel, so an open reading list also closes on a
-  second click in its box and when the panel loses focus. Text typed just
-  before you select another key is saved as the pointer leaves the panel.
+- **Reading** and **Display** start open. Folded sections summarize their settings. Fold choices persist while the plugin runs; **Open all sections**, **Fold all sections**, or Alt-click changes every fold.
+- **The reading picker lists every match**, removing the previous 150-row cutoff. Arrow keys browse, Enter selects, and Tab or a click elsewhere closes it.
+- **Dial rotation is editable in one list:** Earlier, Later, Rename and Remove, with optional named [groups](controls.md#rotation-groups). Ticking a reading does not change the active reading.
+- **Detail settings stay together** under Press: Readings per tile, Title tile text, the Back position and Details list. See [Sensor details](sensor-details.md).
+- **Replacing shared settings and destructive group edits ask for a second press.** Opening a panel writes nothing, and an edit keeps unrelated or unknown stored settings.
+- **Keyboard and narrow-panel handling improved.** Stream Deck still reserves Escape, so the reading picker also closes on another click in its box or when the panel loses focus.
 
-![The dial's settings panel: the header with the dial's face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and filled as the one on the dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title when the dial moves on.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The dial&#x27;s settings panel: the header with the dial&#x27;s face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and filled as the one on the dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title when the dial moves on."></a>
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host.*
@@ -162,12 +117,12 @@ changes. Upgrading from **1.6.0** adds all of it.
 removes that reading's override, and the **Automatic** preset clears the
 color of every reading in the list.
 
-![Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors."></a>
 
 *Production dial renderer with fixed sample readings and generated histories.
 The layouts and values are identical on both sides; only number colors change.*
 
-![The dial's Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The dial&#x27;s Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button."></a>
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host. This is not a photograph of the physical deck.*
@@ -185,7 +140,7 @@ history, or withhold both readings while they share the name. Shared Memory
 remains the preferred source because it supplies hardware identifiers,
 history and a consistency mutex.
 
-![Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age."></a>
 
 *Production status renderers with controlled failure scenarios. These are
 rendered examples, not measurements from a hardware fault test.*
@@ -196,6 +151,9 @@ while the other rows keep working (the plugin log names the slot). That catches
 some partial writes; it does not make the registry an atomic source.
 The [source guide](data-sources.md) explains the remaining limits and pairing
 steps.
+
+<details markdown="1">
+<summary>Software regression coverage and its limits</summary>
 
 ## What the review caught
 
@@ -209,3 +167,5 @@ values as new samples.
 Regression tests cover those cases. They establish software behavior, not
 physical readability or long-run stability; the [hardware page](hardware.md)
 lists what ran on which device and when.
+
+</details>

@@ -1,14 +1,13 @@
 ---
 title: Hardware compatibility
 nav_order: 9.5
+description: See which devices were tested, simulated or expected to work.
 ---
 
-The matrix records device coverage and the dated tests behind it. Historical
-hardware results predate 1.7 and do not stand in for its own checks; the
-dated rows below say what ran on which build.
+Check your device and the evidence behind its support. The dated records distinguish physical tests from simulation and expected compatibility. Historical results do not qualify a newer release.
 
 - **Physically verified**: ran on the real device in my hands, with a recorded result.
-- **SDK simulated**: exercised end to end against a mock Stream Deck WebSocket that replays the device's exact registration and events. Strong evidence, not hardware.
+- **SDK simulated**: exercised against mock Stream Deck registration and events. This is software evidence, not a physical-device result.
 - **Community verified**: a user ran the [test procedure](#hardware-test-procedure) on real hardware and reported back. None yet; reports welcome.
 - **Compatible with limitations**: expected to work from the SDK contract, with the listed caveats, but unproven.
 
@@ -24,6 +23,7 @@ dated rows below say what ran on which build.
 | Pedal, Corsair G-Keys, SCUF controllers | HWiNFO Control only | n/a | Compatible with limitations: these have no display, so the sensor actions are pointless there, but the Control key action drives dials on other decks from them. Their device types are covered by capability fixtures only; the Control key path itself is e2e-driven from a mock 15-key deck (the command code never consults the key's device). |
 | Stream Deck Studio, Galleon 100 SD | Untested | Not claimed | No support is claimed for either, and the reasons differ. Studio (32 keys 16x2, 2 dials): the Stream Deck app ships encoder strip backgrounds for the +, the + XL and the Galleon, but not the Studio, so its dials have no drawable strip and a Sensor Dial there would render nowhere. Galleon 100 SD (a gaming keyboard with a built-in 12-key 3x4 deck, a screen and 2 dials): its screen does take encoder backgrounds, but at 720x384, a different class from the 200x100 per-encoder faces this plugin draws, and it has no touch input; supporting it properly is a rendering task, not a compatibility row. Both take the unknown-device fallback (keys and input still handled, "Unknown device" in logs and reports). A [hardware report](#hardware-test-procedure) is the first step. |
 | Unknown future devices | Fallback | Fallback | Nothing is claimed in advance: capabilities derive from the reported grid, input events are always handled, and rendering degrades to a no-op where there is no display. |
+{: .reference-table .compatibility-table }
 
 Stream Deck software floor is **6.9**. Features from newer apps are detected at runtime and degrade: dynamic gesture hints use a 6.4-era API, `deviceDidChange` (7.0) falls back to connect-time device info, Key Logic (7.0) appears when the app supports it. Basic monitoring depends on none of them.
 
@@ -31,11 +31,11 @@ Stream Deck software floor is **6.9**. Features from newer apps are detected at 
 
 The [sensor detail view](sensor-details.md) ships one bundled profile per deck type: Mini (3x2), 15-key (5x3, every revision), Neo (4x2), + (4x2 keys), XL (8x4) and + XL (9x4 keys). The Virtual Stream Deck borrows whichever keypad layout fits its user-sized grid (a 10x10 virtual deck runs the + XL layout). All bundles are generated from one layout table and structurally locked by `test/detail-profiles.test.ts`; the full switch-in, render and switch-back cycle is hardware-verified on my + XL (2026-07-28, first profile revision: entry switched the physical deck to the bundled view, all 36 tiles registered and rendered, and Back restored the exact previous profile; 2026-07-29, current revision: the editable page and the configurable Back tile rendered on the physical + XL, idle, single and dual, through the real settings panel). The upgrade path, the one-time install prompt and every Back layout were driven end to end through the real Stream Deck app on a 10x10 Virtual Stream Deck, and a + XL owner confirmed the first revision's first-use install and folder return on their hardware ([issue #5](https://github.com/slawrensen/hwinfo-streamdeck/issues/5)). The other classes are verified at the archive and mock-app level; a [hardware report](#hardware-test-procedure) from a Mini, 15-key, Neo, + or XL is welcome. Decks without a bundled profile (Mobile, Studio, Galleon, pedals, G-keys, a virtual deck smaller than 3x2) refuse entry with the Stream Deck alert cue and keep the ordinary key behavior.
 
-![Six dial faces rendered by the plugin at the Stream Deck + XL's six-encoder strip geometry (one 200 by 100 segment per encoder): CPU temperature, GPU temperature, a pinned CPU fan, CPU power, CPU load, and a GPU hot spot at a forced critical value with a red bar, with drawn knob markers beneath.]({{ '/assets/img/plusxl-dials.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/plusxl-dials.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/plusxl-dials.png' | relative_url }}" width="2526" height="360" loading="lazy" decoding="async" alt="Six dial faces rendered by the plugin at the Stream Deck + XL&#x27;s six-encoder strip geometry (one 200 by 100 segment per encoder): CPU temperature, GPU temperature, a pinned CPU fan, CPU power, CPU load, and a GPU hot spot at a forced critical value with a red bar, with drawn knob markers beneath."></a>
 
-And the same claim as a photograph, not a render: my Stream Deck + XL running the validation page in July 2026, on an earlier version, 36 keys and six dial readouts live from HWiNFO (Sony A7 III, 85mm at f/2.5, developed once in Camera Raw; no compositing). Its text is Tahoma Bold, the default Text font; some 1.7 faces lay out differently.
+Hardware photograph: a Stream Deck + XL running the validation page in July 2026, with 36 keys and six dial readouts from HWiNFO. This is an earlier plugin version; some 1.7 faces differ. Captured on a Sony A7 III, 85 mm at f/2.5, developed once in Camera Raw without compositing.
 
-![Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including physical memory, DIMM temperatures and CPU package power, and six metal knobs below.]({{ '/assets/img/plusxl-photo.jpg' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/plusxl-photo.jpg' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/plusxl-photo.jpg' | relative_url }}" width="1600" height="1452" loading="lazy" decoding="async" alt="Photograph of a Stream Deck + XL on a desk running HWiNFO Sensors: 36 keys showing live temperatures, clocks, usage and voltages with sparklines, amber warn and red critical demo keys, the touchstrip showing six per-dial readouts including physical memory, DIMM temperatures and CPU package power, and six metal knobs below."></a>
 
 ## Page swipe
 

@@ -1,9 +1,12 @@
 ---
-title: Dial controls & presets
+title: Dial controls
 nav_order: 5.5
+description: Choose gestures, rotation groups and HWiNFO Control key commands.
 ---
 
-How the dial's physical inputs map to actions. Everything on this page is configured per dial in the [Sensor Dial](sensor-dial.md) settings panel. **Gestures** (the preset, and on Custom one command per gesture), **Touch zones**, **Ignore turns**, **Auto cycle**, **A stats reset clears** and **Link ID** live under its **Controls** section; the rotation and its groups under **Reading**; thresholds and **Auto cycle jumps to a critical reading** under **Alerts**.
+Choose what turning, pressing and touching a Sensor Dial does. Open its **Controls** section for **Gestures**, **Touch zones**, **Ignore turns**, **Auto cycle**, **A stats reset clears** and **Link ID**.
+
+Rotation groups are under **Reading**. Thresholds and **Auto cycle jumps to a critical reading** are under **Alerts**.
 
 ## Control presets
 
@@ -13,7 +16,7 @@ How the dial's physical inputs map to actions. Everything on this page is config
 | **Elite** | Cycle readings | Switch sensor or [rotation group](#rotation-groups) | Short: pause/resume auto cycle. Long (hold half a second): reset session stats | Cycle stat mode, or [touch zones](#touch-zones) | Back to current |
 | **Custom** | Your pick | Your pick | Your pick, short and long separately | Your pick | Your pick |
 
-Nothing remaps until you change it: every dial that existed before presets, and every new dial, runs **Legacy**, which keeps every earlier release's gesture map exactly. One 1.1.10.0 fix applies to all presets: rotating to a different reading clears a custom title, so the title can no longer name one reading while showing another's value. Set **Title when the dial moves on** to **Stays for this dial** to keep a fixed title through rotation, as before that fix.
+New and existing dials use **Legacy** until you choose another preset. Moving to another reading clears a custom title by default. Set **Title when the dial moves on → Stays for this dial** to keep a fixed title.
 
 Two Elite details:
 
@@ -24,11 +27,11 @@ The Stream Deck app's own gesture hints (shown when you hover a dial in the app)
 
 Under **Gestures** the settings panel lists what each gesture does on this dial now, from the same control map the dial runs, including what other settings change: **Ignore turns** marks turns as ignored, two touch zones take the tap, and a pause gesture notes when the auto cycle is off. **How the presets work** at the end of the section spells out Legacy and Elite.
 
-![The dial's settings panel under its header and theme strip, with Controls open and Gestures on Elite: the list of what each gesture does now (Turn cycles readings, Pressed turn switches group, Push pauses or resumes the auto cycle, noting that auto cycle is off, Long push resets session stats, Touch cycles the stat, Long touch returns to the current value), then Touch zones on Off, Ignore turns, Auto cycle on Off, A stats reset clears on This reading only, a Link ID field reading "cpu-dial" and the How the presets work link. Reading, Display, Alerts and Advanced are folded, each naming its current values.]({{ '/assets/img/pi-dial-presets.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-presets.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-presets.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The dial&#x27;s settings panel under its header and theme strip, with Controls open and Gestures on Elite: the list of what each gesture does now (Turn cycles readings, Pressed turn switches group, Push pauses or resumes the auto cycle, noting that auto cycle is off, Long push resets session stats, Touch cycles the stat, Long touch returns to the current value), then Touch zones on Off, Ignore turns, Auto cycle on Off, A stats reset clears on This reading only, a Link ID field reading &quot;cpu-dial&quot; and the How the presets work link. Reading, Display, Alerts and Advanced are folded, each naming its current values."></a>
 
 With **Custom** selected, one select per gesture appears: **Turn**, **Pressed turn**, **Short push**, **Long push**, **Touch tap** and **Long touch**. **Touch zones** stays below them, as on Elite. Switching from Elite to Custom copies Elite's map into every gesture you have not set yourself, so "Elite minus the one gesture you want different" is a single change; unset gestures on a dial that went straight to Custom keep their Legacy commands. On Custom the gesture list shows only the gestures another setting changes, because the selects already name the rest.
 
-![The Controls section with Gestures on Custom and Elite's map copied in: Turn on Cycle readings, Pressed turn on Switch sensor or group, Short push on Pause/resume auto cycle, Long push on Reset session stats, Touch tap on Cycle stat mode and Long touch on Back to current value, then Touch zones, Ignore turns, Auto cycle, A stats reset clears and the Link ID field reading "cpu-dial".]({{ '/assets/img/pi-dial-custom.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-custom.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-custom.png' | relative_url }}" width="800" height="1250" loading="lazy" decoding="async" alt="The Controls section with Gestures on Custom and Elite&#x27;s map copied in: Turn on Cycle readings, Pressed turn on Switch sensor or group, Short push on Pause/resume auto cycle, Long push on Reset session stats, Touch tap on Cycle stat mode and Long touch on Back to current value, then Touch zones, Ignore turns, Auto cycle, A stats reset clears and the Link ID field reading &quot;cpu-dial&quot;."></a>
 
 ## Rotation groups
 
@@ -38,7 +41,7 @@ Build them in the dial's settings panel. **Split into groups** under the rotatio
 
 Removing a group that holds readings, and a merge that would drop a group name or fold two or more groups of readings into one, ask for a second press: the first press arms the button, which then says what goes (for example **Remove GPU and its 2 readings?**), and a quick double click only arms it. An empty group goes at once.
 
-![The rotation split into two named groups, with the search above them labelled Readings for GPU. Overview holds CPU, GPU and Pump, with CPU filled as the one on the dial and selected and the Earlier, Later, Rename and Remove toolbar under it; GPU holds GPU Memory Junction Temperature and GPU Clock, its radio marked so ticks land there, with the dimmed hint "Select one to move, rename or remove it" under it. Each group has a name field and a × button. Below: the note "2 groups. Rotation needs two or more readings in a group to move inside it.", the Add group and Merge back into one set buttons, and the line "New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name."]({{ '/assets/img/pi-dial-groups.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-groups.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-groups.png' | relative_url }}" width="800" height="876" loading="lazy" decoding="async" alt="The rotation split into two named groups, with the search above them labelled Readings for GPU. Overview holds CPU, GPU and Pump, with CPU filled as the one on the dial and selected and the Earlier, Later, Rename and Remove toolbar under it; GPU holds GPU Memory Junction Temperature and GPU Clock, its radio marked so ticks land there, with the dimmed hint &quot;Select one to move, rename or remove it&quot; under it. Each group has a name field and a × button. Below: the note &quot;2 groups. Rotation needs two or more readings in a group to move inside it.&quot;, the Add group and Merge back into one set buttons, and the line &quot;New ticks go to the marked group. Turns stay inside a group; a pressed turn jumps to the next group and shows its name.&quot;"></a>
 
 How groups behave:
 
@@ -61,7 +64,7 @@ Off by default, and only on Elite and Custom: the **Touch zones** select appears
 
 Pause and pin survive page switches and profile changes for up to 30 minutes off screen (the plugin parks the state of the 64 most recently hidden dials; past either bound a returning dial starts fresh). They also reset when the Stream Deck app restarts.
 
-![Three dial faces rendered by the plugin: CPU Temp with "pinned" in place of "session" on its stats line, Pump with "cycle paused" in its place, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds.]({{ '/assets/img/dial-states.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-states.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-states.png' | relative_url }}" width="1280" height="270" loading="lazy" decoding="async" alt="Three dial faces rendered by the plugin: CPU Temp with &quot;pinned&quot; in place of &quot;session&quot; on its stats line, Pump with &quot;cycle paused&quot; in its place, and GPU Hot Spot showing its session MAX of 106 °C at a critical level with the range bar fill in red, the case where an alert-aware auto cycle holds."></a>
 
 ## Session stats are per reading
 
@@ -85,11 +88,14 @@ Alert-aware cycling is opt-in via the **Auto cycle jumps to a critical reading**
 
 Targeting is explicit. Give a dial a **Link ID** (its Controls section) and put the same name in the control key's **Target** field; the key then drives only dials with that ID, wherever they live. An empty Target drives every dial. The key shows a tick when the command reached at least one matching dial (a pinned dial still counts as reached), and an alert icon when none matched. One reach limit: the four selection commands (next/previous reading, next/previous sensor or group) need the target dial on screen somewhere, on any connected deck, which is why the sources listed above are other devices or automations, not a key that swaps the dial off screen as you press it. The stat, pause, pin and reset commands also reach a dial parked off screen inside the same 30-minute window that keeps its pause and pin, and the tick means the command matched a dial, not that anything changed on screen. Pause and pin also have one-way commands (**Pause auto cycle**, **Resume auto cycle**, **Pin reading**, **Unpin reading**), so pressing one again in a Multi Action does not toggle the state back.
 
-![The HWiNFO Control key's settings panel: the header naming the command, Next reading, over "Sends to dials with Link ID "cpu-dial""; the line explaining what the key steers and when it shows a tick or an alert; Command with When pressed on Next reading, Target "cpu-dial" and its help line; and Advanced with the Copy support report button.]({{ '/assets/img/pi-control.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-control.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-control.png' | relative_url }}" width="800" height="892" loading="lazy" decoding="async" alt="The HWiNFO Control key&#x27;s settings panel: the header naming the command, Next reading, over &quot;Sends to dials with Link ID &quot;cpu-dial&quot;&quot;; the line explaining what the key steers and when it shows a tick or an alert; Command with When pressed on Next reading, Target &quot;cpu-dial&quot; and its help line; and Advanced with the Copy support report button."></a>
 
 ## Page swipe
 
 Swiping sideways on the touch strip switches Stream Deck pages. The app handles that gesture. Selection and labels are saved settings. Pause, pin and session state can survive a page switch within the hidden-dial limits above; session statistics still follow the reset rules.
+
+<details markdown="1">
+<summary>Stored settings, downgrade behavior and unknown fields</summary>
 
 ## Settings migration
 
@@ -104,3 +110,5 @@ Settings only ever gain fields; nothing existing is renamed or removed.
 - The overview's **Row labels** field (`overviewLabels`, 1.2.0) shortens shared prefixes by default; only the exact value "full" turns that off. Anything else, including future values, keeps the default.
 - Malformed or unexpected values in any field fall back to the defaults instead of failing; a broken settings blob renders and keeps working.
 - The settings panel keeps what it does not understand. Opening a panel writes nothing, and an edit changes only the field you touched: fields, list entries, group and tile metadata, and option values written by a newer version are kept as they were. A stored choice this version does not know shows as *Stored value "…" (not in this list, kept)* until you pick another.
+
+</details>

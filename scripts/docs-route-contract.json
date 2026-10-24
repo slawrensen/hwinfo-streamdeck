@@ -1,0 +1,278 @@
+{
+  "schema": 1,
+  "source_commit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "routes": [
+    {
+      "path": "changelog.html",
+      "anchors": [
+        "changelog",
+        "1710---2026-10-24",
+        "1700---2026-10-11",
+        "16920---2026-09-09",
+        "1600---2026-09-04",
+        "15900---2026-08-11",
+        "1510---2026-08-11",
+        "1500---2026-08-02",
+        "14930---2026-07-31",
+        "14920---2026-07-30",
+        "14910---2026-07-29",
+        "14900---2026-07-29",
+        "1400---2026-07-25",
+        "13900---2026-07-23",
+        "1300---2026-07-16",
+        "1200---2026-07-13",
+        "11110---2026-07-12",
+        "11100---2026-07-11",
+        "1190---2026-07-05",
+        "1180---2026-07-05",
+        "1170---2026-07-05",
+        "1160---2026-07-05",
+        "1150---2026-07-05",
+        "1140---2026-07-04",
+        "1130---2026-07-04",
+        "1120---2026-07-04",
+        "1110---2026-07-04",
+        "1100---2026-07-04-first-tagged-build"
+      ]
+    },
+    {
+      "path": "controls.html",
+      "anchors": [
+        "control-presets",
+        "rotation-groups",
+        "touch-zones",
+        "pause-pin-and-reset-reach",
+        "session-stats-are-per-reading",
+        "thresholds-and-mixed-units",
+        "the-hwinfo-control-key-action",
+        "page-swipe",
+        "settings-migration"
+      ]
+    },
+    {
+      "path": "data-sources.html",
+      "anchors": [
+        "shared-memory-vs-gadget-registry",
+        "enabling-shared-memory",
+        "enabling-gadget-reporting",
+        "auto-mode",
+        "advanced-settings",
+        "data-source",
+        "read-every",
+        "how-this-shows-up-elsewhere",
+        "link-readings-across-providers",
+        "freshness-and-local-history"
+      ]
+    },
+    {
+      "path": "faq.html",
+      "anchors": [
+        "platform-and-requirements",
+        "does-it-work-on-macos-or-linux",
+        "what-are-the-exact-requirements",
+        "is-this-the-official-hwinfo-plugin-is-it-affiliated-with-realix",
+        "hwinfo-editions-and-the-12-hour-limit",
+        "do-i-need-hwinfo-pro",
+        "why-did-my-values-freeze--stop-updating-after-about-12-hours",
+        "data-sources",
+        "which-data-source-should-i-use",
+        "i-ticked-many-readings-in-gadget-but-only-a-few-show-up-why",
+        "why-do-min--max--avg-show-na",
+        "whats-the-difference-between-the-keys-minmaxavg-and-the-dials",
+        "sparklines",
+        "why-do-my-sparklines-fill-in-slowly-when-a-graph-starts-from-empty",
+        "performance-and-resource-use",
+        "does-it-slow-down-my-pc-how-much-cpu-and-ram",
+        "does-it-get-slower-or-use-more-cpu-if-i-add-more-keys",
+        "how-many-sensors--keys-can-i-use",
+        "can-multiple-keys-show-the-same-sensor",
+        "alerts-thresholds-and-colors",
+        "why-is-a-key-amber-or-red",
+        "how-do-i-reset-a-dials-session-minmax",
+        "themes",
+        "why-isnt-default-the-same-as-void",
+        "a-per-key-theme-wont-follow-my-shared-theme-why",
+        "privacy",
+        "is-my-data-sent-anywhere-any-telemetry",
+        "is-the-native-binary-signed-how-do-i-verify-what-i-installed",
+        "setup-and-portability",
+        "can-i-use-the-free--portable-hwinfo",
+        "do-keys-survive-reboots-hwinfo-restarts-or-reordering-sensors-in-hwinfo",
+        "can-i-use-stream-deck--dials-without-hwinfo-pro",
+        "a-key-says-access-denied-whats-wrong",
+        "what-do-the-two-line-screens-on-my-keys-mean"
+      ]
+    },
+    {
+      "path": "getting-started.html",
+      "anchors": [
+        "1-install-the-plugin",
+        "2-drag-sensor-reading-onto-a-key",
+        "3-pick-a-reading",
+        "4-find-the-rest-of-the-settings",
+        "where-to-go-next"
+      ]
+    },
+    {
+      "path": "hardware.html",
+      "anchors": [
+        "compatibility-matrix",
+        "sensor-details-drill-down-support",
+        "page-swipe",
+        "hardware-test-procedure",
+        "event-recorder-and-replay",
+        "support-report"
+      ]
+    },
+    {
+      "path": "/",
+      "anchors": [
+        "what-it-does",
+        "start-here"
+      ]
+    },
+    {
+      "path": "installation.html",
+      "anchors": [
+        "system-requirements",
+        "install-the-plugin",
+        "updating-and-removing",
+        "one-time-hwinfo-setup",
+        "recommended-shared-memory-support",
+        "free-path-gadget-reporting",
+        "portable-hwinfo-caveats",
+        "verify-it-works",
+        "next-steps"
+      ]
+    },
+    {
+      "path": "sensor-details.html",
+      "anchors": [
+        "what-it-is-and-is-not",
+        "turning-it-on",
+        "choosing-the-list",
+        "editing-custom-tiles",
+        "the-detail-page",
+        "configuring-the-back-tile",
+        "filter-patterns",
+        "supported-decks",
+        "privacy"
+      ]
+    },
+    {
+      "path": "sensor-dial.html",
+      "anchors": [
+        "the-touchscreen-readout",
+        "overview-view",
+        "reading-colors",
+        "gestures",
+        "rotation-set-ignore-turns-and-auto-cycle",
+        "session-stats-are-the-dials-own-per-reading",
+        "settings",
+        "bar-range-fixed-vs-session",
+        "transparent-background",
+        "alerts-on-a-dial",
+        "status-screens",
+        "advanced-shared-by-all-keys-and-dials"
+      ]
+    },
+    {
+      "path": "sensor-reading.html",
+      "anchors": [
+        "settings",
+        "reading",
+        "label-on-the-key",
+        "theme",
+        "text-color",
+        "value-shown-stat-mode",
+        "layout-two-readings-on-one-key",
+        "layout-three-readings-rows",
+        "layout-four-readings-the-quad-grid",
+        "decimals",
+        "temperature-unit",
+        "display-sparkline-bar-ring",
+        "warn-at--critical-at",
+        "direction",
+        "pressing-the-key",
+        "a-press-can-open-details-drill-down",
+        "status-screens",
+        "advanced-shared-by-all-keys-and-dials"
+      ]
+    },
+    {
+      "path": "status-screens.html",
+      "anchors": [
+        "key-screens",
+        "dial-screens-stream-deck-",
+        "in-the-settings-panel",
+        "recovery-is-automatic"
+      ]
+    },
+    {
+      "path": "themes.html",
+      "anchors": [
+        "the-seven-presets",
+        "the-display-system",
+        "per-key-vs-shared",
+        "precedence",
+        "the-default-chip",
+        "text-theme-dim-or-custom",
+        "text-font",
+        "type-accents",
+        "alerts-override-everything"
+      ]
+    },
+    {
+      "path": "thresholds-alerts.html",
+      "anchors": [
+        "the-two-fields",
+        "how-the-comparison-works",
+        "decimal-commas-are-accepted",
+        "direction-alert-when-high-vs-alert-when-low",
+        "colors-are-global-and-colorblind-safe",
+        "alert-colors",
+        "worked-examples",
+        "cpu-temperature-warn-80-crit-90",
+        "fan-rpm-alert-when-it-drops",
+        "free-disk-space-alert-on-a-low-floor",
+        "where-thresholds-live"
+      ]
+    },
+    {
+      "path": "troubleshooting.html",
+      "anchors": [
+        "how-to-read-a-status-screen",
+        "keys-show-start-hwinfo",
+        "keys-show-shared-memory-off",
+        "values-are-frozen--not-updating",
+        "keys-freeze-and-only-closing-the-stream-deck-app-brings-them-back",
+        "keys-show-access-denied",
+        "keys-show-source-error",
+        "keys-show-sensor-missing",
+        "picker-is-empty-or-shows-no-sensors-reported",
+        "only-some-of-the-readings-i-ticked-in-gadget-show-up",
+        "plugin-shows-nothing-at-all--the-action-is-missing",
+        "a-reading-shows-the-wrong-unit",
+        "thresholds-warncritical-dont-fire",
+        "a-press-set-to-open-details-shows-the-alert-triangle",
+        "the-detail-view-says-no-detail--selected",
+        "dial-gestures-do-nothing",
+        "high-memory-high-cpu-or-a-stuck-process",
+        "reading-the-plugin-log",
+        "before-you-file-an-issue"
+      ]
+    },
+    {
+      "path": "whats-new-1.7.html",
+      "anchors": [
+        "171",
+        "ux-improvements-in-the-settings-panels",
+        "renamed-labels",
+        "what-changes-on-your-deck",
+        "set-the-colors-you-want",
+        "why-a-reading-may-now-show-less",
+        "what-the-review-caught"
+      ]
+    }
+  ]
+}

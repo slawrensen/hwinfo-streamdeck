@@ -1,15 +1,16 @@
 ---
 title: Data sources
 nav_order: 8
+description: Choose Shared Memory or Gadget and understand reading identity and history.
 ---
 
 The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory and can fall back to the Gadget registry. Switching sources does not automatically match saved readings.
 
-> This page describes 1.7. 1.6 had no explicit provider links, filled Gadget historical fields with the current value, and used different freshness and identity handling. See [what changed from 1.6](whats-new-1.7.md).
+For setup, use [Install](installation.md#one-time-hwinfo-setup). This reference covers 1.7 and 1.7.1; [upgrade changes](whats-new-1.7.md) describe differences from 1.6.
 
 ## Shared Memory vs. Gadget registry
 
-| | **Shared Memory** (preferred) | **Gadget registry** (fallback) |
+| Capability | **Shared Memory** (preferred) | **Gadget registry** (fallback) |
 | --- | --- | --- |
 | What it reads | `Global\HWiNFO_SENS_SM2` mapping | `HKCU\Software\HWiNFO64\VSB` registry key |
 | Sensor coverage | readings HWiNFO publishes through Shared Memory | only the sensors you tick in HWiNFO |
@@ -19,8 +20,6 @@ The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory a
 | Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Enable reporting to Gadget**, then **Report value in Gadget** per reading |
 
 Shared Memory provides hardware identities, a producer timestamp and HWiNFO's statistics. On the free version it switches off after 12 hours. Gadget has no such timer, but provides current values under name-based identities, without a producer timestamp or historical statistics.
-
-> **Recommendation:** if HWiNFO runs around the clock, I recommend [HWiNFO Pro](https://www.hwinfo.com/licenses/). It keeps Shared Memory on with no time limit, so the plugin never has to fall back to the Gadget registry. More in the [FAQ](faq.md#do-i-need-hwinfo-pro).
 
 > **Note:** Because the Gadget source has no historical stats, a key with **Value shown** set to **Minimum**, **Maximum** or **Average**, or a detail tile showing one of those, displays **N/A** with an empty value while reading from it. While a Gadget source is live, the message under the settings panel's header says "Gadget registry: current values only, no min, max or average." (unless a note about withheld readings takes its place), and the plugin's full note about the source sits under **Advanced → Connection**.
 
@@ -42,6 +41,10 @@ The registry carries no sensor ids, so a key picked while on the Gadget source i
 
 Two ticked readings that share a source name and label are both withheld while both are ticked: the registry has nothing else to tell them apart, and the plugin does not choose between them. HWiNFO itself reports some readings twice under one name (a GPU fan once in RPM and once in percent, for example), and a shift-click range ticks both. In HWiNFO, untick or relabel the one your key should not show, and the other comes back on its own after two polls; the name then means the reading that is left, so acting on the reading your key was on hands the key to the other. The other readings keep working throughout, the settings panel says that names are withheld, and the plugin log names the slots once. Nothing about this is written to disk or remembered after a plugin restart.
 
+<details markdown="1">
+<summary>Selections saved by 1.6 and downgrade limits</summary>
+
+<a id="legacy-gadget-selections"></a>
 HWiNFO's standard source names carry a colon (`CPU [#0]: <model>`), and 1.7 stores a reading whose source name or label contains a colon or tilde under a new key format. Most selections saved by 1.6.0 and earlier keep working: the plugin republishes the old `g:<source>:<label>` spelling as a checked alias when exactly one current reading renders to it and no live reading owns that spelling outright, except for the cases below. Keys, dense layouts, dials, rotation sets and groups, custom detail lists, and per-reading names and colors saved under the old spelling resolve through the alias; nothing is inferred from names.
 
 These old selections get no alias and need one reselection:
@@ -53,6 +56,8 @@ These old selections get no alias and need one reselection:
 The tilde restriction prevents an old duplicate key from being mistaken for a literal name. Reselect these readings in the picker and update any explicit cross-source link that uses the old key. Other names, including `Reading 00` and `Reading 1024`, keep working.
 
 An old spelling that now matches two readings does not resolve while it is ambiguous. That ambiguity is judged on each scan and not remembered, so once one of the two is unticked in HWiNFO the remaining reading answers to the shared spelling. No saved settings are rewritten automatically. A dial still saves the reading it lands on when it rotates or auto cycles, in the new key format, so a Gadget dial without a rotation set needs one reselection if you go back to 1.6.0. The same goes for any Gadget reading you pick in 1.7 whose source name carries a colon, as HWiNFO's standard names do: it is saved in the new key format, which 1.6.0 cannot read.
+
+</details>
 
 A name is all the registry offers. A key saved under a name that two readings shared shows whichever reading still carries it, and the registry cannot distinguish a new device that reuses an old unique name. Use Shared Memory for hardware identity.
 
@@ -186,6 +191,10 @@ seconds after its last accepted read can show the stale screen for one poll
 when the first read on return is skipped, and dial sessions start again
 from the next accepted read.
 
+<details markdown="1">
+<summary>How Gadget scans handle partial writes and duplicate rows</summary>
+
+<a id="gadget-scan-consistency"></a>
 Each occupied Gadget row is read twice. If a field changes between those
 observations, the whole scan is withheld and retried on the next poll. A
 recognized numeric display must also agree with the raw number (rounding
@@ -215,6 +224,8 @@ rows at the next scan belongs to
 [two ticked readings](#enabling-gadget-reporting): those rows are withheld
 on their own, and released once two scans in a row show the name on one
 row, for the same reason.
+
+</details>
 
 Sparklines collect changed values between producer timestamps as well as
 advancing timestamps. Repeated held frames do not add points. A skipped

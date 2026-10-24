@@ -1,65 +1,56 @@
 ---
-title: Home
+title: Overview
 nav_order: 1
-description: >-
-  Live HWiNFO sensor readings on your Elgato Stream Deck.
+description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stream Deck. Install the Windows plugin and add your first reading.
 ---
 
-**HWiNFO Sensors** puts temperatures, clocks, fan speeds, usage and power on
-your Stream Deck. It reads HWiNFO locally. Windows 10+ x64, free, MIT licensed,
-no ads, no telemetry.
+<header class="home-intro">
+  <h1>HWiNFO Sensors <span>for Stream Deck</span></h1>
+  <p class="home-lead">Live temperatures, clocks, fan speeds and power from HWiNFO, right on your keys and dials.</p>
+  <div class="home-actions">
+    <a class="button button-primary" href="{{ site.plugin_release.download }}">Download {{ site.plugin_release.version }} <span aria-hidden="true">↓</span></a>
+    <a class="button button-secondary" href="{{ '/getting-started.html' | relative_url }}">Get started <span aria-hidden="true">→</span></a>
+  </div>
+  <p class="home-requirements"><strong>Windows 10+ (x64)</strong> · Stream Deck 6.9+ · HWiNFO running locally.<br>Free HWiNFO limits Shared Memory to 12 hours. <a href="{{ '/installation.html' | relative_url }}">Requirements & installation</a></p>
+</header>
 
-![Seven themes, alert states, multi-reading keys and dial views.]({{ '/assets/img/themes-contact-sheet.png' | relative_url }})
+<figure class="hero-figure">
+  <a class="image-link" href="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" data-image-viewer aria-label="Open the complete deck image">
+    <picture>
+      <source media="(max-width: 600px)" type="image/webp" srcset="{{ '/assets/img/showcase/deck-detail.webp' | relative_url }}" width="422" height="406">
+      <source media="(max-width: 600px)" srcset="{{ '/assets/img/showcase/deck-detail.jpg' | relative_url }}" width="422" height="406">
+      <source type="image/webp" srcset="{{ '/assets/img/showcase/deck-640.webp' | relative_url }} 640w, {{ '/assets/img/showcase/deck-960.webp' | relative_url }} 960w, {{ '/assets/img/showcase/deck-1300.webp' | relative_url }} 1300w" sizes="(min-width: 1560px) 1140px, (min-width: 1000px) calc(100vw - 340px), calc(100vw - 48px)">
+      <img src="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" width="1300" height="710" fetchpriority="high" alt="Live Midnight keys and six independent Tint dials over the Cosmic Cliffs in the Stream Deck app.">
+    </picture>
+    <span class="image-hint" aria-hidden="true">View complete image ↗</span>
+  </a>
+  <figcaption>Live Stream Deck app capture. Midnight keys and transparent Tint dials. <span class="image-credit">Cosmic Cliffs: NASA, ESA, CSA, STScI.</span></figcaption>
+</figure>
 
-*Production renderers with sample readings and generated histories. This is
-a layout comparison, not a hardware photograph.*
+<section class="home-showcase" aria-labelledby="what-it-does">
+  <h2 id="what-it-does">Make it your display</h2>
+  <div class="showcase-grid">
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/showcase/keys.png' | relative_url }}" aria-label="Enlarge key layout examples"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/keys-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/keys-detail.png' | relative_url }}" width="288" height="288" loading="lazy" decoding="async" alt="A four-reading key with CPU and GPU temperatures, pump speed and power."></picture></a>
+      <figcaption><h3><a href="{{ '/sensor-reading.html' | relative_url }}">Keys <span aria-hidden="true">→</span></a></h3><p>One to four readings per key.<br><span class="capture-type">Sample rendering.</span></p></figcaption>
+    </figure>
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/showcase/dials.png' | relative_url }}" aria-label="Enlarge dial view examples"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/dials-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/dials-detail.png' | relative_url }}" width="400" height="200" loading="lazy" decoding="async" alt="Two-row dial view with CPU and GPU readings and separate trend lines."></picture></a>
+      <figcaption><h3><a href="{{ '/sensor-dial.html' | relative_url }}">Dials <span aria-hidden="true">→</span></a></h3><p>Readings, trends and local session stats.<br><span class="capture-type">Sample rendering. Stream Deck + / + XL.</span></p></figcaption>
+    </figure>
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/dial-backgrounds-strip.jpg' | relative_url }}" aria-label="Enlarge transparent background examples"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/backgrounds-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/backgrounds-detail.jpg' | relative_url }}" width="621" height="332" loading="lazy" decoding="async" alt="Separate dial slots over space, aurora and pale backgrounds in the Stream Deck app."></picture></a>
+      <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Space imagery: NASA, ESA, CSA, STScI.</span></p></figcaption>
+    </figure>
+  </div>
+</section>
 
-> **1.7.1** lets a Sensor Dial show the touch strip picture behind it
-> ([Transparent background](sensor-dial.md#transparent-background)).
-> **1.7** redesigns the settings panels, adds per-reading dial colors and
-> changes how sources, identities and history are handled.
-> [See what changed for you](whats-new-1.7.md).
-
-## What it does
-
-- **Keys:** one to four readings, custom labels, current or historical values,
-  and a sparkline, bar or ring on single-reading keys.
-- **Dials:** a single reading or a two- or three-row overview, over the
-  theme's background or the touch strip picture. Rotate through readings,
-  use named groups or enable auto-cycle. Local session statistics record
-  accepted observations.
-- **Colors:** seven themes, per-action or shared text settings, and
-  individual reading colors on multi-row dials in 1.7. Alerts take priority.
-- **Details:** press a key to open a page for its source, a custom list or a
-  filter. Return with the Back tile.
-- **Controls:** drive dials from a key or Multi Action. Switch readings,
-  pause auto-cycle, pin a reading or reset local statistics.
-
-Shared Memory supplies current values and HWiNFO's MIN/MAX/AVG. Gadget is a
-current-value fallback with limited freshness evidence. Saved readings need
-[explicit links](data-sources.md#link-readings-across-providers) to work across
-the two sources. Read the [source guide](data-sources.md) before relying on
-fallback.
-
-## Start here
-
-1. [Install the plugin](installation.md) and enable sharing in HWiNFO.
-2. [Add your first reading](getting-started.md) and set its label and alerts.
-
-| Guide | Covers |
-| --- | --- |
-| [Sensor Reading](sensor-reading.md) | Key layouts, history and press behavior |
-| [Sensor details](sensor-details.md) | Detail pages, custom tiles and Back navigation |
-| [Sensor Dial](sensor-dial.md) | Dial views, rotation, session statistics and reading colors |
-| [Controls](controls.md) | Gesture presets, rotation groups and the HWiNFO Control action |
-| [Themes](themes.md) | Themes, text colors and display geometry |
-| [Thresholds and alerts](thresholds-alerts.md) | Warning and critical states |
-| [Data sources](data-sources.md) | Sharing, fallback, identity and freshness limits |
-| [Hardware](hardware.md) | Physically tested devices and simulated coverage |
-| [Status screens](status-screens.md) | What each key, dial and settings-panel status means |
-| [Troubleshooting](troubleshooting.md) | Status messages and fixes |
-
-Requires Stream Deck software 6.9+ and [HWiNFO](https://www.hwinfo.com) running
-on the same Windows PC with Shared Memory Support or Gadget reporting enabled.
-Not affiliated with or endorsed by REALiX or Elgato.
-HWiNFO belongs to REALiX; Stream Deck and Elgato are trademarks of Corsair.
+<section class="home-paths" aria-labelledby="start-here">
+  <h2 id="start-here">Find what you need</h2>
+  <ul>
+    <li><a href="{{ '/themes.html' | relative_url }}">Compare the seven themes <span aria-hidden="true">→</span></a><span>Pick a palette and set reading colors.</span></li>
+    <li><a href="{{ '/data-sources.html' | relative_url }}">Understand your data source <span aria-hidden="true">→</span></a><span>Sharing, freshness, history and reading links.</span></li>
+    <li><a href="{{ '/troubleshooting.html' | relative_url }}">Fix a status message <span aria-hidden="true">→</span></a><span>Find the exact message and the next step.</span></li>
+  </ul>
+  <p class="channel-note">GitHub: {{ site.plugin_release.package_version }}. Marketplace: {{ site.plugin_release.marketplace_version }} as checked {{ site.plugin_release.checked }}. <a href="{{ '/installation.html' | relative_url }}">Choose an install channel</a>.</p>
+</section>

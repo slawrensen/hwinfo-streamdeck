@@ -64,7 +64,7 @@ describe("packed-archive gate", () => {
 		}));
 		assert.ok(run(changed).failures.some((line) => /differs from the staged manifest beyond formatting/.test(line)));
 		const failures = run(archiveFor(staging), "9.9.8").failures;
-		assert.ok(failures.some((line) => /Version 9\.9\.9\.0 does not match package\.json 9\.9\.8\.0/.test(line)), failures.join("\n"));
+		assert.ok(failures.some((line) => /Version 9\.9\.9\.0 does not match package\.json 9\.9\.8$/.test(line)), failures.join("\n"));
 	});
 
 	it("rejects an asset the manifest names but the archive lacks", () => {

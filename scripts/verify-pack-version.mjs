@@ -95,7 +95,7 @@ const newest = released[released.length - 1];
 if (compare(packed, newest) <= 0) {
 	console.error(`verify-pack-version: manifest Version ${manifest.Version} does not clear the newest release ${floor} (${newest.join(".")}).`);
 	console.error("Stream Deck replaces an installed plugin only when the pack's version is higher, so this pack would install as a no-op.");
-	console.error("Bump the version first: previews use the 1.X.9n.0 band, stable releases match their tag.");
+	console.error("Bump the version first: a preview takes the 1.X.9n.0 band above the stable it previews, or the fourth segment (X.Y.Z.n) for a hotfix preview; stable releases match their tag.");
 	process.exit(1);
 }
 console.error(`verify-pack-version: ${manifest.Version} clears the newest release ${floor} (${newest.join(".")})`);

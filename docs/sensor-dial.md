@@ -82,7 +82,7 @@ rows and the saved key for the selection, so a measurement with two saved
 colors can change color when rotation selects it. Keep one color per
 measurement to avoid that.
 
-![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+![The Display section of the dial's settings panel: Text color on Theme text, Background on Theme with its help line, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
 *An actual settings-panel capture at panel build 1.7.0.0-d28 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 

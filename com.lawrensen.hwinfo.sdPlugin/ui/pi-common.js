@@ -4206,6 +4206,28 @@
 		};
 		followSetting("dialView", applyView);
 	}
+	// Background (dial PI only): Words in the accent color shows on the looks
+	// that take it (Glass, Tint, Outline). Theme and Clear draw their words as
+	// before whatever is stored, so the box hides there and keeps its value.
+	// The box is unbound like Color numbers by sensor type below: only the
+	// exact true paints it ticked, and only a user's edit writes.
+	const accentWordsEl = document.getElementById("accent-words");
+	const accentWordsToggle = document.getElementById("accent-words-toggle");
+	if (accentWordsEl !== null && accentWordsToggle !== null) {
+		followSetting("dialBackground", (value) => {
+			accentWordsEl.hidden = !model.accentWordsLook({ dialBackground: value });
+		});
+		let painting = false;
+		const [, write] = useSettings("dialAccentWords", () => {}, null);
+		followSetting("dialAccentWords", (value) => {
+			painting = true;
+			accentWordsToggle.checked = value === true;
+			painting = false;
+		});
+		accentWordsToggle.addEventListener("change", () => {
+			if (!painting) write(accentWordsToggle.checked);
+		});
+	}
 	// An unbound checkbox (no data-setting) avoids the binder's truthy
 	// coercion of malformed settings.
 	// Loading paints exact true without saving; only a user's edit persists.

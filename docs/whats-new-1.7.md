@@ -155,7 +155,7 @@ color of every reading in the list.
 *Production dial renderer with fixed sample readings and generated histories.
 The layouts and values are identical on both sides; only number colors change.*
 
-![The dial's Display section: Text color on Theme text, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+![The dial's Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
 *Actual settings-panel capture using live HWiNFO readings in a mock Stream
 Deck host. This is not a photograph of the physical deck.*

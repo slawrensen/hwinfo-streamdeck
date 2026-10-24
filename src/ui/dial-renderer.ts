@@ -7,15 +7,34 @@
  * Spec geometry: title 18/600 x12 y24 · value 34/700 x12 y58 (24/700 from
  * 10 glyphs, 17/700 from 14, so prose faces never run off the slot) with
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
+ *
+ * Each renderer takes the dial's Background (issue #41, dial-background.ts):
+ * Theme draws exactly the faces above; Glass, Tint, Outline and Clear place the
+ * same words in the same places (cut where a Theme face would hide a run
+ * under a background-colored rect) and change only what sits behind them.
  */
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextRun } from "./format";
+import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextFitOptions, type TextRun } from "./format";
 import { faceFont, isTahoma } from "./face-font";
-import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, svgOpen, type DrawnZone } from "./key-renderer";
+import { dialBackgroundTraits, dialFaceOpen, HALO_CLOSE, HALO_GROUP, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, structureFill, type DialBackground } from "./dial-background";
+import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, type DrawnZone } from "./key-renderer";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
 
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
+
+/**
+ * Cut, not mask (issue #41): a run fitted for a face with no overflow rect.
+ * It stays whole while it fits and is cut with an ellipsis otherwise; when
+ * even the bare ellipsis would overrun, nothing is drawn, where a Theme
+ * face hides the run under its background-colored rect. A mask would do the
+ * same at the cost of an offscreen pass per row on the app's QtSvg.
+ */
+function fitOrDrop(text: string, maxWidth: number, size: number, options: TextFitOptions): string {
+	const fitted = fitTextLadder(text, maxWidth, [size], options).text;
+	return estimateKeyTextWidth(fitted, size, options) <= maxWidth - (options.minimumSlack ?? 0) ? fitted : "";
+}
+
 /** 18 px/600 runs ~10 px per glyph; 17 chars keeps clear of the right edge. */
 const TITLE_MAX = 17;
 /** The last pixel column a dial line may ink: 1.6.0 drew whole lines with
@@ -176,6 +195,9 @@ export interface DialOverviewOptions {
 	/** Resolved textual fills; defaults to the palette's own text tokens.
 	 * Row value colors arrive per row, already resolved by the caller. */
 	text?: TextColors;
+	/** What the dial draws behind its readout (issue #41); absent is Theme.
+	 * Text arrives resolved for it (dialTextColors). */
+	background?: DialBackground;
 }
 
 /** The context line: the name yields into the remainder at 13 px, dropping
@@ -225,8 +247,10 @@ function wideContextLine(baseline: number, contextText: string, statsText: strin
  * pixmap contract as renderDial.
  */
 export function renderDialOverview(opts: DialOverviewOptions): string {
-	const { palette } = opts;
+	const { palette, background } = opts;
+	const traits = dialBackgroundTraits(background);
 	const text = opts.text ?? themeTextColors(palette);
+	const structure = structureFill(background, palette);
 	const g = WIDE_GEO[opts.header === "bottom" ? "bottom" : "top"];
 	const separators = opts.separators !== false;
 	const rows = opts.rows.slice(0, 3).map((row) => {
@@ -240,19 +264,26 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 	const valueRight = Math.round((WIDE.valueRight - shift) * 10) / 10;
 	const unitLeft = Math.round((WIDE.unitLeft - shift) * 10) / 10;
 	const pitch = (g.rowsBottom - g.rowsTop) / 3;
-	const parts: string[] = [
-		...svgOpen(200, 100, palette.bg),
-		// The rail groove spans the rows region; the thumb rides in it.
-		`<rect x="0" y="${g.rowsTop}" width="4" height="${g.rowsBottom - g.rowsTop}" fill="${palette.track}"/>`
-	];
+	// The rail groove spans the rows region; the thumb rides in it. With
+	// backings it runs 1 px wider than the thumb, so the thumb's free edge
+	// sits on track, not on the picture.
+	const groove = `<rect x="0" y="${g.rowsTop}" width="${traits.backings ? 5 : 4}" height="${g.rowsBottom - g.rowsTop}" ${structure}/>`;
+	const rules: string[] = [];
 	if (separators) {
 		for (let p = 1; p < rows.length; p++) {
-			parts.push(`<rect x="4" y="${Math.round(g.rowsTop + p * pitch)}" width="196" height="1" fill="${palette.track}"/>`);
+			rules.push(`<rect x="4" y="${Math.round(g.rowsTop + p * pitch)}" width="196" height="1" ${structure}/>`);
 		}
 		if (g.rule !== null) {
-			parts.push(`<rect x="0" y="${g.rule}" width="200" height="1" fill="${palette.track}"/>`);
+			rules.push(`<rect x="0" y="${g.rule}" width="200" height="1" ${structure}/>`);
 		}
 	}
+	// An Outline face keeps the separators hairlines outside its halo group:
+	// a ring would turn each into a 3 px dark bar across the slot.
+	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), ...rules, HALO_GROUP, groove] : [...dialFaceOpen(background, palette), groove, ...rules];
+	// A face with no overflow rect prices glyphs its font lacks at their
+	// fallback width, so a cut run ends where it is drawn.
+	const seeThrough = traits.overflowRects ? undefined : SEE_THROUGH_FALLBACK_ADVANCE_12;
+	const labelFit: TextFitOptions = { minimumSlack: 2, fallbackAdvance12: seeThrough };
 	rows.forEach((row, pos) => {
 		const bandTop = Math.round(g.rowsTop + pos * pitch + (pitch - g.bandH) / 2);
 		// Baseline computed (no dominant-baseline on this engine): optical
@@ -264,32 +295,41 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 		// The label fills to ITS OWN row's value, not the widest row's, and
 		// ellipsizes only when genuinely longer. Painting order is the real
 		// guarantee: the mask and the value draw after the label, so a hot
-		// estimate ends up under the value, never over it.
-		// Tahoma: the label's ink ends a clear gap before this row's value ink;
-		// the mask starts 1.5 px before that ink, past the label's last column.
-		const valueInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: fit.size, fontWeight: 700 }], "end", valueRight).left : 0;
-		const labelRight = isTahoma() ? valueInk - 1.5 : valueRight - wideValueWidth(row.valueText, fit.size) - WIDE_LABEL_GAP;
+		// estimate ends up under the value, never over it. Tahoma: the label's
+		// ink ends a clear gap before this row's value ink; the mask starts
+		// 1.5 px before that ink, past the label's last column. A face with no
+		// mask books the value at no less than its measured ink: Segoe UI's
+		// booking counts characters, which a wide text value outruns (numbers
+		// book wider already and keep their bytes).
+		const valueInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: fit.size, fontWeight: 700, fallbackAdvance12: seeThrough }], "end", valueRight).left : 0;
+		const labelRight = isTahoma() ? valueInk - 1.5 : valueRight - Math.max(wideValueWidth(row.valueText, fit.size), traits.overflowRects ? 0 : estimateKeyTextWidth(row.valueText, fit.size, { fontWeight: 700 })) - WIDE_LABEL_GAP;
 		// Both fonts price the label on their measured tables, with no
 		// letter-spacing: the app's QtSvg draws none (measured even at 3 px),
 		// so writing it only made previews wider than the device. Segoe UI's
 		// estimate credits side bearings, so it keeps 2 px of slack.
+		const labelFits = (line: string): boolean => inkEdges([{ text: line, fontSize: 12, fallbackAdvance12: seeThrough }], "start", WIDE.labelX).right <= valueInk - INK_CLEAR_GAP;
+		const labelRoom = Math.max(0, labelRight - WIDE.labelX);
+		const tahomaLabel = isTahoma() ? fitLadderBy(row.label.toUpperCase(), [12], labelFits).text : "";
 		const label = isTahoma()
-			? fitLadderBy(row.label.toUpperCase(), [12], (line) => inkEdges([{ text: line, fontSize: 12 }], "start", WIDE.labelX).right <= valueInk - INK_CLEAR_GAP).text
-			: fitTextLadder(row.label.toUpperCase(), Math.max(0, labelRight - WIDE.labelX), [12], { minimumSlack: 2 }).text;
-		parts.push(
-			`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`,
+			? traits.overflowRects || labelFits(tahomaLabel) ? tahomaLabel : ""
+			: traits.overflowRects ? fitTextLadder(row.label.toUpperCase(), labelRoom, [12], labelFit).text : fitOrDrop(row.label.toUpperCase(), labelRoom, 12, labelFit);
+		if (traits.overflowRects || label !== "") {
+			parts.push(`<text x="${WIDE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${row.selected ? text.label : text.unit}">${escapeXml(label)}</text>`);
+		}
+		if (traits.overflowRects) {
 			// Bg-colored insurance between the label run and this row's value:
 			// invisible (rows sit on plain bg), and renderer-proof where the
 			// label estimate ran hot (clipPath is unproven on this engine).
-			`<rect x="${labelRight.toFixed(1)}" y="${bandTop}" width="${(200 - labelRight).toFixed(1)}" height="${g.bandH}" fill="${palette.bg}"/>`,
-			`<text x="${valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
-		);
+			// Over a picture it would be a box, so those faces cut instead.
+			parts.push(`<rect x="${labelRight.toFixed(1)}" y="${bandTop}" width="${(200 - labelRight).toFixed(1)}" height="${g.bandH}" fill="${palette.bg}"/>`);
+		}
+		parts.push(`<text x="${valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${fit.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`);
 		if (row.unitText !== "") {
 			parts.push(`<text x="${unitLeft}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
 	});
 	parts.push(wideContextLine(g.lineBaseline, opts.contextText, opts.statsText, text));
-	parts.push("</svg>");
+	parts.push(traits.halo ? HALO_CLOSE : "</svg>");
 	return parts.join("");
 }
 
@@ -351,6 +391,8 @@ export interface DialTwoRowOptions {
 	/** Resolved textual fills; defaults to the palette's own text tokens.
 	 * Row value colors arrive per row, already resolved by the caller. */
 	text?: TextColors;
+	/** What the dial draws behind its readout (issue #41); absent is Theme. */
+	background?: DialBackground;
 }
 
 /**
@@ -362,8 +404,11 @@ export interface DialTwoRowOptions {
  * table columns as the three-row view, footer semantics included.
  */
 export function renderDialTwoRow(opts: DialTwoRowOptions): string {
-	const { palette } = opts;
+	const { palette, background } = opts;
+	const traits = dialBackgroundTraits(background);
 	const text = opts.text ?? themeTextColors(palette);
+	const structure = structureFill(background, palette);
+	const seeThrough = traits.overflowRects ? undefined : SEE_THROUGH_FALLBACK_ADVANCE_12;
 	const rows = opts.rows.slice(0, 2).map((row) => {
 		const valueText = truncateLabel(row.valueText, ROW_VALUE_MAX);
 		return {
@@ -380,36 +425,44 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	const valueEndX = maxUnitW === 0 ? RIGHT_EDGE : unitX - VALUE_UNIT_GAP;
 	// Tahoma books measured bold widths (one digit of flicker damping on odd
 	// counts), so the second label line is sized to the room the value
-	// really leaves.
+	// really leaves. A face with no overflow rect books at no less than the
+	// measured ink: Segoe UI's booking counts characters, which wide text
+	// values outrun.
 	const maxValueW = Math.max(
 		0,
 		...rows.map((row) =>
 			isTahoma()
 				? estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }) + (Array.from(row.valueText).length % 2 === 1 ? estimateKeyTextWidth("0", row.size, { fontWeight: 700 }) : 0)
-				: Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size]
+				: Math.max(Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size], traits.overflowRects ? 0 : estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }))
 		)
 	);
 	const valueStartEst = valueEndX - maxValueW;
 	const line2Max = Math.max(ROW_LABEL_MIN, Math.floor((valueStartEst - 20) / EST_LABEL_CHAR));
-	const parts: string[] = svgOpen(200, 100, palette.bg);
+	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), HALO_GROUP] : dialFaceOpen(background, palette);
 	rows.forEach((row, i) => {
 		const top = TWO_ROW.tops[i] as number;
 		const rowBg = row.selected ? palette.track : palette.bg;
 		if (row.selected) {
-			parts.push(
-				`<rect x="0" y="${top}" width="200" height="${TWO_ROW.height}" fill="${palette.track}"/>`,
-				`<rect x="2" y="${top + 4}" width="4" height="32" rx="2" fill="${palette.accent}"/>`
-			);
+			// Over a picture with no panel the 200 x 40 band would be a slab
+			// across it; the rail and the label token mark the row there, the
+			// rail on its own track backing where the look has backings.
+			if (traits.band) {
+				parts.push(`<rect x="0" y="${top}" width="200" height="${TWO_ROW.height}" ${structure}/>`);
+			}
+			if (traits.backings) {
+				parts.push(`<rect x="1" y="${top + 3}" width="6" height="34" rx="3" fill="${palette.track}"/>`);
+			}
+			parts.push(`<rect x="2" y="${top + 4}" width="4" height="32" rx="2" fill="${palette.accent}"/>`);
 		}
 		// Tahoma: a second line only where the value leaves it readable room;
 		// otherwise one cut line, and line 2 goes to the trend.
 		// Tahoma: line two ends a clear gap before THIS row's value ink (the
 		// other row's wider value no longer costs it room), line one by the
 		// slot edge.
-		const rowInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: row.size, fontWeight: 700 }], "end", valueEndX).left : valueStartEst;
+		const rowInk = isTahoma() ? inkEdges([{ text: row.valueText, fontSize: row.size, fontWeight: 700, fallbackAdvance12: seeThrough }], "end", valueEndX).left : valueStartEst;
 		const room2 = isTahoma() ? rowInk - INK_CLEAR_GAP - 12 : valueStartEst - 20;
 		const line1Fits = (line: string): boolean => dialLineFits([{ text: line, fontSize: 13 }], 12);
-		const line2Fits = (line: string): boolean => inkEdges([{ text: line, fontSize: 13 }], "start", 12).right <= rowInk - INK_CLEAR_GAP;
+		const line2Fits = (line: string): boolean => inkEdges([{ text: line, fontSize: 13, fallbackAdvance12: seeThrough }], "start", 12).right <= rowInk - INK_CLEAR_GAP;
 		const lines = isTahoma() ? (room2 >= 40 ? wrapLabelTwoLinesBy(row.label, line1Fits, line2Fits) : [fitLadderBy(row.label, [13], line1Fits).text]) : wrapLabelTwoLines(row.label, TWO_ROW_LINE1_MAX, line2Max);
 		// The label token marks the selected row; the unit token paints the
 		// other. The selected row sits on the track, where the face label
@@ -422,26 +475,39 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 			`<text x="12" y="${top + TWO_ROW.labelBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[0] as string)}</text>`
 		);
 		if (lines.length > 1) {
-			parts.push(
-				`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(lines[1] as string)}</text>`
-			);
+			// With no overflow rect Segoe UI's line (its wrap counts code
+			// points) is cut by measured width to the room the value leaves,
+			// fallback glyphs priced wide, and left off if not even an ellipsis
+			// fits. Tahoma's ink wrap already fit line two to that room.
+			const line2 = traits.overflowRects || isTahoma() ? (lines[1] as string) : fitOrDrop(lines[1] as string, room2, 13, { fallbackAdvance12: seeThrough });
+			if (traits.overflowRects || line2 !== "") {
+				parts.push(
+					`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(line2)}</text>`
+				);
+			}
 		} else if (row.history !== undefined) {
 			// The freed line hosts the trend: self-normalized over its own
-			// samples, drawn only when it has real width and 2+ points.
+			// samples, drawn only when it has real width and 2+ points. It ends
+			// 8 px before the value's window by construction.
 			const sparkW = valueStartEst - 12 - 12;
 			const samples = row.history.slice(-HISTORY_LENGTH);
 			const points = sparkW >= TWO_ROW_SPARK.minW ? sparklinePoints(samples, 12, top + TWO_ROW_SPARK.y, sparkW, TWO_ROW_SPARK.h) : [];
 			if (points.length > 0) {
-				parts.push(...sparklineSvg(points, top + TWO_ROW_SPARK.y + TWO_ROW_SPARK.h, 3, 3.5, palette));
+				// An Outline face draws the line and its end dot without the
+				// shaded area, which would be a dark wedge over the picture.
+				const spark = sparklineSvg(points, top + TWO_ROW_SPARK.y + TWO_ROW_SPARK.h, 3, 3.5, palette, structure);
+				parts.push(...(traits.underFill ? spark : spark.slice(1)));
 			}
 		}
-		parts.push(
-			// The mask covers only the value line's band, so a wrapped label
-			// or sparkline that ran long is clipped renderer-proof, while the
-			// full-width label line above stays untouched.
-			`<rect x="${(isTahoma() ? rowInk - 1.5 : valueStartEst - 4).toFixed(1)}" y="${top + 18}" width="${(isTahoma() ? 201.5 - rowInk : 204 - valueStartEst).toFixed(1)}" height="${TWO_ROW.height - 18}" fill="${rowBg}"/>`,
-			`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`
-		);
+		if (traits.overflowRects) {
+			parts.push(
+				// The mask covers only the value line's band, so a wrapped label
+				// or sparkline that ran long is clipped renderer-proof, while the
+				// full-width label line above stays untouched.
+				`<rect x="${(isTahoma() ? rowInk - 1.5 : valueStartEst - 4).toFixed(1)}" y="${top + 18}" width="${(isTahoma() ? 201.5 - rowInk : 204 - valueStartEst).toFixed(1)}" height="${TWO_ROW.height - 18}" fill="${rowBg}"/>`
+			);
+		}
+		parts.push(`<text x="${valueEndX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${row.size}" font-weight="700" fill="${row.valueColor}">${escapeXml(row.valueText)}</text>`);
 		if (row.unitText !== "") {
 			parts.push(`<text x="${unitX.toFixed(1)}" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${row.unitColor ?? text.unit}">${escapeXml(row.unitText)}</text>`);
 		}
@@ -449,7 +515,7 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	if (opts.footerText !== "") {
 		parts.push(`<text x="6" y="96" text-anchor="start" font-family="${fontFamily()}" font-size="12" font-weight="600" fill="${text.unit}">${escapeXml(isTahoma() ? fitDialLine(opts.footerText, 6, 12) : fitFooter(opts.footerText, FOOTER_PX))}</text>`);
 	}
-	parts.push("</svg>");
+	parts.push(traits.halo ? HALO_CLOSE : "</svg>");
 	return parts.join("");
 }
 
@@ -471,6 +537,8 @@ export interface DialRenderOptions {
 	zones?: readonly DrawnZone[];
 	/** Resolved textual fills; defaults to the palette's own text tokens. */
 	text?: TextColors;
+	/** What the dial draws behind its readout (issue #41); absent is Theme. */
+	background?: DialBackground;
 }
 
 /** One zone segment on the dial bar: squared mid-track, pill-rounded where
@@ -535,31 +603,55 @@ function statsLineShift(stats: string): number {
 	return over > 0 && over <= 2.5 ? Number((12 - over).toFixed(1)) : 12;
 }
 
+/** The one-reading view's Outline filter region: its three text lines
+ * (title ascent, accents included, to the stats descent, plus the 1 px ring
+ * and slack). The bar sits below it on its own rim, so the filter's buffers
+ * stay a band, not the slot. */
+const SINGLE_HALO = { top: 4, height: 80 } as const;
+
 export function renderDial(opts: DialRenderOptions): string {
-	const { palette, barColor } = opts;
+	const { palette, barColor, background } = opts;
+	const traits = dialBackgroundTraits(background);
 	const text = opts.text ?? themeTextColors(palette);
-	const parts: string[] = [
-		...svgOpen(200, 100, palette.bg),
+	const texts: string[] = [
 		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitDialLine(opts.title, 12, 18) : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
 	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
 	const valueFit = isTahoma() ? tahomaDialValueFit(valueText, opts.unitText) : { size: valueFontSize(valueText), gap: true };
 	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${valueFit.gap ? inlineGap(17) : ""}${escapeXml(opts.unitText)}</tspan>` : "";
-	parts.push(`<text x="12" y="58" text-anchor="start"${unit === "" || !valueFit.gap ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueFit.size}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+	texts.push(`<text x="12" y="58" text-anchor="start"${unit === "" || !valueFit.gap ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueFit.size}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
 		const stats = fitStatsLine(opts.statsText);
 		const statsX = isTahoma() && stats.fontSize === 11 ? statsLineShift(opts.statsText) : 12;
 		const shifted = statsX < 12;
-		parts.push(`<text x="${statsX}" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="${shifted ? 12 : stats.fontSize}" font-weight="600" fill="${text.unit}">${escapeXml(shifted ? opts.statsText : stats.text)}</text>`);
+		texts.push(`<text x="${statsX}" y="78" text-anchor="start" font-family="${fontFamily()}" font-size="${shifted ? 12 : stats.fontSize}" font-weight="600" fill="${text.unit}">${escapeXml(shifted ? opts.statsText : stats.text)}</text>`);
 	}
-	parts.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" fill="${palette.track}"/>`);
-	for (const zone of opts.zones ?? []) {
-		parts.push(dialZoneSvg(zone));
+	// A status or problem face (no fraction) has no range to show: over a
+	// picture its empty track would only be a dark pill, so the looks with
+	// no panel leave the bar out.
+	const live = Number.isFinite(opts.fraction);
+	const bar: string[] = [];
+	if (live || traits.statusBar) {
+		// The bar's surround, 1 px larger on every side: Outline's rim in its
+		// ring color under the track, or with backings the track itself, so
+		// the fill and zones never touch the picture.
+		const surround = (fill: string): string => `<rect x="${BAR.x - 1}" y="${BAR.y - 1}" width="${BAR.w + 2}" height="${BAR.h + 2}" rx="${BAR.r + 1}" fill="${fill}"/>`;
+		if (traits.halo) {
+			bar.push(surround(haloRingColor(palette)));
+		}
+		bar.push(traits.backings ? surround(palette.track) : `<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" ${structureFill(background, palette)}/>`);
+		for (const zone of opts.zones ?? []) {
+			bar.push(dialZoneSvg(zone));
+		}
+		if (live && opts.fraction > 0) {
+			const w = Math.max(BAR.h, Math.min(1, opts.fraction) * BAR.w);
+			bar.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${w.toFixed(1)}" height="${BAR.h}" rx="${BAR.r}" fill="${barColor}"/>`);
+		}
 	}
-	if (Number.isFinite(opts.fraction) && opts.fraction > 0) {
-		const w = Math.max(BAR.h, Math.min(1, opts.fraction) * BAR.w);
-		parts.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${w.toFixed(1)}" height="${BAR.h}" rx="${BAR.r}" fill="${barColor}"/>`);
+	if (traits.halo) {
+		// The bar first, outside the filter, then the text lines in the halo
+		// group: the filter's region is the text band only.
+		return [...dialFaceOpen(background, palette, SINGLE_HALO.top, SINGLE_HALO.height), ...bar, HALO_GROUP, ...texts, HALO_CLOSE].join("");
 	}
-	parts.push("</svg>");
-	return parts.join("");
+	return [...dialFaceOpen(background, palette), ...texts, ...bar, "</svg>"].join("");
 }

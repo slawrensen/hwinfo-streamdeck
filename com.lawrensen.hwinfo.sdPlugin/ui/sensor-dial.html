@@ -119,6 +119,21 @@
 					</div>
 					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
 				</div>
+				<div class="hw-field">
+					<label for="f-background">Background</label>
+					<select id="f-background" data-setting="dialBackground" data-default="theme" aria-describedby="background-help">
+						<option value="theme">Theme</option>
+						<option value="glass">Glass</option>
+						<option value="tint">Tint</option>
+						<option value="outline">Outline</option>
+						<option value="clear">Clear</option>
+					</select>
+					<p class="hw-help" id="background-help">Glass, Tint, Outline and Clear show the touch strip picture set in the Stream Deck app. Clear needs a plain, contrasting one.</p>
+				</div>
+				<div id="accent-words" hidden>
+					<label class="hw-check"><input type="checkbox" id="accent-words-toggle" aria-describedby="accent-words-help" /><span>Words in the accent color</span></label>
+					<p class="hw-help" id="accent-words-help">The title and the selected row's name take the accent color, and units, statistics and other names move halfway to it. Values, alert colors and a Custom text color stay as they are.</p>
+				</div>
 
 				<div class="hw-field">
 					<label for="f-view">View</label>

@@ -28,7 +28,7 @@ The bar always tracks the live value, even while you're touching through MIN / M
 
 **View** offers two multi-row layouts besides the single readout, both listing what rotation moves through:
 
-- **Overview, two rows (big values and trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection. Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
+- **Overview, two rows (big values and trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection (the band only on the **Theme** and **Glass** backgrounds). Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
 - **Overview, three rows**: one line per reading. A marker on the left shows the selection and window position. The context line contains the shared name and session `▼ low ▲ high`; names shorten before statistics. Put it above or below the rows with **Context line**, and show or hide row dividers with **Separators**. Pause, pin and stat badges share the name area. Temporary messages briefly replace the context line.
 
 ![The dial's View select on Overview, three rows, with Decimals on Auto and the Temperature °F box under it, then the Row labels, Context line and Separators selects that the overview reveals.]({{ '/assets/img/pi-dial-overview.png' | relative_url }})
@@ -82,7 +82,7 @@ rows and the saved key for the selection, so a measurement with two saved
 colors can change color when rotation selects it. Keep one color per
 measurement to avoid that.
 
-![The Display section of the dial's settings panel: Text color on Theme text, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+![The Display section of the dial's settings panel: Text color on Theme text, Background on Theme with its help line, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
 *An actual settings-panel capture at panel build 1.7.0.0-d28 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
@@ -151,6 +151,8 @@ Reading and Display start open; each folded section's title line summarizes what
 | Reading | **Title on the dial** | Custom title; blank falls back to the reading's own (renamed) label. |
 | Reading | **Title when the dial moves on** | **Clears** (default): a custom title clears whenever the dial moves on to another reading, by a turn, a press or touch set to step, a Control key or the auto cycle; picking a reading in the settings panel keeps it. **Stays for this dial** keeps it as a fixed title. |
 | Display | **Text color** | **Default** (follows the shared Text color and names it, for example *Default (shared: Theme text)*), **Theme text**, **Dimmed**, or **Custom color** with an exact color. See [Themes](themes.md#text-theme-dim-or-custom). |
+| Display | **Background** | **Theme** (default) fills the dial's part of the touch strip with the theme's background. **Glass**, **Tint**, **Outline** and **Clear** show the touch strip picture set in the Stream Deck app behind the dial. See [Transparent background](#transparent-background). |
+| Display | **Words in the accent color** | Glass, Tint and Outline only: the title and the selected row's name take the accent color, and units, statistics and other names move halfway to it. Off by default. See [Transparent background](#transparent-background). |
 | Display | **View** | **One reading** (default), or an [overview](#overview-view) of the rotation list: **Overview, two rows (big values and trend)** or **Overview, three rows**. |
 | Display | **Decimals** | Auto (magnitude-based; compacts large values through k/M/G/T, e.g. `48.7M`) or a fixed 0–3. Byte and rate units re-tier under the shared **Data units** preference instead. |
 | Display | **°F** (under Temperature) | Temperatures in °F instead of °C. |
@@ -179,6 +181,39 @@ Thresholds and the manual bar range are **unit-scoped**: they only apply to read
 By default (both fields blank) the bar spans the **session low → high**, so the fill grows as new extremes appear and always uses the full width of the range you've actually seen. Set **Bar from** / **Bar to** (Display) to pin the bar to a fixed scale instead (e.g. `0` and `100` for a usage percentage, or `30` and `90` for a CPU temperature) so the fill position means the same thing every time you glance at it. You can set just one end; the other stays automatic.
 
 With **Warn at** or **Critical at** set, the bar's track also marks the threshold zones in muted amber and red, escalating toward the alarmed end (the low side when alerts fire on a drop), the same zones a key's [Bar or Ring display](sensor-reading.md#display-sparkline-bar-ring) draws, and an automatic range widens just enough to keep them visible. A manual Bar from / Bar to is never widened; zones outside it are simply clipped. The zones are fixed landmarks; the **fill** is the live value, at full strength (accent normally, amber/red while alerting) so it always reads over them.
+
+### Transparent background
+
+**Background** is new in 1.7.1; 1.7.0 does not have it. The Stream Deck app can show a picture behind the touch strip: right-click the strip in the app and choose **Set from File...** or **Open Background Library**. A page, a folder and a single dial can each have their own. A Sensor Dial fills its 200 x 100 part of the strip with the theme's background, which hides that picture. **Background** (Display) chooses what the dial draws instead:
+
+| Background | What the dial draws | Text over the picture |
+| --- | --- | --- |
+| **Theme** (default) | The theme's background, exactly as before. | The picture does not show. |
+| **Glass** | The theme's background as a panel at 80% opacity, so the picture shows through at 20%. | Built-in text keeps 4.5:1 contrast over any picture (a calculation). |
+| **Tint** | The theme's background as a panel at 50% opacity, so the picture shows through at half strength, with Outline's 1 px outline on every word and mark. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
+| **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
+| **Clear** | No background and no outline. | Depends on the picture. |
+
+**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert can draw a lighter amber or red (a darker one on Paper) where the theme's own falls short there. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
+
+**Tint.** The panel is the theme's background at 50%, so more of the picture shows than on Glass. Over a white picture (black on **Paper**) that panel leaves the theme's own text below 4.5:1, so Tint does not rely on it: it draws Outline's 1 px outline and uses Outline's text colors, described next.
+
+**Outline.** Labels take the value color, and units and statistics a dimmer step of it, so a gray word does not merge with its dark outline over a light picture. The two-row view draws no band behind the selected row (the accent rail and the brighter label mark it) and draws trend lines without the shaded area under them. Separators stay thin lines in the theme's track color.
+
+**Clear.** Labels, units and statistics take the value color. Use a dark, even picture with a dark theme, or a light one with **Paper**. Over a bright, mid-tone or busy picture the text has no contrast floor; use Glass, Tint or Outline there. The range bar, the three-row rail and the two-row rail keep a track 1 px wider than themselves, and trend lines keep their shaded area.
+
+**Words in the accent color.** On Glass, Tint and Outline, a box under **Background** draws the dial's words in its accent color, the color of the range bar and the rail mark. The title, the selected row's name and the context line's name take the accent. Units, statistics and the other rows' names take their usual color moved halfway toward it, and the selected row's name never has less contrast than they do. With **Accent colors** (Advanced, Shared defaults) on **By sensor type**, the accent is the sensor type's color, so the words change color with the reading on the dial. Under **Dimmed** the accent dims with the rest of the text. Values, alert colors, **Color numbers by sensor type**, **Reading colors** and a **Custom color** for text do not change.
+
+Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (a calculation). Where an accent falls short of it, mostly on Glass, the word draws a lighter shade of it than the bar (a darker one on **Paper**). **Paper**'s accent is a dark gray, so on Paper the words change little. Clear does not offer the box: with no panel and no outline, a word has only the picture behind it, and the value color is already the theme's most readable color there.
+
+On Glass, Tint, Outline and Clear:
+
+- In the two-row view only Glass draws the band behind the selected row. Tint, Outline and Clear mark that row with the accent rail and the brighter label.
+- Status screens such as **Start HWiNFO** show their text without the empty range bar on Tint, Outline and Clear. Glass keeps it as a faint groove.
+- A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
+- With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, or left off when not even an ellipsis fits, so a label with emoji or symbols the face font does not have is shortened a little sooner.
+- The settings panel header cannot show your picture, so it previews a see-through dial over a checkerboard. Sensor Reading keys are not affected.
+- Tint's and Outline's outline is an SVG filter, which the Stream Deck app draws on the versions I checked (7.4 and 7.6). I have run Glass and Outline on my Stream Deck + XL since 2026-10-16.
 
 ## Alerts on a dial
 

@@ -49,6 +49,8 @@ Dials show the same states in the touchscreen's two-slot layout (a title and a v
 
 Like the key screens, the frozen-data message is **source-aware**: a dial reading from the Gadget registry says *check Gadget*, never *check sharing*.
 
+On a dial with **Background** set to **Tint**, **Outline** or **Clear**, these screens show their text without the empty range bar; **Glass** keeps it as a faint groove. See [Transparent background](sensor-dial.md#transparent-background).
+
 While **Sensor missing / waiting** shows, the dial ignores turns so a temporary dropout (an HWiNFO restart, a device asleep) can't bump you off the saved reading; it recovers on its own when the sensor returns. Separately, a live dial can carry a small **"cycle paused"** or **"pinned"** label on its bottom line: those aren't status screens, they're the pause and pin states described on [Dial controls & presets](controls.md#pause-pin-and-reset-reach).
 
 ## In the settings panel

@@ -33,3 +33,24 @@ describe("panel descriptions are read for their content", () => {
 		});
 	}
 });
+
+describe("the dial's Background controls", () => {
+	const html = readFileSync(join(UI_DIR, "sensor-dial.html"), "utf8");
+
+	it("the select saves dialBackground with the exact values the plugin reads, Theme by default", async () => {
+		const { dialBackgroundOf } = await import("../src/ui/dial-background");
+		const select = /<select id="f-background"([^>]*)>([\s\S]*?)<\/select>/.exec(html);
+		assert.ok(select, "the Background select is in the dial panel");
+		assert.match(select[1] as string, /\bdata-setting="dialBackground"/);
+		assert.match(select[1] as string, /\bdata-default="theme"/);
+		const values = [...(select[2] as string).matchAll(/<option value="([^"]*)">/g)].map((m) => m[1]);
+		assert.deepEqual(values, ["theme", "glass", "tint", "outline", "clear"]);
+		for (const value of values) assert.equal(dialBackgroundOf(value), value, `the plugin reads ${value} as itself`);
+	});
+
+	it("Words in the accent color is an unbound box, so only a user's edit saves it", () => {
+		const box = /<input\b[^>]*\bid="accent-words-toggle"[^>]*>/.exec(html)?.[0];
+		assert.ok(box, "the box is in the dial panel");
+		assert.doesNotMatch(box, /data-setting=/, "the sdpi binder would coerce a stored string to ticked");
+	});
+});

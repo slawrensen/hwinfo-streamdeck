@@ -15,6 +15,36 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
+## 1.7.1.0 - Unreleased
+
+A Background setting for Sensor Dials, so the touch strip picture can show
+behind them, and a fix for custom detail lists.
+
+- Sensor Dials have a **Background** setting under Display
+  ([issue #41](https://github.com/slawrensen/hwinfo-streamdeck/issues/41)).
+  **Theme**, the default, draws every dial exactly as before. **Glass**
+  draws the theme's background as a panel at 80% opacity, so the touch
+  strip picture set in the Stream Deck app shows through it, and draws
+  labels and units lighter (darker on Paper) so built-in text keeps its
+  4.5:1 floor over a white picture (black on Paper), a calculation.
+  **Tint** draws that panel at 50% and adds Outline's outline and text
+  colors. **Outline** draws no background and gives every word, bar and
+  mark a 1 px outline, black on the dark themes and the theme's
+  background on Paper. **Clear** draws no background and no outline.
+  Keys are unchanged.
+- In the Stream Deck app's SVG renderer (QtSvg 6.9.3, on my PC), an
+  Outline face takes 1.5 to 3 times as long to draw as a Theme face, a
+  Glass face up to 1.2 times, and a Clear face slightly less than Theme.
+  See PERF.md.
+- A custom detail list keeps each label, color and tile on its own
+  reading when a confirmed source link or a new **Reading** pick makes a
+  listed key the key's own reading
+  ([issue #50](https://github.com/slawrensen/hwinfo-streamdeck/issues/50)).
+  In 1.7.0 the readings after it moved up one cell, so their labels and
+  colors sat one reading off. The hidden reading now keeps its cell. A
+  layout last saved by 1.7.0 shows as before until the next edit to the
+  list or a tile.
+
 ## 1.7.0.0 - 2026-10-11
 
 Redesigned settings panels, per-reading dial colors and reliability

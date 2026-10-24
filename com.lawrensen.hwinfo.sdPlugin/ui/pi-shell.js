@@ -41,6 +41,8 @@ self.hwShell = (() => {
 		globals: {},
 		preview: null,
 		face: "",
+		/** The plugin's theme palettes (the "themes" message), by id. */
+		themes: null,
 		tree: null,
 		treeAt: 0,
 		writes: 0,
@@ -106,6 +108,8 @@ self.hwShell = (() => {
 			if (typeof p.face === "string") state.face = p.face;
 			state.preview = p;
 			emit("preview", p);
+		} else if (p.event === "themes" && isDoc(p.themes)) {
+			state.themes = p.themes;
 		} else if (p.event === "sensorTree") {
 			state.tree = p;
 			state.treeAt = performance.now();
@@ -647,6 +651,28 @@ self.hwShell = (() => {
 		}
 	}
 
+	/** The checkerboard a dial face previews over (issue #41: the panel cannot
+	 * show the strip picture): "dark" on a dark theme, "light" on Paper. The
+	 * drawn theme's background decides, by the rule that picks Outline's ring
+	 * color (relative luminance under 0.18), because Dimmed and accent words
+	 * can draw every word darker than mid-gray on a dark theme (Ember).
+	 * Before the palettes arrive, the brightest word decides. A Theme face's
+	 * opaque rect covers it. */
+	function seeThroughTone(svg) {
+		const drawn = state.preview?.effective?.theme?.drawn;
+		const bg = isDoc(state.themes) && typeof drawn === "string" && Object.hasOwn(state.themes, drawn) ? state.themes[drawn]?.bg : undefined;
+		if (typeof bg === "string" && /^#[0-9A-Fa-f]{6}$/.test(bg)) {
+			const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+			const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(bg.slice(i, i + 2), 16) / 255));
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.18 ? "dark" : "light";
+		}
+		let brightest = -1;
+		for (const ink of svg.matchAll(/<(?:text|tspan)\b[^>]*\bfill="#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"/g)) {
+			brightest = Math.max(brightest, 0.299 * parseInt(ink[1], 16) + 0.587 * parseInt(ink[2], 16) + 0.114 * parseInt(ink[3], 16));
+		}
+		return brightest >= 0 && brightest < 128 ? "light" : "dark";
+	}
+
 	// One persistent polite region for notes that are rebuilt with their
 	// lists (rotation and detail counts): a live region created together
 	// with its text is often not read, and a rebuilt one is read again for
@@ -720,6 +746,11 @@ self.hwShell = (() => {
 				img.dataset.face = state.face;
 				img.src = `data:image/svg+xml,${encodeURIComponent(state.face)}`;
 				faceText = drawnText(state.face);
+			}
+			// Every render: the palettes can arrive after the first face.
+			if (kind === "dial" && state.face !== "") {
+				const tone = seeThroughTone(state.face);
+				if (img.dataset.clear !== tone) img.dataset.clear = tone;
 			}
 			figure.hidden = state.face === "";
 			// The alt text reads what the face itself draws (a status screen

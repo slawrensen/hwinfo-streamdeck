@@ -237,7 +237,8 @@ export class DetailNavigator {
 				detailMode: settings.detailMode,
 				detailKeys: settings.detailKeys,
 				detailTitle: settings.detailTitle,
-				detailFilter: settings.detailFilter
+				detailFilter: settings.detailFilter,
+				detailTilesVersion: settings.detailTilesVersion
 			},
 			presentation: {
 				label: settings.label,

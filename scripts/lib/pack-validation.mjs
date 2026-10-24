@@ -151,7 +151,9 @@ export function validatePack({ archiveBytes, stagingDir, packageVersion, contrac
 	// it names is a member. Icon paths carry no extension in the manifest.
 	if (archiveManifest !== null) {
 		const m = archiveManifest;
-		if (m.Version !== `${packageVersion}.0`) fail(`manifest Version ${m.Version} does not match package.json ${packageVersion}.0`);
+		// X.Y.Z.0 for a release; a hotfix preview takes the fourth segment
+		// (1.7.0.1 previews 1.7.1) and package.json keeps X.Y.Z.
+		if (m.Version.split(".").slice(0, 3).join(".") !== packageVersion) fail(`manifest Version ${m.Version} does not match package.json ${packageVersion}`);
 		if (m.UUID !== uuid) fail(`manifest UUID ${m.UUID} is not ${uuid}`);
 		if (m.CodePath !== "bin/plugin.js") fail(`manifest CodePath ${m.CodePath} is not bin/plugin.js`);
 		if (m.Nodejs?.Version !== "20") fail(`manifest Nodejs.Version ${m.Nodejs?.Version} is not "20"`);

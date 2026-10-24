@@ -101,6 +101,12 @@ export type ReadingSettings = {
 	detailMode?: string;
 	/** Custom detail list: stable reading keys in display order. */
 	detailKeys?: string[];
+	/** How the hand-grouped tile plan (detailTiles) walks detailKeys: 2
+	 * gives every listed key a cell, the opener's own reading included
+	 * (hidden in place), so a link or a re-pick moves no label or color.
+	 * Absent on plans saved by 1.7.0, which keep the older walk. The panel
+	 * writes it with the plan; nothing rewrites it. */
+	detailTilesVersion?: number;
 	/** Optional title for the detail view's title tile. */
 	detailTitle?: string;
 	/** Readings per detail tile: "2", "3" or "4" stack that many readings

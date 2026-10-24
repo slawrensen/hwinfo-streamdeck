@@ -192,7 +192,11 @@ if (manifest) {
 // ---------------------------------------------------------------------------
 
 const pkg = JSON.parse(read("package.json"));
-if (manifest && manifest.Version !== `${pkg.version}.0`) {
+// A release is X.Y.Z.0. A preview of the next hotfix takes the fourth
+// segment above the stable it branched from (1.7.0.1 previews 1.7.1), so
+// package.json keeps X.Y.Z; the release workflow's tag gate holds releases
+// to .0.
+if (manifest && manifest.Version.split(".").slice(0, 3).join(".") !== pkg.version) {
 	fail("package.json", 0, `version ${pkg.version} does not match manifest Version ${manifest.Version}`);
 }
 if (manifest && !new RegExp(`^## ${manifest.Version.replaceAll(".", "\\.")}\\b`, "m").test(read("CHANGELOG.md"))) {

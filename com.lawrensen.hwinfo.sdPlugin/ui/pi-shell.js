@@ -647,6 +647,14 @@ self.hwShell = (() => {
 		}
 	}
 
+	/** The checkerboard a dial face previews over (issue #41: the panel cannot
+	 * show the strip picture): "dark" under light text, "light" under dark
+	 * text (Paper). A Theme face's opaque rect covers it. */
+	function seeThroughTone(svg) {
+		const ink = /<text\b[^>]*\bfill="#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"/.exec(svg);
+		return ink !== null && 0.299 * parseInt(ink[1], 16) + 0.587 * parseInt(ink[2], 16) + 0.114 * parseInt(ink[3], 16) < 128 ? "light" : "dark";
+	}
+
 	// One persistent polite region for notes that are rebuilt with their
 	// lists (rotation and detail counts): a live region created together
 	// with its text is often not read, and a rebuilt one is read again for
@@ -720,6 +728,7 @@ self.hwShell = (() => {
 				img.dataset.face = state.face;
 				img.src = `data:image/svg+xml,${encodeURIComponent(state.face)}`;
 				faceText = drawnText(state.face);
+				if (kind === "dial") img.dataset.clear = seeThroughTone(state.face);
 			}
 			figure.hidden = state.face === "";
 			// The alt text reads what the face itself draws (a status screen

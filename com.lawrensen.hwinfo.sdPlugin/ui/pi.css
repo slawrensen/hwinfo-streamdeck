@@ -153,6 +153,18 @@ html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
 	border-radius: 6px;
 }
 
+/* A dial face drawn without the opaque background (issue #41: Glass,
+   Outline, Clear) previews over a checkerboard, since the panel cannot show
+   the touch strip picture behind it: a dark one under light text, a light
+   one under dark text (Paper), set from the face itself (pi-shell.js). */
+.hw-face img[data-clear="dark"] {
+	background: repeating-conic-gradient(#3a3a3a 0% 25%, #242424 0% 50%) 0 0 / 12px 12px;
+}
+
+.hw-face img[data-clear="light"] {
+	background: repeating-conic-gradient(#e6e6e6 0% 25%, #c8c8c8 0% 50%) 0 0 / 12px 12px;
+}
+
 .hw-head-text {
 	flex: 1 1 160px;
 	min-width: 0;

@@ -64,7 +64,7 @@ export function mixToward(color: string, toward: string, amount: number): string
 }
 
 /** WCAG relative luminance for the validated sRGB theme/settings colors. */
-function luminance(color: string): number {
+export function luminance(color: string): number {
 	const linear = (offset: number): number => {
 		const channel = parseInt(color.slice(offset, offset + 2), 16) / 255;
 		return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -179,6 +179,26 @@ export function quadIdentityColor(identity: QuadIdentity, labeled: boolean, sett
 	}
 	const color = mode === "dim" ? mixToward(identity.color, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : identity.color;
 	return identity.chosen ? color : readableValueColor(color, palette.bg);
+}
+
+/**
+ * Text on a dial drawn with no background over the touch strip picture
+ * (issue #41: the Outline and Clear backgrounds). The theme's secondary
+ * grays are tuned for the theme's own background: over a light picture a
+ * gray word merges with its dark outline, and with no outline it simply
+ * loses the picture's contrast. Labels therefore take the value color (the
+ * platform's own dials draw every word in one light color). Units and stats
+ * take that color stepped toward the surface by `unitBlend`, lifted to the
+ * numeric floor, so the label over unit step (and with it the overview's
+ * selected-row cue) survives in a pair far from the outline; a zero blend
+ * draws them in the value color too, one ink per face. Custom text stays
+ * exactly as chosen. Values, alert, type and per-reading colors are not
+ * touched here.
+ */
+export function pictureText(text: TextColors, surface: string, settings: TextSettings, unitBlend: number): TextColors {
+	if (appliedTextMode(settings) === "custom") return text;
+	const unit = unitBlend === 0 ? text.value : readableValueColor(mixToward(text.value, surface, unitBlend), surface);
+	return { ...text, label: text.value, unit };
 }
 
 /**

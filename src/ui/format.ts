@@ -295,17 +295,19 @@ function isWideGlyph(code: number): boolean {
 }
 
 /** One glyph's advance at the 12 px basis, from the deck's face font
- * (face-font.ts holds the measured tables). */
-function keyGlyphWidth12(ch: string): number {
+ * (face-font.ts holds the measured tables). `fallback12`, when set, is the
+ * least a glyph the table does not map may cost, CJK aside. */
+function keyGlyphWidth12(ch: string, fallback12?: number): number {
 	const mapped = faceFont().advance12[ch];
 	if (mapped !== undefined) {
 		return mapped;
 	}
 	// East Asian wide and fullwidth glyphs advance a full em.
-	if (isWideGlyph(ch.codePointAt(0) as number)) {
-		return 12;
+	const code = ch.codePointAt(0) as number;
+	if (isWideGlyph(code)) {
+		return fallback12 !== undefined && code >= 0x1f000 ? Math.max(12, fallback12) : 12;
 	}
-	return faceFont().unmapped12;
+	return fallback12 !== undefined ? Math.max(faceFont().unmapped12, fallback12) : faceFont().unmapped12;
 }
 
 
@@ -315,6 +317,12 @@ export type TextFitOptions = {
 	fontWeight?: 600 | 700;
 	/** Extra px the fit must leave unused, on top of the caller's budget. */
 	minimumSlack?: number;
+	/** The least a glyph outside the face font's table (emoji, symbols drawn
+	 * by a fallback font) costs at the 12 px basis. Unset keeps the table's
+	 * own guess. Dials drawn over the touch strip picture set it (issue #41):
+	 * they have no overflow rect to hide a run that overruns its fit, so
+	 * such a run is cut instead. */
+	fallbackAdvance12?: number;
 };
 
 /**
@@ -333,7 +341,7 @@ export function estimateKeyTextWidth(text: string, fontSize: number, options?: T
 	let width = 0;
 	let count = 0;
 	for (const ch of text) {
-		const advance = keyGlyphWidth12(ch);
+		const advance = keyGlyphWidth12(ch, options?.fallbackAdvance12);
 		width += ch >= "0" && ch <= "9" ? Math.max(advance, digitFloor) : advance;
 		count++;
 	}
@@ -389,8 +397,9 @@ export function fitTextLadder(text: string, maxWidth: number, sizes: readonly nu
 }
 
 /** One run of a drawn line: the text element's own text or one of its
- * tspans, each at its own size. */
-export type TextRun = { text: string; fontSize: number; fontWeight?: 600 | 700 };
+ * tspans, each at its own size. `fallbackAdvance12` prices glyphs the face
+ * font lacks, as in TextFitOptions. */
+export type TextRun = { text: string; fontSize: number; fontWeight?: 600 | 700; fallbackAdvance12?: number };
 
 /** A line's extent from its pen start: the advance, and where its ink
  * starts and ends. Tahoma carries each glyph's measured ink insets; a glyph
@@ -401,7 +410,7 @@ export type InkSpan = { advance: number; left: number; right: number };
 export function inkSpan(runs: readonly TextRun[]): InkSpan {
 	const insets = faceFont().insets12;
 	if (insets === undefined) {
-		const advance = runs.reduce((sum, run) => sum + estimateKeyTextWidth(run.text, run.fontSize, { fontWeight: run.fontWeight }), 0);
+		const advance = runs.reduce((sum, run) => sum + estimateKeyTextWidth(run.text, run.fontSize, { fontWeight: run.fontWeight, fallbackAdvance12: run.fallbackAdvance12 }), 0);
 		return { advance, left: 0, right: advance };
 	}
 	let pen = 0;
@@ -410,7 +419,7 @@ export function inkSpan(runs: readonly TextRun[]): InkSpan {
 	for (const run of runs) {
 		const k = run.fontSize / 12;
 		for (const ch of run.text) {
-			const advance = keyGlyphWidth12(ch) * k;
+			const advance = keyGlyphWidth12(ch, run.fallbackAdvance12) * k;
 			const inset = insets.get(ch);
 			if (inset !== null) {
 				left = Math.min(left, pen + (inset === undefined ? 0 : inset[0] * k));

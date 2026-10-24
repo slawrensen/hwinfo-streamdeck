@@ -5,7 +5,7 @@
 		<title>Sensor Dial settings</title>
 		<script src="sdpi-components.js"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.0.0-d28" />
+		<link rel="stylesheet" href="pi.css?v=1.7.0.2-1" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
@@ -118,6 +118,16 @@
 						</div>
 					</div>
 					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
+				</div>
+				<div class="hw-field">
+					<label for="f-background">Background</label>
+					<select id="f-background" data-setting="dialBackground" data-default="theme" aria-describedby="background-help">
+						<option value="theme">Theme</option>
+						<option value="glass">Glass</option>
+						<option value="outline">Outline</option>
+						<option value="clear">Clear</option>
+					</select>
+					<p class="hw-help" id="background-help">Glass, Outline and Clear show the touch strip picture set in the Stream Deck app. Clear needs a plain, contrasting one.</p>
 				</div>
 
 				<div class="hw-field">
@@ -493,9 +503,9 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.0.0-d28"></script>
-		<script src="pi-shell.js?v=1.7.0.0-d28"></script>
-		<script src="pi-common.js?v=1.7.0.0-d28"></script>
-		<script src="pi-control.js?v=1.7.0.0-d28"></script>
+		<script src="pi-model.js?v=1.7.0.2-1"></script>
+		<script src="pi-shell.js?v=1.7.0.2-1"></script>
+		<script src="pi-common.js?v=1.7.0.2-1"></script>
+		<script src="pi-control.js?v=1.7.0.2-1"></script>
 	</body>
 </html>

@@ -135,7 +135,9 @@ try {
 		liveState: document.getElementById("head-state").textContent,
 		statusHint: document.getElementById("reading-status").textContent.trim()
 	}))()`);
-	assert.match(evidence.build, /^1\.7\.0\.0-/);
+	// The panel build names the version it ships in (manifest Version).
+	const version = JSON.parse(readFileSync(path.join(root, "com.lawrensen.hwinfo.sdPlugin/manifest.json"), "utf8")).Version;
+	assert.ok(evidence.build.startsWith(`${version}-`), `panel build ${evidence.build} is not a ${version} build`);
 	assert.equal(evidence.preset, "signal");
 	assert.deepEqual(evidence.rows.map((row) => row.label), labels);
 	assert.deepEqual(evidence.rows.map((row) => row.color.toUpperCase()), ["#4CC2FF", "#FF7E8E", "#38CD89", "#D4AB33", "#4CC2FF"]);

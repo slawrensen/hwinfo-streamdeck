@@ -63,6 +63,20 @@ self.hwModel = (() => {
 		return v === "glass" || v === "tint" || v === "outline" || v === "clear" ? v : "theme";
 	}
 
+	/** Whether the dial's look takes Words in the accent color: Glass, Tint
+	 * and Outline (the plugin's accentWords trait). Theme and Clear draw
+	 * their words as before whatever is stored. */
+	function accentWordsLook(settings) {
+		const look = dialBackground(settings);
+		return look === "glass" || look === "tint" || look === "outline";
+	}
+
+	/** Words in the accent color, read the way the plugin reads it
+	 * (dialAccentWordsOf): only the exact true counts, on a look that takes it. */
+	function dialAccentWords(settings) {
+		return settings.dialAccentWords === true && accentWordsLook(settings);
+	}
+
 	function pressBehavior(settings) {
 		const v = settings.pressBehavior;
 		return v === "open-details" || v === "tap-cycle-hold-details" ? v : "cycle-stat";
@@ -142,6 +156,7 @@ self.hwModel = (() => {
 		// A dial drawn over the touch strip picture names its look; Theme,
 		// the default, says nothing.
 		if (kind === "dial" && dialBackground(settings) !== "theme") parts.push(dialBackground(settings));
+		if (kind === "dial" && dialAccentWords(settings)) parts.push("accent words");
 		// The key's graph strip draws on the one-reading layout only; the
 		// stored mode wins, else the legacy sparkline flag (the panel's rule).
 		if (kind === "key" && (preview?.effective?.layout?.drawn ?? storedKeyLayout(settings)) === "single") {
@@ -430,6 +445,8 @@ self.hwModel = (() => {
 		storedKeyLayout,
 		dialView,
 		dialBackground,
+		accentWordsLook,
+		dialAccentWords,
 		pressBehavior,
 		detailMode,
 		detailDensity,

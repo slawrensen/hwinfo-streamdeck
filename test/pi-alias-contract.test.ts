@@ -372,7 +372,7 @@ type Mounted = {
 };
 
 const SHARED_IDS = ["hw-head", "head-reading", "head-source", "head-state", "reading-status", "face", "face-img", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
-const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors"];
+const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors", "accent-words", "accent-words-toggle"];
 const READING_IDS = ["detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
 
 /** Loads the production panel over a fresh DOM, store and socket. */
@@ -610,6 +610,40 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 };
 
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
+
+describe("the dial's Words in the accent color box", () => {
+	it("shows on Glass, Tint and Outline only, follows the Background as it changes, and writes nothing", async () => {
+		const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "outline", dialAccentWords: true });
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, false, "outline");
+		for (const [look, hidden] of [["glass", false], ["tint", false], ["clear", true], ["theme", true], ["Outline", true], [undefined, true], ["outline", false]] as const) {
+			m.echo("dialBackground", look);
+			await m.flush();
+			assert.equal(m.el("accent-words").hidden, hidden, JSON.stringify(look));
+		}
+		assert.equal(m.writes.length, 0, "showing and hiding the box never saves");
+		assert.equal(m.store.dialAccentWords, true, "a hidden box keeps its value");
+	})
+	it("ticks only for the exact true the plugin reads, saves nothing on open, and a click saves the boolean", async () => {
+		for (const [raw, ticked] of [[true, true], ["true", false], [1, false], [false, false], [undefined, false]] as const) {
+			const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "tint", ...(raw === undefined ? {} : { dialAccentWords: raw }) });
+			await m.flush();
+			assert.equal(m.el("accent-words-toggle").checked, ticked, JSON.stringify(raw));
+			assert.equal(m.lastWrite("dialAccentWords"), undefined, `${JSON.stringify(raw)}: opening the panel saves nothing`);
+		}
+		const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "tint", dialAccentWords: "true" });
+		await m.flush();
+		const box = m.el("accent-words-toggle");
+		box.checked = true;
+		box.fire("change");
+		await m.flush();
+		assert.equal(m.lastWrite("dialAccentWords"), true, "a tick saves the boolean the plugin reads");
+		box.checked = false;
+		box.fire("change");
+		await m.flush();
+		assert.equal(m.lastWrite("dialAccentWords"), false);
+	});
+});
 
 describe("remaining PI review regressions", () => {
 	it("an unknown local theme seeds Custom text from its runtime fallback under a nondefault deck", async () => {

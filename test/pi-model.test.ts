@@ -31,6 +31,8 @@ type Model = {
 	patchNames(raw: unknown, key: string, name: string): Record<string, unknown>;
 	patchColors(raw: unknown, updates: Record<number, string>, defaults: string[]): unknown[];
 	themeName(id: unknown): string;
+	accentWordsLook(settings: Settings): boolean;
+	dialAccentWords(settings: Settings): boolean;
 };
 
 const source = readFileSync(fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/pi-model.js", import.meta.url)), "utf8");
@@ -113,6 +115,23 @@ describe("display summary", () => {
 			assert.equal(model.displaySummary("dial", { dialBackground: raw }, {}, null), "One reading · auto decimals · shared text", JSON.stringify(raw));
 		}
 		assert.equal(model.displaySummary("dial", { dialView: "overview", fahrenheit: true, dialBackground: "outline" }, {}, null), "Overview, three rows · auto decimals · shared text · °F · outline");
+	});
+	it("says accent words only for the exact true on a look that draws them, as the plugin reads it", () => {
+		for (const look of ["glass", "tint", "outline"]) {
+			assert.equal(model.accentWordsLook({ dialBackground: look }), true, look);
+			assert.equal(model.displaySummary("dial", { dialBackground: look, dialAccentWords: true }, {}, null), `One reading · auto decimals · shared text · ${look} · accent words`);
+			assert.equal(model.displaySummary("key", { dialBackground: look, dialAccentWords: true }, {}, null), "Current value · auto decimals · shared text");
+			for (const raw of [undefined, false, "true", 1, "on", null, {}, [true]]) {
+				assert.equal(model.dialAccentWords({ dialBackground: look, dialAccentWords: raw }), false, `${look} ${JSON.stringify(raw)}`);
+				assert.equal(model.displaySummary("dial", { dialBackground: look, dialAccentWords: raw }, {}, null), `One reading · auto decimals · shared text · ${look}`, `${look} ${JSON.stringify(raw)}`);
+			}
+		}
+		// Theme and Clear draw their words as before, whatever is stored.
+		for (const look of [undefined, "theme", "clear", "Outline", "glass "]) {
+			assert.equal(model.accentWordsLook({ dialBackground: look }), false, JSON.stringify(look));
+			assert.equal(model.dialAccentWords({ dialBackground: look, dialAccentWords: true }), false, JSON.stringify(look));
+			assert.doesNotMatch(model.displaySummary("dial", { dialBackground: look, dialAccentWords: true }, {}, null), /accent words/, JSON.stringify(look));
+		}
 	});
 	it("says only what is stored when the plugin has not answered", () => {
 		assert.equal(model.displaySummary("key", { theme: "paper" }, {}, null), "Current value · auto decimals · shared text");

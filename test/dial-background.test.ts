@@ -17,12 +17,12 @@ import { composeDialSvg, type DialRenderState, type DialSettings } from "../src/
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 import type { PollerStatus } from "../src/poller";
 import { SessionStatsStore } from "../src/stats";
-import { dialBackgroundOf, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, type DialBackground } from "../src/ui/dial-background";
+import { dialAccentWordsOf, dialBackgroundOf, dialBackgroundTraits, dialPictureText, dialTextPalette, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, type DialBackground } from "../src/ui/dial-background";
 import { renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { setFaceFont, type FaceFontId } from "../src/ui/face-font";
 import { estimateKeyTextWidth, INK_CLEAR_GAP, inkEdges } from "../src/ui/format";
 import { GLASS_INK_OPACITY, GLASS_OPACITY, glassSurfaces, glassTextPalette, TINT_OPACITY, tintOpen } from "../src/ui/glass";
-import { contrastRatio, luminance, parseTextSettings, pictureText, readableValueColor, resolveTextColors, type TextSettings } from "../src/ui/text-colors";
+import { ACCENT_WORD_BLEND, accentWords, contrastRatio, luminance, mixToward, noDimmerThan, parseTextSettings, pictureText, readableValueColor, resolveTextColors, type TextSettings } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
 import { alertValueColor, loadThemes, resolvePalette } from "../src/ui/themes";
 
@@ -36,23 +36,23 @@ type Look = (typeof LOOKS)[number];
  * non-strings. Every one must draw Theme. */
 const JUNK: unknown[] = ["theme", "", "Glass", "glass ", " glass", "GLASS", "Tint", "tint ", " TINT", "Outline", "outline ", "CLEAR", " clear", "transparent", "glow", "shadow", "frost", "solid", "on", true, 1, 0, null, {}, [], ["glass"]];
 
-function useFont(font: FaceFontId): void {
+function useFont(font: FaceFontId, typeAccents: "on" | "off" = "on"): void {
 	setFaceFont(font);
-	applyGlobalThemeSettings({ theme: "void", typeAccents: "on", textMode: "theme", textFont: font });
+	applyGlobalThemeSettings({ theme: "void", typeAccents, textMode: "theme", textFont: font });
 }
 afterEach(() => useFont("tahoma"));
 
 // --- the 63 color goldens (3 views x 7 themes x Theme/Dim/Custom) ----------
 const goldenKeys = Object.keys(JSON.parse(readFileSync(new URL("./golden/dial-color-baseline.json", import.meta.url), "utf8")) as Record<string, string>);
 type Fixture = ReturnType<typeof dialGalleryFixture>;
-const galleryFixture = (key: string, background?: unknown): Fixture => {
+const galleryFixture = (key: string, background?: unknown, extra: Record<string, unknown> = {}): Fixture => {
 	const [view, theme, textMode] = key.split("/");
 	const fixture = dialGalleryFixture(view === "overview" ? "overview" : "tworow");
-	fixture.state.settings = { ...fixture.state.settings, dialView: view, theme, textMode, textColor: "#123abc", ...(background === undefined ? {} : { dialBackground: background }) } as DialSettings;
+	fixture.state.settings = { ...fixture.state.settings, dialView: view, theme, textMode, textColor: "#123abc", ...(background === undefined ? {} : { dialBackground: background }), ...extra } as DialSettings;
 	return fixture;
 };
-const composeGallery = (key: string, background?: unknown): string => {
-	const f = galleryFixture(key, background);
+const composeGallery = (key: string, background?: unknown, extra?: Record<string, unknown>): string => {
+	const f = galleryFixture(key, background, extra);
 	return composeDialSvg(f.state, { state: "ok", snapshot: f.snapshot, source: "shared-memory" }, f.historyOf);
 };
 
@@ -89,7 +89,7 @@ const SCENARIOS: Scenario[] = (() => {
 })();
 const isStatus = (s: Scenario): boolean => s.id.startsWith("status");
 
-function composeScenario(s: Scenario, theme: string, textMode: "theme" | "dim" | "custom", background?: unknown): string {
+function composeScenario(s: Scenario, theme: string, textMode: "theme" | "dim" | "custom", background?: unknown, extra: Record<string, unknown> = {}): string {
 	const stats = new SessionStatsStore();
 	for (const r of s.readings) for (const v of [...(s.history?.[r.key] ?? [r.valueMin, r.valueMax]), r.value]) stats.sample(r.key, v);
 	const settings: Record<string, unknown> = {
@@ -98,7 +98,8 @@ function composeScenario(s: Scenario, theme: string, textMode: "theme" | "dim" |
 		...(textMode === "custom" ? { textMode, textColor: "#FFD60A" } : { textMode }),
 		...(s.view !== "single" ? { dialView: s.view, rotationKeys: s.readings.map((r) => r.key) } : {}),
 		...(background === undefined ? {} : { dialBackground: background }),
-		...s.settings
+		...s.settings,
+		...extra
 	};
 	const snapshot: SensorSnapshot = { pollTime: 1, version: 2, revision: 0, sensors: [{ index: 0, id: 0x31, instance: 0, name: "Sample sensors" }], readings: s.readings, byKey: new Map(s.readings.map((r) => [r.key, r])) } as SensorSnapshot;
 	const state = { settings, stats, statMode: "current", overlay: null, pinned: false, cyclePaused: false } as unknown as DialRenderState;
@@ -333,6 +334,139 @@ describe("Clear: no background and no edge, one ink", () => {
 	});
 });
 
+describe("Words in the accent color: Glass, Tint and Outline only, word fills only", () => {
+	const ACCENT = { dialAccentWords: true };
+	const ACCENT_LOOKS = ["glass", "tint", "outline"] as const;
+	const JUNK_WORDS: unknown[] = [false, "true", "True", "on", "yes", 1, 0, null, {}, [], [true], "accent"];
+	/** The face with every text and tspan fill removed: what it draws besides
+	 * the colors of its words. */
+	const unfilled = (svg: string): string => svg.replace(/(<(?:text|tspan)\b[^>]*?) fill="#[0-9A-Fa-f]{6}"/g, "$1");
+	/** The fills of the 700-weight runs: every value the face draws. */
+	const valueFills = (svg: string): string[] => [...svg.matchAll(/font-weight="700" fill="(#[0-9A-Fa-f]{6})"/g)].map((m) => m[1] as string);
+
+	/** Every face of one look with the box on, beside the same look's face
+	 * without it: the 63 goldens and the ten scenarios in every theme and
+	 * text mode. */
+	function eachAccentFace(font: FaceFontId, look: Look, typeAccents: "on" | "off", fn: (face: string, plain: string, theme: string, where: string, mode: string, view: string) => void): void {
+		useFont(font, typeAccents);
+		for (const key of goldenKeys) {
+			const [view, theme, mode] = key.split("/") as [string, string, string];
+			fn(composeGallery(key, look, ACCENT), composeGallery(key, look), theme, `${font} ${look} type accents ${typeAccents} ${key}`, mode, view);
+		}
+		for (const theme of THEMES) for (const mode of ["theme", "dim", "custom"] as const) for (const s of SCENARIOS) {
+			fn(composeScenario(s, theme, mode, look, ACCENT), composeScenario(s, theme, mode, look), theme, `${font} ${look} type accents ${typeAccents} ${s.id}/${theme}/${mode}`, mode, isStatus(s) ? "status" : s.view);
+		}
+	}
+
+	it("reads the exact true and nothing else, and only the looks with a panel or an edge take it", () => {
+		assert.equal(dialAccentWordsOf(true), true);
+		for (const raw of [undefined, ...JUNK_WORDS]) assert.equal(dialAccentWordsOf(raw), false, JSON.stringify(raw));
+		assert.deepEqual(
+			LOOKS.filter((look) => dialBackgroundTraits(look).accentWords),
+			[...ACCENT_LOOKS]
+		);
+		assert.equal(dialBackgroundTraits("theme").accentWords, false);
+	});
+
+	for (const font of FONTS) {
+		it(`${font}: every other value on every look, and the exact true on Theme and Clear, draw today's face byte for byte`, () => {
+			useFont(font);
+			let compared = 0;
+			for (const key of goldenKeys) for (const look of [undefined, ...LOOKS]) {
+				const base = composeGallery(key, look);
+				for (const raw of JUNK_WORDS) {
+					assert.equal(composeGallery(key, look, { dialAccentWords: raw }), base, `${key} ${look} ${JSON.stringify(raw)}`);
+					compared++;
+				}
+			}
+			// Theme (absent, or a value dialBackgroundOf does not know) and Clear ignore the box.
+			for (const theme of THEMES) for (const s of SCENARIOS) for (const look of [undefined, "theme", "Glass", "outline ", "clear"]) {
+				for (const mode of ["theme", "dim"] as const) assert.equal(composeScenario(s, theme, mode, look, ACCENT), composeScenario(s, theme, mode, look), `${s.id}/${theme}/${mode} ${JSON.stringify(look)}`);
+				compared++;
+			}
+			assert.equal(compared, goldenKeys.length * (LOOKS.length + 1) * JUNK_WORDS.length + THEMES.length * SCENARIOS.length * 5);
+		});
+
+		it(`${font}: only word fills change; values, alerts, sensor-type colors, reading colors and Custom text keep their bytes`, () => {
+			for (const look of ACCENT_LOOKS) for (const typeAccents of ["on", "off"] as const) {
+				eachAccentFace(font, look, typeAccents, (face, plain, _theme, where, mode) => {
+					assert.equal(unfilled(face), unfilled(plain), `${where}: the same elements, words and paint besides word fills`);
+					assert.deepEqual(valueFills(face), valueFills(plain), `${where}: values`);
+					if (mode === "custom") assert.equal(face, plain, `${where}: Custom text stays exact`);
+					else assert.notEqual(face, plain, `${where}: the words change`);
+				});
+			}
+			// Chosen reading colors stay exact (the three-row gallery's rows 1 and 3).
+			useFont(font);
+			for (const look of ACCENT_LOOKS) {
+				const chosen = { sensorValueColors: true, readingColors: { "31:0:1": "#FF00AA", "31:0:3": "#00AAFF" } };
+				const face = composeGallery("overview/midnight/theme", look, { ...chosen, ...ACCENT });
+				assert.deepEqual(valueFills(face), valueFills(composeGallery("overview/midnight/theme", look, chosen)), look);
+				assert.ok(valueFills(face).includes("#FF00AA") && valueFills(face).includes("#00AAFF"), look);
+			}
+		});
+	}
+
+	it("every word keeps 4.5:1 on its look's guaranteed surface (Glass's hardest panel and band, the Tint and Outline edge), in Theme and Dimmed text, with type accents on and off", () => {
+		for (const font of FONTS) for (const look of ACCENT_LOOKS) for (const typeAccents of ["on", "off"] as const) {
+			eachAccentFace(font, look, typeAccents, (face, _plain, theme, where, mode, view) => {
+				if (mode === "custom") return;
+				const p = config.themes[theme]!;
+				const { surface, band } = glassSurfaces(p);
+				const bandTop = /<rect x="0" y="(4|46)" width="200" height="40" fill="url\(#i\)"\/>/.exec(face)?.[1];
+				for (const { fill, y } of textFills(face)) {
+					const onBand = look === "glass" && view === "tworow" && bandTop !== undefined && y > Number(bandTop) && y <= Number(bandTop) + 40;
+					const here = look === "glass" ? (onBand ? band : surface) : haloRingColor(p);
+					assert.ok(contrastRatio(fill, here) >= 4.5, `${where}: ${fill} on ${here} = ${contrastRatio(fill, here).toFixed(2)}`);
+				}
+			});
+		}
+	});
+
+	it("labels take the accent, units and stats their own color halfway toward it; both lift to the floor and the label never reads dimmer than the unit, for every theme and sensor type accent", () => {
+		let checked = 0;
+		for (const [id, base] of Object.entries(config.themes)) {
+			const accents = [base.accent, ...(config.typeAccentsDisabledOn.includes(id) ? [] : Object.values(config.typeAccents))];
+			for (const accent of accents) for (const look of ACCENT_LOOKS) for (const mode of ["theme", "dim"]) {
+				const palette = { ...base, accent };
+				const settings = parseTextSettings({ textMode: mode }) as TextSettings;
+				const tp = dialTextPalette(look, palette);
+				const { surface, band } = glassSurfaces(palette);
+				const ring = haloRingColor(palette);
+				// The face's own words, and the selected two-row row's on the track (Glass: the band).
+				for (const [on, guaranteed] of [
+					[tp.bg, look === "glass" ? surface : ring],
+					[tp.track, look === "glass" ? band : ring]
+				] as const) {
+					const resolved = resolveTextColors({ ...tp, bg: on }, settings, "normal");
+					const today = dialPictureText(look, resolved, on, settings);
+					const words = dialPictureText(look, resolved, on, settings, true);
+					const where = `${id} ${accent} ${look} ${mode} on ${on}`;
+					const unit = readableValueColor(mixToward(today.unit, resolved.badge, ACCENT_WORD_BLEND), on);
+					assert.deepEqual(words, { ...today, label: noDimmerThan(readableValueColor(resolved.badge, on), unit, on), unit }, where);
+					for (const color of [words.label, words.unit]) assert.ok(contrastRatio(color, guaranteed) >= 4.5, `${where}: ${color} on ${guaranteed}`);
+					assert.ok(contrastRatio(words.label, on) >= contrastRatio(words.unit, on) - 1e-9, `${where}: label no dimmer than unit`);
+					checked++;
+				}
+			}
+		}
+		// Six themes with the theme accent and seven type accents, Paper with its own.
+		assert.equal(checked, (6 * 8 + 1) * 3 * 2 * 2);
+		const custom = parseTextSettings({ textMode: "custom", textColor: "#3366FF", textDimSecondary: true }) as TextSettings;
+		const resolved = resolveTextColors(config.themes.void!, custom, "normal");
+		assert.deepEqual(accentWords(resolved, "#000000", custom), resolved);
+	});
+
+	it("Tint stays Outline plus its panel with the box on", () => {
+		useFont("tahoma");
+		const head = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">';
+		for (const theme of THEMES) for (const mode of ["theme", "dim"] as const) for (const s of SCENARIOS) {
+			const outline = composeScenario(s, theme, mode, "outline", ACCENT);
+			assert.equal(composeScenario(s, theme, mode, "tint", ACCENT), `${head}${tintOpen(config.themes[theme]!)}${outline.slice(head.length)}`, `${s.id}/${theme}/${mode}`);
+		}
+	});
+});
+
 describe("cut, not mask: the see-through looks draw no overflow rect", () => {
 	const palette = resolvePalette(config, "midnight", null, "normal");
 	const row = (label: string, valueText: string, unitText = "°C", selected = false) => ({ label, valueText, unitText, selected, valueColor: palette.value });
@@ -434,11 +568,16 @@ function pinnedFaces(): Record<string, string> {
 			out[`${look}/${font}/${theme}/${id}`] = composeScenario(SCENARIOS.find((s) => s.id === id)!, theme, "theme", look);
 		}
 	}
+	// Words in the accent color: the colors are the change, so one font.
+	useFont("tahoma");
+	for (const theme of ["midnight", "paper"]) for (const look of ["glass", "tint", "outline"] as const) for (const id of PINNED_SCENARIOS) {
+		out[`${look}+accent words/tahoma/${theme}/${id}`] = composeScenario(SCENARIOS.find((s) => s.id === id)!, theme, "theme", look, { dialAccentWords: true });
+	}
 	return out;
 }
 
 describe("golden faces per look", () => {
-	it("draw exactly the pinned SVG (Glass, Tint, Outline and Clear; every view and a status face; Tahoma and Segoe UI; a dark and a light theme)", () => {
+	it("draw exactly the pinned SVG (Glass, Tint, Outline and Clear; every view and a status face; Tahoma and Segoe UI; a dark and a light theme; accent words on the three looks that take them)", () => {
 		const faces = pinnedFaces();
 		if (process.env.HW_UPDATE_GOLDEN === "1" || !existsSync(GOLDEN)) {
 			if (process.env.HW_UPDATE_GOLDEN !== "1") assert.fail("test/golden/dial-backgrounds.json is missing; create it with HW_UPDATE_GOLDEN=1");

@@ -11,7 +11,9 @@
  *   Clear    no background and no edge; every word in one ink.
  *
  * One exact-value reader decides, and anything it does not know draws Theme
- * byte for byte, so a rollback or a hand edit degrades to today's face.
+ * byte for byte, so a rollback or a hand edit degrades to today's face. On
+ * Glass, Tint and Outline, Words in the accent color (dialAccentWords, exact
+ * true only) changes text fills and nothing else.
  *
  * Cost on the app's QtSvg (the issue #41 study, measured): a text element
  * costs one full layout and draw, a masked group one offscreen pass, and a
@@ -26,7 +28,7 @@
  */
 import { svgOpen } from "./key-renderer";
 import { GLASS_INK, glassOpen, glassTextPalette, tintOpen } from "./glass";
-import { luminance, pictureText, resolveTextColors, type TextColors, type TextSettings } from "./text-colors";
+import { accentWords, luminance, pictureText, resolveTextColors, type TextColors, type TextSettings } from "./text-colors";
 import type { Palette } from "./themes";
 
 export type DialBackground = "theme" | "glass" | "tint" | "outline" | "clear";
@@ -36,6 +38,13 @@ export type DialBackground = "theme" | "glass" | "tint" | "outline" | "clear";
  * variant, a retired or newer name and every non-string draw Theme. */
 export function dialBackgroundOf(raw: unknown): DialBackground {
 	return raw === "glass" || raw === "tint" || raw === "outline" || raw === "clear" ? raw : "theme";
+}
+
+/** The one reader of DialSettings.dialAccentWords: only the exact boolean
+ * true counts. Absent, false, "true", 1 and every other value draw today's
+ * words, and a look without the accentWords trait ignores it. */
+export function dialAccentWordsOf(raw: unknown): boolean {
+	return raw === true;
 }
 
 export type DialBackgroundTraits = {
@@ -58,14 +67,19 @@ export type DialBackgroundTraits = {
 	/** Graphics sit on track 1 px wider than themselves: the bar groove, a
 	 * 5 px three-row groove and a backing under the two-row rail. */
 	readonly backings: boolean;
+	/** Words in the accent color (dialAccentWords) apply: a panel or an edge
+	 * gives every recolored word a surface to keep the floor on. Clear has
+	 * neither, and its one ink is the theme's highest-contrast color; Theme
+	 * keeps its face byte for byte. */
+	readonly accentWords: boolean;
 };
 
 const TRAITS: Readonly<Record<DialBackground, DialBackgroundTraits>> = {
-	theme: { ink: false, overflowRects: true, halo: false, band: true, underFill: true, statusBar: true, backings: false },
-	glass: { ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false },
-	tint: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
-	outline: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
-	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true }
+	theme: { ink: false, overflowRects: true, halo: false, band: true, underFill: true, statusBar: true, backings: false, accentWords: false },
+	glass: { ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false, accentWords: true },
+	tint: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false, accentWords: true },
+	outline: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false, accentWords: true },
+	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true, accentWords: false }
 };
 
 export function dialBackgroundTraits(background: DialBackground | undefined): DialBackgroundTraits {
@@ -161,16 +175,17 @@ export function dialTextPalette(background: DialBackground | undefined, palette:
 /** The see-through looks' text rule over resolved colors (see pictureText):
  * Outline and Tint step units 30 % toward the surface, Clear draws one ink.
  * Tint's panel can be as light as the picture under it, so its text reads on
- * the edge, like Outline's. */
-export function dialPictureText(background: DialBackground | undefined, text: TextColors, surface: string, settings: TextSettings): TextColors {
-	if (background === "outline" || background === "tint") return pictureText(text, surface, settings, 0.3);
-	if (background === "clear") return pictureText(text, surface, settings, 0);
-	return text;
+ * the edge, like Outline's. With `accent` (the exact-true dialAccentWords)
+ * Glass, Tint and Outline then draw their words in the accent (accentWords),
+ * lifted on the same surface; Theme and Clear ignore it. */
+export function dialPictureText(background: DialBackground | undefined, text: TextColors, surface: string, settings: TextSettings, accent = false): TextColors {
+	const picture = background === "outline" || background === "tint" ? pictureText(text, surface, settings, 0.3) : background === "clear" ? pictureText(text, surface, settings, 0) : text;
+	return accent && dialBackgroundTraits(background).accentWords ? accentWords(picture, surface, settings) : picture;
 }
 
 /** A face's text colors under a Text setting, for the look it is drawn in.
  * Theme resolves exactly as before. */
-export function dialTextColors(background: DialBackground | undefined, palette: Palette, settings: TextSettings): TextColors {
+export function dialTextColors(background: DialBackground | undefined, palette: Palette, settings: TextSettings, accent = false): TextColors {
 	const textPalette = dialTextPalette(background, palette);
-	return dialPictureText(background, resolveTextColors(textPalette, settings, "normal"), textPalette.bg, settings);
+	return dialPictureText(background, resolveTextColors(textPalette, settings, "normal"), textPalette.bg, settings, accent);
 }

@@ -36,7 +36,7 @@ import { poller, type PollerStatus } from "../poller";
 import { describeGestureState, hashId, trace, traceEnabled } from "../recorder";
 import { activeGroupIndex, autoCycleTarget, groupDisplayName, overviewWindow, rotationGroupsOf, rotationReadings, stepGroup, stepReading, stepSensorSource } from "../rotation";
 import { SessionStatsStore, sessionResetMessage, type SessionStats } from "../stats";
-import { dialBackgroundOf, dialPictureText, dialTextColors, dialTextPalette } from "../ui/dial-background";
+import { dialAccentWordsOf, dialBackgroundOf, dialPictureText, dialTextColors, dialTextPalette } from "../ui/dial-background";
 import { footerFits, renderDial, renderDialOverview, renderDialTwoRow, type OverviewRow } from "../ui/dial-renderer";
 import { dialViewOf, overviewRowColors, rotationKeysOf, stepListOf } from "../ui/dial-overview";
 import { alertLevel, convertUnit, dedupeSharedLabelPrefix, nextStatMode, parseThreshold, STAT_BADGE, thresholdsApplyTo, type DecimalsSetting, type StatMode } from "../ui/format";
@@ -154,6 +154,14 @@ export type DialSettings = {
 	 * dialBackgroundOf.
 	 */
 	dialBackground?: string;
+	/**
+	 * Words in the accent color: on Glass, Tint and Outline the exact true
+	 * draws titles and the selected row's name in the dial's accent, and
+	 * units, stats and other row names tinted toward it (accentWords);
+	 * anything else, and every other look, keeps today's words byte for byte.
+	 * Read only through dialAccentWordsOf.
+	 */
+	dialAccentWords?: boolean;
 };
 
 export type InstanceState = {
@@ -1058,7 +1066,8 @@ export function composeDialSvg(state: DialRenderState, status: PollerStatus, his
 	// dial's background look (issue #41) decides the surface text resolves
 	// on; the renderers still draw with the theme's real palette.
 	const background = dialBackgroundOf(settings.dialBackground);
-	const textOf = (palette: Parameters<typeof resolveTextColors>[0]): TextColors => dialTextColors(background, palette, effectiveTextFor(settings));
+	const accentWords = dialAccentWordsOf(settings.dialAccentWords);
+	const textOf = (palette: Parameters<typeof resolveTextColors>[0]): TextColors => dialTextColors(background, palette, effectiveTextFor(settings), accentWords);
 
 	const problem = statusDialText(status);
 	if (problem !== null) {
@@ -1226,17 +1235,19 @@ function composeOverviewSvg(state: DialRenderState, snapshot: SensorSnapshot, re
 	// The background look (issue #41): Glass resolves every row on its
 	// hardest panel and band, so alert, sensor-type and Dim numbers keep
 	// their floor over any picture; Outline and Clear recolor labels and
-	// units on each row's own surface. Theme resolves exactly as before.
+	// units on each row's own surface, and so do accent words. Theme resolves
+	// exactly as before.
 	const background = dialBackgroundOf(settings.dialBackground);
+	const accentWords = dialAccentWordsOf(settings.dialAccentWords);
 	const textPalette = dialTextPalette(background, palette);
-	const text = dialPictureText(background, resolveTextColors(textPalette, textSettings, "normal"), textPalette.bg, textSettings);
+	const text = dialPictureText(background, resolveTextColors(textPalette, textSettings, "normal"), textPalette.bg, textSettings, accentWords);
 	const overviewRows: (OverviewRow & { history?: readonly number[] })[] = rows.map((member, index) => {
 		const selected = index === selectedIndex;
 		const nativeShown = rowStatValue(member.value, state.stats.get(member.key), state.statMode);
 		const shown = formatMeasurement(nativeShown, member.unit, measureOpts);
 		const colors = overviewRowColors({ settings, reading: member, shownValue: nativeShown, selected, rowCount,
 			palette: textPalette, config, themeId, typeAccents: typeAccentsEnabled(), textSettings });
-		const rowText = dialPictureText(background, colors.text, colors.background, textSettings);
+		const rowText = dialPictureText(background, colors.text, colors.background, textSettings, accentWords);
 		return {
 			label: deduped.labels[index] ?? member.label,
 			valueText: shown.valueText,

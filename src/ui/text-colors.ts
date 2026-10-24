@@ -201,6 +201,28 @@ export function pictureText(text: TextColors, surface: string, settings: TextSet
 	return { ...text, label: text.value, unit };
 }
 
+/** How far units and stats move from their own color toward the accent when
+ * a dial draws its words in the accent (accentWords). */
+export const ACCENT_WORD_BLEND = 0.5;
+
+/**
+ * A dial's words in its accent color (the Words in the accent color box, on
+ * the see-through looks with an edge or a panel). Labels take the accent the
+ * face's bar and rail draw in (text.badge: the theme's or the reading type's
+ * accent, stepped like the rest of the text under Dim). Units and stats take
+ * their own color moved halfway toward it, so every word carries the hue
+ * without a unit dropping to a darker step of the accent. Both lift to the
+ * numeric floor on `surface`, and the label then lifts to at least the
+ * unit's ratio (noDimmerThan): the label over unit step marks the selected
+ * overview row. Custom text stays exactly as chosen; values, alert, type and
+ * per-reading colors are not touched here.
+ */
+export function accentWords(text: TextColors, surface: string, settings: TextSettings): TextColors {
+	if (appliedTextMode(settings) === "custom") return text;
+	const unit = readableValueColor(mixToward(text.unit, text.badge, ACCENT_WORD_BLEND), surface);
+	return { ...text, label: noDimmerThan(readableValueColor(text.badge, surface), unit, surface), unit };
+}
+
 /**
  * Resolves the final textual fills. Alert faces always return the (alert)
  * palette's numeric tokens: warn/critical presentation outranks text modes.

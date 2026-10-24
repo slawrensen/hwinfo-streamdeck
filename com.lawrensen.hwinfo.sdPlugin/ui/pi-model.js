@@ -60,7 +60,7 @@ self.hwModel = (() => {
 	 * else draws Theme. */
 	function dialBackground(settings) {
 		const v = settings.dialBackground;
-		return v === "glass" || v === "outline" || v === "clear" ? v : "theme";
+		return v === "glass" || v === "tint" || v === "outline" || v === "clear" ? v : "theme";
 	}
 
 	function pressBehavior(settings) {

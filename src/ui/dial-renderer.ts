@@ -9,7 +9,7 @@
  * inline unit 17/600 · stats 12/600 x12 y78 · bar x12 y84 176×6 r3.
  *
  * Each renderer takes the dial's Background (issue #41, dial-background.ts):
- * Theme draws exactly the faces above; Glass, Outline and Clear place the
+ * Theme draws exactly the faces above; Glass, Tint, Outline and Clear place the
  * same words in the same places (cut where a Theme face would hide a run
  * under a background-colored rect) and change only what sits behind them.
  */

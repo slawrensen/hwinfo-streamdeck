@@ -1,7 +1,7 @@
 /**
  * Issue #41: a Sensor Dial's Background. Theme (absent, and every value but
- * the three exact strings) draws today's face byte for byte. Glass, Outline
- * and Clear let the touch strip picture set in the Stream Deck app show
+ * the four exact strings) draws today's face byte for byte. Glass, Tint,
+ * Outline and Clear let the touch strip picture set in the Stream Deck app show
  * behind the dial, each with its own contract, and none draws a mask or a
  * copy of a word (the cost that made the first outline expensive). Golden
  * faces (test/golden/dial-backgrounds.json) pin what each look draws; to
@@ -21,7 +21,7 @@ import { dialBackgroundOf, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, type 
 import { renderDialOverview, renderDialTwoRow } from "../src/ui/dial-renderer";
 import { setFaceFont, type FaceFontId } from "../src/ui/face-font";
 import { estimateKeyTextWidth, INK_CLEAR_GAP, inkEdges } from "../src/ui/format";
-import { GLASS_INK_OPACITY, GLASS_OPACITY, glassSurfaces, glassTextPalette } from "../src/ui/glass";
+import { GLASS_INK_OPACITY, GLASS_OPACITY, glassSurfaces, glassTextPalette, TINT_OPACITY, tintOpen } from "../src/ui/glass";
 import { contrastRatio, luminance, parseTextSettings, pictureText, readableValueColor, resolveTextColors, type TextSettings } from "../src/ui/text-colors";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
 import { alertValueColor, loadThemes, resolvePalette } from "../src/ui/themes";
@@ -29,12 +29,12 @@ import { alertValueColor, loadThemes, resolvePalette } from "../src/ui/themes";
 const config = loadThemes();
 const FONTS: FaceFontId[] = ["tahoma", "segoe-ui"];
 const THEMES = ["void", "graphite", "ultraviolet", "midnight", "forest", "ember", "paper"];
-const LOOKS = ["glass", "outline", "clear"] as const;
+const LOOKS = ["glass", "tint", "outline", "clear"] as const;
 type Look = (typeof LOOKS)[number];
-/** Values a stored document can hold that are not one of the three looks:
+/** Values a stored document can hold that are not one of the four looks:
  * case and space variants, the names of the looks the study left out, and
  * non-strings. Every one must draw Theme. */
-const JUNK: unknown[] = ["theme", "", "Glass", "glass ", " glass", "GLASS", "Outline", "outline ", "CLEAR", " clear", "transparent", "glow", "shadow", "frost", "solid", "on", true, 1, 0, null, {}, [], ["glass"]];
+const JUNK: unknown[] = ["theme", "", "Glass", "glass ", " glass", "GLASS", "Tint", "tint ", " TINT", "Outline", "outline ", "CLEAR", " clear", "transparent", "glow", "shadow", "frost", "solid", "on", true, 1, 0, null, {}, [], ["glass"]];
 
 function useFont(font: FaceFontId): void {
 	setFaceFont(font);
@@ -130,7 +130,7 @@ const textFills = (svg: string): { fill: string; y: number; size: number }[] =>
 	});
 
 describe("the stored Background: one exact-value reader", () => {
-	it("reads the three looks and nothing else", () => {
+	it("reads the four looks and nothing else", () => {
 		for (const look of LOOKS) assert.equal(dialBackgroundOf(look), look);
 		for (const raw of [undefined, ...JUNK]) assert.equal(dialBackgroundOf(raw), "theme", JSON.stringify(raw));
 	});
@@ -265,6 +265,32 @@ describe("Outline: no background, a 1 px edge from one filter pass", () => {
 				}
 			});
 		}
+	});
+});
+
+describe("Tint: Outline's edge over the theme background at 50 %", () => {
+	for (const font of FONTS) {
+		it(`${font}: exactly the Outline face for the same inputs, with one flat panel under everything`, () => {
+			const outline = new Map<string, string>();
+			eachFace(font, "outline", (face, _theme, where) => outline.set(where.replace(" outline ", " "), face));
+			let compared = 0;
+			eachFace(font, "tint", (face, theme, where) => {
+				const p = config.themes[theme]!;
+				const panel = `<defs><linearGradient id="t" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"><stop offset="0" stop-color="${p.bg}" stop-opacity="${TINT_OPACITY}"/><stop offset="1" stop-color="${p.bg}" stop-opacity="${TINT_OPACITY}"/></linearGradient></defs><rect width="200" height="100" fill="url(#t)"/>`;
+				assert.equal(tintOpen(p), panel, `${where}: the panel`);
+				const head = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">';
+				const twin = outline.get(where.replace(" tint ", " "));
+				assert.ok(twin !== undefined && twin.startsWith(head), `${where}: an Outline twin`);
+				assert.equal(face, `${head}${panel}${twin.slice(head.length)}`, `${where}: Outline plus the panel`);
+				compared++;
+			});
+			assert.equal(compared, outline.size);
+		});
+	}
+
+	it("keeps Glass's panel form at a lower opacity", () => {
+		assert.ok(TINT_OPACITY < GLASS_OPACITY);
+		assert.equal(TINT_OPACITY, 0.5);
 	});
 });
 
@@ -412,7 +438,7 @@ function pinnedFaces(): Record<string, string> {
 }
 
 describe("golden faces per look", () => {
-	it("draw exactly the pinned SVG (Glass, Outline and Clear; every view and a status face; Tahoma and Segoe UI; a dark and a light theme)", () => {
+	it("draw exactly the pinned SVG (Glass, Tint, Outline and Clear; every view and a status face; Tahoma and Segoe UI; a dark and a light theme)", () => {
 		const faces = pinnedFaces();
 		if (process.env.HW_UPDATE_GOLDEN === "1" || !existsSync(GOLDEN)) {
 			if (process.env.HW_UPDATE_GOLDEN !== "1") assert.fail("test/golden/dial-backgrounds.json is missing; create it with HW_UPDATE_GOLDEN=1");

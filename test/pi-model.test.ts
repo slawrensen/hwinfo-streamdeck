@@ -105,11 +105,11 @@ describe("display summary", () => {
 		assert.match(model.displaySummary("dial", { dialView: "tworow" }, {}, null), /^Overview, two rows · auto decimals/);
 	});
 	it("names a dial's background look for the exact stored values only, as the plugin reads them", () => {
-		for (const look of ["glass", "outline", "clear"]) {
+		for (const look of ["glass", "tint", "outline", "clear"]) {
 			assert.equal(model.displaySummary("dial", { dialBackground: look }, {}, null), `One reading · auto decimals · shared text · ${look}`);
 			assert.equal(model.displaySummary("key", { dialBackground: look }, {}, null), "Current value · auto decimals · shared text");
 		}
-		for (const raw of [undefined, "theme", "", "Glass", "glass ", " outline", "CLEAR", "transparent", "glow", "shadow", "frost", true, 1, null, {}, ["clear"]]) {
+		for (const raw of [undefined, "theme", "", "Glass", "glass ", "Tint", " tint", " outline", "CLEAR", "transparent", "glow", "shadow", "frost", true, 1, null, {}, ["clear"]]) {
 			assert.equal(model.displaySummary("dial", { dialBackground: raw }, {}, null), "One reading · auto decimals · shared text", JSON.stringify(raw));
 		}
 		assert.equal(model.displaySummary("dial", { dialView: "overview", fahrenheit: true, dialBackground: "outline" }, {}, null), "Overview, three rows · auto decimals · shared text · °F · outline");

@@ -147,7 +147,7 @@ export type DialSettings = {
 	overviewSeparators?: string;
 	/**
 	 * What the dial draws behind its readout (issue #41): the exact "glass",
-	 * "outline" or "clear" lets the touch strip picture set in the Stream
+	 * "tint", "outline" or "clear" lets the touch strip picture set in the Stream
 	 * Deck app show behind the dial; anything else (absent, "theme", junk, a
 	 * newer version's value) keeps today's face byte for byte, so a rollback
 	 * or a hand edit degrades to the theme background. Read only through

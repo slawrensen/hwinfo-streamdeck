@@ -5,6 +5,7 @@
  * the Stream Deck app show behind the dial:
  *
  *   Glass    the theme background as a panel at 80 % (glass.ts);
+ *   Tint     the theme background as a panel at 50 %, under Outline's edge;
  *   Outline  no background; one filter pass grows every word and mark by a
  *            1 px edge, black on the dark themes, the background on Paper;
  *   Clear    no background and no edge; every word in one ink.
@@ -24,17 +25,17 @@
  * is.
  */
 import { svgOpen } from "./key-renderer";
-import { GLASS_INK, glassOpen, glassTextPalette } from "./glass";
+import { GLASS_INK, glassOpen, glassTextPalette, tintOpen } from "./glass";
 import { luminance, pictureText, resolveTextColors, type TextColors, type TextSettings } from "./text-colors";
 import type { Palette } from "./themes";
 
-export type DialBackground = "theme" | "glass" | "outline" | "clear";
+export type DialBackground = "theme" | "glass" | "tint" | "outline" | "clear";
 
 /** The one reader of DialSettings.dialBackground. Settings are untyped JSON:
  * only the exact stored strings count; absent, "theme", a case or space
  * variant, a retired or newer name and every non-string draw Theme. */
 export function dialBackgroundOf(raw: unknown): DialBackground {
-	return raw === "glass" || raw === "outline" || raw === "clear" ? raw : "theme";
+	return raw === "glass" || raw === "tint" || raw === "outline" || raw === "clear" ? raw : "theme";
 }
 
 export type DialBackgroundTraits = {
@@ -62,6 +63,7 @@ export type DialBackgroundTraits = {
 const TRAITS: Readonly<Record<DialBackground, DialBackgroundTraits>> = {
 	theme: { ink: false, overflowRects: true, halo: false, band: true, underFill: true, statusBar: true, backings: false },
 	glass: { ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false },
+	tint: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
 	outline: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false },
 	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true }
 };
@@ -134,6 +136,8 @@ export function dialFaceOpen(background: DialBackground | undefined, palette: Pa
 	switch (background ?? "theme") {
 		case "glass":
 			return [head, glassOpen(palette)];
+		case "tint":
+			return [head, tintOpen(palette), haloFilterDefs(haloRingColor(palette), haloTop, haloHeight)];
 		case "outline":
 			return [head, haloFilterDefs(haloRingColor(palette), haloTop, haloHeight)];
 		case "clear":
@@ -155,9 +159,11 @@ export function dialTextPalette(background: DialBackground | undefined, palette:
 }
 
 /** The see-through looks' text rule over resolved colors (see pictureText):
- * Outline steps units 30 % toward the surface, Clear draws one ink. */
+ * Outline and Tint step units 30 % toward the surface, Clear draws one ink.
+ * Tint's panel can be as light as the picture under it, so its text reads on
+ * the edge, like Outline's. */
 export function dialPictureText(background: DialBackground | undefined, text: TextColors, surface: string, settings: TextSettings): TextColors {
-	if (background === "outline") return pictureText(text, surface, settings, 0.3);
+	if (background === "outline" || background === "tint") return pictureText(text, surface, settings, 0.3);
 	if (background === "clear") return pictureText(text, surface, settings, 0);
 	return text;
 }

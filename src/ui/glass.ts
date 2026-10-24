@@ -102,3 +102,15 @@ export function glassOpen(palette: Palette): string {
 
 /** Fill attribute for structure an opaque face draws in the track token. */
 export const GLASS_INK = 'fill="url(#i)"';
+
+/** Tint's panel: the theme background at 50 %, the picture at 50 %. Too
+ * light for text to resolve on the hardest panel the way Glass's does (below
+ * about 0.67 Graphite's light text would turn dark), so a Tint face keeps
+ * the theme's text and draws Outline's edge over the panel instead. */
+export const TINT_OPACITY = 0.5;
+
+/** What replaces the opaque background rect on a Tint face: one flat paint
+ * over the whole slot, the same form as Glass's panel. */
+export function tintOpen(palette: Palette): string {
+	return `<defs>${flatPaint("t", palette.bg, TINT_OPACITY)}</defs><rect width="200" height="100" fill="url(#t)"/>`;
+}

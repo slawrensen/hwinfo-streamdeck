@@ -4,7 +4,7 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
-## 1.7.1.0 - Unreleased
+## 1.7.1.0 - 2026-10-24
 
 A Background setting for Sensor Dials, so the touch strip picture can show
 behind them, and a fix for custom detail lists.
@@ -21,6 +21,11 @@ behind them, and a fix for custom detail lists.
   mark a 1 px outline, black on the dark themes and the theme's
   background on Paper. **Clear** draws no background and no outline.
   Keys are unchanged.
+- On Glass, Tint and Outline, **Words in the accent color** draws the
+  dial's title and the selected row's name in the dial's accent color,
+  and units, statistics and other names halfway to it, each kept at the
+  4.5:1 floor on that look (a calculation). Values, alert colors and a
+  Custom text color do not change. Off by default.
 - In the Stream Deck app's SVG renderer (QtSvg 6.9.3, on my PC), an
   Outline face takes 1.5 to 3 times as long to draw as a Theme face, a
   Glass face up to 1.2 times, and a Clear face slightly less than Theme.

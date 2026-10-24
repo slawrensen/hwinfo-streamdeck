@@ -77,6 +77,98 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 	});
 }
 
+for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 1440 }]) {
+	test(`wide articles give media room while keeping prose readable at ${viewport.width}×${viewport.height}`, options, async t => {
+		const page = await pageFor(t);
+		await page.goto(siteUrl("sensor-dial.html#transparent-background"));
+		const laptopWidth = await page.locator(".main-content").evaluate(element => element.getBoundingClientRect().width);
+		await page.setViewportSize(viewport);
+		const media = page.locator('.main-content img[src$="/dial-backgrounds-deck.jpg"]');
+		await media.scrollIntoViewIfNeeded();
+		await media.evaluate(image => image.decode());
+		const dimensions = await page.locator(".main-content").evaluate(content => {
+			const prose = [...content.querySelectorAll(":scope > p")].find(p => p.textContent.length > 80 && !p.querySelector("img, picture"));
+			const style = window.getComputedStyle(prose);
+			const context = document.createElement("canvas").getContext("2d");
+			context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+			return {
+				content: content.getBoundingClientRect().width,
+				prose: prose.getBoundingClientRect().width,
+				character: context.measureText("0").width,
+				font: Number.parseFloat(style.fontSize),
+				pageOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
+			};
+		});
+		const image = await media.evaluate(element => {
+			const box = element.getBoundingClientRect();
+			return { width: box.width, height: box.height, ratio: element.naturalWidth / element.naturalHeight };
+		});
+		assert.ok(dimensions.content > laptopWidth * 1.2, "the article uses substantially more room than the laptop layout");
+		assert.ok(image.width > dimensions.prose * 1.3, "the complete deck capture must not be trapped in the prose column");
+		assert.ok(dimensions.font >= 16 && dimensions.prose <= dimensions.character * 80 + 1, "body copy stays at a readable size and line length");
+		assert.ok(Math.abs(image.width / image.height - image.ratio) < 0.01, "the authentic deck image keeps its aspect ratio");
+		assert.equal(dimensions.pageOverflow, false, "the expanded article must not create horizontal page scrolling");
+	});
+}
+
+for (const viewport of [{ width: 360, height: 800 }, { width: 390, height: 844 }, { width: 768, height: 1024 }]) {
+	test(`all seven themes are readable without horizontal gallery panning at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl("themes.html#the-seven-presets"));
+		const gallery = page.locator(".theme-gallery");
+		const samples = gallery.locator(".theme-sample");
+		assert.equal(await samples.count(), 7);
+		assert.deepEqual(await samples.locator("figcaption strong").allTextContents(), ["Void", "Graphite", "Ultraviolet", "Midnight", "Forest", "Ember", "Paper"]);
+		const rows = new Set();
+		for (let i = 0; i < 7; i++) {
+			const image = samples.nth(i).locator("img");
+			await image.scrollIntoViewIfNeeded();
+			await image.evaluate(element => element.decode());
+			const dimensions = await image.evaluate(element => {
+				const box = element.getBoundingClientRect();
+				const parent = element.closest(".theme-gallery").getBoundingClientRect();
+				return { left: box.left, right: box.right, width: box.width, height: box.height, top: box.top - parent.top, ratio: element.naturalWidth / element.naturalHeight, viewport: window.innerWidth, alt: element.alt };
+			});
+			assert.ok(dimensions.width >= 120 && dimensions.height >= 120, `theme ${i + 1} remains a readable sample`);
+			assert.ok(dimensions.left >= 0 && dimensions.right <= dimensions.viewport, `theme ${i + 1} is reachable by ordinary vertical scrolling`);
+			assert.ok(Math.abs(dimensions.width / dimensions.height - dimensions.ratio) < 0.01, `theme ${i + 1} keeps its complete image geometry`);
+			assert.ok(dimensions.alt.length > 15, `theme ${i + 1} has a useful text alternative`);
+			rows.add(Math.round(dimensions.top));
+		}
+		assert.ok(rows.size > 1, "the samples wrap into rows at phone and tablet widths");
+		assert.equal(await gallery.evaluate(element => element.scrollWidth <= element.clientWidth + 1), true, "comparing presets must not require horizontal gallery scrolling");
+		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+		const fullComparison = page.getByRole("link", { name: "Open the full comparison for layouts and alert states." });
+		assertWithinSite(await fullComparison.getAttribute("href"));
+		await fullComparison.focus();
+		await page.keyboard.press("Enter");
+		const dialog = page.locator("dialog.image-viewer");
+		await dialog.waitFor({ state: "visible" });
+		assert.match(await dialog.locator("img").getAttribute("src"), /themes-contact-sheet\.png$/);
+		await page.keyboard.press("Escape");
+		await dialog.waitFor({ state: "hidden" });
+		assert.equal(await fullComparison.evaluate(element => element === document.activeElement), true, "closing the complete comparison restores its keyboard opener");
+	});
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+	test(`the repository logo and native home link work without JavaScript at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport, javaScriptEnabled: false });
+		await page.goto(siteUrl("installation.html"));
+		const home = page.locator(".site-title");
+		const logo = home.locator("img");
+		assert.equal(await logo.count(), 1, "the project logo is a real image inside the home link");
+		const image = await logo.evaluate(element => ({ complete: element.complete, width: element.naturalWidth, height: element.naturalHeight, src: element.currentSrc }));
+		assert.ok(image.complete && image.width >= 32 && image.height >= 32, "the native logo asset loads at a useful density");
+		assertWithinSite(image.src);
+		assert.equal(new URL(await home.getAttribute("href"), base).href, siteUrl());
+		await home.focus();
+		await page.keyboard.press("Enter");
+		await page.waitForURL(siteUrl());
+		assert.match(await page.locator("h1").innerText(), /HWiNFO Sensors/);
+	});
+}
+
 test("image viewer contains Shift+Tab from Actual size and restores its opener", options, async t => {
 	const page = await pageFor(t);
 	await page.goto(siteUrl());

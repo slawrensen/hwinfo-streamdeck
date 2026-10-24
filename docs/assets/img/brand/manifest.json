@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "recommendedMark": "Existing CPU62\u00b0C tile with cyan sparkline, the plugin and Marketplace app icon.",
+  "source": "com.lawrensen.hwinfo.sdPlugin/imgs/plugin/marketplace@2x.png",
+  "sourceSha256": "feaa2c2fbd7d119347a4b542f096562a3645a2b79b5dfdb0fd0d366eb64de587",
+  "sourceGitBlob": "c730a058f230e76b4c304ca6eb2152d501699a27",
+  "sourceRelease": "v1.7.1",
+  "sourceCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "provenance": [
+    {
+      "file": "com.lawrensen.hwinfo.sdPlugin/imgs/plugin/marketplace@2x.png",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "c730a058f230e76b4c304ca6eb2152d501699a27",
+      "matchesReleasedBlob": true,
+      "sha256": "feaa2c2fbd7d119347a4b542f096562a3645a2b79b5dfdb0fd0d366eb64de587"
+    },
+    {
+      "file": "com.lawrensen.hwinfo.sdPlugin/imgs/plugin/marketplace.png",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "2544137a5314ac457c376dc4808a5f2ba96ace93",
+      "matchesReleasedBlob": true,
+      "sha256": "68884f9fa59d085ba1c69d833d96b936af7ea037de1d742910b005751f80fb9d"
+    },
+    {
+      "file": "com.lawrensen.hwinfo.sdPlugin/imgs/plugin/category-icon.svg",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "20791ddfa655c7eccf2e6b5650a312954f981845",
+      "matchesReleasedBlob": true,
+      "sha256": "4c507076800ce953bae9fabab95a7981f3e0d0dae36b9d2e0f759059cdee6c03"
+    },
+    {
+      "file": "marketing/app-icon-288.png",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "915c6aea2b8bd199e67b99e161fc6a8a6754ebaa",
+      "matchesReleasedBlob": true,
+      "sha256": "6a280968596c3bed47e556036b76e51c3acf8a4a3d62b884fdc1cfe67cf579f0"
+    },
+    {
+      "file": "assets/marketplace.svg",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "10d8daf6e55f486af5a95730554b9cffcd49a92b",
+      "matchesReleasedBlob": true,
+      "sha256": "4c78868f306502d6ccd2ac62222f6b348b207da58034fedeed1f6b509d04866b"
+    },
+    {
+      "file": "scripts/gen-icons.mjs",
+      "releaseTag": "v1.7.1",
+      "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+      "gitBlob": "8403f23bd66b5589866d39efb66190790c5479a3",
+      "matchesReleasedBlob": true,
+      "sha256": "5dc8b4c6a157975915fa42d0cdcac8cd695339b62eaf88b6e5796bdc086f2c3e"
+    }
+  ],
+  "recommendedUse": {
+    "desktopHeader": {
+      "src": "hwinfo-logo-32.png",
+      "srcset": "hwinfo-logo-32.png 1x, hwinfo-logo-64.png 2x",
+      "cssWidth": 32,
+      "cssHeight": 32
+    },
+    "phoneHeader": {
+      "src": "hwinfo-logo-32.png",
+      "srcset": "hwinfo-logo-32.png 1x, hwinfo-logo-64.png 2x",
+      "cssWidth": 28,
+      "cssHeight": 28
+    },
+    "favicon": [
+      "favicon.ico",
+      "hwinfo-logo-32.png",
+      "hwinfo-logo-16.png"
+    ],
+    "appleTouchIcon": "hwinfo-logo-180.png"
+  },
+  "notes": [
+    "The released manifest selects imgs/plugin/marketplace as Icon and category-icon as CategoryIcon.",
+    "The category icon is authentic but is a different context-specific glyph; retain the Marketplace tile consistently in the docs and comparison Site brand.",
+    "The supplied SVG marketplace source contains font references; prefer released raster derivatives so browser font substitution cannot change the mark.",
+    "No new brand geometry, recoloring, typography, readings or decorative effects were created.",
+    "Use empty alt for the image when adjacent text in the same home link already says HWiNFO Sensors.",
+    "Do not apply CSS filters or another border to the existing tile. Its dark rim and corner shape are part of the authentic source."
+  ],
+  "assets": [
+    {
+      "src": "hwinfo-logo-16.png",
+      "width": 16,
+      "height": 16,
+      "bytes": 631,
+      "sha256": "f7ce3d7d0a53e1d4937ff5fa7fcda84715eca94f1997898f5c48546f8847fdba",
+      "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "hwinfo-logo-32.png",
+      "width": 32,
+      "height": 32,
+      "bytes": 1495,
+      "sha256": "f6d9d82e3fa53bb2221d80ba57881994013f98e5cf93097f5c77da28e8af9f79",
+      "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "hwinfo-logo-64.png",
+      "width": 64,
+      "height": 64,
+      "bytes": 3681,
+      "sha256": "732e5d26e7ff23f1f37867cb54871eff57017190a89f6a6526da1bb2bf6c2ce0",
+      "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "hwinfo-logo-180.png",
+      "width": 180,
+      "height": 180,
+      "bytes": 13301,
+      "sha256": "ceb914513bfdf99b4d652787f74f0f2e6fd08f40e5e32a70957b55fdc6ab436b",
+      "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "favicon.ico",
+      "sizes": [
+        [
+          16,
+          16
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          48,
+          48
+        ]
+      ],
+      "bytes": 4728,
+      "sha256": "cb844380128634fe80852ae08e164be893a59f59a42be24ae70355be29071e57",
+      "transformation": "ICO wrapper containing the unchanged16/32/48px derivative PNG bytes."
+    }
+  ]
+}

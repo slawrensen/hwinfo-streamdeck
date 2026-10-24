@@ -10,21 +10,17 @@ For a see-through touch strip, use **Display → Background** on a dial. [Transp
 
 ## The seven presets
 
-| Preset | Background and accent |
-| --- | --- |
-| **Void** | Black, with white values. The default for new installs. |
-| **Graphite** | Dark slate (`#1A1C22`). Retained by installs configured before themes were added. |
-| **Ultraviolet** | Dark violet with a lavender accent. |
-| **Midnight** | Dark blue with a light blue accent. |
-| **Forest** | Dark green with a green accent. |
-| **Ember** | Black with amber text and accents. |
-| **Paper** | Light (`#E9E6DE`) with dark text. |
+<ul class="theme-gallery" aria-label="Seven theme samples">
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/void.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Void sample key with white temperature text on black."><figcaption><strong>Void</strong>Black with white values. Default for new installs.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/graphite.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Graphite sample key on a dark slate background."><figcaption><strong>Graphite</strong>Dark slate (<code>#1A1C22</code>). Retained by installs configured before themes.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/ultraviolet.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Ultraviolet sample key with a lavender accent on dark violet."><figcaption><strong>Ultraviolet</strong>Dark violet with a lavender accent.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/midnight.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Midnight sample key with a light blue accent on dark blue."><figcaption><strong>Midnight</strong>Dark blue with a light blue accent.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/forest.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Forest sample key with a green accent on dark green."><figcaption><strong>Forest</strong>Dark green with a green accent.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/ember.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Ember sample key with amber text and accents on black."><figcaption><strong>Ember</strong>Black with amber text and accents.</figcaption></figure></li>
+	<li class="theme-sample"><figure><img src="{{ '/assets/img/showcase/theme-tiles/paper.webp' | relative_url }}" width="144" height="144" loading="lazy" decoding="async" alt="Paper sample key with dark text on a light background."><figcaption><strong>Paper</strong>Light (<code>#E9E6DE</code>) with dark text.</figcaption></figure></li>
+</ul>
 
-<div class="image-strip" role="region" tabindex="0" aria-label="Seven theme samples, scroll horizontally to compare">
-  <a class="image-link" data-image-viewer href="{{ '/assets/img/themes-contact-sheet.png' | relative_url }}" aria-label="Open the full theme comparison"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/themes-key-strip.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/themes-key-strip.png' | relative_url }}" width="1072" height="168" loading="lazy" decoding="async" alt="Sample keys in Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper, rendered by the plugin."></picture></a>
-</div>
-
-*Scroll to compare the seven presets at a readable size. Open the full comparison for layouts and alert states. Sample renderings.*
+<p class="theme-caption">Sample renderings from the plugin. <a data-image-viewer data-image-caption="Seven theme presets, layouts and alert states. Sample renderings from the plugin." href="{{ '/assets/img/themes-contact-sheet.png' | relative_url }}">Open the full comparison for layouts and alert states.</a></p>
 
 The layout stays consistent when you change themes. [Individual dial colors](sensor-dial.md#reading-colors) can distinguish readings within the same theme.
 

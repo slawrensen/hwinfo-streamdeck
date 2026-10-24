@@ -1,0 +1,30 @@
+✔ home identity, download and platform requirement fit 1280×800 (521.917847ms)
+✔ home identity, download and platform requirement fit 390×844 (338.056813ms)
+✔ wide articles give media room while keeping prose readable at 1920×1080 (477.601851ms)
+✔ wide articles give media room while keeping prose readable at 3440×1440 (420.991076ms)
+✔ all seven themes are readable without horizontal gallery panning at 360px (764.904792ms)
+✔ all seven themes are readable without horizontal gallery panning at 390px (618.457836ms)
+✔ all seven themes are readable without horizontal gallery panning at 768px (673.171744ms)
+✔ the repository logo and native home link work without JavaScript at 1280px (286.115041ms)
+✔ the repository logo and native home link work without JavaScript at 390px (292.891133ms)
+✔ image viewer contains Shift+Tab from Actual size and restores its opener (702.038212ms)
+✔ an open image viewer blocks background navigation (334.091273ms)
+✔ search 'transparent background' reaches a relevant setting or repair (499.100842ms)
+✔ search '12 hours' reaches a relevant setting or repair (510.617679ms)
+✔ search 'Age unknown' reaches a relevant setting or repair (496.970708ms)
+✔ search 'sensor missing' reaches a relevant setting or repair (540.625176ms)
+✔ search replays early input after the index loads and refreshes pasted queries (318.63298ms)
+✔ keyboard search shortcut and Enter reach the concrete status fix (1074.897618ms)
+✔ phone navigation and search remain operable (623.28436ms)
+✔ phone navigation is collapsed before the deferred enhancements load (337.77022ms)
+✔ deep links reveal disclosures on direct entry, reload and history navigation (1005.716319ms)
+✔ routes, search index and principal assets resolve below the selected base path (498.288804ms)
+✔ essential content and navigation work without JavaScript (291.754996ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12065.181333

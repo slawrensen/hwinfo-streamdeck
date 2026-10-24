@@ -1,0 +1,2361 @@
+{
+  "scope": "Independent targeted local Jekyll review of the fluid revision, not the new Codex Sites wrapper",
+  "capturedAt": "2026-10-24T22:36:15.692Z",
+  "normal": [
+    {
+      "route": "themes.html",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/themes.html",
+      "innerWidth": 3440,
+      "innerHeight": 1440,
+      "outerWidth": 3440,
+      "outerHeight": 1440,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 3425,
+      "clientWidth": 3440,
+      "overflow": false,
+      "main": {
+        "x": 316,
+        "y": 200.55,
+        "width": 2781,
+        "height": 4848.94,
+        "top": 200.55,
+        "bottom": 5049.48
+      },
+      "prose": {
+        "x": 316,
+        "y": 200.55,
+        "width": 676.28,
+        "height": 55.03,
+        "top": 200.55,
+        "bottom": 255.58
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 252,
+        "height": 1440,
+        "top": 0,
+        "bottom": 1440
+      },
+      "toc": {
+        "x": 3153,
+        "y": 200.55,
+        "width": 208,
+        "height": 243.58,
+        "top": 200.55,
+        "bottom": 444.13
+      },
+      "gallery": {
+        "rect": {
+          "x": 316,
+          "y": 441.86,
+          "width": 1400,
+          "height": 234,
+          "top": 441.86,
+          "bottom": 675.86
+        },
+        "scrollWidth": 1400,
+        "clientWidth": 1400,
+        "columns": "186.281px 186.281px 186.281px 186.297px 186.281px 186.281px 186.297px",
+        "items": [
+          {
+            "rect": {
+              "x": 316,
+              "y": 441.86,
+              "width": 186.28,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Void\nBlack with white values. Default for new installs."
+          },
+          {
+            "rect": {
+              "x": 518.28,
+              "y": 441.86,
+              "width": 186.28,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Graphite\nDark slate (#1A1C22). Retained by installs configured before themes."
+          },
+          {
+            "rect": {
+              "x": 720.56,
+              "y": 441.86,
+              "width": 186.28,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Ultraviolet\nDark violet with a lavender accent."
+          },
+          {
+            "rect": {
+              "x": 922.84,
+              "y": 441.86,
+              "width": 186.3,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Midnight\nDark blue with a light blue accent."
+          },
+          {
+            "rect": {
+              "x": 1125.14,
+              "y": 441.86,
+              "width": 186.28,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Forest\nDark green with a green accent."
+          },
+          {
+            "rect": {
+              "x": 1327.42,
+              "y": 441.86,
+              "width": 186.28,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Ember\nBlack with amber text and accents."
+          },
+          {
+            "rect": {
+              "x": 1529.7,
+              "y": 441.86,
+              "width": 186.3,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Paper\nLight (#E9E6DE) with dark text."
+          }
+        ]
+      },
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/void.webp",
+          "rect": {
+            "x": 316,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/graphite.webp",
+          "rect": {
+            "x": 518.28,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ultraviolet.webp",
+          "rect": {
+            "x": 720.56,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/midnight.webp",
+          "rect": {
+            "x": 922.84,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/forest.webp",
+          "rect": {
+            "x": 1125.14,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ember.webp",
+          "rect": {
+            "x": 1327.42,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/paper.webp",
+          "rect": {
+            "x": 1529.7,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-theme-share.png",
+          "rect": {
+            "x": 316,
+            "y": 1803.41,
+            "width": 800,
+            "height": 420,
+            "top": 1803.41,
+            "bottom": 2223.41
+          },
+          "naturalWidth": 800,
+          "naturalHeight": 420
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-key-text.png",
+          "rect": {
+            "x": 316,
+            "y": 3072.11,
+            "width": 800,
+            "height": 354,
+            "top": 3072.11,
+            "bottom": 3426.11
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 316,
+            "y": 2509.52,
+            "width": 2781,
+            "height": 250.47,
+            "top": 2509.52,
+            "bottom": 2759.98
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 3984.05,
+            "width": 2781,
+            "height": 400.75,
+            "top": 3984.05,
+            "bottom": 4384.8
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 4693.63,
+            "width": 2781,
+            "height": 150.28,
+            "top": 4693.63,
+            "bottom": 4843.91
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "sensor-dial.html",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/sensor-dial.html",
+      "innerWidth": 3440,
+      "innerHeight": 1440,
+      "outerWidth": 3440,
+      "outerHeight": 1440,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 3425,
+      "clientWidth": 3440,
+      "overflow": false,
+      "main": {
+        "x": 316,
+        "y": 200.55,
+        "width": 2781,
+        "height": 21936.59,
+        "top": 200.55,
+        "bottom": 22137.14
+      },
+      "prose": {
+        "x": 316,
+        "y": 200.55,
+        "width": 676.28,
+        "height": 82.55,
+        "top": 200.55,
+        "bottom": 283.09
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 252,
+        "height": 1440,
+        "top": 0,
+        "bottom": 1440
+      },
+      "toc": {
+        "x": 3153,
+        "y": 200.55,
+        "width": 208,
+        "height": 357.56,
+        "top": 200.55,
+        "bottom": 558.11
+      },
+      "gallery": null,
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dials.png",
+          "rect": {
+            "x": 316,
+            "y": 409.64,
+            "width": 440,
+            "height": 240,
+            "top": 409.64,
+            "bottom": 649.64
+          },
+          "naturalWidth": 440,
+          "naturalHeight": 240
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "rect": {
+            "x": 316,
+            "y": 1352.06,
+            "width": 1264,
+            "height": 352,
+            "top": 1352.06,
+            "bottom": 1704.06
+          },
+          "naturalWidth": 1264,
+          "naturalHeight": 352
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-deck.jpg",
+          "rect": {
+            "x": 316,
+            "y": 2116.58,
+            "width": 1300,
+            "height": 710,
+            "top": 2116.58,
+            "bottom": 2826.58
+          },
+          "naturalWidth": 1300,
+          "naturalHeight": 710
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-overview.png",
+          "rect": {
+            "x": 316,
+            "y": 4309.09,
+            "width": 800,
+            "height": 464,
+            "top": 4309.09,
+            "bottom": 4773.09
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rename.png",
+          "rect": {
+            "x": 342,
+            "y": 5420.92,
+            "width": 650.28,
+            "height": 492.58,
+            "top": 5420.92,
+            "bottom": 5913.5
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 316,
+            "y": 7693.02,
+            "width": 800,
+            "height": 1540,
+            "top": 7693.02,
+            "bottom": 9233.02
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 316,
+            "y": 9310.61,
+            "width": 1340,
+            "height": 884,
+            "top": 9310.61,
+            "bottom": 10194.61
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-picker.png",
+          "rect": {
+            "x": 342,
+            "y": 11800.7,
+            "width": 650.28,
+            "height": 1430.61,
+            "top": 11800.7,
+            "bottom": 13231.31
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rotation.png",
+          "rect": {
+            "x": 342,
+            "y": 13255.31,
+            "width": 650.28,
+            "height": 1430.61,
+            "top": 13255.31,
+            "bottom": 14685.92
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-live-dial-advanced.png",
+          "rect": {
+            "x": 316,
+            "y": 19657.14,
+            "width": 800,
+            "height": 2468,
+            "top": 19657.14,
+            "bottom": 22125.14
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 316,
+            "y": 1023.5,
+            "width": 2781,
+            "height": 300.56,
+            "top": 1023.5,
+            "bottom": 1324.06
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 3518.67,
+            "width": 2781,
+            "height": 250.47,
+            "top": 3518.67,
+            "bottom": 3769.14
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 10741.64,
+            "width": 2781,
+            "height": 250.47,
+            "top": 10741.64,
+            "bottom": 10992.11
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 16108.39,
+            "width": 2781,
+            "height": 1444.91,
+            "top": 16108.39,
+            "bottom": 17553.3
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 316,
+            "y": 18733.31,
+            "width": 2781,
+            "height": 500.94,
+            "top": 18733.31,
+            "bottom": 19234.25
+          },
+          "scrollWidth": 2779,
+          "clientWidth": 2779,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "themes.html",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/themes.html",
+      "innerWidth": 1920,
+      "innerHeight": 1080,
+      "outerWidth": 1920,
+      "outerHeight": 1080,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 1905,
+      "clientWidth": 1920,
+      "overflow": false,
+      "main": {
+        "x": 309.59,
+        "y": 200.55,
+        "width": 1273.81,
+        "height": 4848.94,
+        "top": 200.55,
+        "bottom": 5049.48
+      },
+      "prose": {
+        "x": 309.59,
+        "y": 200.55,
+        "width": 676.28,
+        "height": 55.03,
+        "top": 200.55,
+        "bottom": 255.58
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 252,
+        "height": 1080,
+        "top": 0,
+        "bottom": 1080
+      },
+      "toc": {
+        "x": 1639.41,
+        "y": 200.55,
+        "width": 208,
+        "height": 243.58,
+        "top": 200.55,
+        "bottom": 444.13
+      },
+      "gallery": {
+        "rect": {
+          "x": 309.59,
+          "y": 441.86,
+          "width": 1273.81,
+          "height": 234,
+          "top": 441.86,
+          "bottom": 675.86
+        },
+        "scrollWidth": 1274,
+        "clientWidth": 1274,
+        "columns": "168.25px 168.266px 168.25px 168.266px 168.25px 168.266px 168.25px",
+        "items": [
+          {
+            "rect": {
+              "x": 309.59,
+              "y": 441.86,
+              "width": 168.25,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Void\nBlack with white values. Default for new installs."
+          },
+          {
+            "rect": {
+              "x": 493.84,
+              "y": 441.86,
+              "width": 168.27,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Graphite\nDark slate (#1A1C22). Retained by installs configured before themes."
+          },
+          {
+            "rect": {
+              "x": 678.11,
+              "y": 441.86,
+              "width": 168.25,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Ultraviolet\nDark violet with a lavender accent."
+          },
+          {
+            "rect": {
+              "x": 862.36,
+              "y": 441.86,
+              "width": 168.27,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Midnight\nDark blue with a light blue accent."
+          },
+          {
+            "rect": {
+              "x": 1046.63,
+              "y": 441.86,
+              "width": 168.25,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Forest\nDark green with a green accent."
+          },
+          {
+            "rect": {
+              "x": 1230.88,
+              "y": 441.86,
+              "width": 168.27,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Ember\nBlack with amber text and accents."
+          },
+          {
+            "rect": {
+              "x": 1415.14,
+              "y": 441.86,
+              "width": 168.25,
+              "height": 234,
+              "top": 441.86,
+              "bottom": 675.86
+            },
+            "text": "Paper\nLight (#E9E6DE) with dark text."
+          }
+        ]
+      },
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/void.webp",
+          "rect": {
+            "x": 309.59,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/graphite.webp",
+          "rect": {
+            "x": 493.84,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ultraviolet.webp",
+          "rect": {
+            "x": 678.11,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/midnight.webp",
+          "rect": {
+            "x": 862.36,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/forest.webp",
+          "rect": {
+            "x": 1046.63,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ember.webp",
+          "rect": {
+            "x": 1230.88,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/paper.webp",
+          "rect": {
+            "x": 1415.14,
+            "y": 441.86,
+            "width": 144,
+            "height": 144,
+            "top": 441.86,
+            "bottom": 585.86
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-theme-share.png",
+          "rect": {
+            "x": 309.59,
+            "y": 1803.41,
+            "width": 800,
+            "height": 420,
+            "top": 1803.41,
+            "bottom": 2223.41
+          },
+          "naturalWidth": 800,
+          "naturalHeight": 420
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-key-text.png",
+          "rect": {
+            "x": 309.59,
+            "y": 3072.11,
+            "width": 800,
+            "height": 354,
+            "top": 3072.11,
+            "bottom": 3426.11
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 2509.52,
+            "width": 1273.81,
+            "height": 250.47,
+            "top": 2509.52,
+            "bottom": 2759.98
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 3984.05,
+            "width": 1273.81,
+            "height": 400.75,
+            "top": 3984.05,
+            "bottom": 4384.8
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 4693.63,
+            "width": 1273.81,
+            "height": 150.28,
+            "top": 4693.63,
+            "bottom": 4843.91
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "sensor-dial.html",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/sensor-dial.html",
+      "innerWidth": 1920,
+      "innerHeight": 1080,
+      "outerWidth": 1920,
+      "outerHeight": 1080,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 1905,
+      "clientWidth": 1920,
+      "overflow": false,
+      "main": {
+        "x": 309.59,
+        "y": 200.55,
+        "width": 1273.81,
+        "height": 22663.8,
+        "top": 200.55,
+        "bottom": 22864.34
+      },
+      "prose": {
+        "x": 309.59,
+        "y": 200.55,
+        "width": 676.28,
+        "height": 82.55,
+        "top": 200.55,
+        "bottom": 283.09
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 252,
+        "height": 1080,
+        "top": 0,
+        "bottom": 1080
+      },
+      "toc": {
+        "x": 1639.41,
+        "y": 200.55,
+        "width": 208,
+        "height": 357.56,
+        "top": 200.55,
+        "bottom": 558.11
+      },
+      "gallery": null,
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dials.png",
+          "rect": {
+            "x": 309.59,
+            "y": 409.64,
+            "width": 440,
+            "height": 240,
+            "top": 409.64,
+            "bottom": 649.64
+          },
+          "naturalWidth": 440,
+          "naturalHeight": 240
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "rect": {
+            "x": 309.59,
+            "y": 1444.44,
+            "width": 1264,
+            "height": 352,
+            "top": 1444.44,
+            "bottom": 1796.44
+          },
+          "naturalWidth": 1264,
+          "naturalHeight": 352
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-deck.jpg",
+          "rect": {
+            "x": 309.59,
+            "y": 2208.95,
+            "width": 1273.81,
+            "height": 695.69,
+            "top": 2208.95,
+            "bottom": 2904.64
+          },
+          "naturalWidth": 1300,
+          "naturalHeight": 710
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-overview.png",
+          "rect": {
+            "x": 309.59,
+            "y": 4456.44,
+            "width": 800,
+            "height": 464,
+            "top": 4456.44,
+            "bottom": 4920.44
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rename.png",
+          "rect": {
+            "x": 335.59,
+            "y": 5568.27,
+            "width": 650.28,
+            "height": 492.58,
+            "top": 5568.27,
+            "bottom": 6060.84
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 309.59,
+            "y": 7840.36,
+            "width": 800,
+            "height": 1540,
+            "top": 7840.36,
+            "bottom": 9380.36
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 309.59,
+            "y": 9457.95,
+            "width": 1273.81,
+            "height": 840.33,
+            "top": 9457.95,
+            "bottom": 10298.28
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-picker.png",
+          "rect": {
+            "x": 335.59,
+            "y": 11950.56,
+            "width": 650.28,
+            "height": 1430.61,
+            "top": 11950.56,
+            "bottom": 13381.17
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rotation.png",
+          "rect": {
+            "x": 335.59,
+            "y": 13405.17,
+            "width": 650.28,
+            "height": 1430.61,
+            "top": 13405.17,
+            "bottom": 14835.78
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-live-dial-advanced.png",
+          "rect": {
+            "x": 309.59,
+            "y": 20384.34,
+            "width": 800,
+            "height": 2468,
+            "top": 20384.34,
+            "bottom": 22852.34
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 1023.5,
+            "width": 1273.81,
+            "height": 392.94,
+            "top": 1023.5,
+            "bottom": 1416.44
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 3596.73,
+            "width": 1273.81,
+            "height": 319.75,
+            "top": 3596.73,
+            "bottom": 3916.48
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 10845.31,
+            "width": 1273.81,
+            "height": 296.66,
+            "top": 10845.31,
+            "bottom": 11141.97
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 16258.25,
+            "width": 1273.81,
+            "height": 1860.59,
+            "top": 16258.25,
+            "bottom": 18118.84
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 309.59,
+            "y": 19298.86,
+            "width": 1273.81,
+            "height": 662.59,
+            "top": 19298.86,
+            "bottom": 19961.45
+          },
+          "scrollWidth": 1272,
+          "clientWidth": 1272,
+          "role": null,
+          "name": null
+        }
+      ]
+    }
+  ],
+  "zoom": [
+    {
+      "route": "themes.html",
+      "target": "#the-seven-presets",
+      "targetState": {
+        "visible": true,
+        "top": 204.9765625,
+        "detailsOpen": null
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/themes.html#the-seven-presets",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "main": {
+        "x": 24,
+        "y": 30.91,
+        "width": 584.5,
+        "height": 5654.94,
+        "top": 30.91,
+        "bottom": 5685.85
+      },
+      "prose": {
+        "x": 24,
+        "y": 30.91,
+        "width": 584.5,
+        "height": 55.03,
+        "top": 30.91,
+        "bottom": 85.95
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": -296,
+        "width": 632.5,
+        "height": 71,
+        "top": -296,
+        "bottom": -225
+      },
+      "toc": {
+        "x": 24,
+        "y": -43.09,
+        "width": 549.48,
+        "height": 46,
+        "top": -43.09,
+        "bottom": 2.91
+      },
+      "gallery": {
+        "rect": {
+          "x": 24,
+          "y": 272.23,
+          "width": 584.5,
+          "height": 936,
+          "top": 272.23,
+          "bottom": 1208.23
+        },
+        "scrollWidth": 585,
+        "clientWidth": 585,
+        "columns": "284.25px 284.25px",
+        "items": [
+          {
+            "rect": {
+              "x": 24,
+              "y": 272.23,
+              "width": 284.25,
+              "height": 234,
+              "top": 272.23,
+              "bottom": 506.23
+            },
+            "text": "Void\nBlack with white values. Default for new installs."
+          },
+          {
+            "rect": {
+              "x": 324.25,
+              "y": 272.23,
+              "width": 284.25,
+              "height": 234,
+              "top": 272.23,
+              "bottom": 506.23
+            },
+            "text": "Graphite\nDark slate (#1A1C22). Retained by installs configured before themes."
+          },
+          {
+            "rect": {
+              "x": 24,
+              "y": 530.23,
+              "width": 284.25,
+              "height": 216,
+              "top": 530.23,
+              "bottom": 746.23
+            },
+            "text": "Ultraviolet\nDark violet with a lavender accent."
+          },
+          {
+            "rect": {
+              "x": 324.25,
+              "y": 530.23,
+              "width": 284.25,
+              "height": 216,
+              "top": 530.23,
+              "bottom": 746.23
+            },
+            "text": "Midnight\nDark blue with a light blue accent."
+          },
+          {
+            "rect": {
+              "x": 24,
+              "y": 770.23,
+              "width": 284.25,
+              "height": 216,
+              "top": 770.23,
+              "bottom": 986.23
+            },
+            "text": "Forest\nDark green with a green accent."
+          },
+          {
+            "rect": {
+              "x": 324.25,
+              "y": 770.23,
+              "width": 284.25,
+              "height": 216,
+              "top": 770.23,
+              "bottom": 986.23
+            },
+            "text": "Ember\nBlack with amber text and accents."
+          },
+          {
+            "rect": {
+              "x": 24,
+              "y": 1010.23,
+              "width": 284.25,
+              "height": 198,
+              "top": 1010.23,
+              "bottom": 1208.23
+            },
+            "text": "Paper\nLight (#E9E6DE) with dark text."
+          }
+        ]
+      },
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/void.webp",
+          "rect": {
+            "x": 24,
+            "y": 272.23,
+            "width": 144,
+            "height": 144,
+            "top": 272.23,
+            "bottom": 416.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/graphite.webp",
+          "rect": {
+            "x": 324.25,
+            "y": 272.23,
+            "width": 144,
+            "height": 144,
+            "top": 272.23,
+            "bottom": 416.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ultraviolet.webp",
+          "rect": {
+            "x": 24,
+            "y": 530.23,
+            "width": 144,
+            "height": 144,
+            "top": 530.23,
+            "bottom": 674.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/midnight.webp",
+          "rect": {
+            "x": 324.25,
+            "y": 530.23,
+            "width": 144,
+            "height": 144,
+            "top": 530.23,
+            "bottom": 674.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/forest.webp",
+          "rect": {
+            "x": 24,
+            "y": 770.23,
+            "width": 144,
+            "height": 144,
+            "top": 770.23,
+            "bottom": 914.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ember.webp",
+          "rect": {
+            "x": 324.25,
+            "y": 770.23,
+            "width": 144,
+            "height": 144,
+            "top": 770.23,
+            "bottom": 914.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/paper.webp",
+          "rect": {
+            "x": 24,
+            "y": 1010.23,
+            "width": 144,
+            "height": 144,
+            "top": 1010.23,
+            "bottom": 1154.23
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-theme-share.png",
+          "rect": {
+            "x": 24,
+            "y": 2473.35,
+            "width": 584.5,
+            "height": 306.86,
+            "top": 2473.35,
+            "bottom": 2780.21
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-key-text.png",
+          "rect": {
+            "x": 24,
+            "y": 3776.32,
+            "width": 584.5,
+            "height": 258.64,
+            "top": 3776.32,
+            "bottom": 4034.96
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 24,
+            "y": 3066.32,
+            "width": 584.5,
+            "height": 342.84,
+            "top": 3066.32,
+            "bottom": 3409.16
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 4592.9,
+            "width": 584.5,
+            "height": 400.75,
+            "top": 4592.9,
+            "bottom": 4993.65
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 5329.99,
+            "width": 584.5,
+            "height": 150.28,
+            "top": 5329.99,
+            "bottom": 5480.27
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "sensor-dial.html",
+      "target": "#transparent-background",
+      "targetState": {
+        "visible": true,
+        "top": 205.0234375,
+        "detailsOpen": null
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/sensor-dial.html#transparent-background",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "main": {
+        "x": 24,
+        "y": -315.59,
+        "width": 584.5,
+        "height": 22040.02,
+        "top": -315.59,
+        "bottom": 21724.44
+      },
+      "prose": {
+        "x": 24,
+        "y": -315.59,
+        "width": 584.5,
+        "height": 110.06,
+        "top": -315.59,
+        "bottom": -205.52
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": -642.5,
+        "width": 632.5,
+        "height": 71,
+        "top": -642.5,
+        "bottom": -571.5
+      },
+      "toc": {
+        "x": 24,
+        "y": -389.59,
+        "width": 549.48,
+        "height": 46,
+        "top": -389.59,
+        "bottom": -343.59
+      },
+      "gallery": null,
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dials.png",
+          "rect": {
+            "x": 24,
+            "y": -78.98,
+            "width": 440,
+            "height": 240,
+            "top": -78.98,
+            "bottom": 161.02
+          },
+          "naturalWidth": 440,
+          "naturalHeight": 240
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "rect": {
+            "x": 24,
+            "y": 1176.93,
+            "width": 584.5,
+            "height": 162.77,
+            "top": 1176.93,
+            "bottom": 1339.7
+          },
+          "naturalWidth": 1264,
+          "naturalHeight": 352
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-deck.jpg",
+          "rect": {
+            "x": 24,
+            "y": 1779.73,
+            "width": 584.5,
+            "height": 319.23,
+            "top": 1779.73,
+            "bottom": 2098.95
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-overview.png",
+          "rect": {
+            "x": 24,
+            "y": 3848.77,
+            "width": 584.5,
+            "height": 339.01,
+            "top": 3848.77,
+            "bottom": 4187.77
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rename.png",
+          "rect": {
+            "x": 50,
+            "y": 4918.15,
+            "width": 558.5,
+            "height": 423.06,
+            "top": 4918.15,
+            "bottom": 5341.21
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 24,
+            "y": 7230.79,
+            "width": 584.5,
+            "height": 1125.16,
+            "top": 7230.79,
+            "bottom": 8355.95
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/dial-reading-colors-1.7.png",
+          "rect": {
+            "x": 24,
+            "y": 8433.54,
+            "width": 584.5,
+            "height": 385.59,
+            "top": 8433.54,
+            "bottom": 8819.13
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-picker.png",
+          "rect": {
+            "x": 50,
+            "y": 10717.74,
+            "width": 558.5,
+            "height": 1228.7,
+            "top": 10717.74,
+            "bottom": 11946.44
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-dial-rotation.png",
+          "rect": {
+            "x": 50,
+            "y": 11970.44,
+            "width": 558.5,
+            "height": 1228.7,
+            "top": 11970.44,
+            "bottom": 13199.13
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-live-dial-advanced.png",
+          "rect": {
+            "x": 24,
+            "y": 19909.26,
+            "width": 584.5,
+            "height": 1803.18,
+            "top": 19909.26,
+            "bottom": 21712.44
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 24,
+            "y": 617.43,
+            "width": 584.5,
+            "height": 531.5,
+            "top": 617.43,
+            "bottom": 1148.93
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 2818.56,
+            "width": 584.5,
+            "height": 435.22,
+            "top": 2818.56,
+            "bottom": 3253.78
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 9414.48,
+            "width": 584.5,
+            "height": 412.13,
+            "top": 9414.48,
+            "bottom": 9826.6
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 14786.7,
+            "width": 584.5,
+            "height": 2345.56,
+            "top": 14786.7,
+            "bottom": 17132.26
+          },
+          "scrollWidth": 820,
+          "clientWidth": 583,
+          "role": "region",
+          "name": "Settings table 4, scroll horizontally"
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 18449.85,
+            "width": 584.5,
+            "height": 1009,
+            "top": 18449.85,
+            "bottom": 19458.85
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "data-sources.html",
+      "target": "#legacy-gadget-selections",
+      "targetState": {
+        "visible": true,
+        "top": 205.0703125,
+        "detailsOpen": true
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/data-sources.html#legacy-gadget-selections",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "main": {
+        "x": 24,
+        "y": -2587.59,
+        "width": 584.5,
+        "height": 9392.52,
+        "top": -2587.59,
+        "bottom": 6804.93
+      },
+      "prose": {
+        "x": 24,
+        "y": -2587.59,
+        "width": 584.5,
+        "height": 82.55,
+        "top": -2587.59,
+        "bottom": -2505.04
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": -2914.5,
+        "width": 632.5,
+        "height": 71,
+        "top": -2914.5,
+        "bottom": -2843.5
+      },
+      "toc": {
+        "x": 24,
+        "y": -2661.59,
+        "width": 549.48,
+        "height": 46,
+        "top": -2661.59,
+        "bottom": -2615.59
+      },
+      "gallery": null,
+      "media": [],
+      "tables": [
+        {
+          "rect": {
+            "x": 24,
+            "y": -2326.76,
+            "width": 584.5,
+            "height": 627.78,
+            "top": -2326.76,
+            "bottom": -1698.98
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 2649.73,
+            "width": 584.5,
+            "height": 292.75,
+            "top": 2649.73,
+            "bottom": 2942.48
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        }
+      ]
+    },
+    {
+      "route": "troubleshooting.html",
+      "target": "#age-unknown",
+      "targetState": {
+        "visible": true,
+        "top": 205.0546875,
+        "detailsOpen": null
+      },
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/troubleshooting.html#age-unknown",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "main": {
+        "x": 24,
+        "y": -4701.59,
+        "width": 584.5,
+        "height": 18414.88,
+        "top": -4701.59,
+        "bottom": 13713.29
+      },
+      "prose": {
+        "x": 24,
+        "y": -4701.59,
+        "width": 584.5,
+        "height": 55.03,
+        "top": -4701.59,
+        "bottom": -4646.55
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": -5028.5,
+        "width": 632.5,
+        "height": 71,
+        "top": -5028.5,
+        "bottom": -4957.5
+      },
+      "toc": {
+        "x": 24,
+        "y": -4775.59,
+        "width": 549.48,
+        "height": 46,
+        "top": -4775.59,
+        "bottom": -4729.59
+      },
+      "gallery": null,
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/reading-status-1.7.png",
+          "rect": {
+            "x": 24,
+            "y": -2527.09,
+            "width": 584.5,
+            "height": 302.56,
+            "top": -2527.09,
+            "bottom": -2224.52
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/sensor-picker.png",
+          "rect": {
+            "x": 24,
+            "y": 4318.07,
+            "width": 584.5,
+            "height": 1285.9,
+            "top": 4318.07,
+            "bottom": 5603.97
+          },
+          "naturalWidth": 0,
+          "naturalHeight": 0
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 24,
+            "y": -4626.55,
+            "width": 584.5,
+            "height": 350.66,
+            "top": -4626.55,
+            "bottom": -4275.9
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": -4014.59,
+            "width": 584.5,
+            "height": 1459.5,
+            "top": -4014.59,
+            "bottom": -2555.09
+          },
+          "scrollWidth": 583,
+          "clientWidth": 583,
+          "role": null,
+          "name": null
+        }
+      ]
+    }
+  ],
+  "nojs": [
+    {
+      "route": "themes.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/themes.html",
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "outerWidth": 500,
+      "outerHeight": 844,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 375,
+      "clientWidth": 390,
+      "overflow": false,
+      "main": {
+        "x": 20,
+        "y": 832.59,
+        "width": 335,
+        "height": 6264.44,
+        "top": 832.59,
+        "bottom": 7097.03
+      },
+      "prose": {
+        "x": 20,
+        "y": 832.59,
+        "width": 335,
+        "height": 110.06,
+        "top": 832.59,
+        "bottom": 942.66
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 661,
+        "top": 0,
+        "bottom": 661
+      },
+      "toc": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "gallery": {
+        "rect": {
+          "x": 20,
+          "y": 1145.95,
+          "width": 335,
+          "height": 954,
+          "top": 1145.95,
+          "bottom": 2099.95
+        },
+        "scrollWidth": 335,
+        "clientWidth": 335,
+        "columns": "159.5px 159.5px",
+        "items": [
+          {
+            "rect": {
+              "x": 20,
+              "y": 1145.95,
+              "width": 159.5,
+              "height": 234,
+              "top": 1145.95,
+              "bottom": 1379.95
+            },
+            "text": "Void\nBlack with white values. Default for new installs."
+          },
+          {
+            "rect": {
+              "x": 195.5,
+              "y": 1145.95,
+              "width": 159.5,
+              "height": 234,
+              "top": 1145.95,
+              "bottom": 1379.95
+            },
+            "text": "Graphite\nDark slate (#1A1C22). Retained by installs configured before themes."
+          },
+          {
+            "rect": {
+              "x": 20,
+              "y": 1403.95,
+              "width": 159.5,
+              "height": 216,
+              "top": 1403.95,
+              "bottom": 1619.95
+            },
+            "text": "Ultraviolet\nDark violet with a lavender accent."
+          },
+          {
+            "rect": {
+              "x": 195.5,
+              "y": 1403.95,
+              "width": 159.5,
+              "height": 216,
+              "top": 1403.95,
+              "bottom": 1619.95
+            },
+            "text": "Midnight\nDark blue with a light blue accent."
+          },
+          {
+            "rect": {
+              "x": 20,
+              "y": 1643.95,
+              "width": 159.5,
+              "height": 216,
+              "top": 1643.95,
+              "bottom": 1859.95
+            },
+            "text": "Forest\nDark green with a green accent."
+          },
+          {
+            "rect": {
+              "x": 195.5,
+              "y": 1643.95,
+              "width": 159.5,
+              "height": 216,
+              "top": 1643.95,
+              "bottom": 1859.95
+            },
+            "text": "Ember\nBlack with amber text and accents."
+          },
+          {
+            "rect": {
+              "x": 20,
+              "y": 1883.95,
+              "width": 159.5,
+              "height": 216,
+              "top": 1883.95,
+              "bottom": 2099.95
+            },
+            "text": "Paper\nLight (#E9E6DE) with dark text."
+          }
+        ]
+      },
+      "media": [
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/void.webp",
+          "rect": {
+            "x": 20,
+            "y": 1145.95,
+            "width": 144,
+            "height": 144,
+            "top": 1145.95,
+            "bottom": 1289.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/graphite.webp",
+          "rect": {
+            "x": 195.5,
+            "y": 1145.95,
+            "width": 144,
+            "height": 144,
+            "top": 1145.95,
+            "bottom": 1289.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ultraviolet.webp",
+          "rect": {
+            "x": 20,
+            "y": 1403.95,
+            "width": 144,
+            "height": 144,
+            "top": 1403.95,
+            "bottom": 1547.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/midnight.webp",
+          "rect": {
+            "x": 195.5,
+            "y": 1403.95,
+            "width": 144,
+            "height": 144,
+            "top": 1403.95,
+            "bottom": 1547.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/forest.webp",
+          "rect": {
+            "x": 20,
+            "y": 1643.95,
+            "width": 144,
+            "height": 144,
+            "top": 1643.95,
+            "bottom": 1787.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/ember.webp",
+          "rect": {
+            "x": 195.5,
+            "y": 1643.95,
+            "width": 144,
+            "height": 144,
+            "top": 1643.95,
+            "bottom": 1787.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/showcase/theme-tiles/paper.webp",
+          "rect": {
+            "x": 20,
+            "y": 1883.95,
+            "width": 144,
+            "height": 144,
+            "top": 1883.95,
+            "bottom": 2027.95
+          },
+          "naturalWidth": 144,
+          "naturalHeight": 144
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-theme-share.png",
+          "rect": {
+            "x": 20,
+            "y": 3726.48,
+            "width": 335,
+            "height": 175.88,
+            "top": 3726.48,
+            "bottom": 3902.36
+          },
+          "naturalWidth": 800,
+          "naturalHeight": 420
+        },
+        {
+          "src": "/hwinfo-streamdeck/assets/img/pi-key-text.png",
+          "rect": {
+            "x": 20,
+            "y": 5078.3,
+            "width": 335,
+            "height": 148.23,
+            "top": 5078.3,
+            "bottom": 5226.53
+          },
+          "naturalWidth": 800,
+          "naturalHeight": 354
+        }
+      ],
+      "tables": [
+        {
+          "rect": {
+            "x": 20,
+            "y": 4233,
+            "width": 335,
+            "height": 340.56,
+            "top": 4233,
+            "bottom": 4573.56
+          },
+          "scrollWidth": 333,
+          "clientWidth": 333,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 20,
+            "y": 5901.05,
+            "width": 335,
+            "height": 323,
+            "top": 5901.05,
+            "bottom": 6224.05
+          },
+          "scrollWidth": 333,
+          "clientWidth": 333,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 20,
+            "y": 6632.44,
+            "width": 335,
+            "height": 121.44,
+            "top": 6632.44,
+            "bottom": 6753.88
+          },
+          "scrollWidth": 372,
+          "clientWidth": 333,
+          "role": null,
+          "name": null
+        }
+      ],
+      "navLinks": 16,
+      "imageLinks": 3
+    },
+    {
+      "route": "data-sources.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/data-sources.html",
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "outerWidth": 500,
+      "outerHeight": 844,
+      "dpr": 1,
+      "scale": 1,
+      "scrollWidth": 375,
+      "clientWidth": 390,
+      "overflow": false,
+      "main": {
+        "x": 20,
+        "y": 832.59,
+        "width": 335,
+        "height": 12509.88,
+        "top": 832.59,
+        "bottom": 13342.47
+      },
+      "prose": {
+        "x": 20,
+        "y": 832.59,
+        "width": 335,
+        "height": 137.58,
+        "top": 832.59,
+        "bottom": 970.17
+      },
+      "proseMaxWidth": "676.281px",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "width": 375,
+        "height": 661,
+        "top": 0,
+        "bottom": 661
+      },
+      "toc": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "top": 0,
+        "bottom": 0
+      },
+      "gallery": null,
+      "media": [],
+      "tables": [
+        {
+          "rect": {
+            "x": 20,
+            "y": 1194.22,
+            "width": 335,
+            "height": 594.31,
+            "top": 1194.22,
+            "bottom": 1788.53
+          },
+          "scrollWidth": 372,
+          "clientWidth": 333,
+          "role": null,
+          "name": null
+        },
+        {
+          "rect": {
+            "x": 20,
+            "y": 7023.61,
+            "width": 335,
+            "height": 265.63,
+            "top": 7023.61,
+            "bottom": 7289.23
+          },
+          "scrollWidth": 333,
+          "clientWidth": 333,
+          "role": null,
+          "name": null
+        }
+      ],
+      "navLinks": 16,
+      "imageLinks": 0
+    }
+  ],
+  "zoomBefore": {
+    "url": "http://127.0.0.1:4173/hwinfo-streamdeck/",
+    "innerWidth": 1280,
+    "innerHeight": 813,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "dpr": 1,
+    "scale": 1,
+    "scrollWidth": 1265,
+    "clientWidth": 1280,
+    "overflow": false,
+    "main": {
+      "x": 290.39,
+      "y": 108,
+      "width": 936.22,
+      "height": 1542.44,
+      "top": 108,
+      "bottom": 1650.44
+    },
+    "prose": null,
+    "proseMaxWidth": null,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "width": 252,
+      "height": 813,
+      "top": 0,
+      "bottom": 813
+    },
+    "toc": null,
+    "gallery": null,
+    "media": [
+      {
+        "src": "/hwinfo-streamdeck/assets/img/dial-backgrounds-deck.jpg",
+        "rect": {
+          "x": 291.39,
+          "y": 404.3,
+          "width": 934.22,
+          "height": 509.92,
+          "top": 404.3,
+          "bottom": 914.22
+        },
+        "naturalWidth": 940,
+        "naturalHeight": 513
+      },
+      {
+        "src": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.png",
+        "rect": {
+          "x": 361.42,
+          "y": 1085.16,
+          "width": 154,
+          "height": 154,
+          "top": 1085.16,
+          "bottom": 1239.16
+        },
+        "naturalWidth": 288,
+        "naturalHeight": 288
+      },
+      {
+        "src": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.png",
+        "rect": {
+          "x": 623.45,
+          "y": 1094.64,
+          "width": 270.08,
+          "height": 135.03,
+          "top": 1094.64,
+          "bottom": 1229.67
+        },
+        "naturalWidth": 400,
+        "naturalHeight": 200
+      },
+      {
+        "src": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.jpg",
+        "rect": {
+          "x": 943.53,
+          "y": 1089.97,
+          "width": 270.06,
+          "height": 144.38,
+          "top": 1089.97,
+          "bottom": 1234.34
+        },
+        "naturalWidth": 621,
+        "naturalHeight": 332
+      }
+    ],
+    "tables": []
+  },
+  "zoomSetting": "2",
+  "zoomVerified": true
+}

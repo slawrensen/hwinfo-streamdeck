@@ -2,6 +2,8 @@
 
 Audit date: 24 October 2026. Scope: the complete documentation site, its assets, and documentation build, test and preview tooling. Plugin runtime, native code, manifests, release history and production publication are unchanged.
 
+The subsequent [responsive, branding and installation follow-up](responsive-followup.md) implements the user's review corrections. It replaces the initial constrained media column and horizontal theme strip with a fluid shell and wrapping samples, uses the actual released app icon, and adds a minimal HWiNFO Pro recommendation. Its independent checks and publication identity are recorded separately from the initial review below.
+
 ## Source and release identity
 
 The audited source is [bb4aedecbce499e199df8af63793a1490c0fb6ed](https://github.com/slawrensen/hwinfo-streamdeck/commit/bb4aedecbce499e199df8af63793a1490c0fb6ed). The separately resolved annotated [v1.7.1 tag](https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1) points to that commit; the stable package is 1.7.1.0. Marketplace was checked separately and advertises 1.7, with 1.7.0.0 release notes. [Release evidence](release-evidence.md) records source-backed claims and their qualifications.
@@ -14,7 +16,7 @@ The final source commit, generated preview commit, successful deployment run and
 
 Three compositions were compared using genuine repository assets: a healthy whole-deck app capture, a focused transparent-dial strip, and renderer comparison boards. The healthy Midnight deck with transparent Tint dials gives the clearest attainable overview. A faithful detail crop makes those same readings legible on phones; its link opens the complete original. Dense theme and alert comparisons belong in the theme reference. No synthetic product UI was generated.
 
-The shared shell uses charcoal surfaces, one cool accent, restrained borders, system fonts, and reusable spacing/color tokens. The article measure stays at 76ch, including tablets; a centered 1560px shell makes ultrawide layouts deliberate. Start, Customize, Help and Reference organize the existing destinations. Help precedes the longer reference list so Troubleshooting is visible on ordinary laptops. Search remains visible when the mobile menu is closed. The page's group and current link remain clear.
+The shared shell uses charcoal surfaces, one cool accent, restrained borders, system fonts, and reusable spacing/color tokens. The initial revision used a 76ch article measure and a centered 1560px shell. The follow-up retains the prose measure while making the shell fluid and allowing useful imagery and tables more room. Start, Customize, Help and Reference organize the existing destinations. Help precedes the longer reference list so Troubleshooting is visible on ordinary laptops. Search remains visible when the mobile menu is closed. The page's group and current link remain clear.
 
 The homepage leads with product identity, one sentence, the pinned stable download, Get started, and essential requirements before the main image. It has approximately 152 visible main-content words including captions, credits and the channel note, comfortably below the requested budget. Desktop and phone first-screen tests check the actual geometry rather than shrinking controls to fit.
 
@@ -60,7 +62,7 @@ Production promotion is outside this task. The intentional absence of a reposito
 
 ## Before and after
 
-These are browser screenshots of the local audited baseline and reviewed candidate. They preserve the actual app captures and do not fabricate product output.
+These are historical browser screenshots of the local audited baseline and first reviewed candidate. They predate the fluid-layout and authentic-logo follow-up. They preserve the actual app captures and do not fabricate product output. Current comparison captures and the matching final source identity are linked from PR #60 and the separate comparison Site.
 
 | Viewport | Before | After |
 | --- | --- | --- |

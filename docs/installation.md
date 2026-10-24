@@ -53,9 +53,9 @@ Enable at least one source. **Auto** prefers Shared Memory when readable.
 2. Open **Settings**, enable **Shared Memory Support**, and click **OK**.
 3. Keep HWiNFO running and polling sensors. Optionally enable **Auto Start** and **Minimize Sensors on Startup**.
 
-Shared Memory supplies HWiNFO's published readings and min/max/average.
+Shared Memory supplies HWiNFO's published readings and min/max/average. **I recommend [buying HWiNFO Pro](https://www.hwinfo.com/licenses/) for continuous Shared Memory use without the 12-hour limit.**
 
-**Free HWiNFO disables Shared Memory after 12 hours.** Re-enable sharing or restart HWiNFO to resume. [HWiNFO Pro](https://www.hwinfo.com/licenses/) removes that timer. Auto can fall back to Gadget, but saved selections need [explicit provider links](data-sources.md#link-readings-across-providers) to identify the same reading on another source.
+**Free HWiNFO disables Shared Memory after 12 hours.** Re-enable sharing or restart HWiNFO to resume. Auto can fall back to Gadget, but saved selections need [explicit provider links](data-sources.md#link-readings-across-providers) to identify the same reading on another source.
 
 ### Free path: Gadget reporting
 

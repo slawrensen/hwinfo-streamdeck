@@ -77,12 +77,10 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 	});
 }
 
-for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 1440 }]) {
-	test(`wide articles give media room while keeping prose readable at ${viewport.width}×${viewport.height}`, options, async t => {
-		const page = await pageFor(t);
+for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 1440 }, { width: 5120, height: 2160 }]) {
+	test(`wide reading workspace keeps related content together at ${viewport.width}×${viewport.height}`, options, async t => {
+		const page = await pageFor(t, { viewport });
 		await page.goto(siteUrl("sensor-dial.html#transparent-background"));
-		const laptopWidth = await page.locator(".main-content").evaluate(element => element.getBoundingClientRect().width);
-		await page.setViewportSize(viewport);
 		const media = page.locator('.main-content img[src$="/dial-backgrounds-deck.jpg"]');
 		await media.scrollIntoViewIfNeeded();
 		await media.evaluate(image => image.decode());
@@ -91,8 +89,17 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 			const style = window.getComputedStyle(prose);
 			const context = document.createElement("canvas").getContext("2d");
 			context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+			const contentBox = content.getBoundingClientRect();
+			const sidebar = document.querySelector(".side-bar").getBoundingClientRect();
+			const main = document.querySelector(".side-bar + .main").getBoundingClientRect();
+			const toc = document.querySelector(".page-toc").getBoundingClientRect();
 			return {
-				content: content.getBoundingClientRect().width,
+				workspace: main.right - sidebar.left,
+				leftMargin: sidebar.left,
+				rightMargin: document.documentElement.clientWidth - main.right,
+				navigationGap: main.left - sidebar.right,
+				tocGap: toc.left - contentBox.right,
+				tocWidth: toc.width,
 				prose: prose.getBoundingClientRect().width,
 				character: context.measureText("0").width,
 				font: Number.parseFloat(style.fontSize),
@@ -103,11 +110,22 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 			const box = element.getBoundingClientRect();
 			return { width: box.width, height: box.height, ratio: element.naturalWidth / element.naturalHeight };
 		});
-		assert.ok(dimensions.content > laptopWidth * 1.2, "the article uses substantially more room than the laptop layout");
+		assert.ok(dimensions.workspace <= 1921, "navigation, article and contents stop spreading beyond the reading workspace");
+		assert.ok(dimensions.leftMargin >= -1 && dimensions.rightMargin >= -1, "the workspace stays inside the viewport");
+		assert.ok(Math.abs(dimensions.leftMargin - dimensions.rightMargin) <= 16, "the complete workspace is centered, allowing for the browser scrollbar");
+		assert.ok(Math.abs(dimensions.navigationGap) <= 2, "navigation remains attached to the content workspace");
+		assert.ok(dimensions.tocGap >= 24 && dimensions.tocGap <= 64 && dimensions.tocWidth >= 180, "page contents stays beside the article with readable link width");
 		assert.ok(image.width > dimensions.prose * 1.3, "the complete deck capture must not be trapped in the prose column");
 		assert.ok(dimensions.font >= 16 && dimensions.prose <= dimensions.character * 80 + 1, "body copy stays at a readable size and line length");
 		assert.ok(Math.abs(image.width / image.height - image.ratio) < 0.01, "the authentic deck image keeps its aspect ratio");
 		assert.equal(dimensions.pageOverflow, false, "the expanded article must not create horizontal page scrolling");
+		const readout = page.locator(".main-content .table-wrapper").filter({ has: page.getByRole("columnheader", { name: "Element", exact: true }) });
+		assert.equal(await readout.count(), 1, "the touchscreen readout table is present");
+		const table = await readout.evaluate(element => ({ width: element.getBoundingClientRect().width, scroll: element.scrollWidth, client: element.clientWidth }));
+		assert.ok(table.width <= 961 && table.width >= dimensions.prose, "ordinary descriptive tables stay readable without spreading across the full media area");
+		assert.ok(table.scroll <= table.client + 1, "the ordinary readout table needs no sideways panning on desktop");
+		const reference = await page.locator(".reference-table").evaluate(element => element.closest(".table-wrapper").getBoundingClientRect().width);
+		assert.ok(reference >= table.width && reference <= 1281, "the settings matrix can use extra width without becoming unbounded");
 	});
 }
 
@@ -151,15 +169,38 @@ for (const viewport of [{ width: 360, height: 800 }, { width: 390, height: 844 }
 	});
 }
 
-for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }, { width: 360, height: 800 }]) {
 	test(`the repository logo and native home link work without JavaScript at ${viewport.width}px`, options, async t => {
-		const page = await pageFor(t, { viewport, javaScriptEnabled: false });
+		const page = await pageFor(t, { viewport, javaScriptEnabled: false, deviceScaleFactor: viewport.width === 390 ? 2 : 1 });
 		await page.goto(siteUrl("installation.html"));
 		const home = page.locator(".site-title");
 		const logo = home.locator("img");
 		assert.equal(await logo.count(), 1, "the project logo is a real image inside the home link");
-		const image = await logo.evaluate(element => ({ complete: element.complete, width: element.naturalWidth, height: element.naturalHeight, src: element.currentSrc }));
-		assert.ok(image.complete && image.width >= 32 && image.height >= 32, "the native logo asset loads at a useful density");
+		const image = await logo.evaluate(element => {
+			const box = element.getBoundingClientRect();
+			const link = element.closest("a");
+			const linkBox = link.getBoundingClientRect();
+			const header = element.closest(".site-header").getBoundingClientRect();
+			return {
+				complete: element.complete, width: element.naturalWidth, height: element.naturalHeight, src: element.currentSrc,
+				renderedWidth: box.width, renderedHeight: box.height, density: window.devicePixelRatio,
+				withinHeader: linkBox.left >= header.left && linkBox.right <= header.right && linkBox.top >= header.top && linkBox.bottom <= header.bottom,
+				clipped: link.scrollWidth > link.clientWidth + 1 || link.scrollHeight > link.clientHeight + 1
+			};
+		});
+		assert.ok(image.complete && image.renderedWidth >= 44 && image.renderedHeight >= 44, "the real logo has a legible presence on desktop and phone");
+		assert.ok(image.width > 0 && image.height > 0, "the native logo image decodes");
+		const logoResponse = await page.request.get(image.src);
+		assert.equal(logoResponse.status(), 200);
+		const logoBytes = await logoResponse.body();
+		assert.equal(logoBytes.subarray(1, 4).toString(), "PNG", "the selected logo source is the shipped PNG derivative");
+		// naturalWidth is density-corrected for a 2x srcset candidate. Read the
+		// encoded PNG dimensions to detect an undersized high-density source.
+		assert.ok(logoBytes.readUInt32BE(16) >= image.renderedWidth * image.density - 1 && logoBytes.readUInt32BE(20) >= image.renderedHeight * image.density - 1,
+			"the responsive logo source supplies enough pixels for the display density");
+		assert.ok(Math.abs(image.renderedWidth - image.renderedHeight) <= 1, "the logo keeps its square geometry");
+		assert.ok(image.withinHeader && !image.clipped, "the larger logo and wordmark fit inside the header without clipping");
+		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, "branding must not create horizontal page overflow");
 		assertWithinSite(image.src);
 		assert.equal(new URL(await home.getAttribute("href"), base).href, siteUrl());
 		await home.focus();

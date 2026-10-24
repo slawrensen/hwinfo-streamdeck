@@ -58,16 +58,16 @@
   ],
   "recommendedUse": {
     "desktopHeader": {
-      "src": "hwinfo-logo-32.png",
-      "srcset": "hwinfo-logo-32.png 1x, hwinfo-logo-64.png 2x",
-      "cssWidth": 32,
-      "cssHeight": 32
+      "src": "hwinfo-logo-48.png",
+      "srcset": "hwinfo-logo-48.png 1x, hwinfo-logo-96.png 2x",
+      "cssWidth": 48,
+      "cssHeight": 48
     },
     "phoneHeader": {
-      "src": "hwinfo-logo-32.png",
-      "srcset": "hwinfo-logo-32.png 1x, hwinfo-logo-64.png 2x",
-      "cssWidth": 28,
-      "cssHeight": 28
+      "src": "hwinfo-logo-48.png",
+      "srcset": "hwinfo-logo-48.png 1x, hwinfo-logo-96.png 2x",
+      "cssWidth": 48,
+      "cssHeight": 48
     },
     "favicon": [
       "favicon.ico",
@@ -82,7 +82,8 @@
     "The supplied SVG marketplace source contains font references; prefer released raster derivatives so browser font substitution cannot change the mark.",
     "No new brand geometry, recoloring, typography, readings or decorative effects were created.",
     "Use empty alt for the image when adjacent text in the same home link already says HWiNFO Sensors.",
-    "Do not apply CSS filters or another border to the existing tile. Its dark rim and corner shape are part of the authentic source."
+    "Do not apply CSS filters or another border to the existing tile. Its dark rim and corner shape are part of the authentic source.",
+    "The 48px documentation header uses direct 48px and 96px derivatives for standard and high-density screens; existing favicon and Apple-touch assets are retained unchanged."
   ],
   "assets": [
     {
@@ -102,12 +103,28 @@
       "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
     },
     {
+      "src": "hwinfo-logo-48.png",
+      "width": 48,
+      "height": 48,
+      "bytes": 2548,
+      "sha256": "5579bb05d1d18cf7d9232d222256a4defbcac81a355a62c7373c17c7a7d58b5a",
+      "transformation": "Lanczos downsample from the released 512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
       "src": "hwinfo-logo-64.png",
       "width": 64,
       "height": 64,
       "bytes": 3681,
       "sha256": "732e5d26e7ff23f1f37867cb54871eff57017190a89f6a6526da1bb2bf6c2ce0",
       "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "hwinfo-logo-96.png",
+      "width": 96,
+      "height": 96,
+      "bytes": 6237,
+      "sha256": "1361c0bc3dec6d0205842e4a19ec46af6ca7da2e89d7dde793f479f131c417da",
+      "transformation": "Lanczos downsample from the released 512px raster; original colors, type, geometry and transparency retained."
     },
     {
       "src": "hwinfo-logo-180.png",

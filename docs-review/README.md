@@ -4,6 +4,8 @@ Audit date: 24 October 2026. Scope: the complete documentation site, its assets,
 
 The subsequent [responsive, branding and installation follow-up](responsive-followup.md) implements the user's review corrections. It replaces the initial constrained media column and horizontal theme strip with a fluid shell and wrapping samples, uses the actual released app icon, and adds a minimal HWiNFO Pro recommendation. Its independent checks and publication identity are recorded separately from the initial review below.
 
+The latest [ultrawide bounds and logo follow-up](ultrawide-bounds.md) refines that fluid layout: the complete workspace is centered within 1920px, ordinary tables stop at 960px, and the authentic logo renders at 48px on desktop and phone. Its candidate checks and independent rendered comparison are recorded separately; the PR identifies the final published build.
+
 ## Source and release identity
 
 The audited source is [bb4aedecbce499e199df8af63793a1490c0fb6ed](https://github.com/slawrensen/hwinfo-streamdeck/commit/bb4aedecbce499e199df8af63793a1490c0fb6ed). The separately resolved annotated [v1.7.1 tag](https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1) points to that commit; the stable package is 1.7.1.0. Marketplace was checked separately and advertises 1.7, with 1.7.0.0 release notes. [Release evidence](release-evidence.md) records source-backed claims and their qualifications.

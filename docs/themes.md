@@ -3,7 +3,7 @@ title: Themes & colors
 nav_order: 6
 ---
 
-Seven themes control the background, text, graphs and dividers. Set a theme per key or dial, or pick **Default** to follow the shared theme. **Type accents** color graphs and indicators by sensor category. Alerts take priority over normal colors.
+Seven themes control the background, text, graphs and dividers. Set a theme per key or dial, or pick **Default** to follow the shared theme. **Type accents** color graphs and indicators by sensor category. Alerts take priority over normal colors. A dial's **Background** can let the touch strip picture show instead of the theme's background ([Transparent background](sensor-dial.md#transparent-background)).
 
 > This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
 

@@ -27,6 +27,64 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-10-24: 1.7.1.0, soak scope and what the dial looks cost the app
+
+**Soak scope.** The runbook asks for a hardware soak when a release
+touches `native/hwsm` or the poller. `git diff v1.7.0 -- native
+src/poller.ts src/hwinfo` is empty for 1.7.1.0, so the rule does not
+apply. This records what ran anyway, on the 1.7.0.2 preview (#51 and #52
+with Glass, Outline and Clear; pack `d63ccf1a…`), and why the two changes
+made after it did not start a new one.
+
+| Run | Value |
+| --- | ---: |
+| Soak 3, `release/bench-1.7.0.2/soak-1.7.0.2-20261016-0659.csv` | 11.8 h, 709 samples, one PID |
+| RSS / private bytes slope, soak 3 | +0.03 / +0.08 MB/30 min |
+| Private bytes plateau, soak 3 | 64.4 MB from the first hour |
+| Field run, no sampler (the plugin PID's own counters at the end) | 2026-10-19T18:02Z to 2026-10-24T04:43Z, 106.7 h, one PID |
+| Private bytes / handles at the end of the field run | 64.9 MB / 177 |
+| CPU over the field run | 805 s, 0.21% of one core |
+| Log over the field run | 1 WARN, 0 ERROR |
+
+During the field run four + XL dials drew Outline over a touch strip
+picture. The one WARN is HWiNFO closing at 2026-10-23T00:10Z; the plugin
+reopened shared memory when it came back at 00:15Z, with no restart. Both
+decks disconnected and reconnected six times overnight (the app's device
+sleep; the PC did not sleep). The run ended when the Stream Deck app was
+quit and started again at 04:43Z, and the plugin came back in 15 s.
+
+Made after these runs: **Tint**, whose face is the Outline face for the
+same inputs plus one flat paint (pinned by `test/dial-background.test.ts`;
+both paints ran in the soaked bytes), and **Words in the accent color**,
+which changes text fills only. Neither adds a timer, cache, handle or
+per-frame allocation beyond the one SVG string the composer already builds
+for each changed frame, so neither moves what a soak measures. What they
+can move is the work the Stream Deck app does to draw a face, measured
+next.
+
+**App cost per look.** Stream Deck 7.6.0.23012 (Qt 6.11.1) on this PC, the
+1.7.1.0 candidate installed, six Sensor Dials on the + XL over the same
+1200 x 100 strip picture, Midnight, the same six views and readings, and
+no keys on the page; only the Background differs. Each run starts the app
+in the background (`--runinbk`, no window), waits 100 s (the app spends
+about 70 s near a full core after every start), then reads the app's and
+the plugin's own CPU time over 60 s. Two passes, the second in reverse
+order. Raw rows: `release/bench-1.7.1/app-cpu-per-look-20261023.csv`.
+
+| Look | StreamDeck.exe, % of one core (pass 1 / 2) | Plugin, % of one core |
+| --- | ---: | ---: |
+| Theme | 5.5 / 2.6 | 0.18 / 0.05 |
+| Glass | 6.8 / 5.5 | 0.23 / 0.16 |
+| Tint | 8.6 / 9.1 | 0.13 / 0.08 |
+| Outline | 6.3 / 4.8 | 0.21 / 0.16 |
+| Clear | 7.5 / 6.1 | 0.18 / 0.10 |
+
+Tint measured highest in both passes, at most 9.1% of one core (about
+0.3% of this 32-thread machine). The app's own background work moves a
+run by about 3 points, as Theme's two passes show, so only Tint's lead is
+larger than the noise. The 2026-10-09 entry below has the per-face render
+times in QtSvg 6.9.3.
+
 ### 2026-10-11: the 1.7.0.0 soak closed clean
 
 `node scripts/soak-monitor.mjs --summary release/soak-1.7.0.0-d26-20261010-1220.csv`.

@@ -37,10 +37,10 @@ behind them, and a fix for custom detail lists.
   and units, statistics and other names halfway to it, each kept at the
   4.5:1 floor on that look (a calculation). Values, alert colors and a
   Custom text color do not change. Off by default.
-- In the Stream Deck app's SVG renderer (QtSvg 6.9.3, on my PC), an
-  Outline face takes 1.5 to 3 times as long to draw as a Theme face, a
-  Glass face up to 1.2 times, and a Clear face slightly less than Theme.
-  See PERF.md.
+- With six dials on a Stream Deck + XL, the Stream Deck app (7.6) used
+  2.6 to 9.1% of one CPU core across the five looks; Tint measured
+  highest. In the app's SVG renderer (QtSvg 6.9.3, on my PC) an Outline
+  face takes 1.5 to 3 times as long to draw as a Theme face. See PERF.md.
 - A custom detail list keeps each label, color and tile on its own
   reading when a confirmed source link or a new **Reading** pick makes a
   listed key the key's own reading

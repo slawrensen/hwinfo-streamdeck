@@ -8,6 +8,18 @@ changes how sources, identities and history are handled.** The upgrade
 rewrites no stored settings. The tables below say where a change needs you to act; the
 [changelog](changelog.md) lists every change.
 
+## 1.7.1
+
+- **Background** under Display lets a Sensor Dial show the touch strip
+  picture set in the Stream Deck app: **Glass**, **Tint**, **Outline** or
+  **Clear**. **Theme**, the default, draws every dial as before. See
+  [Transparent background](sensor-dial.md#transparent-background).
+- **Words in the accent color** draws a see-through dial's title and
+  selected row in its accent color (Glass, Tint and Outline).
+- A custom detail list keeps each label, color and tile on its own reading
+  when a source link or a new **Reading** pick makes a listed key the key's
+  own reading. See [Choosing the list](sensor-details.md#choosing-the-list).
+
 ## UX improvements in the settings panels
 
 The Sensor Reading, Sensor Dial and HWiNFO Control panels share one layout.

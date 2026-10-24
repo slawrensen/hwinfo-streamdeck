@@ -14,6 +14,8 @@ no ads, no telemetry.
 *Production renderers with sample readings and generated histories. This is
 a layout comparison, not a hardware photograph.*
 
+> **1.7.1** lets a Sensor Dial show the touch strip picture behind it
+> ([Transparent background](sensor-dial.md#transparent-background)).
 > **1.7** redesigns the settings panels, adds per-reading dial colors and
 > changes how sources, identities and history are handled.
 > [See what changed for you](whats-new-1.7.md).
@@ -22,9 +24,10 @@ a layout comparison, not a hardware photograph.*
 
 - **Keys:** one to four readings, custom labels, current or historical values,
   and a sparkline, bar or ring on single-reading keys.
-- **Dials:** a single reading or a two- or three-row overview. Rotate through
-  readings, use named groups or enable auto-cycle. Local session statistics
-  record accepted observations.
+- **Dials:** a single reading or a two- or three-row overview, over the
+  theme's background or the touch strip picture. Rotate through readings,
+  use named groups or enable auto-cycle. Local session statistics record
+  accepted observations.
 - **Colors:** seven themes, per-action or shared text settings, and
   individual reading colors on multi-row dials in 1.7. Alerts take priority.
 - **Details:** press a key to open a page for its source, a custom list or a

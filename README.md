@@ -31,6 +31,10 @@
 </p>
 
 > [!NOTE]
+> **1.7.1** lets a Sensor Dial show the touch strip picture behind it: set
+> **Background** to Glass, Tint, Outline or Clear. See
+> [Transparent background](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-dial.html#transparent-background).
+>
 > **1.7** redesigns the settings panels, adds individual dial colors and
 > changes how sources, saved readings and HWiNFO's statistics are handled.
 > The upgrade rewrites no stored settings; [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html)
@@ -70,6 +74,11 @@ One reading or several on each Stream Deck + and + XL touchscreen segment, in an
 - **View**: one reading with a range bar, three compact rows, or two rows with big values and a trend line.
 - At warn and critical the bar turns amber or red; in the two- and three-row views, which have no bar, the alerting row's number does. The rest of the face keeps its theme.
 - **Reading colors**: give each reading on a two- or three-row dial its own number color, or start from the Signal, Pairs or Uniform presets.
+- **Background**: Glass, Tint, Outline or Clear show the touch strip picture set in the Stream Deck app behind the dial. **Words in the accent color** colors the words on Glass, Tint and Outline.
+
+<img src=".github/readme/backgrounds.jpg" width="100%" alt="Six Stream Deck + XL touch strips, each with six live dials over one picture: the Cosmic Cliffs, an aurora over the Earth's horizon, a night aurora, a dusk gradient, a starfield and a pale mist, in Tint and Clear">
+
+<sub>Stream Deck app captures with live readings on a Stream Deck + XL. Strip pictures: the Cosmic Cliffs (NASA, ESA, CSA, STScI), auroras photographed from the International Space Station (NASA), and gradients I made.</sub>
 - Rotate to move through the readings; the marked row follows and the list scrolls. Touch cycles stats; push resets the session.
 - An **HWiNFO Control** key steers a dial from a pedal, a Multi Action or another deck.
 

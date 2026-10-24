@@ -16,7 +16,7 @@ dated rows below say what ran on which build.
 
 | Device | Keys | Dials | Status |
 | --- | --- | --- | --- |
-| Stream Deck + XL (9x4, 6 dials) | Yes | Yes | **Physically verified** 2026-07-09: 36 keys + 6 dials live, all themes, alerts, sparklines, touchscreen dials, 0.1 % CPU (see PERF.md). Elite/Custom preset gestures and rotation groups were physically verified on the same device on 2026-07-12. |
+| Stream Deck + XL (9x4, 6 dials) | Yes | Yes | **Physically verified** 2026-07-09: 36 keys + 6 dials live, all themes, alerts, sparklines, touchscreen dials, 0.1 % CPU (see PERF.md). Elite/Custom preset gestures and rotation groups were physically verified on the same device on 2026-07-12. Glass and Outline dial backgrounds over a touch strip picture ran on it from 2026-10-16 (1.7.1 previews, Stream Deck 7.4 and 7.6); Tint and **Words in the accent color** ran on it on 2026-10-23 (Stream Deck 7.6). |
 | Stream Deck +, 15-key, MK.2 | Yes | Yes (+) | SDK simulated: the e2e suite registers a 15-key (type 0) and a + (type 7) and drives keys on the former; every dial event is driven on the + XL, whose dials share the + code path. The + 4x2/4-encoder shape is locked by capability fixtures. |
 | Stream Deck XL, Mini, Neo | Yes | n/a | Compatible with limitations: XL, Mini and Neo grids are locked by capability fixtures (`test/devices.test.ts`), and the key rendering they share is device-independent and e2e-driven on a mock 5x3 deck. Neo's info bar and touch points are not used. |
 | Stream Deck Mobile / Virtual | Yes | n/a | Compatible with limitations: grids are taken from what the app reports; grid changes while running need Stream Deck 7.0 (below that, reconnect refreshes them). |

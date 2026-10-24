@@ -84,7 +84,7 @@ measurement to avoid that.
 
 ![The Display section of the dial's settings panel: Text color on Theme text, Background on Theme with its help line, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
 
-*An actual settings-panel capture at panel build 1.7.0.0-d28 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
+*An actual settings-panel capture at panel build 1.7.1.0-1 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
 ![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
 
@@ -194,6 +194,10 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 | **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
 | **Clear** | No background and no outline. | Depends on the picture. |
 
+![Three touch strips from a Stream Deck + XL, each with six dials over one picture: the Cosmic Cliffs, an aurora over the Earth's horizon and a pale mist. From left, the same reading drawn in Theme, Glass, Tint, Outline and Clear, then a three-row overview in Tint.]({{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }})
+
+*Stream Deck app captures with live readings on a Stream Deck + XL. From left: Theme, Glass, Tint, Outline, Clear, then Tint in the three-row view. Strip pictures: the Cosmic Cliffs (NASA, ESA, CSA, STScI), auroras photographed from the International Space Station (NASA), and gradients I made.*
+
 **Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert can draw a lighter amber or red (a darker one on Paper) where the theme's own falls short there. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
 
 **Tint.** The panel is the theme's background at 50%, so more of the picture shows than on Glass. Over a white picture (black on **Paper**) that panel leaves the theme's own text below 4.5:1, so Tint does not rely on it: it draws Outline's 1 px outline and uses Outline's text colors, described next.
@@ -205,6 +209,10 @@ With **Warn at** or **Critical at** set, the bar's track also marks the threshol
 **Words in the accent color.** On Glass, Tint and Outline, a box under **Background** draws the dial's words in its accent color, the color of the range bar and the rail mark. The title, the selected row's name and the context line's name take the accent. Units, statistics and the other rows' names take their usual color moved halfway toward it, and the selected row's name never has less contrast than they do. With **Accent colors** (Advanced, Shared defaults) on **By sensor type**, the accent is the sensor type's color, so the words change color with the reading on the dial. Under **Dimmed** the accent dims with the rest of the text. Values, alert colors, **Color numbers by sensor type**, **Reading colors** and a **Custom color** for text do not change.
 
 Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (a calculation). Where an accent falls short of it, mostly on Glass, the word draws a lighter shade of it than the bar (a darker one on **Paper**). **Paper**'s accent is a dark gray, so on Paper the words change little. Clear does not offer the box: with no panel and no outline, a word has only the picture behind it, and the value color is already the theme's most readable color there.
+
+![A Stream Deck + XL page: 36 Sensor Reading keys in Midnight, and six Tint dials with Words in the accent color over the Cosmic Cliffs across the whole touch strip.]({{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }})
+
+*A Stream Deck app capture of a whole + XL page with live readings: Midnight keys, and six dials on Tint with Words in the accent color. Strip picture: the Cosmic Cliffs (NASA, ESA, CSA, STScI).*
 
 On Glass, Tint, Outline and Clear:
 

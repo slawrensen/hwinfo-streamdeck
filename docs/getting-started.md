@@ -44,7 +44,7 @@ Choose a guide for the next setting you want to change:
 
 - **[Sensor Reading (keys)](sensor-reading.md)**. Every key setting: **Label on the key**, **Readings on this key** (one reading, two stacked, three rows, or a quad grid of four), **Value shown** (current value, minimum, maximum or average), **Decimals**, the **°F** box, **Graph under the value** (sparkline, bar or ring), and what **A press** does.
 - **[Sensor details (drill-down)](sensor-details.md)**. A key press can instead open a full page of related readings, with the pressed key staying live as the Back tile. One bundled view per deck type, installed on first use.
-- **[Sensor Dial (Stream Deck +)](sensor-dial.md)**. The dial/touchscreen action for the Stream Deck + and + XL: rotate-to-switch, the rotation list, auto cycle, push-to-reset, and a session range bar.
+- **[Sensor Dial (Stream Deck +)](sensor-dial.md)**. The dial/touchscreen action for the Stream Deck + and + XL: rotate-to-switch, the rotation list, auto cycle, push-to-reset, a session range bar, and a background that can let the touch strip picture show through.
 - **[Dial controls & presets](controls.md)**. The Legacy, Elite and Custom gesture presets, rotation groups, touch zones, pause/pin, **A stats reset clears**, and the **HWiNFO Control** key action that drives dials from any key or pedal.
 - **[Themes](themes.md)**. The seven presets (Void, Graphite, Ultraviolet, Midnight, Forest, Ember, Paper), **Default** versus a key's own theme, and **Accent colors**.
 - **[Thresholds & alerts](thresholds-alerts.md)**. **Warn at** / **Critical at** and the **Alert when the value drops to or below these numbers** checkbox for fan RPM, free space, and other alert-when-low readings.

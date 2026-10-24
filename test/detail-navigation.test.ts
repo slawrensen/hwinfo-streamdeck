@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { DetailNavigator } from "../src/detail/navigation";
+import { applyReadingLinks } from "../src/hwinfo/reading-links";
 import { tickSignature } from "../src/detail/tick-signature";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
 
@@ -742,4 +743,43 @@ describe("the navigator's own clock ignores wall-clock corrections", () => {
 			}
 		});
 	}
+});
+
+describe("a version 2 tile plan across a link change mid-session", () => {
+	// The panel saves detailTilesVersion 2 with a plan: every listed key holds
+	// a cell, so a link that makes a listed key the opener's own reading
+	// hides that cell in place. refresh() re-resolves with the stored
+	// settings, the marker included, so labels stay on their readings.
+	const S = [0, 1, 2].map((n) => `f0001234:0:100000${n}`) as [string, string, string];
+	const G0 = "g:Box:Zero";
+	const shm = snapshotOf(S.map((k, i) => reading(k, 0, `Reading ${i}`)), ["Box"]);
+	const linked = applyReadingLinks(shm, [{ sharedMemory: S[0], gadget: G0, unit: "°C", sensorType: SensorType.Temperature }], 1);
+	const settings = {
+		readingKey: S[0],
+		detailMode: "custom",
+		detailKeys: [G0, S[1], S[2]],
+		detailTiles: [
+			{ size: 2, labels: ["ZERO", "ONE"], colors: ["#111111", "#222222"] },
+			{ size: 1, labels: ["TWO"] }
+		],
+		detailTilesVersion: 2
+	};
+
+	it("entered unlinked, then linked, then unlinked: labels stay on their readings and the plan comes back exactly", async () => {
+		const { nav } = bed();
+		assert.equal(await nav.enter({ deviceId: "dev1", deviceType: 0, settings, snapshot: shm }), "entered");
+		const dressing = (): string[] => {
+			const page = nav.pageFor(nav.stateFor("dev1")!);
+			return page.chunks.flatMap((chunk, t) => chunk.map((key, i) => `${key}=${page.specs[t]?.labels[i] ?? ""}`));
+		};
+		const original = nav.pageFor(nav.stateFor("dev1")!).specs.slice(0, 2);
+		assert.deepEqual(dressing(), [`${G0}=ZERO`, `${S[1]}=ONE`, `${S[2]}=TWO`]);
+		nav.refresh("dev1", linked);
+		assert.deepEqual(nav.stateFor("dev1")?.group.keys, [S[1], S[2]]);
+		assert.deepEqual(dressing(), [`${S[1]}=ONE`, `${S[2]}=TWO`]);
+		assert.deepEqual(nav.pageFor(nav.stateFor("dev1")!).specs[0]?.colors, ["#222222"]);
+		nav.refresh("dev1", shm);
+		assert.deepEqual(dressing(), [`${G0}=ZERO`, `${S[1]}=ONE`, `${S[2]}=TWO`]);
+		assert.deepEqual(nav.pageFor(nav.stateFor("dev1")!).specs.slice(0, 2), original);
+	});
 });

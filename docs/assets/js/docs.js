@@ -286,6 +286,7 @@
 			if (!viewer) buildViewer();
 			opener = trigger;
 			const groupName = link.dataset.imageGroup;
+			viewer.classList.toggle("is-home-capture", groupName === "home-looks");
 			const candidates = groupName ? [...content.querySelectorAll("a[data-image-viewer][data-image-group]")].filter(candidate => {
 				if (candidate.dataset.imageGroup !== groupName) return false;
 				// Inactive carousel slides are intentional group members. Images in

@@ -421,6 +421,23 @@ test("deep links reveal disclosures on direct entry, reload and history navigati
 	await page.waitForFunction(() => document.getElementById("settings-migration")?.closest("details")?.open);
 });
 
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+	test(`direct article fragments start just below the sticky header at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl("sensor-dial.html#transparent-background"), { waitUntil: "networkidle" });
+		const geometry = await page.locator("#transparent-background").evaluate(async heading => {
+			await document.fonts.ready;
+			await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+			const target = heading.getBoundingClientRect();
+			const header = document.querySelector("#main-header").getBoundingClientRect();
+			return { headingTop: target.top, headerBottom: header.bottom, gap: target.top - header.bottom };
+		});
+		assert.ok(geometry.headerBottom > 0 && geometry.headerBottom < viewport.height, "the sticky search header is visible at the deep link");
+		assert.ok(geometry.gap >= 8 && geometry.gap <= 24,
+			`the requested section starts with a compact readable gap below sticky navigation; actual gap ${geometry.gap}px`);
+	});
+}
+
 test("routes, search index and principal assets resolve below the selected base path", options, async t => {
 	const page = await pageFor(t);
 	const responses = [];
@@ -473,7 +490,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 			} else {
 				const legacy = page.getByRole("link", { name: /^Legacy docs/ });
 				const box = await legacy.boundingBox();
-				assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height, "the legacy link is visible before scrolling");
+				// Centering a 44px target inside a bordered 44px bar can place
+				// its edge on a half pixel. Allow only rounding-level tolerance.
+				assert.ok(box && box.y >= -1 && box.y + box.height <= viewport.height + 1, "the legacy link is visible before scrolling");
 				assert.ok(box.height >= 44, "the edition switch retains a usable touch target");
 				assert.equal(new URL(await legacy.getAttribute("href"), page.url()).href, siteUrl(`legacy/${route}`), "the edition switch retains the current page");
 				await legacy.focus();

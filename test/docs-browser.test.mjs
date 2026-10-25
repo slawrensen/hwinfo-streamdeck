@@ -60,6 +60,99 @@ async function focusStaysInViewer(page) {
 		"keyboard focus must remain inside the open modal, not Edit this page or another background control");
 }
 
+async function viewerGeometry(page) {
+	const geometry = await page.locator(".viewer-stage img").evaluate(async image => {
+		await image.decode();
+		await new Promise(resolve => window.requestAnimationFrame(resolve));
+		const stage = image.closest(".viewer-stage");
+		const imageBox = image.getBoundingClientRect();
+		const stageBox = stage.getBoundingClientRect();
+		const style = window.getComputedStyle(stage);
+		const imageStyle = window.getComputedStyle(image);
+		const left = stageBox.left + stage.clientLeft + Number.parseFloat(style.paddingLeft);
+		const top = stageBox.top + stage.clientTop + Number.parseFloat(style.paddingTop);
+		const width = stage.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+		const height = stage.clientHeight - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom);
+		return {
+			source: image.currentSrc,
+			natural: { width: image.naturalWidth, height: image.naturalHeight },
+			box: { left: imageBox.left, top: imageBox.top, width: imageBox.width, height: imageBox.height },
+			available: { left, top, width, height, right: left + width, bottom: top + height },
+			objectFit: imageStyle.objectFit, objectPosition: imageStyle.objectPosition,
+			scroll: { x: stage.scrollLeft, y: stage.scrollTop, maxX: stage.scrollWidth - stage.clientWidth, maxY: stage.scrollHeight - stage.clientHeight }
+		};
+	});
+	// object-fit can fill an element box while letterboxing its image. Measure
+	// the painted content from the browser's actual box, intrinsic image size,
+	// and computed fit/position, rather than mistaking the box for the picture.
+	const { box, natural, objectFit } = geometry;
+	const contain = Math.min(box.width / natural.width, box.height / natural.height);
+	const scale = { contain, cover: Math.max(box.width / natural.width, box.height / natural.height), none: 1, "scale-down": Math.min(1, contain) }[objectFit];
+	const width = objectFit === "fill" ? box.width : natural.width * scale;
+	const height = objectFit === "fill" ? box.height : natural.height * scale;
+	const position = geometry.objectPosition.split(/\s+/);
+	const offset = (value, spare) => value.endsWith("%") ? Number.parseFloat(value) * spare / 100 : Number.parseFloat(value);
+	const left = box.left + offset(position[0], box.width - width);
+	const top = box.top + offset(position[1], box.height - height);
+	return { ...geometry, painted: { left, top, width, height, right: left + width, bottom: top + height } };
+}
+
+function assertFittedImage(geometry) {
+	const { painted, natural, available, scroll } = geometry;
+	const scale = Math.min(available.width / natural.width, available.height / natural.height);
+	assert.ok(Math.abs(painted.width - natural.width * scale) <= 2 && Math.abs(painted.height - natural.height * scale) <= 2,
+		"Fit uses the available viewing area for the complete image, including enlarging a smaller source");
+	assert.ok(painted.left >= available.left - 1 && painted.right <= available.right + 1
+		&& painted.top >= available.top - 1 && painted.bottom <= available.bottom + 1,
+		"Fit displays every image edge inside the viewing area without cropping");
+	assert.ok(Math.abs((painted.left + painted.right) / 2 - (available.left + available.right) / 2) <= 1
+		&& Math.abs((painted.top + painted.bottom) / 2 - (available.top + available.bottom) / 2) <= 1,
+		"the fitted picture stays centered in the viewing area");
+	assert.ok(scroll.maxX <= 1 && scroll.maxY <= 1 && scroll.x <= 1 && scroll.y <= 1, "Fit needs no panning or retained scroll offset");
+}
+
+function assertActualImage(geometry) {
+	const { painted, natural, available } = geometry;
+	assert.ok(Math.abs(painted.width - natural.width) <= 1 && Math.abs(painted.height - natural.height) <= 1,
+		"Actual size renders the image at its native dimensions");
+	if (natural.width <= available.width + 1) {
+		assert.ok(Math.abs((painted.left + painted.right) / 2 - (available.left + available.right) / 2) <= 1,
+			"an image that fits horizontally remains centered at Actual size");
+	}
+	if (natural.height <= available.height + 1) {
+		assert.ok(Math.abs((painted.top + painted.bottom) / 2 - (available.top + available.bottom) / 2) <= 1,
+			"an image that fits vertically remains centered at Actual size");
+	}
+}
+
+async function assertActualImageEdgesReachable(page) {
+	const initial = await viewerGeometry(page);
+	const horizontal = initial.natural.width > initial.available.width + 1;
+	const vertical = initial.natural.height > initial.available.height + 1;
+	assert.ok(horizontal || vertical, "this case exercises a picture that needs panning");
+	if (horizontal) assert.ok(initial.scroll.maxX > 0, "the oversized image can scroll horizontally");
+	if (vertical) assert.ok(initial.scroll.maxY > 0, "the oversized image can scroll vertically");
+	const stage = page.locator(".viewer-stage");
+	const box = await stage.boundingBox();
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	for (const end of [false, true]) {
+		const direction = end ? 1 : -1;
+		await page.mouse.wheel(direction * initial.natural.width * 2, direction * initial.natural.height * 2);
+		await page.waitForFunction(({ end, horizontal, vertical }) => {
+			const stage = document.querySelector(".viewer-stage");
+			const targetX = end ? stage.scrollWidth - stage.clientWidth : 0;
+			const targetY = end ? stage.scrollHeight - stage.clientHeight : 0;
+			return (!horizontal || Math.abs(stage.scrollLeft - targetX) <= 1) && (!vertical || Math.abs(stage.scrollTop - targetY) <= 1);
+		}, { end, horizontal, vertical });
+		const geometry = await viewerGeometry(page);
+		assertActualImage(geometry);
+		if (horizontal) assert.ok(end ? geometry.painted.right <= geometry.available.right + 1 : geometry.painted.left >= geometry.available.left - 1,
+			`the ${end ? "right" : "left"} image edge is reachable by horizontal panning`);
+		if (vertical) assert.ok(end ? geometry.painted.bottom <= geometry.available.bottom + 1 : geometry.painted.top >= geometry.available.top - 1,
+			`the ${end ? "bottom" : "top"} image edge is reachable by vertical panning`);
+	}
+}
+
 for (const viewport of [{ width: 360, height: 800 }, { width: 1280, height: 800 }]) {
 	test(`essential documentation text stays readable without page overflow at ${viewport.width}px`, options, async t => {
 		const page = await pageFor(t, { viewport });
@@ -103,7 +196,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 		await page.goto(siteUrl());
 		await page.locator(".home-intro").waitFor();
 		assert.equal(await page.locator("h1").count(), 1);
-		for (const selector of ["h1", ".home-lead", ".home-actions .button-primary", ".home-requirements strong"]) {
+		for (const selector of ["h1", ".home-lead", ".home-actions .button-primary", ".home-requirements"]) {
 			const box = await page.locator(selector).boundingBox();
 			assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height, `${selector} must be readable before the first viewport ends`);
 		}
@@ -212,9 +305,124 @@ for (const viewport of [{ width: 360, height: 800 }, { width: 390, height: 844 }
 	});
 }
 
+for (const viewport of [
+	{ width: 320, height: 800 }, { width: 360, height: 800 }, { width: 390, height: 844 },
+	{ width: 768, height: 1024 }, { width: 1000, height: 800 }, { width: 1199, height: 800 },
+	{ width: 1200, height: 800 }, { width: 1280, height: 800 }, { width: 3440, height: 1440 }
+]) {
+	test(`larger branding preserves readable text and usable navigation at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl());
+		await page.locator(".site-title img").evaluate(async image => {
+			await document.fonts.ready;
+			await image.decode();
+		});
+		const geometry = await page.locator(".site-header").evaluate(header => {
+			const rectangle = element => {
+				const box = element.getBoundingClientRect();
+				return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width, height: box.height };
+			};
+			const home = header.querySelector(".site-title");
+			const image = home.querySelector("img");
+			const name = home.querySelector("strong");
+			const subtitle = home.querySelector("small");
+			const menu = header.querySelector("#menu-button");
+			const text = [name, subtitle].map(element => {
+				const range = document.createRange();
+				range.selectNodeContents(element);
+				const box = range.getBoundingClientRect();
+				const style = window.getComputedStyle(element);
+				return {
+					text: element.textContent, left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+					height: box.height, lineHeight: Number.parseFloat(style.lineHeight), fontSize: Number.parseFloat(style.fontSize)
+				};
+			});
+			return {
+				header: rectangle(header), home: rectangle(home), image: rectangle(image), text,
+				menu: window.getComputedStyle(menu).display === "none" ? null : rectangle(menu),
+				clipped: home.scrollWidth > home.clientWidth + 1 || home.scrollHeight > home.clientHeight + 1,
+				overflow: document.documentElement.scrollWidth > window.innerWidth + 1
+			};
+		});
+		const withinHeader = box => box.left >= geometry.header.left - 1 && box.right <= geometry.header.right + 1
+			&& box.top >= geometry.header.top - 1 && box.bottom <= geometry.header.bottom + 1;
+		assert.equal(geometry.image.width, viewport.width >= 1200 ? 72 : 56, "the approved logo scale applies across the desktop breakpoint");
+		assert.equal(geometry.image.height, geometry.image.width, "the actual logo retains its square proportions");
+		assert.ok(withinHeader(geometry.home) && withinHeader(geometry.image), "the complete home link and logo stay inside the header");
+		assert.equal(geometry.clipped, false, "branding is not hidden by a constrained link box");
+		for (const text of geometry.text) {
+			assert.ok(withinHeader(text), `${text.text} stays inside the header`);
+			assert.ok(text.left >= geometry.image.right + 4, `${text.text} stays clear of the logo`);
+			assert.ok(text.height <= text.lineHeight + 1, `${text.text} remains on a readable single line`);
+		}
+		assert.ok(geometry.text[0].fontSize >= 16 && geometry.text[1].fontSize >= 14,
+			"enlarging the icon must not shrink the product name or subtitle");
+		assert.ok(geometry.image.top >= geometry.header.top + 6 && geometry.image.bottom <= geometry.header.bottom - 6,
+			"the larger icon retains visible breathing room above and below");
+		if (geometry.menu) {
+			assert.ok(withinHeader(geometry.menu), "the Menu control stays inside the header");
+			assert.ok(geometry.menu.left >= geometry.home.right - 1, "the Menu control and home link do not overlap");
+			assert.ok(geometry.menu.left >= Math.max(...geometry.text.map(text => text.right)) + 8,
+				"the product name and subtitle retain clear separation from Menu");
+			assert.ok(geometry.menu.width >= 44 && geometry.menu.height >= 44, "Menu retains a usable touch target");
+			const menu = page.locator("#menu-button");
+			await menu.click();
+			assert.equal(await menu.getAttribute("aria-expanded"), "true");
+			assert.equal(await page.locator("#site-nav").isVisible(), true, "the larger header does not obstruct navigation");
+			await page.keyboard.press("Escape");
+			assert.equal(await menu.getAttribute("aria-expanded"), "false");
+			assert.equal(await menu.evaluate(element => element === document.activeElement), true, "closing navigation restores the Menu control");
+		}
+		assert.equal(geometry.overflow, false, "branding must not create whole-page horizontal scrolling");
+	});
+}
+
+for (const width of [320, 390]) {
+	test(`narrow navigation labels fit their targets and wrapped links work at ${width}px`, options, async t => {
+		const page = await pageFor(t, { viewport: { width, height: 844 } });
+		await page.goto(siteUrl());
+		await page.locator("#menu-button").click();
+		const labels = await page.locator("#site-nav .nav-list-link").evaluateAll(links => links.map(link => {
+			const range = document.createRange();
+			range.selectNodeContents(link);
+			const target = link.getBoundingClientRect();
+			return {
+				text: link.textContent.trim(), href: link.getAttribute("href"), font: Number.parseFloat(window.getComputedStyle(link).fontSize),
+				target: { left: target.left, right: target.right, top: target.top, bottom: target.bottom, height: target.height },
+				lines: [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0)
+					.map(rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }))
+			};
+		}));
+		assert.ok(labels.length > 0, "the opened menu contains real documentation destinations");
+		for (const label of labels) {
+			assert.ok(label.font >= 16, `${label.text} keeps readable text instead of shrinking to fit`);
+			assert.ok(label.target.height >= 44, `${label.text} retains a usable touch target`);
+			assert.ok(label.lines.length > 0, `${label.text} has visible text`);
+			for (const [index, line] of label.lines.entries()) {
+				assert.ok(line.left >= label.target.left - 1 && line.right <= label.target.right + 1
+					&& line.top >= label.target.top - 1 && line.bottom <= label.target.bottom + 1,
+					`${label.text} stays inside its own target instead of spilling into the adjacent navigation column`);
+				if (index > 0) {
+					const gap = line.top - label.lines[index - 1].bottom;
+					assert.ok(gap >= -1 && gap <= label.font / 2,
+						`${label.text} reads as one label with clear, compact spacing between wrapped lines`);
+				}
+			}
+		}
+		const wrapped = labels.find(label => label.lines.length > 1);
+		assert.ok(wrapped, "the narrow menu exercises an actual wrapped navigation label");
+		assertWithinSite(wrapped.href);
+		await page.locator("#site-nav").getByRole("link", { name: wrapped.text, exact: true }).click();
+		await page.waitForURL(new URL(wrapped.href, base).href);
+		assert.equal(await page.locator('#site-nav [aria-current="page"]').innerText(), wrapped.text,
+			"the wrapped label activates its intended documentation destination");
+		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+	});
+}
+
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }, { width: 360, height: 800 }]) {
 	test(`the repository logo and native home link work without JavaScript at ${viewport.width}px`, options, async t => {
-		const page = await pageFor(t, { viewport, javaScriptEnabled: false, deviceScaleFactor: viewport.width === 390 ? 2 : 1 });
+		const page = await pageFor(t, { viewport, javaScriptEnabled: false, deviceScaleFactor: 2 });
 		await page.goto(siteUrl("installation.html"));
 		const home = page.locator(".site-title");
 		const logo = home.locator("img");
@@ -231,7 +439,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 				clipped: link.scrollWidth > link.clientWidth + 1 || link.scrollHeight > link.clientHeight + 1
 			};
 		});
-		assert.ok(image.complete && image.renderedWidth >= 44 && image.renderedHeight >= 44, "the real logo has a legible presence on desktop and phone");
+		const approvedSize = viewport.width >= 1200 ? 72 : 56;
+		assert.ok(image.complete && image.renderedWidth === approvedSize && image.renderedHeight === approvedSize,
+			"the authentic logo uses the approved desktop or smaller-screen size without JavaScript");
 		assert.ok(image.width > 0 && image.height > 0, "the native logo image decodes");
 		const logoResponse = await page.request.get(image.src);
 		assert.equal(logoResponse.status(), 200);
@@ -252,6 +462,87 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 		assert.match(await page.locator("h1").innerText(), /HWiNFO Sensors/);
 	});
 }
+
+for (const scenario of [
+	{ width: 2048, height: 1220, page: "sensor-dial.html", image: "dial-backgrounds-looks.jpg" },
+	{ width: 3440, height: 1440, page: "", image: "dial-backgrounds-strip.jpg" }
+]) {
+	test(`image viewer enlarges the complete strip in Fit and centers Actual at ${scenario.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport: { width: scenario.width, height: scenario.height } });
+		await page.goto(siteUrl(scenario.page));
+		const opener = page.locator(`.main-content a[data-image-viewer][href$="/${scenario.image}"]`);
+		await opener.click();
+		const dialog = page.locator("dialog.image-viewer");
+		const fit = await viewerGeometry(page);
+		assertFittedImage(fit);
+		assert.ok(fit.natural.width < fit.available.width && fit.natural.height < fit.available.height,
+			"the reported-defect case uses a source smaller than its viewing area");
+		await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+		const actual = await viewerGeometry(page);
+		assertActualImage(actual);
+		assert.ok(fit.painted.width > actual.painted.width * 1.1,
+			"Fit and Actual change the picture's scale materially, rather than merely moving it to a corner");
+		await dialog.getByRole("button", { name: "Fit to screen", exact: true }).click();
+		assertFittedImage(await viewerGeometry(page));
+		await page.keyboard.press("Escape");
+		assert.equal(await opener.evaluate(element => element === document.activeElement), true);
+	});
+}
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+	test(`image viewer fits the complete deck and reaches every native-size edge at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl());
+		await page.locator(".hero-figure .image-link[data-image-viewer]").click();
+		const dialog = page.locator("dialog.image-viewer");
+		const fit = await viewerGeometry(page);
+		assertFittedImage(fit);
+		assert.ok(fit.painted.width < fit.natural.width - 32, "the full-deck image is scaled down to fit this viewport");
+		await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+		assertActualImage(await viewerGeometry(page));
+		await assertActualImageEdgesReachable(page);
+		await dialog.getByRole("button", { name: "Fit to screen", exact: true }).click();
+		assertFittedImage(await viewerGeometry(page));
+		await dialog.getByRole("button", { name: "Close", exact: true }).click();
+	});
+}
+
+test("image viewer refits on resize, centers the fitting axis, and resets when another image opens", options, async t => {
+	const page = await pageFor(t, { viewport: { width: 2048, height: 1220 } });
+	await page.goto(siteUrl("sensor-dial.html"));
+	const strip = page.locator('.main-content a[data-image-viewer][href$="/dial-backgrounds-looks.jpg"]');
+	const deck = page.locator('.main-content a[data-image-viewer][href$="/dial-backgrounds-deck.jpg"]');
+	await strip.click();
+	const dialog = page.locator("dialog.image-viewer");
+	const wide = await viewerGeometry(page);
+	assertFittedImage(wide);
+	await page.setViewportSize({ width: 390, height: 844 });
+	const phone = await viewerGeometry(page);
+	assertFittedImage(phone);
+	assert.ok(phone.painted.width < wide.painted.width / 2, "an already-open picture refits after the viewport narrows");
+	await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+	const actual = await viewerGeometry(page);
+	assertActualImage(actual);
+	assert.ok(actual.natural.width > actual.available.width && actual.natural.height < actual.available.height,
+		"this case needs horizontal panning while its vertical axis still fits");
+	await assertActualImageEdgesReachable(page);
+	await page.keyboard.press("Escape");
+	await deck.click();
+	const replacement = await viewerGeometry(page);
+	assert.match(replacement.source, /dial-backgrounds-deck\.jpg$/);
+	assertFittedImage(replacement);
+	assert.notDeepEqual(replacement.natural, phone.natural, "the replacement loads a genuinely different image size");
+	assert.equal(await dialog.getByRole("button", { name: "Actual size", exact: true }).count(), 1, "opening another picture starts in Fit");
+	await page.keyboard.press("Escape");
+	await strip.click();
+	const reopened = await viewerGeometry(page);
+	assert.match(reopened.source, /dial-backgrounds-looks\.jpg$/);
+	assertFittedImage(reopened);
+	await page.setViewportSize({ width: 2048, height: 1220 });
+	assertFittedImage(await viewerGeometry(page));
+	await page.keyboard.press("Escape");
+	assert.equal(await strip.evaluate(element => element === document.activeElement), true);
+});
 
 test("image viewer contains Shift+Tab from Actual size and restores its opener", options, async t => {
 	const page = await pageFor(t);
@@ -276,10 +567,16 @@ test("image viewer contains Shift+Tab from Actual size and restores its opener",
 	}
 	await page.locator("#search-input").evaluate(input => input.focus());
 	await focusStaysInViewer(page);
+	const fitted = await viewerGeometry(page);
 	await actual.click();
-	assert.equal(await actual.getAttribute("aria-pressed"), "true", "Actual size has an observable toggled state");
+	assert.equal(await actual.innerText(), "Fit to screen", "the button names the action available from Actual size");
+	assert.equal(await actual.getAttribute("aria-pressed"), null, "the changing action label is not exposed as a contradictory pressed toggle");
+	const natural = await viewerGeometry(page);
+	assertActualImage(natural);
+	assert.ok(natural.painted.width > fitted.painted.width + 32, "Actual size changes the displayed full-deck scale");
 	await actual.click();
-	assert.equal(await actual.getAttribute("aria-pressed"), "false");
+	assert.equal(await actual.innerText(), "Actual size");
+	assertFittedImage(await viewerGeometry(page));
 	await page.keyboard.press("Escape");
 	await dialog.waitFor({ state: "hidden" });
 	assert.equal(await opener.evaluate(element => element === document.activeElement), true, "Escape returns focus to the image link");

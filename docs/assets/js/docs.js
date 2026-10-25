@@ -137,7 +137,6 @@
 			stage.classList.toggle("is-full", full);
 			stage.classList.toggle("is-fit", !full);
 			toggle.textContent = full ? "Fit to screen" : "Actual size";
-			toggle.setAttribute("aria-pressed", String(full));
 			requestAnimationFrame(() => {
 				stage.scrollTop = full ? Math.max(0, (stage.scrollHeight - stage.clientHeight) / 2) : 0;
 				stage.scrollLeft = full ? Math.max(0, (stage.scrollWidth - stage.clientWidth) / 2) : 0;
@@ -148,7 +147,7 @@
 			viewer.className = "image-viewer";
 			viewer.setAttribute("aria-labelledby", "image-viewer-title");
 			viewer.setAttribute("aria-describedby", "image-viewer-caption");
-			viewer.innerHTML = '<h2 id="image-viewer-title" class="sr-only">Image viewer</h2><div class="viewer-toolbar"><p class="viewer-caption" id="image-viewer-caption"></p><button type="button" data-viewer-toggle aria-pressed="false">Actual size</button><button type="button" data-viewer-close>Close</button></div><div class="viewer-stage is-fit" tabindex="0" role="region" aria-label="Image, scroll to pan at actual size"><img alt=""></div><p class="viewer-help">Actual size shows the original pixels. Scroll to pan. Escape closes.</p>';
+			viewer.innerHTML = '<h2 id="image-viewer-title" class="sr-only">Image viewer</h2><div class="viewer-toolbar"><p class="viewer-caption" id="image-viewer-caption"></p><button type="button" data-viewer-toggle>Actual size</button><button type="button" data-viewer-close>Close</button></div><div class="viewer-stage is-fit" tabindex="0" role="region" aria-label="Image, scroll to pan at actual size"><img alt=""></div><p class="viewer-help">Actual size shows the original pixels. Scroll to pan. Escape closes.</p>';
 			document.body.append(viewer);
 			stage = viewer.querySelector(".viewer-stage");
 			fullImage = stage.querySelector("img");

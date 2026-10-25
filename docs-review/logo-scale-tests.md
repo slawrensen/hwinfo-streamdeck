@@ -52,3 +52,7 @@ Final source fingerprints checked with these runs:
 | `test/docs-browser.test.mjs` | `4ebc28611cf30c5a8eb72763aa71575c00ac331cbcdc67fa1d8edc25379cbd68` |
 
 Physical Windows/HWiNFO/Stream Deck testing is **UNAVAILABLE** in this check and was not performed. These local checks do not claim field performance measurements, complete accessibility certification or successful publication. The coordinator records the reviewed commit, generated preview commit, matching Pages deployment and served-byte verification separately.
+
+## Publication cache follow-up
+
+The first live publication exposed an existing-session cache mismatch: new HTML loaded the prior unversioned stylesheet. The head template now versions the authored CSS and JavaScript with the generated build identity. An additional browser case checks home and article metadata, resolved asset subpaths, version parameters, and the actual requested URLs against `docs-build.json`. The deferred-startup test also recognizes the script's version query, so it continues to hold the real enhancement request. The final PR records the focused baseline failure, committed-build retests and live publication result for this follow-up; the fingerprints and 51-case results above describe the earlier sizing and navigation candidate.

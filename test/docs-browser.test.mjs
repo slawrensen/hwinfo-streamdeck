@@ -60,6 +60,33 @@ async function focusStaysInViewer(page) {
 		"keyboard focus must remain inside the open modal, not Edit this page or another background control");
 }
 
+test("authored CSS and JavaScript use the generated build identity", options, async t => {
+	const page = await pageFor(t);
+	const requested = new Set();
+	page.on("request", request => requested.add(request.url()));
+	const manifestResponse = await page.request.get(siteUrl("docs-build.json"));
+	assert.equal(manifestResponse.status(), 200, "the generated site exposes its build identity");
+	const manifest = await manifestResponse.json();
+	assert.ok(typeof manifest.build_id === "string" && manifest.build_id.trim(), "the build manifest declares a nonempty identity");
+	for (const route of ["", "sensor-dial.html"]) {
+		await page.goto(siteUrl(route));
+		const declaredBuild = await page.locator('meta[name="docs-build-id"]').getAttribute("content");
+		assert.equal(declaredBuild, manifest.build_id, "home and article HTML belong to the generated build");
+		const assetUrls = await page.locator('head link[rel="stylesheet"][href], head script[src]')
+			.evaluateAll(elements => elements.map(element => element.href || element.src));
+		for (const asset of ["assets/css/docs.css", "assets/js/docs.js"]) {
+			const expected = new URL(asset, base);
+			const matches = assetUrls.map(url => new URL(url)).filter(url => url.pathname === expected.pathname);
+			assert.equal(matches.length, 1, `${asset} is loaded once under the current site base path`);
+			const url = matches[0];
+			assert.equal(url.origin, base.origin, `${asset} stays on the generated site's origin`);
+			assert.deepEqual(url.searchParams.getAll("v"), [declaredBuild],
+				`${asset} uses this build's cache identity so new HTML cannot reuse an unversioned or older authored asset`);
+			assert.ok(requested.has(url.href), `the browser requests the declared version of ${asset}`);
+		}
+	}
+});
+
 async function viewerGeometry(page) {
 	const geometry = await page.locator(".viewer-stage img").evaluate(async image => {
 		await image.decode();
@@ -703,7 +730,7 @@ test("phone navigation is collapsed before the deferred enhancements load", opti
 	let releaseScript;
 	let scriptRequested = false;
 	const scriptReady = new Promise(resolve => { releaseScript = resolve; });
-	await page.route("**/assets/js/docs.js", async route => {
+	await page.route(url => url.origin === base.origin && url.pathname === new URL("assets/js/docs.js", base).pathname, async route => {
 		scriptRequested = true;
 		const response = await route.fetch();
 		await scriptReady;

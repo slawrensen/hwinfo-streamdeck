@@ -17,6 +17,7 @@ The isolated branch starts at production commit `63861eb3d34fd5c6ee24b70168f2dca
 | Fit to screen | The complete image fills the available viewing area while retaining its aspect ratio. Smaller sources can enlarge, so Fit is useful on ultrawide screens. |
 | Actual size | Original image dimensions are preserved. An image stays centered on each axis where it fits; oversized axes scroll to every edge. |
 | Viewer button semantics | The changing label describes the next action. Removing the contradictory pressed state avoids announcing Fit as selected while Actual is displayed. |
+| Deployment cache | The authored CSS and viewer script carry the HTML build identifier in their URLs. A reproduced live reload had new HTML with cached old styling; versioned asset URLs keep an existing browser session on the same build. |
 
 The independent visual review found no reason for another global font increase or a wider workspace. Body text, controls, supporting text and article measure retain the previously reviewed scale. The viewer repair uses CSS sizing, with no new dependency or sizing JavaScript.
 
@@ -60,3 +61,5 @@ Four specialist agents worked in successive waves, with at most three helpers ac
 | UNAVAILABLE | New field performance measurements and a complete accessibility certification; neither is claimed. |
 
 The isolated headless browser could not validate the live HTTPS preview because its certificate trust rejected that origin. No certificate exception was added. Final live verification uses the connected browser and strict HTTPS content/deployment checks, recorded separately in the PR. Local browser results above remain scoped to the local Jekyll builds.
+
+The first publication of this follow-up exposed the cache mismatch in the connected browser. It was not accepted as complete. The final PR record identifies the subsequent deployment with versioned authored assets and the live retest.

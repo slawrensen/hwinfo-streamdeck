@@ -60,6 +60,14 @@ async function focusStaysInViewer(page) {
 		"keyboard focus must remain inside the open modal, not Edit this page or another background control");
 }
 
+async function waitForGalleryImage(page, source) {
+	await page.waitForFunction(expected => {
+		const link = document.querySelector("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+		const image = link?.querySelector("img");
+		return link?.href === expected && image?.complete && image.naturalWidth > 0;
+	}, source);
+}
+
 test("authored CSS and JavaScript use the generated build identity", options, async t => {
 	const page = await pageFor(t);
 	const requested = new Set();
@@ -102,6 +110,8 @@ async function viewerGeometry(page) {
 		const height = stage.clientHeight - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom);
 		return {
 			source: image.currentSrc,
+			stageClass: stage.className,
+			hidden: image.hidden,
 			natural: { width: image.naturalWidth, height: image.naturalHeight },
 			box: { left: imageBox.left, top: imageBox.top, width: imageBox.width, height: imageBox.height },
 			available: { left, top, width, height, right: left + width, bottom: top + height },
@@ -128,7 +138,7 @@ function assertFittedImage(geometry) {
 	const { painted, natural, available, scroll } = geometry;
 	const scale = Math.min(available.width / natural.width, available.height / natural.height);
 	assert.ok(Math.abs(painted.width - natural.width * scale) <= 2 && Math.abs(painted.height - natural.height * scale) <= 2,
-		"Fit uses the available viewing area for the complete image, including enlarging a smaller source");
+		`Fit uses the available viewing area for the complete image, including enlarging a smaller source: ${JSON.stringify(geometry)}`);
 	assert.ok(painted.left >= available.left - 1 && painted.right <= available.right + 1
 		&& painted.top >= available.top - 1 && painted.bottom <= available.bottom + 1,
 		"Fit displays every image edge inside the viewing area without cropping");
@@ -250,8 +260,6 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 		const dimensions = await page.locator(".main-content").evaluate(content => {
 			const prose = [...content.querySelectorAll(":scope > p")].find(p => p.textContent.length > 80 && !p.querySelector("img, picture"));
 			const style = window.getComputedStyle(prose);
-			const context = document.createElement("canvas").getContext("2d");
-			context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
 			const contentBox = content.getBoundingClientRect();
 			const sidebar = document.querySelector(".side-bar").getBoundingClientRect();
 			const main = document.querySelector(".side-bar + .main").getBoundingClientRect();
@@ -264,7 +272,8 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 				tocGap: toc.left - contentBox.right,
 				tocWidth: toc.width,
 				prose: prose.getBoundingClientRect().width,
-				character: context.measureText("0").width,
+				proseLeft: prose.getBoundingClientRect().left,
+				rootFont: Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize),
 				font: Number.parseFloat(style.fontSize),
 				pageOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
 			};
@@ -279,16 +288,16 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 		assert.ok(Math.abs(dimensions.navigationGap) <= 2, "navigation remains attached to the content workspace");
 		assert.ok(dimensions.tocGap >= 24 && dimensions.tocGap <= 64 && dimensions.tocWidth >= 180, "page contents stays beside the article with readable link width");
 		assert.ok(image.width > dimensions.prose * 1.3, "the complete deck capture must not be trapped in the prose column");
-		// CSS ch is a zero-glyph width, not a literal count of characters per line.
-		assert.ok(dimensions.font >= 17 && dimensions.prose >= dimensions.character * 80 - 1
-			&& dimensions.prose <= dimensions.character * 90 + 1,
-		"body copy uses the wider reading column without shrinking its text or becoming unbounded");
+		assert.ok(Math.abs(dimensions.font - 19) < 0.1 && Math.abs(dimensions.prose - 48 * dimensions.rootFont) <= 1
+			&& dimensions.prose > 680,
+		"desktop copy uses the measured wider column and larger type without stretching across the media area");
 		assert.ok(Math.abs(image.width / image.height - image.ratio) < 0.01, "the authentic deck image keeps its aspect ratio");
 		assert.equal(dimensions.pageOverflow, false, "the expanded article must not create horizontal page scrolling");
 		const readout = page.locator(".main-content .table-wrapper").filter({ has: page.getByRole("columnheader", { name: "Element", exact: true }) });
 		assert.equal(await readout.count(), 1, "the touchscreen readout table is present");
-		const table = await readout.evaluate(element => ({ width: element.getBoundingClientRect().width, scroll: element.scrollWidth, client: element.clientWidth }));
+		const table = await readout.evaluate(element => ({ width: element.getBoundingClientRect().width, left: element.getBoundingClientRect().left, scroll: element.scrollWidth, client: element.clientWidth }));
 		assert.ok(table.width <= 961 && table.width >= dimensions.prose, "ordinary descriptive tables stay readable without spreading across the full media area");
+		assert.ok(Math.abs(table.left - dimensions.proseLeft) <= 1, "paragraphs and tables share the article's left edge");
 		assert.ok(table.scroll <= table.client + 1, "the ordinary readout table needs no sideways panning on desktop");
 		const reference = await page.locator(".reference-table").evaluate(element => element.closest(".table-wrapper").getBoundingClientRect().width);
 		assert.ok(reference >= table.width && reference <= 1281, "the settings matrix can use extra width without becoming unbounded");
@@ -296,8 +305,9 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 }
 
 for (const viewport of [
+	{ width: 320, height: 800 }, { width: 390, height: 844 },
 	{ width: 640, height: 400 }, { width: 768, height: 1024 }, { width: 1280, height: 800 },
-	{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 3440, height: 1440 }
+	{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 3440, height: 1440 }, { width: 5120, height: 2160 }
 ]) {
 	test(`article prose uses available width and remains bounded at ${viewport.width}px`, options, async t => {
 		// 640 CSS px exercises the reflow width of a 1280px window at 200% zoom;
@@ -309,26 +319,29 @@ for (const viewport of [
 				await document.fonts.ready;
 				const prose = [...content.querySelectorAll(":scope > p")].find(element => element.textContent.length > 100 && !element.querySelector("img, picture"));
 				const style = window.getComputedStyle(prose);
-				const context = document.createElement("canvas").getContext("2d");
-				context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
 				const article = content.getBoundingClientRect();
 				const paragraph = prose.getBoundingClientRect();
+				const table = content.querySelector(".table-wrapper").getBoundingClientRect();
 				return {
 					article: { width: article.width, left: article.left, right: article.right },
 					prose: { width: paragraph.width, left: paragraph.left, right: paragraph.right },
-					zeroGlyph: context.measureText("0").width,
+					table: { width: table.width, left: table.left, right: table.right },
+					rootFont: Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize),
 					fontSize: Number.parseFloat(style.fontSize),
 					lineHeight: Number.parseFloat(style.lineHeight),
 					viewportWidth: window.innerWidth,
 					pageOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
 				};
 			});
-			assert.ok(geometry.fontSize >= 17 && geometry.lineHeight >= geometry.fontSize * 1.5,
-				`${route}: the wider column preserves comfortable text size and line spacing`);
-			assert.ok(geometry.prose.width >= Math.min(geometry.article.width, geometry.zeroGlyph * 80) - 1,
-				`${route}: prose uses the available width and grows beyond the previous narrow column when space permits`);
-			assert.ok(geometry.prose.width <= Math.min(geometry.article.width, geometry.zeroGlyph * 90) + 1,
-				`${route}: prose remains bounded independently of wider technical tables`);
+			assert.ok(Math.abs(geometry.fontSize - (viewport.width <= 600 ? 16 : 19)) < 0.1
+				&& geometry.lineHeight >= geometry.fontSize * 1.5,
+				`${route}: desktop type is larger while phone text and comfortable line spacing are preserved`);
+			assert.ok(Math.abs(geometry.prose.width - Math.min(geometry.article.width, 48 * geometry.rootFont)) <= 1,
+				`${route}: prose fills the available width up to the measured 768px reading column at the default text size`);
+			if (geometry.article.width > 680) assert.ok(geometry.prose.width > 680,
+				`${route}: spacious layouts grow beyond the former narrow column`);
+			assert.ok(Math.abs(geometry.prose.left - geometry.table.left) <= 1 && geometry.table.width >= geometry.prose.width - 1,
+				`${route}: paragraphs and wider reference tables share a consistent left edge`);
 			assert.ok(geometry.prose.left >= geometry.article.left - 1 && geometry.prose.right <= geometry.article.right + 1
 				&& geometry.article.left >= 0 && geometry.article.right <= geometry.viewportWidth + 1,
 				`${route}: paragraphs and the article fit their available viewport`);
@@ -564,8 +577,8 @@ for (const scenario of [
 for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
 	test(`image viewer fits the complete deck and reaches every native-size edge at ${viewport.width}px`, options, async t => {
 		const page = await pageFor(t, { viewport });
-		await page.goto(siteUrl());
-		await page.locator(".hero-figure .image-link[data-image-viewer]").click();
+		await page.goto(siteUrl("sensor-dial.html"));
+		await page.locator('.main-content a[data-image-viewer][href$="/dial-backgrounds-deck.jpg"]').click();
 		const dialog = page.locator("dialog.image-viewer");
 		const fit = await viewerGeometry(page);
 		assertFittedImage(fit);
@@ -619,7 +632,7 @@ test("image viewer refits on resize, centers the fitting axis, and resets when a
 test("image viewer contains Shift+Tab from Actual size and restores its opener", options, async t => {
 	const page = await pageFor(t);
 	await page.goto(siteUrl());
-	const opener = page.locator(".hero-figure .image-link[data-image-viewer]");
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
 	await opener.focus();
 	await page.keyboard.press("Enter");
 	const dialog = page.locator("dialog.image-viewer");
@@ -645,7 +658,7 @@ test("image viewer contains Shift+Tab from Actual size and restores its opener",
 	assert.equal(await actual.getAttribute("aria-pressed"), null, "the changing action label is not exposed as a contradictory pressed toggle");
 	const natural = await viewerGeometry(page);
 	assertActualImage(natural);
-	assert.ok(natural.painted.width > fitted.painted.width + 32, "Actual size changes the displayed full-deck scale");
+	assert.ok(Math.abs(natural.painted.width - fitted.painted.width) > 32, "Actual size changes the displayed gallery image scale");
 	await actual.click();
 	assert.equal(await actual.innerText(), "Actual size");
 	assertFittedImage(await viewerGeometry(page));
@@ -675,13 +688,194 @@ test("an open image viewer blocks background navigation", options, async t => {
 	const navigation = page.locator('#site-nav a[href$="installation.html"]');
 	const target = await navigation.boundingBox();
 	assert.ok(target);
-	await page.locator(".hero-figure .image-link[data-image-viewer]").click();
+	await page.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]").click();
 	await page.locator("dialog.image-viewer").waitFor({ state: "visible" });
 	const originalUrl = page.url();
 	// A real pointer hit on the covered sidebar may close the viewer's backdrop,
 	// but it must never activate the navigation link underneath it.
 	await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
 	assert.equal(page.url(), originalUrl);
+});
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+	test(`display gallery browses and expands without controls covering images at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl());
+		const gallery = page.locator("[data-gallery]");
+		const slides = gallery.locator("[data-gallery-slide]");
+		const sources = await slides.locator("a[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
+		assert.ok(sources.length >= 2, "the homepage offers multiple authentic display looks");
+		assert.equal(new Set(sources).size, sources.length, "each gallery slide is a distinct source image");
+		assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden])").count(), 1, "only the selected slide is displayed after enhancement");
+		const previous = gallery.getByRole("button", { name: "Previous look", exact: true });
+		const next = gallery.getByRole("button", { name: "Next look", exact: true });
+		const expand = gallery.getByRole("button", { name: "Expand image", exact: true });
+		const controls = await gallery.locator(".gallery-controls").boundingBox();
+		const image = await gallery.locator("[data-gallery-slide]:not([hidden]) img").boundingBox();
+		assert.ok(controls.y >= image.y + image.height - 1, "the navigation and expand affordance sit below the image");
+		for (const control of [previous, next, expand]) {
+			const box = await control.boundingBox();
+			assert.ok(box.width >= 44 && box.height >= 44, "gallery controls remain comfortably usable by touch");
+			assert.ok(await control.getAttribute("title"), "the icon control exposes a tooltip without obscuring the image");
+		}
+		await previous.click();
+		await waitForGalleryImage(page, sources.at(-1));
+		assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources.at(-1),
+			"Previous wraps directly to the last available look");
+		await previous.press("ArrowRight");
+		await waitForGalleryImage(page, sources[0]);
+		assert.match(await gallery.locator("[data-gallery-position]").innerText(), new RegExp(`1 / ${sources.length}$`));
+		await expand.click();
+		const dialog = page.locator("dialog.image-viewer");
+		assert.equal((await viewerGeometry(page)).source, sources[0]);
+		const navigation = dialog.locator(".viewer-navigation");
+		assert.equal(await navigation.isVisible(), true);
+		const stageBox = await dialog.locator(".viewer-stage").boundingBox();
+		const navigationBox = await navigation.boundingBox();
+		assert.ok(navigationBox.y >= stageBox.y + stageBox.height - 1, "lightbox navigation stays outside the image stage");
+		await dialog.getByRole("button", { name: "Next image", exact: true }).click();
+		assert.equal((await viewerGeometry(page)).source, sources[1]);
+		assert.equal(await dialog.locator(".viewer-position").innerText(), `2 / ${sources.length}`);
+		await page.keyboard.press("ArrowLeft");
+		assert.equal((await viewerGeometry(page)).source, sources[0], "arrow keys browse while fitted");
+		await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+		await dialog.locator(".viewer-stage").focus();
+		await page.keyboard.press("ArrowRight");
+		assert.equal((await viewerGeometry(page)).source, sources[0], "Actual size reserves image arrow keys for panning");
+		await dialog.getByRole("button", { name: "Next image", exact: true }).click();
+		assertFittedImage(await viewerGeometry(page));
+		await page.keyboard.press("Escape");
+		assert.equal(await expand.evaluate(element => element === document.activeElement), true, "closing returns to the external Expand button");
+		const activeLink = gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+		await waitForGalleryImage(page, sources[1]);
+		assert.equal(await activeLink.evaluate(link => link.href), sources[1], "the inline gallery retains the selected enlarged look");
+		await activeLink.click();
+		await dialog.getByRole("button", { name: "Next image", exact: true }).click();
+		await viewerGeometry(page);
+		await dialog.getByRole("button", { name: "Close", exact: true }).click();
+		await waitForGalleryImage(page, sources[2 % sources.length]);
+		assert.equal(await activeLink.evaluate(element => element === document.activeElement), true,
+			"an image-link opener restores focus to the currently visible slide after browsing");
+		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+	});
+}
+
+test("gallery preserves its decoded frame during a slow replacement and ignores superseded selection", { ...options, timeout: 30000 }, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl());
+	const gallery = page.locator("[data-gallery]");
+	const slides = gallery.locator("[data-gallery-slide]");
+	assert.ok(await slides.count() >= 3, "the timing case browses past a slow image to another look");
+	const sources = await slides.locator("a[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
+	await waitForGalleryImage(page, sources[0]);
+	const firstCaption = await slides.nth(0).locator("figcaption").innerText();
+	const delayedSource = slides.nth(1).locator("source").first();
+	const delayed = new URL(await delayedSource.getAttribute("srcset"), base);
+	delayed.searchParams.set("gallery-test", "slow-image");
+	let release, requested;
+	const gate = new Promise(resolve => { release = resolve; });
+	const requestSeen = new Promise(resolve => { requested = resolve; });
+	t.after(() => release());
+	await page.route(delayed.href, async route => {
+		requested();
+		await gate;
+		await route.continue();
+	});
+	await delayedSource.evaluate((source, href) => { source.srcset = href; }, delayed.href);
+	const next = gallery.getByRole("button", { name: "Next look", exact: true });
+	await next.click();
+	await requestSeen;
+	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources[0],
+		"a slow replacement leaves the current image visible");
+	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) figcaption").innerText(), firstCaption,
+		"the visible image retains its matching caption while loading");
+	assert.match(await gallery.locator("[data-gallery-position]").innerText(), /Loading look 2/);
+	assert.equal(await next.evaluate(element => element === document.activeElement), true);
+	await next.click();
+	await waitForGalleryImage(page, sources[2]);
+	const response = page.waitForResponse(delayed.href);
+	release();
+	await (await response).finished();
+	await slides.nth(1).locator("img").evaluate(image => image.decode());
+	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources[2],
+		"a superseded request cannot replace the newer selected look");
+	assert.match(await gallery.locator("[data-gallery-position]").innerText(), /3 \/ /);
+});
+
+test("gallery images remain available as ordinary links without JavaScript", options, async t => {
+	const page = await pageFor(t, { javaScriptEnabled: false });
+	await page.goto(siteUrl());
+	const gallery = page.locator("[data-gallery]");
+	const slides = gallery.locator("[data-gallery-slide]");
+	assert.ok(await slides.count() >= 2);
+	assert.equal(await gallery.locator(".gallery-controls").isVisible(), false, "inactive JavaScript controls are not exposed");
+	for (const slide of await slides.all()) {
+		assert.equal(await slide.isVisible(), true, "every look remains available without carousel scripting");
+		const link = slide.locator("a[data-image-viewer]");
+		assertWithinSite(await link.getAttribute("href"));
+		assert.ok(await link.locator("img").getAttribute("alt"));
+	}
+});
+
+test("an unavailable gallery image has a reachable fallback and navigation recovers", options, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl());
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+	const original = await opener.evaluate(link => link.href);
+	const broken = new URL(original);
+	broken.searchParams.set("viewer-test", "invalid-image");
+	await page.route(broken.href, route => route.fulfill({ status: 200, contentType: "image/png", body: "invalid image bytes" }));
+	await opener.evaluate((link, href) => { link.href = href; }, broken.href);
+	await opener.click();
+	const dialog = page.locator("dialog.image-viewer");
+	await dialog.getByRole("link", { name: "Open original image", exact: true }).waitFor({ state: "visible" });
+	assert.match(await dialog.getByRole("status").innerText(), /could not be loaded/);
+	assert.equal(await dialog.getByRole("link", { name: "Open original image", exact: true }).getAttribute("href"), broken.href);
+	assert.equal(await dialog.getByRole("button", { name: "Actual size", exact: true }).isEnabled(), false);
+	for (let i = 0; i < 8; i++) {
+		await page.keyboard.press("Tab");
+		await focusStaysInViewer(page);
+	}
+	await dialog.getByRole("link", { name: "Open original image", exact: true }).focus();
+	await page.keyboard.press("ArrowRight");
+	assertFittedImage(await viewerGeometry(page));
+	await focusStaysInViewer(page);
+	assert.equal(await dialog.locator(".viewer-status").textContent(), "");
+	assert.equal(await dialog.getByRole("link", { name: "Open original image", exact: true }).isVisible(), false);
+	assert.equal(await dialog.getByRole("button", { name: "Actual size", exact: true }).isEnabled(), true);
+	await page.keyboard.press("Escape");
+});
+
+test("a late failure from a previous image cannot overwrite the current gallery selection", { ...options, timeout: 30000 }, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl());
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+	const stale = new URL(await opener.evaluate(link => link.href));
+	stale.searchParams.set("viewer-test", "late-failure");
+	let release, requested, completed;
+	const gate = new Promise(resolve => { release = resolve; });
+	t.after(() => release());
+	const requestSeen = new Promise(resolve => { requested = resolve; });
+	const requestDone = new Promise(resolve => { completed = resolve; });
+	await page.route(stale.href, async route => {
+		requested();
+		await gate;
+		await route.fulfill({ status: 200, contentType: "image/png", body: "invalid image bytes" });
+		completed();
+	});
+	await opener.evaluate((link, href) => { link.href = href; }, stale.href);
+	await opener.click();
+	await requestSeen;
+	const dialog = page.locator("dialog.image-viewer");
+	await dialog.getByRole("button", { name: "Next image", exact: true }).click();
+	const selected = await viewerGeometry(page);
+	release();
+	await requestDone;
+	assert.equal((await viewerGeometry(page)).source, selected.source);
+	assert.equal(await dialog.locator(".viewer-status").textContent(), "", "the obsolete failed request does not change current image status");
+	assert.equal(await dialog.getByRole("link", { name: "Open original image", exact: true }).isVisible(), false);
+	assert.equal(await dialog.getByRole("button", { name: "Actual size", exact: true }).isEnabled(), true);
+	await page.keyboard.press("Escape");
 });
 
 const searches = [

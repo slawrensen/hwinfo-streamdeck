@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "sourceKind": "User-supplied Stream Deck app capture",
+  "processing": "Deterministic crops only at native size. No generated pixels, repainting, recoloring, compositing, resampling or upscaling. Native PNG and WebP exports are pixel-identical to the source crop. Exact original PNG masters are retained in sources/.",
+  "rebuild": "node scripts/docs-gallery-images.mjs",
+  "encoder": {
+    "sharp": "0.35.4",
+    "libvips": "8.18.6",
+    "libwebp": "1.6.0"
+  },
+  "frame": {
+    "width": 830,
+    "height": 450,
+    "cropCoordinates": "[left, top, right, bottom], zero-based, right and bottom exclusive",
+    "keyRows": [
+      [
+        0,
+        78
+      ],
+      [
+        94,
+        172
+      ],
+      [
+        188,
+        266
+      ],
+      [
+        282,
+        360
+      ]
+    ],
+    "keyColumns": [
+      [
+        0,
+        78
+      ],
+      [
+        94,
+        172
+      ],
+      [
+        188,
+        266
+      ],
+      [
+        282,
+        360
+      ],
+      [
+        376,
+        454
+      ],
+      [
+        470,
+        548
+      ],
+      [
+        564,
+        642
+      ],
+      [
+        658,
+        736
+      ],
+      [
+        752,
+        830
+      ]
+    ],
+    "touchStrip": [
+      0,
+      376,
+      830,
+      450
+    ]
+  },
+  "rights": {
+    "credit": "App captures supplied by Stephen Lawrensen.",
+    "background": "Supplied by maintainer; source background identity not provided.",
+    "backgroundDownloads": false,
+    "note": "Color labels describe these captures without asserting an exact theme or background source. These are screenshots with readings, not clean background files. No separate image license is inferred from the repository's software license."
+  },
+  "assets": [
+    {
+      "name": "green-night",
+      "source": "docs/assets/img/showcase/gallery/sources/green-night.png",
+      "originalName": "image(20261025-033735).png",
+      "sourceSha256": "12902cb2ba8815441976526f9cd64072490a6b001c2129b1dbee467db16b6d89",
+      "sourceSize": [
+        888,
+        501
+      ],
+      "crop": [
+        29,
+        28,
+        859,
+        478
+      ],
+      "output": [
+        {
+          "file": "green-night.png",
+          "width": 830,
+          "height": 450,
+          "bytes": 180521,
+          "sha256": "f5b1d7f3f15f5f05b9c0817025db914e7908a0c6504193043282182cb22c97af",
+          "pixelExact": true
+        },
+        {
+          "file": "green-night.webp",
+          "width": 830,
+          "height": 450,
+          "bytes": 134634,
+          "sha256": "3e93ff380e845401cfd3fea2e4aa7a56dfeaaa73bace15e02f0bcb1e75ad4e70",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "name": "green-aurora",
+      "source": "docs/assets/img/showcase/gallery/sources/green-aurora.png",
+      "originalName": "image(20261025-033807).png",
+      "sourceSha256": "ac1c55502014de334578289f4d931c8ef40b09c692e59bb19ccdb4984155a1e9",
+      "sourceSize": [
+        944,
+        495
+      ],
+      "crop": [
+        56,
+        29,
+        886,
+        479
+      ],
+      "output": [
+        {
+          "file": "green-aurora.png",
+          "width": 830,
+          "height": 450,
+          "bytes": 222991,
+          "sha256": "3e70f130b1495f8a364efee496bdf9df9371201879caf60f5042b2544184e76b",
+          "pixelExact": true
+        },
+        {
+          "file": "green-aurora.webp",
+          "width": 830,
+          "height": 450,
+          "bytes": 158330,
+          "sha256": "14b610c075444b50cb3fb8859f3eadd939520c953abb510a6ac4ec0ce96ae7c6",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "name": "violet-dusk",
+      "source": "docs/assets/img/showcase/gallery/sources/violet-dusk.png",
+      "originalName": "image(20261025-033834).png",
+      "sourceSha256": "5dcb0d530d0f59081534ca55976f243257caace83511f733ba9476cea63d53db",
+      "sourceSize": [
+        886,
+        506
+      ],
+      "crop": [
+        27,
+        38,
+        857,
+        488
+      ],
+      "output": [
+        {
+          "file": "violet-dusk.png",
+          "width": 830,
+          "height": 450,
+          "bytes": 141489,
+          "sha256": "de015c5ebec0b2e2c1e79d67f3ff4f56e1ea3e307c031370b2980f88c018134b",
+          "pixelExact": true
+        },
+        {
+          "file": "violet-dusk.webp",
+          "width": 830,
+          "height": 450,
+          "bytes": 121630,
+          "sha256": "b5f09ec02595f6556bb93c3d2a9392a79d3b90742290c1b3e9a7ad354d762285",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "name": "amber-dusk",
+      "source": "docs/assets/img/showcase/gallery/sources/amber-dusk.png",
+      "originalName": "image(20261025-033904).png",
+      "sourceSha256": "7c5cb39c40a38a1cffce2b1d2b820232562b71f78a6018aefccdcf0fbe23ed26",
+      "sourceSize": [
+        884,
+        499
+      ],
+      "crop": [
+        26,
+        30,
+        856,
+        480
+      ],
+      "output": [
+        {
+          "file": "amber-dusk.png",
+          "width": 830,
+          "height": 450,
+          "bytes": 152530,
+          "sha256": "6bc9b83de62f5e77ac07a134ee26869431f814d629bc74d93bcac81c5ef9e963",
+          "pixelExact": true
+        },
+        {
+          "file": "amber-dusk.webp",
+          "width": 830,
+          "height": 450,
+          "bytes": 115066,
+          "sha256": "9f93aea9f48e19b4d9082edd01faf79d5222cff401c98aca97880bd5645b10de",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "name": "cyan-stars",
+      "source": "docs/assets/img/showcase/gallery/sources/cyan-stars.png",
+      "originalName": "image(20261025-033934).png",
+      "sourceSha256": "976c2a25b2db3a5a4a2749c46dfcf0a35c3c1b1cb29450e9b8ad4b4daaac462c",
+      "sourceSize": [
+        909,
+        495
+      ],
+      "crop": [
+        36,
+        31,
+        866,
+        481
+      ],
+      "output": [
+        {
+          "file": "cyan-stars.png",
+          "width": 830,
+          "height": 450,
+          "bytes": 126588,
+          "sha256": "19289b8cf4efa69acecb69da711737ef45e7fa5ff65fa8673adab4aca77bc9b3",
+          "pixelExact": true
+        },
+        {
+          "file": "cyan-stars.webp",
+          "width": 830,
+          "height": 450,
+          "bytes": 69476,
+          "sha256": "25ef07194bd94cecd23849e2e4ac2515df19fc071d257f1070e458bf5c17a7e4",
+          "pixelExact": true
+        }
+      ]
+    }
+  ]
+}

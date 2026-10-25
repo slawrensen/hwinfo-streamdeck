@@ -141,7 +141,10 @@ The settings-panel sensor list is populated live from whatever source is active.
 4. **HWiNFO is running but publishes no readings.** The message says exactly that, with **HWiNFO setup steps**: enable Shared Memory Support, or tick readings for Gadget as in item 2.
 5. **Search filter too narrow.** The list then says "No readings match" with your search. Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/sensor-picker.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/sensor-picker.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The key&#x27;s settings panel with its reading list open: the header with the live face, the theme line and chips, then &quot;gpu&quot; typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i&#x27;s GPU/CPU current rails, then the RTX 5080), each row with its live value and type."></a>
+<figure class="settings-detail">
+  <a class="image-link" data-image-viewer href="{{ '/assets/img/sensor-picker-detail.png' | relative_url }}" aria-label="Enlarge the Reading picker"><img src="{{ '/assets/img/sensor-picker-detail.png' | relative_url }}" width="800" height="784" loading="lazy" decoding="async" alt="Reading search for gpu, with matching readings grouped by sensor and the reload button."></a>
+  <figcaption>Reading picker detail, captured with live HWiNFO in a test host. <a data-image-viewer data-image-caption="Full Sensor Reading settings panel, captured with live HWiNFO in a test host." href="{{ '/assets/img/sensor-picker.png' | relative_url }}">Full settings panel</a>.</figcaption>
+</figure>
 
 ## Only some of the readings I ticked in Gadget show up
 

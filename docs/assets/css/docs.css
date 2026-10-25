@@ -122,6 +122,7 @@ body.docs-site .search-results { left: 0; top: 54px; width: min(760px, calc(100v
 .main-content p:has(> img), .main-content p:has(> picture), .main-content p:has(> .image-link) { max-width: none; margin: 24px 0 12px; }
 .main-content p > em:only-child { display: block; color: var(--muted); font-size: var(--font-small); font-style: normal; line-height: 1.6; }
 .main-content figure { margin: 24px 0; }
+.main-content .settings-detail { max-width: 560px; }
 .main-content figcaption { color: var(--muted); font-size: var(--font-small); line-height: 1.6; margin-top: 10px; }
 .image-strip { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); margin: 24px 0 12px; }
 .image-strip .image-link { display: block; width: max-content; max-width: none; }

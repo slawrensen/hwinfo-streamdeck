@@ -60,6 +60,43 @@ async function focusStaysInViewer(page) {
 		"keyboard focus must remain inside the open modal, not Edit this page or another background control");
 }
 
+for (const viewport of [{ width: 360, height: 800 }, { width: 1280, height: 800 }]) {
+	test(`essential documentation text stays readable without page overflow at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport });
+		await page.goto(siteUrl("troubleshooting.html"));
+		const menu = page.locator("#menu-button");
+		if (await menu.isVisible()) await menu.click();
+		assert.ok(await page.locator("#site-nav").isVisible(), "the sampled navigation is available to readers");
+		const measurements = await page.evaluate(() => {
+			const roles = {
+				"article text": ".main-content > p",
+				"status table headings": ".main-content th",
+				"status table cells": ".main-content td",
+				"inline technical names": ".main-content :not(pre) > code",
+				"code examples": ".main-content pre code",
+				"navigation links": "#site-nav .nav-list-link",
+				"image captions": ".main-content > p > em:only-child",
+				"sidebar help": ".site-footer, .site-footer a, .site-footer span"
+			};
+			const samples = Object.entries(roles).map(([role, selector]) => {
+				const sizes = [...document.querySelectorAll(selector)].filter(element => element.textContent.trim())
+					.map(element => Number.parseFloat(window.getComputedStyle(element).fontSize));
+				return { role, samples: sizes.length, minimum: Math.min(...sizes) };
+			});
+			const markers = [...document.querySelectorAll(".main-content ol > li")]
+				.map(element => window.getComputedStyle(element, "::before"))
+				.filter(style => !["none", "normal"].includes(style.content))
+				.map(style => Number.parseFloat(style.fontSize));
+			return [...samples, { role: "ordered step markers", samples: markers.length, minimum: Math.min(...markers) }];
+		});
+		for (const sample of measurements) assert.ok(sample.samples > 0, `${sample.role} must be present in the rendered reference`);
+		assert.deepEqual(measurements.filter(sample => sample.minimum < 14), [],
+			"essential copy, controls and technical references must not shrink below a readable 14px minimum");
+		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true,
+			"readable reference text must fit the page; wide tables and code scroll within their own regions");
+	});
+}
+
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
 	test(`home identity, download and platform requirement fit ${viewport.width}×${viewport.height}`, options, async t => {
 		const page = await pageFor(t, { viewport });
@@ -420,6 +457,51 @@ test("deep links reveal disclosures on direct entry, reload and history navigati
 	await page.waitForURL(/controls\.html#settings-migration$/);
 	await page.waitForFunction(() => document.getElementById("settings-migration")?.closest("details")?.open);
 });
+
+for (const width of [1440, 1600]) {
+	test(`page contents fits its article position at ${width}px`, options, async t => {
+		const page = await pageFor(t, { viewport: { width, height: 900 } });
+		await page.goto(siteUrl("troubleshooting.html"));
+		const toc = page.locator(".page-toc");
+		const details = toc.locator("details");
+		const summary = details.locator("summary");
+		await toc.waitFor({ state: "visible" });
+		assert.equal(await details.evaluate(element => element.open), width === 1600,
+			"contents starts compact above an article and expanded in its side column");
+		if (width === 1440) {
+			assert.ok((await toc.boundingBox()).height <= 80, "inline contents must not consume the opening screen");
+			const firstFix = await page.locator(".main-content table").first().getByRole("link").first().boundingBox();
+			assert.ok(firstFix && firstFix.y >= 0 && firstFix.y + firstFix.height <= 900,
+				"the first concrete troubleshooting action is visible before scrolling");
+			const resize = async nextWidth => {
+				await page.setViewportSize({ width: nextWidth, height: 900 });
+				await page.evaluate(() => new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))));
+			};
+			await summary.click();
+			assert.equal(await details.evaluate(element => element.open), true, "the inline disclosure opens normally");
+			await resize(1500);
+			assert.equal(await details.evaluate(element => element.open), true, "resizing within the inline layout preserves a reader's open choice");
+			await resize(1600);
+			assert.equal(await details.evaluate(element => element.open), true);
+			await summary.click();
+			await resize(1680);
+			assert.equal(await details.evaluate(element => element.open), false, "resizing within the side layout preserves a reader's closed choice");
+			await summary.click();
+			await toc.locator('a[href="#age-unknown"]').focus();
+			await resize(1440);
+			assert.equal(await details.evaluate(element => element.open), false, "returning to an inline layout restores its compact default");
+			assert.equal(await summary.evaluate(element => element === document.activeElement), true,
+				"collapsing responsive contents must not leave keyboard focus inside hidden links");
+		} else {
+			const box = await toc.boundingBox();
+			const article = await page.locator(".main-content").boundingBox();
+			assert.ok(box.x >= article.x + article.width + 24, "expanded contents occupies the side column beside the article");
+			await toc.locator('a[href="#age-unknown"]').click();
+			await page.waitForURL(/#age-unknown$/);
+			assert.ok(await page.locator("#age-unknown").isVisible(), "contents links reach the concrete status explanation");
+		}
+	});
+}
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
 	test(`direct article fragments start just below the sticky header at ${viewport.width}px`, options, async t => {

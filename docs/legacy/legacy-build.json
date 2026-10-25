@@ -18,6 +18,7 @@
     "Frozen archive source metadata and noindex",
     "Document-relative archive navigation, resources and search targets",
     "44px Legacy documentation bar and same-page Current docs links",
+    "Intrinsic desktop header height keeps the historical wrapped title below the archive bar",
     "Native-dialog focus containment and inert background for the historical image viewer",
     "Image toolbar hit testing and 44px controls",
     "No-JavaScript navigation visibility"
@@ -878,83 +879,83 @@
     },
     {
       "path": "changelog.html",
-      "bytes": 110480,
-      "sha256": "71224023791497066661df33d6622fd1ce483454378387dcc2c5431e30e9f000"
+      "bytes": 110625,
+      "sha256": "c4fac96f4fe20dbe436989f138c2235a7750bfa8411e829cced7c5a41da86aa7"
     },
     {
       "path": "controls.html",
-      "bytes": 45172,
-      "sha256": "16878cce06e7d75ceff08282b04a30f75115f30a2fb2810149d5a55f32d78783"
+      "bytes": 45317,
+      "sha256": "39c6160aa5d4af8c26c0102e9e5c949ff06248019240920fec9e7f16c6cc6487"
     },
     {
       "path": "data-sources.html",
-      "bytes": 50060,
-      "sha256": "9bc91ec985c1c9076271684c98fff7724d3b1345c2042d25bb8369fe6e72125a"
+      "bytes": 50205,
+      "sha256": "3eb40a46311e22cd2530aad41b47b31dec5dca8fc78c7d3072830ae3fe58fc29"
     },
     {
       "path": "faq.html",
-      "bytes": 58349,
-      "sha256": "b017b9cd41c559d5883951fba15f93338567da78462c201f9badebb3c0861d51"
+      "bytes": 58494,
+      "sha256": "5014c2e41a3d0e73a69c6ab99a871fed56dbaece64f90f1a429bf4b7caa6c3cf"
     },
     {
       "path": "getting-started.html",
-      "bytes": 31675,
-      "sha256": "76a75b5c2bc68499537e788f2dd75904dc983aaa21ee10ca5213479be5ffbef4"
+      "bytes": 31820,
+      "sha256": "1b621f70070d530a4764e746a3547cd32fe9afa8c08ba2885609ff7393bcd431"
     },
     {
       "path": "hardware.html",
-      "bytes": 35993,
-      "sha256": "36a9d3bcc96e75fa25afbbd68854b32f3348cb963674ced6e4e57cd8eb25d2e1"
+      "bytes": 36138,
+      "sha256": "03e76581fb411f7a15191d92638f95604575714555ab52f71ab765ea35b994df"
     },
     {
       "path": "index.html",
-      "bytes": 26543,
-      "sha256": "547a66318497b9eafe67f58d0700f00a05c63a179b64222c3bae15d744cc7cc4"
+      "bytes": 26688,
+      "sha256": "8e51f8e5722a025adab331e008c021275a86e538ada16de1c42e5c98887fb2b6"
     },
     {
       "path": "installation.html",
-      "bytes": 34894,
-      "sha256": "79ab5cb9e7c62fdd0436d6cf649398c9949f03073de7df465d1e17ef4992b63d"
+      "bytes": 35039,
+      "sha256": "62c0c2a94f0b84059a1ef69205e62577afbf2c66d649a0d2132009662593f3a9"
     },
     {
       "path": "sensor-details.html",
-      "bytes": 52595,
-      "sha256": "4f7055a67d59ffd51b37f06ae4571c82b615faf5fe4ffa8d6e812c313776b308"
+      "bytes": 52740,
+      "sha256": "6060e802d631ba290b24a6370976ecee30cbe65b386da57c04a5591e4bf82373"
     },
     {
       "path": "sensor-dial.html",
-      "bytes": 71444,
-      "sha256": "2e6079de63beb2137345fcff28e809f3fb6524bb5c1b25129277e941edf009e9"
+      "bytes": 71589,
+      "sha256": "e4c9b55800b0e87c27130192489a1350fbf8068bc9ed4031edd05d5012cde2a9"
     },
     {
       "path": "sensor-reading.html",
-      "bytes": 64364,
-      "sha256": "5a177a83fcbda3628de1f02a4df2f43339ffad9d2fa24e37aee08f088e637eaf"
+      "bytes": 64509,
+      "sha256": "3437b5219b5fc0714c1877a7cc9ee9a8e5be8959af29b10cefce26ee55c1e944"
     },
     {
       "path": "status-screens.html",
-      "bytes": 35128,
-      "sha256": "59ee1fe43b855f74917f219304928fbb311432ecd940fc23f17472c1b337ac04"
+      "bytes": 35273,
+      "sha256": "df986717a1a84c8c8462ddce8b004e6e628ed7af21f36b4044389e2c1f2cb2e2"
     },
     {
       "path": "themes.html",
-      "bytes": 40873,
-      "sha256": "3d3ab7c988d28dde42e30719e075433e5a7766b94899c618d5bb8dfee9d29675"
+      "bytes": 41018,
+      "sha256": "fe5f3386c05b9c882d921490c2e7ccda0236d2410526d079974818e535290b5c"
     },
     {
       "path": "thresholds-alerts.html",
-      "bytes": 35573,
-      "sha256": "67d0552b35450ab7dddcac2b0d1e38caa684f6b541f313647bff6d0791831442"
+      "bytes": 35718,
+      "sha256": "dac5c8239b8042c8787f9cdf108cb8d5e4591254c2776697e4b57722935c8c62"
     },
     {
       "path": "troubleshooting.html",
-      "bytes": 68721,
-      "sha256": "7cf122ffe183bbc673aeac18b9a86f1378e8cc10d5619f6ba7dbc789ff3dd00d"
+      "bytes": 68866,
+      "sha256": "3c85955c7870c53523b44c4195be851fef559811fb996be34562b011afb4e193"
     },
     {
       "path": "whats-new-1.7.html",
-      "bytes": 44145,
-      "sha256": "eb353a3fde72d7b3fd54409460570c06bd1fa4de31f4e4286610cf99f33acca0"
+      "bytes": 44290,
+      "sha256": "f093dcfcce0fea03a4a101ffd8d3c47ef1d7f435486707c48a2ed29757e03267"
     }
   ]
 }

@@ -63,7 +63,11 @@ body.legacy-documentation { padding-top: 44px; }
 .zoom-stage { padding-top: 80px; }
 .zoom-stage:focus-visible { outline: 2px solid #8ac9f8; outline-offset: -4px; }
 .zoom-btn { min-height: 44px; }
-@media (min-width: 50rem) { .legacy-documentation .side-bar { top: 44px; height: calc(100vh - 44px); } }
+@media (min-width: 50rem) {
+  .legacy-documentation .side-bar { top: 44px; height: calc(100vh - 44px); }
+  .legacy-documentation .site-header { height: auto; max-height: none; flex-shrink: 0; }
+  .legacy-documentation .site-title { height: auto; }
+}
 @media (max-width: 49.999rem) { .legacy-banner { justify-content: space-between; gap: 12px; font-size: 12px; } }
 `;
 
@@ -174,7 +178,7 @@ export function buildLegacy({ sourceRoot = ROOT, output = path.join(sourceRoot, 
 			builder: "scripts/docs-legacy-build.mjs", theme: "just-the-docs/just-the-docs@v0.10.1",
 			gemfile_sha256: sha256(fs.readFileSync(path.join(sourceRoot, "Gemfile"))),
 			gemfile_lock_sha256: sha256(fs.readFileSync(path.join(sourceRoot, "Gemfile.lock"))),
-			transformations: ["Hosting URL and base path", "Article-scoped default layout and GitHub Pages documentation plugins", "Frozen archive source metadata and noindex", "Document-relative archive navigation, resources and search targets", "44px Legacy documentation bar and same-page Current docs links", "Native-dialog focus containment and inert background for the historical image viewer", "Image toolbar hit testing and 44px controls", "No-JavaScript navigation visibility"],
+			transformations: ["Hosting URL and base path", "Article-scoped default layout and GitHub Pages documentation plugins", "Frozen archive source metadata and noindex", "Document-relative archive navigation, resources and search targets", "44px Legacy documentation bar and same-page Current docs links", "Intrinsic desktop header height keeps the historical wrapped title below the archive bar", "Native-dialog focus containment and inert background for the historical image viewer", "Image toolbar hit testing and 44px controls", "No-JavaScript navigation visibility"],
 			routes, files };
 		fs.writeFileSync(path.join(destination, "legacy-build.json"), JSON.stringify(manifest, null, 2) + "\n");
 		fs.rmSync(target, { recursive: true, force: true });

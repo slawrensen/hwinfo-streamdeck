@@ -75,9 +75,20 @@
 				links.append(item);
 			});
 			details.append(links);
-			details.open = window.matchMedia("(min-width: 1440px)").matches;
 			toc.append(details);
 			toc.hidden = false;
+			// CSS owns the rail breakpoint. Preserve a manual disclosure choice
+			// until the layout changes between the inline and side positions.
+			let previousSideLayout;
+			const syncContentsLayout = () => {
+				const sideLayout = window.getComputedStyle(toc).position === "sticky";
+				if (sideLayout === previousSideLayout) return;
+				if (!sideLayout && details.contains(document.activeElement)) summary.focus({ preventScroll: true });
+				details.open = sideLayout;
+				previousSideLayout = sideLayout;
+			};
+			syncContentsLayout();
+			window.addEventListener("resize", syncContentsLayout);
 		}
 
 		function revealHash() {

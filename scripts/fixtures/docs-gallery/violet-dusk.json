@@ -1246,11 +1246,11 @@
 		"The caption must identify the result as a renderer reconstruction/sample, not a new live hardware capture or a pixel-identical high-resolution original."
 	],
 	"dialBackgroundInference": {
-		"mode": "outline",
-		"confidence": "high visual consistency, not confirmed by original profile",
-		"textResolver": "dialTextColors(\"outline\", palette, {textMode:\"theme\"})",
+		"mode": "tint",
+		"confidence": "Paired exposed Amber and Violet pixels support 50% Ultraviolet Tint over the shared dusk gradient; the original profile is unavailable.",
+		"textResolver": "dialTextColors(\"tint\", palette, {mode:\"theme\", color:undefined, dimSecondary:false}, false)",
 		"accentWords": false,
-		"note": "White/pale violet words with dark outlines; purple accent rails, graphs and range bars; no rectangular row selection band."
+		"note": "The initial Outline inference was superseded by paired dusk-background measurements. White/pale violet words retain dark outlines; purple accent rails, graphs and range bars remain unchanged."
 	},
 	"backdrop": {
 		"type": "smooth-dusk-gradient",

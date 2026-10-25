@@ -82,12 +82,14 @@ async function sampledBackground(recipe) {
 	for (let row = 0; row < rows; row++) {
 		defs += `<linearGradient id="surface-${row}" gradientUnits="userSpaceOnUse" x1="3" y1="0" x2="827" y2="0">${grid[row].map((c, col) => `<stop offset="${col / (cols - 1)}" stop-color="${color(c)}"/>`).join("")}</linearGradient>`;
 	}
-	for (let row = 0; row < rows - 1; row++) {
-		const y = 379 + row * 67 / (rows - 1);
-		const nextY = 379 + (row + 1) * 67 / (rows - 1);
-		const h = nextY - y + (row === rows - 2 ? 2 : 0.04);
-		defs += `<linearGradient id="surface-blend-${row}" gradientUnits="userSpaceOnUse" x1="0" y1="${y}" x2="0" y2="${nextY}"><stop stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="1"/></linearGradient><mask id="surface-mask-${row}" maskUnits="userSpaceOnUse" x="3" y="${y}" width="824" height="${h}"><rect x="3" y="${y}" width="824" height="${h}" fill="url(#surface-blend-${row})"/></mask>`;
-		body += `<rect x="3" y="${y}" width="824" height="${h}" fill="url(#surface-${row})"/><rect x="3" y="${y}" width="824" height="${h}" fill="url(#surface-${row + 1})" mask="url(#surface-mask-${row})"/>`;
+	body += '<rect x="3" y="379" width="824" height="68" fill="url(#surface-0)"/>';
+	for (let row = 1; row < rows; row++) {
+		const y = 379 + (row - 1) * 67 / (rows - 1);
+		const nextY = 379 + row * 67 / (rows - 1);
+		// Full-height layers avoid antialiased seams at internal grid edges.
+		// The mask reaches opacity 1 at its row and stays opaque below it.
+		defs += `<linearGradient id="surface-blend-${row}" gradientUnits="userSpaceOnUse" x1="0" y1="${y}" x2="0" y2="${nextY}"><stop stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="1"/></linearGradient><mask id="surface-mask-${row}" maskUnits="userSpaceOnUse" x="3" y="379" width="824" height="68"><rect x="3" y="379" width="824" height="68" fill="url(#surface-blend-${row})"/></mask>`;
+		body += `<rect x="3" y="379" width="824" height="68" fill="url(#surface-${row})" mask="url(#surface-mask-${row})"/>`;
 	}
 	// Keep only observed small bright points in regions the rendered text cannot
 	// occupy. This does not invent the stars hidden underneath the original UI.

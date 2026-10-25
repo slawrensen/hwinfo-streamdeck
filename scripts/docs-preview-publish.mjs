@@ -1,157 +1,172 @@
-// Publishes THIS worktree's docs/ tree to the public preview site:
-//   https://docs.slawrensen.com/hwinfo-streamdeck-preview/
+// Stage committed docs for the existing preview repository. Publishing is
+// explicit, preserves its history, and requires the head the reviewer inspected.
 //
-// The pattern: project Pages sites of the same owner all serve under the
-// user domain as their own subpath, so a dedicated preview repo gets a
-// real URL on the official domain while the official site (built from
-// main) stays untouched. The preview repo is disposable and force-pushed:
-// every publish replaces it wholesale, so it never accumulates history
-// worth protecting.
+// node scripts/docs-preview-publish.mjs --stage-only --expected-head <sha>
+// node scripts/docs-preview-publish.mjs --publish --expected-head <sha>
 //
-// Safety: files are enumerated with `git ls-files --cached --others
-// --exclude-standard`, so gitignored trees (docs/release, the internal
-// runbooks) can never leak into the public preview, while new not-yet-
-// committed pages and images are included. The copy is patched for its
-// subpath (baseurl), marked noindex, and wears a preview banner on every
-// page; the sidebar title stays byte-identical to production.
-//
-//   node scripts/docs-preview-publish.mjs
+// --source-ref selects a committed source revision (HEAD by default). Staging
+// reads git objects, never untracked files or uncommitted working-tree changes.
+// No repository creation, Pages reconfiguration, or production push occurs.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import { parseDocument } from "yaml";
 
-const PREVIEW_REPO = "slawrensen/hwinfo-streamdeck-preview";
-const PREVIEW_BASEURL = "/hwinfo-streamdeck-preview";
-const PREVIEW_URL = `https://docs.slawrensen.com${PREVIEW_BASEURL}/`;
+export const PREVIEW_REPO = "slawrensen/hwinfo-streamdeck-preview";
+export const PREVIEW_BASEURL = "/hwinfo-streamdeck-preview";
+export const PREVIEW_URL = `https://docs.slawrensen.com${PREVIEW_BASEURL}/`;
+const PREVIEW_REMOTE = `https://github.com/${PREVIEW_REPO}.git`;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SHA = /^[a-f0-9]{40}$/;
+const execute = (command, args, options = {}) => execFileSync(command, args, {
+	encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024, ...options
+});
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PREVIEW_LABEL = `${JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version} preview`;
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", cwd: repoRoot, ...opts });
-
-const branch = run("git", ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
-const files = run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "docs"]).split("\0").filter(Boolean);
-if (files.length === 0) {
-	throw new Error("no docs files found");
-}
-
-const stage = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-docs-preview-stage-"));
-for (const file of files) {
-	const rel = file.slice("docs/".length);
-	const target = path.join(stage, rel);
-	fs.mkdirSync(path.dirname(target), { recursive: true });
-	fs.copyFileSync(path.join(repoRoot, file), target);
-}
-console.error(`staged ${files.length} docs files from ${branch}`);
-
-// --- patch the copy for its preview identity ---------------------------
-const configPath = path.join(stage, "_config.yml");
-let config = fs.readFileSync(configPath, "utf8");
-const patch = (from, to) => {
-	if (!config.includes(from)) {
-		throw new Error(`_config.yml drifted; expected: ${from}`);
+function requireSha(value, name) {
+	if (typeof value !== "string" || !SHA.test(value)) {
+		throw new Error(`${name} must be the full 40-character commit SHA that was inspected`);
 	}
-	config = config.replace(from, to);
-};
-patch("baseurl: /hwinfo-streamdeck\n", `baseurl: ${PREVIEW_BASEURL}\n`);
-patch("gh_edit_link: true\n", "gh_edit_link: false\n");
-patch("exclude:\n  - release/\n", "exclude:\n  - release/\n  - README.md\n");
-fs.writeFileSync(configPath, config);
-
-// site.title stays untouched: the theme clamps the sidebar header to 60px
-// at desktop widths (height + max-height in layout.scss), the production
-// title already wraps to two lines there, and a " (preview)" suffix wraps
-// it to a third line that gets clipped. Preview identity lives in the
-// banner below, the tab title, and the noindex tag instead.
-
-// Preview pages must never be indexed as the real documentation, and the
-// tab title carries the preview mark the sidebar title cannot.
-const headPath = path.join(stage, "_includes", "head_custom.html");
-fs.appendFileSync(headPath, `\n<meta name="robots" content="noindex">\n<script>document.title += " (${PREVIEW_LABEL})";</script>\n`);
-
-// Every page wears a slim banner above the top bar. The theme's documented
-// header_custom.html hook cannot host it: that hook renders inside
-// #main-header, which is display:none below the md breakpoint and height-
-// clamped at 60px above it. So this shadows components/header.html with a
-// verbatim copy of the include from the pinned just-the-docs@v0.10.1 and
-// the banner in front; the version pin makes the copy drift-proof.
-const componentsDir = path.join(stage, "_includes", "components");
-fs.mkdirSync(componentsDir, { recursive: true });
-fs.writeFileSync(
-	path.join(componentsDir, "header.html"),
-	`<style>
-  .preview-banner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 10px;
-    padding: 8px 24px;
-    font-size: 13px;
-    line-height: 1.5;
-    background: rgba(115, 130, 240, 0.13);
-    border-bottom: 1px solid rgba(115, 130, 240, 0.38);
-  }
-  .preview-banner-tag {
-    flex: none;
-    padding: 1px 9px;
-    border: 1px solid rgba(115, 130, 240, 0.55);
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-  @media (max-width: 50rem) {
-    .preview-banner { padding: 8px 16px; }
-  }
-</style>
-<div class="preview-banner" role="note">
-  <span class="preview-banner-tag">${PREVIEW_LABEL}</span>
-  <span>Unreleased documentation, published early for review. The released docs live at <a href="https://docs.slawrensen.com/hwinfo-streamdeck/">docs.slawrensen.com/hwinfo-streamdeck</a>.</span>
-</div>
-<div id="main-header" class="main-header">
-  {% if site.search_enabled != false %}
-    {% include components/search_header.html %}
-  {% else %}
-    <div></div>
-  {% endif %}
-  {% include header_custom.html %}
-  {% if site.aux_links %}
-    {% include components/aux_nav.html %}
-  {% endif %}
-</div>
-`
-);
-
-fs.writeFileSync(
-	path.join(stage, "README.md"),
-	`# hwinfo-streamdeck docs preview\n\nPre-release documentation preview for [hwinfo-streamdeck](https://github.com/slawrensen/hwinfo-streamdeck), force-pushed from a feature branch by \`scripts/docs-preview-publish.mjs\`. The official documentation lives at https://docs.slawrensen.com/hwinfo-streamdeck/ and always matches the released plugin; this preview matches unreleased work and can be replaced or deleted at any time.\n`
-);
-
-// --- create the repo on first use, then force-push the stage -----------
-try {
-	run("gh", ["repo", "view", PREVIEW_REPO, "--json", "name"]);
-} catch {
-	console.error(`creating ${PREVIEW_REPO}`);
-	run("gh", ["repo", "create", PREVIEW_REPO, "--public", "--description", "Pre-release documentation previews for hwinfo-streamdeck (disposable; official docs live at docs.slawrensen.com/hwinfo-streamdeck)"]);
+	return value;
 }
-const git = (...args) => run("git", args, { cwd: stage });
-git("init", "-b", "main");
-git("add", "-A");
-git("-c", "user.name=Stephen Lawrensen", "-c", "user.email=19673454+slawrensen@users.noreply.github.com", "commit", "-m", `docs preview from ${branch}`);
-git("remote", "add", "origin", `https://github.com/${PREVIEW_REPO}.git`);
-git("push", "--force", "origin", "main");
-console.error("pushed");
 
-// Enable Pages (main, root) on first use; 409 means it already is.
-try {
-	run("gh", ["api", "-X", "POST", `repos/${PREVIEW_REPO}/pages`, "-f", "source[branch]=main", "-f", "source[path]=/"]);
-	console.error("Pages enabled");
-} catch (err) {
-	if (!String(err.stderr ?? err).includes("409")) {
-		throw err;
+/** Structural YAML overlay. Existing theme, navigation, and shell settings stay
+ * intact even when their order, formatting or quoting changes. */
+export function previewConfig(source, { sourceSha, expectedHead, buildId }) {
+	const document = parseDocument(source, { uniqueKeys: true });
+	if (document.errors.length) throw new Error(`Invalid docs configuration: ${document.errors.map(error => error.message).join("; ")}`);
+	const data = document.toJS();
+	if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Docs configuration must be a mapping");
+	if (data.exclude !== undefined && (!Array.isArray(data.exclude) || data.exclude.some(item => typeof item !== "string"))) {
+		throw new Error("Docs configuration exclude must be a list of paths");
 	}
-	console.error("Pages already enabled");
+	const changes = {
+		url: "https://docs.slawrensen.com",
+		baseurl: PREVIEW_BASEURL,
+		docs_preview: true,
+		docs_source_sha: sourceSha,
+		docs_preview_previous_sha: expectedHead,
+		docs_build_id: buildId,
+		gh_edit_link: false,
+		exclude: [...new Set([...(data.exclude ?? []), "release/", "README.md"])]
+	};
+	for (const [key, value] of Object.entries(changes)) document.set(key, value);
+	return document.toString();
 }
-console.error(`preview will build at ${PREVIEW_URL}`);
+
+/** Return an independent, inspectable directory suitable for a real Jekyll
+ * build or connector-based publication. Transport is deliberately separate. */
+export function stagePreview({ sourceRoot = ROOT, sourceRef = "HEAD", expectedHead, temporaryRoot = os.tmpdir() }) {
+	requireSha(expectedHead, "--expected-head");
+	const git = (...args) => execute("git", args, { cwd: sourceRoot });
+	const sourceSha = git("rev-parse", "--verify", "--end-of-options", `${sourceRef}^{commit}`).trim();
+	requireSha(sourceSha, "source commit");
+	const entries = git("ls-tree", "-r", "-z", "--full-tree", sourceSha, "--", "docs/").split("\0").filter(Boolean);
+	if (!entries.length) throw new Error("The committed source contains no docs files");
+	const stage = fs.mkdtempSync(path.join(temporaryRoot, "hwinfo-docs-preview-stage-"));
+	const files = [];
+	const excluded = [];
+	for (const entry of entries) {
+		const match = /^(\d+) blob ([a-f0-9]{40})\t(docs\/.+)$/s.exec(entry);
+		if (!match) throw new Error(`Unsupported committed docs entry: ${entry}`);
+		const [, mode, objectSha, fullPath] = match;
+		const relative = fullPath.slice("docs/".length);
+		if (relative.split("/").some(part => part === ".." || part === ".git") || path.isAbsolute(relative)) {
+			throw new Error(`Unsafe docs path: ${fullPath}`);
+		}
+		if (/^(?:release|_site|\.jekyll-cache|\.sass-cache)(?:\/|$)/i.test(relative)) {
+			excluded.push(fullPath);
+			continue;
+		}
+		if (/^(?:CNAME|\.nojekyll)$/i.test(relative)) throw new Error(`Unexpected ${fullPath}; the preview inherits its domain and needs Jekyll`);
+		if (mode !== "100644" && mode !== "100755") throw new Error(`Only regular committed docs files can be staged: ${fullPath}`);
+		const target = path.join(stage, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.writeFileSync(target, execute("git", ["cat-file", "blob", objectSha], { cwd: sourceRoot, encoding: "buffer" }));
+		files.push(relative);
+	}
+	const configPath = path.join(stage, "_config.yml");
+	const buildId = `docs-${sourceSha.slice(0, 12)}`;
+	fs.writeFileSync(configPath, previewConfig(fs.readFileSync(configPath, "utf8"), { sourceSha, expectedHead, buildId }));
+	// The shared shell owns the marker and robots policy. Publishing must not
+	// shadow its header or append scripts that mislabel a stable plugin release.
+	const templates = files.filter(file => /^(?:_includes|_layouts)\/.*\.html$/.test(file))
+		.map(file => fs.readFileSync(path.join(stage, file), "utf8")).join("\n");
+	if (!templates.includes("site.docs_preview") || !templates.includes("noindex") || !templates.includes("Documentation preview")) {
+		throw new Error("The committed shared shell must render the docs_preview marker and noindex policy before it can be staged");
+	}
+	const pluginVersion = JSON.parse(git("show", `${sourceSha}:package.json`)).version;
+	const manifest = {
+		schema: 1,
+		kind: "documentation-preview",
+		build_id: buildId,
+		source_repository: "slawrensen/hwinfo-streamdeck",
+		source_commit: sourceSha,
+		preview_previous_commit: expectedHead,
+		preview_repository: PREVIEW_REPO,
+		preview_url: PREVIEW_URL,
+		source_plugin_version: pluginVersion
+	};
+	fs.writeFileSync(path.join(stage, "docs-build.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+	fs.writeFileSync(path.join(stage, "README.md"), `# Documentation preview\n\nComplete documentation staged from [${sourceSha}](https://github.com/slawrensen/hwinfo-streamdeck/commit/${sourceSha}).\n\nPreview: ${PREVIEW_URL}\n\nProduction: https://docs.slawrensen.com/hwinfo-streamdeck/\n\nBuild ID: ${buildId}\n\nPrevious preview commit: ${expectedHead}\n\nSource package version: ${pluginVersion}. The website preview identity is separate from plugin release status; verify releases before making a stable-version claim.\n`);
+	return { stage, sourceRoot, sourceSha, expectedHead, buildId, files, excluded, manifest };
+}
+
+/** Public CLI transport. A rejected read is an error, never evidence that a
+ * repository is absent. The exact expected head is checked before staging a
+ * commit, immediately before push, and atomically by git's push lease. */
+export function publishPreview(staged, { run = execute } = {}) {
+	const { stage, sourceRoot, sourceSha, expectedHead } = staged;
+	requireSha(expectedHead, "expected preview head");
+	const metadata = JSON.parse(run("gh", ["repo", "view", PREVIEW_REPO, "--json", "nameWithOwner,isPrivate,defaultBranchRef"], { cwd: sourceRoot }));
+	if (metadata.nameWithOwner !== PREVIEW_REPO || metadata.isPrivate !== false || metadata.defaultBranchRef?.name !== "main") {
+		throw new Error("The existing preview repository must be the intended public repository with main as its default branch; no settings were changed");
+	}
+	const remoteHead = () => {
+		const response = run("git", ["ls-remote", "--exit-code", PREVIEW_REMOTE, "refs/heads/main"], { cwd: sourceRoot }).trim();
+		const match = /^([a-f0-9]{40})\s+refs\/heads\/main$/.exec(response);
+		if (!match) throw new Error("Could not establish the existing preview main head");
+		if (match[1] !== expectedHead) throw new Error(`Preview moved from ${expectedHead} to ${match[1]}; inspect and reconcile before retrying`);
+	};
+	remoteHead();
+	const git = (...args) => run("git", args, { cwd: stage });
+	git("init", "-b", "main");
+	git("remote", "add", "origin", PREVIEW_REMOTE);
+	git("fetch", "--depth=1", "origin", "refs/heads/main");
+	if (git("rev-parse", "FETCH_HEAD").trim() !== expectedHead) throw new Error("Preview moved during fetch; inspect and reconcile before retrying");
+	// A normal child commit preserves the previous preview and permits rollback.
+	// The staged directory is complete; files removed from the docs are removed
+	// from the preview index by add -A, not left over from an earlier build.
+	git("reset", "--mixed", expectedHead);
+	git("add", "-A");
+	git("-c", "user.name=Documentation Preview", "-c", "user.email=docs-preview@users.noreply.github.com", "commit", "-m", `docs: preview ${staged.buildId} from ${sourceSha}`);
+	const previewSha = git("rev-parse", "HEAD").trim();
+	remoteHead();
+	git("push", `--force-with-lease=refs/heads/main:${expectedHead}`, "origin", "HEAD:refs/heads/main");
+	return { ...staged.manifest, preview_commit: previewSha, stage, deployment: "UNVERIFIED: verify the Pages build and served build ID for this commit" };
+}
+
+function main() {
+	const { values } = parseArgs({ options: {
+		"source-ref": { type: "string", default: "HEAD" },
+		"expected-head": { type: "string" },
+		"stage-only": { type: "boolean", default: false },
+		publish: { type: "boolean", default: false },
+		help: { type: "boolean", short: "h", default: false }
+	} });
+	if (values.help) {
+		console.log("Usage: node scripts/docs-preview-publish.mjs (--stage-only | --publish) --expected-head <reviewed-preview-sha> [--source-ref <committed-ref>]\nPublish updates only the existing preview repository and preserves its history. A push is not deployment verification.");
+		return;
+	}
+	if (values.publish === values["stage-only"]) throw new Error("Choose exactly one of --stage-only or --publish");
+	const staged = stagePreview({ sourceRef: values["source-ref"], expectedHead: values["expected-head"] });
+	console.error(`Staged ${staged.files.length} committed docs files at ${staged.stage}; ${staged.excluded.length} private/generated paths excluded`);
+	console.log(JSON.stringify(values.publish ? publishPreview(staged) : staged, null, 2));
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+	try { main(); }
+	catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
+}

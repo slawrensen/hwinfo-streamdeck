@@ -1,0 +1,181 @@
+{
+  "profile": "/tmp/hwinfo-docs-zoom-sOr7aJ",
+  "method": "Actual Chrome Page zoom control in an owned temporary profile",
+  "results": [
+    {
+      "route": "index",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "HWiNFO Sensors for Stream Deck"
+    },
+    {
+      "route": "installation.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/installation.html",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "Install"
+    },
+    {
+      "route": "sensor-dial.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/sensor-dial.html",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "Sensor Dial"
+    },
+    {
+      "route": "themes.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/themes.html",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "Themes & colors"
+    },
+    {
+      "route": "data-sources.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/data-sources.html",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "Data sources"
+    },
+    {
+      "route": "troubleshooting.html",
+      "url": "http://127.0.0.1:4173/hwinfo-streamdeck/troubleshooting.html",
+      "innerWidth": 640,
+      "innerHeight": 406,
+      "outerWidth": 1280,
+      "outerHeight": 900,
+      "dpr": 2,
+      "scale": 1,
+      "scrollWidth": 632,
+      "clientWidth": 640,
+      "overflow": false,
+      "h1": "Troubleshooting"
+    }
+  ],
+  "before": {
+    "url": "http://127.0.0.1:4173/hwinfo-streamdeck/",
+    "innerWidth": 1280,
+    "innerHeight": 813,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "dpr": 1,
+    "scale": 1,
+    "scrollWidth": 1265,
+    "clientWidth": 1280,
+    "overflow": false,
+    "h1": "HWiNFO Sensors for Stream Deck"
+  },
+  "selects": [
+    {
+      "id": "zoomLevel",
+      "value": "1",
+      "options": [
+        {
+          "value": "0.25",
+          "text": "25%"
+        },
+        {
+          "value": "0.3333333333333333",
+          "text": "33%"
+        },
+        {
+          "value": "0.5",
+          "text": "50%"
+        },
+        {
+          "value": "0.6666666666666666",
+          "text": "67%"
+        },
+        {
+          "value": "0.75",
+          "text": "75%"
+        },
+        {
+          "value": "0.8",
+          "text": "80%"
+        },
+        {
+          "value": "0.9",
+          "text": "90%"
+        },
+        {
+          "value": "1",
+          "text": "100%"
+        },
+        {
+          "value": "1.1",
+          "text": "110%"
+        },
+        {
+          "value": "1.25",
+          "text": "125%"
+        },
+        {
+          "value": "1.5",
+          "text": "150%"
+        },
+        {
+          "value": "1.75",
+          "text": "175%"
+        },
+        {
+          "value": "2",
+          "text": "200%"
+        },
+        {
+          "value": "2.5",
+          "text": "250%"
+        },
+        {
+          "value": "3",
+          "text": "300%"
+        },
+        {
+          "value": "4",
+          "text": "400%"
+        },
+        {
+          "value": "5",
+          "text": "500%"
+        }
+      ]
+    }
+  ],
+  "zoomSetting": "2",
+  "verified": true
+}

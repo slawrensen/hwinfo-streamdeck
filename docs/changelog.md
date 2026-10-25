@@ -3,8 +3,6 @@ title: Changelog
 nav_order: 12
 ---
 
-# Changelog
-
 The release history. Download any tagged version as a
 `.streamDeckPlugin` from the
 [GitHub releases](https://github.com/slawrensen/hwinfo-streamdeck/releases)

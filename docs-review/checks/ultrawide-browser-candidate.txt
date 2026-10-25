@@ -1,0 +1,32 @@
+✔ home identity, download and platform requirement fit 1280×800 (547.276654ms)
+✔ home identity, download and platform requirement fit 390×844 (286.107943ms)
+✔ wide reading workspace keeps related content together at 1920×1080 (398.307832ms)
+✔ wide reading workspace keeps related content together at 3440×1440 (395.260951ms)
+✔ wide reading workspace keeps related content together at 5120×2160 (368.494376ms)
+✔ all seven themes are readable without horizontal gallery panning at 360px (557.194242ms)
+✔ all seven themes are readable without horizontal gallery panning at 390px (544.062298ms)
+✔ all seven themes are readable without horizontal gallery panning at 768px (602.851497ms)
+✔ the repository logo and native home link work without JavaScript at 1280px (242.870704ms)
+✔ the repository logo and native home link work without JavaScript at 390px (232.880393ms)
+✔ the repository logo and native home link work without JavaScript at 360px (233.166576ms)
+✔ image viewer contains Shift+Tab from Actual size and restores its opener (633.97813ms)
+✔ an open image viewer blocks background navigation (326.366039ms)
+✔ search 'transparent background' reaches a relevant setting or repair (515.120057ms)
+✔ search '12 hours' reaches a relevant setting or repair (456.584408ms)
+✔ search 'Age unknown' reaches a relevant setting or repair (471.557667ms)
+✔ search 'sensor missing' reaches a relevant setting or repair (492.414448ms)
+✔ search replays early input after the index loads and refreshes pasted queries (359.89199ms)
+✔ keyboard search shortcut and Enter reach the concrete status fix (1020.268586ms)
+✔ phone navigation and search remain operable (630.184869ms)
+✔ phone navigation is collapsed before the deferred enhancements load (300.105278ms)
+✔ deep links reveal disclosures on direct entry, reload and history navigation (998.389896ms)
+✔ routes, search index and principal assets resolve below the selected base path (478.242603ms)
+✔ essential content and navigation work without JavaScript (288.837806ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11759.628653

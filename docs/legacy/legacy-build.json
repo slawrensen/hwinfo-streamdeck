@@ -1,0 +1,961 @@
+{
+  "schema": 1,
+  "kind": "documentation-legacy",
+  "source_repository": "slawrensen/hwinfo-streamdeck",
+  "source_commit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "build_id": "legacy-bb4aedecbce4",
+  "canonical_base": "https://docs.slawrensen.com/hwinfo-streamdeck/legacy/",
+  "current_base": "../",
+  "portable_internal_urls": true,
+  "indexing": "noindex; static HTML without front matter stays outside the current documentation search index",
+  "builder": "scripts/docs-legacy-build.mjs",
+  "theme": "just-the-docs/just-the-docs@v0.10.1",
+  "gemfile_sha256": "b9f621562553c94a4f4165c9f93f02373a53c2bf4d5c29f10d1721684bd0377d",
+  "gemfile_lock_sha256": "30094c33d76361b881e949d1e0e3eb6ca48b7f622354d2b15ba54706227a2c9d",
+  "transformations": [
+    "Hosting URL and base path",
+    "Article-scoped default layout and GitHub Pages documentation plugins",
+    "Frozen archive source metadata and noindex",
+    "Document-relative archive navigation, resources and search targets",
+    "44px Legacy documentation bar and same-page Current docs links",
+    "Intrinsic desktop header height keeps the historical wrapped title below the archive bar",
+    "Native-dialog focus containment and inert background for the historical image viewer",
+    "Image toolbar hit testing and 44px controls",
+    "No-JavaScript navigation visibility"
+  ],
+  "routes": [
+    {
+      "path": "changelog.html",
+      "current": "../changelog.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "changelog",
+        "1710---2026-10-24",
+        "1700---2026-10-11",
+        "16920---2026-09-09",
+        "1600---2026-09-04",
+        "15900---2026-08-11",
+        "1510---2026-08-11",
+        "1500---2026-08-02",
+        "14930---2026-07-31",
+        "14920---2026-07-30",
+        "14910---2026-07-29",
+        "14900---2026-07-29",
+        "1400---2026-07-25",
+        "13900---2026-07-23",
+        "1300---2026-07-16",
+        "1200---2026-07-13",
+        "11110---2026-07-12",
+        "11100---2026-07-11",
+        "1190---2026-07-05",
+        "1180---2026-07-05",
+        "1170---2026-07-05",
+        "1160---2026-07-05",
+        "1150---2026-07-05",
+        "1140---2026-07-04",
+        "1130---2026-07-04",
+        "1120---2026-07-04",
+        "1110---2026-07-04",
+        "1100---2026-07-04-first-tagged-build"
+      ]
+    },
+    {
+      "path": "controls.html",
+      "current": "../controls.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "control-presets",
+        "rotation-groups",
+        "touch-zones",
+        "pause-pin-and-reset-reach",
+        "session-stats-are-per-reading",
+        "thresholds-and-mixed-units",
+        "the-hwinfo-control-key-action",
+        "page-swipe",
+        "settings-migration"
+      ]
+    },
+    {
+      "path": "data-sources.html",
+      "current": "../data-sources.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "shared-memory-vs-gadget-registry",
+        "enabling-shared-memory",
+        "enabling-gadget-reporting",
+        "auto-mode",
+        "advanced-settings",
+        "data-source",
+        "read-every",
+        "how-this-shows-up-elsewhere",
+        "link-readings-across-providers",
+        "freshness-and-local-history"
+      ]
+    },
+    {
+      "path": "faq.html",
+      "current": "../faq.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "platform-and-requirements",
+        "does-it-work-on-macos-or-linux",
+        "what-are-the-exact-requirements",
+        "is-this-the-official-hwinfo-plugin-is-it-affiliated-with-realix",
+        "hwinfo-editions-and-the-12-hour-limit",
+        "do-i-need-hwinfo-pro",
+        "why-did-my-values-freeze--stop-updating-after-about-12-hours",
+        "data-sources",
+        "which-data-source-should-i-use",
+        "i-ticked-many-readings-in-gadget-but-only-a-few-show-up-why",
+        "why-do-min--max--avg-show-na",
+        "whats-the-difference-between-the-keys-minmaxavg-and-the-dials",
+        "sparklines",
+        "why-do-my-sparklines-fill-in-slowly-when-a-graph-starts-from-empty",
+        "performance-and-resource-use",
+        "does-it-slow-down-my-pc-how-much-cpu-and-ram",
+        "does-it-get-slower-or-use-more-cpu-if-i-add-more-keys",
+        "how-many-sensors--keys-can-i-use",
+        "can-multiple-keys-show-the-same-sensor",
+        "alerts-thresholds-and-colors",
+        "why-is-a-key-amber-or-red",
+        "how-do-i-reset-a-dials-session-minmax",
+        "themes",
+        "why-isnt-default-the-same-as-void",
+        "a-per-key-theme-wont-follow-my-shared-theme-why",
+        "privacy",
+        "is-my-data-sent-anywhere-any-telemetry",
+        "is-the-native-binary-signed-how-do-i-verify-what-i-installed",
+        "setup-and-portability",
+        "can-i-use-the-free--portable-hwinfo",
+        "do-keys-survive-reboots-hwinfo-restarts-or-reordering-sensors-in-hwinfo",
+        "can-i-use-stream-deck--dials-without-hwinfo-pro",
+        "a-key-says-access-denied-whats-wrong",
+        "what-do-the-two-line-screens-on-my-keys-mean"
+      ]
+    },
+    {
+      "path": "getting-started.html",
+      "current": "../getting-started.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "1-install-the-plugin",
+        "2-drag-sensor-reading-onto-a-key",
+        "3-pick-a-reading",
+        "4-find-the-rest-of-the-settings",
+        "where-to-go-next"
+      ]
+    },
+    {
+      "path": "hardware.html",
+      "current": "../hardware.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "compatibility-matrix",
+        "sensor-details-drill-down-support",
+        "page-swipe",
+        "hardware-test-procedure",
+        "event-recorder-and-replay",
+        "support-report"
+      ]
+    },
+    {
+      "path": "index.html",
+      "current": "../",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "what-it-does",
+        "start-here"
+      ]
+    },
+    {
+      "path": "installation.html",
+      "current": "../installation.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "system-requirements",
+        "install-the-plugin",
+        "updating-and-removing",
+        "one-time-hwinfo-setup",
+        "recommended-shared-memory-support",
+        "free-path-gadget-reporting",
+        "portable-hwinfo-caveats",
+        "verify-it-works",
+        "next-steps"
+      ]
+    },
+    {
+      "path": "sensor-details.html",
+      "current": "../sensor-details.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "what-it-is-and-is-not",
+        "turning-it-on",
+        "choosing-the-list",
+        "editing-custom-tiles",
+        "the-detail-page",
+        "configuring-the-back-tile",
+        "filter-patterns",
+        "supported-decks",
+        "privacy"
+      ]
+    },
+    {
+      "path": "sensor-dial.html",
+      "current": "../sensor-dial.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "the-touchscreen-readout",
+        "overview-view",
+        "reading-colors",
+        "gestures",
+        "rotation-set-ignore-turns-and-auto-cycle",
+        "session-stats-are-the-dials-own-per-reading",
+        "settings",
+        "bar-range-fixed-vs-session",
+        "transparent-background",
+        "alerts-on-a-dial",
+        "status-screens",
+        "advanced-shared-by-all-keys-and-dials"
+      ]
+    },
+    {
+      "path": "sensor-reading.html",
+      "current": "../sensor-reading.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "settings",
+        "reading",
+        "label-on-the-key",
+        "theme",
+        "text-color",
+        "value-shown-stat-mode",
+        "layout-two-readings-on-one-key",
+        "layout-three-readings-rows",
+        "layout-four-readings-the-quad-grid",
+        "decimals",
+        "temperature-unit",
+        "display-sparkline-bar-ring",
+        "warn-at--critical-at",
+        "direction",
+        "pressing-the-key",
+        "a-press-can-open-details-drill-down",
+        "status-screens",
+        "advanced-shared-by-all-keys-and-dials"
+      ]
+    },
+    {
+      "path": "status-screens.html",
+      "current": "../status-screens.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "key-screens",
+        "dial-screens-stream-deck-",
+        "in-the-settings-panel",
+        "recovery-is-automatic"
+      ]
+    },
+    {
+      "path": "themes.html",
+      "current": "../themes.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "the-seven-presets",
+        "the-display-system",
+        "per-key-vs-shared",
+        "precedence",
+        "the-default-chip",
+        "text-theme-dim-or-custom",
+        "text-font",
+        "type-accents",
+        "alerts-override-everything"
+      ]
+    },
+    {
+      "path": "thresholds-alerts.html",
+      "current": "../thresholds-alerts.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "the-two-fields",
+        "how-the-comparison-works",
+        "decimal-commas-are-accepted",
+        "direction-alert-when-high-vs-alert-when-low",
+        "colors-are-global-and-colorblind-safe",
+        "alert-colors",
+        "worked-examples",
+        "cpu-temperature-warn-80-crit-90",
+        "fan-rpm-alert-when-it-drops",
+        "free-disk-space-alert-on-a-low-floor",
+        "where-thresholds-live"
+      ]
+    },
+    {
+      "path": "troubleshooting.html",
+      "current": "../troubleshooting.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "how-to-read-a-status-screen",
+        "keys-show-start-hwinfo",
+        "keys-show-shared-memory-off",
+        "values-are-frozen--not-updating",
+        "keys-freeze-and-only-closing-the-stream-deck-app-brings-them-back",
+        "keys-show-access-denied",
+        "keys-show-source-error",
+        "keys-show-sensor-missing",
+        "picker-is-empty-or-shows-no-sensors-reported",
+        "only-some-of-the-readings-i-ticked-in-gadget-show-up",
+        "plugin-shows-nothing-at-all--the-action-is-missing",
+        "a-reading-shows-the-wrong-unit",
+        "thresholds-warncritical-dont-fire",
+        "a-press-set-to-open-details-shows-the-alert-triangle",
+        "the-detail-view-says-no-detail--selected",
+        "dial-gestures-do-nothing",
+        "high-memory-high-cpu-or-a-stuck-process",
+        "reading-the-plugin-log",
+        "before-you-file-an-issue"
+      ]
+    },
+    {
+      "path": "whats-new-1.7.html",
+      "current": "../whats-new-1.7.html",
+      "anchors": [
+        "jtd-head-nav-stylesheet",
+        "jtd-nav-activation",
+        "svg-link",
+        "svg-menu",
+        "svg-arrow-right",
+        "svg-external-link",
+        "svg-external-link-title",
+        "svg-doc",
+        "svg-search",
+        "svg-copy",
+        "svg-copied",
+        "menu-button",
+        "site-nav",
+        "top",
+        "main-header",
+        "search-input",
+        "search-results",
+        "main-content",
+        "171",
+        "ux-improvements-in-the-settings-panels",
+        "renamed-labels",
+        "what-changes-on-your-deck",
+        "set-the-colors-you-want",
+        "why-a-reading-may-now-show-less",
+        "what-the-review-caught"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "assets/css/just-the-docs-dark.css",
+      "bytes": 101367,
+      "sha256": "71d845fa1eb989aaa3e3b5fd883d53a1bb1c17b7460fdca1c75363a66acf797a"
+    },
+    {
+      "path": "assets/css/just-the-docs-default.css",
+      "bytes": 101367,
+      "sha256": "71d845fa1eb989aaa3e3b5fd883d53a1bb1c17b7460fdca1c75363a66acf797a"
+    },
+    {
+      "path": "assets/css/just-the-docs-head-nav.css",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "assets/css/just-the-docs-light.css",
+      "bytes": 99348,
+      "sha256": "70c359bca4b8513b4dd63aa02421ba60dc19942ffd6584a0ac26033c7a923af8"
+    },
+    {
+      "path": "assets/images/large-image.jpg",
+      "bytes": 545267,
+      "sha256": "c14f484d16680faaf9a69089fa4cc2d7bec6aa2c6f7ac1d6e0cb6508aed2d0aa"
+    },
+    {
+      "path": "assets/images/small-image.jpg",
+      "bytes": 44128,
+      "sha256": "6e9152fc1153b9fb8c0a9ad4f3ccc655f0375078bf4b40589a0ebdc8b740e693"
+    },
+    {
+      "path": "assets/img/control-key.png",
+      "bytes": 8758,
+      "sha256": "12afb71f9ec1dbded81dcd054774ac7964701fde3b0d2072889a28df558cda82"
+    },
+    {
+      "path": "assets/img/detail-custom-tiles-panel.png",
+      "bytes": 66276,
+      "sha256": "f1ae4e56ef12179d528f18a778449475ea66f8af9b144b7e7e27db1087882c1a"
+    },
+    {
+      "path": "assets/img/detail-dense-view.png",
+      "bytes": 112723,
+      "sha256": "0488fc6459a19fb6b42c4c2e458bcc388fc607b46afcf843e2864f1916e49507"
+    },
+    {
+      "path": "assets/img/detail-filter-panel.png",
+      "bytes": 55138,
+      "sha256": "f6519b333f3b19a66bd71adce314485e844c5448bb6ba51b8fe82b33b616fed6"
+    },
+    {
+      "path": "assets/img/detail-mixed-view.png",
+      "bytes": 109632,
+      "sha256": "8e9bb1bb7dd1b6ac03394e69ed7b8d4b5333377a9e98eb4bd633ee396a1dd66d"
+    },
+    {
+      "path": "assets/img/detail-press-panel.png",
+      "bytes": 41425,
+      "sha256": "7cf045039a40b61b7f803f4a0534a982d390dd5a3854cf2ef9aec40412571679"
+    },
+    {
+      "path": "assets/img/detail-second-back.png",
+      "bytes": 74269,
+      "sha256": "bb404bf1af28b2cf7fe860fe55850828bc9569e577cd52f9614e434e01fc6518"
+    },
+    {
+      "path": "assets/img/detail-view-filter.png",
+      "bytes": 70137,
+      "sha256": "a52f3d31addfeeb8a5b303c191dddcfc73abc3954f6489830f4991129bc7fe06"
+    },
+    {
+      "path": "assets/img/detail-view.png",
+      "bytes": 73365,
+      "sha256": "89a480f6ed5725667d5f7347ca75d75cd68a84e1c1461d094fdabfa252589ad0"
+    },
+    {
+      "path": "assets/img/dial-backgrounds-deck.jpg",
+      "bytes": 161936,
+      "sha256": "d22296bfb25ad33aa3a5be98ff0a0491119389894c6aad53afd96359873e14a1"
+    },
+    {
+      "path": "assets/img/dial-backgrounds-looks.jpg",
+      "bytes": 93166,
+      "sha256": "5e0d2c8ef976f938617f1d19841ae0673fcf20efe4e89a5a9aa8002e0d9d36bc"
+    },
+    {
+      "path": "assets/img/dial-backgrounds-strip.jpg",
+      "bytes": 194097,
+      "sha256": "79d8245164894564155060116ca139c388e674e628344e6058360fd47e55ff5b"
+    },
+    {
+      "path": "assets/img/dial-reading-colors-1.7.png",
+      "bytes": 120846,
+      "sha256": "fd0bfb641ee7eecf5b78f1903bd67965f1742daa48f7dcc74013098701796247"
+    },
+    {
+      "path": "assets/img/dial-states.png",
+      "bytes": 42708,
+      "sha256": "2741549e48a695ec32f004a02370e5bf322864540412d67d89db79a2d69e10cd"
+    },
+    {
+      "path": "assets/img/dials.png",
+      "bytes": 12785,
+      "sha256": "6aa4f8c3f37dbb52ad174174a641e1bec5d2da9474540a1b105faf5204b1a124"
+    },
+    {
+      "path": "assets/img/display-text.png",
+      "bytes": 112503,
+      "sha256": "5f6e451b886f31ca23c5a11472a314876436584c021ab16eaf17a2ee61dcca61"
+    },
+    {
+      "path": "assets/img/multi-readouts.png",
+      "bytes": 138987,
+      "sha256": "3b44d3c8d4b7baf863f793b5d36354730e37d0c52726bb3438d4fc51cef65983"
+    },
+    {
+      "path": "assets/img/pi-control.png",
+      "bytes": 64562,
+      "sha256": "e5fa558fec72d7122344725dbc2598732e92a566e1fa70129c42bbf050552407"
+    },
+    {
+      "path": "assets/img/pi-dial-custom.png",
+      "bytes": 90900,
+      "sha256": "21ed3a6c39488db5ade472213d1e8585be95647f0bc9b2ebce4a21601c6f853f"
+    },
+    {
+      "path": "assets/img/pi-dial-groups.png",
+      "bytes": 63999,
+      "sha256": "3051931297b8e6959b1eda4c6bdad6fffae6286e5b86deabfd80b6c87e1669ca"
+    },
+    {
+      "path": "assets/img/pi-dial-overview.png",
+      "bytes": 27566,
+      "sha256": "60a8dabd04d1b1dc09e485fb3d38663146308858d1ef11174a90a5fd39ccc539"
+    },
+    {
+      "path": "assets/img/pi-dial-picker.png",
+      "bytes": 166276,
+      "sha256": "081723076c803fcf5d3aca026444607efb6e6ecb46a6f7176626d4bca7bc1120"
+    },
+    {
+      "path": "assets/img/pi-dial-presets.png",
+      "bytes": 149389,
+      "sha256": "1a51bbe44dc7eb7e8633b83fd909b31d71402068880d57f69397dbee2ff608a4"
+    },
+    {
+      "path": "assets/img/pi-dial-reading-colors-1.7.png",
+      "bytes": 107435,
+      "sha256": "bd8ebc066b1c6f8e7fd88bc28229df07b052cad9889a982ae98d47c044c89535"
+    },
+    {
+      "path": "assets/img/pi-dial-reading-colors-1.7.provenance.json",
+      "bytes": 3094,
+      "sha256": "a5667b97fd6aeba444a1938625cca41dd7b925d0dd3477d366cf05149065989e"
+    },
+    {
+      "path": "assets/img/pi-dial-reading-colors-preview.png",
+      "bytes": 57776,
+      "sha256": "cfce6d35d4819857ae59036a6bce17b417b120b04189bfa0238526894b4188bd"
+    },
+    {
+      "path": "assets/img/pi-dial-rename.png",
+      "bytes": 43776,
+      "sha256": "199ae8bff51a329e0c0f8e280e8653d4a49b86b15274ba078ae16fb2a75793d2"
+    },
+    {
+      "path": "assets/img/pi-dial-rotation.png",
+      "bytes": 150435,
+      "sha256": "e4a560cd82268909f220df4ac8000f8f8b63c3c60a5350af8fe2908fba48e645"
+    },
+    {
+      "path": "assets/img/pi-key-display.png",
+      "bytes": 28302,
+      "sha256": "9815107ed2edf52787000abfa68c2723c4577e15a6f8cc463aeaeb01302c04d6"
+    },
+    {
+      "path": "assets/img/pi-key-dual.png",
+      "bytes": 150267,
+      "sha256": "f0a59f78f056ed3eb0c21922dd01d0a76b2d29522d108cd7381cc17c761e11e1"
+    },
+    {
+      "path": "assets/img/pi-key-quad.png",
+      "bytes": 173499,
+      "sha256": "2b258f07fa72f70d15dd232b7311695d4d5e94d063e1ef3ff298d861b213c2f4"
+    },
+    {
+      "path": "assets/img/pi-key-text.png",
+      "bytes": 24943,
+      "sha256": "970683a1b455c338d64d6913ef2947e8ed3b75a97fac69fbfe9b49dbce5f38b4"
+    },
+    {
+      "path": "assets/img/pi-key-triple.png",
+      "bytes": 150097,
+      "sha256": "fbab49ef5926eb41bdb01ad730c6b34d4ae2b91a1ad28ebcee571a1eb2ad2636"
+    },
+    {
+      "path": "assets/img/pi-live-dial-advanced.png",
+      "bytes": 196331,
+      "sha256": "17712857c1d2e81d5060b658971b9a7324f63ca3baf3c2ad03b4d889fad38f3e"
+    },
+    {
+      "path": "assets/img/pi-live-key-advanced.png",
+      "bytes": 192728,
+      "sha256": "73e8f135d0e6a074676950b34e1ffaa8bc84141aa81b6b0dfc7a3fb7aeb48d59"
+    },
+    {
+      "path": "assets/img/pi-theme-folded.png",
+      "bytes": 31902,
+      "sha256": "2dc040586f333dc646ba02878197f9b6777374b23d40abecc5a079c0275edf4e"
+    },
+    {
+      "path": "assets/img/pi-theme-share.png",
+      "bytes": 46779,
+      "sha256": "640d12d915bf547bd28b1af5a14b05e5487bc004a86e9cc67439bca1073aa310"
+    },
+    {
+      "path": "assets/img/pi-theme-strip.png",
+      "bytes": 45459,
+      "sha256": "6b191e348d89e57294d00aaab54cd973d3e9bda9b517b18a95203d7748f5e38b"
+    },
+    {
+      "path": "assets/img/plusxl-dials.png",
+      "bytes": 67161,
+      "sha256": "13a56162f195303e415895cd9618d56bdce0edf2fc64ff411d9a760a39e641ad"
+    },
+    {
+      "path": "assets/img/plusxl-photo.jpg",
+      "bytes": 440447,
+      "sha256": "857fb04f83de81525c85dbf236bccb1d196a6aa6cbecd3a22a4a33554cf82275"
+    },
+    {
+      "path": "assets/img/reading-status-1.7.png",
+      "bytes": 93501,
+      "sha256": "2b9baa9ed6d19cb6a0a239a6c2087c41078f20cd5cdc937403242494885a53b3"
+    },
+    {
+      "path": "assets/img/renderer-images-1.7.provenance.json",
+      "bytes": 7166,
+      "sha256": "e99a990415fb964b50d8ba9b8d00b6ae3296393bef0ac3cc7b4e2af02100107c"
+    },
+    {
+      "path": "assets/img/sensor-picker.png",
+      "bytes": 138305,
+      "sha256": "006264c8709ed21bb3a936eff8aa20cd5e5e7f377ab0471f8f26fb73cfe78d5e"
+    },
+    {
+      "path": "assets/img/settings-panel.png",
+      "bytes": 342238,
+      "sha256": "584f3a5896ef214c79c2102cbf00de00673e2ac0fdd4e1462f97e5102ec0b16b"
+    },
+    {
+      "path": "assets/img/status-screens.png",
+      "bytes": 114271,
+      "sha256": "4c8afb1276eee8e8a714243ae47bb89907a6238eb83128274a2148cc9e1057de"
+    },
+    {
+      "path": "assets/img/themes-contact-sheet.png",
+      "bytes": 181574,
+      "sha256": "68925c97f75f1429f0bf1d297e25e049ac2347702d5a7066c51fbb27c4e28091"
+    },
+    {
+      "path": "assets/js/just-the-docs.js",
+      "bytes": 18963,
+      "sha256": "ddbcea4d4fe43c022b19e8a93fb40a9b8946a496f4b1c1674bcebef81bcdf3a4"
+    },
+    {
+      "path": "assets/js/search-data.json",
+      "bytes": 333041,
+      "sha256": "80c31928c0c88790fcf3865c3e409aa7959d6e316ab73cc8ba5cca60334a5212"
+    },
+    {
+      "path": "assets/js/vendor/lunr.min.js",
+      "bytes": 31211,
+      "sha256": "da48a90810422f96c61054a3e16a6d1e6a4111a03f79cf6b2e16c07fc635059b"
+    },
+    {
+      "path": "changelog.html",
+      "bytes": 110625,
+      "sha256": "c4fac96f4fe20dbe436989f138c2235a7750bfa8411e829cced7c5a41da86aa7"
+    },
+    {
+      "path": "controls.html",
+      "bytes": 45317,
+      "sha256": "39c6160aa5d4af8c26c0102e9e5c949ff06248019240920fec9e7f16c6cc6487"
+    },
+    {
+      "path": "data-sources.html",
+      "bytes": 50205,
+      "sha256": "3eb40a46311e22cd2530aad41b47b31dec5dca8fc78c7d3072830ae3fe58fc29"
+    },
+    {
+      "path": "faq.html",
+      "bytes": 58494,
+      "sha256": "5014c2e41a3d0e73a69c6ab99a871fed56dbaece64f90f1a429bf4b7caa6c3cf"
+    },
+    {
+      "path": "getting-started.html",
+      "bytes": 31820,
+      "sha256": "1b621f70070d530a4764e746a3547cd32fe9afa8c08ba2885609ff7393bcd431"
+    },
+    {
+      "path": "hardware.html",
+      "bytes": 36138,
+      "sha256": "03e76581fb411f7a15191d92638f95604575714555ab52f71ab765ea35b994df"
+    },
+    {
+      "path": "index.html",
+      "bytes": 26688,
+      "sha256": "8e51f8e5722a025adab331e008c021275a86e538ada16de1c42e5c98887fb2b6"
+    },
+    {
+      "path": "installation.html",
+      "bytes": 35039,
+      "sha256": "62c0c2a94f0b84059a1ef69205e62577afbf2c66d649a0d2132009662593f3a9"
+    },
+    {
+      "path": "sensor-details.html",
+      "bytes": 52740,
+      "sha256": "6060e802d631ba290b24a6370976ecee30cbe65b386da57c04a5591e4bf82373"
+    },
+    {
+      "path": "sensor-dial.html",
+      "bytes": 71589,
+      "sha256": "e4c9b55800b0e87c27130192489a1350fbf8068bc9ed4031edd05d5012cde2a9"
+    },
+    {
+      "path": "sensor-reading.html",
+      "bytes": 64509,
+      "sha256": "3437b5219b5fc0714c1877a7cc9ee9a8e5be8959af29b10cefce26ee55c1e944"
+    },
+    {
+      "path": "status-screens.html",
+      "bytes": 35273,
+      "sha256": "df986717a1a84c8c8462ddce8b004e6e628ed7af21f36b4044389e2c1f2cb2e2"
+    },
+    {
+      "path": "themes.html",
+      "bytes": 41018,
+      "sha256": "fe5f3386c05b9c882d921490c2e7ccda0236d2410526d079974818e535290b5c"
+    },
+    {
+      "path": "thresholds-alerts.html",
+      "bytes": 35718,
+      "sha256": "dac5c8239b8042c8787f9cdf108cb8d5e4591254c2776697e4b57722935c8c62"
+    },
+    {
+      "path": "troubleshooting.html",
+      "bytes": 68866,
+      "sha256": "3c85955c7870c53523b44c4195be851fef559811fb996be34562b011afb4e193"
+    },
+    {
+      "path": "whats-new-1.7.html",
+      "bytes": 44290,
+      "sha256": "f093dcfcce0fea03a4a101ffd8d3c47ef1d7f435486707c48a2ed29757e03267"
+    }
+  ]
+}

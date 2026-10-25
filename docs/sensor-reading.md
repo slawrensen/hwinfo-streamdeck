@@ -1,31 +1,42 @@
 ---
-title: Sensor Reading (keys)
+title: Sensor Reading
 nav_order: 4
+description: Configure key layouts, readings, graphs and press actions.
 ---
 
-The **Sensor Reading** action puts a live HWiNFO reading on a Stream Deck key: a value, its unit, a custom label, an optional [sparkline, bar, or ring display](#display-sparkline-bar-ring), and warn/critical coloring. A key can also [stack two readings](#layout-two-readings-on-one-key) as two compact rows, show [three readings as rows](#layout-three-readings-rows), or show [four readings in a quad grid](#layout-four-readings-the-quad-grid). Drag **HWiNFO Sensors → Sensor Reading** onto a key and pick a reading to start.
+Show one to four HWiNFO readings on a display key. Add a graph to the single-reading layout, set alerts, or make a press open related readings.
 
-Choose one to four readings per key. Each layout has fixed positions for its labels, values and units.
+**Start:** drag **HWiNFO Sensors → Sensor Reading** onto a key and choose **Reading**. For the complete setup, follow [Get started](getting-started.md).
 
-> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
+| Change | Setting or guide |
+| --- | --- |
+| Number of readings | [Two stacked](#layout-two-readings-on-one-key), [three rows](#layout-three-readings-rows), or [four-cell grid](#layout-four-readings-the-quad-grid) |
+| Graph or gauge | [Graph under the value](#display-sparkline-bar-ring) |
+| Appearance | [Theme](#theme) and [Text color](#text-color) |
+| Press behavior | [Cycle statistics or open details](#pressing-the-key) |
 
-This page documents every setting in the key's settings panel. For the Stream Deck + dial, see [Sensor Dial](sensor-dial.md).
+<details markdown="1">
+<summary>See the complete Sensor Reading settings panel</summary>
 
-![The whole Sensor Reading settings panel with every section open: the header with the key's live face and state, the theme strip under it, then Reading (the reading, its label and Readings on this key), Display (Text color, Value shown, Decimals, the °F box and the graph), Alerts (Warn at 80, Critical at 89 and the drop checkbox), Press (the A press select), and Advanced with its four groups open (Shared defaults and Connection, each marked All keys and dials, Support, and the Configuration documents with their Copy and Replace buttons).]({{ '/assets/img/settings-panel.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/settings-panel.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/settings-panel.png' | relative_url }}" width="800" height="4310" loading="lazy" decoding="async" alt="Sensor Reading settings: Reading, Display, Alerts, Press and Advanced."></a>
+
+*Settings-panel capture. Open the image to read individual controls.*
+
+</details>
 
 ## Settings
 
-The header at the top of the panel shows the key's face exactly as the plugin last drew it on the device (a change you make shows there when the key repaints), the reading's name and sensor, and the state of its data, for example *Live · Shared Memory*, *Not updating for 42 s* or *No HWiNFO data*. It stays at the top while you scroll, unless it would take more than a third of the panel's height. When the data or the saved reading needs attention, a message under the header says what is wrong and offers the fix (see [Status screens](#status-screens)).
+The header shows the last rendered key face, reading and data state. A message below it offers a next step when data or the selection needs attention.
 
-Next comes the theme strip, open on a first visit and folding like the sections, then five sections: **Reading** and **Display** open, **Alerts**, **Press** and **Advanced** folded. A folded section's title line says what it currently does, for example *Warn ≥ 80 °C · critical ≥ 90 °C*; the line steps aside while the section is open. Longer explanations sit behind the **How Display works** and **How the detail view works** links. **Open all sections** and **Fold all sections**, the two chevron buttons at the top right of the header, open or fold every section at once; Alt-click on a section title does the same. A section you open or fold stays that way on the next key's panel while the plugin runs; restarting the Stream Deck app shows the defaults again. Folding writes nothing to your keys.
+**Reading** and **Display** open first. **Alerts**, **Press** and **Advanced** start folded, with a short settings summary. **Open all sections**, **Fold all sections**, or Alt-click on a section title changes every fold. Folds persist between keys while the plugin runs; they do not change saved key settings.
 
 ### Reading
 
-The **Reading** box in the Reading section searches every reading HWiNFO publishes (typically 500+), grouped by sensor (CPU, GPU, drives, network, and so on), and every match is listed. Type part of a reading or sensor name to filter; each row shows its value when the list loaded, so you can confirm you have the right one. Arrow keys browse without changing anything, Enter picks the highlighted reading, and Tab, a click elsewhere, or a second click in the box before you type closes the list and puts your saved reading back. The Stream Deck app keeps the Escape key for itself, so it does not reach the panel. The circular-arrow button beside the box (**Reload the sensor list**) reloads the list if HWiNFO's sensor set changed.
+Search by reading or sensor name. Each result shows its value when the list loaded; **Reload the sensor list** refreshes it. Arrow keys browse, Enter selects, and Tab, another click in the box or a click elsewhere closes the list. Stream Deck keeps Escape for its own use. Enter with an empty search leaves the selection unchanged.
 
-The selected sensor is stored as HWiNFO's stable `sensor-id : instance : reading-id` identity (on the Gadget registry, which carries no ids, as the source name and reading label HWiNFO writes), not a list position, so keys survive HWiNFO restarts and sensor reordering. If that identity later disappears from HWiNFO's output (a hardware, driver, or sensor-profile change, or a rename in HWiNFO while on the Gadget source), the key shows **Sensor missing / pick again** and the panel says **Saved reading not found**. The reading stays saved with its label and look, and returns by itself if HWiNFO publishes it again; pick another reading to replace it. When HWiNFO is not running at all, the panel says so instead and never calls your reading missing.
+Shared Memory stores HWiNFO's `sensor-id : instance : reading-id`; Gadget uses its source name and reading label. Selections survive reordering and restarts while that identity remains valid. Renaming a Gadget source or reading changes its identity.
 
-> **Note:** With the picker open, pressing Enter with no search text typed does **not** change your selection (fixed in 1.1.5.0). Your saved sensor is left untouched.
+**Sensor missing / pick again** means the saved reading is absent from a readable source. Its settings remain saved and it recovers if that identity returns. When the source itself is unavailable, the panel reports that instead. See [identities and provider links](data-sources.md).
 
 ### Label on the key
 
@@ -33,9 +44,13 @@ Custom text for the key. Leave it blank to use the sensor's own (HWiNFO-renamed)
 
 ### Theme
 
-The theme strip sits right under the header (below any status message), above the sections, and opens on a first visit: **Default** and the seven presets, **Void** (default), **Graphite**, **Ultraviolet**, **Midnight**, **Forest**, **Ember** and **Paper**, each a chip drawn in its own colors with its name written on it. The line above the chips says what the key draws and where it comes from: *Default (shared: Void)* with **Change** beside it, which opens *Advanced → Shared defaults* at its **Theme** select, or for example *Ember (set on this key)*. When the key's own theme differs from the shared one, **Make shared** takes Change's place: it makes that theme the shared theme and sets the key back to Default, so it keeps drawing the same colors. Fold the strip like a section and its line keeps the checked theme as a small chip in that theme's colors, beside where it comes from; on a key with no reading the folded line also keeps *Shows on the key once a reading is picked.* The line does not change when you point at a chip, because every chip carries its own name. Pick one to theme **this key only**, or pick **Default** to follow the shared theme set under *Advanced → Shared defaults → Theme*, which every HWiNFO key and dial on every Stream Deck follows when set to Default.
+Choose **Default**, **Void**, **Graphite**, **Ultraviolet**, **Midnight**, **Forest**, **Ember** or **Paper** in the theme strip under the header.
 
-Precedence: a per-key theme always wins; the shared theme only affects keys set to Default. The Default chip has a dashed frame and a link mark in front of its name, which tell it apart from the preset it currently draws, and a key's own theme is kept when the shared one changes. On a key with no reading yet, a line under the strip says the theme shows once a reading is picked. See [Themes](themes.md) for the full palette and type-accent details.
+- A named theme applies to this key only.
+- **Default** follows **Advanced → Shared defaults → Theme**, shared by all HWiNFO keys and dials.
+- **Change** opens the shared theme setting. **Make shared** appears when this key's theme differs from it; that command updates the shared theme and returns this key to Default.
+
+The strip names both the current theme and where it comes from. [Compare themes and colors](themes.md).
 
 ### Text color
 
@@ -67,74 +82,58 @@ When a non-current mode is selected, a small **MIN / MAX / AVG** badge appears i
 
 ### Layout: two readings on one key
 
-**Readings on this key → Two readings, stacked** splits the key into two rows, each with its own small label and a value with the unit inline, separated by a thin divider. Pick the second reading in the **Reading 2** box that appears right under the choice (same searchable list as the first), and give it an optional **Label 2**. Until Reading 2 holds a pick, the key keeps drawing one reading and a note under **Readings on this key** says so. While the layout is dual, **Graph under the value** hides.
+Choose **Reading → Readings on this key → Two readings, stacked**, then pick **Reading 2** and an optional **Label 2**. The key stays single until a second reading is selected.
 
-**Row 2 shows** decides the second row's stat:
+**Row 2 shows** controls the second row's statistic:
 
-- **The same stat as row 1** *(default)*: both rows show the same stat, and the key press cycles them together. When that stat isn't the current value, **one MIN / MAX / AVG badge sits centered in the divider gap**, the key's most visible spot.
-- **Always the current value / minimum / maximum / average**: pins the second row to a fixed stat, and the key press then cycles row 1 alone. Each row that isn't showing the current value names its stat in a small badge after its own label (for example **CCD2 MAX**), so both values keep their full size and their place on every press. When a label is too long to keep its size beside the badge, that row's badge follows its value instead, as in 1.6.0, and the label stays whole. Two rows pinned to the same stat share one badge in the divider gap.
+- **The same stat as row 1**: a press cycles both rows together. MIN, MAX or AVG appears once in the divider.
+- **Always the current value / minimum / maximum / average**: pins row 2 while a press cycles row 1. Each non-current row names its statistic. Matching statistics share a divider badge.
 
-![The key's settings panel with Readings on this key set to Two readings, stacked: the header's face shows both rows, Reading 2 holds a GPU temperature beside an empty Label 2 field, and Row 2 shows is set to The same stat as row 1 with its help line; Display has no Graph under the value select, and the folded Alerts line ends in first reading.]({{ '/assets/img/pi-key-dual.png' | relative_url }})
+Useful pairs include CPU/GPU temperature, network download/upload, or one sensor's current value above its fixed maximum.
 
-![Multi-readout key and dial faces rendered by the plugin: CPU and GPU temperature stacked on one key, the same CPU sensor as a min and max pair, a press-cycled pair showing MAX, a three-row key with labels left and values right, a quad grid key with four color-coded readings, and the dial overview and two-row views.]({{ '/assets/img/multi-readouts.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-dual.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-dual.png' | relative_url }}" width="800" height="1796" loading="lazy" decoding="async" alt="Two stacked readings configured in the Sensor Reading settings, including Reading 2 and Row 2 shows."></a>
 
-Two stacked rows are this layout's limit; for more, the [three-row layout](#layout-three-readings-rows) trades the big stacked values for three compact rows, and the [quad grid](#layout-four-readings-the-quad-grid) shows four readings per key, which is the ceiling. Some useful pairs:
+<a class="image-link" data-image-viewer href="{{ '/assets/img/multi-readouts.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/multi-readouts.png' | relative_url }}" width="2820" height="358" loading="lazy" decoding="async" alt="Production-rendered examples of stacked, three-row and four-cell keys, alongside dial overview layouts."></a>
 
-- Two related sensors: CPU and GPU temperature, both RAM sticks, two drives.
-- The **same sensor twice** with a pinned second stat: current above a pinned maximum, or **Value shown = Minimum** with **Row 2 shows = Always the maximum** for the min/max pair in the image above (framerate lows and highs work the same way).
-- A download/upload rate pair for one adapter.
+**Shared rules for all multi-reading key layouts:**
 
-What carries over, and what stays with the first reading:
+- **Warn at / Critical at watch the first reading only**, recoloring the whole key. Put the reading you need alerts on first, or give it its own key.
+- **Decimals** and **°F** apply to every reading. The sensor-type accent follows the first.
+- **Graph under the value** is available only with One reading. Its setting stays saved when hidden.
+- A missing reading shows a placeholder while the others continue. If all picked readings disappear, the key shows **Sensor missing**.
+- Changing layouts preserves readings, labels and colors. Switching to One reading restores the single face.
 
-- **Decimals** and **°F** apply to both rows.
-- **Warn at / Critical at** watch the **first** reading only, and an alert recolors the whole key exactly like the single layout. There are no per-row thresholds; put the reading you want alerts on first (or use two keys).
-- The sensor-type accent (badge color) follows the first reading.
-- The **Display strip is a single-layout feature**: the second row takes its space, so **Graph under the value** hides while the layout is dual (the setting is kept for when you switch back).
-- Row labels size themselves like the single layout's label. A pinned row's stat badge shares its label line only while the label keeps its size there; otherwise the badge follows the value.
-- If one row's sensor drops out of HWiNFO's output, that row shows an em-dash placeholder while the other keeps updating; if both drop out, the key shows the usual **Sensor missing** screen.
-
-Switching back to **One reading** restores the exact single-layout face; the second reading's settings are remembered.
+Pinned row statistics are specific to the two-reading layout. Their badges share the label line when space permits and otherwise follow the value.
 
 ### Layout: three readings, rows
 
-**Readings on this key → Three readings, rows** shows three compact horizontal rows: the label on the left, the value with its unit aligned on the right, separated by thin rules. It reads like a small table (CCD1, CCD2 and the core maximum of a 9950X3D fit on one key). The first row is the key's own sensor, the **Reading 2** and **Reading 3** boxes fill the other two, each with an optional label. The third slot is the same field the quad grid uses, so switching between three and four readings keeps every pick; a triple needs the first sensor plus at least one more, and an unpicked row stays empty.
+Choose **Readings on this key → Three readings, rows**, then set **Reading 2** and **Reading 3**. Each row has a left-aligned label and a right-aligned value with its unit. **Label 2** and **Label 3** are optional.
 
-Each row's label gets the space its own value leaves over, sizing itself like the other layouts' labels. Values keep one shared size per key so they read as a column.
+The layout needs the first reading and at least one additional reading; an unpicked row remains empty. Reading 3 is shared with the four-cell layout, so changing layouts keeps that selection.
 
-![The key's settings panel with Readings on this key set to Three readings, rows: Reading 2 and Reading 3 holding a GPU temperature and a GPU clock, each beside its label field, and the three-row help line below.]({{ '/assets/img/pi-key-triple.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-triple.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-triple.png' | relative_url }}" width="800" height="1796" loading="lazy" decoding="async" alt="The three-row layout selected, with Reading 2 and Reading 3 fields."></a>
 
-What carries over, and what stays with the first sensor:
+All rows display the same statistic and a press cycles them together. MIN, MAX or AVG appears once on the first separator. Values share a font size; labels shorten to fit the space beside their own value.
 
-- All rows show the **same stat**, and pressing the key cycles them together; a non-current stat shows one MIN / MAX / AVG badge on the first separator. Per-row stat pins are a dual-layout feature.
-- **Decimals** and **°F** apply to every row.
-- **Warn at / Critical at** watch the **first** sensor only, and an alert recolors the whole key in the global alert palette, exactly like the other layouts.
-- The sensor-type accent follows the first sensor, and the **Display strip stays a single-layout feature**.
-- A row whose sensor drops out of HWiNFO's output shows an em-dash placeholder while the rest keep updating; if every picked sensor drops out, the key shows the usual **Sensor missing** screen.
-
-Switching to another layout keeps all three sensors and labels; switching back to **One reading** restores the exact single-layout face.
+The [multi-reading rules](#layout-two-readings-on-one-key) apply: the first reading controls alerts, there are no per-row stat pins, and this layout has no graph strip.
 
 ### Layout: four readings, the quad grid
 
-**Readings on this key → Four readings, quad grid** splits the key into a 2x2 grid, one reading per cell, behind a hairline cross. The first reading is the top left cell and **Reading 2** the top right (the same fields the stacked layout uses, so switching between two and four readings keeps both sensors), with **Reading 3** and **Reading 4** below. A quad needs the first sensor plus at least one more; unpicked cells stay empty, so a three-sensor quad is fine.
+Choose **Readings on this key → Four readings, quad grid**. The first reading is top left, **Reading 2** top right, and **Reading 3** and **Reading 4** below. It needs the first reading and at least one more; unpicked cells remain empty.
 
-Four values on a 72 px key leave no room for full labels, so the quad has two ways to keep the cells identifiable:
+**Cell colors** in Display distinguish the readings:
 
-- **Cell colors** (in the Display section) *(default)*: each value is drawn in its cell's color. The preset select offers **Signal** (four distinct hues), **Pairs** (top row one hue, bottom row another, for two related pairs), and **Uniform** (accent blue everywhere); the four color wells beside it recolor any single cell, and the select reads *Custom* when the wells match no preset.
-- **Cell labels**: ticking **Show a small label in each cell** switches to a short uppercase label above each value; the label takes the cell color and the value the theme's text color. Labels come from **Label on the key** and **Label 2** for the top cells and **Label 3 / Label 4** for the bottom ones, defaulting to the sensor name's first word; the first 4 characters show.
+- **Signal** gives four hues, **Pairs** groups the top and bottom rows, and **Uniform** uses one accent hue.
+- The four color wells change individual cells. The preset reads **Custom** when no preset matches.
+- **Show a small label in each cell** puts a short label above each value. Labels use the cell color and values use the theme's text color. Unticked, values take the cell colors.
 
-Values compact to at most **four characters** per cell: decimals drop first, then large numbers shorten (`48700` shows as `49k`), so a cell never overflows.
+Labels use **Label on the key** and **Label 2 / 3 / 4**, falling back to the first word of each reading's name. Only the first four characters appear. Values compact to at most four characters: decimals drop first, then large numbers shorten, such as `48700` to `49k`.
 
-![The key's settings panel with Readings on this key set to Four readings, quad grid: Readings 2 to 4 (a GPU temperature, a GPU clock and a pump) each beside a label field that takes 4 characters, and in Display the Cell colors row with its preset select, four color wells and the cell label checkbox.]({{ '/assets/img/pi-key-quad.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-quad.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-quad.png' | relative_url }}" width="800" height="2072" loading="lazy" decoding="async" alt="Four-cell grid settings with Reading 2 to 4, cell color presets and the small-label checkbox."></a>
 
-What carries over from the other layouts, and what stays with the first sensor:
+A press cycles every cell through the same statistic; one MIN, MAX or AVG badge appears at the center. The [multi-reading rules](#layout-two-readings-on-one-key) apply: the first reading controls alerts, there are no per-cell stat pins, and the layout has no graph strip.
 
-- All cells show the **same stat**, and pressing the key cycles them together; a non-current stat shows one MIN / MAX / AVG badge centered on the cross. Per-cell stat pins are a dual-layout feature.
-- **Decimals** and **°F** apply to every cell.
-- **Warn at / Critical at** watch the **first** sensor only, and an alert recolors the whole key in the global alert palette, over the cell colors, exactly like the other layouts; an alert is always the whole field, never one cell's color.
-- The sensor-type accent (badge color) follows the first sensor, and the **Display strip stays a single-layout feature**.
-- A cell whose sensor drops out of HWiNFO's output shows an em-dash placeholder while the rest keep updating; if every picked sensor drops out, the key shows the usual **Sensor missing** screen.
-
-Switching back to **One reading**, **Two readings, stacked** or **Three readings, rows** restores that exact face; the extra sensors, labels and colors are remembered for the next switch to quad.
+Individually chosen cell colors can be hard to read. **Custom color** for text takes priority; [Themes & colors](themes.md#text-theme-dim-or-custom) explains contrast and color precedence.
 
 ### Decimals
 
@@ -158,9 +157,9 @@ The **Graph under the value** select in the Display section picks one strip unde
 - **Bar (value in its range)**: a horizontal gauge in the sparkline's spot showing where the live value sits in its range.
 - **Ring (value in its range)**: the same gauge as a radial arc around the value.
 
-![Graph modes and the Text color setting rendered by the plugin: a sparkline key, a percentage bar, a bar with amber and red threshold zones, a ring, a dial bar sharing the zones, and theme, dim, custom and secondary-dimmed text faces.]({{ '/assets/img/display-text.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/display-text.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/display-text.png' | relative_url }}" width="1672" height="696" loading="lazy" decoding="async" alt="Graph modes and the Text color setting rendered by the plugin: a sparkline key, a percentage bar, a bar with amber and red threshold zones, a ring, a dial bar sharing the zones, and theme, dim, custom and secondary-dimmed text faces."></a>
 
-![The Graph under the value select in the key's settings panel, set to Bar (value in its range), with the range sentence it shows only for Bar and Ring.]({{ '/assets/img/pi-key-display.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-display.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-display.png' | relative_url }}" width="800" height="270" loading="lazy" decoding="async" alt="The Graph under the value select in the key&#x27;s settings panel, set to Bar (value in its range), with the range sentence it shows only for Bar and Ring."></a>
 
 Bar and Ring find their range automatically:
 
@@ -209,30 +208,24 @@ The detail view's own Back tile is this same Sensor Reading action with one diff
 
 ## Status screens
 
-If the key cannot show a reading, it shows a two-line status message:
+A two-line message replaces the value when a reading cannot be shown. **Start HWiNFO / not detected**, **Shared Memory / is off**, **Not updating / check sharing** and **Age unknown / check Gadget** describe different source states. **Sensor missing / pick again** concerns the saved selection.
 
-| Key shows | Meaning / fix |
-| --- | --- |
-| **Start HWiNFO / not detected** | HWiNFO isn't publishing to the selected data source (in Auto, to neither). Start it with Shared Memory Support (or Gadget reporting) enabled, or check **Data source**. |
-| **Source busy / retrying** | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
-| **Shared Memory / is off** | HWiNFO reports sharing disabled. Re-enable it in HWiNFO Settings. Auto can use Gadget when enabled; saved selections need explicit links to work across sources. |
-| **Not updating / check sharing** | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| **Age unknown / check Gadget** | Gadget has no producer timestamp. Check HWiNFO and Gadget reporting; unchanged values can be steady or left by a kill or crash. |
-| **Tick sensors / in Gadget** | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
-| **Access denied / open settings** | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| **Pick a sensor / in settings** | No sensor selected yet. Open the key's settings. |
-| **Sensor missing / pick again** | The saved sensor isn't in HWiNFO's current output. Pick it again. |
-| **Bridge failed / reinstall** | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
-| **Needs x64 / Windows** | This plugin needs 64-bit (x64) Windows. macOS and Windows-on-ARM are unsupported. |
-| **Source error / open settings** | The sensor source could not be opened or validated. In Auto mode a Gadget failure shows this only while Shared Memory is not running. Open settings and choose **Copy support report** for support. |
+Use the [complete status table](status-screens.md#key-screens) or [Troubleshooting](troubleshooting.md) for the exact message. The settings header offers **Check again**, **HWiNFO setup steps**, **Reload sensor list** or **Pick another reading** as appropriate. A source outage preserves the saved selection and settings.
 
-While the key is in one of these states, the message under the panel's header explains it and offers the fix it can: **Check again** and **HWiNFO setup steps** when HWiNFO data is unavailable (plus **Data source setting** when **Data source** is set to one provider only), **Reload sensor list** and **Pick another reading** when the saved reading is not found, and **Check again** when data stops updating. If Check again gets the same answer, a line under the buttons says when it checked, for example *Checked again at 14:02:31: no change yet*. Full details are on [Status screens](status-screens.md).
+**Access denied** and **Source error** need the evidence in **Advanced → Support → Copy support report**. **Bridge failed / reinstall** can require an installation repair and plugin restart; the message alone does not identify the cause.
 
 ## Advanced (shared by all keys and dials)
 
-The **Advanced** section holds four groups that fold on their own, so opening Advanced shows four lines instead of one long block: **Shared defaults** and **Connection**, both marked **All keys and dials** because every HWiNFO key and dial on every Stream Deck shares them (Stream Deck stores them once for the whole plugin), then **Support** and **Configuration documents**. Shared defaults holds **Theme**, **Text color**, **Text font**, **Accent colors** and **Data units**; Connection holds **Data source**, **Read every**, the reading-links note and the **HWiNFO setup steps**; on a healthy Gadget source it also carries the plugin's full note about that source, which the message under the header shortens to one line. Folded, Shared defaults and Connection name their current values on their title line, for example *Auto source · read every 1 s*. Themes and Text color are documented under [Themes](themes.md), the sources under [Data sources](data-sources.md).
+**Advanced** contains four groups:
 
-![The Advanced section at the panel's real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Text font, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This key's settings well and the Shared settings well (marked All keys and dials), each with Copy and Replace, over the help line that explains them.]({{ '/assets/img/pi-live-key-advanced.png' | relative_url }})
+- **Shared defaults:** Theme, Text color, Text font, Accent colors and Data units.
+- **Connection:** Data source, Read every, source links and HWiNFO setup steps.
+- **Support:** Copy support report.
+- **Configuration documents:** copy or replace this key's settings and the shared settings.
+
+Shared defaults and Connection are marked **All keys and dials**. They affect the whole plugin. See [Themes](themes.md) and [Data sources](data-sources.md).
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-live-key-advanced.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-live-key-advanced.png' | relative_url }}" width="800" height="2436" loading="lazy" decoding="async" alt="The Advanced section at the panel&#x27;s real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Text font, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This key&#x27;s settings well and the Shared settings well (marked All keys and dials), each with Copy and Replace, over the help line that explains them."></a>
 
 **Configuration documents** holds two JSON wells: **This key's settings**, the exact settings this key runs on, and **Shared settings**, the plugin-wide settings. **Copy** fills an untouched well with the settings of the moment you press it and puts the document on the clipboard; save it to a file to back a hand-built layout up. Paste a saved document and press **Replace this key's settings** to restore it, or to clone it onto another key here or on another machine. Replacing swaps the whole document in one write and reloads the panel; fields this build does not know survive untouched. **Replace shared settings** changes every HWiNFO key and dial, so its first press only arms it (the button then reads *Press again to replace for all keys and dials*) and a second press replaces; a quick double click only arms it, and leaving the button or editing the document disarms it. Reading keys in the document carry the sensor's friendly name after the key so the file stays readable; replacing strips the names, and settings always store bare keys. The wells live on the Sensor Reading and Sensor Dial panels only; the HWiNFO Control key holds just a command, a target and a reset scope, so it has no wells; re-enter those by hand.
 

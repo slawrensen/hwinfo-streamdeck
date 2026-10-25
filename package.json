@@ -41,7 +41,13 @@
 		"pack:validate": "node scripts/validate-pack.mjs",
 		"e2e:reading-links": "node scripts/e2e-reading-links.mjs",
 		"e2e:gadget-raw": "node scripts/e2e-gadget-raw.mjs",
-		"gen:tahoma-metrics": "node scripts/gen-tahoma-metrics.mjs C:/Windows/Fonts/tahomabd.ttf scripts/tahoma-ink-corrections.json src/ui/tahoma-bold-metrics.ts"
+		"gen:tahoma-metrics": "node scripts/gen-tahoma-metrics.mjs C:/Windows/Fonts/tahomabd.ttf scripts/tahoma-ink-corrections.json src/ui/tahoma-bold-metrics.ts",
+		"docs:build": "bundle exec jekyll build --source docs --destination .docs-site",
+		"docs:test": "node --test test/docs-crawl.test.mjs test/docs-preview-stage.test.mjs test/docs-site-shots.test.mjs",
+		"docs:test:browser": "node --test test/docs-browser.test.mjs",
+		"docs:crawl": "node scripts/docs-crawl.mjs",
+		"docs:shots": "node scripts/docs-site-shots.mjs",
+		"docs:preview": "node scripts/docs-preview-publish.mjs"
 	},
 	"dependencies": {
 		"@elgato/streamdeck": "^2.1.2",
@@ -54,16 +60,19 @@
 		"@rollup/plugin-terser": "^1.0.0",
 		"@rollup/plugin-typescript": "^12.3.0",
 		"@types/node": "^20.19.43",
+		"axe-core": "4.14.0",
 		"eslint": "^10.12.0",
 		"globals": "^17.12.0",
 		"koffi": "^3.3.2",
 		"node-gyp": "^12.4.0",
+		"playwright": "1.62.1",
 		"rollup": "^4.64.3",
 		"sharp": "^0.35.4",
 		"tslib": "^2.8.1",
 		"tsx": "^4.23.15",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.70.0",
-		"ws": "^8.22.0"
+		"ws": "^8.22.0",
+		"yaml": "2.9.1"
 	}
 }

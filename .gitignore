@@ -47,3 +47,9 @@ com.lawrensen.hwinfo.sdPlugin/logs/
 native/hwsm/build/
 native/hwsm/source-id.h
 /release-native-manifest.json
+
+# Jekyll documentation build output
+.sass-cache/
+.jekyll-cache/
+.docs-site/
+.bundle/

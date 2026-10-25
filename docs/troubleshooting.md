@@ -1,13 +1,21 @@
 ---
 title: Troubleshooting
 nav_order: 11
+description: Find an exact status message and the action that can resolve it.
 ---
 
-Find the message or symptom below. For setup, see [Data sources](data-sources.md).
+Start with the exact message on your key, dial or settings header. HWiNFO must be running locally with **Shared Memory Support** or **Gadget reporting** enabled.
 
-> This page describes 1.7's source and status behavior. See [what changed from 1.6](whats-new-1.7.md).
+| What you see | Go to |
+| --- | --- |
+| Start HWiNFO | [Enable the selected source](#keys-show-start-hwinfo) |
+| Shared Memory off, often after 12 hours | [Re-enable sharing](#keys-show-shared-memory-off) |
+| Not updating / No new data | [Check freshness](#values-are-frozen--not-updating) |
+| Age unknown / check Gadget | [Check HWiNFO and Gadget reporting](#age-unknown) |
+| Sensor missing / pick again | [Check the saved reading](#keys-show-sensor-missing) |
+| Access denied | [Collect the access evidence](#keys-show-access-denied) |
 
-> **First check, always:** is **HWiNFO** running, and is it publishing on at least one interface (**Shared Memory Support** *or* **Gadget reporting**)? Most status screens trace back to this. See [Data sources](data-sources.md).
+For first-time setup, follow [Get started](getting-started.md).
 
 ## How to read a status screen
 
@@ -28,7 +36,7 @@ When a key cannot show a reading, it shows a two-line status message. Dials use 
 | **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
-![Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on the key and No new data / check sharing on the dial for Shared Memory; and Age unknown / check Gadget on both for Gadget.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on the key and No new data / check sharing on the dial for Shared Memory; and Age unknown / check Gadget on both for Gadget."></a>
 
 *Simulated source states rendered by the 1.7 production code, not a hardware photograph.*
 
@@ -63,17 +71,33 @@ No Shared Memory producer timestamp or value revision advanced for more than ~15
 2. **Check for the free version's 12-hour timer.** Expiry marks Shared Memory disabled. The plugin shows **Shared Memory off**, or tries Gadget in Auto mode. An unlinked Shared Memory selection will be missing on Gadget.
 3. **HWiNFO itself crashed or hung.** Restart it. On Shared Memory the plugin checks a fresh connection about every 5 seconds while stale; on Gadget the next value change brings the keys back. Both recover on their own.
 4. **The machine's clock stepped backwards** (a virtual machine resuming, the first time sync after a boot with a flat CMOS battery, a Windows and Linux dual boot that disagree about UTC). Before 1.5.0.0 that could delay this screen for as long as the correction: elapsed time was measured against the wall clock, so a frozen reading was not reported as frozen. Fixed in 1.5.0.0; on older builds the screen catches up once the clock settles.
-5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If **Read every** is shorter than HWiNFO's interval, you'll see the same number repeat between HWiNFO updates; that's expected, not a freeze. The plugin only calls it stale after 15 s of no change.
+5. **Confusing a slow refresh for a freeze.** HWiNFO updates on its own poll cycle (default ~2 s). If **Read every** is shorter than HWiNFO's interval, you'll see the same number repeat between HWiNFO updates; that's expected, not a freeze. The plugin reports stale Shared Memory data after about 15 seconds without fresh measurement evidence; an unchanged value with an advancing producer timestamp can still be current.
+
+## Age unknown
+
+**Age unknown / check Gadget** means the Gadget registry has no producer timestamp. Before its first observed value change, or after 15 seconds without another, the plugin cannot distinguish a steady reading from one left by a stopped HWiNFO.
+
+1. Open HWiNFO and confirm the Sensors window is polling.
+2. Open **Configure Sensors → HWiNFO Gadget**. Confirm **Enable reporting to Gadget** and **Report value in Gadget** for the reading.
+3. Compare that reading in HWiNFO. If it changes there, choose **Check again** in the plugin settings and wait for a poll.
+4. For timestamped freshness and HWiNFO history, enable **Shared Memory Support**. Select the reading on that source or configure an [explicit provider link](data-sources.md#link-readings-across-providers).
+
+Restarting the source cannot prove the age of an unchanged Gadget value. Use Shared Memory when that distinction matters.
 
 ## Keys freeze, and only closing the Stream Deck app brings them back
 
 Different from **"Not updating"** above: there is no status screen at all. The keys sit on their last reading, the settings panel's **Copy support report** button gets no answer (current versions change it to **Plugin not responding**, and the panel says the plugin is not answering), restarting HWiNFO changes nothing, and closing the Stream Deck app and reopening it fixes it for a while. In the app's own key preview the keys show the plain **HWiNFO 62 °C** action icon rather than live values.
 
-That combination means the plugin process is not running. Every symptom follows from it: the deck keeps showing the last picture it was sent, the app falls back to the action's icon, and nothing is left to answer the support report.
+This combination suggests the plugin is not answering the app. It does not by itself identify why. Update to the current release, restart Stream Deck, and keep the plugin log if the problem returns.
 
-Two causes, both fixed in **1.5.0.0**. A safety check that exists to clean up if the Stream Deck app ever crashes could decide the app was gone whenever it was unable to inspect it, which on some machines is always, and shut the plugin down about 30 seconds after every start. Separately, if the app's connection to the plugin died while keys were on screen, the plugin kept running with nowhere to draw, so the keys froze until the app was restarted. Update, and both stop.
+<details markdown="1">
+<summary>Historical fixes for versions before 1.5.0</summary>
 
-On an older build you can switch that check off: add a user environment variable `HWINFO_PARENT_CHECK_MS` with the value `999999999`, then close and reopen the Stream Deck app. The only cost is that if the app ever crashes outright, a leftover `node.exe` may need ending in Task Manager.
+Version 1.5.0 fixed two causes: a parent-process check that could exit when it could not inspect Stream Deck, and a disconnected plugin that could keep running without an app connection. These fixes do not establish the cause of a freeze on a newer release.
+
+On an older build, the parent check can be disabled with the user environment variable `HWINFO_PARENT_CHECK_MS=999999999`, followed by a Stream Deck restart. If Stream Deck crashes, a leftover `node.exe` can then require manual cleanup. Updating is preferred.
+
+</details>
 
 ## Keys show "Access denied"
 
@@ -117,7 +141,7 @@ The settings-panel sensor list is populated live from whatever source is active.
 4. **HWiNFO is running but publishes no readings.** The message says exactly that, with **HWiNFO setup steps**: enable Shared Memory Support, or tick readings for Gadget as in item 2.
 5. **Search filter too narrow.** The list then says "No readings match" with your search. Clear the search box; the list groups readings by source (CPU, GPU, drives…).
 
-![The key's settings panel with its reading list open: the header with the live face, the theme line and chips, then "gpu" typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i's GPU/CPU current rails, then the RTX 5080), each row with its live value and type.]({{ '/assets/img/sensor-picker.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/sensor-picker.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/sensor-picker.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The key&#x27;s settings panel with its reading list open: the header with the live face, the theme line and chips, then &quot;gpu&quot; typed in the Reading box beside the reload button, and the matching readings grouped under their sensors (a Corsair AX1500i&#x27;s GPU/CPU current rails, then the RTX 5080), each row with its live value and type."></a>
 
 ## Only some of the readings I ticked in Gadget show up
 
@@ -158,7 +182,7 @@ Other notes:
 
 The yellow Stream Deck alert cue on a drill-down press means entry was refused, on purpose. In order of likelihood:
 
-- **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Everything else about the key still works.
+- **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Check [Hardware compatibility](hardware.md) for the other actions supported on that model.
 - **HWiNFO is not publishing data** and the detail list is set to *Every reading from this reading's sensor* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only *A custom list* opens while HWiNFO is down.
 - **The selected sensor is missing** from HWiNFO's current output, so its source cannot be identified. Reopen settings and pick it again.
 - **The filter pattern is empty** (*Readings matching a filter*): there is nothing to list until you type one. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
@@ -234,18 +258,18 @@ Useful lines to look for:
 
 Run through this first; most problems resolve here:
 
-- [ ] **HWiNFO is running** and its **Sensors window is open**.
-- [ ] At least one interface is enabled: **Shared Memory Support** *or* **Gadget reporting** ("Report value in Gadget" on the sensors you need).
-- [ ] **Data source** (**Advanced → Connection**) is **Auto** unless you have a specific reason otherwise.
-- [ ] **Stream Deck 6.9+**, **64-bit Windows 10+**.
-- [ ] You **re-picked the sensor** if it went missing after a hardware/driver change.
-- [ ] Threshold values use the **displayed temperature unit**, or HWiNFO's **original byte/rate unit** before Data units changes the display scale, and **Alert when the value drops to or below these numbers** is ticked where low is bad.
+- **HWiNFO is running** and its **Sensors window is open**.
+- At least one interface is enabled: **Shared Memory Support** *or* **Gadget reporting** ("Report value in Gadget" on the sensors you need).
+- **Data source** (**Advanced → Connection**) is **Auto** unless you have a specific reason otherwise.
+- **Stream Deck 6.9+**, **64-bit Windows 10+**.
+- You **re-picked the sensor** if it went missing after a hardware/driver change.
+- Threshold values use the **displayed temperature unit**, or HWiNFO's **original byte/rate unit** before Data units changes the display scale, and **Alert when the value drops to or below these numbers** is ticked where low is bad.
 
 If it still fails, open an issue at the [project repository](https://github.com/slawrensen/hwinfo-streamdeck) and include:
 
 1. **What you see**: the exact status-screen text (e.g. "Access denied / open settings") or a photo of the key/dial.
 2. **HWiNFO version and edition** (free or Pro), and which interface(s) you enabled.
-3. **Plugin version** (see the Marketplace listing or `manifest.json`).
+3. **Installed plugin version** (from **Copy support report** or the installed `manifest.json`, not the current Marketplace listing).
 4. **Stream Deck software version** and device model (regular, Stream Deck +, Stream Deck + XL).
 5. **Windows version**.
 6. **The relevant lines from the log** (`com.lawrensen.hwinfo.0.log`), especially any `HWiNFO unavailable […]` and the `Opened HWiNFO data source` lines.

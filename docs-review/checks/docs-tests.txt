@@ -1,0 +1,52 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> hwinfo-streamdeck@1.7.1 docs:test
+> node --test test/docs-crawl.test.mjs test/docs-preview-stage.test.mjs test/docs-site-shots.test.mjs
+
+▶ docs crawler inspects every reachable page and proves private 404s
+  ✔ inspects a page first fetched for an anchor and finds its broken child (157.320986ms)
+  ✔ also checks expected text and leaks on an anchor-prefetched page (144.521663ms)
+  ✔ rejects a private path returning HTTP 200 (163.214513ms)
+  ✔ rejects a private path returning HTTP 500 (131.74544ms)
+  ✔ passes healthy anchored pages, handles cycles and fetches each URL once (130.547071ms)
+✔ docs crawler inspects every reachable page and proves private 404s (729.042112ms)
+▶ docs crawler catches redesigned-site and deployment regressions
+  ✔ checks an unlinked legacy route and a removed fragment from the route contract (123.026364ms)
+  ✔ verifies a consistent preview build and canonical-host search links under a local subpath (113.627095ms)
+  ✔ rejects a cached page from a different build and missing preview noindex (122.651073ms)
+  ✔ rejects a mismatched externally expected deployment build (129.318739ms)
+  ✔ checks every picture and img srcset candidate rather than only the fallback image (131.046297ms)
+  ✔ rejects a root-relative image that escapes the project base even if that image exists (129.288288ms)
+  ✔ finds private material in the JSON search index even when every HTML page is clean (115.859618ms)
+  ✔ rejects broken search-result fragments and results pointing at the other base path (137.878522ms)
+  ✔ requires a real, nonempty JSON search index (137.084805ms)
+✔ docs crawler catches redesigned-site and deployment regressions (1140.803981ms)
+▶ docs crawler consumes closing response streams
+  ✔ finishes large image bodies from an HTTP/1.0 server without an undici parser crash (137.119501ms)
+  ✔ reports a truncated asset transfer as a failed check instead of claiming success (118.3253ms)
+✔ docs crawler consumes closing response streams (255.768292ms)
+✔ staging uses committed docs, preserves the shared shell and excludes private files (106.119554ms)
+✔ invalid YAML, missing leases and a committed CNAME fail without publication (50.588818ms)
+✔ repository read errors never create repositories or change visibility (59.148281ms)
+✔ publication preserves preview history, removes stale files, and records source identity (266.785201ms)
+✔ a stale expected head stops before any update (121.273589ms)
+✔ a concurrent publish after the final read is protected by the actual git lease (231.619557ms)
+✔ docs screenshots never probe a shared debugger when their own port file is absent (7.241102ms)
+✔ docs screenshots use only their unique profile's assigned port and scoped cleanup (3.885705ms)
+✔ docs screenshots fail before endpoint access when Chrome exits or fails to spawn (4.822284ms)
+✔ docs screenshots accept a zero-exit launcher handoff through their owned debugger (1.957494ms)
+✔ docs screenshots still need their own debugger after a zero-exit launcher handoff (2.142298ms)
+✔ docs screenshots refuse malformed assigned ports without probing an endpoint (11.322827ms)
+✔ POSIX screenshots stop only their spawned browser and remove its own profile (2.315635ms)
+✔ a POSIX launcher that already exited is never signaled by an old PID (1.677338ms)
+✔ an explicit browser path is used and a missing one fails before launching (3.235089ms)
+✔ malformed extended viewport input fails before browser launch (5.075901ms)
+✔ browser captures complete long pages, paints lazy images and exposes broken assets (2629.644783ms)
+ℹ tests 33
+ℹ suites 3
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2806.572585

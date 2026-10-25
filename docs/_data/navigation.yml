@@ -1,0 +1,40 @@
+- title: Start
+  pages:
+    - title: Overview
+      url: /
+    - title: Install
+      url: /installation.html
+    - title: Get started
+      url: /getting-started.html
+- title: Customize
+  pages:
+    - title: Sensor Reading
+      url: /sensor-reading.html
+    - title: Sensor Dial
+      url: /sensor-dial.html
+    - title: Sensor details
+      url: /sensor-details.html
+    - title: Themes & colors
+      url: /themes.html
+    - title: Thresholds & alerts
+      url: /thresholds-alerts.html
+    - title: Dial controls
+      url: /controls.html
+- title: Help
+  pages:
+    - title: Troubleshooting
+      url: /troubleshooting.html
+    - title: Status screens
+      url: /status-screens.html
+    - title: FAQ
+      url: /faq.html
+- title: Reference
+  pages:
+    - title: Data sources
+      url: /data-sources.html
+    - title: Hardware compatibility
+      url: /hardware.html
+    - title: What's new in 1.7
+      url: /whats-new-1.7.html
+    - title: Changelog
+      url: /changelog.html

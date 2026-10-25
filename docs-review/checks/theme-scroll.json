@@ -1,0 +1,14 @@
+{
+  "viewport": "390x844",
+  "before": {
+    "left": 0,
+    "width": 333,
+    "contentWidth": 1072,
+    "role": "region",
+    "tabindex": 0
+  },
+  "scrollLeftAfterArrowRight": 2,
+  "originalViewerSource": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/themes-contact-sheet.png",
+  "focusRestored": true,
+  "overflow": false
+}

@@ -1,15 +1,16 @@
 ---
 title: Status screens
 nav_order: 9
+description: Identify key, dial and settings-panel messages.
 ---
 
-When a key or dial cannot show a reading, it shows a **status screen** instead of a value. The first line names the observed state; the second gives a next step. Source recovery is automatic when readable data returns. A native bridge load failure can require an installation repair and plugin restart.
+The first line names the observed state; the second gives a next step. Use the tables below to identify the message, then follow [Troubleshooting](troubleshooting.md) for a full repair path. Source errors usually recover when readable data returns; **Bridge failed** can require an installation repair and plugin restart.
 
 > This page describes 1.7. The image uses simulated source states rendered by production code. It is not a hardware photograph.
 
 ## Key screens
 
-![Production-rendered key and dial status examples: Source busy and retrying; Not updating or No new data with check sharing; Age unknown with check Gadget.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial status examples: Source busy and retrying; Not updating or No new data with check sharing; Age unknown with check Gadget."></a>
 
 | Key shows | What it means | How to fix it |
 | --- | --- | --- |
@@ -79,6 +80,6 @@ Source errors do not require removing the key. While a reading action is visible
 - In **Auto** mode on Gadget, it checks for Shared Memory about every 15 seconds and switches back when it can read it. Saved selections still need the appropriate identity or an explicit link.
 - A transient read failure can retain the last display within the freshness grace period. A layout change triggers a reopen and another read; the settings panel says **Reopening source** meanwhile, never **Live**. If recovery fails, the source status replaces the reading. *Access denied*, *Shared Memory off* and *Tick sensors* appear without that grace period.
 
-Source failures are retried automatically. **Bridge failed** remains cached for the plugin process, so after repairing the installation, restart the plugin. A loader error alone does not establish whether a file is damaged, missing or blocked.
+**Bridge failed** remains cached for the plugin process, so after repairing the installation, restart the plugin. A loader error alone does not establish whether a file is damaged, missing or blocked.
 
 > **Related:** the *Shared Memory off*, *Not updating*, and *Tick sensors* screens all trace back to how HWiNFO is publishing; see [Data sources](data-sources.md) for the Shared Memory vs. Gadget trade-offs and the 12-hour free-version timer.

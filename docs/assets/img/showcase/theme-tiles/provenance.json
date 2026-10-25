@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "release": "v1.7.1",
+  "releaseCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "source": "docs/assets/img/themes-contact-sheet.png",
+  "sourceGitBlob": "4a19ef5b0fba315b61ee70aa73110b503ef8a832",
+  "sourceSha256": "68925c97f75f1429f0bf1d297e25e049ac2347702d5a7066c51fbb27c4e28091",
+  "sourceSize": [
+    1072,
+    799
+  ],
+  "intermediate": "docs/assets/img/showcase/themes-key-strip.png",
+  "intermediateSha256": "913c19f2cfea05e1b8a6ac83c774441caf6661328af51bb673458461e01782dd",
+  "intermediateSize": [
+    1072,
+    168
+  ],
+  "intermediateIsPixelExactCropOfSource": [
+    0,
+    0,
+    1072,
+    168
+  ],
+  "transformation": "Lossless native144x144 crops only. Existing theme-name labels above the tiles and inter-tile gutters are excluded. No resizing, reconstruction, repainting, recoloring, reading alteration or geometry changes.",
+  "caption": "Sample renderings. Seven preset themes with the pictured sample readings.",
+  "usageNotes": [
+    "Use the external theme labels from each record.",
+    "Keep images at144CSSpx or smaller; avoid stretching raster samples far beyond their native size.",
+    "A wrapping gallery can show two144px samples within a333px phone content region without horizontal scrolling.",
+    "Keep access to the complete original comparison board for additional layouts and alert states.",
+    "These are renderer samples rather than hardware photographs; different sample sensor values and their type accents are preserved from the source."
+  ],
+  "assets": [
+    {
+      "theme": "void",
+      "label": "Void",
+      "crop": [
+        8,
+        22,
+        152,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "void.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 6120,
+          "sha256": "fac15d836df5be7ef056dcda2538864a6084f32491c8d266fcf4018c9fed760e",
+          "pixelExact": true
+        },
+        {
+          "file": "void.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 3254,
+          "sha256": "3308069a4768f4b47da9730a8ef0cf3ef1cc3109458681edf89eb5970842b174",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "graphite",
+      "label": "Graphite",
+      "crop": [
+        160,
+        22,
+        304,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "graphite.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 5607,
+          "sha256": "5d60adab9722265074bb95f088640818bb655a780643accda1fae0ca15a8fc51",
+          "pixelExact": true
+        },
+        {
+          "file": "graphite.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 2910,
+          "sha256": "54cf34d7110d282ab47996b5ad09f61d251640d682fe31d4df59527ce73ab8f9",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "ultraviolet",
+      "label": "Ultraviolet",
+      "crop": [
+        312,
+        22,
+        456,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "ultraviolet.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 6325,
+          "sha256": "b4ab6cb64f7d63ddefbb216e3a6a4f8a95fcd495d5088dcab7d2eba9734c9167",
+          "pixelExact": true
+        },
+        {
+          "file": "ultraviolet.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 3264,
+          "sha256": "235b0a15bc46ffbcbf45029c8948ba52abcbce6c888f9f76b72e069e27dcaa55",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "midnight",
+      "label": "Midnight",
+      "crop": [
+        464,
+        22,
+        608,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "midnight.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 7226,
+          "sha256": "6cd6530a65c2ed4ab89cb0dd015c176cbb9b46fb162c68c43366b70aa475cbc9",
+          "pixelExact": true
+        },
+        {
+          "file": "midnight.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 3740,
+          "sha256": "4242839923a6a1e1581dcb58682159f4110d903ec074b83a470282da276a0484",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "forest",
+      "label": "Forest",
+      "crop": [
+        616,
+        22,
+        760,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "forest.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 7030,
+          "sha256": "de751534e9a8d2d23c418df99465616fdf6e95c57ab76b30cd9f558d84213bb4",
+          "pixelExact": true
+        },
+        {
+          "file": "forest.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 3612,
+          "sha256": "d8d0c2052c6c60ba941066274caf2b95290b6640753ec7b107e964f03c54fbf9",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "ember",
+      "label": "Ember",
+      "crop": [
+        768,
+        22,
+        912,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "ember.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 5924,
+          "sha256": "6680267d21ace1713f625ebb79cf4c4e3f1954a280fae98bf9a6c51a0c83cee6",
+          "pixelExact": true
+        },
+        {
+          "file": "ember.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 3376,
+          "sha256": "36828bfcc9b3a4837448b3aede9d31b60346fcce9f9d47c4ec940bbcd99790b1",
+          "pixelExact": true
+        }
+      ]
+    },
+    {
+      "theme": "paper",
+      "label": "Paper",
+      "crop": [
+        920,
+        22,
+        1064,
+        166
+      ],
+      "cropCoordinateSystem": "left, top, right-exclusive, bottom-exclusive; relative to both original source and top-row strip",
+      "output": [
+        {
+          "file": "paper.png",
+          "width": 144,
+          "height": 144,
+          "bytes": 5792,
+          "sha256": "6cba3f4de0ac3bdda0b22db217470591dd662666282d49e5fbf24d72ce78af2a",
+          "pixelExact": true
+        },
+        {
+          "file": "paper.webp",
+          "width": 144,
+          "height": 144,
+          "bytes": 2572,
+          "sha256": "a888cfe052282db023728050a0a3fb1cddc1aa68e06cfb4975318dbfc1a4ec73",
+          "pixelExact": true
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "themes": 7,
+    "webpBytes": 22728,
+    "pngBytes": 44024,
+    "allPixelsVerifiedAgainstReleasedMaster": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "button": {
+    "width": 44,
+    "height": 44,
+    "opacity": "1",
+    "background": "rgb(27, 32, 39)",
+    "outlineStyle": "solid"
+  },
+  "svg": {
+    "width": 18,
+    "height": 18
+  },
+  "pre": {
+    "width": 288,
+    "height": 59.4375,
+    "background": "rgb(21, 24, 29)",
+    "border": "1px solid rgb(44, 50, 59)",
+    "padding": "18px 62px 18px 18px",
+    "scrollLeft": 265,
+    "scrollWidth": 551
+  },
+  "copyWorks": true
+}

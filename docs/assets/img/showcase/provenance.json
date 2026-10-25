@@ -1,0 +1,309 @@
+{
+  "release": "v1.7.1",
+  "auditedCommit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "processing": "Technical crops, proportional downsampling and encoding only. No generated pixels, rewritten values, recoloring, compositing or geometry changes. Original masters preserved. PNG-origin WebP exports are lossless. JPEG-origin exports use WebP quality 91.",
+  "assets": [
+    {
+      "source": "docs/assets/img/dial-backgrounds-deck.jpg",
+      "sourceSha256": "d22296bfb25ad33aa3a5be98ff0a0491119389894c6aad53afd96359873e14a1",
+      "sourceSize": [
+        1300,
+        710
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "deck-1300.webp",
+          "width": 1300,
+          "height": 710,
+          "bytes": 129498,
+          "sha256": "5e84ed4f8964103dd700689b2e7b7038ff5ca90d36179b6e0e511887c7e04827"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/dial-backgrounds-deck.jpg",
+      "sourceSha256": "d22296bfb25ad33aa3a5be98ff0a0491119389894c6aad53afd96359873e14a1",
+      "sourceSize": [
+        1300,
+        710
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "deck-960.webp",
+          "width": 960,
+          "height": 524,
+          "bytes": 90260,
+          "sha256": "097a8032f4b9a112272f639be6f3c5f70d6d08951cf555860c1574c2b318cef8"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/dial-backgrounds-deck.jpg",
+      "sourceSha256": "d22296bfb25ad33aa3a5be98ff0a0491119389894c6aad53afd96359873e14a1",
+      "sourceSize": [
+        1300,
+        710
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "deck-640.webp",
+          "width": 640,
+          "height": 350,
+          "bytes": 53388,
+          "sha256": "65c4acf76b8af8d11dd0061022f8e3c54d5a90828bf948da798ee09a8be83c73"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/dial-backgrounds-deck.jpg",
+      "sourceSha256": "d22296bfb25ad33aa3a5be98ff0a0491119389894c6aad53afd96359873e14a1",
+      "sourceSize": [
+        1300,
+        710
+      ],
+      "crop": [
+        20,
+        294,
+        442,
+        700
+      ],
+      "output": [
+        {
+          "file": "deck-detail.webp",
+          "width": 422,
+          "height": 406,
+          "bytes": 28466,
+          "sha256": "3b166547c13d81f217f9cccc8f899b3bf9c99df8a6f7094681429dd91e1eabbd"
+        },
+        {
+          "file": "deck-detail.jpg",
+          "width": 422,
+          "height": 406,
+          "bytes": 59112,
+          "sha256": "ebf148476caa3aac712f892282674f9851b9c788a88bd60b54678f7b4465cb86"
+        }
+      ]
+    },
+    {
+      "source": ".github/readme/keys.png",
+      "sourceSha256": "427e7a2c5a109e9005f52bca9b4f2bbcfe4d196b8999355f802c617a05a172c3",
+      "sourceSize": [
+        976,
+        732
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "keys.webp",
+          "width": 976,
+          "height": 732,
+          "bytes": 37210,
+          "sha256": "16720c4a7c13fe4947a09176bfe28822ef02b89043c81673495e234200bd0622"
+        },
+        {
+          "file": "keys.png",
+          "width": 976,
+          "height": 732,
+          "bytes": 73579,
+          "sha256": "427e7a2c5a109e9005f52bca9b4f2bbcfe4d196b8999355f802c617a05a172c3"
+        }
+      ]
+    },
+    {
+      "source": ".github/readme/keys.png",
+      "sourceSha256": "427e7a2c5a109e9005f52bca9b4f2bbcfe4d196b8999355f802c617a05a172c3",
+      "sourceSize": [
+        976,
+        732
+      ],
+      "crop": [
+        656,
+        378,
+        944,
+        666
+      ],
+      "output": [
+        {
+          "file": "keys-detail.webp",
+          "width": 288,
+          "height": 288,
+          "bytes": 7946,
+          "sha256": "4cd7d61785a6f221084edc26e1dee8d614e5b34915d8123f4c0187d2719dafe0"
+        },
+        {
+          "file": "keys-detail.png",
+          "width": 288,
+          "height": 288,
+          "bytes": 15986,
+          "sha256": "201183e6aa5d0ec91433cbc4632c119045dc03812082eb6fcfba2850c5fd02ec"
+        }
+      ]
+    },
+    {
+      "source": ".github/readme/dials.png",
+      "sourceSha256": "dcc0ecc6db971ebf23488d2f39767f704ebe60c29b2d2b544999a81b42c69d36",
+      "sourceSize": [
+        1312,
+        880
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "dials.webp",
+          "width": 1312,
+          "height": 880,
+          "bytes": 112768,
+          "sha256": "e0f49fdcef95d75e69e2edec97fd9fda9150478b7d466835abcb32e9e40d67bb"
+        },
+        {
+          "file": "dials.png",
+          "width": 1312,
+          "height": 880,
+          "bytes": 163867,
+          "sha256": "dcc0ecc6db971ebf23488d2f39767f704ebe60c29b2d2b544999a81b42c69d36"
+        }
+      ]
+    },
+    {
+      "source": ".github/readme/dials.png",
+      "sourceSha256": "dcc0ecc6db971ebf23488d2f39767f704ebe60c29b2d2b544999a81b42c69d36",
+      "sourceSize": [
+        1312,
+        880
+      ],
+      "crop": [
+        456,
+        32,
+        856,
+        232
+      ],
+      "output": [
+        {
+          "file": "dials-detail.webp",
+          "width": 400,
+          "height": 200,
+          "bytes": 12466,
+          "sha256": "69b307a1fb8e542ee2b9c56e21c78e7f746d705740df0e278964b7c11d56ff64"
+        },
+        {
+          "file": "dials-detail.png",
+          "width": 400,
+          "height": 200,
+          "bytes": 27525,
+          "sha256": "1ce55a2be3a00ad10d3128fb6615ab4cbd602171c20820cdfb4c79341c76e76a"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/dial-backgrounds-strip.jpg",
+      "sourceSha256": "79d8245164894564155060116ca139c388e674e628344e6058360fd47e55ff5b",
+      "sourceSize": [
+        1264,
+        694
+      ],
+      "crop": null,
+      "output": [
+        {
+          "file": "backgrounds.webp",
+          "width": 1264,
+          "height": 694,
+          "bytes": 173790,
+          "sha256": "11dd74d709f802a7312be7d192f70f885c02fd925d3687dda3af0f640d221271"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/dial-backgrounds-strip.jpg",
+      "sourceSha256": "79d8245164894564155060116ca139c388e674e628344e6058360fd47e55ff5b",
+      "sourceSize": [
+        1264,
+        694
+      ],
+      "crop": [
+        10,
+        10,
+        631,
+        342
+      ],
+      "output": [
+        {
+          "file": "backgrounds-detail.webp",
+          "width": 621,
+          "height": 332,
+          "bytes": 55472,
+          "sha256": "7f30e83fb1f2decfa1bf2cb36ca177cb0a812c8d96a578e5cecae2601b3e1c0e"
+        },
+        {
+          "file": "backgrounds-detail.jpg",
+          "width": 621,
+          "height": 332,
+          "bytes": 95402,
+          "sha256": "f5e09b5eea6c6aaeb74c4d03e52638784d5a060d871aeba5ff926a74805b5574"
+        }
+      ]
+    },
+    {
+      "source": ".github/readme/themes.png",
+      "sourceSha256": "12f1352f7d79c200b153f1ecfe1231756a7d326f666fe0eb5aea2ebb45ffd600",
+      "sourceSize": [
+        2224,
+        1172
+      ],
+      "crop": [
+        0,
+        0,
+        2224,
+        804
+      ],
+      "output": [
+        {
+          "file": "themes.webp",
+          "width": 2224,
+          "height": 804,
+          "bytes": 129518,
+          "sha256": "6a23f8e9005e591b876f6cbd5cbcd978b40253af87ba0a26d72289e87301d344"
+        },
+        {
+          "file": "themes.png",
+          "width": 2224,
+          "height": 804,
+          "bytes": 271795,
+          "sha256": "cb0400c07cc063f6b387204b513ca46ef3da9e4ce4ec5ab947f9993d21eec437"
+        }
+      ]
+    },
+    {
+      "source": "docs/assets/img/themes-contact-sheet.png",
+      "sourceSha256": "68925c97f75f1429f0bf1d297e25e049ac2347702d5a7066c51fbb27c4e28091",
+      "sourceSize": [
+        1072,
+        799
+      ],
+      "crop": [
+        0,
+        0,
+        1072,
+        168
+      ],
+      "output": [
+        {
+          "file": "themes-key-strip.webp",
+          "width": 1072,
+          "height": 168,
+          "bytes": 26090,
+          "sha256": "3629f69bfd57b7c7ac7ca15123a7eff0676e7570b629718603c72386b3c68643"
+        },
+        {
+          "file": "themes-key-strip.png",
+          "width": 1072,
+          "height": 168,
+          "bytes": 49797,
+          "sha256": "913c19f2cfea05e1b8a6ac83c774441caf6661328af51bb673458461e01782dd"
+        }
+      ]
+    }
+  ]
+}

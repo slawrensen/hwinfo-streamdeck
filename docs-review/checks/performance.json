@@ -1,0 +1,1856 @@
+{
+  "started": "2026-10-24T21:32:52.704Z",
+  "browser": "156.0.8078.47",
+  "base": "http://127.0.0.1:4173/hwinfo-streamdeck/",
+  "geometry": [],
+  "performance": [
+    {
+      "scenario": "home-phone",
+      "run": 1,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1740,
+      "lcp": {
+        "startTime": 1780,
+        "size": 101565,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 3941.60000000149,
+          "duration": 442
+        }
+      ],
+      "blockingTimeAfterFCP": 392,
+      "domContentLoaded": 1783.6000000014901,
+      "load": 1786.8999999985099,
+      "measurementEnd": 5398.699999999255,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1487.800000000745,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 506.29999999701977,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 903.1999999992549,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 707,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 811.6000000014901,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1170.199999999255,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+          "initiatorType": "img",
+          "duration": 883.8999999985099,
+          "transferSize": 28766,
+          "encodedBodySize": 28466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 303,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 378,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 827,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2158.900000002235,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        },
+        {
+          "name": "/favicon.ico",
+          "initiatorType": "other",
+          "duration": 185.5,
+          "transferSize": 635,
+          "encodedBodySize": 335
+        }
+      ],
+      "totalTransferSize": 680003,
+      "requests": 13,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp"
+    },
+    {
+      "scenario": "home-phone",
+      "run": 2,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1760,
+      "lcp": {
+        "startTime": 1760,
+        "size": 101565,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 3918,
+          "duration": 440
+        }
+      ],
+      "blockingTimeAfterFCP": 390,
+      "domContentLoaded": 1763,
+      "load": 1767.5,
+      "measurementEnd": 5369.900000002235,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1487.0999999977648,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 526.2000000029802,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 901.9000000022352,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 721.1000000014901,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 813.3999999985099,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1171.800000000745,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+          "initiatorType": "img",
+          "duration": 876.3000000007451,
+          "transferSize": 28766,
+          "encodedBodySize": 28466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 319.30000000074506,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 371.80000000074506,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 821.5,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2154.60000000149,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 679368,
+      "requests": 12,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp"
+    },
+    {
+      "scenario": "home-phone",
+      "run": 3,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1768,
+      "lcp": {
+        "startTime": 1768,
+        "size": 101565,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 3922.5,
+          "duration": 421
+        }
+      ],
+      "blockingTimeAfterFCP": 371,
+      "domContentLoaded": 1773.7999999970198,
+      "load": 1779.5,
+      "measurementEnd": 5356.099999997765,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1481.5999999977648,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 505.8999999985099,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 896.4000000022352,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 722.1999999992549,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 805.1000000014901,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1171.9000000022352,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+          "initiatorType": "img",
+          "duration": 868.6999999992549,
+          "transferSize": 28766,
+          "encodedBodySize": 28466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 297,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 370.9000000022352,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 819.6999999992549,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2149,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 679368,
+      "requests": 12,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp"
+    },
+    {
+      "scenario": "home-desktop",
+      "run": 1,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 2096,
+      "lcp": {
+        "startTime": 2096,
+        "size": 365234,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 4232.10000000149,
+          "duration": 468
+        }
+      ],
+      "blockingTimeAfterFCP": 418,
+      "domContentLoaded": 2078.5,
+      "load": 2082.5,
+      "measurementEnd": 5713.10000000149,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1782.1000000014901,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 505.5,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 894.3999999985099,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 721.7999999970198,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 797.1999999992549,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1785.6000000014901,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+          "initiatorType": "img",
+          "duration": 1483.9000000022352,
+          "transferSize": 90560,
+          "encodedBodySize": 90260
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 295.30000000074506,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 377.80000000074506,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 820.8000000007451,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2153.599999997765,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 741162,
+      "requests": 12,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp"
+    },
+    {
+      "scenario": "home-desktop",
+      "run": 2,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 2096,
+      "lcp": {
+        "startTime": 2096,
+        "size": 365234,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 4228.099999997765,
+          "duration": 484
+        }
+      ],
+      "blockingTimeAfterFCP": 434,
+      "domContentLoaded": 2071.39999999851,
+      "load": 2074.699999999255,
+      "measurementEnd": 5725.699999999255,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1782.2999999970198,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 499.0999999977648,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 897.1999999992549,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 701.1999999992549,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 813.5,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1787.5,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+          "initiatorType": "img",
+          "duration": 1483.300000000745,
+          "transferSize": 90560,
+          "encodedBodySize": 90260
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 297.19999999925494,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 386.80000000074506,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 821.9000000022352,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2156.400000002235,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 741162,
+      "requests": 12,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp"
+    },
+    {
+      "scenario": "home-desktop",
+      "run": 3,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 2096,
+      "lcp": {
+        "startTime": 2096,
+        "size": 365234,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 4233.800000000745,
+          "duration": 449
+        }
+      ],
+      "blockingTimeAfterFCP": 399,
+      "domContentLoaded": 2076,
+      "load": 2080,
+      "measurementEnd": 5698.5,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1783,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 506,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 896.0999999977648,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 715.5999999977648,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 809.5999999977648,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1769.6000000014901,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-960.webp",
+          "initiatorType": "img",
+          "duration": 1483.300000000745,
+          "transferSize": 90560,
+          "encodedBodySize": 90260
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 300.80000000074506,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 391,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 825.5999999977648,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2159.39999999851,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 741162,
+      "requests": 12,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-960.webp"
+    },
+    {
+      "scenario": "sensor-dial-phone",
+      "run": 1,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1752,
+      "lcp": {
+        "startTime": 2056,
+        "size": 61210,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.05406526680869126,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1836.199999999255,
+          "value": 0.05406526680869126,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 19,
+                "y": 240.59375,
+                "width": 336.328125,
+                "height": 603.40625,
+                "top": 240.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              },
+              "currentRect": {
+                "x": 19,
+                "y": 314.59375,
+                "width": 336.328125,
+                "height": 529.40625,
+                "top": 314.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              }
+            },
+            {
+              "tag": "H2",
+              "id": "transparent-background",
+              "class": "",
+              "previousRect": {
+                "x": 20,
+                "y": 805.984375,
+                "width": 335,
+                "height": 38.015625,
+                "top": 805.984375,
+                "right": 355,
+                "bottom": 844,
+                "left": 20
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 348,
+                "y": 817.984375,
+                "width": 21,
+                "height": 26.015625,
+                "top": 817.984375,
+                "right": 369,
+                "bottom": 844,
+                "left": 348
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4052.699999999255,
+          "duration": 476
+        }
+      ],
+      "blockingTimeAfterFCP": 426,
+      "domContentLoaded": 1822,
+      "load": 1828.1000000014901,
+      "measurementEnd": 5540.699999999255,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1473.199999999255,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 527.1999999992549,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 729.5,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 893.6999999992549,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 833.5,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1148,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 306.1000000014901,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1115.4000000022352,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2230.300000000745,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    },
+    {
+      "scenario": "sensor-dial-phone",
+      "run": 2,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1740,
+      "lcp": {
+        "startTime": 2048,
+        "size": 61210,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.05406526680869126,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1822.5,
+          "value": 0.05406526680869126,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 19,
+                "y": 240.59375,
+                "width": 336.328125,
+                "height": 603.40625,
+                "top": 240.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              },
+              "currentRect": {
+                "x": 19,
+                "y": 314.59375,
+                "width": 336.328125,
+                "height": 529.40625,
+                "top": 314.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              }
+            },
+            {
+              "tag": "H2",
+              "id": "transparent-background",
+              "class": "",
+              "previousRect": {
+                "x": 20,
+                "y": 805.984375,
+                "width": 335,
+                "height": 38.015625,
+                "top": 805.984375,
+                "right": 355,
+                "bottom": 844,
+                "left": 20
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 348,
+                "y": 817.984375,
+                "width": 21,
+                "height": 26.015625,
+                "top": 817.984375,
+                "right": 369,
+                "bottom": 844,
+                "left": 348
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4041.89999999851,
+          "duration": 446
+        }
+      ],
+      "blockingTimeAfterFCP": 396,
+      "domContentLoaded": 1810.7999999970198,
+      "load": 1815.699999999255,
+      "measurementEnd": 5500.599999997765,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1473.5,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 526.5,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 900.6999999992549,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 735.1999999992549,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 832.1000000014901,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1154.3999999985099,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 303.5999999977648,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1113.3999999985099,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2231.099999997765,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    },
+    {
+      "scenario": "sensor-dial-phone",
+      "run": 3,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1736,
+      "lcp": {
+        "startTime": 2052,
+        "size": 61210,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.05406526680869126,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1819.7999999970198,
+          "value": 0.05406526680869126,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 19,
+                "y": 240.59375,
+                "width": 336.328125,
+                "height": 603.40625,
+                "top": 240.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              },
+              "currentRect": {
+                "x": 19,
+                "y": 314.59375,
+                "width": 336.328125,
+                "height": 529.40625,
+                "top": 314.59375,
+                "right": 355.328125,
+                "bottom": 844,
+                "left": 19
+              }
+            },
+            {
+              "tag": "H2",
+              "id": "transparent-background",
+              "class": "",
+              "previousRect": {
+                "x": 20,
+                "y": 805.984375,
+                "width": 335,
+                "height": 38.015625,
+                "top": 805.984375,
+                "right": 355,
+                "bottom": 844,
+                "left": 20
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 348,
+                "y": 817.984375,
+                "width": 21,
+                "height": 26.015625,
+                "top": 817.984375,
+                "right": 369,
+                "bottom": 844,
+                "left": 348
+              },
+              "currentRect": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4040.699999999255,
+          "duration": 450
+        }
+      ],
+      "blockingTimeAfterFCP": 400,
+      "domContentLoaded": 1810.699999999255,
+      "load": 1830.5999999977648,
+      "measurementEnd": 5505,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1476.6000000014901,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 537.9000000022352,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 898.3999999985099,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 724.3999999985099,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 826.5,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1133,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 310.8999999985099,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1120.3999999985099,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2230.699999999255,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    },
+    {
+      "scenario": "sensor-dial-desktop",
+      "run": 1,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 1780,
+      "lcp": {
+        "startTime": 2080,
+        "size": 105441,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.022985719299316407,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1844.300000000745,
+          "value": 0.022985719299316407,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 295,
+                "y": 200.546875,
+                "width": 677.28125,
+                "height": 599.453125,
+                "top": 200.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              },
+              "currentRect": {
+                "x": 295,
+                "y": 274.546875,
+                "width": 677.28125,
+                "height": 525.453125,
+                "top": 274.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 272,
+                "y": 705.640625,
+                "width": 24,
+                "height": 50.5,
+                "top": 705.640625,
+                "right": 296,
+                "bottom": 756.140625,
+                "left": 272
+              },
+              "currentRect": {
+                "x": 272,
+                "y": 779.640625,
+                "width": 24,
+                "height": 20.359375,
+                "top": 779.640625,
+                "right": 296,
+                "bottom": 800,
+                "left": 272
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4073,
+          "duration": 469
+        }
+      ],
+      "blockingTimeAfterFCP": 419,
+      "domContentLoaded": 1831.699999999255,
+      "load": 1838.1000000014901,
+      "measurementEnd": 5553,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1474.2000000029802,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 527.6999999992549,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 737,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 901.3999999985099,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 825.3999999985099,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1155.5999999977648,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 302.9000000022352,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1127.2000000029802,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2241.5,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    },
+    {
+      "scenario": "sensor-dial-desktop",
+      "run": 2,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 1756,
+      "lcp": {
+        "startTime": 2036,
+        "size": 105441,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.022985719299316407,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1831,
+          "value": 0.022985719299316407,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 295,
+                "y": 200.546875,
+                "width": 677.28125,
+                "height": 599.453125,
+                "top": 200.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              },
+              "currentRect": {
+                "x": 295,
+                "y": 274.546875,
+                "width": 677.28125,
+                "height": 525.453125,
+                "top": 274.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 272,
+                "y": 705.640625,
+                "width": 24,
+                "height": 50.5,
+                "top": 705.640625,
+                "right": 296,
+                "bottom": 756.140625,
+                "left": 272
+              },
+              "currentRect": {
+                "x": 272,
+                "y": 779.640625,
+                "width": 24,
+                "height": 20.359375,
+                "top": 779.640625,
+                "right": 296,
+                "bottom": 800,
+                "left": 272
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4043.300000000745,
+          "duration": 445
+        }
+      ],
+      "blockingTimeAfterFCP": 395,
+      "domContentLoaded": 1821.199999999255,
+      "load": 1842,
+      "measurementEnd": 5502.5,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1475.0999999977648,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 528.7999999970198,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 723.1000000014901,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 903,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 830.1000000014901,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1144.699999999255,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 288.5999999977648,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1112.5,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2221.5,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    },
+    {
+      "scenario": "sensor-dial-desktop",
+      "run": 3,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "fcp": 1760,
+      "lcp": {
+        "startTime": 2076,
+        "size": 105441,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/dials.png",
+        "element": "IMG"
+      },
+      "cls": 0.022985719299316407,
+      "layoutShiftEntries": [
+        {
+          "startTime": 1818.300000000745,
+          "value": 0.022985719299316407,
+          "sources": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "class": "main-content",
+              "previousRect": {
+                "x": 295,
+                "y": 200.546875,
+                "width": 677.28125,
+                "height": 599.453125,
+                "top": 200.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              },
+              "currentRect": {
+                "x": 295,
+                "y": 274.546875,
+                "width": 677.28125,
+                "height": 525.453125,
+                "top": 274.546875,
+                "right": 972.28125,
+                "bottom": 800,
+                "left": 295
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "class": "anchor-heading",
+              "previousRect": {
+                "x": 272,
+                "y": 705.640625,
+                "width": 24,
+                "height": 50.5,
+                "top": 705.640625,
+                "right": 296,
+                "bottom": 756.140625,
+                "left": 272
+              },
+              "currentRect": {
+                "x": 272,
+                "y": 779.640625,
+                "width": 24,
+                "height": 20.359375,
+                "top": 779.640625,
+                "right": 296,
+                "bottom": 800,
+                "left": 272
+              }
+            }
+          ]
+        }
+      ],
+      "longTasks": [
+        {
+          "startTime": 4070.10000000149,
+          "duration": 503
+        }
+      ],
+      "blockingTimeAfterFCP": 453,
+      "domContentLoaded": 1809.4000000022352,
+      "load": 1828.5,
+      "measurementEnd": 5585.5,
+      "navigationTransferSize": 62406,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1477.0999999977648,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 531.3000000007451,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 734,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 906.5,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 831.5,
+          "transferSize": 25237,
+          "encodedBodySize": 24937
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1145.199999999255,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dials.png",
+          "initiatorType": "img",
+          "duration": 310.3999999985099,
+          "transferSize": 13085,
+          "encodedBodySize": 12785
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/dial-backgrounds-looks.jpg",
+          "initiatorType": "img",
+          "duration": 1135,
+          "transferSize": 93466,
+          "encodedBodySize": 93166
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2257.300000000745,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        }
+      ],
+      "totalTransferSize": 724916,
+      "requests": 10,
+      "hero": null
+    }
+  ],
+  "enhancement": {},
+  "finished": "2026-10-24T21:34:51.268Z",
+  "errors": [],
+  "performanceConditions": {
+    "cache": "Disabled by CDP; new browser context per sample",
+    "network": "150 ms latency, 1.6 Mbps download, 750 kbps upload",
+    "cpu": "4\u00d7 slowdown",
+    "server": "Python local HTTP server; static uncompressed responses",
+    "note": "Synthetic cold-load lab observations, not field Core Web Vitals. No INP or Lighthouse score claimed."
+  },
+  "excludedSamples": [
+    {
+      "scenario": "home-phone",
+      "run": 1,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "fcp": 1788,
+      "lcp": {
+        "startTime": 1788,
+        "size": 101565,
+        "url": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+        "element": "IMG"
+      },
+      "cls": 0,
+      "layoutShiftEntries": [],
+      "longTasks": [
+        {
+          "startTime": 3946,
+          "duration": 571
+        }
+      ],
+      "blockingTimeAfterFCP": 521,
+      "domContentLoaded": 1781.6000000014901,
+      "load": 1785.9000000022352,
+      "measurementEnd": 5535.400000002235,
+      "navigationTransferSize": 17859,
+      "resources": [
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-default.css",
+          "initiatorType": "link",
+          "duration": 1489.300000000745,
+          "transferSize": 134274,
+          "encodedBodySize": 133974
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/just-the-docs-head-nav.css",
+          "initiatorType": "link",
+          "duration": 512.6999999992549,
+          "transferSize": 12556,
+          "encodedBodySize": 12256
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/vendor/lunr.min.js",
+          "initiatorType": "script",
+          "duration": 902.8000000007451,
+          "transferSize": 31511,
+          "encodedBodySize": 31211
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/just-the-docs.js",
+          "initiatorType": "script",
+          "duration": 729.0999999977648,
+          "transferSize": 19725,
+          "encodedBodySize": 19425
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/css/docs.css",
+          "initiatorType": "link",
+          "duration": 819.1999999992549,
+          "transferSize": 24847,
+          "encodedBodySize": 24547
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/docs.js",
+          "initiatorType": "script",
+          "duration": 1179.199999999255,
+          "transferSize": 9540,
+          "encodedBodySize": 9240
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+          "initiatorType": "img",
+          "duration": 875.9000000022352,
+          "transferSize": 28766,
+          "encodedBodySize": 28466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/keys-detail.webp",
+          "initiatorType": "img",
+          "duration": 309.69999999925494,
+          "transferSize": 8246,
+          "encodedBodySize": 7946
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/dials-detail.webp",
+          "initiatorType": "img",
+          "duration": 392.3999999985099,
+          "transferSize": 12766,
+          "encodedBodySize": 12466
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/img/showcase/backgrounds-detail.webp",
+          "initiatorType": "img",
+          "duration": 835.3000000007451,
+          "transferSize": 55772,
+          "encodedBodySize": 55472
+        },
+        {
+          "name": "/hwinfo-streamdeck/assets/js/search-data.json",
+          "initiatorType": "xmlhttprequest",
+          "duration": 2163.89999999851,
+          "transferSize": 323116,
+          "encodedBodySize": 322816
+        },
+        {
+          "name": "/favicon.ico",
+          "initiatorType": "other",
+          "duration": 186.39999999850988,
+          "transferSize": 635,
+          "encodedBodySize": 335
+        }
+      ],
+      "totalTransferSize": 679613,
+      "requests": 13,
+      "hero": "http://127.0.0.1:4173/hwinfo-streamdeck/assets/img/showcase/deck-detail.webp",
+      "reason": "This one sample overlapped the coordinator CSS rebuild; stylesheet encodedBodySize24547 differed from final24937 bytes. Replaced by a stable-build sample."
+    }
+  ],
+  "summary": [
+    {
+      "scenario": "home-phone",
+      "n": 3,
+      "lcpMedianMs": 1768,
+      "lcpRangeMs": [
+        1760,
+        1780
+      ],
+      "fcpMedianMs": 1760,
+      "clsMedian": 0,
+      "blockingTimeAfterFCPMedianMs": 390,
+      "transferSizeMedian": 679368,
+      "requestsMedian": 12
+    },
+    {
+      "scenario": "home-desktop",
+      "n": 3,
+      "lcpMedianMs": 2096,
+      "lcpRangeMs": [
+        2096,
+        2096
+      ],
+      "fcpMedianMs": 2096,
+      "clsMedian": 0,
+      "blockingTimeAfterFCPMedianMs": 418,
+      "transferSizeMedian": 741162,
+      "requestsMedian": 12
+    },
+    {
+      "scenario": "sensor-dial-phone",
+      "n": 3,
+      "lcpMedianMs": 2052,
+      "lcpRangeMs": [
+        2048,
+        2056
+      ],
+      "fcpMedianMs": 1740,
+      "clsMedian": 0.05406526680869126,
+      "blockingTimeAfterFCPMedianMs": 400,
+      "transferSizeMedian": 724916,
+      "requestsMedian": 10
+    },
+    {
+      "scenario": "sensor-dial-desktop",
+      "n": 3,
+      "lcpMedianMs": 2076,
+      "lcpRangeMs": [
+        2036,
+        2080
+      ],
+      "fcpMedianMs": 1760,
+      "clsMedian": 0.022985719299316407,
+      "blockingTimeAfterFCPMedianMs": 419,
+      "transferSizeMedian": 724916,
+      "requestsMedian": 10
+    }
+  ]
+}

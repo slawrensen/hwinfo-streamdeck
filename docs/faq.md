@@ -1,11 +1,12 @@
 ---
 title: FAQ
 nav_order: 10
+description: Answers about requirements, data, privacy, installation and everyday use.
 ---
 
 For setup and source errors, see [Data sources](data-sources.md) or [Troubleshooting](troubleshooting.md).
 
-> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
+For version-specific changes, see [What changed in 1.7](whats-new-1.7.md).
 
 ## Platform and requirements
 
@@ -19,7 +20,7 @@ No. The plugin requires **Windows 10 or later, x64**. It reads HWiNFO's local Wi
 - Stream Deck software **6.9+**
 - [HWiNFO](https://www.hwinfo.com/download/) (installer or portable) running, publishing on **Shared Memory Support** or **Gadget reporting**
 
-Dials are optional: a Stream Deck + or Stream Deck + XL adds the [Sensor Dial](sensor-dial.md) action, but the key action works on any Stream Deck.
+A Stream Deck + or + XL adds [Sensor Dial](sensor-dial.md). Sensor Reading needs display keys; displayless inputs can use HWiNFO Control. See [Hardware compatibility](hardware.md) for tested, simulated and expected support.
 
 ### Is this the official HWiNFO plugin? Is it affiliated with REALiX?
 
@@ -44,7 +45,7 @@ If you restart HWiNFO at least every 12 hours, the free version with Shared Memo
 
 ### Why did my values freeze / stop updating after about 12 hours?
 
-That's the free version's Shared Memory timer expiring. HWiNFO stops publishing to shared memory after 12 hours of runtime and marks the mapping disabled. What you see depends on your data source:
+Check whether the free version's Shared Memory timer expired. It disables sharing after 12 hours of runtime. Other freezes need the [troubleshooting checks](troubleshooting.md#values-are-frozen--not-updating). For timer expiry, what you see depends on your data source:
 
 - **Auto mode** (default): the plugin detects the disabled mapping and tries the **Gadget registry**. Enable Gadget reporting and select its readings, or configure explicit reading links (new in 1.7). Without links, a saved Shared Memory selection is missing on Gadget.
 - **Shared Memory only mode**: no fallback; keys show `Shared Memory / is off` until you re-enable Shared Memory Support in HWiNFO (Settings → Shared Memory Support) or restart HWiNFO.
@@ -61,18 +62,11 @@ After the timer expires:
 
 ### Which data source should I use?
 
-**Auto** prefers Shared Memory, tries Gadget when Shared Memory is unavailable, and switches back when it returns. Source availability and reading identity are separate: matching saved readings across sources requires an explicit link since 1.7. Use **Shared Memory only** or **Gadget registry only** if you want to keep one source.
+**Auto** is the default. It prefers Shared Memory, tries Gadget when Shared Memory is unavailable, and switches back when it returns. Saved reading identities need [explicit links](data-sources.md#link-readings-across-providers) to work across providers.
 
-| | Shared Memory (preferred) | Gadget registry (fallback) |
-| --- | --- | --- |
-| Sensor coverage | readings HWiNFO publishes through Shared Memory | only sensors you tick in HWiNFO |
-| Min / max / average | yes (from HWiNFO) | no (current value only) |
-| Free-version limit | disables after 12 h | none |
-| Enable in HWiNFO | Settings → Shared Memory Support | Configure Sensors → *HWiNFO Gadget* tab → tick *Enable reporting to Gadget*, then *Report value in Gadget* per reading |
+Shared Memory supplies hardware identities, a producer timestamp and HWiNFO statistics, but free HWiNFO disables it after 12 hours. Gadget has no timer, exposes only ticked current values, and cannot prove freshness from a steady reading.
 
-Set it under **Advanced → Connection → Data source** in any key's or dial's settings (**Auto (Shared Memory, else Gadget)**, **Shared Memory only**, **Gadget registry only**). It's a global setting, marked **All keys and dials**: it applies to every key and dial.
-
-A provider switch does not translate saved identities by itself. Configure explicit [reading links](data-sources.md#link-readings-across-providers) for continuity in either direction. See [Data sources](data-sources.md) for the full breakdown.
+Choose **Advanced → Connection → Data source** to keep Auto or force one provider. The choice affects **All keys and dials**. See the [source comparison](data-sources.md#shared-memory-vs-gadget-registry).
 
 ### I ticked many readings in Gadget but only a few show up. Why?
 
@@ -114,12 +108,9 @@ Changing the plugin's **Read every** interval (Advanced, Connection) *does* clea
 
 ### Does it slow down my PC? How much CPU and RAM?
 
-The recorded runs below used a live page at a one-second poll. They are measurements of those builds and setups, not a guarantee for every machine. Sources and harnesses are in [PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md):
+[PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md) records the build, hardware, harness and conditions for measurements. Historical live-page runs at a one-second poll measured about **0.2% of one CPU core** and **40–48 MB RSS**. These are recorded results, not a guarantee for 1.7.1 or another machine.
 
-- **CPU: a fraction of one percent of one core** (~0.2 % long-run average on the live deck; zero polling cost when no Sensor Reading key or Sensor Dial is on screen, because the poller stops entirely).
-- **RAM: ~40–48 MB** RSS, stable across externally monitored multi-hour soaks (PERF.md carries the measured slopes).
-
-The parse path is incremental: one poll tick to decode ~520 readings costs about **10 µs** with near-zero allocation (measured, see PERF.md's 1.4.1 entry). Most of that memory is the Node runtime the Stream Deck app hosts plugins in, not the plugin's own data; the plugin's native bridge is a single 152 KB addon.
+Source choice and the number of ticked Gadget readings affect scan cost. Visible keys add rendering work. With no Sensor Reading key or Sensor Dial visible, source polling stops; the process still maintains its Stream Deck connection.
 
 ### Does it get slower or use more CPU if I add more keys?
 
@@ -181,13 +172,17 @@ Because a per-key pick always wins. The shared **Theme** (Advanced → Shared de
 
 ### Is the native binary signed? How do I verify what I installed?
 
-The plugin's native piece, `bin/hwsm.node`, is **unsigned**: it carries no Authenticode certificate. That alone does not explain a load failure or establish a security block. What you can verify is the bytes. Every [GitHub release](https://github.com/slawrensen/hwinfo-streamdeck/releases) from 1.4.0 on prints the addon's SHA-256 and the pack's SHA-256 in its notes. Compare your installed copy in PowerShell:
+The native addon, `bin/hwsm.node`, is **unsigned** and has no Authenticode certificate. A loader error alone does not establish whether a file is damaged, missing or blocked.
+
+For a **GitHub release**, compare the downloaded package with that release's **pack SHA-256**, as shown in [Install](installation.md#github-release). Compare the installed native addon with the **addon SHA-256** for the same version:
 
 ```powershell
 Get-FileHash "$env:APPDATA\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\bin\hwsm.node" -Algorithm SHA256
 ```
 
-A GitHub-release install matches its published hash byte for byte. Reporting a security problem privately: see [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md).
+**Marketplace is a separate channel.** Its package receives DRM and may be a different version; do not apply a GitHub package hash to it or assume identical package bytes. Check the installed version against the channel you used. A checksum identifies bytes; it does not establish safety.
+
+See [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/SECURITY.md) for private vulnerability reports.
 
 ## Setup and portability
 
@@ -212,23 +207,4 @@ Windows denied access needed to read the sensor source. The error can come from 
 
 ### What do the two-line screens on my keys mean?
 
-They name the observed state and a next step. These are the 1.7 messages:
-
-| Key shows | Meaning / fix |
-| --- | --- |
-| `Start HWiNFO / not detected` | HWiNFO isn't publishing to the selected data source (in Auto, to neither). Start it with Shared Memory or Gadget reporting on, or check **Data source**. |
-| `Source busy / retrying` | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
-| `Shared Memory / is off` | HWiNFO reports sharing disabled (including after the free version's 12-hour timer): re-enable it (or use Gadget; Auto falls back by itself). |
-| `Not updating / check sharing` | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
-| `Age unknown / check Gadget` | Gadget has no producer timestamp. The plugin cannot tell whether unchanged values are steady or left by a killed or crashed HWiNFO. Check HWiNFO and Gadget reporting. |
-| `Access denied / open settings` | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| `Tick sensors / in Gadget` | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
-| `Pick a sensor / in settings` | No sensor selected yet: open the key's settings. |
-| `Sensor missing / pick again` | The saved sensor isn't in HWiNFO's current output; pick it again. |
-| `Source error / open settings` | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
-| `Needs x64 / Windows` | Not a 64-bit Windows machine (Windows-on-ARM / other); unsupported. |
-| `Bridge failed / reinstall` | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
-
-![Production-rendered key and dial examples for Source busy, no new Shared Memory data, and Gadget Age unknown.]({{ '/assets/img/reading-status-1.7.png' | relative_url }})
-
-*Simulated source states rendered by the 1.7 production code, not a hardware photograph. See [Status screens](status-screens.md) for the full list.*
+They name the observed state and a next step. **Start HWiNFO**, **Shared Memory off**, **Not updating**, **Age unknown** and **Sensor missing** have different causes. Use [Status screens](status-screens.md#key-screens) for the complete wording, or [Troubleshooting](troubleshooting.md) for actions to take. Do not delete and rebuild a key just because the source is temporarily unavailable.

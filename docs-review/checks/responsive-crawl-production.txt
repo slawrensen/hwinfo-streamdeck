@@ -1,0 +1,28 @@
+crawled 16 pages, 94 URLs under http://127.0.0.1:4174/hwinfo-streamdeck/
+  200 /hwinfo-streamdeck/
+  200 /hwinfo-streamdeck/changelog.html
+  200 /hwinfo-streamdeck/controls.html
+  200 /hwinfo-streamdeck/data-sources.html
+  200 /hwinfo-streamdeck/faq.html
+  200 /hwinfo-streamdeck/getting-started.html
+  200 /hwinfo-streamdeck/hardware.html
+  200 /hwinfo-streamdeck/installation.html
+  200 /hwinfo-streamdeck/sensor-details.html
+  200 /hwinfo-streamdeck/sensor-dial.html
+  200 /hwinfo-streamdeck/sensor-reading.html
+  200 /hwinfo-streamdeck/status-screens.html
+  200 /hwinfo-streamdeck/themes.html
+  200 /hwinfo-streamdeck/thresholds-alerts.html
+  200 /hwinfo-streamdeck/troubleshooting.html
+  200 /hwinfo-streamdeck/whats-new-1.7.html
+  404 /hwinfo-streamdeck/release/RELEASE_RUNBOOK.html
+  404 /hwinfo-streamdeck/release/COPY_RULES.html
+  404 /hwinfo-streamdeck/release/STREAM_DECK_MARKETPLACE.html
+  404 /hwinfo-streamdeck/release/RELEASE_RUNBOOK.md
+  404 /hwinfo-streamdeck/release/COPY_RULES.md
+  404 /hwinfo-streamdeck/release/STREAM_DECK_MARKETPLACE.md
+  404 /hwinfo-streamdeck/release/
+  404 /hwinfo-streamdeck/release/evidence/
+  404 /hwinfo-streamdeck/README.html
+
+DOCS CRAWL: no broken links, images or anchors; private paths answer 404; search index checked; route contract checked

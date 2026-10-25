@@ -1,0 +1,28 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> hwinfo-streamdeck@1.7.1 docs:test:browser
+> node --test test/docs-browser.test.mjs
+
+✔ home identity, download and platform requirement fit 1280×800 (500.428882ms)
+✔ home identity, download and platform requirement fit 390×844 (346.694107ms)
+✔ image viewer contains Shift+Tab from Actual size and restores its opener (723.297238ms)
+✔ an open image viewer blocks background navigation (389.276965ms)
+✔ search 'transparent background' reaches a relevant setting or repair (535.566063ms)
+✔ search '12 hours' reaches a relevant setting or repair (463.191278ms)
+✔ search 'Age unknown' reaches a relevant setting or repair (483.496047ms)
+✔ search 'sensor missing' reaches a relevant setting or repair (513.063392ms)
+✔ search replays early input after the index loads and refreshes pasted queries (352.253132ms)
+✔ keyboard search shortcut and Enter reach the concrete status fix (1093.78551ms)
+✔ phone navigation and search remain operable (724.792309ms)
+✔ phone navigation is collapsed before the deferred enhancements load (425.084516ms)
+✔ deep links reveal disclosures on direct entry, reload and history navigation (1137.597226ms)
+✔ routes, search index and principal assets resolve below the selected base path (594.312014ms)
+✔ essential content and navigation work without JavaScript (313.337036ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9007.165905

@@ -1,15 +1,71 @@
 ---
-title: Sensor Dial (Stream Deck +)
+title: Sensor Dial
 nav_order: 5
+description: Configure touchscreen readings, transparent backgrounds and dial behavior.
 ---
 
 The **Sensor Dial** action shows HWiNFO readings on a Stream Deck + or Stream Deck + XL touchscreen. Choose one reading with a range bar, two readings with sparklines, or three compact rows. Turn to switch readings; push and touch to control the display.
 
-> This page describes 1.7. See [what changed from 1.6](whats-new-1.7.md).
+**Requires:** Windows x64, local HWiNFO, and a Stream Deck + or + XL. Set **Display → Background** for transparency, **Display → View** for layouts, or **Controls → Gestures** for the dial's inputs.
 
-It shares its data source, themes, thresholds, and formatting with [Sensor Reading](sensor-reading.md) keys; this page covers only what's specific to the dial. Windows only, HWiNFO required.
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dials.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dials.png' | relative_url }}" width="440" height="240" loading="lazy" decoding="async" alt="A Sensor Dial face as the plugin renders it: CPU Temp at 58.6 °C, the session low 52.8 and high 78.9, and a range bar whose track marks the warn and critical zones in amber and red."></a>
 
-![A Sensor Dial face as the plugin renders it: CPU Temp at 58.6 °C, the session low 52.8 and high 78.9, and a range bar whose track marks the warn and critical zones in amber and red.]({{ '/assets/img/dials.png' | relative_url }})
+## Transparent background
+
+Available in **1.7.1**. To show the Stream Deck app's touch strip picture behind your readings:
+
+1. Right-click the strip in Stream Deck and choose **Set from File...** or **Open Background Library**.
+2. Select a Sensor Dial and open **Display → Background**.
+3. Choose **Glass**, **Tint**, **Outline** or **Clear**. Repeat for the dials you want transparent.
+
+Each dial still draws inside its own **200 × 100** segment. A picture can span the touch strip; 1.7.1 does **not** provide a graph spanning the whole strip or half the strip.
+
+| Background | What the dial draws | Text over the picture |
+| --- | --- | --- |
+| **Theme** (default) | The theme's background, exactly as before. | The picture does not show. |
+| **Glass** | The theme's background as a panel at 80% opacity, so the picture shows through at 20%. | Built-in text keeps 4.5:1 contrast over any picture (a calculation). |
+| **Tint** | The theme's background as a panel at 50% opacity, so the picture shows through at half strength, with Outline's 1 px outline on every word and mark. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
+| **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
+| **Clear** | No background and no outline. | Depends on the picture. |
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" width="1264" height="352" loading="lazy" decoding="async" alt="Three touch strips from a Stream Deck + XL, each with six dials over one picture: the Cosmic Cliffs, an aurora over the Earth&#x27;s horizon and a pale mist. From left, the same reading drawn in Theme, Glass, Tint, Outline and Clear, then a three-row overview in Tint."></a>
+
+*Stream Deck app captures with live readings on a Stream Deck + XL. From left: Theme, Glass, Tint, Outline, Clear, then Tint in the three-row view. Strip pictures: the Cosmic Cliffs (NASA, ESA, CSA, STScI), auroras photographed from the International Space Station (NASA), and gradients I made.*
+
+**Words in the accent color** appears below Background on Glass, Tint and Outline. It colors the title, selected row name and context name with the dial's accent; values and individual Reading colors keep their own settings. The accent follows **Advanced → Shared defaults → Accent colors**.
+
+**Check custom colors on the actual display.** Custom text and individually chosen reading colors can fall below the contrast floor. Clear has no panel or outline, so its readability depends entirely on the picture. Use Glass, Tint or Outline for busy or uneven backgrounds.
+
+<details markdown="1">
+<summary>How the background modes draw text and selection indicators</summary>
+
+**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert can draw a lighter amber or red (a darker one on Paper) where the theme's own falls short there. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
+
+**Tint.** The panel is the theme's background at 50%, so more of the picture shows than on Glass. Over a white picture (black on **Paper**) that panel leaves the theme's own text below 4.5:1, so Tint does not rely on it: it draws Outline's 1 px outline and uses Outline's text colors, described next.
+
+**Outline.** Labels take the value color, and units and statistics a dimmer step of it, so a gray word does not merge with its dark outline over a light picture. The two-row view draws no band behind the selected row (the accent rail and the brighter label mark it) and draws trend lines without the shaded area under them. Separators stay thin lines in the theme's track color.
+
+**Clear.** Labels, units and statistics take the value color. Use a dark, even picture with a dark theme, or a light one with **Paper**. Over a bright, mid-tone or busy picture the text has no contrast floor; use Glass, Tint or Outline there. The range bar, the three-row rail and the two-row rail keep a track 1 px wider than themselves, and trend lines keep their shaded area.
+
+**Words in the accent color.** On Glass, Tint and Outline, a box under **Background** draws the dial's words in its accent color, the color of the range bar and the rail mark. The title, the selected row's name and the context line's name take the accent. Units, statistics and the other rows' names take their usual color moved halfway toward it, and the selected row's name never has less contrast than they do. With **Accent colors** (Advanced, Shared defaults) on **By sensor type**, the accent is the sensor type's color, so the words change color with the reading on the dial. Under **Dimmed** the accent dims with the rest of the text. Values, alert colors, **Color numbers by sensor type**, **Reading colors** and a **Custom color** for text do not change.
+
+Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (a calculation). Where an accent falls short of it, mostly on Glass, the word draws a lighter shade of it than the bar (a darker one on **Paper**). **Paper**'s accent is a dark gray, so on Paper the words change little. Clear does not offer the box: with no panel and no outline, a word has only the picture behind it, and the value color is already the theme's most readable color there.
+
+</details>
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" width="1300" height="710" loading="lazy" decoding="async" alt="A Stream Deck + XL page: 36 Sensor Reading keys in Midnight, and six Tint dials with Words in the accent color over the Cosmic Cliffs across the whole touch strip."></a>
+
+*A Stream Deck app capture of a whole + XL page with live readings: Midnight keys, and six dials on Tint with Words in the accent color. Strip picture: the Cosmic Cliffs (NASA, ESA, CSA, STScI).*
+
+On Glass, Tint, Outline and Clear:
+
+- In the two-row view only Glass draws the band behind the selected row. Tint, Outline and Clear mark that row with the accent rail and the brighter label.
+- Status screens such as **Start HWiNFO** show their text without the empty range bar on Tint, Outline and Clear. Glass keeps it as a faint groove.
+- A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
+- With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, or left off when not even an ellipsis fits, so a label with emoji or symbols the face font does not have is shortened a little sooner.
+- The settings panel header cannot show your picture, so it previews a see-through dial over a checkerboard. Sensor Reading keys are not affected.
+- Tint's and Outline's outline is an SVG filter, which the Stream Deck app draws on the versions I checked (7.4 and 7.6). I have run Glass and Outline on my Stream Deck + XL since 2026-10-16.
+
 
 ## The touchscreen readout
 
@@ -31,7 +87,7 @@ The bar always tracks the live value, even while you're touching through MIN / M
 - **Overview, two rows (big values and trend)**: two rows with large right-aligned values. A highlight band and accent bar mark the selection (the band only on the **Theme** and **Glass** backgrounds). Long labels wrap; labels that fit one line leave room for a sparkline. The footer shows the selected reading's session statistics.
 - **Overview, three rows**: one line per reading. A marker on the left shows the selection and window position. The context line contains the shared name and session `▼ low ▲ high`; names shorten before statistics. Put it above or below the rows with **Context line**, and show or hide row dividers with **Separators**. Pause, pin and stat badges share the name area. Temporary messages briefly replace the context line.
 
-![The dial's View select on Overview, three rows, with Decimals on Auto and the Temperature °F box under it, then the Row labels, Context line and Separators selects that the overview reveals.]({{ '/assets/img/pi-dial-overview.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-overview.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-overview.png' | relative_url }}" width="800" height="464" loading="lazy" decoding="async" alt="The dial&#x27;s View select on Overview, three rows, with Decimals on Auto and the Temperature °F box under it, then the Row labels, Context line and Separators selects that the overview reveals."></a>
 
 Three things keep the short labels readable:
 
@@ -39,7 +95,7 @@ Three things keep the short labels readable:
 - **Values share one right-aligned column.** Every value's ones digit lands on the same column edge, with units in their own column beside it. The three-row face steps the value size down a ladder until the widest visible value fits, and each row's label runs up to its own value before it shortens. Its columns stay in place unless a wide rate unit (Mbps, Gbps, MB/s, MT/s) is in view; since 1.7 the value and unit columns then move left together so the unit is not cut at the screen edge. The two-row face places its columns by the widest visible value, so a short value leaves more room for the labels.
 - **You can rename any reading in the rotation.** Select it in the rotation list under **Readings to rotate through** and press **Rename** in the toolbar under the list (or double-click it, or press F2 in the list), then type a new name in the **Name on the dial for …** field (Enter or click away to save; clear it to go back to HWiNFO's name). The name shows on that row and as the dial's title whenever that reading is selected, in both views. Unticking a reading keeps its name for later.
 
-  ![The Rotation group of the dial's settings panel: the Readings to rotate through search and its help line, then a rotation list of three readings, two already renamed "CPU" (filled, as the one on the dial) and "GPU", and the third, PUMP SYS1, selected. Under the list, the Earlier, Later, Rename and Remove toolbar with Later dimmed because PUMP SYS1 is last, the "Name on the dial for PUMP SYS1" field with "Pump" typed and selected, the line "Rotation moves through these 3 readings only, in this order." and the Split into groups button.]({{ '/assets/img/pi-dial-rename.png' | relative_url }})
+  <a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-rename.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-rename.png' | relative_url }}" width="800" height="606" loading="lazy" decoding="async" alt="The Rotation group of the dial&#x27;s settings panel: the Readings to rotate through search and its help line, then a rotation list of three readings, two already renamed &quot;CPU&quot; (filled, as the one on the dial) and &quot;GPU&quot;, and the third, PUMP SYS1, selected. Under the list, the Earlier, Later, Rename and Remove toolbar with Later dimmed because PUMP SYS1 is last, the &quot;Name on the dial for PUMP SYS1&quot; field with &quot;Pump&quot; typed and selected, the line &quot;Rotation moves through these 3 readings only, in this order.&quot; and the Split into groups button."></a>
 
   For example, rename two `SPD Hub Temperature` readings to `DIMM 1` and `DIMM 2` for display. This does not change HWiNFO's names, so it does not separate two Gadget readings that share a name.
 
@@ -82,11 +138,11 @@ rows and the saved key for the selection, so a measurement with two saved
 colors can change color when rotation selects it. Keep one color per
 measurement to avoid that.
 
-![The Display section of the dial's settings panel: Text color on Theme text, Background on Theme with its help line, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue.]({{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The Display section of the dial&#x27;s settings panel: Text color on Theme text, Background on Theme with its help line, View on Overview (three rows), Row labels on Always full labels, Color numbers by sensor type unticked, and Reading colors on Signal (four hues), with a color well and an Auto button for each reading: CPU Temp blue, GPU Temp pink, Pump green, GPU Power gold and GPU Load blue."></a>
 
 *An actual settings-panel capture at panel build 1.7.1.0-1 (the marker in its title bar), served by the local test host with live HWiNFO Shared Memory readings.*
 
-![Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue.]({{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }})
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue."></a>
 
 *Production-rendered fixed sample data. Both sides use Void, Text color Theme text and Accent colors Theme accent everywhere; only the individual reading colors change. This is not a hardware photograph.*
 
@@ -113,9 +169,9 @@ Three settings control what rotation can reach:
 
 - **Rotation set.** Tick readings in the **Readings to rotate through** search (under Reading, in the **Rotation** group) to build a custom list; the dial then rotates through *only* those readings, in list order, wrapping at the ends. Ticking never changes the reading on the dial; the **On the dial now** picker above it does that. The set can mix readings from different sensors. Picked readings show as a list under the search, in rotation order; select one and use **Earlier**, **Later**, **Rename** or **Remove** in the toolbar under it (in the list, Alt with an arrow key moves it and F2 renames it), and the reading on the dial right now is highlighted: turn, jump groups or let the auto cycle run with the panel open and the mark moves with it. A ticked reading HWiNFO is not publishing right now keeps its place, shows a **missing** pill and is skipped until it returns; the note under the list counts only the readings the dial steps through. Two readings with the same name (two drives' Drive Temperature) carry the word that tells their sensors apart, such as **#0** and **#1**. When the reading on the dial is not in the set, a line under the list says the next step leaves it and names where it goes. Leave the set empty for the default same-sensor behavior. The set can also be [split into named rotation groups](controls.md#rotation-groups): a plain turn then stays inside one group and a pressed turn (Elite) jumps between groups.
 
-  ![The top of the dial's settings panel: the header with the dial face beside CPU (Tctl/Tdie) and Live · Shared Memory, the theme strip on Default (shared: Void), then Reading with "cpu" typed in the Readings to rotate through search. The results sit under their sensor, each row a checkbox with its live value and type; Core 0 VID and Core 1 VID are ticked and form the rotation list under the search, with the Earlier, Later, Rename and Remove toolbar. A line at the bottom says CPU (Tctl/Tdie) is on the dial but not in this rotation, so the next step moves to Core 0 VID and does not come back.]({{ '/assets/img/pi-dial-picker.png' | relative_url }})
+  <a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-picker.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-picker.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The top of the dial&#x27;s settings panel: the header with the dial face beside CPU (Tctl/Tdie) and Live · Shared Memory, the theme strip on Default (shared: Void), then Reading with &quot;cpu&quot; typed in the Readings to rotate through search. The results sit under their sensor, each row a checkbox with its live value and type; Core 0 VID and Core 1 VID are ticked and form the rotation list under the search, with the Earlier, Later, Rename and Remove toolbar. A line at the bottom says CPU (Tctl/Tdie) is on the dial but not in this rotation, so the next step moves to Core 0 VID and does not come back."></a>
 
-  ![The top of the dial's settings panel: the header with the dial face beside CPU (Tctl/Tdie) and Live · Shared Memory, the theme strip on Default (shared: Void), On the dial now with the line "Turns and pressed turns change this too.", and a rotation of three readings from three sensors (CPU (Tctl/Tdie), filled as the one on the dial and selected, GPU Temperature and PUMP SYS1) with the Earlier, Later, Rename and Remove toolbar and Split into groups below it, then the title fields and the start of Display.]({{ '/assets/img/pi-dial-rotation.png' | relative_url }})
+  <a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The top of the dial&#x27;s settings panel: the header with the dial face beside CPU (Tctl/Tdie) and Live · Shared Memory, the theme strip on Default (shared: Void), On the dial now with the line &quot;Turns and pressed turns change this too.&quot;, and a rotation of three readings from three sensors (CPU (Tctl/Tdie), filled as the one on the dial and selected, GPU Temperature and PUMP SYS1) with the Earlier, Later, Rename and Remove toolbar and Split into groups below it, then the title fields and the start of Display."></a>
 - **Ignore turns.** A checkbox under Controls that makes the dial ignore rotation entirely, so a bump against the deck can never move you off the reading you chose. Push, touch, and the settings panel still work.
 - **Auto cycle.** A select under Controls that steps to the next reading in the rotation set (or the picked sensor's readings) on a timer, from every 5 seconds to every 5 minutes. It runs even while turns are ignored, which makes a hands-off tour of your picked readings: build a set, ignore turns, set a cycle time. A manual turn restarts the timer, and each step clears the custom title just like a manual turn (unless **Title when the dial moves on** is set to **Stays for this dial**). Timing rides the poll interval (**Read every**), so a step can land up to one read late. Ticking **Auto cycle jumps to a critical reading** (under Alerts) makes the cycle alert-aware: it holds instead of rotating away while the shown reading is critical, and its next step goes to a critical member of the set instead of the next one in order. Left unticked (the default), alerts do not steer the cycle; see [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
@@ -134,18 +190,13 @@ With no Sensor Reading key or Sensor Dial visible, polling stops. Retained state
 
 ## Settings
 
-Open the dial's settings panel (the Property Inspector) to configure it. It follows the same order as the key panel:
+The panel groups settings under **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**. Its header shows the current face, reading and data state. A status message offers a fix when needed. The theme strip sits below the header.
 
-1. **The header**, which stays at the top while you scroll: the dial's current touchscreen face (the exact image the plugin last drew) beside the name the dial shows, the reading's sensor (after HWiNFO's own name for the reading when the dial shows another), and the data state in the face's own words, such as *Live · Shared Memory* or *No new data for 42 s*.
-2. **A status message** under the header, only when something needs attention: what is wrong and the local fix, as buttons such as **Check again** (which says when the answer came back if nothing changed), **HWiNFO setup steps**, **Reload sensor list**, **Pick another reading**, or **Data source setting** when Data source is set to one provider only. A healthy Gadget source shows one line here instead.
-3. **The theme strip**, open on a first visit; folded, its line keeps the checked theme as a small chip in that theme's colors, beside where it comes from.
-4. The sections **Reading**, **Display**, **Alerts**, **Controls** and **Advanced**.
-
-Reading and Display start open; each folded section's title line summarizes what it holds, so you can check a dial without opening anything. Sections you open or fold, and the groups inside Advanced, stay that way on every dial's panel while the plugin runs; after the Stream Deck app restarts they start from the defaults again. The two chevron buttons at the top right of the header open or fold them all at once (so does Alt-click on a section title). Folding writes nothing to your dials.
+Reading and Display start open. Folded sections summarize their settings; folds persist between dial panels until Stream Deck restarts. **Open all sections**, **Fold all sections**, or Alt-click on a section title changes them together.
 
 | Section | Setting | What it does |
 | --- | --- | --- |
-| Theme strip | **Theme** | Under the header, open on a first visit; it folds like a section, and folded its line keeps the checked theme as a small chip. When the dial's own theme differs from the shared one, **Make shared** takes Change's place and makes that theme the shared one, setting the dial back to Default. One line names what is drawn and where it comes from, for example **Default** (shared: Void) with **Change**, which opens the shared theme under Advanced, or Ember (set on this dial). Under it, a chip per theme with its name on it, led by the **Default** chip, which follows the shared theme. See [Themes](themes.md). |
+| Theme strip | **Theme** | A named theme applies to this dial; **Default** follows the shared theme. **Make shared** makes this dial's theme the shared choice. [Compare themes](themes.md). |
 | Reading | **On the dial now** | Searchable picker over every reading HWiNFO publishes, with live values; the button beside it reloads the sensor list. The line under it names what else changes the reading on this dial, from the dial's control map, for example *Turns and pressed turns change this too.* Arrow keys browse, Enter picks, Tab or a click elsewhere closes without changing anything. |
 | Reading | **Readings to rotate through** | The **Rotation** group sits right under **On the dial now**: first a search whose results tick readings in or out (ticking never changes what is on the dial now), then the ticked readings in rotation order as one list, the one on the dial highlighted, so you can watch it move as the dial turns, and one HWiNFO no longer lists marked **missing**. Select a reading and use the toolbar under the list: **Earlier**, **Later**, **Rename**, **Remove**. The list is one Tab stop; arrow keys select and Delete removes. Empty means every reading of the picked sensor: an overview then shows the reading on the dial and the ones after it in HWiNFO's list. Can be split into named [rotation groups](controls.md#rotation-groups). |
 | Reading | **Title on the dial** | Custom title; blank falls back to the reading's own (renamed) label. |
@@ -171,6 +222,7 @@ Reading and Display start open; each folded section's title line summarizes what
 | Controls | **Auto cycle** | Timer that steps through the rotation automatically, every 5 seconds to every 5 minutes. Off by default. |
 | Controls | **A stats reset clears** | **This reading only** (default), **The whole rotation set**, or **Every dial, everywhere**. |
 | Controls | **Link ID** | The name HWiNFO Control keys target to steer this dial. |
+{: .reference-table }
 
 The Controls title line reads the dial's resolved gesture map, so a Touch tap made dead by two touch zones is not listed as if it worked.
 
@@ -181,47 +233,6 @@ Thresholds and the manual bar range are **unit-scoped**: they only apply to read
 By default (both fields blank) the bar spans the **session low → high**, so the fill grows as new extremes appear and always uses the full width of the range you've actually seen. Set **Bar from** / **Bar to** (Display) to pin the bar to a fixed scale instead (e.g. `0` and `100` for a usage percentage, or `30` and `90` for a CPU temperature) so the fill position means the same thing every time you glance at it. You can set just one end; the other stays automatic.
 
 With **Warn at** or **Critical at** set, the bar's track also marks the threshold zones in muted amber and red, escalating toward the alarmed end (the low side when alerts fire on a drop), the same zones a key's [Bar or Ring display](sensor-reading.md#display-sparkline-bar-ring) draws, and an automatic range widens just enough to keep them visible. A manual Bar from / Bar to is never widened; zones outside it are simply clipped. The zones are fixed landmarks; the **fill** is the live value, at full strength (accent normally, amber/red while alerting) so it always reads over them.
-
-### Transparent background
-
-**Background** is new in 1.7.1; 1.7.0 does not have it. The Stream Deck app can show a picture behind the touch strip: right-click the strip in the app and choose **Set from File...** or **Open Background Library**. A page, a folder and a single dial can each have their own. A Sensor Dial fills its 200 x 100 part of the strip with the theme's background, which hides that picture. **Background** (Display) chooses what the dial draws instead:
-
-| Background | What the dial draws | Text over the picture |
-| --- | --- | --- |
-| **Theme** (default) | The theme's background, exactly as before. | The picture does not show. |
-| **Glass** | The theme's background as a panel at 80% opacity, so the picture shows through at 20%. | Built-in text keeps 4.5:1 contrast over any picture (a calculation). |
-| **Tint** | The theme's background as a panel at 50% opacity, so the picture shows through at half strength, with Outline's 1 px outline on every word and mark. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
-| **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
-| **Clear** | No background and no outline. | Depends on the picture. |
-
-![Three touch strips from a Stream Deck + XL, each with six dials over one picture: the Cosmic Cliffs, an aurora over the Earth's horizon and a pale mist. From left, the same reading drawn in Theme, Glass, Tint, Outline and Clear, then a three-row overview in Tint.]({{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }})
-
-*Stream Deck app captures with live readings on a Stream Deck + XL. From left: Theme, Glass, Tint, Outline, Clear, then Tint in the three-row view. Strip pictures: the Cosmic Cliffs (NASA, ESA, CSA, STScI), auroras photographed from the International Space Station (NASA), and gradients I made.*
-
-**Glass.** The plugin cannot read the picture, so I calculate Glass's text colors against the hardest case: the panel over pure white, or over pure black for **Paper**. Every built-in value, unit, statistic and label keeps the 4.5:1 floor of [the display system](themes.md#the-display-system) over any picture. That is why labels and units draw lighter on Glass (darker on Paper), and why an overview value in alert can draw a lighter amber or red (a darker one on Paper) where the theme's own falls short there. The red lifts most on **Graphite**, whose background is the lightest of the dark themes, and on the selected row of the two-row view. The bar track, the rail groove, the separators, the selected two-row band and the area under a trend draw in the theme's label color at 20%.
-
-**Tint.** The panel is the theme's background at 50%, so more of the picture shows than on Glass. Over a white picture (black on **Paper**) that panel leaves the theme's own text below 4.5:1, so Tint does not rely on it: it draws Outline's 1 px outline and uses Outline's text colors, described next.
-
-**Outline.** Labels take the value color, and units and statistics a dimmer step of it, so a gray word does not merge with its dark outline over a light picture. The two-row view draws no band behind the selected row (the accent rail and the brighter label mark it) and draws trend lines without the shaded area under them. Separators stay thin lines in the theme's track color.
-
-**Clear.** Labels, units and statistics take the value color. Use a dark, even picture with a dark theme, or a light one with **Paper**. Over a bright, mid-tone or busy picture the text has no contrast floor; use Glass, Tint or Outline there. The range bar, the three-row rail and the two-row rail keep a track 1 px wider than themselves, and trend lines keep their shaded area.
-
-**Words in the accent color.** On Glass, Tint and Outline, a box under **Background** draws the dial's words in its accent color, the color of the range bar and the rail mark. The title, the selected row's name and the context line's name take the accent. Units, statistics and the other rows' names take their usual color moved halfway toward it, and the selected row's name never has less contrast than they do. With **Accent colors** (Advanced, Shared defaults) on **By sensor type**, the accent is the sensor type's color, so the words change color with the reading on the dial. Under **Dimmed** the accent dims with the rest of the text. Values, alert colors, **Color numbers by sensor type**, **Reading colors** and a **Custom color** for text do not change.
-
-Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (a calculation). Where an accent falls short of it, mostly on Glass, the word draws a lighter shade of it than the bar (a darker one on **Paper**). **Paper**'s accent is a dark gray, so on Paper the words change little. Clear does not offer the box: with no panel and no outline, a word has only the picture behind it, and the value color is already the theme's most readable color there.
-
-![A Stream Deck + XL page: 36 Sensor Reading keys in Midnight, and six Tint dials with Words in the accent color over the Cosmic Cliffs across the whole touch strip.]({{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }})
-
-*A Stream Deck app capture of a whole + XL page with live readings: Midnight keys, and six dials on Tint with Words in the accent color. Strip picture: the Cosmic Cliffs (NASA, ESA, CSA, STScI).*
-
-On Glass, Tint, Outline and Clear:
-
-- In the two-row view only Glass draws the band behind the selected row. Tint, Outline and Clear mark that row with the accent rail and the brighter label.
-- Status screens such as **Start HWiNFO** show their text without the empty range bar on Tint, Outline and Clear. Glass keeps it as a faint groove.
-- A **Custom color** for text and chosen **Reading colors** stay exactly as chosen and can fall below the floor over a bright picture.
-- With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, or left off when not even an ellipsis fits, so a label with emoji or symbols the face font does not have is shortened a little sooner.
-- The settings panel header cannot show your picture, so it previews a see-through dial over a checkerboard. Sensor Reading keys are not affected.
-- Tint's and Outline's outline is an SVG filter, which the Stream Deck app draws on the versions I checked (7.4 and 7.6). I have run Glass and Outline on my Stream Deck + XL since 2026-10-16.
 
 ## Alerts on a dial
 
@@ -251,6 +262,8 @@ Before you've picked a sensor, the dial shows **HWiNFO** / **rotate to pick** wi
 
 ## Advanced (shared by all keys and dials)
 
-The dial's **Advanced** section holds the same four groups as the key panel, each folding on its own. The two shared ones are marked **All keys and dials**: **Shared defaults** (Theme, Text color, Text font, Accent colors, Data units) and **Connection** (**Data source**, **Read every**, the reading-links note and the **HWiNFO setup steps** checklist). They apply to the whole plugin rather than to this dial alone; they're documented in [Data sources](data-sources.md), [Themes](themes.md), and the key page's [Advanced section](sensor-reading.md#advanced-shared-by-all-keys-and-dials). **Support** holds the **Copy support report** button. **Configuration documents** shows this dial's settings and the shared settings as JSON, with **Copy**, **Replace this dial's settings** and **Replace shared settings**; they behave exactly as described on the key page, including the second click that replacing shared settings asks for.
+**Shared defaults** and **Connection** affect every HWiNFO key and dial. They are documented in [Themes](themes.md), [Data sources](data-sources.md) and the key's [Advanced reference](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
 
-![The dial's Advanced section at the panel's real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Text font, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This dial's settings and Shared settings wells, their Copy buttons and the Replace this dial's settings and Replace shared settings buttons.]({{ '/assets/img/pi-live-dial-advanced.png' | relative_url }})
+**Support** contains **Copy support report**. **Configuration documents** can copy or replace **This dial's settings** or **Shared settings**. Replacing shared settings asks for a second press because it changes all keys and dials.
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-live-dial-advanced.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-live-dial-advanced.png' | relative_url }}" width="800" height="2468" loading="lazy" decoding="async" alt="The dial&#x27;s Advanced section at the panel&#x27;s real width with its four groups open: Shared defaults (marked All keys and dials) with Theme, Text color, Text font, Accent colors and Data units; Connection (marked All keys and dials) with Data source, Read every, the reading-links note and the folded HWiNFO setup steps; Support with the Copy support report button; and Configuration documents with the This dial&#x27;s settings and Shared settings wells, their Copy buttons and the Replace this dial&#x27;s settings and Replace shared settings buttons."></a>

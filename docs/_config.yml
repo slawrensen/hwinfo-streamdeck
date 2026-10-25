@@ -14,14 +14,46 @@ baseurl: /hwinfo-streamdeck
 remote_theme: just-the-docs/just-the-docs@v0.10.1
 plugins:
   - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-include-cache
+  - jekyll-relative-links
+
+defaults:
+  - scope:
+      path: "*.md"
+    values:
+      layout: default
 
 color_scheme: dark
 search_enabled: true
 heading_anchors: true
+search:
+  heading_level: 3
+  previews: 2
+  preview_words_before: 5
+  preview_words_after: 12
+  rel_url: false
+  focus_shortcut_key: k
+enable_copy_code_button: true
+
+# The website preview is independent of the released plugin version.
+docs_preview: false
+docs_legacy: true
+plugin_release:
+  version: 1.7.1
+  package_version: 1.7.1.0
+  tag: v1.7.1
+  download: https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin
+  notes: https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1
+  marketplace_version: 1.7.0.0
+  checked: 2026-10-24
 
 # Internal release runbooks: kept next to the docs, never published.
 exclude:
   - release/
+  - README.md
+  - Gemfile
+  - Gemfile.lock
 
 # Repo links in the header + "edit this page" footer.
 aux_links:

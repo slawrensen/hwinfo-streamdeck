@@ -1,0 +1,710 @@
+{
+	"kind": "sampled-horizontal-gradient-times-linear-vertical-brightness",
+	"source": "docs/assets/img/showcase/gallery/amber-dusk.png",
+	"coordinateSpace": "native830x450board",
+	"profileSampleY": 446,
+	"xDomain": [
+		3,
+		827
+	],
+	"yDomain": [
+		379,
+		446
+	],
+	"topBrightnessFactor": 0.65618338,
+	"bottomBrightnessFactor": 1,
+	"stops": [
+		{
+			"offset": 0.0,
+			"x": 3,
+			"rgb": [
+				19.3677,
+				11.7992,
+				57.41
+			]
+		},
+		{
+			"offset": 0.0157767,
+			"x": 16,
+			"rgb": [
+				21.0,
+				12.0,
+				60.0
+			]
+		},
+		{
+			"offset": 0.03519417,
+			"x": 32,
+			"rgb": [
+				24.0,
+				13.0,
+				62.0
+			]
+		},
+		{
+			"offset": 0.05461165,
+			"x": 48,
+			"rgb": [
+				26.0,
+				14.0,
+				64.0
+			]
+		},
+		{
+			"offset": 0.07402913,
+			"x": 64,
+			"rgb": [
+				29.0,
+				15.0,
+				67.0
+			]
+		},
+		{
+			"offset": 0.0934466,
+			"x": 80,
+			"rgb": [
+				31.0,
+				16.0,
+				70.0
+			]
+		},
+		{
+			"offset": 0.11286408,
+			"x": 96,
+			"rgb": [
+				33.0,
+				17.0,
+				73.0
+			]
+		},
+		{
+			"offset": 0.13228155,
+			"x": 112,
+			"rgb": [
+				36.0,
+				17.0,
+				75.0
+			]
+		},
+		{
+			"offset": 0.15169903,
+			"x": 128,
+			"rgb": [
+				38.0,
+				18.0,
+				78.0
+			]
+		},
+		{
+			"offset": 0.1711165,
+			"x": 144,
+			"rgb": [
+				41.0,
+				19.0,
+				81.0
+			]
+		},
+		{
+			"offset": 0.19053398,
+			"x": 160,
+			"rgb": [
+				42.0,
+				19.0,
+				84.0
+			]
+		},
+		{
+			"offset": 0.20995146,
+			"x": 176,
+			"rgb": [
+				45.0,
+				21.0,
+				87.0
+			]
+		},
+		{
+			"offset": 0.22936893,
+			"x": 192,
+			"rgb": [
+				47.0,
+				21.0,
+				89.0
+			]
+		},
+		{
+			"offset": 0.24878641,
+			"x": 208,
+			"rgb": [
+				49.0,
+				21.0,
+				92.0
+			]
+		},
+		{
+			"offset": 0.26820388,
+			"x": 224,
+			"rgb": [
+				52.0,
+				22.0,
+				95.0
+			]
+		},
+		{
+			"offset": 0.28762136,
+			"x": 240,
+			"rgb": [
+				55.0,
+				24.0,
+				98.0
+			]
+		},
+		{
+			"offset": 0.30703883,
+			"x": 256,
+			"rgb": [
+				57.0,
+				25.0,
+				100.0
+			]
+		},
+		{
+			"offset": 0.32645631,
+			"x": 272,
+			"rgb": [
+				60.0,
+				26.0,
+				103.0
+			]
+		},
+		{
+			"offset": 0.34587379,
+			"x": 288,
+			"rgb": [
+				62.0,
+				27.0,
+				106.0
+			]
+		},
+		{
+			"offset": 0.36529126,
+			"x": 304,
+			"rgb": [
+				64.0,
+				27.0,
+				109.0
+			]
+		},
+		{
+			"offset": 0.38470874,
+			"x": 320,
+			"rgb": [
+				66.0,
+				28.0,
+				111.0
+			]
+		},
+		{
+			"offset": 0.40412621,
+			"x": 336,
+			"rgb": [
+				68.0,
+				29.0,
+				114.0
+			]
+		},
+		{
+			"offset": 0.42354369,
+			"x": 352,
+			"rgb": [
+				71.0,
+				30.0,
+				117.0
+			]
+		},
+		{
+			"offset": 0.44296117,
+			"x": 368,
+			"rgb": [
+				73.0,
+				31.0,
+				120.0
+			]
+		},
+		{
+			"offset": 0.46237864,
+			"x": 384,
+			"rgb": [
+				79.0,
+				33.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.48179612,
+			"x": 400,
+			"rgb": [
+				87.0,
+				35.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.50121359,
+			"x": 416,
+			"rgb": [
+				94.0,
+				38.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.52063107,
+			"x": 432,
+			"rgb": [
+				102.0,
+				40.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.54004854,
+			"x": 448,
+			"rgb": [
+				110.0,
+				43.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.55946602,
+			"x": 464,
+			"rgb": [
+				118.0,
+				46.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.5788835,
+			"x": 480,
+			"rgb": [
+				125.0,
+				48.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.59830097,
+			"x": 496,
+			"rgb": [
+				133.0,
+				51.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.61771845,
+			"x": 512,
+			"rgb": [
+				141.0,
+				54.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.63713592,
+			"x": 528,
+			"rgb": [
+				148.0,
+				56.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.6565534,
+			"x": 544,
+			"rgb": [
+				156.0,
+				59.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.67597087,
+			"x": 560,
+			"rgb": [
+				163.0,
+				60.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.69538835,
+			"x": 576,
+			"rgb": [
+				172.0,
+				63.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.71480583,
+			"x": 592,
+			"rgb": [
+				180.0,
+				65.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.7342233,
+			"x": 608,
+			"rgb": [
+				187.0,
+				68.0,
+				121.0
+			]
+		},
+		{
+			"offset": 0.75364078,
+			"x": 624,
+			"rgb": [
+				193.0,
+				72.0,
+				120.0
+			]
+		},
+		{
+			"offset": 0.77305825,
+			"x": 640,
+			"rgb": [
+				197.0,
+				78.0,
+				118.0
+			]
+		},
+		{
+			"offset": 0.79247573,
+			"x": 656,
+			"rgb": [
+				201.0,
+				85.0,
+				115.0
+			]
+		},
+		{
+			"offset": 0.8118932,
+			"x": 672,
+			"rgb": [
+				205.0,
+				92.0,
+				113.0
+			]
+		},
+		{
+			"offset": 0.83131068,
+			"x": 688,
+			"rgb": [
+				209.0,
+				99.0,
+				110.0
+			]
+		},
+		{
+			"offset": 0.85072816,
+			"x": 704,
+			"rgb": [
+				213.0,
+				106.0,
+				108.0
+			]
+		},
+		{
+			"offset": 0.87014563,
+			"x": 720,
+			"rgb": [
+				217.0,
+				113.0,
+				106.0
+			]
+		},
+		{
+			"offset": 0.88956311,
+			"x": 736,
+			"rgb": [
+				221.0,
+				119.0,
+				103.0
+			]
+		},
+		{
+			"offset": 0.90898058,
+			"x": 752,
+			"rgb": [
+				225.0,
+				126.0,
+				101.0
+			]
+		},
+		{
+			"offset": 0.92839806,
+			"x": 768,
+			"rgb": [
+				229.0,
+				133.0,
+				98.0
+			]
+		},
+		{
+			"offset": 0.94781553,
+			"x": 784,
+			"rgb": [
+				233.0,
+				140.0,
+				96.0
+			]
+		},
+		{
+			"offset": 0.96723301,
+			"x": 800,
+			"rgb": [
+				237.0,
+				147.0,
+				93.0
+			]
+		},
+		{
+			"offset": 0.98665049,
+			"x": 816,
+			"rgb": [
+				241.0,
+				153.0,
+				91.0
+			]
+		},
+		{
+			"offset": 1.0,
+			"x": 827,
+			"rgb": [
+				243.8092,
+				158.2646,
+				89.2615
+			]
+		}
+	],
+	"rendering": "Draw a horizontal SVGlinearGradient from x3to827 using the RGBstops; overlay a black vertical gradient with opacity1-topBrightnessFactor at y379 and0 at y446. Clip to the strip. The high-resolution output interpolates these sampled colors as vectors.",
+	"validation": {
+		"sampleCount": 4205,
+		"channelCount": 12615,
+		"medianAbsoluteChannelError": 0.375,
+		"p95AbsoluteChannelError": 1.0452186341596605,
+		"rmsePerChannel": 0.5388250372435269,
+		"maximumAbsoluteChannelError": 1.9046715338339624,
+		"mask": "Top rows379–381 excluding third-slot context x270–420; bottom rows443–446 in clear portions of single-view slots; row446excludingselectionrail x274–283 androunding edges."
+	},
+	"sharedVioletEvidence": [
+		{
+			"xy": [
+				15,
+				381
+			],
+			"amber": [
+				14,
+				8,
+				39
+			],
+			"violet": [
+				15,
+				7,
+				35
+			],
+			"expectedVioletTint": [
+				15.0,
+				7.0,
+				35.0
+			],
+			"maximumChannelError": 0.0
+		},
+		{
+			"xy": [
+				100,
+				381
+			],
+			"amber": [
+				22,
+				11,
+				48
+			],
+			"violet": [
+				19,
+				8,
+				40
+			],
+			"expectedVioletTint": [
+				19.0,
+				8.5,
+				39.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				200,
+				381
+			],
+			"amber": [
+				32,
+				14,
+				60
+			],
+			"violet": [
+				24,
+				10,
+				46
+			],
+			"expectedVioletTint": [
+				24.0,
+				10.0,
+				45.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				500,
+				381
+			],
+			"amber": [
+				89,
+				33,
+				80
+			],
+			"violet": [
+				52,
+				19,
+				56
+			],
+			"expectedVioletTint": [
+				52.5,
+				19.5,
+				55.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				700,
+				381
+			],
+			"amber": [
+				141,
+				69,
+				72
+			],
+			"violet": [
+				78,
+				37,
+				52
+			],
+			"expectedVioletTint": [
+				78.5,
+				37.5,
+				51.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				815,
+				381
+			],
+			"amber": [
+				160,
+				101,
+				60
+			],
+			"violet": [
+				87,
+				53,
+				46
+			],
+			"expectedVioletTint": [
+				88.0,
+				53.5,
+				45.5
+			],
+			"maximumChannelError": 1.0
+		},
+		{
+			"xy": [
+				15,
+				444
+			],
+			"amber": [
+				21,
+				12,
+				58
+			],
+			"violet": [
+				18,
+				9,
+				45
+			],
+			"expectedVioletTint": [
+				18.5,
+				9.0,
+				44.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				420,
+				444
+			],
+			"amber": [
+				95,
+				37,
+				120
+			],
+			"violet": [
+				55,
+				21,
+				76
+			],
+			"expectedVioletTint": [
+				55.5,
+				21.5,
+				75.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				815,
+				444
+			],
+			"amber": [
+				238,
+				151,
+				90
+			],
+			"violet": [
+				127,
+				78,
+				61
+			],
+			"expectedVioletTint": [
+				127.0,
+				78.5,
+				60.5
+			],
+			"maximumChannelError": 0.5
+		}
+	],
+	"limits": [
+		"This is a measured reconstruction from visible source pixels. Covered background pixels are not independently verifiable.",
+		"The rounded-edge profile is linearly extrapolated; strip-frame pixels are excluded.",
+		"The fitted field supports Amber Outline and the same background plus production Ultraviolet Tint for Violet."
+	]
+}

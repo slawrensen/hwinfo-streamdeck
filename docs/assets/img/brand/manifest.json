@@ -58,16 +58,16 @@
   ],
   "recommendedUse": {
     "desktopHeader": {
-      "src": "hwinfo-logo-48.png",
-      "srcset": "hwinfo-logo-48.png 1x, hwinfo-logo-96.png 2x",
-      "cssWidth": 48,
-      "cssHeight": 48
+      "src": "hwinfo-logo-72.png",
+      "srcset": "hwinfo-logo-72.png 1x, hwinfo-logo-144.png 2x",
+      "cssWidth": 72,
+      "cssHeight": 72
     },
     "phoneHeader": {
-      "src": "hwinfo-logo-48.png",
-      "srcset": "hwinfo-logo-48.png 1x, hwinfo-logo-96.png 2x",
-      "cssWidth": 48,
-      "cssHeight": 48
+      "src": "hwinfo-logo-56.png",
+      "srcset": "hwinfo-logo-56.png 1x, hwinfo-logo-112.png 2x",
+      "cssWidth": 56,
+      "cssHeight": 56
     },
     "favicon": [
       "favicon.ico",
@@ -83,7 +83,7 @@
     "No new brand geometry, recoloring, typography, readings or decorative effects were created.",
     "Use empty alt for the image when adjacent text in the same home link already says HWiNFO Sensors.",
     "Do not apply CSS filters or another border to the existing tile. Its dark rim and corner shape are part of the authentic source.",
-    "The 48px documentation header uses direct 48px and 96px derivatives for standard and high-density screens; existing favicon and Apple-touch assets are retained unchanged."
+    "The documentation header uses direct 72px and 144px derivatives on desktop, and 56px and 112px derivatives on phones and narrow laptops. The original master, previous derivatives, favicon and Apple-touch assets are retained unchanged."
   ],
   "assets": [
     {
@@ -111,6 +111,14 @@
       "transformation": "Lanczos downsample from the released 512px raster; original colors, type, geometry and transparency retained."
     },
     {
+      "src": "hwinfo-logo-56.png",
+      "width": 56,
+      "height": 56,
+      "bytes": 3100,
+      "sha256": "41fca9a1aa0c0d363dbb28cfc7a193fca414ff105cb192833641b860acf84bc0",
+      "transformation": "Lanczos downsample directly from the released 512px RGBA raster, with lossless PNG compression. No recoloring, text edits, cropping or geometry changes."
+    },
+    {
       "src": "hwinfo-logo-64.png",
       "width": 64,
       "height": 64,
@@ -119,12 +127,36 @@
       "transformation": "Lanczos downsample from released512px raster; original colors, type, geometry and transparency retained."
     },
     {
+      "src": "hwinfo-logo-72.png",
+      "width": 72,
+      "height": 72,
+      "bytes": 4304,
+      "sha256": "9711ddf42cf853882517acd59cd9b8ef76114438fd895737eb895c59f9bce0ed",
+      "transformation": "Lanczos downsample directly from the released 512px RGBA raster, with lossless PNG compression. No recoloring, text edits, cropping or geometry changes."
+    },
+    {
       "src": "hwinfo-logo-96.png",
       "width": 96,
       "height": 96,
       "bytes": 6237,
       "sha256": "1361c0bc3dec6d0205842e4a19ec46af6ca7da2e89d7dde793f479f131c417da",
       "transformation": "Lanczos downsample from the released 512px raster; original colors, type, geometry and transparency retained."
+    },
+    {
+      "src": "hwinfo-logo-112.png",
+      "width": 112,
+      "height": 112,
+      "bytes": 7527,
+      "sha256": "34341fa2e72ec2898b3c9cb5b3f0291aaf5758154444f21039eeee59c9004612",
+      "transformation": "Lanczos downsample directly from the released 512px RGBA raster, with lossless PNG compression. No recoloring, text edits, cropping or geometry changes."
+    },
+    {
+      "src": "hwinfo-logo-144.png",
+      "width": 144,
+      "height": 144,
+      "bytes": 10353,
+      "sha256": "12585c65da2f3de2ab000e5d591764740c3da7abae65bba3eb234288c2ace5ce",
+      "transformation": "Lanczos downsample directly from the released 512px RGBA raster, with lossless PNG compression. No recoloring, text edits, cropping or geometry changes."
     },
     {
       "src": "hwinfo-logo-180.png",

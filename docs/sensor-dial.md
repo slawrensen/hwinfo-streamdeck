@@ -28,9 +28,9 @@ Each dial still draws inside its own **200 × 100** segment. A picture can span 
 | **Outline** | No background. Every word, the range bar, the rail mark and the trend line get a 1 px outline: black on the dark themes, the theme's background on **Paper**. | Built-in text keeps 4.5:1 contrast against its outline (a calculation). |
 | **Clear** | No background and no outline. | Depends on the picture. |
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" width="1264" height="352" loading="lazy" decoding="async" alt="Three touch strips from a Stream Deck + XL, each with six dials over one picture: the Cosmic Cliffs, an aurora over the Earth&#x27;s horizon and a pale mist. From left, the same reading drawn in Theme, Glass, Tint, Outline and Clear, then a three-row overview in Tint."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped for the touch strip. Auroras: NASA." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0 (Cosmic Cliffs)" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><img src="{{ '/assets/img/dial-backgrounds-looks.jpg' | relative_url }}" width="1264" height="352" loading="lazy" decoding="async" alt="Three touch strips from a Stream Deck + XL, each with six dials over one picture: the Cosmic Cliffs, an aurora over the Earth&#x27;s horizon and a pale mist. From left, the same reading drawn in Theme, Glass, Tint, Outline and Clear, then a three-row overview in Tint."></a>
 
-*Stream Deck app captures with live readings on a Stream Deck + XL. From left: Theme, Glass, Tint, Outline, Clear, then Tint in the three-row view. Strip pictures: the Cosmic Cliffs (NASA, ESA, CSA, STScI), auroras photographed from the International Space Station (NASA), and gradients I made.*
+*Stream Deck app captures with live readings on a Stream Deck + XL. From left: Theme, Glass, Tint, Outline, Clear, then Tint in the three-row view. Strip pictures: the Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped for the strip), auroras photographed from the International Space Station (NASA), and gradients I made.*
 
 **Words in the accent color** appears below Background on Glass, Tint and Outline. It colors the title, selected row name and context name with the dial's accent; values and individual Reading colors keep their own settings. The accent follows **Advanced → Shared defaults → Accent colors**.
 
@@ -53,9 +53,9 @@ Each recolored word keeps the 4.5:1 floor of the rest of the text on that look (
 
 </details>
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" width="1300" height="710" loading="lazy" decoding="async" alt="A Stream Deck + XL page: 36 Sensor Reading keys in Midnight, and six Tint dials with Words in the accent color over the Cosmic Cliffs across the whole touch strip."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped for the touch strip." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0 (Cosmic Cliffs)" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><img src="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" width="1300" height="710" loading="lazy" decoding="async" alt="A Stream Deck + XL page: 36 Sensor Reading keys in Midnight, and six Tint dials with Words in the accent color over the Cosmic Cliffs across the whole touch strip."></a>
 
-*A Stream Deck app capture of a whole + XL page with live readings: Midnight keys, and six dials on Tint with Words in the accent color. Strip picture: the Cosmic Cliffs (NASA, ESA, CSA, STScI).*
+*A Stream Deck app capture of a whole + XL page with live readings: Midnight keys, and six dials on Tint with Words in the accent color. Strip picture: the Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped for the strip).*
 
 On Glass, Tint, Outline and Clear:
 
@@ -65,6 +65,10 @@ On Glass, Tint, Outline and Clear:
 - With no background box to hide a label that runs long, a three-row label and a two-row label's second line are cut to their measured width, or left off when not even an ellipsis fits, so a label with emoji or symbols the face font does not have is shortened a little sooner.
 - The settings panel header cannot show your picture, so it previews a see-through dial over a checkerboard. Sensor Reading keys are not affected.
 - Tint's and Outline's outline is an SVG filter, which the Stream Deck app draws on the versions I checked (7.4 and 7.6). I have run Glass and Outline on my Stream Deck + XL since 2026-10-16.
+
+### Get the Cosmic Cliffs background
+
+[Download the source photograph from ESA/Webb](https://esawebb.org/images/weic2205a/). This is the full photograph; crop it to fit your touch strip, then use **Set from File...** in Stream Deck. To match the displayed settings, use **Midnight** on the keys and **Tint** with **Words in the accent color** on the dials.
 
 
 ## The touchscreen readout

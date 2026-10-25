@@ -1,0 +1,18 @@
+{
+  "kind": "settings-panel crop",
+  "source": "sensor-picker.png",
+  "source_sha256": "006264c8709ed21bb3a936eff8aa20cd5e5e7f377ab0471f8f26fb73cfe78d5e",
+  "source_release": "v1.7.1",
+  "source_release_commit": "bb4aedecbce499e199df8af63793a1490c0fb6ed",
+  "source_git_blob": "a3e64637fc9fdc25d3d757bf7330e885da3b8e50",
+  "capture": "Local property-inspector test host with live HWiNFO, 400 CSS pixels at DPR 2; not a physical-device photograph.",
+  "operation": "Lossless rectangular crop; no changed readings, colors, layout or reconstructed pixels.",
+  "crop": {
+    "left": 0,
+    "top": 416,
+    "width": 800,
+    "height": 784
+  },
+  "output": "sensor-picker-detail.png",
+  "output_sha256": "a30d6eed3f8f03bec89ef4b4f3e1c10c0fbceb6a572031001fdb43e4ac8448db"
+}

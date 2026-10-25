@@ -61,4 +61,14 @@ The publisher keeps the prior preview commit as a parent and uses an explicit ex
 
 Use genuine captures or production-renderer output. Optimized showcase derivatives retain source hashes, crop coordinates and release provenance in `assets/img/showcase/provenance.json`. Preserve masters, distinguish samples/app captures/hardware photographs, retain credits, and add intrinsic dimensions. Do not describe a shared touch-strip picture as a graph spanning multiple dials.
 
+### Prose and display gallery
+
+The shared prose cap is `48rem` (768px at the default root size), with 19px desktop body text and the existing 16px phone text. Tables keep their wider space and share the prose's left edge. The choice was checked against 97 paragraphs across Sensor Dial, Sensor Reading, Troubleshooting and Data sources at 1440px and 1920px. Complete lines had a median of 87 characters and a 90th percentile of 92, compared with 86 and 91 at the former roughly 681px / 17px setting. The proposed 832px / 17px setting produced 106 and 112. These are Chromium measurements using its available Liberation Sans fallback; other system fonts can wrap differently. Phone paragraph dimensions and wrapping were unchanged at 320px and 390px.
+
+The measure follows the distinction between prose and wider reference content in [GOV.UK layout guidance](https://design-system.service.gov.uk/styles/layout/) and [USWDS typography guidance](https://designsystem.digital.gov/components/typography/). It is a measured choice for these reference pages, not a claim of universal optimal line length or full accessibility conformance.
+
+The homepage gallery uses five maintainer-supplied app captures. `node scripts/docs-gallery-images.mjs` reproduces native 830 × 450 PNG and lossless WebP crops from the retained masters and checks decoded pixel equality. `assets/img/showcase/gallery/provenance.json` records hashes, crop coordinates, matching key and touch-strip geometry, and the limits of background-image provenance. Do not offer those composited screenshots as clean background downloads.
+
+Gallery arrows and Expand stay below the image; nothing overlays the capture. The native dialog keeps navigation outside the image stage, offers Fit and Actual size, and reserves arrow keys for panning at Actual size. Group links use `data-image-group`; source attribution can use `data-image-credit`, `data-image-credit-url`, `data-image-license` and `data-image-license-url`. Credit is shown separately from the shortened image description. Normal full-image links and all gallery slides remain available without JavaScript.
+
 Documentation validation does not qualify a plugin release. Windows/HWiNFO installation, physical-device checks, signing, private release-runbook gates and fresh manual VirusTotal validation remain separate.

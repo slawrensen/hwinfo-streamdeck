@@ -14,18 +14,48 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
   <p class="home-requirements"><strong>Windows 10+ (x64)</strong> · Stream Deck 6.9+ · HWiNFO running locally.<br>Free HWiNFO limits Shared Memory to 12 hours. <a href="{{ '/installation.html' | relative_url }}">Requirements & installation</a></p>
 </header>
 
-<figure class="hero-figure">
-  <a class="image-link" href="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" data-image-viewer aria-label="Open the complete deck image">
-    <picture>
-      <source media="(max-width: 600px)" type="image/webp" srcset="{{ '/assets/img/showcase/deck-detail.webp' | relative_url }}" width="422" height="406">
-      <source media="(max-width: 600px)" srcset="{{ '/assets/img/showcase/deck-detail.jpg' | relative_url }}" width="422" height="406">
-      <source type="image/webp" srcset="{{ '/assets/img/showcase/deck-640.webp' | relative_url }} 640w, {{ '/assets/img/showcase/deck-960.webp' | relative_url }} 960w, {{ '/assets/img/showcase/deck-1300.webp' | relative_url }} 1300w" sizes="(min-width: 1560px) 1140px, (min-width: 1000px) calc(100vw - 340px), calc(100vw - 48px)">
-      <img src="{{ '/assets/img/dial-backgrounds-deck.jpg' | relative_url }}" width="1300" height="710" fetchpriority="high" alt="Live Midnight keys and six independent Tint dials over the Cosmic Cliffs in the Stream Deck app.">
-    </picture>
-    <span class="image-hint" aria-hidden="true">View complete image ↗</span>
-  </a>
-  <figcaption>Live Stream Deck app capture. Midnight keys and transparent Tint dials. <span class="image-credit">Cosmic Cliffs: NASA, ESA, CSA, STScI.</span></figcaption>
-</figure>
+<section class="hero-gallery" data-gallery aria-label="Display looks">
+  <div class="gallery-slides">
+    <figure data-gallery-slide data-gallery-title="Cyan">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/cyan-stars.png' | relative_url }}" aria-label="Expand cyan display" data-image-caption="Cyan accents over a star field. Live Stream Deck app capture.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/cyan-stars.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/cyan-stars.png' | relative_url }}" width="830" height="450" fetchpriority="high" alt="Thirty-six keys with cyan accents and six independent dials over a star field."></picture>
+      </a>
+      <figcaption>Cyan accents over a star field. Live Stream Deck app capture.</figcaption>
+    </figure>
+    <figure data-gallery-slide data-gallery-title="Green · night">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/green-night.png' | relative_url }}" aria-label="Expand green night display" data-image-caption="Green accents over a dark sky. Live Stream Deck app capture.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/green-night.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/green-night.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with green accents and six independent dials over a dark sky."></picture>
+      </a>
+      <figcaption>Green accents over a dark sky. Live Stream Deck app capture.</figcaption>
+    </figure>
+    <figure data-gallery-slide data-gallery-title="Violet">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/violet-dusk.png' | relative_url }}" aria-label="Expand violet display" data-image-caption="Violet accents over a dusk gradient. Live Stream Deck app capture.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/violet-dusk.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/violet-dusk.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with violet accents and six independent dials over a purple-to-orange gradient."></picture>
+      </a>
+      <figcaption>Violet accents over a dusk gradient. Live Stream Deck app capture.</figcaption>
+    </figure>
+    <figure data-gallery-slide data-gallery-title="Amber">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/amber-dusk.png' | relative_url }}" aria-label="Expand amber display" data-image-caption="Amber accents over a dusk gradient. Live Stream Deck app capture.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/amber-dusk.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/amber-dusk.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with amber accents and six independent dials over a purple-to-orange gradient."></picture>
+      </a>
+      <figcaption>Amber accents over a dusk gradient. Live Stream Deck app capture.</figcaption>
+    </figure>
+    <figure data-gallery-slide data-gallery-title="Green · aurora">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/green-aurora.png' | relative_url }}" aria-label="Expand green aurora display" data-image-caption="Green accents over an aurora. Live Stream Deck app capture.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/green-aurora.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/green-aurora.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with green accents and six independent dials over a bright green aurora."></picture>
+      </a>
+      <figcaption>Green accents over an aurora. Live Stream Deck app capture.</figcaption>
+    </figure>
+  </div>
+  <div class="gallery-controls" hidden>
+    <p class="gallery-position" data-gallery-position aria-live="polite" aria-atomic="true"></p>
+    <div class="gallery-actions">
+      <button type="button" data-gallery-previous aria-label="Previous look" title="Previous look"><span aria-hidden="true">‹</span></button>
+      <button type="button" data-gallery-expand aria-label="Expand image" title="Expand image"><span aria-hidden="true">⤢</span></button>
+      <button type="button" data-gallery-next aria-label="Next look" title="Next look"><span aria-hidden="true">›</span></button>
+    </div>
+  </div>
+</section>
 
 <section class="home-showcase" aria-labelledby="what-it-does">
   <h2 id="what-it-does">Make it your display</h2>
@@ -39,8 +69,8 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
       <figcaption><h3><a href="{{ '/sensor-dial.html' | relative_url }}">Dials <span aria-hidden="true">→</span></a></h3><p>Readings, trends and local session stats.<br><span class="capture-type">Sample rendering. Stream Deck + / + XL.</span></p></figcaption>
     </figure>
     <figure>
-      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/dial-backgrounds-strip.jpg' | relative_url }}" aria-label="Enlarge transparent background examples"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/backgrounds-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/backgrounds-detail.jpg' | relative_url }}" width="621" height="332" loading="lazy" decoding="async" alt="Separate dial slots over space, aurora and pale backgrounds in the Stream Deck app."></picture></a>
-      <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Space imagery: NASA, ESA, CSA, STScI.</span></p></figcaption>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/dial-backgrounds-strip.jpg' | relative_url }}" aria-label="Enlarge transparent background examples" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped for the touch strip. Auroras: NASA." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0 (Cosmic Cliffs)" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/backgrounds-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/backgrounds-detail.jpg' | relative_url }}" width="621" height="332" loading="lazy" decoding="async" alt="Separate dial slots over space, aurora and pale backgrounds in the Stream Deck app."></picture></a>
+      <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Cosmic Cliffs: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped. Auroras: NASA.</span></p></figcaption>
     </figure>
   </div>
 </section>

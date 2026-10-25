@@ -28,9 +28,10 @@ In Stream Deck, drag **HWiNFO Sensors → Sensor Reading** onto an empty display
 
 Click **Reading**, type part of a name such as `cpu die` or `gpu hot`, and choose a result. The list groups readings by their HWiNFO sensor. Arrow keys browse and Enter selects; **Reload the sensor list** refreshes it.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/sensor-picker.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/sensor-picker.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The Sensor Reading picker filtered to GPU readings, grouped by their HWiNFO sensor."></a>
-
-*Settings-panel capture with live HWiNFO readings in a test host.*
+<figure class="settings-detail">
+  <a class="image-link" data-image-viewer href="{{ '/assets/img/sensor-picker-detail.png' | relative_url }}" aria-label="Enlarge the Reading picker"><img src="{{ '/assets/img/sensor-picker-detail.png' | relative_url }}" width="800" height="784" loading="lazy" decoding="async" alt="Reading search for gpu, with matching readings grouped by sensor and the reload button."></a>
+  <figcaption>Reading picker detail, captured with live HWiNFO in a test host. <a data-image-viewer data-image-caption="Full Sensor Reading settings panel, captured with live HWiNFO in a test host." href="{{ '/assets/img/sensor-picker.png' | relative_url }}">Full settings panel</a>.</figcaption>
+</figure>
 
 ## 5. Confirm a value
 

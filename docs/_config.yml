@@ -20,7 +20,7 @@ plugins:
 
 defaults:
   - scope:
-      path: ""
+      path: "*.md"
     values:
       layout: default
 
@@ -38,6 +38,7 @@ enable_copy_code_button: true
 
 # The website preview is independent of the released plugin version.
 docs_preview: false
+docs_legacy: true
 plugin_release:
   version: 1.7.1
   package_version: 1.7.1.0

@@ -1,0 +1,16 @@
+---
+layout: null
+search_exclude: true
+nav_exclude: true
+---
+{% assign docs_source_sha = site.docs_source_sha | default: site.github.build_revision %}{% assign docs_build_id = site.docs_build_id %}{% if docs_source_sha and docs_build_id == nil %}{% assign source_short = docs_source_sha | slice: 0, 12 %}{% assign docs_build_id = 'docs-' | append: source_short %}{% endif %}
+{
+  "schema": 1,
+  "kind": "documentation-production",
+  "source_repository": "slawrensen/hwinfo-streamdeck",
+  "source_commit": {{ docs_source_sha | jsonify }},
+  "build_id": {{ docs_build_id | jsonify }},
+  "base_path": {{ site.baseurl | jsonify }},
+  "source_plugin_version": {{ site.plugin_release.version | jsonify }},
+  "legacy_path": {{ '/legacy/' | relative_url | jsonify }}
+}

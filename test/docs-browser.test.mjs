@@ -1,7 +1,7 @@
 // Real generated-site regression tests, separate from plugin release gates.
 // DOCS_TEST_URL=http://127.0.0.1:4000/hwinfo-streamdeck-preview/ \
 // CHROME_PATH=/usr/bin/google-chrome node --test test/docs-browser.test.mjs
-// Run once for each locally built base path, then against the deployed preview.
+// Run once for each locally built base path, then against the deployed site.
 /* global document, window */
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -9,7 +9,8 @@ import { chromium } from "playwright";
 
 const base = process.env.DOCS_TEST_URL ? new URL(process.env.DOCS_TEST_URL.endsWith("/") ? process.env.DOCS_TEST_URL : `${process.env.DOCS_TEST_URL}/`) : null;
 const enabled = Boolean(base);
-const options = { skip: enabled ? false : "UNAVAILABLE: set DOCS_TEST_URL to a real Jekyll build or published preview" };
+const options = { skip: enabled ? false : "UNAVAILABLE: set DOCS_TEST_URL to a real Jekyll build or published site" };
+const isPreview = Boolean(base?.pathname.includes("preview"));
 let browser;
 
 before(async () => {
@@ -48,6 +49,11 @@ function assertWithinSite(url) {
 	const resolved = new URL(url, base);
 	assert.equal(resolved.origin, base.origin);
 	assert.ok(resolved.pathname.startsWith(base.pathname), `${resolved.href} escaped the ${base.pathname} base path`);
+}
+function assertWithinArchive(url, from = siteUrl("legacy/")) {
+	const target = new URL(url, from);
+	assert.equal(target.origin, base.origin);
+	assert.ok(target.pathname.startsWith(new URL("legacy/", base).pathname), `${target.href} escaped the legacy documentation`);
 }
 async function focusStaysInViewer(page) {
 	assert.equal(await page.locator("dialog.image-viewer").evaluate(dialog => dialog.contains(document.activeElement)), true,
@@ -453,4 +459,127 @@ test("essential content and navigation work without JavaScript", options, async 
 	const start = page.locator('#site-nav a[href$="getting-started.html"]');
 	await start.click();
 	assert.match(await page.locator("#main-content").innerText(), /Confirm a value/);
+});
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+	test(`current and legacy documentation have visible native return paths at ${viewport.width}px`, options, async t => {
+		const page = await pageFor(t, { viewport, javaScriptEnabled: false });
+		for (const route of ["", "sensor-dial.html"]) {
+			await page.goto(siteUrl(route));
+			if (isPreview) {
+				const stable = page.getByRole("link", { name: /^Stable docs/ });
+				assert.equal(new URL(await stable.getAttribute("href"), page.url()).href, "https://docs.slawrensen.com/hwinfo-streamdeck/");
+				await page.goto(siteUrl(`legacy/${route}`));
+			} else {
+				const legacy = page.getByRole("link", { name: /^Legacy docs/ });
+				const box = await legacy.boundingBox();
+				assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height, "the legacy link is visible before scrolling");
+				assert.ok(box.height >= 44, "the edition switch retains a usable touch target");
+				assert.equal(new URL(await legacy.getAttribute("href"), page.url()).href, siteUrl(`legacy/${route}`), "the edition switch retains the current page");
+				await legacy.focus();
+				await page.keyboard.press("Enter");
+			}
+			await page.waitForURL(siteUrl(`legacy/${route}`));
+			const current = page.getByRole("link", { name: /^Current docs/ });
+			assert.equal(new URL(await current.getAttribute("href"), page.url()).href, siteUrl(route), "the native return link points to the corresponding current page");
+			const banner = page.locator(".legacy-banner");
+			assert.match(await banner.innerText(), /Legacy documentation/);
+			const box = await banner.boundingBox();
+			assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height, "legacy identity and its return link stay visible on entry");
+			assert.ok(await current.isVisible());
+			assert.ok((await current.boundingBox()).height >= 44, "the current documentation return link retains a usable touch target");
+			assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, "the edition bar must not cause page overflow");
+			await current.focus();
+			await page.keyboard.press("Enter");
+			await page.waitForURL(siteUrl(route));
+			assert.equal(await page.locator("h1").count(), 1);
+		}
+		if (!isPreview) {
+			await page.goto(siteUrl("404.html"));
+			const legacy = page.getByRole("link", { name: /^Legacy docs/ });
+			assert.equal(new URL(await legacy.getAttribute("href"), page.url()).href, siteUrl("legacy/"), "new pages without an archived counterpart link to the legacy homepage");
+			await legacy.click();
+			await page.waitForURL(siteUrl("legacy/"));
+		}
+	});
+}
+
+test("only preview and archived documentation are excluded from indexing", options, async t => {
+	const page = await pageFor(t);
+	for (const route of ["", "sensor-dial.html"]) {
+		await page.goto(siteUrl(route));
+		const currentRobots = await page.locator('meta[name="robots"]').evaluateAll(elements => elements.map(element => element.content).join(","));
+		assert.equal(/(?:^|[\s,])noindex(?:[\s,]|$)/i.test(currentRobots ?? ""), isPreview, "production current pages must not inherit preview noindex");
+		await page.goto(siteUrl(`legacy/${route}`));
+		const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+		assert.match(robots, /(?:^|[\s,])noindex(?:[\s,]|$)/i, "archived content is explicitly excluded from search engines");
+		assert.match(await page.locator(".legacy-banner").innerText(), /Legacy documentation/);
+	}
+});
+
+test("current and legacy search keep visitors inside the selected documentation", options, async t => {
+	const page = await pageFor(t);
+	const currentResponse = await page.request.get(siteUrl("assets/js/search-data.json"));
+	assert.equal(currentResponse.status(), 200);
+	const currentIndex = Object.values(await currentResponse.json());
+	assert.ok(currentIndex.length > 0, "current search is populated");
+	for (const entry of currentIndex) {
+		assert.equal(typeof entry.url, "string");
+		assert.ok(!new URL(entry.url, base).pathname.startsWith(new URL("legacy/", base).pathname), "the current index must not include frozen legacy pages");
+	}
+	const legacyRoot = siteUrl("legacy/");
+	const archiveResponse = await page.request.get(siteUrl("legacy/assets/js/search-data.json"));
+	assert.equal(archiveResponse.status(), 200);
+	const archiveIndex = Object.values(await archiveResponse.json());
+	assert.ok(archiveIndex.length > 0, "the archive keeps its own useful search index");
+	for (const entry of archiveIndex) {
+		assert.equal(typeof entry.url, "string");
+		assertWithinArchive(entry.url, legacyRoot);
+	}
+	await page.goto(siteUrl("legacy/sensor-dial.html#transparent-background"));
+	assert.equal(await page.locator("#transparent-background").count(), 1, "an existing legacy fragment still resolves directly");
+	await page.locator("#search-input").pressSequentially("transparent background", { delay: 25 });
+	const result = page.locator('#search-results a[href*="sensor-dial.html"]').first();
+	await result.waitFor({ state: "visible" });
+	for (const href of await page.locator("#search-results a").evaluateAll(links => links.map(link => link.href))) assertWithinArchive(href);
+	await result.click();
+	assertWithinArchive(page.url());
+	assert.match(await page.locator(".main-content").innerText(), /Transparent background/);
+});
+
+test("legacy image viewer contains keyboard focus and restores its image opener", options, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl("legacy/sensor-dial.html#transparent-background"));
+	const opener = page.locator('.main-content img[src$="dial-backgrounds-deck.jpg"]');
+	await opener.scrollIntoViewIfNeeded();
+	await opener.evaluate(image => image.decode());
+	await page.waitForFunction(() => document.querySelector('.main-content img[src$="dial-backgrounds-deck.jpg"]')?.getAttribute("role") === "button");
+	await opener.focus();
+	await page.keyboard.press("Enter");
+	const dialog = page.getByRole("dialog", { name: "Zoomed image" });
+	await dialog.waitFor({ state: "visible" });
+	const actual = dialog.getByRole("button", { name: "Actual size", exact: true });
+	await actual.focus();
+	const containsFocus = async () => assert.equal(await dialog.evaluate(element => element.contains(document.activeElement)), true, "focus must not reach Edit this page or another background control");
+	await page.keyboard.press("Shift+Tab");
+	await containsFocus();
+	for (const key of ["Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+		await page.keyboard.press(key);
+		await containsFocus();
+	}
+	await page.locator("#search-input").evaluate(input => input.focus());
+	await containsFocus();
+	await actual.click();
+	const fit = dialog.getByRole("button", { name: "Fit to screen", exact: true });
+	assert.equal(await fit.count(), 1, "Actual size is pointer-accessible and exposes its changed action");
+	await fit.click();
+	assert.equal(await actual.count(), 1, "Fit to screen is pointer-accessible and restores the fitted view");
+	await page.keyboard.press("Escape");
+	await dialog.waitFor({ state: "hidden" });
+	assert.equal(await opener.evaluate(element => element === document.activeElement), true, "Escape restores the image that opened the archive viewer");
+	await page.keyboard.press("Enter");
+	await dialog.waitFor({ state: "visible" });
+	await dialog.getByRole("button", { name: "Close", exact: true }).click();
+	await dialog.waitFor({ state: "hidden" });
+	assert.equal(await opener.evaluate(element => element === document.activeElement), true, "Close restores the archive image opener");
 });

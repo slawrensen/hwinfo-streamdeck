@@ -4,13 +4,19 @@ layout: table_wrappers
 <!DOCTYPE html>
 <html lang="en">
 {% include head.html %}
-<body class="docs-site{% if page.url == '/' %} docs-home{% endif %}{% if site.docs_preview %} docs-preview{% endif %}">
+<body class="docs-site{% if page.url == '/' %} docs-home{% endif %}{% if site.docs_preview %} docs-preview{% elsif site.docs_legacy %} docs-versioned{% endif %}">
 	<a class="skip-to-main" href="#main-content">Skip to main content</a>
 	{% include icons/icons.html %}
 	{% if site.docs_preview %}
-	<aside class="preview-banner" aria-label="Documentation preview">
+	<aside class="edition-banner preview-banner" aria-label="Documentation preview">
 		<span>Documentation preview</span>
 		<a href="https://docs.slawrensen.com/hwinfo-streamdeck/">Stable docs <span aria-hidden="true">↗</span></a>
+	</aside>
+	{% elsif site.docs_legacy %}
+	{% assign legacy_page = page.url %}{% if page.url == '/404.html' %}{% assign legacy_page = '/' %}{% endif %}
+	<aside class="edition-banner" aria-label="Documentation version">
+		<span>New documentation</span>
+		<a data-legacy-docs-link href="{{ '/legacy' | append: legacy_page | relative_url }}">Legacy docs <span aria-hidden="true">↗</span></a>
 	</aside>
 	{% endif %}
 	{% include components/sidebar.html %}

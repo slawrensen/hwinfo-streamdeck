@@ -110,7 +110,36 @@ function manifest(t, routes) {
 const sourceSha = "a".repeat(40);
 const buildId = `docs-${sourceSha.slice(0, 12)}`;
 const buildJson = JSON.stringify({ kind: "documentation-preview", build_id: buildId, source_commit: sourceSha });
+const productionBuildJson = JSON.stringify({ kind: "documentation-production", build_id: buildId, source_commit: sourceSha });
 const previewHtml = content => `<meta name="robots" content="noindex, nofollow"><meta name="docs-build-id" content="${buildId}"><meta name="docs-source-sha" content="${sourceSha}"><aside>Documentation preview</aside>${content}`;
+
+const legacySourceSha = "b".repeat(40);
+const legacyBuildId = `legacy-${legacySourceSha.slice(0, 12)}`;
+const currentHtml = (content, { source = sourceSha, build = buildId } = {}) => `<meta name="docs-build-id" content="${build}"><meta name="docs-source-sha" content="${source}">${content}`;
+const legacyHtml = (content, { source = legacySourceSha, build = legacyBuildId, noindex = true } = {}) => `${noindex ? '<meta name="robots" content="noindex, follow">' : ""}<meta name="docs-legacy-build-id" content="${build}"><meta name="docs-legacy-source-sha" content="${source}"><aside>Legacy documentation</aside>${content}`;
+const legacyJson = JSON.stringify({
+	schema: 1,
+	kind: "documentation-legacy",
+	source_repository: "slawrensen/hwinfo-streamdeck",
+	source_commit: legacySourceSha,
+	build_id: legacyBuildId,
+	routes: [{ path: "index.html", anchors: [] }, { path: "guide.html", anchors: ["kept"] }]
+});
+
+function editionPages(preview = false) {
+	const html = preview ? previewHtml : currentHtml;
+	const legacyHome = { html: legacyHtml('<a href="guide.html#kept">Legacy guide</a><a href="../">Current docs</a>') };
+	return {
+		"/docs/": { html: html('<a href="guide.html#kept">Current guide</a><a href="legacy/guide.html#kept">Legacy guide</a>') },
+		"/docs/guide.html": { html: html('<h1 id="kept">Current guide</h1>') },
+		"/docs/docs-build.json": { type: "application/json", html: preview ? buildJson : productionBuildJson },
+		"/docs/legacy/": legacyHome,
+		"/docs/legacy/index.html": legacyHome,
+		"/docs/legacy/guide.html": { html: legacyHtml('<h1 id="kept">Legacy guide</h1><a href="../guide.html#kept">Current docs</a>') },
+		"/docs/legacy/legacy-build.json": { type: "application/json", html: legacyJson },
+		"/docs/legacy/assets/js/search-data.json": { type: "application/json", html: JSON.stringify({ guide: { title: "Legacy guide", url: "guide.html#kept" } }) }
+	};
+}
 
 describe("docs crawler catches redesigned-site and deployment regressions", () => {
 	it("checks an unlinked legacy route and a removed fragment from the route contract", async t => {
@@ -222,6 +251,130 @@ describe("docs crawler catches redesigned-site and deployment regressions", () =
 		const result = await crawl(root);
 		assert.equal(result.code, 1);
 		assert.match(result.stderr, /invalid JSON search index/);
+	});
+});
+
+describe("docs crawler distinguishes current production from its frozen legacy edition", () => {
+	it("rejects a stale normal-production build even when its routes still work", async t => {
+		const { root } = await fixture(t, {
+			"/docs/": { html: currentHtml("Cached production", { build: "docs-cccccccccccc" }) },
+			"/docs/docs-build.json": { type: "application/json", html: productionBuildJson }
+		});
+		const result = await crawl(`${root}docs/`, "--build-id", buildId);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /(?:build.*(?:match|expected)|(?:expected|match).*build)/i);
+	});
+
+	it("rejects the wrong production source even when the short build marker matches", async t => {
+		const { root } = await fixture(t, {
+			"/docs/": { html: currentHtml("Wrong source", { source: `${sourceSha.slice(0, 12)}${"c".repeat(28)}` }) },
+			"/docs/docs-build.json": { type: "application/json", html: productionBuildJson }
+		});
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /source/i);
+	});
+
+	it("rejects production pages accidentally left noindex after preview promotion", async t => {
+		const { root } = await fixture(t, {
+			"/docs/": { html: currentHtml('<meta name="robots" content="noindex, nofollow">Production') },
+			"/docs/docs-build.json": { type: "application/json", html: productionBuildJson }
+		});
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /noindex/i);
+	});
+
+	for (const preview of [false, true]) {
+		it(`checks a healthy archive under ${preview ? "preview" : "production"} using its own identity and search`, async t => {
+			const { root, requests } = await fixture(t, editionPages(preview));
+			const result = await crawl(`${root}docs/`, ...(preview ? ["--preview"] : []), "--build-id", buildId, "--source-sha", sourceSha);
+			assert.equal(result.code, 0, result.stderr);
+			assert.equal(requests.get("/docs/legacy/legacy-build.json"), 1, "the archive needs its independent source manifest");
+			assert.equal(requests.get("/docs/legacy/assets/js/search-data.json"), 1, "the archive's own search is validated during the complete-site crawl");
+			assert.equal(requests.get("/docs/legacy/guide.html"), 1, "an anchor-prefetched archive page is checked without duplicate requests");
+		});
+	}
+
+	it("rejects a stale archive page instead of accepting the current edition's good source", async t => {
+		const pages = editionPages();
+		pages["/docs/legacy/guide.html"].html = legacyHtml('<h1 id="kept">Wrong archived source</h1>', { source: "c".repeat(40) });
+		const { root } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/guide\.html[^\n]*source/i);
+	});
+
+	it("rejects an archive manifest that drops its route inventory despite valid source metadata", async t => {
+		const pages = editionPages();
+		const incomplete = JSON.parse(legacyJson);
+		delete incomplete.routes;
+		pages["/docs/legacy/legacy-build.json"].html = JSON.stringify(incomplete);
+		const { root } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /\/docs\/legacy\/[^\n]*invalid legacy route manifest/i);
+	});
+
+	it("checks archive routes present only in the frozen inventory even if navigation and search omit them", async t => {
+		const pages = editionPages();
+		const inventory = JSON.parse(legacyJson);
+		inventory.routes.push({ path: "forgotten.html", anchors: ["original-heading"] });
+		pages["/docs/legacy/legacy-build.json"].html = JSON.stringify(inventory);
+		const { root, requests } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/forgotten\.html: HTTP 404/);
+		assert.equal(requests.get("/docs/legacy/forgotten.html"), 1);
+	});
+
+	it("requires archive noindex and authenticates the baseline during a direct legacy crawl", async t => {
+		const pages = editionPages();
+		pages["/docs/legacy/guide.html"].html = legacyHtml('<h1 id="kept">Archive without policy</h1>', { noindex: false });
+		const { root } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/legacy/`, "--legacy", "--build-id", legacyBuildId, "--source-sha", "c".repeat(40));
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/guide\.html[^\n]*noindex/i);
+		assert.match(result.stderr, /(?:expected.*source|source.*(?:expected|match))/i);
+	});
+
+	it("rejects legacy results in the current search even when their destination is valid", async t => {
+		const pages = editionPages();
+		pages["/docs/assets/js/search-data.json"] = { type: "application/json", html: JSON.stringify({ duplicate: { title: "Old guide", url: "/docs/legacy/guide.html#kept" } }) };
+		const { root } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /search-data\.json[^\n]*legacy/i);
+	});
+
+	it("finds a broken archive child after first fetching its parent through a fragment", async t => {
+		const pages = editionPages();
+		pages["/docs/legacy/guide.html"].html = legacyHtml('<h1 id="kept">Archive</h1><a href="missing-child.html">Broken archive child</a>');
+		const { root, requests } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/missing-child\.html: HTTP 404/);
+		assert.equal(requests.get("/docs/legacy/missing-child.html"), 1);
+	});
+
+	it("rejects archive search results escaping into current docs and leaks inside the archive index", async t => {
+		const pages = editionPages();
+		pages["/docs/legacy/assets/js/search-data.json"] = { type: "application/json", html: JSON.stringify({ wrongEdition: { title: "Wrong edition", content: "COPY_RULES private text", url: "../guide.html#kept" } }) };
+		const { root } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/assets\/js\/search-data\.json[^\n]*leaks/i);
+		assert.match(result.stderr, /search result.*(?:escapes|edition)/i);
+	});
+
+	it("proves private archive paths are 404 rather than only checking current private paths", async t => {
+		const pages = editionPages();
+		pages["/docs/legacy/README.html"] = { html: "Accidentally published archive input" };
+		const { root, requests } = await fixture(t, pages);
+		const result = await crawl(`${root}docs/`, "--build-id", buildId, "--source-sha", sourceSha);
+		assert.equal(result.code, 1, result.stdout);
+		assert.match(result.stderr, /legacy\/README\.html[^\n]*HTTP 200[^\n]*expected 404/i);
+		assert.equal(requests.get("/docs/legacy/README.html"), 1);
 	});
 });
 

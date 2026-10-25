@@ -4,6 +4,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="{{ '/assets/img/brand/hwinfo-logo-180.png' | relative_url }}">
 <script>document.documentElement.classList.add('docs-js');</script>
 {% if site.docs_preview %}<meta name="robots" content="noindex, nofollow, noarchive">{% endif %}
-{% if site.docs_build_id %}<meta name="docs-build-id" content="{{ site.docs_build_id }}"><meta name="docs-source-sha" content="{{ site.docs_source_sha }}">{% endif %}
+{% assign docs_source_sha = site.docs_source_sha | default: site.github.build_revision %}{% assign docs_build_id = site.docs_build_id %}{% if docs_source_sha and docs_build_id == nil %}{% assign source_short = docs_source_sha | slice: 0, 12 %}{% assign docs_build_id = 'docs-' | append: source_short %}{% endif %}
+{% if docs_build_id %}<meta name="docs-build-id" content="{{ docs_build_id }}"><meta name="docs-source-sha" content="{{ docs_source_sha }}">{% endif %}
 <link rel="stylesheet" href="{{ '/assets/css/docs.css' | relative_url }}">
 <script src="{{ '/assets/js/docs.js' | relative_url }}" defer></script>

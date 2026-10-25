@@ -3,6 +3,8 @@
 //
 // node scripts/docs-crawl.mjs <root> --manifest scripts/docs-route-contract.json
 // node scripts/docs-crawl.mjs <preview-root> --preview --build-id docs-<source>
+// node scripts/docs-crawl.mjs <production-root> --build-id docs-<source> --source-sha <sha>
+// node scripts/docs-crawl.mjs <legacy-root> --legacy --source-sha <archived-sha>
 //
 // The default Just the Docs search index is mandatory. --search-index can name
 // another site-relative JSON index. Private paths must return real HTTP 404s.
@@ -64,7 +66,9 @@ async function main() {
 		expect: { type: "string" },
 		manifest: { type: "string" },
 		preview: { type: "boolean", default: false },
+		legacy: { type: "boolean", default: false },
 		"build-id": { type: "string" },
+		"source-sha": { type: "string" },
 		"search-index": { type: "string", default: "assets/js/search-data.json" }
 	} });
 	const root = positionals[0];
@@ -73,6 +77,8 @@ async function main() {
 	}
 	const base = new URL(root.endsWith("/") ? root : `${root}/`);
 	if (base.hash || base.search) throw new Error("Site root must not contain a query or fragment");
+	if (values.preview && values.legacy) throw new Error("Choose preview or legacy identity, not both");
+	if (values["source-sha"] && !/^[a-f0-9]{40}$/.test(values["source-sha"])) throw new Error("--source-sha must be a full 40-character commit SHA");
 	const contract = readContract(values.manifest);
 	const seen = new Map();
 	const pending = new Map();
@@ -83,10 +89,13 @@ async function main() {
 	const expected = new Map();
 	let htmlBuildId = values["build-id"] ?? null;
 	let buildManifest = null;
+	const archiveScopes = new Map();
+	const nestedArchive = new URL("legacy/", base);
 	const isInternal = url => url.origin === base.origin && url.pathname.startsWith(base.pathname);
+	const isNestedArchive = url => !values.legacy && isInternal(url) && url.pathname.startsWith(nestedArchive.pathname);
 	const isPrivate = url => {
 		const relative = decodeURIComponent(url.pathname.slice(base.pathname.length));
-		return /^(?:release(?:\/|$)|README\.html$)/i.test(relative);
+		return /(?:^|\/)(?:release(?:\/|$)|README\.html$)/i.test(relative);
 	};
 	const absolute = (value, from = base.href) => {
 		const target = new URL(value, from);
@@ -173,6 +182,75 @@ async function main() {
 		else if (image && asset.html) problems.push(`${from}: image ${target.pathname} returned HTML`);
 	}
 
+	async function readIdentity(scope, kind, expectedBuild, expectedSource) {
+		const archived = kind === "documentation-legacy";
+		const filename = archived ? "legacy-build.json" : "docs-build.json";
+		const url = new URL(filename, scope).href;
+		const response = await fetchPage(url);
+		if (response.status !== 200) { problems.push(`${url}: HTTP ${response.status}`); return null; }
+		let manifest;
+		try { manifest = JSON.parse(response.text); }
+		catch { problems.push(`${url}: invalid JSON build manifest`); return null; }
+		const prefix = archived ? "legacy-" : "docs-";
+		if (manifest.kind !== kind || !/^[a-f0-9]{40}$/.test(manifest.source_commit ?? "") || manifest.build_id !== `${prefix}${manifest.source_commit?.slice(0, 12)}`) {
+			problems.push(`${url}: invalid ${kind} build identity`);
+		}
+		if (expectedBuild && manifest.build_id !== expectedBuild) problems.push(`${url}: expected build ${expectedBuild}, got ${manifest.build_id}`);
+		if (expectedSource && manifest.source_commit !== expectedSource) problems.push(`${url}: source commit does not match expected ${expectedSource}`);
+		return manifest;
+	}
+
+	async function checkSearch(scope, archived = false, index = "assets/js/search-data.json") {
+		const searchUrl = absolute(index, scope.href);
+		const within = target => target.origin === base.origin && target.pathname.startsWith(scope.pathname);
+		if (!within(searchUrl)) { problems.push(`${searchUrl.href}: search index escapes its edition`); return; }
+		const search = await fetchPage(searchUrl.href);
+		if (search.status !== 200) { problems.push(`${searchUrl.href}: search index HTTP ${search.status}`); return; }
+		try {
+			const data = JSON.parse(search.text);
+			const strings = [];
+			const collect = value => {
+				if (typeof value === "string") strings.push(value);
+				else if (value && typeof value === "object") Object.values(value).forEach(collect);
+			};
+			collect(data);
+			scanLeaks(searchUrl.href, strings.join("\n"));
+			const records = data && typeof data === "object" ? Object.values(data) : [];
+			if (!records.length) problems.push(`${searchUrl.href}: search index is empty`);
+			for (const record of records) {
+				if (!record || typeof record.url !== "string") { problems.push(`${searchUrl.href}: search record has no URL`); continue; }
+				let target;
+				try { target = absolute(record.url, scope.href); }
+				catch { problems.push(`${searchUrl.href}: invalid result URL ${record.url}`); continue; }
+				if (!within(target)) { problems.push(`${searchUrl.href}: search result escapes site base ${record.url}`); continue; }
+				if (!archived && isNestedArchive(target)) { problems.push(`${searchUrl.href}: current search indexes legacy content ${record.url}`); continue; }
+				if (isPrivate(target)) problems.push(`${searchUrl.href}: indexes private path ${target.pathname}`);
+				await checkLink(searchUrl.href, target.href, "search anchor");
+			}
+		} catch { problems.push(`${searchUrl.href}: invalid JSON search index`); }
+	}
+
+	async function archiveAt(scope, expectedBuild, expectedSource) {
+		if (archiveScopes.has(scope.href)) return archiveScopes.get(scope.href);
+		const manifest = await readIdentity(scope, "documentation-legacy", expectedBuild, expectedSource);
+		archiveScopes.set(scope.href, manifest);
+		const validInventory = manifest?.schema === 1 && manifest.source_repository === "slawrensen/hwinfo-streamdeck" && Array.isArray(manifest.routes) && manifest.routes.length > 0;
+		if (manifest && !validInventory) problems.push(`${scope.href}: invalid legacy route manifest; schema 1, source repository and a nonempty routes array are required`);
+		for (const route of validInventory ? manifest.routes : []) {
+			if (!route || typeof route.path !== "string" || !Array.isArray(route.anchors) || route.anchors.some(anchor => typeof anchor !== "string")) {
+				problems.push(`${scope.href}: malformed legacy route manifest`); continue;
+			}
+			const target = new URL(route.path, scope);
+			if (target.origin !== base.origin || !target.pathname.startsWith(scope.pathname) || target.search || target.hash || isPrivate(target)) {
+				problems.push(`${scope.href}: legacy route escapes its public archive: ${route.path}`); continue;
+			}
+			expected.set(target.href, [...new Set([...(expected.get(target.href) ?? []), ...route.anchors])]);
+			enqueue(target);
+		}
+		await checkSearch(scope, true);
+		return manifest;
+	}
+
 	const first = await fetchPage(base.href);
 	for (const tag of tags(first.html)) {
 		if (tag.name === "link" && tag.attributes.rel === "canonical" && tag.attributes.href) {
@@ -189,49 +267,13 @@ async function main() {
 		enqueue(target);
 	}
 
-	if (values.preview) {
-		const url = new URL("docs-build.json", base).href;
-		const response = await fetchPage(url);
-		if (response.status !== 200) problems.push(`${url}: HTTP ${response.status}`);
-		else {
-			try {
-				buildManifest = JSON.parse(response.text);
-				if (buildManifest.kind !== "documentation-preview" || !/^docs-[a-f0-9]{12}$/.test(buildManifest.build_id ?? "") || !/^[a-f0-9]{40}$/.test(buildManifest.source_commit ?? "")) {
-					problems.push(`${url}: invalid preview build identity`);
-				}
-				if (buildManifest.build_id !== `docs-${buildManifest.source_commit?.slice(0, 12)}`) problems.push(`${url}: build ID does not match source commit`);
-				if (htmlBuildId && htmlBuildId !== buildManifest.build_id) problems.push(`${url}: expected build ${htmlBuildId}, got ${buildManifest.build_id}`);
-				htmlBuildId ??= buildManifest.build_id;
-			} catch { problems.push(`${url}: invalid JSON build manifest`); }
-		}
-	}
-
-	const searchUrl = absolute(values["search-index"]);
-	if (!isInternal(searchUrl)) throw new Error("Search index must be under the site root");
-	const search = await fetchPage(searchUrl.href);
-	if (search.status !== 200) problems.push(`${searchUrl.href}: search index HTTP ${search.status}`);
+	if (values.legacy) await archiveAt(base, htmlBuildId, values["source-sha"]);
 	else {
-		try {
-			const data = JSON.parse(search.text);
-			const strings = [];
-			const collect = value => {
-				if (typeof value === "string") strings.push(value);
-				else if (value && typeof value === "object") Object.values(value).forEach(collect);
-			};
-			collect(data);
-			scanLeaks(searchUrl.href, strings.join("\n"));
-			const records = data && typeof data === "object" ? Object.values(data) : [];
-			if (!records.length) problems.push(`${searchUrl.href}: search index is empty`);
-			for (const record of records) {
-				if (!record || typeof record.url !== "string") { problems.push(`${searchUrl.href}: search record has no URL`); continue; }
-				let target;
-				try { target = absolute(record.url); }
-				catch { problems.push(`${searchUrl.href}: invalid result URL ${record.url}`); continue; }
-				if (!isInternal(target)) { problems.push(`${searchUrl.href}: search result escapes site base ${record.url}`); continue; }
-				if (isPrivate(target)) problems.push(`${searchUrl.href}: indexes private path ${target.pathname}`);
-				await checkLink(searchUrl.href, target.href, "search anchor");
-			}
-		} catch { problems.push(`${searchUrl.href}: invalid JSON search index`); }
+		if (values.preview || htmlBuildId || values["source-sha"]) {
+			buildManifest = await readIdentity(base, values.preview ? "documentation-preview" : "documentation-production", htmlBuildId, values["source-sha"]);
+			htmlBuildId ??= buildManifest?.build_id;
+		}
+		await checkSearch(base, false, values["search-index"]);
 	}
 
 	while (queue.length) {
@@ -249,12 +291,21 @@ async function main() {
 		const present = ids(page.html);
 		for (const anchor of expected.get(url) ?? []) if (!present.has(anchor)) problems.push(`${url}: required legacy anchor #${anchor} not on the page`);
 		const elements = tags(page.html);
-		if (values.preview) {
-			const meta = new Map(elements.filter(tag => tag.name === "meta").map(tag => [tag.attributes.name?.toLowerCase(), tag.attributes.content ?? ""]));
-			if (!/(?:^|[\s,])noindex(?:[\s,]|$)/i.test(meta.get("robots") ?? "")) problems.push(`${url}: preview robots meta is missing noindex`);
-			if (!meta.get("docs-build-id") || meta.get("docs-build-id") !== htmlBuildId) problems.push(`${url}: preview build meta does not match ${htmlBuildId ?? "a verified build"}`);
-			if (buildManifest && meta.get("docs-source-sha") !== buildManifest.source_commit) problems.push(`${url}: preview source meta does not match build manifest`);
-			if (!page.html.includes("Documentation preview")) problems.push(`${url}: preview marker is missing`);
+		const meta = new Map(elements.filter(tag => tag.name === "meta").map(tag => [tag.attributes.name?.toLowerCase(), tag.attributes.content ?? ""]));
+		const noindex = /(?:^|[\s,])noindex(?:[\s,]|$)/i.test(meta.get("robots") ?? "");
+		if (values.legacy || isNestedArchive(new URL(url))) {
+			const archived = await archiveAt(values.legacy ? base : nestedArchive, values.legacy ? htmlBuildId : null, values.legacy ? values["source-sha"] : null);
+			if (!noindex) problems.push(`${url}: legacy robots meta is missing noindex`);
+			if (!archived || meta.get("docs-legacy-build-id") !== archived.build_id) problems.push(`${url}: legacy build meta does not match archive manifest`);
+			if (!archived || meta.get("docs-legacy-source-sha") !== archived.source_commit) problems.push(`${url}: legacy source meta does not match archive manifest`);
+			if (!page.html.includes("Legacy documentation")) problems.push(`${url}: legacy marker is missing`);
+		} else {
+			if (values.preview) {
+				if (!noindex) problems.push(`${url}: preview robots meta is missing noindex`);
+				if (!page.html.includes("Documentation preview")) problems.push(`${url}: preview marker is missing`);
+			} else if (buildManifest && noindex) problems.push(`${url}: current production page must be indexable, found noindex`);
+			if ((values.preview || htmlBuildId) && (!meta.get("docs-build-id") || meta.get("docs-build-id") !== htmlBuildId)) problems.push(`${url}: ${values.preview ? "preview" : "production"} build meta does not match ${htmlBuildId ?? "a verified build"}`);
+			if (buildManifest && meta.get("docs-source-sha") !== buildManifest.source_commit) problems.push(`${url}: ${values.preview ? "preview" : "production"} source meta does not match build manifest`);
 		}
 		for (const tag of elements) if (tag.name === "a" && tag.attributes.href) await checkLink(url, tag.attributes.href);
 		const assets = [];
@@ -275,9 +326,12 @@ async function main() {
 		}
 	}
 
-	for (const relative of PRIVATE) {
-		const response = await fetchPage(new URL(relative, base).href);
-		if (response.status !== 404) problems.push(`private path ${relative}: HTTP ${response.status}, expected 404`);
+	for (const scope of new Set([base.href, ...archiveScopes.keys()])) {
+		for (const relative of PRIVATE) {
+			const target = new URL(relative, scope);
+			const response = await fetchPage(target.href);
+			if (response.status !== 404) problems.push(`private path ${target.pathname}: HTTP ${response.status}, expected 404`);
+		}
 	}
 	const pages = [...seen.entries()].filter(([, entry]) => entry.html && entry.status === 200);
 	console.log(`crawled ${pages.length} pages, ${seen.size} URLs under ${base.href}`);
@@ -287,7 +341,7 @@ async function main() {
 		for (const problem of problems) console.error(`  ${problem}`);
 		process.exitCode = 1;
 	} else {
-		console.log(`\nDOCS CRAWL: no broken links, images or anchors; private paths answer 404; search index checked${values.manifest ? "; route contract checked" : ""}${values.preview ? `; preview build ${htmlBuildId} checked` : ""}`);
+		console.log(`\nDOCS CRAWL: no broken links, images or anchors; private paths answer 404; search index checked${values.manifest ? "; route contract checked" : ""}${!values.legacy && htmlBuildId ? `; ${values.preview ? "preview" : "production"} build ${htmlBuildId} checked` : ""}${archiveScopes.size ? `; ${archiveScopes.size} legacy archive identity/search checked` : ""}`);
 	}
 }
 

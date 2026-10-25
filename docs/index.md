@@ -24,7 +24,7 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
     </picture>
     <span class="image-hint" aria-hidden="true">View complete image ↗</span>
   </a>
-  <figcaption>Live Stream Deck app capture. Midnight keys and transparent Tint dials. <span class="image-credit">Cosmic Cliffs: NASA, ESA, CSA, STScI.</span></figcaption>
+  <figcaption>Live Stream Deck app capture. Midnight keys and transparent Tint dials. <span class="image-credit">Cosmic Cliffs: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>. <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped for the strip.</span></figcaption>
 </figure>
 
 <section class="home-showcase" aria-labelledby="what-it-does">
@@ -40,7 +40,7 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
     </figure>
     <figure>
       <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/dial-backgrounds-strip.jpg' | relative_url }}" aria-label="Enlarge transparent background examples"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/backgrounds-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/backgrounds-detail.jpg' | relative_url }}" width="621" height="332" loading="lazy" decoding="async" alt="Separate dial slots over space, aurora and pale backgrounds in the Stream Deck app."></picture></a>
-      <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Space imagery: NASA, ESA, CSA, STScI.</span></p></figcaption>
+      <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Cosmic Cliffs: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped. Auroras: NASA.</span></p></figcaption>
     </figure>
   </div>
 </section>

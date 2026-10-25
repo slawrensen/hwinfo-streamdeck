@@ -15,7 +15,7 @@
 	--sidebar: 252px;
 	--brand-size: 72px;
 	--workspace-max: 1920px;
-	--article-measure: 72ch;
+	--article-measure: 88ch;
 	--table-measure: 960px;
 	--reference-measure: 1280px;
 	--page-gutter: clamp(28px, 3vw, 64px);

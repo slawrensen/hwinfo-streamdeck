@@ -279,7 +279,10 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 		assert.ok(Math.abs(dimensions.navigationGap) <= 2, "navigation remains attached to the content workspace");
 		assert.ok(dimensions.tocGap >= 24 && dimensions.tocGap <= 64 && dimensions.tocWidth >= 180, "page contents stays beside the article with readable link width");
 		assert.ok(image.width > dimensions.prose * 1.3, "the complete deck capture must not be trapped in the prose column");
-		assert.ok(dimensions.font >= 16 && dimensions.prose <= dimensions.character * 80 + 1, "body copy stays at a readable size and line length");
+		// CSS ch is a zero-glyph width, not a literal count of characters per line.
+		assert.ok(dimensions.font >= 17 && dimensions.prose >= dimensions.character * 80 - 1
+			&& dimensions.prose <= dimensions.character * 90 + 1,
+		"body copy uses the wider reading column without shrinking its text or becoming unbounded");
 		assert.ok(Math.abs(image.width / image.height - image.ratio) < 0.01, "the authentic deck image keeps its aspect ratio");
 		assert.equal(dimensions.pageOverflow, false, "the expanded article must not create horizontal page scrolling");
 		const readout = page.locator(".main-content .table-wrapper").filter({ has: page.getByRole("columnheader", { name: "Element", exact: true }) });
@@ -289,6 +292,48 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 3440, height: 14
 		assert.ok(table.scroll <= table.client + 1, "the ordinary readout table needs no sideways panning on desktop");
 		const reference = await page.locator(".reference-table").evaluate(element => element.closest(".table-wrapper").getBoundingClientRect().width);
 		assert.ok(reference >= table.width && reference <= 1281, "the settings matrix can use extra width without becoming unbounded");
+	});
+}
+
+for (const viewport of [
+	{ width: 640, height: 400 }, { width: 768, height: 1024 }, { width: 1280, height: 800 },
+	{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 3440, height: 1440 }
+]) {
+	test(`article prose uses available width and remains bounded at ${viewport.width}px`, options, async t => {
+		// 640 CSS px exercises the reflow width of a 1280px window at 200% zoom;
+		// it does not claim to change the browser's actual zoom setting.
+		const page = await pageFor(t, { viewport });
+		for (const route of ["hardware.html", "data-sources.html"]) {
+			await page.goto(siteUrl(route));
+			const geometry = await page.locator(".main-content").evaluate(async content => {
+				await document.fonts.ready;
+				const prose = [...content.querySelectorAll(":scope > p")].find(element => element.textContent.length > 100 && !element.querySelector("img, picture"));
+				const style = window.getComputedStyle(prose);
+				const context = document.createElement("canvas").getContext("2d");
+				context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+				const article = content.getBoundingClientRect();
+				const paragraph = prose.getBoundingClientRect();
+				return {
+					article: { width: article.width, left: article.left, right: article.right },
+					prose: { width: paragraph.width, left: paragraph.left, right: paragraph.right },
+					zeroGlyph: context.measureText("0").width,
+					fontSize: Number.parseFloat(style.fontSize),
+					lineHeight: Number.parseFloat(style.lineHeight),
+					viewportWidth: window.innerWidth,
+					pageOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
+				};
+			});
+			assert.ok(geometry.fontSize >= 17 && geometry.lineHeight >= geometry.fontSize * 1.5,
+				`${route}: the wider column preserves comfortable text size and line spacing`);
+			assert.ok(geometry.prose.width >= Math.min(geometry.article.width, geometry.zeroGlyph * 80) - 1,
+				`${route}: prose uses the available width and grows beyond the previous narrow column when space permits`);
+			assert.ok(geometry.prose.width <= Math.min(geometry.article.width, geometry.zeroGlyph * 90) + 1,
+				`${route}: prose remains bounded independently of wider technical tables`);
+			assert.ok(geometry.prose.left >= geometry.article.left - 1 && geometry.prose.right <= geometry.article.right + 1
+				&& geometry.article.left >= 0 && geometry.article.right <= geometry.viewportWidth + 1,
+				`${route}: paragraphs and the article fit their available viewport`);
+			assert.equal(geometry.pageOverflow, false, `${route}: reflow must not introduce horizontal page scrolling`);
+		}
 	});
 }
 

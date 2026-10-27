@@ -67,8 +67,21 @@ The shared prose cap is `48rem` (768px at the default root size), with 19px desk
 
 The measure follows the distinction between prose and wider reference content in [GOV.UK layout guidance](https://design-system.service.gov.uk/styles/layout/) and [USWDS typography guidance](https://designsystem.digital.gov/components/typography/). It is a measured choice for these reference pages, not a claim of universal optimal line length or full accessibility conformance.
 
-The homepage gallery uses five maintainer-supplied app captures. `node scripts/docs-gallery-images.mjs` reproduces native 830 × 450 PNG and lossless WebP crops from the retained masters and checks decoded pixel equality. `assets/img/showcase/gallery/provenance.json` records hashes, crop coordinates, matching key and touch-strip geometry, and the limits of background-image provenance. Do not offer those composited screenshots as clean background downloads.
+The homepage gallery presents five production-renderer samples in this order: Cyan, Green night, Violet, Amber, Green aurora. Their backgrounds and graph histories are illustrative reconstructions; they are not recovered live telemetry. Each caption labels the sample and provides an independent **Original capture** lightbox link for comparison. Keep those references outside the `home-looks` image group so sample navigation stays coherent.
 
-Gallery arrows and Expand stay below the image; nothing overlays the capture. The native dialog keeps navigation outside the image stage, offers Fit and Actual size, and reserves arrow keys for panning at Actual size. Group links use `data-image-group`; source attribution can use `data-image-credit`, `data-image-credit-url`, `data-image-license` and `data-image-license-url`. Credit is shown separately from the shortened image description. Normal full-image links and all gallery slides remain available without JavaScript.
+Samples live in `assets/img/showcase/gallery/rendered/`. Each keeps the same 830 × 450 layout, with responsive 830px, 1660px and 2490px WebP candidates for inline display. The lightbox loads the 4980 × 2700 WebP only when requested. The committed SVG and full-resolution lossless WebP are the durable masters for each look. The workflow retains the original Chromium PNG captures as QA artifacts and verifies that the 4980px WebP decodes to exactly the same pixels. Render text, keys and dial faces through the production renderers; do not enlarge screenshot pixels to manufacture detail.
+
+To reproduce the samples after installing the locked dependencies, run on Windows with installed Tahoma Bold and Chrome:
+
+```sh
+npx --no-install tsx scripts/docs-gallery-render.mjs --out .gallery-render-work
+npx --no-install tsx scripts/docs-gallery-raster.mjs --input .gallery-render-work --output .gallery-render-work/final
+```
+
+Use a fresh, empty output directory. The rasterizer verifies the installed font used for the rendered glyphs and checks its advances against the production Tahoma profile; no font files are bundled. Before publishing, require `verification.publishable: true` and `verification.status: "verified-windows-tahoma"` in the output `provenance.json`. `--allow-font-fallback` is for local inspection and always produces an unpublishable result. The `docs-gallery-render` workflow retains the generated assets, PNG captures and provenance together for QA.
+
+The five maintainer-supplied app captures remain unchanged. `node scripts/docs-gallery-images.mjs` reproduces their native 830 × 450 PNG and lossless WebP crops from the retained masters and checks decoded pixel equality. `assets/img/showcase/gallery/provenance.json` records their hashes, crop coordinates, matching key and touch-strip geometry, and the limits of background-image provenance. Do not offer composited screenshots or reconstructed sample scenery as the original clean background files.
+
+Gallery arrows and Expand stay below the image; nothing overlays the image. The native dialog keeps navigation outside the image stage, offers Fit and Actual size, and reserves arrow keys for panning at Actual size. Group links use `data-image-group`; source attribution can use `data-image-credit`, `data-image-credit-url`, `data-image-license` and `data-image-license-url`. Credit is shown separately from the shortened image description. Normal full-image links and all gallery slides remain available without JavaScript.
 
 Documentation validation does not qualify a plugin release. Windows/HWiNFO installation, physical-device checks, signing, private release-runbook gates and fresh manual VirusTotal validation remain separate.

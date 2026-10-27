@@ -1,0 +1,2178 @@
+{
+	"look": "amber-dusk",
+	"source": "docs/assets/img/showcase/gallery/amber-dusk.png",
+	"theme": "ember",
+	"themeEvidence": "Repeated exact RGB matches to every shipped Ember key-palette token; type accents are off. Dial values/labels approach #FFB84D and units are dimmed, consistent with Outline and theme text, accentWords=false.",
+	"palette": {
+		"bg": "#000000",
+		"label": "#A47632",
+		"value": "#FFB84D",
+		"unit": "#926E35",
+		"accent": "#E0912F",
+		"track": "#1E1305"
+	},
+	"geometry": {
+		"canvas": [
+			830,
+			450
+		],
+		"keyOuterSize": 78,
+		"keyPitch": 94,
+		"columns": 9,
+		"rows": 4,
+		"keyOuterRadiusApprox": 17,
+		"keyRendererSize": [
+			144,
+			144
+		],
+		"keyFaceBoundsRelative": [
+			3,
+			3,
+			72,
+			72
+		],
+		"frame": "#2D2D2D",
+		"border": "#474747",
+		"stripOuterBounds": [
+			0,
+			376,
+			830,
+			74
+		],
+		"stripInsetApprox": 3,
+		"stripRendererSize": [
+			1200,
+			100
+		],
+		"stripNativeSegmentSize": [
+			200,
+			100
+		]
+	},
+	"values": {
+		"cpuTemp": [
+			"CPU Temp",
+			"57.4",
+			"°C"
+		],
+		"ccd1Temp": [
+			"CCD1 Temp",
+			"50.3",
+			"°C"
+		],
+		"cpuPower": [
+			"CPU Power",
+			"67.5",
+			"W"
+		],
+		"cpuLoad": [
+			"CPU Load",
+			"6.07",
+			"%"
+		],
+		"memory": [
+			"Memory",
+			"75.6",
+			"%"
+		],
+		"gpuTemp": [
+			"GPU Temp",
+			"44.9",
+			"°C"
+		],
+		"vramTemp": [
+			"VRAM Temp",
+			"58.0",
+			"°C"
+		],
+		"gpuPower": [
+			"GPU Power",
+			"53.9",
+			"W"
+		],
+		"gpuLoad": [
+			"GPU Load",
+			"7.00",
+			"%"
+		],
+		"gpuClock": [
+			"GPU Clock",
+			"1267",
+			"MHz"
+		],
+		"gpuFan": [
+			"GPU Fan",
+			"0.00",
+			"RPM"
+		],
+		"pump": [
+			"Pump",
+			"1762",
+			"RPM"
+		],
+		"fps": [
+			"FPS",
+			"117",
+			"FPS"
+		],
+		"download": [
+			"Download",
+			"171",
+			"kbps"
+		],
+		"upload": [
+			"Upload",
+			"67.7",
+			"kbps"
+		]
+	},
+	"keys": [
+		{
+			"row": 0,
+			"column": 0,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "57.4",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				0,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.79,
+				0.7842,
+				0.7483,
+				0.726,
+				0.6067,
+				0.5168,
+				0.3206,
+				0.1462,
+				0.1144,
+				0.1147,
+				0.0,
+				0.1356,
+				0.7136,
+				1.0,
+				0.8123,
+				0.5922,
+				0.5541,
+				0.5653,
+				0.4839,
+				0.3308,
+				0.2427,
+				0.172,
+				0.1389,
+				0.2338,
+				0.3777,
+				0.5622,
+				0.5441,
+				0.4525,
+				0.5779,
+				0.67,
+				0.5469,
+				0.4024,
+				0.3373,
+				0.282,
+				0.1073,
+				0.097
+			]
+		},
+		{
+			"row": 0,
+			"column": 1,
+			"sensor": "ccd1Temp",
+			"label": "CCD1 Temp",
+			"valueText": "50.3",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				94,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.1475,
+				0.5743,
+				0.907,
+				0.7564,
+				0.46,
+				0.3851,
+				0.3083,
+				0.5415,
+				0.2808,
+				0.0162,
+				0.2495,
+				0.6891,
+				1.0,
+				0.3575,
+				0.722,
+				0.6962,
+				0.4937,
+				0.4016,
+				0.3429,
+				0.1458,
+				0.0,
+				0.3107,
+				0.5961,
+				0.4412,
+				0.6382,
+				0.699,
+				0.5316,
+				0.6287,
+				0.7489,
+				0.6981,
+				0.2808,
+				0.4004,
+				0.5341,
+				0.1286,
+				0.3806,
+				0.4457
+			]
+		},
+		{
+			"row": 0,
+			"column": 2,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "67.5",
+			"unitText": "W",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.1275,
+			"gaugeFitError": 2.410293244869023e-06
+		},
+		{
+			"row": 0,
+			"column": 3,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "6.07",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				282,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.060700000000000004
+		},
+		{
+			"row": 0,
+			"column": 4,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "75.6",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				376,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.7559999999999999
+		},
+		{
+			"row": 0,
+			"column": 5,
+			"sensor": "gpuTemp",
+			"label": "GPU Temp",
+			"valueText": "44.9",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				470,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.008,
+				0.0607,
+				0.1847,
+				0.0855,
+				0.0712,
+				0.0966,
+				0.0036,
+				0.017,
+				0.1988,
+				0.2782,
+				0.047,
+				0.1767,
+				0.52,
+				0.2525,
+				0.3336,
+				0.3978,
+				0.3672,
+				0.1733,
+				0.156,
+				0.1929,
+				0.0893,
+				0.0,
+				0.1223,
+				0.4069,
+				0.9669,
+				1.0,
+				0.5644,
+				0.5197,
+				0.2723,
+				0.4406,
+				0.3308,
+				0.1955,
+				0.1977,
+				0.2493,
+				0.4343,
+				0.3986
+			]
+		},
+		{
+			"row": 0,
+			"column": 6,
+			"sensor": "vramTemp",
+			"label": "VRAM Temp",
+			"valueText": "58.0",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5,
+				0.5
+			],
+			"traceNote": "The source VRAM graph is flat. Endpoint-cap sampling artifacts were excluded rather than normalized into a false trend."
+		},
+		{
+			"row": 0,
+			"column": 7,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "53.9",
+			"unitText": "W",
+			"display": "bar",
+			"outerBounds": [
+				658,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.124,
+			"gaugeFitError": 2.524563348809888e-06
+		},
+		{
+			"row": 0,
+			"column": 8,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "7.00",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.07
+		},
+		{
+			"row": 1,
+			"column": 0,
+			"sensor": "gpuClock",
+			"label": "GPU Clock",
+			"valueText": "1267",
+			"unitText": "MHz",
+			"display": "spark",
+			"outerBounds": [
+				0,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.0348,
+				0.124,
+				0.1745,
+				0.1366,
+				0.0919,
+				0.1272,
+				0.1015,
+				0.0633,
+				0.0917,
+				0.0818,
+				0.1019,
+				0.369,
+				0.8315,
+				0.3877,
+				0.1907,
+				0.1563,
+				0.1179,
+				0.0308,
+				0.0634,
+				0.0477,
+				0.1082,
+				0.0,
+				0.0076,
+				0.2951,
+				0.9158,
+				1.0,
+				0.5332,
+				0.2125,
+				0.1489,
+				0.1211,
+				0.1071,
+				0.0895,
+				0.0814,
+				0.0279,
+				0.0424,
+				0.0866
+			]
+		},
+		{
+			"row": 1,
+			"column": 1,
+			"sensor": "gpuFan",
+			"label": "GPU Fan",
+			"valueText": "0.00",
+			"unitText": "RPM",
+			"display": "bar",
+			"outerBounds": [
+				94,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0,
+			"gaugeFitError": 0
+		},
+		{
+			"row": 1,
+			"column": 2,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1762",
+			"unitText": "RPM",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0.464,
+			"gaugeFitError": 2.698181225994286e-06
+		},
+		{
+			"row": 1,
+			"column": 3,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "117",
+			"unitText": "FPS",
+			"display": "spark",
+			"outerBounds": [
+				282,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.1786,
+				0.2656,
+				0.3686,
+				0.2527,
+				0.2973,
+				0.2446,
+				0.3523,
+				0.3653,
+				0.6084,
+				0.4458,
+				0.3795,
+				0.3252,
+				1.0,
+				0.5913,
+				0.8286,
+				0.2803,
+				0.5543,
+				0.2743,
+				0.3901,
+				0.1331,
+				0.2637,
+				0.0,
+				0.1818,
+				0.0927,
+				0.8328,
+				0.9939,
+				0.7,
+				0.5524,
+				0.6563,
+				0.8929,
+				0.3096,
+				0.406,
+				0.3195,
+				0.24,
+				0.1733,
+				0.2129
+			]
+		},
+		{
+			"row": 1,
+			"column": 4,
+			"sensor": "download",
+			"label": "Download",
+			"valueText": "171",
+			"unitText": "kbps",
+			"display": "spark",
+			"outerBounds": [
+				376,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.9525,
+				0.3799,
+				0.0076,
+				0.3554,
+				0.9666,
+				0.3919,
+				0.0,
+				0.3915,
+				0.9897,
+				0.4509,
+				0.0137,
+				0.302,
+				0.8732,
+				0.2667,
+				0.0006,
+				0.336,
+				0.967,
+				0.4563,
+				0.0036,
+				0.375,
+				0.9069,
+				0.3472,
+				0.0,
+				0.3612,
+				1.0,
+				0.3363,
+				0.0013,
+				0.3244,
+				0.913,
+				0.3534,
+				0.0,
+				0.0442,
+				0.4925,
+				0.9159,
+				0.2171,
+				0.0178
+			]
+		},
+		{
+			"row": 1,
+			"column": 5,
+			"sensor": "upload",
+			"label": "Upload",
+			"valueText": "67.7",
+			"unitText": "kbps",
+			"display": "spark",
+			"outerBounds": [
+				470,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				1.0,
+				0.3548,
+				0.0418,
+				0.0549,
+				0.1449,
+				0.0525,
+				0.0448,
+				0.0596,
+				0.1589,
+				0.0614,
+				0.0426,
+				0.0533,
+				0.1517,
+				0.0478,
+				0.0415,
+				0.0665,
+				0.2763,
+				0.085,
+				0.0405,
+				0.0551,
+				0.1572,
+				0.0634,
+				0.0455,
+				0.0501,
+				0.1462,
+				0.0462,
+				0.0436,
+				0.0533,
+				0.161,
+				0.1313,
+				0.0449,
+				0.046,
+				0.0654,
+				0.1434,
+				0.0,
+				0.0589
+			]
+		},
+		{
+			"row": 1,
+			"column": 6,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "67.5",
+			"unitText": "W",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.5265,
+				0.6262,
+				0.8108,
+				0.81,
+				0.6873,
+				0.4443,
+				0.2658,
+				0.1306,
+				0.1588,
+				0.2898,
+				0.113,
+				0.2335,
+				0.8848,
+				0.5667,
+				0.2342,
+				0.4139,
+				0.7996,
+				0.7141,
+				0.4235,
+				0.2079,
+				0.1451,
+				0.164,
+				0.1776,
+				0.3606,
+				0.5959,
+				1.0,
+				0.812,
+				0.5091,
+				0.7638,
+				0.9293,
+				0.5156,
+				0.1168,
+				0.0,
+				0.2438,
+				0.0799,
+				0.0441
+			]
+		},
+		{
+			"row": 1,
+			"column": 7,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "53.9",
+			"unitText": "W",
+			"display": "spark",
+			"outerBounds": [
+				658,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.0556,
+				0.1139,
+				0.1318,
+				0.0857,
+				0.0978,
+				0.0491,
+				0.0793,
+				0.0608,
+				0.0607,
+				0.0159,
+				0.0332,
+				0.3127,
+				0.7972,
+				0.3818,
+				0.2413,
+				0.1582,
+				0.2151,
+				0.0476,
+				0.0785,
+				0.0208,
+				0.0574,
+				0.0262,
+				0.0401,
+				0.1824,
+				0.7296,
+				1.0,
+				0.4622,
+				0.2073,
+				0.1551,
+				0.219,
+				0.1022,
+				0.0232,
+				0.0201,
+				0.0157,
+				0.0,
+				0.0609
+			]
+		},
+		{
+			"row": 1,
+			"column": 8,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "57.4",
+			"unitText": "°C",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0.136,
+			"gaugeFitError": 5.4262535184594954e-05
+		},
+		{
+			"row": 2,
+			"column": 0,
+			"sensor": "ccd1Temp",
+			"label": "CCD1 Temp",
+			"valueText": "50.3",
+			"unitText": "°C",
+			"display": "bar",
+			"outerBounds": [
+				0,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.308,
+			"gaugeFitError": 2.5144723536335076e-06
+		},
+		{
+			"row": 2,
+			"column": 1,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "6.07",
+			"unitText": "%",
+			"display": "spark",
+			"outerBounds": [
+				94,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.5206,
+				0.941,
+				0.8912,
+				0.6156,
+				0.4467,
+				0.2818,
+				0.1936,
+				0.0,
+				0.1023,
+				0.1857,
+				0.0456,
+				0.5121,
+				1.0,
+				0.4386,
+				0.7615,
+				0.7769,
+				0.9007,
+				0.6756,
+				0.3105,
+				0.2168,
+				0.1884,
+				0.1505,
+				0.4012,
+				0.3802,
+				0.382,
+				0.8197,
+				0.6109,
+				0.452,
+				0.7698,
+				0.8651,
+				0.4811,
+				0.2194,
+				0.2085,
+				0.1826,
+				0.4747,
+				0.5987
+			]
+		},
+		{
+			"row": 2,
+			"column": 2,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "75.6",
+			"unitText": "%",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.7559999999999999
+		},
+		{
+			"row": 2,
+			"column": 3,
+			"sensor": "vramTemp",
+			"label": "VRAM Temp",
+			"valueText": "58.0",
+			"unitText": "°C",
+			"display": "ring",
+			"outerBounds": [
+				282,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.4665,
+			"gaugeFitError": 0.0005012060119589329
+		},
+		{
+			"row": 2,
+			"column": 4,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "7.00",
+			"unitText": "%",
+			"display": "spark",
+			"outerBounds": [
+				376,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.1975,
+				0.1223,
+				0.2,
+				0.1622,
+				0.2034,
+				0.1474,
+				0.1148,
+				0.1148,
+				0.1148,
+				0.115,
+				0.1663,
+				0.3796,
+				0.4104,
+				0.233,
+				0.163,
+				0.2034,
+				0.126,
+				0.0,
+				0.0891,
+				0.1147,
+				0.1148,
+				0.1391,
+				0.2046,
+				0.3444,
+				0.8614,
+				1.0,
+				0.4599,
+				0.1187,
+				0.1225,
+				0.4998,
+				0.3475,
+				0.1576,
+				0.09,
+				0.0151,
+				0.0006,
+				0.0061
+			]
+		},
+		{
+			"row": 2,
+			"column": 5,
+			"sensor": "gpuFan",
+			"label": "GPU Fan",
+			"valueText": "0.00",
+			"unitText": "RPM",
+			"display": "ring",
+			"outerBounds": [
+				470,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0,
+			"gaugeFitError": 0
+		},
+		{
+			"row": 2,
+			"column": 6,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1762",
+			"unitText": "RPM",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.331,
+				0.5155,
+				0.9436,
+				0.7335,
+				0.1716,
+				0.5182,
+				0.9017,
+				0.6362,
+				0.8743,
+				0.5816,
+				0.5616,
+				0.9309,
+				1.0,
+				0.7071,
+				0.4946,
+				0.3108,
+				0.0,
+				0.2994,
+				0.4361,
+				0.5905,
+				0.7881,
+				0.3429,
+				0.2331,
+				0.4315,
+				0.0353,
+				0.4475,
+				0.7898,
+				0.3682,
+				0.4291,
+				0.6292,
+				0.606,
+				0.7855,
+				0.3487,
+				0.331,
+				0.6064,
+				0.3806
+			]
+		},
+		{
+			"row": 2,
+			"column": 7,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "117",
+			"unitText": "FPS",
+			"display": "bar",
+			"outerBounds": [
+				658,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.01,
+			"gaugeFitError": 2.524410492298544e-06,
+			"gaugeFractionIdentifiability": "Any nonzero fraction up to about0.0893 produces the same renderer minimum5px bar; 0.01 is one fitted presentation value, not an inferred hardware range."
+		},
+		{
+			"row": 2,
+			"column": 8,
+			"sensor": "gpuClock",
+			"label": "GPU Clock",
+			"valueText": "1267",
+			"unitText": "MHz",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.388,
+			"gaugeFitError": 0.00927061016383064
+		},
+		{
+			"row": 3,
+			"column": 0,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "57.4",
+			"unitText": "°C",
+			"display": "plain",
+			"outerBounds": [
+				0,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 1,
+			"sensor": "gpuTemp",
+			"label": "GPU Temp",
+			"valueText": "44.9",
+			"unitText": "°C",
+			"display": "plain",
+			"outerBounds": [
+				94,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 2,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "67.5",
+			"unitText": "W",
+			"display": "plain",
+			"outerBounds": [
+				188,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 3,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "53.9",
+			"unitText": "W",
+			"display": "plain",
+			"outerBounds": [
+				282,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 4,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "6.07",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				376,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 5,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "7.00",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				470,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 6,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "75.6",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				564,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 7,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "117",
+			"unitText": "FPS",
+			"display": "plain",
+			"outerBounds": [
+				658,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 8,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1762",
+			"unitText": "RPM",
+			"display": "plain",
+			"outerBounds": [
+				752,
+				282,
+				78,
+				78
+			]
+		}
+	],
+	"dials": [
+		{
+			"slot": 0,
+			"view": "single",
+			"sensor": "cpuTemp",
+			"statsText": "▼ 57.4   ▲ 59.0   session",
+			"fraction": 0
+		},
+		{
+			"slot": 1,
+			"view": "tworow",
+			"sensors": [
+				"cpuPower",
+				"gpuPower"
+			],
+			"selectedRow": 0,
+			"footerText": "▼62.2 ▲93.2 session"
+		},
+		{
+			"slot": 2,
+			"view": "overview",
+			"sensors": [
+				"cpuTemp",
+				"gpuTemp",
+				"pump"
+			],
+			"selectedRow": 0,
+			"contextText": "session",
+			"statsText": "▼57.4 ▲59.0",
+			"header": "top"
+		},
+		{
+			"slot": 3,
+			"view": "single",
+			"sensor": "gpuLoad",
+			"statsText": "▼ 7.00   ▲ 13.0   session",
+			"fraction": 0
+		},
+		{
+			"slot": 4,
+			"view": "tworow",
+			"sensors": [
+				"gpuClock",
+				"fps"
+			],
+			"selectedRow": 0,
+			"footerText": "▼1177 ▲1305 session"
+		},
+		{
+			"slot": 5,
+			"view": "single",
+			"sensor": "gpuTemp",
+			"statsText": "▼ 44.5   ▲ 45.1   session",
+			"fraction": 0.6666666666666627
+		}
+	],
+	"limits": [
+		"The clean dusk gradient original and its exact settings are absent. Reconstruct its exposed color field and label the result as reconstructed, not the exact original wallpaper.",
+		"The 13 normalized36-point histories are visual traces of the supplied raster, not recovered hardware telemetry. Non-percent gauge fills are fitted presentation values, not recovered range bounds.",
+		"Actual Tahoma Bold on Windows is required to match glyph shape and spacing. This Linux host lacks Tahoma; do not claim an exact face-font match from its fallback renders.",
+		"Paired exposed pixels support Amber Outline and Violet 50% Ultraviolet Tint over a shared dusk backdrop. Covered wallpaper pixels remain unverifiable.",
+		"Higher-resolution output can match values, ordering, palette, nominal proportions, and display modes, but is a reconstruction rather than a pixel-identical enlargement."
+	],
+	"dialAppearance": {
+		"background": "outline",
+		"textMode": "theme",
+		"accentWords": false,
+		"textColors": {
+			"value": "#FFB84D",
+			"label": "#FFB84D",
+			"unit": "#B38136",
+			"badge": "#E0912F"
+		},
+		"evidence": "Visible black outline; values and label pixel ratios match #FFB84D. Paired Amber and Violet pixels support Amber Outline with Violet 50% Ultraviolet Tint over the common measured dusk gradient. Covered pixels remain reconstructed."
+	},
+	"backdrop": {
+		"kind": "sampled-horizontal-gradient-times-linear-vertical-brightness",
+		"source": "docs/assets/img/showcase/gallery/amber-dusk.png",
+		"coordinateSpace": "native830x450board",
+		"profileSampleY": 446,
+		"xDomain": [
+			3,
+			827
+		],
+		"yDomain": [
+			379,
+			446
+		],
+		"topBrightnessFactor": 0.65618338,
+		"bottomBrightnessFactor": 1,
+		"stops": [
+			{
+				"offset": 0.0,
+				"x": 3,
+				"rgb": [
+					19.3677,
+					11.7992,
+					57.41
+				]
+			},
+			{
+				"offset": 0.0157767,
+				"x": 16,
+				"rgb": [
+					21.0,
+					12.0,
+					60.0
+				]
+			},
+			{
+				"offset": 0.03519417,
+				"x": 32,
+				"rgb": [
+					24.0,
+					13.0,
+					62.0
+				]
+			},
+			{
+				"offset": 0.05461165,
+				"x": 48,
+				"rgb": [
+					26.0,
+					14.0,
+					64.0
+				]
+			},
+			{
+				"offset": 0.07402913,
+				"x": 64,
+				"rgb": [
+					29.0,
+					15.0,
+					67.0
+				]
+			},
+			{
+				"offset": 0.0934466,
+				"x": 80,
+				"rgb": [
+					31.0,
+					16.0,
+					70.0
+				]
+			},
+			{
+				"offset": 0.11286408,
+				"x": 96,
+				"rgb": [
+					33.0,
+					17.0,
+					73.0
+				]
+			},
+			{
+				"offset": 0.13228155,
+				"x": 112,
+				"rgb": [
+					36.0,
+					17.0,
+					75.0
+				]
+			},
+			{
+				"offset": 0.15169903,
+				"x": 128,
+				"rgb": [
+					38.0,
+					18.0,
+					78.0
+				]
+			},
+			{
+				"offset": 0.1711165,
+				"x": 144,
+				"rgb": [
+					41.0,
+					19.0,
+					81.0
+				]
+			},
+			{
+				"offset": 0.19053398,
+				"x": 160,
+				"rgb": [
+					42.0,
+					19.0,
+					84.0
+				]
+			},
+			{
+				"offset": 0.20995146,
+				"x": 176,
+				"rgb": [
+					45.0,
+					21.0,
+					87.0
+				]
+			},
+			{
+				"offset": 0.22936893,
+				"x": 192,
+				"rgb": [
+					47.0,
+					21.0,
+					89.0
+				]
+			},
+			{
+				"offset": 0.24878641,
+				"x": 208,
+				"rgb": [
+					49.0,
+					21.0,
+					92.0
+				]
+			},
+			{
+				"offset": 0.26820388,
+				"x": 224,
+				"rgb": [
+					52.0,
+					22.0,
+					95.0
+				]
+			},
+			{
+				"offset": 0.28762136,
+				"x": 240,
+				"rgb": [
+					55.0,
+					24.0,
+					98.0
+				]
+			},
+			{
+				"offset": 0.30703883,
+				"x": 256,
+				"rgb": [
+					57.0,
+					25.0,
+					100.0
+				]
+			},
+			{
+				"offset": 0.32645631,
+				"x": 272,
+				"rgb": [
+					60.0,
+					26.0,
+					103.0
+				]
+			},
+			{
+				"offset": 0.34587379,
+				"x": 288,
+				"rgb": [
+					62.0,
+					27.0,
+					106.0
+				]
+			},
+			{
+				"offset": 0.36529126,
+				"x": 304,
+				"rgb": [
+					64.0,
+					27.0,
+					109.0
+				]
+			},
+			{
+				"offset": 0.38470874,
+				"x": 320,
+				"rgb": [
+					66.0,
+					28.0,
+					111.0
+				]
+			},
+			{
+				"offset": 0.40412621,
+				"x": 336,
+				"rgb": [
+					68.0,
+					29.0,
+					114.0
+				]
+			},
+			{
+				"offset": 0.42354369,
+				"x": 352,
+				"rgb": [
+					71.0,
+					30.0,
+					117.0
+				]
+			},
+			{
+				"offset": 0.44296117,
+				"x": 368,
+				"rgb": [
+					73.0,
+					31.0,
+					120.0
+				]
+			},
+			{
+				"offset": 0.46237864,
+				"x": 384,
+				"rgb": [
+					79.0,
+					33.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.48179612,
+				"x": 400,
+				"rgb": [
+					87.0,
+					35.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.50121359,
+				"x": 416,
+				"rgb": [
+					94.0,
+					38.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.52063107,
+				"x": 432,
+				"rgb": [
+					102.0,
+					40.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.54004854,
+				"x": 448,
+				"rgb": [
+					110.0,
+					43.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.55946602,
+				"x": 464,
+				"rgb": [
+					118.0,
+					46.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.5788835,
+				"x": 480,
+				"rgb": [
+					125.0,
+					48.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.59830097,
+				"x": 496,
+				"rgb": [
+					133.0,
+					51.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.61771845,
+				"x": 512,
+				"rgb": [
+					141.0,
+					54.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.63713592,
+				"x": 528,
+				"rgb": [
+					148.0,
+					56.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.6565534,
+				"x": 544,
+				"rgb": [
+					156.0,
+					59.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.67597087,
+				"x": 560,
+				"rgb": [
+					163.0,
+					60.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.69538835,
+				"x": 576,
+				"rgb": [
+					172.0,
+					63.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.71480583,
+				"x": 592,
+				"rgb": [
+					180.0,
+					65.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.7342233,
+				"x": 608,
+				"rgb": [
+					187.0,
+					68.0,
+					121.0
+				]
+			},
+			{
+				"offset": 0.75364078,
+				"x": 624,
+				"rgb": [
+					193.0,
+					72.0,
+					120.0
+				]
+			},
+			{
+				"offset": 0.77305825,
+				"x": 640,
+				"rgb": [
+					197.0,
+					78.0,
+					118.0
+				]
+			},
+			{
+				"offset": 0.79247573,
+				"x": 656,
+				"rgb": [
+					201.0,
+					85.0,
+					115.0
+				]
+			},
+			{
+				"offset": 0.8118932,
+				"x": 672,
+				"rgb": [
+					205.0,
+					92.0,
+					113.0
+				]
+			},
+			{
+				"offset": 0.83131068,
+				"x": 688,
+				"rgb": [
+					209.0,
+					99.0,
+					110.0
+				]
+			},
+			{
+				"offset": 0.85072816,
+				"x": 704,
+				"rgb": [
+					213.0,
+					106.0,
+					108.0
+				]
+			},
+			{
+				"offset": 0.87014563,
+				"x": 720,
+				"rgb": [
+					217.0,
+					113.0,
+					106.0
+				]
+			},
+			{
+				"offset": 0.88956311,
+				"x": 736,
+				"rgb": [
+					221.0,
+					119.0,
+					103.0
+				]
+			},
+			{
+				"offset": 0.90898058,
+				"x": 752,
+				"rgb": [
+					225.0,
+					126.0,
+					101.0
+				]
+			},
+			{
+				"offset": 0.92839806,
+				"x": 768,
+				"rgb": [
+					229.0,
+					133.0,
+					98.0
+				]
+			},
+			{
+				"offset": 0.94781553,
+				"x": 784,
+				"rgb": [
+					233.0,
+					140.0,
+					96.0
+				]
+			},
+			{
+				"offset": 0.96723301,
+				"x": 800,
+				"rgb": [
+					237.0,
+					147.0,
+					93.0
+				]
+			},
+			{
+				"offset": 0.98665049,
+				"x": 816,
+				"rgb": [
+					241.0,
+					153.0,
+					91.0
+				]
+			},
+			{
+				"offset": 1.0,
+				"x": 827,
+				"rgb": [
+					243.8092,
+					158.2646,
+					89.2615
+				]
+			}
+		],
+		"rendering": "Draw a horizontal SVGlinearGradient from x3to827 using the RGBstops; overlay a black vertical gradient with opacity1-topBrightnessFactor at y379 and0 at y446. Clip to the strip. The high-resolution output interpolates these sampled colors as vectors.",
+		"validation": {
+			"sampleCount": 4205,
+			"channelCount": 12615,
+			"medianAbsoluteChannelError": 0.375,
+			"p95AbsoluteChannelError": 1.0452186341596605,
+			"rmsePerChannel": 0.5388250372435269,
+			"maximumAbsoluteChannelError": 1.9046715338339624,
+			"mask": "Top rows379–381 excluding third-slot context x270–420; bottom rows443–446 in clear portions of single-view slots; row446excludingselectionrail x274–283 androunding edges."
+		},
+		"sharedVioletEvidence": [
+			{
+				"xy": [
+					15,
+					381
+				],
+				"amber": [
+					14,
+					8,
+					39
+				],
+				"violet": [
+					15,
+					7,
+					35
+				],
+				"expectedVioletTint": [
+					15.0,
+					7.0,
+					35.0
+				],
+				"maximumChannelError": 0.0
+			},
+			{
+				"xy": [
+					100,
+					381
+				],
+				"amber": [
+					22,
+					11,
+					48
+				],
+				"violet": [
+					19,
+					8,
+					40
+				],
+				"expectedVioletTint": [
+					19.0,
+					8.5,
+					39.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					200,
+					381
+				],
+				"amber": [
+					32,
+					14,
+					60
+				],
+				"violet": [
+					24,
+					10,
+					46
+				],
+				"expectedVioletTint": [
+					24.0,
+					10.0,
+					45.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					500,
+					381
+				],
+				"amber": [
+					89,
+					33,
+					80
+				],
+				"violet": [
+					52,
+					19,
+					56
+				],
+				"expectedVioletTint": [
+					52.5,
+					19.5,
+					55.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					700,
+					381
+				],
+				"amber": [
+					141,
+					69,
+					72
+				],
+				"violet": [
+					78,
+					37,
+					52
+				],
+				"expectedVioletTint": [
+					78.5,
+					37.5,
+					51.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					815,
+					381
+				],
+				"amber": [
+					160,
+					101,
+					60
+				],
+				"violet": [
+					87,
+					53,
+					46
+				],
+				"expectedVioletTint": [
+					88.0,
+					53.5,
+					45.5
+				],
+				"maximumChannelError": 1.0
+			},
+			{
+				"xy": [
+					15,
+					444
+				],
+				"amber": [
+					21,
+					12,
+					58
+				],
+				"violet": [
+					18,
+					9,
+					45
+				],
+				"expectedVioletTint": [
+					18.5,
+					9.0,
+					44.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					420,
+					444
+				],
+				"amber": [
+					95,
+					37,
+					120
+				],
+				"violet": [
+					55,
+					21,
+					76
+				],
+				"expectedVioletTint": [
+					55.5,
+					21.5,
+					75.5
+				],
+				"maximumChannelError": 0.5
+			},
+			{
+				"xy": [
+					815,
+					444
+				],
+				"amber": [
+					238,
+					151,
+					90
+				],
+				"violet": [
+					127,
+					78,
+					61
+				],
+				"expectedVioletTint": [
+					127.0,
+					78.5,
+					60.5
+				],
+				"maximumChannelError": 0.5
+			}
+		],
+		"limits": [
+			"This is a measured reconstruction from visible source pixels. Covered background pixels are not independently verifiable.",
+			"The rounded-edge profile is linearly extrapolated; strip-frame pixels are excluded.",
+			"The fitted field supports Amber Outline and the same background plus production Ultraviolet Tint for Violet."
+		]
+	},
+	"sourceSha256": "6bc9b83de62f5e77ac07a134ee26869431f814d629bc74d93bcac81c5ef9e963",
+	"sharedDuskBackgroundEvidence": [
+		{
+			"xy": [
+				15,
+				381
+			],
+			"amber": [
+				14,
+				8,
+				39
+			],
+			"violet": [
+				15,
+				7,
+				35
+			],
+			"expectedVioletTint": [
+				15.0,
+				7.0,
+				35.0
+			],
+			"maximumChannelError": 0.0
+		},
+		{
+			"xy": [
+				100,
+				381
+			],
+			"amber": [
+				22,
+				11,
+				48
+			],
+			"violet": [
+				19,
+				8,
+				40
+			],
+			"expectedVioletTint": [
+				19.0,
+				8.5,
+				39.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				200,
+				381
+			],
+			"amber": [
+				32,
+				14,
+				60
+			],
+			"violet": [
+				24,
+				10,
+				46
+			],
+			"expectedVioletTint": [
+				24.0,
+				10.0,
+				45.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				500,
+				381
+			],
+			"amber": [
+				89,
+				33,
+				80
+			],
+			"violet": [
+				52,
+				19,
+				56
+			],
+			"expectedVioletTint": [
+				52.5,
+				19.5,
+				55.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				700,
+				381
+			],
+			"amber": [
+				141,
+				69,
+				72
+			],
+			"violet": [
+				78,
+				37,
+				52
+			],
+			"expectedVioletTint": [
+				78.5,
+				37.5,
+				51.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				815,
+				381
+			],
+			"amber": [
+				160,
+				101,
+				60
+			],
+			"violet": [
+				87,
+				53,
+				46
+			],
+			"expectedVioletTint": [
+				88.0,
+				53.5,
+				45.5
+			],
+			"maximumChannelError": 1.0
+		},
+		{
+			"xy": [
+				15,
+				444
+			],
+			"amber": [
+				21,
+				12,
+				58
+			],
+			"violet": [
+				18,
+				9,
+				45
+			],
+			"expectedVioletTint": [
+				18.5,
+				9.0,
+				44.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				420,
+				444
+			],
+			"amber": [
+				95,
+				37,
+				120
+			],
+			"violet": [
+				55,
+				21,
+				76
+			],
+			"expectedVioletTint": [
+				55.5,
+				21.5,
+				75.5
+			],
+			"maximumChannelError": 0.5
+		},
+		{
+			"xy": [
+				815,
+				444
+			],
+			"amber": [
+				238,
+				151,
+				90
+			],
+			"violet": [
+				127,
+				78,
+				61
+			],
+			"expectedVioletTint": [
+				127.0,
+				78.5,
+				60.5
+			],
+			"maximumChannelError": 0.5
+		}
+	],
+	"reconstructionBackgroundMode": "outline"
+}

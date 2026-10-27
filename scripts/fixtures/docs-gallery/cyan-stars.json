@@ -1,0 +1,1424 @@
+{
+	"geometry": {
+		"canvas": [
+			830,
+			450
+		],
+		"keyOuterSize": 78,
+		"keyPitch": 94,
+		"columns": 9,
+		"rows": 4,
+		"keyOuterRadiusApprox": 17,
+		"keyRendererSize": [
+			144,
+			144
+		],
+		"keyFaceBoundsRelative": [
+			3,
+			3,
+			72,
+			72
+		],
+		"frame": "#2D2D2D",
+		"border": "#474747",
+		"stripOuterBounds": [
+			0,
+			376,
+			830,
+			74
+		],
+		"stripInsetApprox": 3,
+		"stripRendererSize": [
+			1200,
+			100
+		],
+		"stripNativeSegmentSize": [
+			200,
+			100
+		]
+	},
+	"keys": [
+		{
+			"row": 0,
+			"column": 0,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "62.4",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				0,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.21095,
+				0.27823,
+				0.19646,
+				0.12123,
+				0.07215,
+				0.04994,
+				0.02229,
+				0.0683,
+				0.12614,
+				0.26578,
+				0.24646,
+				0.16119,
+				0.26799,
+				0.30514,
+				0.24374,
+				0.17085,
+				0.11662,
+				0.09308,
+				0.05254,
+				0.01105,
+				0.0,
+				0.18778,
+				0.26836,
+				0.28598,
+				0.26911,
+				0.21215,
+				0.15004,
+				0.17413,
+				0.44218,
+				0.484,
+				0.33259,
+				0.31125,
+				0.50618,
+				0.73847,
+				1.0,
+				0.88197
+			]
+		},
+		{
+			"row": 0,
+			"column": 1,
+			"sensor": "ccd1Temp",
+			"label": "CCD1 Temp",
+			"valueText": "50.8",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				94,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.50561,
+				0.43164,
+				0.38372,
+				0.23189,
+				0.0,
+				0.37627,
+				0.69209,
+				0.39482,
+				0.70883,
+				0.75296,
+				0.52672,
+				0.6331,
+				0.82035,
+				0.7808,
+				0.2722,
+				0.40821,
+				0.68986,
+				0.0761,
+				0.34152,
+				0.61096,
+				0.56967,
+				0.50427,
+				0.39863,
+				0.79741,
+				0.64636,
+				0.31675,
+				0.37819,
+				0.50545,
+				0.9767,
+				0.95722,
+				0.57239,
+				1.0,
+				0.88313,
+				0.83273,
+				0.69115,
+				0.60741
+			]
+		},
+		{
+			"row": 0,
+			"column": 2,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "98.3",
+			"unitText": "W",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.266,
+			"gaugeVisualFit": {
+				"fraction": 0.266,
+				"accentMSE": 6.672474388374267e-07,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 0,
+			"column": 3,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "5.64",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				282,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.0564,
+			"gaugeVisualFit": {
+				"fraction": 0.056,
+				"accentMSE": 4.3666258232241585e-05,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 0,
+			"column": 4,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "76.2",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				376,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.762,
+			"gaugeVisualFit": {
+				"fraction": 0.7625,
+				"accentMSE": 0.0006992691820126157,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 0,
+			"column": 5,
+			"sensor": "gpuTemp",
+			"label": "GPU Temp",
+			"valueText": "45.3",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				470,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.34871,
+				0.11706,
+				0.11213,
+				0.20876,
+				0.08028,
+				0.0,
+				0.0988,
+				0.27543,
+				0.96512,
+				1.0,
+				0.41731,
+				0.54852,
+				0.13681,
+				0.47321,
+				0.31145,
+				0.15077,
+				0.21008,
+				0.14368,
+				0.6221,
+				0.42031,
+				0.21792,
+				0.65273,
+				0.50439,
+				0.65104,
+				0.46371,
+				0.44286,
+				0.69721,
+				0.41383,
+				0.88565,
+				0.68134,
+				0.71106,
+				0.88262,
+				0.66362,
+				0.64431,
+				0.68811,
+				0.87039
+			]
+		},
+		{
+			"row": 0,
+			"column": 6,
+			"sensor": "vramTemp",
+			"label": "VRAM Temp",
+			"valueText": "60.0",
+			"unitText": "°C",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				0,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07867,
+				0.07865,
+				0.07871,
+				0.07854,
+				0.07919,
+				0.07593,
+				0.08991,
+				0.04277,
+				0.25072,
+				0.86493,
+				0.28218,
+				0.0,
+				0.56249,
+				1.0
+			]
+		},
+		{
+			"row": 0,
+			"column": 7,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "59.4",
+			"unitText": "W",
+			"display": "bar",
+			"outerBounds": [
+				658,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.142,
+			"gaugeVisualFit": {
+				"fraction": 0.142,
+				"accentMSE": 8.006969266049168e-07,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 0,
+			"column": 8,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "13.0",
+			"unitText": "%",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				0,
+				78,
+				78
+			],
+			"gaugeFraction": 0.13,
+			"gaugeVisualFit": {
+				"fraction": 0.1295,
+				"accentMSE": 3.659597870039892e-05,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 1,
+			"column": 0,
+			"sensor": "gpuClock",
+			"label": "GPU Clock",
+			"valueText": "1672",
+			"unitText": "MHz",
+			"display": "spark",
+			"outerBounds": [
+				0,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.10867,
+				0.02901,
+				0.06888,
+				0.04811,
+				0.11395,
+				0.0,
+				0.00045,
+				0.17702,
+				0.92135,
+				1.0,
+				0.42322,
+				0.16739,
+				0.11334,
+				0.09947,
+				0.09197,
+				0.07974,
+				0.08262,
+				0.03661,
+				0.03781,
+				0.05144,
+				0.23603,
+				0.87817,
+				0.42008,
+				0.10467,
+				0.19445,
+				0.07973,
+				0.18033,
+				0.19153,
+				0.37489,
+				0.24002,
+				0.7549,
+				0.99333,
+				0.4948,
+				0.45785,
+				0.34494,
+				0.37401
+			]
+		},
+		{
+			"row": 1,
+			"column": 1,
+			"sensor": "gpuFan",
+			"label": "GPU Fan",
+			"valueText": "0.00",
+			"unitText": "RPM",
+			"display": "bar",
+			"outerBounds": [
+				94,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0,
+			"gaugeVisualFit": {
+				"fraction": 0,
+				"accentMSE": 0,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 1,
+			"column": 2,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1759",
+			"unitText": "RPM",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0.357,
+			"gaugeVisualFit": {
+				"fraction": 0.357,
+				"accentMSE": 5.337979510699439e-07,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 1,
+			"column": 3,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "165",
+			"unitText": "FPS",
+			"display": "spark",
+			"outerBounds": [
+				282,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.42047,
+				0.15537,
+				0.27986,
+				0.12001,
+				0.24168,
+				0.02985,
+				0.23827,
+				0.0278,
+				0.50075,
+				0.53114,
+				0.37053,
+				0.29459,
+				0.32904,
+				0.54514,
+				0.16603,
+				0.27161,
+				0.22939,
+				0.18513,
+				0.09429,
+				0.21998,
+				0.23548,
+				0.55484,
+				0.68734,
+				0.224,
+				0.08125,
+				0.24718,
+				0.14314,
+				0.0,
+				0.3459,
+				0.20711,
+				0.2618,
+				0.69959,
+				0.86038,
+				0.39072,
+				0.86848,
+				1.0
+			]
+		},
+		{
+			"row": 1,
+			"column": 4,
+			"sensor": "download",
+			"label": "Download",
+			"valueText": "429",
+			"unitText": "kbps",
+			"display": "spark",
+			"outerBounds": [
+				376,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				1.0,
+				0.33165,
+				0.01471,
+				0.28816,
+				0.93029,
+				0.27683,
+				0.00139,
+				0.29875,
+				0.98136,
+				0.31875,
+				0.00776,
+				0.25955,
+				0.94727,
+				0.24075,
+				0.05804,
+				0.08634,
+				0.41007,
+				0.9266,
+				0.23615,
+				0.00916,
+				0.31525,
+				0.97749,
+				0.31292,
+				0.0,
+				0.3562,
+				0.9738,
+				0.28987,
+				0.01966,
+				0.25055,
+				0.98463,
+				0.26646,
+				0.07749,
+				0.1876,
+				0.10253,
+				0.05521,
+				0.23294
+			]
+		},
+		{
+			"row": 1,
+			"column": 5,
+			"sensor": "upload",
+			"label": "Upload",
+			"valueText": "3.54",
+			"unitText": "Mbps",
+			"display": "spark",
+			"outerBounds": [
+				470,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.3713,
+				0.06203,
+				0.01245,
+				0.03269,
+				0.19923,
+				0.06076,
+				0.02684,
+				0.04785,
+				0.18636,
+				0.0315,
+				0.01542,
+				0.02913,
+				0.19424,
+				0.16064,
+				0.022,
+				0.01761,
+				0.06647,
+				0.1891,
+				0.02226,
+				0.01501,
+				0.05379,
+				0.17879,
+				0.05974,
+				0.3873,
+				0.14049,
+				0.81588,
+				0.19307,
+				0.0066,
+				0.2067,
+				0.24946,
+				0.05617,
+				0.03885,
+				0.0,
+				0.35263,
+				1.0,
+				0.52173
+			]
+		},
+		{
+			"row": 1,
+			"column": 6,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "98.3",
+			"unitText": "W",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.71849,
+				0.54178,
+				0.32065,
+				0.19439,
+				0.14198,
+				0.19135,
+				0.1564,
+				0.32137,
+				0.40187,
+				0.7834,
+				0.64154,
+				0.30458,
+				0.61502,
+				0.7538,
+				0.40414,
+				0.10865,
+				0.0,
+				0.2833,
+				0.11987,
+				0.08693,
+				0.04194,
+				0.59691,
+				0.77447,
+				0.53019,
+				0.69213,
+				0.48639,
+				0.20774,
+				0.53425,
+				0.96024,
+				0.78585,
+				0.5652,
+				0.45284,
+				0.70038,
+				0.93293,
+				1.0,
+				0.87325
+			]
+		},
+		{
+			"row": 1,
+			"column": 7,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "59.4",
+			"unitText": "W",
+			"display": "spark",
+			"outerBounds": [
+				658,
+				94,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.1789,
+				0.01425,
+				0.07284,
+				0.02241,
+				0.05687,
+				0.02353,
+				0.03697,
+				0.06336,
+				0.70429,
+				1.0,
+				0.33947,
+				0.13422,
+				0.09878,
+				0.19671,
+				0.07293,
+				0.02002,
+				0.02459,
+				0.00407,
+				0.0733,
+				0.0,
+				0.19159,
+				0.81777,
+				0.65496,
+				0.16954,
+				0.109,
+				0.07947,
+				0.0551,
+				0.02874,
+				0.17987,
+				0.06424,
+				0.16672,
+				0.79661,
+				0.44878,
+				0.14508,
+				0.32744,
+				0.3416
+			]
+		},
+		{
+			"row": 1,
+			"column": 8,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "62.4",
+			"unitText": "°C",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				94,
+				78,
+				78
+			],
+			"gaugeFraction": 0.26,
+			"gaugeVisualFit": {
+				"fraction": 0.26,
+				"accentMSE": 0.0002925295055740284,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 2,
+			"column": 0,
+			"sensor": "ccd1Temp",
+			"label": "CCD1 Temp",
+			"valueText": "50.8",
+			"unitText": "°C",
+			"display": "bar",
+			"outerBounds": [
+				0,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.316,
+			"gaugeVisualFit": {
+				"fraction": 0.316,
+				"accentMSE": 5.337979510699415e-07,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 2,
+			"column": 1,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "5.64",
+			"unitText": "%",
+			"display": "spark",
+			"outerBounds": [
+				94,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.50568,
+				0.39104,
+				0.17509,
+				0.15711,
+				0.13113,
+				0.06852,
+				0.28161,
+				0.22403,
+				0.1613,
+				0.49403,
+				0.33001,
+				0.21061,
+				0.4604,
+				0.49767,
+				0.25401,
+				0.14733,
+				0.15,
+				0.09892,
+				0.18596,
+				0.33694,
+				0.05088,
+				0.42352,
+				0.46766,
+				0.44582,
+				0.54347,
+				0.161,
+				0.0,
+				0.39416,
+				1.0,
+				0.70432,
+				0.30233,
+				0.49519,
+				0.55845,
+				0.9518,
+				0.68686,
+				0.33127
+			]
+		},
+		{
+			"row": 2,
+			"column": 2,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "76.2",
+			"unitText": "%",
+			"display": "bar",
+			"outerBounds": [
+				188,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.762,
+			"gaugeVisualFit": {
+				"fraction": 0.7615,
+				"accentMSE": 1.2677701337911177e-06,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 2,
+			"column": 3,
+			"sensor": "vramTemp",
+			"label": "VRAM Temp",
+			"valueText": "60.0",
+			"unitText": "°C",
+			"display": "ring",
+			"outerBounds": [
+				282,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.5335,
+			"gaugeVisualFit": {
+				"fraction": 0.5335,
+				"accentMSE": 0.0006532991248317965,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 2,
+			"column": 4,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "13.0",
+			"unitText": "%",
+			"display": "spark",
+			"outerBounds": [
+				376,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.10833,
+				0.00256,
+				0.10338,
+				0.10949,
+				0.1059,
+				0.11613,
+				0.19943,
+				0.20169,
+				0.84445,
+				1.0,
+				0.36611,
+				0.06753,
+				0.07402,
+				0.54702,
+				0.33482,
+				0.12401,
+				0.10073,
+				0.01328,
+				0.2014,
+				0.01666,
+				0.0,
+				0.007,
+				0.26347,
+				0.77272,
+				0.53579,
+				0.22534,
+				0.21754,
+				0.45119,
+				0.76438,
+				0.27271,
+				0.48266,
+				0.17731,
+				0.59567,
+				0.83548,
+				0.50591,
+				0.64727
+			]
+		},
+		{
+			"row": 2,
+			"column": 5,
+			"sensor": "gpuFan",
+			"label": "GPU Fan",
+			"valueText": "0.00",
+			"unitText": "RPM",
+			"display": "ring",
+			"outerBounds": [
+				470,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0,
+			"gaugeVisualFit": {
+				"fraction": 0,
+				"accentMSE": 0,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 2,
+			"column": 6,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1759",
+			"unitText": "RPM",
+			"display": "spark",
+			"outerBounds": [
+				564,
+				188,
+				78,
+				78
+			],
+			"normalizedHistoryFromRaster": [
+				0.0,
+				0.41935,
+				0.45841,
+				0.52702,
+				0.79501,
+				0.29331,
+				0.23445,
+				0.57233,
+				0.05249,
+				0.44464,
+				0.81586,
+				0.28051,
+				0.44709,
+				0.62413,
+				0.52708,
+				0.78009,
+				0.30062,
+				0.25059,
+				0.84899,
+				0.4235,
+				0.12421,
+				0.72245,
+				0.94637,
+				1.0,
+				0.50929,
+				0.24356,
+				0.57296,
+				0.24408,
+				0.29407,
+				0.76357,
+				0.11435,
+				0.74639,
+				0.50552,
+				0.2828,
+				0.4045,
+				0.2173
+			]
+		},
+		{
+			"row": 2,
+			"column": 7,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "165",
+			"unitText": "FPS",
+			"display": "bar",
+			"outerBounds": [
+				658,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.05,
+			"gaugeVisualFit": {
+				"fraction": 0.01,
+				"accentMSE": 4.6707320718620383e-07,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			},
+			"gaugeFractionConstraint": "0 < fraction <= 10/112; minimum visible bar floor prevents exact recovery. .05 reproduces that floor."
+		},
+		{
+			"row": 2,
+			"column": 8,
+			"sensor": "gpuClock",
+			"label": "GPU Clock",
+			"valueText": "1672",
+			"unitText": "MHz",
+			"display": "ring",
+			"outerBounds": [
+				752,
+				188,
+				78,
+				78
+			],
+			"gaugeFraction": 0.536,
+			"gaugeVisualFit": {
+				"fraction": 0.536,
+				"accentMSE": 0.00027476112517752464,
+				"method": "Production SVG accent shape fitted against source crop at72px. Presentation estimate, not recovered sensor bounds."
+			}
+		},
+		{
+			"row": 3,
+			"column": 0,
+			"sensor": "cpuTemp",
+			"label": "CPU Temp",
+			"valueText": "62.4",
+			"unitText": "°C",
+			"display": "plain",
+			"outerBounds": [
+				0,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 1,
+			"sensor": "gpuTemp",
+			"label": "GPU Temp",
+			"valueText": "45.3",
+			"unitText": "°C",
+			"display": "plain",
+			"outerBounds": [
+				94,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 2,
+			"sensor": "cpuPower",
+			"label": "CPU Power",
+			"valueText": "98.3",
+			"unitText": "W",
+			"display": "plain",
+			"outerBounds": [
+				188,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 3,
+			"sensor": "gpuPower",
+			"label": "GPU Power",
+			"valueText": "59.4",
+			"unitText": "W",
+			"display": "plain",
+			"outerBounds": [
+				282,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 4,
+			"sensor": "cpuLoad",
+			"label": "CPU Load",
+			"valueText": "5.64",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				376,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 5,
+			"sensor": "gpuLoad",
+			"label": "GPU Load",
+			"valueText": "13.0",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				470,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 6,
+			"sensor": "memory",
+			"label": "Memory",
+			"valueText": "76.2",
+			"unitText": "%",
+			"display": "plain",
+			"outerBounds": [
+				564,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 7,
+			"sensor": "fps",
+			"label": "FPS",
+			"valueText": "165",
+			"unitText": "FPS",
+			"display": "plain",
+			"outerBounds": [
+				658,
+				282,
+				78,
+				78
+			]
+		},
+		{
+			"row": 3,
+			"column": 8,
+			"sensor": "pump",
+			"label": "Pump",
+			"valueText": "1759",
+			"unitText": "RPM",
+			"display": "plain",
+			"outerBounds": [
+				752,
+				282,
+				78,
+				78
+			]
+		}
+	],
+	"dials": [
+		{
+			"slot": 0,
+			"view": "single",
+			"sensor": "cpuTemp",
+			"statsText": "▼ 58.0   ▲ 63.9   session",
+			"fraction": 0.7457627118644067
+		},
+		{
+			"slot": 1,
+			"view": "tworow",
+			"sensors": [
+				"cpuPower",
+				"gpuPower"
+			],
+			"selectedRow": 0,
+			"footerText": "▼79.8 ▲110 session"
+		},
+		{
+			"slot": 2,
+			"view": "overview",
+			"sensors": [
+				"cpuTemp",
+				"gpuTemp",
+				"pump"
+			],
+			"selectedRow": 0,
+			"contextText": "session",
+			"statsText": "▼58.0 ▲63.9",
+			"header": "top"
+		},
+		{
+			"slot": 3,
+			"view": "single",
+			"sensor": "gpuLoad",
+			"statsText": "▼ 8.00   ▲ 16.0   session",
+			"fraction": 0.625
+		},
+		{
+			"slot": 4,
+			"view": "tworow",
+			"sensors": [
+				"gpuClock",
+				"fps"
+			],
+			"selectedRow": 0,
+			"footerText": "▼1395 ▲2752 session"
+		},
+		{
+			"slot": 5,
+			"view": "single",
+			"sensor": "gpuTemp",
+			"statsText": "▼ 44.8   ▲ 45.4   session",
+			"fraction": 0.8333333333333314
+		}
+	],
+	"look": "cyan-stars",
+	"source": "docs/assets/img/showcase/gallery/cyan-stars.png",
+	"sourceSha256": "19289b8cf4efa69acecb69da711737ef45e7fa5ff65fa8673adab4aca77bc9b3",
+	"theme": "void",
+	"themeEvidence": "Exact repeated RGB matches to all six shipped Void theme tokens in opaque key faces. Type accents are off.",
+	"palette": {
+		"bg": "#000000",
+		"label": "#7A8393",
+		"value": "#FFFFFF",
+		"unit": "#6B7586",
+		"accent": "#4CC2FF",
+		"track": "#161A21"
+	},
+	"values": {
+		"cpuTemp": [
+			"CPU Temp",
+			"62.4",
+			"°C"
+		],
+		"ccd1Temp": [
+			"CCD1 Temp",
+			"50.8",
+			"°C"
+		],
+		"cpuPower": [
+			"CPU Power",
+			"98.3",
+			"W"
+		],
+		"cpuLoad": [
+			"CPU Load",
+			"5.64",
+			"%"
+		],
+		"memory": [
+			"Memory",
+			"76.2",
+			"%"
+		],
+		"gpuTemp": [
+			"GPU Temp",
+			"45.3",
+			"°C"
+		],
+		"vramTemp": [
+			"VRAM Temp",
+			"60.0",
+			"°C"
+		],
+		"gpuPower": [
+			"GPU Power",
+			"59.4",
+			"W"
+		],
+		"gpuLoad": [
+			"GPU Load",
+			"13.0",
+			"%"
+		],
+		"gpuClock": [
+			"GPU Clock",
+			"1672",
+			"MHz"
+		],
+		"gpuFan": [
+			"GPU Fan",
+			"0.00",
+			"RPM"
+		],
+		"pump": [
+			"Pump",
+			"1759",
+			"RPM"
+		],
+		"fps": [
+			"FPS",
+			"165",
+			"FPS"
+		],
+		"download": [
+			"Download",
+			"429",
+			"kbps"
+		],
+		"upload": [
+			"Upload",
+			"3.54",
+			"Mbps"
+		]
+	},
+	"historyTracing": {
+		"method": "36 known production renderer sample x anchors fitted to accent-weighted raster column centerlines by linear least squares, then normalized to0..1. Uses the displayed plot only; no original telemetry recovered. Aliasing, low source resolution and the endpoint dot limit subpixel fidelity.",
+		"sourceHistoryLength": 36,
+		"traces": [
+			{
+				"row": 0,
+				"column": 0,
+				"rawNormalizedMinimum": 0.01395,
+				"rawNormalizedMaximum": 0.8521,
+				"columnsUsed": 65
+			},
+			{
+				"row": 0,
+				"column": 1,
+				"rawNormalizedMinimum": 0.04288,
+				"rawNormalizedMaximum": 0.94438,
+				"columnsUsed": 65
+			},
+			{
+				"row": 0,
+				"column": 5,
+				"rawNormalizedMinimum": 0.00764,
+				"rawNormalizedMaximum": 0.90259,
+				"columnsUsed": 65
+			},
+			{
+				"row": 0,
+				"column": 6,
+				"rawNormalizedMinimum": -0.07838,
+				"rawNormalizedMaximum": 0.91795,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 0,
+				"rawNormalizedMinimum": 0.0116,
+				"rawNormalizedMaximum": 0.90481,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 3,
+				"rawNormalizedMinimum": 0.04082,
+				"rawNormalizedMaximum": 0.98012,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 4,
+				"rawNormalizedMinimum": -0.07171,
+				"rawNormalizedMaximum": 0.78697,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 5,
+				"rawNormalizedMinimum": -0.01288,
+				"rawNormalizedMaximum": 0.70093,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 6,
+				"rawNormalizedMinimum": 0.06827,
+				"rawNormalizedMaximum": 0.85261,
+				"columnsUsed": 65
+			},
+			{
+				"row": 1,
+				"column": 7,
+				"rawNormalizedMinimum": 0.01233,
+				"rawNormalizedMaximum": 0.85655,
+				"columnsUsed": 65
+			},
+			{
+				"row": 2,
+				"column": 1,
+				"rawNormalizedMinimum": 0.03091,
+				"rawNormalizedMaximum": 0.93489,
+				"columnsUsed": 65
+			},
+			{
+				"row": 2,
+				"column": 4,
+				"rawNormalizedMinimum": -0.003,
+				"rawNormalizedMaximum": 0.87048,
+				"columnsUsed": 65
+			},
+			{
+				"row": 2,
+				"column": 6,
+				"rawNormalizedMinimum": 0.03855,
+				"rawNormalizedMaximum": 0.94066,
+				"columnsUsed": 65
+			}
+		]
+	},
+	"backgroundEvidence": {
+		"appearance": "Dark blue-purple star field behind the six-slot strip. White dial labels, values, units and stats.",
+		"cleanSourceAvailable": false,
+		"modeInference": "Compatible with Clear or Outline using white picture text; original slot background/text settings are not uniquely recoverable from this raster.",
+		"representativeVisibleColors": [
+			"#181C37",
+			"#141730",
+			"#151832",
+			"#14162F",
+			"#13152D"
+		]
+	},
+	"limits": [
+		"Exact clean star-field wallpaper is not present among tracked assets inspected. The captured overlay hides some wallpaper pixels, preventing lossless recovery of the background.",
+		"Exact original36-sample histories and non-percent gauge bounds are absent. Histories are normalized visual traces; gauge fractions are fitted display estimates. Neither is recovered hardware telemetry.",
+		"The small FPS bar has a5px floor at this capture scale, so its exact nonzero fraction below10/112 cannot be recovered. Use.05 to preserve the visible floor.",
+		"Production default face font is Tahoma. A true matching font face is required for faithful glyphs; local Linux fallback changes shape/width. Windows/Tahoma rasterization should be used if available.",
+		"Values, names, decimals, palette, mode order and nominal geometry are directly grounded. A higher-resolution renderer reconstruction can match these but cannot be honestly described as pixel-identical to the app screenshot because wallpaper, antialiasing and hidden source settings are missing."
+	],
+	"reconstructionBackgroundMode": "clear"
+}

@@ -62,7 +62,7 @@ async function focusStaysInViewer(page) {
 
 async function waitForGalleryImage(page, source) {
 	await page.waitForFunction(expected => {
-		const link = document.querySelector("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+		const link = document.querySelector("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
 		const image = link?.querySelector("img");
 		return link?.href === expected && image?.complete && image.naturalWidth > 0;
 	}, source);
@@ -697,14 +697,100 @@ test("an open image viewer blocks background navigation", options, async t => {
 	assert.equal(page.url(), originalUrl);
 });
 
+for (const scenario of [
+	{ width: 390, height: 844, density: 1 },
+	{ width: 1440, height: 900, density: 2 },
+	{ width: 1920, height: 1080, density: 3 }
+]) {
+	test(`renderer gallery selects sharp inline imagery and opens the full-resolution sample at ${scenario.width}px / ${scenario.density}×`, options, async t => {
+		const page = await pageFor(t, { viewport: { width: scenario.width, height: scenario.height }, deviceScaleFactor: scenario.density });
+		const requested = new Set();
+		page.on("request", request => requested.add(request.url()));
+		await page.goto(siteUrl());
+		const gallery = page.locator("[data-gallery]");
+		const opener = gallery.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
+		const fullSource = await opener.evaluate(link => link.href);
+		const inline = await opener.locator("img").evaluate(async image => {
+			await image.decode();
+			const box = image.getBoundingClientRect();
+			// An image selected by a width-descriptor srcset has density-corrected
+			// natural dimensions. Decode the selected bytes without srcset to check
+			// their real pixel resolution against the display and device density.
+			const pixels = document.createElement("img");
+			pixels.src = image.currentSrc;
+			await pixels.decode();
+			return { source: image.currentSrc, width: box.width, height: box.height, pixels: { width: pixels.naturalWidth, height: pixels.naturalHeight } };
+		});
+		assert.match(inline.source, /\/gallery\/rendered\/cyan-stars-(830|1660|2490)\.webp$/,
+			"the inline view uses a generated responsive candidate");
+		assert.ok(inline.pixels.width >= Math.min(inline.width * scenario.density, 2490) - 1
+			&& inline.pixels.width <= 2490, "the candidate provides enough pixels for the display up to the largest inline size");
+		assert.ok(Math.abs(inline.width / inline.height - 830 / 450) < 0.001
+			&& Math.abs(inline.pixels.width / inline.pixels.height - 830 / 450) < 0.001,
+			"responsive candidates keep the same uncropped layout and proportions");
+		assert.equal([...requested].some(url => /\/gallery\/rendered\/[^/]+-4980\.webp(?:\?|$)/.test(url)), false,
+			"opening the page does not download full-resolution lightbox images");
+		assert.match(fullSource, /\/gallery\/rendered\/cyan-stars-4980\.webp$/);
+		await opener.click();
+		const dialog = page.locator("dialog.image-viewer");
+		const fitted = await viewerGeometry(page);
+		assert.deepEqual(fitted.natural, { width: 4980, height: 2700 }, "the viewer loads the rendered 6× image, not the small inline candidate");
+		assert.equal(fitted.source, fullSource);
+		assert.ok(requested.has(fullSource), "the full image is requested when the user expands it");
+		assertFittedImage(fitted);
+		assert.match(await dialog.locator(".viewer-caption").innerText(), /Production-renderer sample/);
+		await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+		assertActualImage(await viewerGeometry(page));
+		if (scenario.density === 2) await assertActualImageEdgesReachable(page);
+		await dialog.getByRole("button", { name: "Fit to screen", exact: true }).click();
+		assertFittedImage(await viewerGeometry(page));
+		await page.keyboard.press("Escape");
+		assert.equal(await opener.evaluate(element => element === document.activeElement), true);
+	});
+}
+
+test("all five renderer samples preserve independently viewable original captures", options, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl());
+	const gallery = page.locator("[data-gallery]");
+	const slides = gallery.locator("[data-gallery-slide]");
+	const names = ["Cyan", "Green · night", "Violet", "Amber", "Green · aurora"];
+	const ids = ["cyan-stars", "green-night", "violet-dusk", "amber-dusk", "green-aurora"];
+	assert.deepEqual(await slides.evaluateAll(elements => elements.map(element => element.dataset.galleryTitle)), names,
+		"sample order preserves the approved comparison sequence");
+	assert.match(await gallery.locator(":scope > .capture-type").innerText(), /Backgrounds and graph histories are illustrative reconstructions/);
+	const next = gallery.getByRole("button", { name: "Next look", exact: true });
+	for (let index = 0; index < ids.length; index++) {
+		const slide = slides.nth(index);
+		const sample = slide.locator(".image-link[data-image-viewer]");
+		await waitForGalleryImage(page, await sample.evaluate(link => link.href));
+		assert.match(await slide.locator("figcaption").innerText(), /Production-renderer sample/);
+		const original = slide.getByRole("link", { name: "Original capture", exact: true });
+		const source = await original.evaluate(link => link.href);
+		assert.equal(await original.getAttribute("data-image-group"), null, "original captures are independent from the sample browsing group");
+		assert.ok(source.endsWith(`/assets/img/showcase/gallery/${ids[index]}.png`));
+		await original.click();
+		const dialog = page.locator("dialog.image-viewer");
+		const capture = await viewerGeometry(page);
+		assert.equal(capture.source, source);
+		assert.deepEqual(capture.natural, { width: 830, height: 450 }, "the original reference retains its native capture pixels");
+		assertFittedImage(capture);
+		assert.match(await dialog.locator(".viewer-caption").innerText(), /Original live Stream Deck app capture/);
+		assert.equal(await dialog.locator(".viewer-navigation").isVisible(), false, "the reference opens on its own without mixing into sample navigation");
+		await page.keyboard.press("Escape");
+		assert.equal(await original.evaluate(element => element === document.activeElement), true);
+		if (index < ids.length - 1) await next.click();
+	}
+});
+
 for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
 	test(`display gallery browses and expands without controls covering images at ${viewport.width}px`, options, async t => {
 		const page = await pageFor(t, { viewport });
 		await page.goto(siteUrl());
 		const gallery = page.locator("[data-gallery]");
 		const slides = gallery.locator("[data-gallery-slide]");
-		const sources = await slides.locator("a[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
-		assert.ok(sources.length >= 2, "the homepage offers multiple authentic display looks");
+		const sources = await slides.locator(".image-link[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
+		assert.ok(sources.length >= 2, "the homepage offers multiple production-renderer display samples");
 		assert.equal(new Set(sources).size, sources.length, "each gallery slide is a distinct source image");
 		assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden])").count(), 1, "only the selected slide is displayed after enhancement");
 		const previous = gallery.getByRole("button", { name: "Previous look", exact: true });
@@ -720,7 +806,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
 		}
 		await previous.click();
 		await waitForGalleryImage(page, sources.at(-1));
-		assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources.at(-1),
+		assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]").evaluate(link => link.href), sources.at(-1),
 			"Previous wraps directly to the last available look");
 		await previous.press("ArrowRight");
 		await waitForGalleryImage(page, sources[0]);
@@ -746,7 +832,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
 		assertFittedImage(await viewerGeometry(page));
 		await page.keyboard.press("Escape");
 		assert.equal(await expand.evaluate(element => element === document.activeElement), true, "closing returns to the external Expand button");
-		const activeLink = gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+		const activeLink = gallery.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
 		await waitForGalleryImage(page, sources[1]);
 		assert.equal(await activeLink.evaluate(link => link.href), sources[1], "the inline gallery retains the selected enlarged look");
 		await activeLink.click();
@@ -766,11 +852,12 @@ test("gallery preserves its decoded frame during a slow replacement and ignores 
 	const gallery = page.locator("[data-gallery]");
 	const slides = gallery.locator("[data-gallery-slide]");
 	assert.ok(await slides.count() >= 3, "the timing case browses past a slow image to another look");
-	const sources = await slides.locator("a[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
+	const sources = await slides.locator(".image-link[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
 	await waitForGalleryImage(page, sources[0]);
 	const firstCaption = await slides.nth(0).locator("figcaption").innerText();
 	const delayedSource = slides.nth(1).locator("source").first();
-	const delayed = new URL(await delayedSource.getAttribute("srcset"), base);
+	const candidate = (await delayedSource.getAttribute("srcset")).split(",")[0].trim().split(/\s+/)[0];
+	const delayed = new URL(candidate, base);
 	delayed.searchParams.set("gallery-test", "slow-image");
 	let release, requested;
 	const gate = new Promise(resolve => { release = resolve; });
@@ -785,7 +872,7 @@ test("gallery preserves its decoded frame during a slow replacement and ignores 
 	const next = gallery.getByRole("button", { name: "Next look", exact: true });
 	await next.click();
 	await requestSeen;
-	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources[0],
+	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]").evaluate(link => link.href), sources[0],
 		"a slow replacement leaves the current image visible");
 	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) figcaption").innerText(), firstCaption,
 		"the visible image retains its matching caption while loading");
@@ -797,7 +884,7 @@ test("gallery preserves its decoded frame during a slow replacement and ignores 
 	release();
 	await (await response).finished();
 	await slides.nth(1).locator("img").evaluate(image => image.decode());
-	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]").evaluate(link => link.href), sources[2],
+	assert.equal(await gallery.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]").evaluate(link => link.href), sources[2],
 		"a superseded request cannot replace the newer selected look");
 	assert.match(await gallery.locator("[data-gallery-position]").innerText(), /3 \/ /);
 });
@@ -811,16 +898,17 @@ test("gallery images remain available as ordinary links without JavaScript", opt
 	assert.equal(await gallery.locator(".gallery-controls").isVisible(), false, "inactive JavaScript controls are not exposed");
 	for (const slide of await slides.all()) {
 		assert.equal(await slide.isVisible(), true, "every look remains available without carousel scripting");
-		const link = slide.locator("a[data-image-viewer]");
+		const link = slide.locator(".image-link[data-image-viewer]");
 		assertWithinSite(await link.getAttribute("href"));
 		assert.ok(await link.locator("img").getAttribute("alt"));
+		assertWithinSite(await slide.getByRole("link", { name: "Original capture", exact: true }).getAttribute("href"));
 	}
 });
 
 test("an unavailable gallery image has a reachable fallback and navigation recovers", options, async t => {
 	const page = await pageFor(t);
 	await page.goto(siteUrl());
-	const opener = page.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
 	const original = await opener.evaluate(link => link.href);
 	const broken = new URL(original);
 	broken.searchParams.set("viewer-test", "invalid-image");
@@ -849,7 +937,7 @@ test("an unavailable gallery image has a reachable fallback and navigation recov
 test("a late failure from a previous image cannot overwrite the current gallery selection", { ...options, timeout: 30000 }, async t => {
 	const page = await pageFor(t);
 	await page.goto(siteUrl());
-	const opener = page.locator("[data-gallery-slide]:not([hidden]) a[data-image-viewer]");
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
 	const stale = new URL(await opener.evaluate(link => link.href));
 	stale.searchParams.set("viewer-test", "late-failure");
 	let release, requested, completed;

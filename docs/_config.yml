@@ -45,8 +45,8 @@ plugin_release:
   tag: v1.7.1
   download: https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin
   notes: https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1
-  marketplace_version: 1.7.0.0
-  checked: 2026-10-24
+  marketplace_version: 1.7.1.0
+  checked: 2026-10-27
 
 # Internal release runbooks: kept next to the docs, never published.
 exclude:

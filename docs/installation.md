@@ -34,7 +34,7 @@ The native addon is **unsigned**. A matching checksum identifies the published b
 
 ### Elgato Marketplace
 
-Install from the [Marketplace listing](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). It hands the package to Stream Deck. Checked 24 October 2026: the listing shows **1.7**, with notes for **1.7.0.0**. GitHub's stable release is **1.7.1**, which adds transparent dial backgrounds. Marketplace packaging applies DRM, so do not compare its package hash with the GitHub package hash.
+Install from the [Marketplace listing](https://marketplace.elgato.com/product/hwinfo-sensors-82436166-3d61-4527-9034-8fdf16d92c54). It hands the package to Stream Deck. Checked {{ site.plugin_release.checked | date: "%d %B %Y" }}: the Marketplace release notes identify **{{ site.plugin_release.marketplace_version }}**. Marketplace packaging applies DRM, so do not compare its package hash with the GitHub package hash.
 
 No administrator rights are required to install the plugin. If reading sensors later produces **Access denied**, follow the [access checks](troubleshooting.md#keys-show-access-denied).
 

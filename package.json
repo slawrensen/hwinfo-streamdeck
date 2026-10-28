@@ -51,7 +51,7 @@
 	},
 	"dependencies": {
 		"@elgato/streamdeck": "^2.1.2",
-		"@elgato/utils": "^0.6.0"
+		"@elgato/utils": "^0.6.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

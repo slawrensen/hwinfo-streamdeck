@@ -16,35 +16,35 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
 
 <section class="hero-gallery" data-gallery aria-label="Display looks">
   <div class="gallery-slides">
-    <figure data-gallery-slide data-gallery-title="Cyan">
-      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/cyan-stars.png' | relative_url }}" aria-label="Expand cyan display" data-image-caption="Cyan accents over a star field. Live Stream Deck app capture.">
-        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/cyan-stars.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/cyan-stars.png' | relative_url }}" width="830" height="450" fetchpriority="high" alt="Thirty-six keys with cyan accents and six independent dials over a star field."></picture>
+    <figure data-gallery-slide data-gallery-title="Cosmic Cliffs">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/deck-cliffs-1.8.jpg' | relative_url }}" aria-label="Expand the Cosmic Cliffs deck" data-image-caption="Every key and the strip on Tint, over the Cosmic Cliffs as the page picture. Sample rendering." data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped to the display." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0" data-image-license-url="https://creativecommons.org/licenses/by/4.0/">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/deck-cliffs-1.8.webp' | relative_url }}"><img src="{{ '/assets/img/deck-cliffs-1.8.jpg' | relative_url }}" width="1920" height="1200" fetchpriority="high" alt="A Stream Deck + XL page of 36 Sensor Reading keys with the Cosmic Cliffs showing behind every key, blue sky and stars behind the top rows and orange cliffs behind the lower ones, and one Trend graph across the whole touch strip over the same picture."></picture>
       </a>
-      <figcaption>Cyan accents over a star field. Live Stream Deck app capture.</figcaption>
+      <figcaption>Keys on Tint over a page picture, and one graph across the strip. Sample rendering. Picture: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped.</figcaption>
     </figure>
-    <figure data-gallery-slide data-gallery-title="Green · night">
-      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/green-night.png' | relative_url }}" aria-label="Expand green night display" data-image-caption="Green accents over a dark sky. Live Stream Deck app capture.">
-        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/green-night.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/green-night.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with green accents and six independent dials over a dark sky."></picture>
+    <figure data-gallery-slide data-gallery-title="Nebula">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/deck-nebula-1.8.png' | relative_url }}" aria-label="Expand the Nebula deck" data-image-caption="Background Nebula on the Void theme: the plugin draws the picture. Sample rendering.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/deck-nebula-1.8.webp' | relative_url }}"><img src="{{ '/assets/img/deck-nebula-1.8.png' | relative_url }}" width="1920" height="1200" loading="lazy" decoding="async" alt="The same page on the Void theme with Background Nebula: soft teal and blue clouds drawn by the plugin cross the lower key rows and continue into the touch strip behind an Area graph."></picture>
       </a>
-      <figcaption>Green accents over a dark sky. Live Stream Deck app capture.</figcaption>
+      <figcaption>Nebula, a picture the plugin draws across the deck. Sample rendering.</figcaption>
     </figure>
-    <figure data-gallery-slide data-gallery-title="Violet">
-      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/violet-dusk.png' | relative_url }}" aria-label="Expand violet display" data-image-caption="Violet accents over a dusk gradient. Live Stream Deck app capture.">
-        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/violet-dusk.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/violet-dusk.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with violet accents and six independent dials over a purple-to-orange gradient."></picture>
+    <figure data-gallery-slide data-gallery-title="Deep field">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/deck-deep-field-1.8.jpg' | relative_url }}" aria-label="Expand the deep field deck" data-image-caption="Every key and dial on Outline, over Webb&#x27;s First Deep Field as the page picture. Sample rendering." data-image-credit="Webb&#x27;s First Deep Field: NASA, ESA, CSA, and STScI. Cropped to the display." data-image-credit-url="https://esawebb.org/images/weic2209a/" data-image-license="CC BY 4.0" data-image-license-url="https://creativecommons.org/licenses/by/4.0/">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/deck-deep-field-1.8.webp' | relative_url }}"><img src="{{ '/assets/img/deck-deep-field-1.8.jpg' | relative_url }}" width="1920" height="1200" loading="lazy" decoding="async" alt="The same page with Webb&#x27;s First Deep Field showing at full strength behind every key and behind six independent dials, each word with a thin dark outline."></picture>
       </a>
-      <figcaption>Violet accents over a dusk gradient. Live Stream Deck app capture.</figcaption>
+      <figcaption>Keys and dials on Outline over a page picture. Sample rendering. Picture: <a href="https://esawebb.org/images/weic2209a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped.</figcaption>
     </figure>
-    <figure data-gallery-slide data-gallery-title="Amber">
-      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/amber-dusk.png' | relative_url }}" aria-label="Expand amber display" data-image-caption="Amber accents over a dusk gradient. Live Stream Deck app capture.">
-        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/amber-dusk.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/amber-dusk.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with amber accents and six independent dials over a purple-to-orange gradient."></picture>
+    <figure data-gallery-slide data-gallery-title="Dusk">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/deck-dusk-1.8.png' | relative_url }}" aria-label="Expand the Dusk deck" data-image-caption="Background Dusk on the Ultraviolet theme: the plugin draws the picture. Sample rendering.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/deck-dusk-1.8.webp' | relative_url }}"><img src="{{ '/assets/img/deck-dusk-1.8.png' | relative_url }}" width="1920" height="1200" loading="lazy" decoding="async" alt="The same page on the Ultraviolet theme with Background Dusk: a blue-violet glow behind the lower key rows, the top rows nearly black, and a Trend graph across the touch strip."></picture>
       </a>
-      <figcaption>Amber accents over a dusk gradient. Live Stream Deck app capture.</figcaption>
+      <figcaption>Dusk, drawn by the plugin, with a Trend graph across the strip. Sample rendering.</figcaption>
     </figure>
-    <figure data-gallery-slide data-gallery-title="Green · aurora">
-      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/showcase/gallery/green-aurora.png' | relative_url }}" aria-label="Expand green aurora display" data-image-caption="Green accents over an aurora. Live Stream Deck app capture.">
-        <picture><source type="image/webp" srcset="{{ '/assets/img/showcase/gallery/green-aurora.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/gallery/green-aurora.png' | relative_url }}" width="830" height="450" loading="lazy" decoding="async" alt="Thirty-six keys with green accents and six independent dials over a bright green aurora."></picture>
+    <figure data-gallery-slide data-gallery-title="Stars">
+      <a class="image-link" data-image-viewer data-image-group="home-looks" href="{{ '/assets/img/deck-stars-1.8.png' | relative_url }}" aria-label="Expand the Stars deck" data-image-caption="Background Stars on the Midnight theme: the plugin draws the picture. Sample rendering.">
+        <picture><source type="image/webp" srcset="{{ '/assets/img/deck-stars-1.8.webp' | relative_url }}"><img src="{{ '/assets/img/deck-stars-1.8.png' | relative_url }}" width="1920" height="1200" loading="lazy" decoding="async" alt="The same page on the Midnight theme with Background Stars: small stars in the dark blue behind every key and behind six independent dials."></picture>
       </a>
-      <figcaption>Green accents over an aurora. Live Stream Deck app capture.</figcaption>
+      <figcaption>Stars, drawn by the plugin, behind every key and dial. Sample rendering.</figcaption>
     </figure>
   </div>
   <div class="gallery-controls" hidden>
@@ -81,8 +81,8 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
       <figcaption><h3><a href="{{ '/themes.html#deck-backgrounds-stars-dusk-and-nebula' | relative_url }}">Deck backgrounds <span aria-hidden="true">→</span></a></h3><p>Stars, Dusk or Nebula: one picture the plugin draws across the deck.<br><span class="capture-type">Sample rendering. New in 1.8.</span></p></figcaption>
     </figure>
     <figure>
-      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/key-backgrounds-deck-1.8.png' | relative_url }}" aria-label="Enlarge key background example"><img src="{{ '/assets/img/showcase/key-backgrounds-detail.png' | relative_url }}" width="640" height="400" loading="lazy" decoding="async" alt="A Stream Deck + XL page with every key and dial on Tint over a blue to violet to orange gradient."></a>
-      <figcaption><h3><a href="{{ '/sensor-reading.html#background' | relative_url }}">Key backgrounds <span aria-hidden="true">→</span></a></h3><p>Your page picture, behind each key.<br><span class="capture-type">Sample rendering over a gradient drawn for it. New in 1.8.</span></p></figcaption>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/deck-cliffs-1.8.jpg' | relative_url }}" aria-label="Enlarge key background example" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped to the display." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><img src="{{ '/assets/img/showcase/key-backgrounds-detail.jpg' | relative_url }}" width="640" height="400" loading="lazy" decoding="async" alt="A Stream Deck + XL page with every key and the strip on Tint over the Cosmic Cliffs."></a>
+      <figcaption><h3><a href="{{ '/sensor-reading.html#background' | relative_url }}">Key backgrounds <span aria-hidden="true">→</span></a></h3><p>Your page picture, behind each key.<br><span class="capture-type">Sample rendering. New in 1.8. Cosmic Cliffs: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped.</span></p></figcaption>
     </figure>
   </div>
 </section>

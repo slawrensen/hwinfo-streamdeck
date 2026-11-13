@@ -62,8 +62,10 @@ Shots 10, 11 and 12 need no HWiNFO: `npx tsx scripts/docs-v18-images.mjs`
 draws them with the 1.8 documentation boards from fixed sample values
 (`scripts/lib/boards-18.ts`). Each key and strip slice is drawn by the
 production composers at its place in Elgato's published layout of the
-Stream Deck + XL display. The picture behind the keys in shot 12 is a
-gradient the script draws.
+Stream Deck + XL display. The picture behind the keys in shot 12 is the
+Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/),
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped), from
+`docs/assets/img/showcase/pictures/`; the still's footnote carries the credit.
 
 Shots 1, 3, 5, 6, 7, 8 and the thumbnail render straight from the renderers
 with live HWiNFO running. Shot 8 shows the GPU's fans, so render it with the

@@ -11,6 +11,8 @@
  * is drawn over a page picture cut to the same rects; the glass between
  * the keys is black, as on the device.
  */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import { composeDialSvg, type DialRenderState, type DialSettings } from "../../src/actions/sensor-dial";
@@ -233,8 +235,8 @@ export type DeckSpec = {
 	readonly strip: StripSpec;
 	/** Words in the accent color (Glass, Tint and Outline). */
 	readonly accentWords?: boolean;
-	/** The page picture a see-through look shows: an SVG the size of the LCD. Absent for Theme and the deck backgrounds. */
-	readonly picture?: string;
+	/** The page picture a see-through look shows: an SVG the size of the LCD, or a committed picture file. Absent for Theme and the deck backgrounds. */
+	readonly picture?: string | PictureFile;
 };
 
 export type DeckFaces = { readonly keys: readonly string[]; readonly strip: readonly (string | null)[] };
@@ -287,8 +289,14 @@ export async function stripPng(slices: readonly (string | null)[], scale: number
 	return sharp(flat).composite([{ input: rounded(W, h, Math.round(h * 0.08)), blend: "dest-in" }]).png().toBuffer();
 }
 
-/** A page picture at a deck's LCD size times `scale`, as a PNG. */
-export const picturePng = (picture: string, w: number, h: number): Promise<Buffer> => sharp(Buffer.from(picture)).resize(w, h, { fit: "fill" }).png().toBuffer();
+/** A photograph committed beside the boards, with the credit its license asks for (docs/assets/img/showcase/pictures). */
+export type PictureFile = { readonly file: string; readonly title: string; readonly credit: string; readonly source: string; readonly license: string; readonly licenseUrl: string; readonly changes: string };
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** A page picture at a deck's LCD size times `scale`, as a PNG: a photograph is cropped to the LCD's shape from its center. */
+export const picturePng = (picture: string | PictureFile, w: number, h: number): Promise<Buffer> =>
+	typeof picture === "string" ? sharp(Buffer.from(picture)).resize(w, h, { fit: "fill" }).png().toBuffer() : sharp(path.join(ROOT, picture.file)).resize(w, h, { fit: "cover" }).png().toBuffer();
 
 /**
  * A deck as its LCD shows it, `scale` output px per LCD px: black glass,
@@ -352,12 +360,20 @@ const THEME_NAMES: Readonly<Record<string, string>> = { void: "Void", graphite: 
 
 const trend = (encoders: StripEncoders, background: string, theme: string): StripScene => stripScene({ panes: [{ style: "trend", series: ["cpu", "gpu"] }], encoders, background, theme });
 
+const WEBB = { credit: "NASA, ESA, CSA, and STScI", license: "CC BY 4.0", licenseUrl: "https://creativecommons.org/licenses/by/4.0/", changes: "Cropped to the display and resized." } as const;
+/** The photographs behind the see-through decks: two Webb pictures from ESA/Webb, cropped to the + XL display. */
+export const PICTURES = {
+	cliffs: { file: "docs/assets/img/showcase/pictures/cosmic-cliffs.jpg", title: "Cosmic Cliffs in Carina (NIRCam)", source: "https://esawebb.org/images/weic2205a/", ...WEBB },
+	deepField: { file: "docs/assets/img/showcase/pictures/webb-deep-field.jpg", title: "Webb's First Deep Field (NIRCam)", source: "https://esawebb.org/images/weic2209a/", ...WEBB }
+} as const satisfies Record<string, PictureFile>;
+
 /** The decks the pictures show. */
 export const DECKS = {
 	stars: { device: "plusxl", look: "stars", theme: "midnight", strip: "dials" },
 	dusk: { device: "plusxl", look: "dusk", theme: "ultraviolet", strip: trend(6, "dusk", "ultraviolet") },
 	nebula: { device: "plusxl", look: "nebula", theme: "void", strip: stripScene({ panes: [{ style: "area", series: ["hot"] }], encoders: 6, background: "nebula", theme: "void" }) },
-	tint: { device: "plusxl", look: "tint", theme: "void", strip: "dials", picture: duskPicture(1280, 800) },
+	cliffs: { device: "plusxl", look: "tint", theme: "void", strip: trend(6, "tint", "void"), picture: PICTURES.cliffs },
+	deepField: { device: "plusxl", look: "outline", theme: "void", strip: "dials", picture: PICTURES.deepField },
 	plus: { device: "plus", look: "tint", theme: "void", strip: trend(4, "tint", "void"), picture: duskPicture(800, 480) }
 } as const satisfies Record<string, DeckSpec>;
 
@@ -429,7 +445,23 @@ const facesOf = (spec: DeckSpec): string[] => {
 const stripOf = (scene: StripScene, device: DeviceName = "plusxl"): string[] => stripFaces(device, scene).filter((s): s is string => s !== null);
 const rowOf = (name: string): (typeof STRIP_ROWS)[number] => STRIP_ROWS.find((r) => r.name === name) as (typeof STRIP_ROWS)[number];
 
-const deckBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => deckPng(deck, scale) });
+const rendered = new Map<string, Promise<Buffer>>();
+/** One render of a deck per scale, shared by every board that shows it. */
+function deckOnce(deck: DeckSpec, scale: number): Promise<Buffer> {
+	const name = Object.entries(DECKS).find(([, spec]) => spec === deck)?.[0];
+	if (name === undefined) return deckPng(deck, scale);
+	const key = `${name}@${scale}`;
+	let png = rendered.get(key);
+	if (png === undefined) rendered.set(key, (png = deckPng(deck, scale)));
+	return png;
+}
+/** A board's bytes in the format its file name asks for: PNG as drawn, JPEG for a deck over a photograph, WebP for the copy a page shows inline. */
+async function encoded(file: string, png: Promise<Buffer>): Promise<Buffer> {
+	if (file.endsWith(".jpg")) return sharp(await png).jpeg({ quality: 90, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
+	if (file.endsWith(".webp")) return sharp(await png).webp({ quality: 84 }).toBuffer();
+	return png;
+}
+const deckBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => encoded(file, deckOnce(deck, scale)) });
 
 async function stripBoard(): Promise<Buffer> {
 	const pad = 60;
@@ -511,7 +543,7 @@ async function shotDecks(): Promise<Buffer> {
 	for (const [i, name] of SHOT_DECKS.entries()) {
 		const deck = DECKS[name];
 		const left = 30 + i * (w + 18);
-		layers.push({ input: await fit(await deckPng(deck, 1.5), w, h), left, top: 276 });
+		layers.push({ input: await fit(await deckOnce(deck, 1.5), w, h), left, top: 276 });
 		elements.push(label(left + w / 2, 716, 26, LOOK_NAMES[deck.look] as string, { anchor: "middle", weight: 600 }) + label(left + w / 2, 750, 20, `on the ${THEME_NAMES[deck.theme] as string} theme`, { anchor: "middle", fill: BODY }));
 	}
 	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, layers);
@@ -520,8 +552,8 @@ async function shotDecks(): Promise<Buffer> {
 async function shotKeys(): Promise<Buffer> {
 	const w = 1040;
 	const h = 650;
-	const elements = shotText("Keys over your page picture.", "Background: Glass, Tint, Outline or Clear on a key, as on a dial. Here every key and dial is on Tint.", "sample values drawn by the plugin's renderer · the picture is a gradient drawn for this board");
-	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, [{ input: await fit(await deckPng(DECKS.tint, 1.5), w, h), left: (SHOT.w - w) / 2, top: 218 }]);
+	const elements = shotText("Keys over your page picture.", "Background: Glass, Tint, Outline or Clear on a key, as on a dial. Here every key and the strip are on Tint.", `sample values drawn by the plugin's renderer · picture: Cosmic Cliffs, ${PICTURES.cliffs.credit} (${PICTURES.cliffs.license}), cropped`);
+	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, [{ input: await fit(await deckOnce(DECKS.cliffs, 1.5), w, h), left: (SHOT.w - w) / 2, top: 218 }]);
 }
 
 const IMG = "docs/assets/img";
@@ -530,15 +562,21 @@ export const BOARDS: readonly Board[] = [
 	deckBoard(`${IMG}/deck-stars-1.8.png`, DECKS.stars, 1.5, "A Stream Deck + XL on Midnight with Background Stars on every key and on six independent dials."),
 	deckBoard(`${IMG}/deck-dusk-1.8.png`, DECKS.dusk, 1.5, "A Stream Deck + XL on Ultraviolet with Background Dusk on every key and on a whole-strip Trend graph."),
 	deckBoard(`${IMG}/deck-nebula-1.8.png`, DECKS.nebula, 1.5, "A Stream Deck + XL on Void with Background Nebula on every key and on a whole-strip Area graph."),
-	deckBoard(`${IMG}/key-backgrounds-deck-1.8.png`, DECKS.tint, 1.5, "A Stream Deck + XL on Void with Background Tint on every key and dial, over a dusk gradient as the page picture."),
+	deckBoard(`${IMG}/deck-stars-1.8.webp`, DECKS.stars, 1.5, "The Stars deck again, for the home page to show inline."),
+	deckBoard(`${IMG}/deck-dusk-1.8.webp`, DECKS.dusk, 1.5, "The Dusk deck again, for the home page to show inline."),
+	deckBoard(`${IMG}/deck-nebula-1.8.webp`, DECKS.nebula, 1.5, "The Nebula deck again, for the home page to show inline."),
+	deckBoard(`${IMG}/deck-cliffs-1.8.jpg`, DECKS.cliffs, 1.5, "A Stream Deck + XL on Void with Background Tint on every key and on a whole-strip Trend graph, over the Cosmic Cliffs as the page and strip picture."),
+	deckBoard(`${IMG}/deck-cliffs-1.8.webp`, DECKS.cliffs, 1.5, "The Cosmic Cliffs deck again, for the home page to show inline."),
+	deckBoard(`${IMG}/deck-deep-field-1.8.jpg`, DECKS.deepField, 1.5, "A Stream Deck + XL on Void with Background Outline on every key and on six independent dials, over Webb's First Deep Field as the page and strip picture."),
+	deckBoard(`${IMG}/deck-deep-field-1.8.webp`, DECKS.deepField, 1.5, "The deep field deck again, for the home page to show inline."),
 	deckBoard(`${IMG}/deck-plus-1.8.png`, DECKS.plus, 2, "A Stream Deck + on Void with Background Tint on every key and on a whole-strip Trend graph, over a dusk gradient as the page picture."),
 	{ file: `${IMG}/key-backgrounds-looks-1.8.png`, shows: "Theme, Glass, Tint, Outline and Clear on a one-reading key with a sparkline, a two-reading key and a four-reading key, over a dusk gradient.", faces: lookFaces, draw: looksBoard },
 	{ file: `${IMG}/reading-units-1.8.png`, shows: "One two-reading key of two GPUs' free memory (12100 MB and 453 MB) on Void: on Auto, and with GB and 2 decimals set for each reading.", faces: unitFaces, draw: unitsBoard },
 	{ file: `${IMG}/strip-graphs-1.8.png`, shows: "The nine Strip display graph styles, Group's Tiles view and an Equal split, each across a whole Stream Deck + XL strip on Void.", faces: () => STRIP_ROWS.flatMap((r) => stripOf(r.scene)), draw: stripBoard },
 	{ file: `${IMG}/showcase/strip-detail.png`, shows: "The home page tile: Trend, Heat and Meters, each across a whole Stream Deck + strip on Void.", faces: () => PLUS_STRIPS.flatMap((scene) => stripOf(scene, "plus")), draw: plusStrips },
-	{ file: `${IMG}/showcase/deck-backgrounds-detail.png`, shows: "The home page tile: the Dusk deck, small.", faces: () => facesOf(DECKS.dusk), draw: async () => fit(await deckPng(DECKS.dusk, 1.5), 640, 400) },
-	{ file: `${IMG}/showcase/key-backgrounds-detail.png`, shows: "The home page tile: the Tint deck over the dusk gradient, small.", faces: () => facesOf(DECKS.tint), draw: async () => fit(await deckPng(DECKS.tint, 1.5), 640, 400) },
+	{ file: `${IMG}/showcase/deck-backgrounds-detail.png`, shows: "The home page tile: the Dusk deck, small.", faces: () => facesOf(DECKS.dusk), draw: async () => fit(await deckOnce(DECKS.dusk, 1.5), 640, 400) },
+	{ file: `${IMG}/showcase/key-backgrounds-detail.jpg`, shows: "The home page tile: the Cosmic Cliffs deck, small.", faces: () => facesOf(DECKS.cliffs), draw: async () => encoded(".jpg", fit(await deckOnce(DECKS.cliffs, 1.5), 640, 400)) },
 	{ file: "marketing/shot-10-strip.png", shows: "Marketplace still: Trend, Lanes, Heat and Meters across a whole strip.", faces: () => SHOT_STRIPS.flatMap((n) => stripOf(rowOf(n).scene)), draw: shotStrip },
 	{ file: "marketing/shot-11-deck-backgrounds.png", shows: "Marketplace still: the Stars, Dusk and Nebula decks side by side.", faces: () => SHOT_DECKS.flatMap((n) => facesOf(DECKS[n])), draw: shotDecks },
-	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the dusk gradient.", faces: () => facesOf(DECKS.tint), draw: shotKeys }
+	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the Cosmic Cliffs.", faces: () => facesOf(DECKS.cliffs), draw: shotKeys }
 ];

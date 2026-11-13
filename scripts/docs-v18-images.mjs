@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
-import { BOARD_GLOBALS, BOARDS } from "./lib/boards-18.ts";
+import { BOARD_GLOBALS, BOARDS, PICTURES } from "./lib/boards-18.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = path.resolve(process.argv[2] ?? root);
@@ -33,7 +33,9 @@ for (const board of BOARDS) {
 }
 
 if (filter === undefined) {
+	// The photographs behind the see-through decks, with the credit their license asks for.
+	const pictures = Object.values(PICTURES).map((picture) => ({ ...picture, sha256: sha256(readFileSync(path.join(root, picture.file))) }));
 	const note = "Fixed sample values through the production key, dial and strip composers, each face painted at its place on the device's published layout. Not device captures.";
-	writeFileSync(path.join(out, "docs/assets/img/renderer-images-1.8.provenance.json"), `${JSON.stringify({ version, command: "npx tsx scripts/docs-v18-images.mjs", globals: BOARD_GLOBALS, note, assets }, null, "\t")}\n`);
+	writeFileSync(path.join(out, "docs/assets/img/renderer-images-1.8.provenance.json"), `${JSON.stringify({ version, command: "npx tsx scripts/docs-v18-images.mjs", globals: BOARD_GLOBALS, note, pictures, assets }, null, "\t")}\n`);
 }
 process.exit(0);

@@ -89,6 +89,10 @@ Folding the strip keeps the chosen chip and its source visible. A new key with n
 
 The Stream Deck app can show one picture behind all the keys of a page and another behind the touch strip (right-click a key or the strip, **Set from File...**). That is the way to put a photograph behind the plugin: it costs nothing per frame, and it also shows in empty cells. Set the keys' and dials' **Background** to **Tint** or **Outline** (or **Glass**) so built-in text keeps its 4.5:1 floor over the picture. A dark, calm picture such as a deep field reads best.
 
+<a class="image-link" data-image-viewer href="{{ '/assets/img/deck-deep-field-1.8.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Webb&#x27;s First Deep Field: NASA, ESA, CSA, and STScI. Cropped to the display." data-image-credit-url="https://esawebb.org/images/weic2209a/" data-image-license="CC BY 4.0" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><img src="{{ '/assets/img/deck-deep-field-1.8.jpg' | relative_url }}" width="1920" height="1200" loading="lazy" decoding="async" alt="A Stream Deck + XL page of 36 Sensor Reading keys and six dials, all on Outline, over Webb&#x27;s First Deep Field: galaxies and stars on a black sky show at full strength behind every key and dial, and each word has a thin dark outline."></a>
+
+*Production-rendered fixed sample data, not a device capture: every key and dial on **Outline** on the Void theme. Picture: Webb's First Deep Field ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2209a/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped), standing in for a page and strip picture set in the Stream Deck app.*
+
 The plugin ships no pictures. Many space pictures can be used freely, under conditions:
 
 - **NASA** material is generally not under copyright in the United States. Acknowledge NASA as the source. Pictures on NASA sites credited to someone else, and NASA logos, are not covered, and nothing may suggest NASA endorses what you make.

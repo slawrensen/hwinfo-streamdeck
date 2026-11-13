@@ -64,7 +64,7 @@
 		"e2e:pi-help": "tsx scripts/e2e-pi-help.mjs"
 	},
 	"dependencies": {
-		"@elgato/streamdeck": "^2.1.2",
+		"@elgato/streamdeck": "^3.0.4",
 		"@elgato/utils": "^0.6.0"
 	},
 	"devDependencies": {

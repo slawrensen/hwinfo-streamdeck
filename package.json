@@ -68,7 +68,7 @@
 		"@elgato/utils": "^0.6.0"
 	},
 	"devDependencies": {
-		"@elgato/cli": "1.10.3",
+		"@elgato/cli": "1.10.4",
 		"@eslint/js": "^10.0.1",
 		"@rollup/plugin-commonjs": "^29.0.3",
 		"@rollup/plugin-node-resolve": "^16.0.3",

@@ -13,25 +13,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLUGIN_ROOT, PLUGIN_UUID, STAGING_ONLY } from "./lib/pack-contract.mjs";
-import { validatePack } from "./lib/pack-validation.mjs";
+import { elgatoCli, pinnedElgatoCliVersion } from "./lib/elgato-cli.mjs";
+import { NATIVE_MEMBERS, PLUGIN_ROOT, PLUGIN_UUID, STAGING_ONLY } from "./lib/pack-contract.mjs";
+import { nativeExpectationsFromManifest, validatePack } from "./lib/pack-validation.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** The CLI, as `npm run pack` has always called it: a global install, the
- * exact version the release workflow pins. */
+/** The locked CLI from node_modules (scripts/lib/elgato-cli.mjs), run by
+ * its entry script under this Node: no shell, so the paths go through as
+ * plain arguments. It must be the exact version package.json pins. */
 function runElgatoPacker(stagedDir, outputDir) {
-	// The global CLI is a .cmd shim on Windows, and Node runs a .cmd only
-	// through a shell (it refuses with EINVAL otherwise), so the command is
-	// one quoted line: both paths are this script's own temp and release
-	// directories, quoted whole, and a path carrying a quote or a newline is
-	// refused rather than escaped.
-	for (const arg of [stagedDir, outputDir]) {
-		if (/["\r\n]/.test(arg)) throw new Error(`refusing to pack through a path with a quote or newline: ${arg}`);
-	}
-	const command = process.platform === "win32" ? "streamdeck.cmd" : "streamdeck";
-	const line = [command, "pack", `"${stagedDir}"`, "--output", `"${outputDir}"`, "--force"].join(" ");
-	const result = spawnSync(line, { cwd: repoRoot, stdio: "inherit", shell: true });
+	const cli = elgatoCli(repoRoot);
+	if (cli === null) throw new Error("the Elgato CLI is not installed in node_modules; run `npm ci`");
+	const pinned = pinnedElgatoCliVersion(repoRoot);
+	if (cli.version !== pinned) throw new Error(`node_modules holds @elgato/cli ${cli.version}, package.json pins ${pinned}; run \`npm ci\``);
+	const result = spawnSync(process.execPath, [cli.entry, "pack", stagedDir, "--output", outputDir, "--force"], { cwd: repoRoot, stdio: "inherit" });
 	if (result.error) throw new Error(`streamdeck pack could not start: ${result.error.message}`);
 	if (result.status !== 0) throw new Error(`streamdeck pack exited with ${result.status ?? `signal ${result.signal}`}`);
 }
@@ -55,13 +51,23 @@ function copyStaged(fromDir, toDir, rel) {
 	}
 }
 
+/** The native hashes release-native-manifest.json records, when that file
+ * exists (the release workflow writes it right before packing); an empty
+ * map otherwise. */
+export function nativeExpectations(manifestPath) {
+	if (!fs.existsSync(manifestPath)) return new Map();
+	return nativeExpectationsFromManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
+}
+
 /**
  * Stages, packs, validates. `runPacker(stagedDir, outputDir)` must leave
- * `<outputDir>/<uuid>.streamDeckPlugin` behind; tests inject one. Returns
- * the archive path. Throws (after removing any archive it wrote) when the
- * packer fails or the archive does not pass the gate.
+ * `<outputDir>/<uuid>.streamDeckPlugin` behind; tests inject one.
+ * `expectedNative` (archive path -> sha256) holds the native members to a
+ * native manifest. Returns the archive path. Throws (after removing any
+ * archive it wrote) when the packer fails or the archive does not pass the
+ * gate.
  */
-export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacker = runElgatoPacker, log = console.log }) {
+export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacker = runElgatoPacker, log = console.log, expectedNative = new Map() }) {
 	const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hwinfo-pack-"));
 	const stagedDir = path.join(stagingRoot, PLUGIN_ROOT);
 	const archivePath = path.join(outputDir, `${PLUGIN_UUID}.streamDeckPlugin`);
@@ -74,13 +80,13 @@ export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacke
 		fs.rmSync(archivePath, { force: true });
 		runPacker(stagedDir, outputDir);
 		if (!fs.existsSync(archivePath)) throw new Error(`the packer left no ${path.basename(archivePath)} in ${outputDir}`);
-		const { failures, members, payload } = validatePack({ archiveBytes: fs.readFileSync(archivePath), stagingDir: sourceDir, packageVersion });
+		const { failures, members, payload } = validatePack({ archiveBytes: fs.readFileSync(archivePath), stagingDir: sourceDir, packageVersion, expectedNative });
 		if (failures.length > 0) {
 			throw new Error(`PACK VALIDATION: ${failures.length} failure(s); the archive was removed\n  ${failures.join("\n  ")}`);
 		}
 		log(`PACK VALIDATION: OK (${members} members match the shipping contract and the staged build)`);
 		log(`  bin/plugin.js ${payload.get("bin/plugin.js")}`);
-		log(`  bin/hwsm.node ${payload.get("bin/hwsm.node")}`);
+		for (const rel of NATIVE_MEMBERS) log(`  ${rel} ${payload.get(rel)}${expectedNative.has(rel) ? " (matches the native manifest)" : ""}`);
 		return archivePath;
 	} catch (error) {
 		// Whatever failed, including a packer that wrote its archive and
@@ -95,7 +101,12 @@ export function packWithStaging({ sourceDir, outputDir, packageVersion, runPacke
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
 	try {
-		const archive = packWithStaging({ sourceDir: path.join(repoRoot, PLUGIN_ROOT), outputDir: path.join(repoRoot, "release"), packageVersion });
+		// HWSM_NATIVE_MANIFEST names the manifest to hold the native members
+		// to (qualify.mjs --native-manifest); it must exist when named.
+		const manifestPath = process.env.HWSM_NATIVE_MANIFEST ? path.resolve(process.env.HWSM_NATIVE_MANIFEST) : path.join(repoRoot, "release-native-manifest.json");
+		if (process.env.HWSM_NATIVE_MANIFEST && !fs.existsSync(manifestPath)) throw new Error(`HWSM_NATIVE_MANIFEST names ${manifestPath}, which does not exist`);
+		const expectedNative = nativeExpectations(manifestPath);
+		const archive = packWithStaging({ sourceDir: path.join(repoRoot, PLUGIN_ROOT), outputDir: path.join(repoRoot, "release"), packageVersion, expectedNative });
 		console.log(`packed ${path.relative(repoRoot, archive)}`);
 	} catch (err) {
 		console.error(`pack: ${err.message}`);

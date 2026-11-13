@@ -1164,6 +1164,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 			assert.equal(new URL(await legacy.getAttribute("href"), page.url()).href, siteUrl("legacy/"), "new pages without an archived counterpart link to the legacy homepage");
 			await legacy.click();
 			await page.waitForURL(siteUrl("legacy/"));
+			await page.goto(siteUrl("strip-display.html"));
+			const newer = page.getByRole("link", { name: /^Legacy docs/ });
+			assert.equal(new URL(await newer.getAttribute("href"), page.url()).href, siteUrl("legacy/"), "a page added after the archive links to the legacy homepage, not to a missing archived page");
 		}
 	});
 }

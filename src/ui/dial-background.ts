@@ -10,6 +10,13 @@
  *            1 px edge, black on the dark themes, the background on Paper;
  *   Clear    no background and no edge; every word in one ink.
  *
+ * The art looks draw a picture of their own instead of letting the strip's show
+ * (deck-art.ts ART_LOOKS): Stars, Dusk and Nebula, one scene across the whole deck, keys
+ * and strip, cut per face from the device's published panel layout. They
+ * keep the see-through structure (no overflow rects, cut-not-mask) over an
+ * opaque backdrop, and their text resolves on the brightest color the art
+ * can put under it.
+ *
  * One exact-value reader decides, and anything it does not know draws Theme
  * byte for byte, so a rollback or a hand edit degrades to today's face. On
  * Glass, Tint and Outline, Words in the accent color (dialAccentWords, exact
@@ -26,18 +33,33 @@
  * finished drawing, about one extra full-face draw however much text there
  * is.
  */
-import { svgOpen } from "./key-renderer";
+import { ART_LOOKS, artFits, artMark, artTextPalette, isArtLook } from "./deck-art";
+import { svgOpen } from "./svg-canvas";
 import { GLASS_INK, glassOpen, glassTextPalette, tintOpen } from "./glass";
-import { accentWords, luminance, pictureText, resolveTextColors, type TextColors, type TextSettings } from "./text-colors";
+import { accentWords, appliedTextMode, luminance, pictureText, readableValueColor, resolveTextColors, type TextColors, type TextSettings } from "./text-colors";
 import type { Palette } from "./themes";
 
-export type DialBackground = "theme" | "glass" | "tint" | "outline" | "clear";
+/** Every Background, in the order the panels offer them: the one catalog
+ * for keys, dials and strips (KeyBackground is this type). A test or
+ * fixture that means every look reads this list, so a new look is covered
+ * by default. */
+export const DIAL_BACKGROUNDS = ["theme", "glass", "tint", "outline", "clear", ...ART_LOOKS] as const;
+
+export type DialBackground = (typeof DIAL_BACKGROUNDS)[number];
 
 /** The one reader of DialSettings.dialBackground. Settings are untyped JSON:
  * only the exact stored strings count; absent, "theme", a case or space
  * variant, a retired or newer name and every non-string draw Theme. */
 export function dialBackgroundOf(raw: unknown): DialBackground {
-	return raw === "glass" || raw === "tint" || raw === "outline" || raw === "clear" ? raw : "theme";
+	return raw === "glass" || raw === "tint" || raw === "outline" || raw === "clear" || isArtLook(raw) ? raw : "theme";
+}
+
+/** The look a face draws on a palette: Stars and Nebula draw Theme, byte
+ * for byte, on a light theme (Paper, deck-art.ts artFits). Undefined (a
+ * resolved look not given) draws Theme, as dialFaceOpen does. */
+export function lookOn(look: DialBackground | undefined, palette: Pick<Palette, "bg">): DialBackground {
+	if (look === undefined) return "theme";
+	return isArtLook(look) && !artFits(palette) ? "theme" : look;
 }
 
 /** The one reader of DialSettings.dialAccentWords: only the exact boolean
@@ -45,6 +67,19 @@ export function dialBackgroundOf(raw: unknown): DialBackground {
  * words, and a look without the accentWords trait ignores it. */
 export function dialAccentWordsOf(raw: unknown): boolean {
 	return raw === true;
+}
+
+/** An action's own background look: one of the seven exact names, "theme"
+ * included, else null (absent, the empty value the panel's Default saves,
+ * and anything else), which follows the shared default (shared-looks.ts). */
+export function ownBackgroundOf(raw: unknown): DialBackground | null {
+	return raw === "theme" || raw === "glass" || raw === "tint" || raw === "outline" || raw === "clear" || isArtLook(raw) ? raw : null;
+}
+
+/** An action's own Words in the accent color: the exact boolean, else null,
+ * which follows the shared default (shared-looks.ts). */
+export function ownAccentWordsOf(raw: unknown): boolean | null {
+	return raw === true || raw === false ? raw : null;
 }
 
 export type DialBackgroundTraits = {
@@ -79,7 +114,14 @@ const TRAITS: Readonly<Record<DialBackground, DialBackgroundTraits>> = {
 	glass: { ink: true, overflowRects: false, halo: false, band: true, underFill: true, statusBar: true, backings: false, accentWords: true },
 	tint: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false, accentWords: true },
 	outline: { ink: false, overflowRects: false, halo: true, band: false, underFill: false, statusBar: false, backings: false, accentWords: true },
-	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true, accentWords: false }
+	clear: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: false, backings: true, accentWords: false },
+	// The art looks: an opaque backdrop of their own, so structure keeps the
+	// theme's track; no overflow rect and no selected-row band (over the art
+	// each shows as a dark slab), so the selected row keeps its label-token
+	// words, as on Tint and Outline.
+	stars: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: true, backings: false, accentWords: false },
+	nebula: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: true, backings: false, accentWords: false },
+	dusk: { ink: false, overflowRects: false, halo: false, band: false, underFill: true, statusBar: true, backings: false, accentWords: false }
 };
 
 export function dialBackgroundTraits(background: DialBackground | undefined): DialBackgroundTraits {
@@ -123,12 +165,26 @@ export function haloRingColor(palette: { bg: string }): string {
  * everything the group draws plus its ring: nothing outside it is drawn.
  */
 function haloFilterDefs(ring: string, top: number, height: number): string {
+	return haloFilterDefsAt(ring, 0, top, 200, height);
+}
+
+/**
+ * The Outline filter over any region in user units. A touch strip slice
+ * (src/strip/slicer.ts) widens it past the slice edges so marks that
+ * continue into the neighbouring slice reach the dilation wherever the
+ * renderer draws a filter region outside the viewport (QtSvg 6.9 draws a
+ * filtered group into a buffer the size of its filter region, so it does).
+ * Independent faces keep the 200 px slot region through haloFilterDefs,
+ * byte for byte. `id` names a second filter in the same SVG (the strip's
+ * row words, src/strip/scene.ts ROWS_FILTER).
+ */
+export function haloFilterDefsAt(ring: string, x: number, top: number, width: number, height: number, id = "h"): string {
 	const black = ring === "#000000";
 	const src = black ? "SourceAlpha" : "k";
 	const node = (input: string): string => `<feMergeNode in="${input}"/>`;
 	const ringLayers = `${node("c")}${node("d")}${node("q")}`;
 	return [
-		`<defs><filter id="h" filterUnits="userSpaceOnUse" x="0" y="${top}" width="200" height="${height}" color-interpolation-filters="sRGB">`,
+		`<defs><filter id="${id}" filterUnits="userSpaceOnUse" x="${x}" y="${top}" width="${width}" height="${height}" color-interpolation-filters="sRGB">`,
 		black ? "" : `<feFlood flood-color="${ring}"/><feComposite in2="SourceGraphic" operator="in" result="k"/>`,
 		`<feOffset in="${src}" dx="-1" result="a"/><feOffset in="${src}" dx="1" result="b"/>`,
 		`<feMerge result="q">${node("a")}${node("b")}${node(src)}</feMerge>`,
@@ -147,7 +203,8 @@ export const HALO_CLOSE = "</g></svg>";
  * text band, or the whole slot). */
 export function dialFaceOpen(background: DialBackground | undefined, palette: Palette, haloTop = 0, haloHeight = 100): string[] {
 	const [head, opaque] = svgOpen(200, 100, palette.bg) as [string, string];
-	switch (background ?? "theme") {
+	const look = background ?? "theme";
+	switch (look) {
 		case "glass":
 			return [head, glassOpen(palette)];
 		case "tint":
@@ -156,6 +213,10 @@ export function dialFaceOpen(background: DialBackground | undefined, palette: Pa
 			return [head, haloFilterDefs(haloRingColor(palette), haloTop, haloHeight)];
 		case "clear":
 			return [head];
+		case "stars":
+		case "nebula":
+		case "dusk":
+			return [head, artMark(look, 200, 100, palette)];
 		default:
 			return [head, opaque];
 	}
@@ -167,9 +228,10 @@ export function structureFill(background: DialBackground | undefined, palette: P
 }
 
 /** The palette text resolves on: Glass resolves on its hardest panel and
- * band (glass.ts); every other look on the theme's own tokens. */
+ * band (glass.ts), Stars and Nebula on the brightest color their art can
+ * put under text (deck-art.ts); every other look on the theme's own tokens. */
 export function dialTextPalette(background: DialBackground | undefined, palette: Palette): Palette {
-	return background === "glass" ? glassTextPalette(palette) : palette;
+	return background === "glass" ? glassTextPalette(palette) : isArtLook(background) ? artTextPalette(background, palette) : palette;
 }
 
 /** The see-through looks' text rule over resolved colors (see pictureText):
@@ -177,8 +239,11 @@ export function dialTextPalette(background: DialBackground | undefined, palette:
  * Tint's panel can be as light as the picture under it, so its text reads on
  * the edge, like Outline's. With `accent` (the exact-true dialAccentWords)
  * Glass, Tint and Outline then draw their words in the accent (accentWords),
- * lifted on the same surface; Theme and Clear ignore it. */
+ * lifted on the same surface; Theme and Clear ignore it. Stars and Nebula
+ * keep the colors resolved on their ceiling and lift the badge there too
+ * (the strip's pause and stat badges), as a key does, unless Custom. */
 export function dialPictureText(background: DialBackground | undefined, text: TextColors, surface: string, settings: TextSettings, accent = false): TextColors {
+	if (isArtLook(background)) return appliedTextMode(settings) === "custom" ? text : { ...text, badge: readableValueColor(text.badge, surface) };
 	const picture = background === "outline" || background === "tint" ? pictureText(text, surface, settings, 0.3) : background === "clear" ? pictureText(text, surface, settings, 0) : text;
 	return accent && dialBackgroundTraits(background).accentWords ? accentWords(picture, surface, settings) : picture;
 }

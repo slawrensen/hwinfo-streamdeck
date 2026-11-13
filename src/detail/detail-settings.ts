@@ -6,6 +6,7 @@
  * never rewrites what it cannot parse.
  */
 import { HEX6 } from "../ui/text-colors";
+import type { ManagedDetailProfile, SlotCell } from "./managed-profiles";
 
 /** What a key press does; absent or unrecognized values mean "cycle-stat". */
 export type PressBehavior = "cycle-stat" | "open-details" | "tap-cycle-hold-details";
@@ -42,14 +43,45 @@ export function detailModeOf(settings: { detailMode?: unknown }): DetailMode {
 	return settings.detailMode === "custom" ? "custom" : settings.detailMode === "filter" ? "filter" : "source";
 }
 
-/** The filter pattern, trimmed and capped; empty and non-string unset. */
+/** Separates the alternatives of one filter pattern (issue #35). Always a
+ *  separator, never escaped: HWiNFO's own names do not contain it, and
+ *  `?` still matches one in a sensor renamed to include it. */
+export const DETAIL_FILTER_SEPARATOR = "|";
+
+/**
+ * The alternatives of a filter pattern, in typed order: split on every
+ * {@link DETAIL_FILTER_SEPARATOR}, each piece trimmed with the same
+ * String.prototype.trim as the outer trim (interior spaces stay
+ * literal), empty pieces dropped. A pattern made only of separators and
+ * spaces has none. The panel mirrors this in ui/pi-model.js
+ * (detailFilterAlternatives); keep the two in sync.
+ */
+export function detailFilterAlternatives(pattern: string): readonly string[] {
+	const alternatives: string[] = [];
+	for (const piece of pattern.split(DETAIL_FILTER_SEPARATOR)) {
+		const trimmed = piece.trim();
+		if (trimmed !== "") {
+			alternatives.push(trimmed);
+		}
+	}
+	return alternatives;
+}
+
+/**
+ * The filter pattern, trimmed and then capped at {@link DETAIL_FILTER_MAX}
+ * as one string (the cap counts every separator and space, before any
+ * split). Non-string, empty, and a pattern whose alternatives are all
+ * empty (`|`, ` | | `) are unset, so entry refuses like an empty field.
+ * Otherwise the whole capped text is returned as typed: it doubles as
+ * the view's title.
+ */
 export function detailFilterOf(settings: { detailFilter?: unknown }): string | undefined {
 	const raw = settings.detailFilter;
 	if (typeof raw !== "string") {
 		return undefined;
 	}
 	const trimmed = raw.trim().slice(0, DETAIL_FILTER_MAX);
-	return trimmed === "" ? undefined : trimmed;
+	return detailFilterAlternatives(trimmed).length === 0 ? undefined : trimmed;
 }
 
 /**
@@ -59,13 +91,22 @@ export function detailFilterOf(settings: { detailFilter?: unknown }): string | u
  * (`4090` behaves as `*4090*`), so the obvious thing typed does the
  * obvious thing. Tested against the source name and reading label
  * TOGETHER, which the resolver documents and the panel help states.
- * The panel's live match counter (`detailFilterMatcher` in
- * ui/pi-common.js) mirrors this matcher; keep the two in sync.
+ * A pattern containing {@link DETAIL_FILTER_SEPARATOR} is a union: each
+ * of its {@link detailFilterAlternatives} keeps those rules on its own
+ * (its own substring wrap or anchoring), and a candidate matches when
+ * any alternative does. A pattern without one takes exactly the
+ * single-pattern path under the same cache key, so every filter saved
+ * before the union existed keeps its meaning. The panel's live match
+ * counter (`detailFilterMatcher` in ui/pi-model.js) mirrors this
+ * matcher; keep the two in sync.
  *
  * Memoized: source-mode groups re-resolve every fresh snapshot and a
  * filter session does the same, so the same pattern would otherwise
  * recompile per tick per device. One live pattern per opener makes a
- * tiny cache the natural shape (bounded, insertion-evicted).
+ * tiny cache the natural shape (bounded, insertion-evicted). A union
+ * takes ONE entry, keyed by its full pattern; its alternatives compile
+ * beside the cache, never through it, so a long union cannot evict the
+ * other openers' live patterns.
  */
 const COMPILED_FILTER_CACHE = new Map<string, (candidate: string) => boolean>();
 const COMPILED_FILTER_CACHE_MAX = 16;
@@ -136,14 +177,33 @@ function globMatch(pattern: readonly number[], candidate: readonly number[]): bo
 	return pi === pattern.length;
 }
 
+/** One alternative's folded glob: substring-wrapped unless it carries a
+ *  wildcard, in which case it is anchored to the whole candidate. */
+function compileGlob(pattern: string): readonly number[] {
+	return foldedUnits(/[*?]/.test(pattern) ? pattern : `*${pattern}*`);
+}
+
+function compileUncached(pattern: string): (candidate: string) => boolean {
+	if (!pattern.includes(DETAIL_FILTER_SEPARATOR)) {
+		const compiled = compileGlob(pattern);
+		return (candidate: string): boolean => globMatch(compiled, foldedUnits(candidate));
+	}
+	const alternatives = detailFilterAlternatives(pattern).map(compileGlob);
+	// The candidate folds once and every alternative walks the same units.
+	// The alternatives share the one 128-character cap, so a union's worst
+	// case stays linear in that cap times the candidate, like one pattern.
+	return (candidate: string): boolean => {
+		const folded = foldedUnits(candidate);
+		return alternatives.some((alternative) => globMatch(alternative, folded));
+	};
+}
+
 export function compileDetailFilter(pattern: string): (candidate: string) => boolean {
 	const cached = COMPILED_FILTER_CACHE.get(pattern);
 	if (cached !== undefined) {
 		return cached;
 	}
-	const anchored = /[*?]/.test(pattern) ? pattern : `*${pattern}*`;
-	const compiled = foldedUnits(anchored);
-	const matcher = (candidate: string): boolean => globMatch(compiled, foldedUnits(candidate));
+	const matcher = compileUncached(pattern);
 	if (COMPILED_FILTER_CACHE.size >= COMPILED_FILTER_CACHE_MAX) {
 		const oldest = COMPILED_FILTER_CACHE.keys().next().value;
 		if (oldest !== undefined) {
@@ -334,4 +394,109 @@ export function detailKeysOf(settings: { detailKeys?: unknown }): readonly strin
 export function detailTitleOf(settings: { detailTitle?: unknown }): string | undefined {
 	const raw = settings.detailTitle;
 	return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : undefined;
+}
+
+/** The most logical pages an opener's intentional empty cells describe;
+ * pages past them flow around the navigation tiles and the mirror alone. */
+export const DETAIL_GAP_PAGES_MAX = 16;
+
+/**
+ * The opener's intentional empty cells (detailGaps) on one bundle, page
+ * by page, exactly as stored: `{ [bundle key]: [[{ column, row }, ...] per
+ * logical page] }`. Positional, so they apply in every list mode, and
+ * kept per bundle, so a deck class that never had a layout keeps
+ * flowing. Salvage, never a throw and never a rewrite:
+ * - a non-object, a missing or unknown bundle key, or a non-array bundle
+ *   value is no gaps at all;
+ * - a page that is not an array is a page without gaps, kept in place so
+ *   later pages never shift;
+ * - inside a page, a cell that is not an object, has a non-integer
+ *   column or row, is not one of the bundle's reading cells (outside the
+ *   grid or a navigation cell), or repeats an earlier cell is dropped;
+ * - pages past {@link DETAIL_GAP_PAGES_MAX} are ignored, and trailing
+ *   pages without gaps are dropped.
+ * A page here may still cover every reading cell: the Page layout
+ * preview shows such a page as stored, while the deck reads
+ * {@link detailGapsOf}, which ignores it.
+ */
+export function storedDetailGapsOf(settings: { detailGaps?: unknown }, profile: Pick<ManagedDetailProfile, "key" | "layout">): readonly (readonly SlotCell[])[] {
+	const raw = settings.detailGaps;
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw) || !Object.hasOwn(raw, profile.key)) {
+		return [];
+	}
+	const pages = (raw as Record<string, unknown>)[profile.key];
+	if (!Array.isArray(pages)) {
+		return [];
+	}
+	const readingCells = new Set(profile.layout.readings.map((cell) => `${cell.column},${cell.row}`));
+	const out: SlotCell[][] = [];
+	for (const page of pages.slice(0, DETAIL_GAP_PAGES_MAX)) {
+		const cells: SlotCell[] = [];
+		const seen = new Set<string>();
+		for (const entry of Array.isArray(page) ? page : []) {
+			if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
+			const { column, row } = entry as { column?: unknown; row?: unknown };
+			if (typeof column !== "number" || typeof row !== "number" || !Number.isInteger(column) || !Number.isInteger(row)) continue;
+			const id = `${column},${row}`;
+			if (!readingCells.has(id) || seen.has(id)) continue;
+			seen.add(id);
+			cells.push({ column, row });
+		}
+		out.push(cells);
+	}
+	return withoutTrailingEmpty(out);
+}
+
+/**
+ * The opener's intentional empty cells (detailGaps) on one bundle, page
+ * by page, as the deck applies them: {@link storedDetailGapsOf}, with a
+ * page whose gaps would cover every reading cell ignored for that page.
+ * An opener whose layout holds no gap anywhere returns [] and takes the
+ * exact legacy flow. Separate from the detailKeys/detailTiles/
+ * detailTilesVersion triplet: gaps reserve cells, they never enter the
+ * tile walk.
+ */
+export function detailGapsOf(settings: { detailGaps?: unknown }, profile: Pick<ManagedDetailProfile, "key" | "layout">): readonly (readonly SlotCell[])[] {
+	const all = new Set(profile.layout.readings.map((cell) => `${cell.column},${cell.row}`)).size;
+	return withoutTrailingEmpty(storedDetailGapsOf(settings, profile).map((cells) => (cells.length >= all ? [] : cells)));
+}
+
+function withoutTrailingEmpty(pages: readonly (readonly SlotCell[])[]): readonly (readonly SlotCell[])[] {
+	let end = pages.length;
+	while (end > 0 && (pages[end - 1] as readonly SlotCell[]).length === 0) {
+		end--;
+	}
+	return end === pages.length ? pages : pages.slice(0, end);
+}
+
+/** The most detail-page sources one hand-placed key can be limited to. */
+export const DETAIL_SCOPE_MAX = 32;
+
+/**
+ * The detail pages a hand-placed Sensor Reading key belongs to
+ * (detailScope: `{ sources: [...] }`), as HWiNFO source ids: a Shared
+ * Memory sensor's `sensorIdHex:instance`, or the Gadget source name. Kept
+ * byte for byte (a Gadget name may end in a space), exact duplicates and
+ * non-string or empty entries dropped, capped at {@link DETAIL_SCOPE_MAX}.
+ * Undefined, the default, means the key shows on every detail page the
+ * way it always has: an absent field, a non-object, a non-array
+ * `sources` and a list left with no usable entry all land there. Never
+ * thrown on, never rewritten.
+ */
+export function detailScopeOf(settings: { detailScope?: unknown }): readonly string[] | undefined {
+	const raw = settings.detailScope;
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+		return undefined;
+	}
+	const sources = (raw as { sources?: unknown }).sources;
+	if (!Array.isArray(sources)) {
+		return undefined;
+	}
+	const out: string[] = [];
+	for (const entry of sources) {
+		if (typeof entry !== "string" || entry === "" || out.includes(entry)) continue;
+		out.push(entry);
+		if (out.length >= DETAIL_SCOPE_MAX) break;
+	}
+	return out.length === 0 ? undefined : out;
 }

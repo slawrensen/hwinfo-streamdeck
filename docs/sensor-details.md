@@ -16,7 +16,7 @@ Practical consequences:
 
 - The first time you open details on a deck, the Stream Deck app asks to install that deck's detail profile. Accept once; later entries switch silently.
 - The page is a normal, editable profile, but it ships with every cell already filled: reading tiles, the Back tile, the title and the pagers. Adding a key of your own means replacing one of those, not filling a gap. The plugin never repairs or overwrites what you change. The shipped page holds no data of yours: every tile asks the plugin what to show at runtime.
-- What you change on that page is shared. There is one detail page per deck type, so a key you add, or a tile you replace, appears on every drill-down you open on that deck no matter which key you pressed. What still follows the key you pressed is the live content: the reading tiles, the title, the pager range and, until you pick a sensor for it, the Back tile's face.
+- What you change on that page is shared. There is one detail page per deck type, so a key you add, or a tile you replace, appears on every drill-down you open on that deck no matter which key you pressed. What still follows the key you pressed is the live content: the reading tiles, the title, the pager range and, until you pick a sensor for it, the Back tile's face. Two settings give each key its own layout on that shared page: **Page layout** keeps chosen cells empty for one key's drill-down, and a Sensor Reading key you placed on the page can be limited to the drill-downs of some sensors. Both are described under [Each key's own layout](#each-keys-own-layout).
 - To get the shipped page back, delete the profile under Preferences, Profiles in the Stream Deck app, then open a drill-down again and accept the install. There is no reset inside the plugin, because a plugin cannot edit or repair a profile you already have installed.
 - If what you want is a page you lay out yourself, with your own multi-reading keys on it, make a Stream Deck folder instead: right-click a key in the Stream Deck app and choose Create Folder. That is the app's own feature, not this plugin's, and unlike the detail page it belongs to that one key. The trade is that a folder's opener key shows a static icon, while a drill-down key shows a live reading.
 - The Stream Deck app never updates a profile that is already installed. When a plugin update changes the page itself, it ships as a new profile revision under a new internal identity, the next drill-down asks once to install it, and the previously installed copy stays untouched in your profile list. Upgrading from a preview works that way, but the release name is "HWiNFO Details" again: remove the preview's detail profiles first, or the new one installs alongside them as "HWiNFO Details copy".
@@ -33,6 +33,7 @@ Open **Press** in the Sensor Reading settings:
 | **Title tile text** | A name for the page, or leave it blank for the sensor name, filter pattern or **Custom set**. |
 | **Also go back from this key's own position** | Keeps a second Back tile at the opener's position. On by default. |
 | **Details list** | All other readings from this sensor, a custom list, or readings matching a filter. See [Choosing the list](#choosing-the-list). |
+| **Page layout** | A fold under the list that keeps chosen cells of the detail page empty for this key's drill-down, page by page. See [Each key's own layout](#each-keys-own-layout). |
 
 Custom lists can mix tile sizes, labels and colors. Use [Editing custom tiles](#editing-custom-tiles) for grouping and drag behavior. Sensor and filter lists update with HWiNFO and cannot pin fixed tile groups.
 
@@ -52,7 +53,7 @@ Since 1.7.1, when a confirmed link or a new **Reading** pick makes a listed key 
 
 A tile layout last saved by 1.7.0 keeps the 1.7.0 rule until you next edit the list or a tile, so after such a link or pick its labels and colors can sit one reading off. To move it to the new rule, undo the link or the pick, make any edit while the labels sit right, then link or pick again. That edit stores the tile sizes 1.7.0 would store: a hidden reading that keeps its place takes the cell 1.7.0 gives it, so its tile shows one reading fewer until you undo the link or the pick, and if the edit grows that tile, the next size you pick grows it. When two keys for the opener's reading sit after the last reading your tiles show, an edit made while both are hidden keeps the 1.7.0 rule; the next edit made while one of them shows moves the layout. If you go back to 1.7.0 and edit a list that 1.7.1 saved, then update again, the layout can read one reading off while such a link or pick stands: undo it, make any edit, and link or pick again.
 
-**Readings matching a filter** matches the combined sensor name and reading label across every sensor the current data source publishes. Matches update each poll. The panel shows a match count, and the pattern becomes the title unless you set one. See [Filter patterns](#filter-patterns) for examples.
+**Readings matching a filter** matches the combined sensor name and reading label across every sensor the current data source publishes. Matches update each poll, and `|` combines patterns: `4090 | pump` lists the card plus the pump. The panel shows a match count, and the pattern becomes the title unless you set one. See [Filter patterns](#filter-patterns) for examples.
 
 ### Editing custom tiles
 
@@ -94,6 +95,39 @@ A hand-grouped custom list mixes sizes on one page: here a single, a stacked pai
 
 If HWiNFO stops publishing while the view is open, the tiles show the same status screens as ordinary keys and recover on their own; Back keeps working throughout. If a listed reading disappears (custom mode), its tile shows **Sensor missing** in place, and the others do not shift.
 
+## Each key's own layout
+
+The detail page is one shared page per deck type, so on its own it cannot look different for the CPU key and the GPU key. Two settings change that without a second profile.
+
+### Empty cells: Page layout
+
+Open **Press**, then the **Page layout** fold under the list. It draws the detail page the way this kind of deck lays it out for this key, from live HWiNFO data, one page at a time; **Previous** and **Next** step through the pages.
+
+- Press a reading cell to keep it empty on that page. The tiles move on to the next free cell, so no reading is hidden: the page holds one tile fewer, and the readings that tile would have carried (one, or more with **Readings per tile** above one or a grouped tile) move on to the following pages. Press the cell again to let a reading back in.
+- Each page has its own empty cells, up to page 16. Pages past the ones you set fill every cell as before. The fold counts every page the list fills, and **Next** stops at page 16.
+- The layout is kept per kind of deck. Empty cells set on a Stream Deck XL do not apply to a 15-key deck, and a Virtual Stream Deck resized into another layout (see [Supported decks](#supported-decks)) shows the plain order until you set cells for that layout too.
+- It works with every **Details list** choice, because it is about positions on the page, not about which readings are listed. Tile groups, labels and colors of a custom list are untouched.
+- The navigation cells and this key's own cell while the second Back is on cannot be emptied, and the last cell left for readings on a page stays one. If a page's empty cells and the second Back leave no cell for readings, for example after you tick **Also go back from this key's own position** again, the deck ignores that page's empty cells and the fold says so.
+- On the deck an empty cell always draws the page's blank tile, also while HWiNFO is down and the other cells show the status screen, and pressing it does nothing.
+- If you replaced the tile at that position with a key of your own, there is nothing left to keep empty there and the readings flow as they did.
+- Each press saves this one setting once. Opening the fold, paging through it and folding it away save nothing. Version 1.7.1 and earlier ignore the setting and show the plain order.
+
+### Keys you place on the detail page
+
+A Sensor Reading key you put on the detail page shows on every drill-down on that deck. To keep it on the drill-downs of one sensor:
+
+1. Open the drill-down from a key whose reading belongs to that sensor.
+2. Select the key you placed. At the top of its settings panel, press **Show only on** *sensor name* **detail pages**.
+
+On a drill-down opened from any other sensor's key, that key then shows a blank tile and a press does nothing. To add another sensor, open its drill-down, select the key and press **Also show on** *sensor name* **detail pages**. The panel lists the sensors the key is limited to, each with **Remove**; removing every one shows the key on all drill-downs again. Off the detail page, for example after you copy it elsewhere, the key works as an ordinary key.
+
+What counts:
+
+- The sensor is the HWiNFO sensor that the drill-down key's own reading belongs to, in every **Details list** mode. A filter drill-down opened from a CPU temperature key counts as a CPU drill-down, whatever the filter lists.
+- With Shared Memory the plugin records the sensor by HWiNFO's sensor id, so renaming the sensor in HWiNFO keeps the setting. Gadget publishes no sensor ids, so there it records the sensor name as HWiNFO writes it. A key limited while one data source was in use does not match the same sensor on the other: if the data source changes, press **Also show on** once more on that drill-down.
+- If the drill-down key's own reading is missing when the page opens, a limited key stays blank until the reading comes back.
+- Only this plugin's Sensor Reading keys can be limited. Keys from other plugins and the Stream Deck app's own actions on the detail page show on every drill-down, because a plugin cannot hide another plugin's key. The Back tile is never limited.
+
 ## Configuring the Back tile
 
 The Back tile is an ordinary Sensor Reading key with one fixed job. Select it in the Stream Deck app and its settings panel opens with everything a normal key has: the **Reading** picker, **Label on the key**, **Readings on this key** (one to four readings), the theme strip, **Text color**, **Value shown**, **Decimals**, **°F**, **Graph under the value**, and **Warn at** / **Critical at**. Its header reads *Back tile · sensor detail view*. Two things differ, both stated in the panel:
@@ -105,13 +139,14 @@ Copying the Back tile elsewhere copies the fixed role with it: a pasted copy sti
 
 ## Filter patterns
 
-The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one character, everything else is literal, and case never matters. Every reading is tested against one string: the sensor name, a single space, then the label. For the 4090's first fan that text is `dGPU [#0]: NVIDIA GeForce RTX 4090 GPU Fan1` (the middle of the sensor name is shortened here), which is why one pattern can select by card, by quantity, or across every sensor at once, and why anchored patterns must account for the sensor name at the front. Three rules cover all of it:
+The filter is a glob, not a regex: `*` spans anything, `?` matches exactly one character, `|` separates patterns (rule 4), everything else is literal, and case never matters. Every reading is tested against one string: the sensor name, a single space, then the label. For the 4090's first fan that text is `dGPU [#0]: NVIDIA GeForce RTX 4090 GPU Fan1` (the middle of the sensor name is shortened here), which is why one pattern can select by card, by quantity, or across every sensor at once, and why anchored patterns must account for the sensor name at the front. Four rules cover all of it:
 
 1. **Plain text matches anywhere.** A pattern with no wildcard behaves as if wrapped in `*...*`, so `4090` and `*4090*` are the same filter.
 2. **One wildcard anchors the whole pattern.** The moment a pattern contains `*` or `?`, the automatic wrapping is off and the pattern must cover the entire combined text. `core*clock` matches nothing, because the text starts with the sensor name, not with "core"; `*core*clock*` is the form you want.
 3. **Spaces are literal.** Multi-word plain text works only when the words sit adjacent in the name: `gpu fan` finds the GPU fans, but `core clock` finds nothing because the cores are named `Core 0 Clock`. Span the gap with a star: `*core*clock*`.
+4. **`|` adds another pattern.** A filter can hold several patterns separated by `|`, and a reading is listed when any one of them matches. Each pattern follows rules 1 to 3 on its own: `4090|ccd2` lists the whole card plus every CCD2 reading, and in `4090*|ccd2` the star anchors only `4090*`, so `ccd2` still matches anywhere. Spaces around each pattern are trimmed (`4090 | ccd2` is the same filter), while spaces inside one stay literal. The list keeps HWiNFO's order, not the order you typed the patterns in, and a reading two patterns match is listed once. Version 1.7.1 and earlier read `|` as a plain character, so a filter that uses it opens an empty view (`0 / 0`) there.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/detail-filter-panel.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/detail-filter-panel.png' | relative_url }}" width="800" height="696" loading="lazy" decoding="async" alt="Part of the Press section of the settings panel, from the note about installing the bundled detail view down: Readings per tile at One, an empty Title tile text field, an unticked Also go back from this key&#x27;s own position, and Details list set to Readings matching a filter; the Filter field holds the pattern star GPU star, a live hint under it reads Matches 93 readings right now, then the help text on how patterns match and the How the detail view works link."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/detail-filter-panel.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/detail-filter-panel.png' | relative_url }}" width="800" height="696" loading="lazy" decoding="async" alt="Part of the Press section of the settings panel, from the note about installing the bundled detail view down: Readings per tile at One, an empty Title tile text field, an unticked Also go back from this key&#x27;s own position, and Details list set to Readings matching a filter; the Filter field holds the pattern star GPU star, a live hint under it reads Matches 94 readings right now, then the help text on how patterns match and the How the detail view works link."></a>
 
 Patterns I ran on my bench in July 2026, when it held an RTX 4090 (512 readings across 21 sensors), with their match counts then:
 
@@ -127,7 +162,13 @@ Patterns I ran on my bench in July 2026, when it held an RTX 4090 (512 readings 
 | `?PU*` | 270 | sensors whose name starts with any one character plus "PU" (anchored start) |
 | `*` | everything | all readings, paginated |
 
-Two edges worth knowing: an empty pattern refuses entry with the alert cue (there is nothing to list), and a pattern that matches nothing opens an empty view reading `0 / 0`. Two more: leading and trailing spaces are trimmed (spaces only count inside the pattern), and everything past 128 characters is cut. The panel's live count reflects all of this before you press.
+Combining patterns with `|`:
+
+- `4090 | ccd2`: the whole card plus every reading labelled with CCD2.
+- `tdie | *hot*spot*`: the three Tdie temperatures and both hot spots.
+- `gpu fan | pump`: the card's fans and the pump.
+
+Two edges worth knowing: an empty pattern refuses entry with the alert cue (there is nothing to list), and a pattern that matches nothing opens an empty view reading `0 / 0`. Two more: leading and trailing spaces are trimmed (spaces only count inside the pattern), and everything past 128 characters is cut. The 128 characters count the whole filter, every `|` and space included, and the cut happens before the filter is split into patterns. Empty patterns are skipped, so a doubled or trailing `|` changes nothing in the list, though the title tile still shows the filter as you typed it unless you set **Title tile text**; a filter made only of `|` and spaces counts as empty. `|` always separates and cannot be escaped; HWiNFO's own sensor names and labels do not contain it, and a name you renamed to include one still matches a `?` in that spot. The panel's live count reflects all of this before you press.
 
 ## Supported decks
 

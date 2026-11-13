@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="#new-in-18">New in 1.8</a> ·
   <a href="#install">Install</a> ·
   <a href="#keys">Keys</a> ·
   <a href="#dials">Dials</a> ·
@@ -31,14 +32,9 @@
 </p>
 
 > [!NOTE]
-> **1.7.1** lets a Sensor Dial show the touch strip picture behind it: set
-> **Background** to Glass, Tint, Outline or Clear. See
-> [Transparent background](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-dial.html#transparent-background).
->
-> **1.7** redesigns the settings panels, adds individual dial colors and
-> changes how sources, saved readings and HWiNFO's statistics are handled.
-> The upgrade rewrites no stored settings; [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html)
-> says where an upgrade needs you to act.
+> **1.8** joins Sensor Dials into one graph across the touch strip and gives
+> each reading its own alert limits, among other additions. Some of it is not
+> yet checked on real hardware; [New in 1.8](#new-in-18) says what was tested.
 
 ## Install
 
@@ -52,6 +48,19 @@
 > [HWiNFO Pro](https://www.hwinfo.com/licenses/), which has no limit.
 
 **More:** [Getting started](https://docs.slawrensen.com/hwinfo-streamdeck/getting-started.html) · [Data sources](https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html)
+
+## New in 1.8
+
+- **Strip display**: join the Sensor Dials of a Stream Deck + or + XL into one graph across the touch strip, or two side by side. A graph is one of nine styles: Trend, Area, Compare, Lanes, Heat, Group, Ambient, Meters or Events. A whole strip has run on my Stream Deck + XL since 2026-10-25; the equal split and the Stream Deck + are checked on a simulated deck only. [Strip display](https://docs.slawrensen.com/hwinfo-streamdeck/strip-display.html)
+- **Time window**: a key's sparkline or a two-row dial can span the last 1, 5 or 15 minutes. [Time window](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html#time-window)
+- **Limits for each reading**: every reading on a multi-reading key, and any reading on a dial, can carry its own warn and critical limits, with **Alert after**, **Clear by** and a snooze. [Thresholds and alerts](https://docs.slawrensen.com/hwinfo-streamdeck/thresholds-alerts.html)
+- **Each key's own detail layout**: **Page layout** keeps chosen cells empty for one key's drill-down. [Sensor details](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html#each-keys-own-layout)
+- **Reading links from the settings panel**: pair a Shared Memory reading with its Gadget counterpart under *Advanced → Reading links*. [Link readings](https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers)
+- **Calculated readings**: the sum, average, lowest or highest of 2 to 8 readings, or the difference or ratio of two. [Calculated readings](https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#calculated-readings)
+- **Unit and decimals per reading** ([issue #59](https://github.com/slawrensen/hwinfo-streamdeck/issues/59)): each reading can have its own decimals, and a byte reading can keep one unit. Binary data units now read HWiNFO's KB to TB as 1024-based (12,100 MB read 11.27 GiB and now read 11.82 GiB). [Unit and decimals per reading](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html#unit-and-decimals-per-reading)
+- **Key backgrounds and deck pictures**: a Sensor Reading key can show the page picture behind it, and Stars, Dusk and Nebula draw one picture across the whole deck. A see-through key is checked in renderer tests only. [Background](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html#background)
+
+The upgrade rewrites no stored settings, and 1.7.1 ignores the new ones if you go back. The [changelog](CHANGELOG.md) has the details. Upgrading from 1.6: [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html) says where an upgrade needs you to act.
 
 ## Keys
 

@@ -10,7 +10,9 @@
 import streamDeck, { action, SingletonAction, type KeyDownEvent, type WillAppearEvent, type WillDisappearEvent } from "@elgato/streamdeck";
 
 import type { DetailController } from "../detail/controller";
+import { deviceCapabilities } from "../devices";
 import { poller } from "../poller";
+import { artPlace, paintArt } from "../ui/deck-art";
 
 /** The baked binding shape; parsed strictly by the controller. */
 type DetailSlotSettings = {
@@ -44,7 +46,12 @@ export class DetailSlotAction extends SingletonAction<DetailSlotSettings> {
 		streamDeck.logger.debug(`Detail slot appeared on ${JSON.stringify(act.device.name)}${cell === null ? "" : ` at ${cell.column},${cell.row}`} (${JSON.stringify(ev.payload.settings)})`);
 		this.controller.registerSlot(act.id, act.device.id, ev.payload.settings, cell, {
 			setImage: (svg: string): void => {
-				void act.setImage(`data:image/svg+xml,${encodeURIComponent(svg)}`);
+				// A Stars or Nebula tile gets its piece of the deck's scene.
+				const painted = paintArt(svg, () => {
+					const caps = deviceCapabilities.get(act.device.id);
+					return artPlace({ id: act.device.id, type: caps.type, columns: caps.columns, rows: caps.rows }, cell ?? undefined, act.id, false);
+				});
+				void act.setImage(`data:image/svg+xml,${encodeURIComponent(painted)}`);
 			}
 		});
 	}

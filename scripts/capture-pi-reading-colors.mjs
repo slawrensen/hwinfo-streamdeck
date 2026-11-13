@@ -144,7 +144,7 @@ try {
 	assert.equal(evidence.liveState, "Live · Shared Memory");
 	assert.equal(evidence.statusHint, "");
 	const face = await (await fetch(`${base}/face/ctx-dial.svg`)).text();
-	assert.ok(!face.includes("Sensor missing") && !face.includes("No new data"), "The live dial must resolve the selected readings");
+	assert.ok(!face.includes("Sensor missing") && !face.includes("Not updating"), "The live dial must resolve the selected readings");
 	for (const color of ["#4CC2FF", "#FF7E8E", "#38CD89"]) assert.ok(face.toUpperCase().includes(color), `Live dial is missing ${color}`);
 	evidence.appliedSettings = { ...settings, readingColors: Object.fromEntries(evidence.rows.map((row) => [row.key, row.color])) };
 	evidence.appliedGlobals = globals;

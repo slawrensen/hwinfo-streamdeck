@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { isControlCommand } from "../src/commands";
 import { parseResetScope, resolveControls, schemeCanSwitchGroups, triggerDescriptions } from "../src/controls";
 
 describe("resolveControls", () => {
@@ -149,5 +150,36 @@ describe("triggerDescriptions", () => {
 		const texts = triggerDescriptions(resolveControls({ controlPreset: "custom", gestureTap: "none", gestureTouchHold: "none" }), false);
 		assert.equal(texts.touch, undefined);
 		assert.equal(texts.longTouch, undefined);
+	});
+});
+
+describe("the snooze gesture command (append-only)", () => {
+	it("Custom maps snooze on any gesture; an unknown stored value keeps falling back to the gesture's Legacy command", () => {
+		const scheme = resolveControls({ controlPreset: "custom", gestureShortPress: "snooze", gestureLongPress: "snoozeAll", gestureTap: "snooze", gestureTouchHold: "SNOOZE", gestureRotate: "snooze" });
+		assert.equal(scheme.shortPress, "snooze");
+		assert.equal(scheme.tap, "snooze");
+		assert.equal(scheme.rotate, "snooze");
+		assert.equal(scheme.longPress, "resetStats", "a future command name falls back");
+		assert.equal(scheme.touchHold, "backToCurrent", "exact spelling only");
+	});
+
+	it("Legacy and Elite ignore a stored snooze, exactly as they ignore every gesture field", () => {
+		assert.equal(resolveControls({ gestureShortPress: "snooze" }).shortPress, "resetStats");
+		assert.equal(resolveControls({ controlPreset: "elite", gestureShortPress: "snooze" }).shortPress, "pauseResume");
+	});
+
+	it("the app's gesture hints name it", () => {
+		const texts = triggerDescriptions(resolveControls({ controlPreset: "custom", gestureShortPress: "snooze", gestureLongPress: "pin", gestureTap: "snooze", gestureTouchHold: "snooze" }), false);
+		assert.equal(texts.push, "Snooze alerts · hold: pin/unpin");
+		assert.equal(texts.touch, "Snooze alerts");
+		assert.equal(texts.longTouch, "Snooze alerts");
+		assert.equal(triggerDescriptions(resolveControls({ controlPreset: "custom", gestureShortPress: "pin", gestureLongPress: "snooze" }), false).push, "Pin/unpin · hold: snooze alerts");
+	});
+});
+
+describe("the Control key's snooze commands (append-only)", () => {
+	it("snoozeAlerts and unsnoozeAlerts are commands; every earlier command still is, and a near miss is not", () => {
+		for (const id of ["next", "prev", "resetStats", "togglePin", "snoozeAlerts", "unsnoozeAlerts"]) assert.equal(isControlCommand(id), true, id);
+		for (const id of ["snooze", "snoozealerts", "unsnooze", "", "constructor"]) assert.equal(isControlCommand(id), false, id);
 	});
 });

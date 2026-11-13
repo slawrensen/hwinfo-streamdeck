@@ -2,12 +2,18 @@
    settings documents and every write, the native-control bindings, the
    section summaries, the header with the device face, and the status line.
 
-   Writes go through the vendored sdpi settings store (useSettings /
-   useGlobalSettings), exactly as before: each edit merges one field into
-   the store's copy of the document and saves the WHOLE document, so fields
-   this build does not know ride along untouched. The shell wraps the
-   client's setSettings/setGlobalSettings only to OBSERVE those saves (the
-   app never echoes a panel's own write back to it); it never adds one.
+   Writes go through the panel client's settings stores (pi-client.js,
+   useSettings / useGlobalSettings), exactly as before: each edit merges
+   one field into the store's copy of the document and saves the WHOLE
+   document, so fields this build does not know ride along untouched. The shell wraps the
+   client's setSettings/setGlobalSettings to OBSERVE those saves (the app
+   never echoes a panel's own write back to it); it never adds one. The
+   two global fields only the plugin writes (readingLinks and
+   calculatedReadings, through the Reading links and Calculated readings
+   editors) are guarded here: while the plugin commits one, the panel's
+   own whole-document global saves wait (3 s at most), and a document that
+   still carries the field as it was before the commit gets the committed
+   value instead, so a stale copy never puts an old list back.
    Opening, closing, scrolling, expanding a section, searching and focusing
    write nothing. */
 /* global SDPIComponents, hwModel */
@@ -54,39 +60,101 @@ self.hwShell = (() => {
 
 	const isDoc = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 
+	// A Sensor Dial's stripGroup is the plugin's alone (src/strip/pi.ts):
+	// the panel never edits it, but every save sends the whole document, and
+	// the settings store (pi-client.js) may still hold a copy older than the
+	// plugin's newest write (a save made before that write's echo arrived).
+	// The newest copy this panel received (from the host's settings or the
+	// plugin's strip replies) replaces a copy it has seen before. A copy it
+	// has never seen (a pasted document under Configuration documents) is
+	// sent as typed, and the plugin shows it as a different copy to choose
+	// about.
+	const strip = { known: false, latest: undefined, seen: new Set() };
+	// Compared by content: the app sorts the keys of plugin messages, so the
+	// same copy can arrive in two key orders.
+	const sortedCopy = (v) => (Array.isArray(v) ? v.map(sortedCopy) : isDoc(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedCopy(v[k])])) : v);
+	const stripText = (v) => (v === undefined ? "" : JSON.stringify(sortedCopy(v)));
+	function noteStripGroup(value) {
+		const v = value === null ? undefined : value;
+		strip.known = true;
+		strip.latest = v;
+		if (strip.seen.size >= 32) strip.seen.clear();
+		strip.seen.add(stripText(v));
+	}
+	function withLatestStripGroup(doc) {
+		if (kind !== "dial" || !strip.known || !isDoc(doc)) return doc;
+		const sent = stripText(doc.stripGroup);
+		if (sent === stripText(strip.latest) || !strip.seen.has(sent)) return doc;
+		const next = { ...doc };
+		if (strip.latest === undefined) delete next.stripGroup;
+		else next.stripGroup = strip.latest;
+		return next;
+	}
 	const setSettings = client.setSettings.bind(client);
-	client.setSettings = (doc) => {
+	client.setSettings = (raw) => {
+		const doc = withLatestStripGroup(raw);
 		state.writes += 1;
 		if (isDoc(doc)) state.settings = doc;
 		emit("settings", { origin: "local" });
 		return setSettings(doc);
 	};
 	const setGlobals = client.setGlobalSettings.bind(client);
-	client.setGlobalSettings = (doc) => {
+	const globalsGuard = hwModel.createGlobalsGuard();
+	let releaseTimer = 0;
+	/** Sends the held whole-document save, once nothing holds it. */
+	const releaseHeld = () => {
+		const doc = globalsGuard.release(performance.now());
+		if (doc === null) return;
 		state.globalWrites += 1;
-		if (isDoc(doc)) state.globals = doc;
+		setGlobals(doc);
+	};
+	client.setGlobalSettings = (doc, options) => {
+		if (options?.explicit === true) {
+			// Replace shared settings: the document the person chose goes as
+			// it is (pi-model.js createGlobalsGuard().explicit).
+			const chosen = globalsGuard.explicit(doc);
+			if (isDoc(chosen)) state.globals = chosen;
+			emit("globals", { origin: "local" });
+			state.globalWrites += 1;
+			return setGlobals(chosen);
+		}
+		const out = globalsGuard.outgoing(doc, performance.now());
+		if (isDoc(out.doc)) state.globals = out.doc;
 		emit("globals", { origin: "local" });
-		return setGlobals(doc);
+		if (out.hold) {
+			// Sent when the plugin answers, or when the hold ends on its own.
+			clearTimeout(releaseTimer);
+			const endsAt = globalsGuard.holdEndsAt();
+			releaseTimer = setTimeout(releaseHeld, Math.max(0, (endsAt ?? 0) - performance.now()) + 5);
+			return Promise.resolve();
+		}
+		state.globalWrites += 1;
+		return setGlobals(out.doc);
 	};
 	client.didReceiveSettings.subscribe((ev) => {
 		const doc = ev?.payload?.settings;
 		if (!isDoc(doc)) return;
+		if (kind === "dial") noteStripGroup(doc.stripGroup);
 		state.settings = doc;
 		emit("settings", { origin: "echo" });
 	});
-	// Settled by the first shared document the host sends (sdpi asks for it
-	// once, at load), so a reader can wait for it instead of asking again.
+	// Settled by the first shared document the host sends (pi-client.js asks
+	// for it once, on the first shared binding), so a reader can wait for it
+	// instead of asking again.
 	let heardGlobals;
 	const globalsReady = new Promise((resolve) => (heardGlobals = resolve));
 	client.didReceiveGlobalSettings.subscribe((ev) => {
 		heardGlobals();
 		const doc = ev?.payload?.settings;
 		if (!isDoc(doc)) return;
+		globalsGuard.received(doc);
 		state.globals = doc;
 		emit("globals", { origin: "echo" });
 	});
 	client.getConnectionInfo().then((info) => {
 		state.context = info?.actionInfo?.context ?? "";
+		const loaded = info?.actionInfo?.payload?.settings;
+		if (kind === "dial" && isDoc(loaded) && !strip.known) noteStripGroup(loaded.stripGroup);
 		state.connectedAt = performance.now();
 		// Sensor panels ask once for the current face; the plugin also sends
 		// one with every tick, so this only shortens the first wait.
@@ -97,10 +165,68 @@ self.hwShell = (() => {
 		// hide: say so instead of waiting forever.
 		setTimeout(scheduleRender, 3200);
 	});
+	// Plugin-written global edits in flight, by request id.
+	const applies = new Map();
+	// Edits whose answer did not come in time, by request id: a late answer
+	// still counts for the guard (the commit may have landed), never for the
+	// promise, which settled empty.
+	const lateApplies = new Set();
+	/**
+	 * The committed field into the panel's own view of the shared document.
+	 * The event names the field, so an editor holding a list of it (Reading
+	 * links, Calculated readings) can ask for that list again.
+	 */
+	const adoptCommitted = (reply) => {
+		if (!(isDoc(reply) && reply.ok === true && typeof reply.field === "string" && Object.hasOwn(reply, "next"))) return;
+		state.globals = hwModel.setOwn({ ...state.globals }, reply.field, reply.next);
+		emit("globals", { origin: "plugin", field: reply.field });
+	};
+	const lateAnswer = (requestId, reply) => {
+		lateApplies.delete(requestId);
+		const resend = globalsGuard.late(reply, performance.now());
+		adoptCommitted(reply);
+		if (resend !== null) {
+			state.globalWrites += 1;
+			setGlobals(resend);
+		}
+	};
+	/**
+	 * Sends one explicit global edit (applyLink, applyCalculated) to the
+	 * plugin, which re-reads the latest globals and commits only its row
+	 * (src/global-writer.ts). Pending text is saved first; the panel's own
+	 * whole-document global saves wait for the answer (3 s at most). The
+	 * promise settles with the plugin's answer, or null without one.
+	 */
+	function applyGlobalField(message) {
+		flushPending();
+		const requestId = `apply-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		globalsGuard.begin(performance.now());
+		return new Promise((resolve) => {
+			const finish = (reply) => {
+				if (!applies.has(requestId)) return;
+				applies.delete(requestId);
+				clearTimeout(timer);
+				globalsGuard.settle(reply);
+				adoptCommitted(reply);
+				releaseHeld();
+				resolve(isDoc(reply) ? reply : null);
+			};
+			const timer = setTimeout(() => {
+				// Bounded: only the newest few unanswered edits wait for a late answer.
+				lateApplies.add(requestId);
+				if (lateApplies.size > 8) lateApplies.delete(lateApplies.values().next().value);
+				finish(null);
+			}, hwModel.GLOBALS_HOLD_MS);
+			applies.set(requestId, finish);
+			client.send("sendToPlugin", { ...message, requestId });
+		});
+	}
 	client.sendToPropertyInspector.subscribe((ev) => {
 		const p = ev?.payload;
 		if (!isDoc(p)) return;
 		state.heardFromPlugin = true;
+		if (typeof p.requestId === "string" && applies.has(p.requestId)) applies.get(p.requestId)(p);
+		else if (typeof p.requestId === "string" && lateApplies.has(p.requestId)) lateAnswer(p.requestId, p);
 		if (p.event === "preview") {
 			// A preview for another context (a late reply after a quick
 			// switch) is never shown here.
@@ -114,6 +240,10 @@ self.hwShell = (() => {
 			state.tree = p;
 			state.treeAt = performance.now();
 			emit("tree", p);
+		} else if ((p.event === "stripState" || p.event === "stripEditResult") && kind === "dial") {
+			if (typeof p.context === "string" && state.context !== "" && p.context !== state.context) return;
+			if ("stored" in p) noteStripGroup(p.stored);
+			emit(p.event, p);
 		}
 		scheduleRender();
 	});
@@ -122,8 +252,31 @@ self.hwShell = (() => {
 	// <select|input data-setting="x" [data-global] [data-default="v"]>. The
 	// default is DISPLAY only (what the runtime does when the field is absent);
 	// it is never written. A stored value no option offers (a newer version's
-	// choice) is shown as such and kept until the person picks another.
+	// choice) is shown as such and kept until the person picks another. A
+	// blank on a shared select is no one's choice: it shows what the runtime
+	// draws for it (pi-model.js sharedChoiceShown), and is not rewritten.
 	const bound = [];
+	// While a dial draws part of a running strip, a few of its own fields
+	// act on the strip instead (pi-strip.js sets them: text color,
+	// Background, Words, decimals, °F): each shows the strip's value, and a
+	// change is sent to the plugin as one strip edit, never saved to the
+	// dial. The dial's own value stays stored for when it leaves. A shared
+	// field (data-global) of the same name is never redirected: Shared
+	// defaults always show and save the shared settings (the owner's + XL,
+	// 2026-10-28: Shared defaults Text color showed the strip's Default as
+	// a kept value, and a pick there edited the strip). setting ->
+	// { value(): unknown, set(value): void }.
+	const redirects = new Map();
+	/** The value a bound field shows: the strip's while it is redirected. */
+	const shownOf = (setting, value) => (redirects.has(setting) ? redirects.get(setting).value() : value);
+	/** Sends a change of a redirected field to its target; false when the
+	 * field is the dial's own. */
+	const sentElsewhere = (setting, value) => {
+		const target = redirects.get(setting);
+		if (target === undefined) return false;
+		target.set(value);
+		return true;
+	};
 	// Text saves waiting out their debounce. Switching to another action
 	// unloads this page; the pending text is saved first, to this panel's
 	// own context (the socket and registration are still this page's).
@@ -149,11 +302,18 @@ self.hwShell = (() => {
 			return;
 		}
 		if ((el.tagName === "INPUT" || el.tagName === "TEXTAREA") && document.activeElement === el) return; // never under the caret
-		const text = value === undefined || value === null ? (el.dataset.default ?? "") : typeof value === "string" ? value : JSON.stringify(value);
+		let text = value === undefined || value === null ? (el.dataset.default ?? "") : typeof value === "string" ? value : JSON.stringify(value);
 		if (el.tagName === "SELECT") {
+			const offered = (v) => Array.from(el.options).some((o) => !o.hasAttribute("data-unknown") && o.value === v);
+			if (el.hasAttribute("data-global") && !offered(text)) {
+				const drawn = hwModel.sharedChoiceShown(el.dataset.setting, text, el.dataset.default ?? "");
+				if (offered(drawn)) text = drawn;
+			}
+			// data-kept="default": the runtime reads a value no option offers
+			// as the default, so the default shows; the stored value stays.
+			if (el.dataset.kept === "default" && !offered(text)) text = el.dataset.default ?? "";
 			let unknown = el.querySelector("option[data-unknown]");
-			const known = Array.from(el.options).some((o) => !o.hasAttribute("data-unknown") && o.value === text);
-			if (!known) {
+			if (!offered(text)) {
 				if (unknown === null) {
 					unknown = document.createElement("option");
 					unknown.dataset.unknown = "";
@@ -203,8 +363,12 @@ self.hwShell = (() => {
 
 	function bindControl(el) {
 		const setting = el.dataset.setting;
-		const store = el.hasAttribute("data-global") ? useGlobalSettings : useSettings;
-		const [get, save] = store(setting, (value) => showValue(el, value), null);
+		// Only the panel's own fields follow a strip's redirects, never a shared one.
+		const own = !el.hasAttribute("data-global");
+		const store = own ? useSettings : useGlobalSettings;
+		const shown = (value) => (own ? shownOf(setting, value) : value);
+		const elsewhere = (value) => own && sentElsewhere(setting, value);
+		const [get, save] = store(setting, (value) => showValue(el, shown(value)), null);
 		const isText = el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && el.type !== "checkbox");
 		let timer = 0;
 		let composing = false;
@@ -221,17 +385,21 @@ self.hwShell = (() => {
 			pendingFlushes.add(flush);
 		};
 		if (el.type === "checkbox") {
-			el.addEventListener("change", () => save(el.checked));
+			el.addEventListener("change", () => {
+				if (!elsewhere(el.checked)) save(el.checked);
+			});
 		} else if (el.tagName === "SELECT") {
 			el.addEventListener("change", () => {
 				if (el.selectedOptions[0]?.hasAttribute("data-unknown")) return;
+				if (elsewhere(el.value)) return;
 				save(el.value);
 				// The kept value is gone from the document once another is picked.
 				el.querySelector("option[data-unknown]")?.remove();
 			});
 		} else if (isText) {
-			// Typing saves 200 ms after the last keystroke (the sdpi textfield
-			// cadence), never mid-composition, and at once on commit.
+			// Typing saves 200 ms after the last keystroke (the save delay of
+			// the sdpi-components textfield, before pi-client.js replaced that
+			// library), never mid-composition, and at once on commit.
 			el.addEventListener("compositionstart", () => {
 				composing = true;
 			});
@@ -248,8 +416,8 @@ self.hwShell = (() => {
 				if (timer !== 0) flush();
 			});
 		}
-		get().then((value) => showValue(el, value));
-		bound.push({ el, setting, get });
+		get().then((value) => showValue(el, shown(value)));
+		bound.push({ el, setting, get, shown });
 	}
 
 	for (const el of document.querySelectorAll("[data-setting]")) bindControl(el);
@@ -257,9 +425,21 @@ self.hwShell = (() => {
 	/** Re-reads bound controls from the store (after a wholesale apply):
 	 * every one, or only those bound to the named settings. */
 	function resyncBound(settings) {
-		for (const { el, setting, get } of bound) {
-			if (settings === undefined || settings.includes(setting)) get().then((value) => showValue(el, value));
+		for (const { el, setting, get, shown } of bound) {
+			if (settings === undefined || settings.includes(setting)) get().then((value) => showValue(el, shown(value)));
 		}
+	}
+
+	/** Points the fields named in `targets` ({ setting: { value, set } })
+	 * at a strip, or back at the dial's own settings (null), and shows
+	 * what each now edits. Emits "redirect" for the panel's own renders. */
+	function redirect(targets) {
+		const before = [...redirects.keys()];
+		redirects.clear();
+		for (const [setting, target] of Object.entries(targets ?? {})) if (target !== null && typeof target === "object" && typeof target.set === "function") redirects.set(setting, target);
+		resyncBound([...new Set([...before, ...redirects.keys()])]);
+		emit("redirect");
+		scheduleRender();
 	}
 	on("settings", (ev) => {
 		if (ev.origin === "echo") resyncBound();
@@ -415,12 +595,14 @@ self.hwShell = (() => {
 
 	// --- a press that lands where the panel just scrolled --------------------
 	// When the panel itself moves the page under a resting pointer (a reading
-	// list brought into view as it opens, a reveal), whatever slid under the
-	// pointer must not take the next press: the second press of a double
-	// click would pick or tick a reading the person never aimed at. For half
-	// a second after such a scroll, a press within 4 px of where the pointer
-	// rested is swallowed; moving the pointer ends the guard at once.
-	// Keyboard input is never affected (round 3, re-review VY01, PY01, AY01).
+	// list brought into view as it opens, a reveal, a question or a list that
+	// opens or closes there), whatever slid under the pointer must not take
+	// the next press: it would pick or tick a reading the person never aimed
+	// at. That press can come past the double-click time, a single click the
+	// rule for one gesture (below) does not count, so for half a second after
+	// such a move a press within 4 px of where the pointer rested is
+	// swallowed; moving the pointer ends the guard at once. Keyboard input is
+	// never affected (round 3, re-review VY01, PY01, AY01).
 	const pointer = { x: -1, y: -1 };
 	let panelScroll = null; // { at, x, y }
 	document.addEventListener("pointermove", (ev) => {
@@ -469,20 +651,116 @@ self.hwShell = (() => {
 		if (stale) swallow(ev);
 	}, true);
 
-	// An armed button (remove a group, Merge, Replace shared settings) asks
-	// for a second, fresh press. A held Enter or Space repeats its keydown
-	// every few tens of ms after about half a second, which would outlast the
-	// double-press guard and confirm without the person pressing again: a
-	// repeated key never activates an armed button (round 3, re-review PY02,
-	// AY01).
+	// --- one gesture, one action: the later clicks of a double click ----------
+	// A double or triple click is one gesture, and it acts once. Its first
+	// click can put another control where the pointer rests (focus follows
+	// to the next reading's remove, a control is drawn as its opposite, a
+	// list opens or closes, a fold shrinks the page), and a control left in
+	// place would act again (Add a screen while the plugin is still
+	// answering). So a later click (detail 2 or more) within 4 px of the
+	// click before it presses no button, link, summary, checkbox or radio,
+	// nor a label of one, whatever is under the pointer then: it is
+	// swallowed from its press (which would move focus) through its click.
+	// A text field or a select keeps its own double click (a word, the
+	// line) and takes no later click from a gesture that began elsewhere:
+	// one that slid under the pointer would take focus and open its list.
+	// Nor does the empty space between controls when the gesture began on
+	// one: that press would take focus away (an armed Remove that grew onto
+	// its own line would disarm). A reading list's row (a rotation member,
+	// a picker's reading) is known by the reading it names: a later click
+	// acts on the row the gesture began on (the member's rename) and on no
+	// other row (a member that slid up as a picker's list closed), and a
+	// gesture begun on a row takes no later click elsewhere. A gesture begun
+	// on anything else (plain words) keeps its later clicks and its
+	// dblclick (a word selected); a swallowed later click takes its
+	// dblclick with it. A drag is not touched. Two taps on two controls
+	// further apart are two presses, though the browser counts the second 2.
+	// A control built for chained presses names what it acts on in
+	// data-step, in words its rebuild keeps ("rotation-later:<reading>",
+	// "tile-size:<tile>", "screen-later:<screen id>"): a later click acts
+	// when the control under the pointer then names the step the
+	// gesture's first click pressed, so it stops where a press changed the
+	// target. The screen tools' Earlier and Later name the screen on the
+	// strip by its stored id. The strip keeps the screen it shows wherever
+	// a move takes it, the first screen included, so quick presses move it
+	// again and again, answered yet or not, until it reaches an end. A
+	// screen with no stored id names no step: its place names another
+	// screen after a move.
+	const ONE_PRESS = 'button, a[href], summary, [role="button"], [role="checkbox"], [role="radio"], input[type="checkbox"], input[type="radio"], input[type="button"], input[type="submit"], input[type="reset"]';
+	const FIELD = 'input, select, textarea, [contenteditable]:not([contenteditable="false"])';
+	const elementOf = (target) => (target instanceof Element ? target : target instanceof Node ? target.parentElement : null);
+	/** The control a press on `target` works, a label's own control for a
+	 * label; null over anything else. */
+	const controlOf = (target) => {
+		const hit = elementOf(target)?.closest(`${ONE_PRESS}, ${FIELD}, label`) ?? null;
+		return hit !== null && hit.tagName === "LABEL" ? hit.control : hit;
+	};
+	const stepOf = (target) => elementOf(target)?.closest("[data-step]")?.dataset.step ?? null;
+	/** A reading list's row under `target`: its place in its list and the
+	 * reading it names, which a rebuild of the list keeps; null elsewhere. */
+	const rowOf = (target) => {
+		const row = elementOf(target)?.closest('[role="option"]') ?? null;
+		return row === null ? null : `${row.id}|${row.dataset.key ?? ""}`;
+	};
+	let lastPress = null; // { x, y, at }: the last left press
+	let gesture = null; // { control, step, row }: what the gesture's first click pressed
+	let laterSwallowed = false; // this later click's verdict, from its press to its click
+	document.addEventListener("mousedown", (ev) => {
+		if (ev.button !== 0) return;
+		const near = lastPress !== null && Math.hypot(ev.clientX - lastPress.x, ev.clientY - lastPress.y) <= 4;
+		lastPress = { x: ev.clientX, y: ev.clientY, at: performance.now() };
+		const control = controlOf(ev.target);
+		const row = control === null ? rowOf(ev.target) : null;
+		if (ev.detail <= 1) {
+			gesture = { control, step: stepOf(ev.target), row };
+			laterSwallowed = false;
+			return;
+		}
+		const step = stepOf(ev.target);
+		let again;
+		if (control !== null) again = control.matches(ONE_PRESS) ? step !== null && step === gesture?.step : control === gesture?.control;
+		else if (row !== null || (gesture?.row ?? null) !== null) again = row === gesture?.row;
+		else again = (gesture?.control ?? null) === null;
+		laterSwallowed = near && !again;
+		if (laterSwallowed) swallow(ev);
+	}, true);
+	document.addEventListener("click", (ev) => {
+		if (ev.detail >= 2 && laterSwallowed) swallow(ev);
+	}, true);
+	document.addEventListener("dblclick", (ev) => {
+		if (laterSwallowed) swallow(ev);
+	}, true);
+	// A disabled control takes no mousedown or click, only the pointerdown,
+	// whose one effect is to take focus from where the click before put it
+	// (a detail cell's rename field): such a press right on the heels of
+	// another, at its point, is swallowed there.
+	document.addEventListener("pointerdown", (ev) => {
+		if (ev.button !== 0 || lastPress === null || !(ev.target instanceof Element) || ev.target.closest(":disabled") === null) return;
+		if (performance.now() - lastPress.at <= 500 && Math.hypot(ev.clientX - lastPress.x, ev.clientY - lastPress.y) <= 4) swallow(ev);
+	}, true);
+
+	// --- one press, one action ---------------------------------------------------
+	// A held Enter repeats its keydown every few tens of ms after about half
+	// a second, and the browser presses a button, a link or a summary again
+	// on each repeat (Space presses once, on its release). A press that
+	// moves focus hands those repeats to whatever control takes it: Build
+	// screens to Use these screens, a remove to the next remove, Every dial
+	// leaves to Restore the strip, an armed button to its confirmation. On
+	// every control of every panel, a repeated Enter or Space presses
+	// nothing, so a new control is covered without joining a list (external
+	// review AX20, PY02, AY01). Typing is left alone: a held Space types
+	// spaces, a held Enter in a text area makes lines. A control that only
+	// steps through a view says data-repeat and keeps its repeats.
+	const TYPES_SPACE = 'textarea, [contenteditable]:not([contenteditable="false"]), input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="email"], input[type="url"], input[type="tel"], input[type="password"]';
+	const TYPES_ENTER = 'textarea, [contenteditable]:not([contenteditable="false"])';
 	document.addEventListener(
 		"keydown",
 		(ev) => {
 			if (!ev.repeat || (ev.key !== "Enter" && ev.key !== " ")) return;
-			if (ev.target instanceof HTMLElement && ev.target.dataset.armed === "true") {
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-			}
+			const el = ev.target instanceof Element ? ev.target : null;
+			if (el === null || el.closest("[data-repeat]") !== null || el.matches(ev.key === " " ? TYPES_SPACE : TYPES_ENTER)) return;
+			ev.preventDefault();
+			ev.stopImmediatePropagation();
 		},
 		true
 	);
@@ -491,7 +769,8 @@ self.hwShell = (() => {
 	// confirm on its old release (external review AX72). Leaving the button
 	// mid-press drops its arm, so an arm made after that is newer than the
 	// press. Keys need no note: Enter clicks on its own press, its repeats
-	// are refused above, and arming ends a Space pressed before it.
+	// press nothing (one press, one action, above), and arming ends a Space
+	// pressed before it.
 	// Each pointer keeps its own note from its press to its click, and a
 	// click reads only the note of the pointer that made it (the click's
 	// pointerId): a touch, a pen or a second mouse button pressed while a
@@ -562,7 +841,7 @@ self.hwShell = (() => {
 	});
 
 	// --- summaries, header and status: one coalesced render ----------------------
-	const summaries = new Map(); // section -> () => string
+	const summaries = new Map(); // section -> [() => string, (() => string[]) | undefined]
 	let queued = false;
 	function scheduleRender() {
 		if (queued) return;
@@ -592,9 +871,10 @@ self.hwShell = (() => {
 		return null;
 	}
 
-	/** What the face draws while the source is stale (src/ui/state-screens.ts):
-	 * Gadget cannot measure freshness, so it never claims the data stopped. */
-	const staleFace = (p) => (p.source === "gadget" ? "Age unknown" : kind === "dial" ? "No new data" : "Not updating");
+	/** What the face draws while the source is stale (src/ui/state-screens.ts),
+	 * the same on a key and a dial: Gadget cannot measure freshness, so it
+	 * never claims the data stopped. */
+	const staleFace = (p) => (p.source === "gadget" ? "Age unknown" : "Not updating");
 
 	/** A stale Shared Memory age in words, from the plugin's evidence clock
 	 * (whole seconds). Coarser as it grows, so a long outage repaints the
@@ -605,6 +885,14 @@ self.hwShell = (() => {
 		const m = Math.floor(s / 60);
 		return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 	}
+
+	/** The longest age ageText writes under 100 h ("99 h 59 min"): the
+	 * state line keeps its room while it counts, so a longer age does not
+	 * wrap it onto one more line. Its digits are tabular (pi.css
+	 * .hw-state), so every shorter age fits; from 100 h 10 min the age is
+	 * a digit longer. Four days and more of frozen data is past what the
+	 * room is for. */
+	const AGE_ROOM_MS = (99 * 60 + 59) * 60_000;
 
 	/** The data state in one word and a tone; never "Live" unless it is. */
 	function dataState() {
@@ -623,12 +911,23 @@ self.hwShell = (() => {
 			if (p.state === "stale") return { text: p.source === "gadget" ? "HWiNFO data age unknown" : "HWiNFO data not updating", tone: "warn" };
 			return { text: `HWiNFO ready · ${p.source === "gadget" ? "Gadget registry" : "Shared Memory"}`, tone: "muted" };
 		}
-		if (p.missing === true) return { text: "Saved reading not found", tone: "warn" };
+		// A dial in a strip draws its slice, not its own saved reading.
+		if (p.missing === true && !stripJoined(p)) return { text: "Saved reading not found", tone: "warn" };
 		// The poller is riding out a source reopen on the last values: the
 		// state still reads as before, but nothing new is being read.
 		if (p.holding === true) return { text: `Reopening source · ${kind === "dial" ? "dial" : "key"} unchanged`, tone: "warn" };
-		if (p.state === "stale") return { text: typeof p.staleForMs === "number" ? `${staleFace(p)} for ${ageText(p.staleForMs)}` : staleFace(p), tone: "warn" };
+		if (p.state === "stale") return typeof p.staleForMs === "number" ? { text: `${staleFace(p)} for ${ageText(p.staleForMs)}`, tone: "warn", room: [`${staleFace(p)} for ${ageText(AGE_ROOM_MS)}`] } : { text: staleFace(p), tone: "warn" };
 		return { text: p.source === "gadget" ? "Live · Gadget registry" : "Live · Shared Memory", tone: "ok" };
+	}
+
+	/** The plugin says this dial draws its part of a strip. */
+	const stripJoined = (p) => kind === "dial" && isDoc(p?.strip) && p.strip.status === "joined";
+
+	/** The header's words for a dial in a strip: its layout and its place. */
+	function stripRole(p) {
+		const s = p.strip;
+		const where = s.layout === "split" ? "Equal split" : "Whole strip";
+		return { title: where, source: `Strip display · dial ${Number.isInteger(s.column) ? s.column + 1 : "?"}${s.mode === "paused" ? " · paused" : ""}` };
 	}
 
 	/** A data source forced to one provider, in the Connection select's words. */
@@ -699,6 +998,260 @@ self.hwShell = (() => {
 	announce("validate", ""); // primed: a field's first typo is said
 	announce("check", ""); // primed: a Check again that fixes the problem is said
 
+	/** The name a dial's rotation gives a reading, or null. */
+	const rotationName = (s, key) => (isDoc(s.rotationNames) && typeof s.rotationNames[key] === "string" && s.rotationNames[key].trim() !== "" ? s.rotationNames[key].trim() : null);
+
+	/** The header's name and source lines for a reading: the dial's own
+	 * words lead and HWiNFO's name moves to the source line (round 3, R43). */
+	const headLines = (custom, reading) => [custom ?? reading.label, `${custom !== null ? `${reading.label} · ` : ""}${reading.source}`];
+
+	/** The keys a dial's own steps (a turn, a group jump, the auto cycle and
+	 * its alert hunt) move through, as the plugin lists them (src/rotation.ts):
+	 * the rotation's members, from its groups when its controls switch
+	 * groups, else its set; with no rotation, the readings of the sensor
+	 * that owns the pick (a group jump there moves to another sensor, and
+	 * the list moves with it). */
+	function stepKeys(s, tree) {
+		const groups = hwModel.claimedGroups(s);
+		if (groups.length >= 2 && state.preview?.effective?.controls?.switchesGroups !== false) return groups.flat();
+		const set = Array.isArray(s.rotationKeys) ? s.rotationKeys.filter((k) => typeof k === "string") : [];
+		if (set.length > 0) return set;
+		return tree.find((g) => g.readings.some((r) => r.key === s.readingKey || (Array.isArray(r.keys) && r.keys.includes(s.readingKey))))?.readings.map((r) => r.key) ?? [];
+	}
+
+	/** Every name and source line those steps can bring to the header. A
+	 * step drops the dial's own label unless the label is fixed. A step's
+	 * rotation name is the one saved under its saved key, the key the dial
+	 * adopts and the header reads, even when the tree lists the reading
+	 * under a linked key. */
+	function stepLines(s) {
+		const tree = state.tree?.groups;
+		if (!Array.isArray(tree) || typeof s.readingKey !== "string" || s.readingKey === "") return [];
+		const kept = s.labelMode === "fixed" && typeof s.label === "string" && s.label.trim() !== "" ? s.label.trim() : null;
+		const lines = [];
+		for (const key of stepKeys(s, tree)) {
+			const found = labelOf(key);
+			if (found !== null) lines.push(headLines(kept ?? rotationName(s, key), found));
+		}
+		return lines;
+	}
+
+	/** Lays every text out unseen in the shown line's cell (pi.css
+	 * .hw-room), so the cell keeps the room of the longest. Touched only
+	 * when the cell's texts change, never on a step or a tick. `fill`
+	 * writes one text into its unseen copy (the text itself by default). */
+	const roomOf = new Map();
+	function holdRoom(shown, texts, fill = (line, text) => void (line.textContent = text)) {
+		const room = shown?.parentElement;
+		if (room?.classList?.contains("hw-room") !== true) return;
+		const want = [...new Set(texts)];
+		const sig = JSON.stringify(want);
+		if (roomOf.get(shown) === sig) return;
+		roomOf.set(shown, sig);
+		for (const line of [...room.children]) if (line !== shown) line.remove();
+		for (const text of want) {
+			const line = document.createElement(shown.tagName);
+			line.className = shown.className;
+			line.setAttribute("aria-hidden", "true");
+			fill(line, text);
+			room.appendChild(line);
+		}
+	}
+
+	/** The header's name and source lines, one block. Its cell also holds,
+	 * unseen, the tallest name the dial's steps can bring over the tallest
+	 * source line (every name laid out in one cell, every source line in
+	 * the cell under it), so the block is never shorter than those two,
+	 * whichever pair shows. The room a shorter pair leaves is under its
+	 * source line, so a name always sits on its source. */
+	function holdHeadRoom(lines) {
+		const stacks = [0, 1].map((i) => [...new Set(lines.map((pair) => pair[i]))]);
+		holdRoom(document.getElementById("head-lines"), lines.length === 0 ? [] : [JSON.stringify(stacks)], (block, text) => {
+			for (const [i, texts] of JSON.parse(text).entries()) {
+				const stack = document.createElement("div");
+				stack.className = "hw-room";
+				for (const one of texts) {
+					const line = document.createElement("p");
+					line.className = i === 0 ? "hw-head-reading" : "hw-head-source";
+					line.textContent = one;
+					stack.appendChild(line);
+				}
+				block.appendChild(stack);
+			}
+		});
+	}
+
+	// A dial's name and source line share four lines (shareLines below), so
+	// the header stays pinned. While a shown line is cut, the two are the
+	// handle of a card with the whole text and a Copy button, laid over the
+	// form: nothing moves when it shows. It opens once the pointer has
+	// rested on the handle for WHOLE_OPEN_MS (a pass over it opens nothing)
+	// and on keyboard focus; a click, Enter or Space on the handle holds it
+	// open, and so does a press on the card's text, so a selection there
+	// survives the pointer leaving. It closes WHOLE_CLOSE_MS after the
+	// pointer has left the header and the card, unless held or holding
+	// keyboard focus; at once on a click or focus anywhere else, and on a
+	// second click, Enter or Space on the handle. Only the name opens it:
+	// the rest of the header keeps an open card open and opens nothing.
+	// Escape never reaches a Stream Deck panel, so nothing here waits for
+	// it. With no line cut there is no handle and no card.
+	const WHOLE_OPEN_MS = 250;
+	// Windows' own wait before a menu follows the pointer. The card hangs
+	// from the header and laps over its bottom edge, so no straight way
+	// from the name to the card leaves the two, however slow; the wait is
+	// for a hand that strays past an edge and comes back.
+	const WHOLE_CLOSE_MS = 400;
+	const COPIED_MS = 1500;
+	/** Follows the header after a render: the card's text, what Copy takes,
+	 * and whether the lines are a handle. Set below, on the dial's page. */
+	let syncWhole = () => {};
+	if (kind === "dial" && document.getElementById("head-whole") !== null) {
+		const card = document.getElementById("head-whole");
+		const lines = document.getElementById("head-lines");
+		const shown = [document.getElementById("head-reading"), document.getElementById("head-source")];
+		const texts = [document.getElementById("head-whole-name"), document.getElementById("head-whole-source")];
+		const button = document.getElementById("head-copy");
+		const label = document.getElementById("head-copy-label");
+		const head = document.getElementById("hw-head"); // the card is inside it
+		const over = new Set(); // of lines and head: where the pointer is
+		let held = false;
+		let timer = 0; // the one pending open or close
+		let copies = ""; // what Copy takes
+		let copyRun = 0; // a press, a step and a close each outdate the press before
+		let copyTimer = 0;
+		const inside = (node) => lines.contains(node) || card.contains(node);
+		const isCut = () => lines.hasAttribute("data-cut");
+		const restCopy = () => {
+			copyRun++;
+			clearTimeout(copyTimer);
+			setText(label, "Copy");
+		};
+		const show = (on) => {
+			clearTimeout(timer);
+			const open = on && isCut();
+			if (!open) held = false;
+			if (card.hidden !== open) return;
+			card.hidden = !open;
+			if (isCut()) lines.setAttribute("aria-expanded", String(open));
+			if (!open) restCopy();
+		};
+		// The pointer's wait on the name before the card opens.
+		const rest = () => {
+			clearTimeout(timer);
+			if (card.hidden) timer = setTimeout(() => over.has(lines) && show(true), WHOLE_OPEN_MS);
+		};
+		const keepsFocus = () => inside(document.activeElement) && document.activeElement.matches(":focus-visible");
+		const toggle = () => {
+			if (!isCut()) return;
+			const close = !card.hidden && held;
+			show(!close);
+			held = !close;
+		};
+		for (const el of [lines, head]) {
+			el.addEventListener("mouseenter", () => {
+				over.add(el);
+				if (el === lines) rest();
+				else clearTimeout(timer);
+			});
+			el.addEventListener("mouseleave", () => {
+				over.delete(el);
+				clearTimeout(timer);
+				timer = setTimeout(() => !held && over.size === 0 && !keepsFocus() && show(false), WHOLE_CLOSE_MS);
+			});
+		}
+		lines.addEventListener("click", toggle);
+		lines.addEventListener("keydown", (ev) => {
+			if (!isCut() || (ev.key !== "Enter" && ev.key !== " ")) return;
+			ev.preventDefault(); // Space would scroll the panel
+			if (!ev.repeat) toggle();
+		});
+		lines.addEventListener("focus", () => lines.matches(":focus-visible") && show(true));
+		document.addEventListener("focusin", (ev) => !inside(ev.target) && show(false));
+		document.addEventListener(
+			"pointerdown",
+			(ev) => {
+				if (!inside(ev.target)) show(false);
+				else if (card.contains(ev.target) && !button.contains(ev.target)) held = true;
+			},
+			true
+		);
+		// Where the app's webview refuses the clipboard call: the same text,
+		// copied as a selection, inside the card so focus stays where it is.
+		const copySelected = (text) => {
+			const scratch = document.createElement("span");
+			scratch.className = "hw-sr-only";
+			scratch.setAttribute("aria-hidden", "true");
+			scratch.textContent = text;
+			card.appendChild(scratch);
+			const selection = getSelection();
+			selection.removeAllRanges();
+			const range = document.createRange();
+			range.selectNodeContents(scratch);
+			selection.addRange(range);
+			let ok = false;
+			try {
+				ok = document.execCommand("copy");
+			} catch {
+				/* refused: reported as a failed copy */
+			}
+			selection.removeAllRanges();
+			scratch.remove();
+			return ok;
+		};
+		// The outcome shows on the button, which keeps one width through it
+		// (.hw-room in the page), and is spoken once: the button's name does
+		// not change. The shell says nothing on a channel's first message.
+		announce("whole", "");
+		button.addEventListener("click", async () => {
+			clearTimeout(copyTimer);
+			const run = ++copyRun;
+			const text = copies;
+			let ok = true;
+			try {
+				// A call the webview neither grants nor refuses counts as refused.
+				await Promise.race([navigator.clipboard.writeText(text), new Promise((_, refuse) => setTimeout(refuse, 500))]);
+			} catch {
+				if (run !== copyRun) return;
+				ok = copySelected(text);
+			}
+			if (run !== copyRun) return;
+			setText(label, ok ? "Copied" : "Copy failed");
+			announce("whole", label.textContent, { repeat: true });
+			copyTimer = setTimeout(restCopy, COPIED_MS);
+		});
+		syncWhole = (text = copies) => {
+			// Cut: the line's text is taller than the lines it is given.
+			const cut = shown.some((el) => el.scrollHeight > el.clientHeight + 1);
+			if (cut !== isCut()) {
+				lines.toggleAttribute("data-cut", cut);
+				if (cut) {
+					lines.tabIndex = 0;
+					lines.setAttribute("role", "button");
+					lines.setAttribute("aria-controls", "head-whole");
+					lines.setAttribute("aria-expanded", String(!card.hidden));
+					// A name that comes to be cut under a resting pointer: the
+					// wait starts now, as if the pointer had just come.
+					if (over.has(lines)) rest();
+				} else {
+					for (const name of ["tabindex", "role", "aria-controls", "aria-expanded"]) lines.removeAttribute(name);
+				}
+			}
+			for (const [i, el] of shown.entries()) setText(texts[i], el.textContent);
+			if (text !== copies) {
+				copies = text;
+				restCopy();
+			}
+			if (!cut) show(false);
+		};
+		// The lines' width follows the panel's, the scrollbar's and the
+		// face's: a name can come to wrap and a line to be cut, or stop, with
+		// no render. The shown name tells: it is as wide as every line here,
+		// and the share never changes its size, so this never calls itself.
+		// It is set up before the header's own observer below, which then
+		// measures the header with the share settled, in the same frame.
+		if (typeof ResizeObserver === "function") new ResizeObserver(() => (shareLines(), syncWhole())).observe(shown[0]);
+	}
+
 	// The pinned header's real height, for scroll padding and the sticky
 	// dock; a header taller than a third of the panel is not pinned.
 	const pinnedHead = document.querySelector(".hw-head[data-pin]");
@@ -713,6 +1266,27 @@ self.hwShell = (() => {
 		measure();
 	}
 
+	/** A dial's name and source line share four lines. The name takes two
+	 * at most (pi.css); the source line takes three where every name the
+	 * dial can show takes one line (the shown one and the unseen ones that
+	 * keep its room), and two where any of them takes two. The unseen
+	 * source lines follow, so the room is four lines at most. The names are
+	 * the same on every step, so a step never changes the share. */
+	function shareLines() {
+		const cell = document.getElementById("head-lines")?.parentElement;
+		if (cell == null) return;
+		const names = [...cell.querySelectorAll(".hw-head-reading")];
+		// One style for them all. A line height the browser will not give in
+		// px ("normal") is 1.2 of the font's size, near enough to tell one
+		// line from two.
+		const style = getComputedStyle(names[0]);
+		const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+		const three = names.every((el) => el.getBoundingClientRect().height < line * 1.5);
+		if (three === cell.hasAttribute("data-source-lines")) return;
+		if (three) cell.setAttribute("data-source-lines", "3");
+		else cell.removeAttribute("data-source-lines");
+	}
+
 	function renderHeader() {
 		const head = document.getElementById("hw-head");
 		if (head === null || (kind !== "key" && kind !== "dial")) return;
@@ -722,22 +1296,39 @@ self.hwShell = (() => {
 		const found = configured ? labelOf(s.readingKey) : null;
 		const reading = p?.reading ?? (found === null ? null : { label: found.label, source: found.source });
 		// The dial's title precedence: its own label, then the name the
-		// rotation gives this reading, then HWiNFO's label. The header leads
-		// with what the dial shows and keeps HWiNFO's name on the source line
-		// (round 3, R43).
+		// rotation gives this reading, then HWiNFO's label.
 		const label = typeof s.label === "string" && s.label.trim() !== "" ? s.label.trim() : null;
-		const named = kind === "dial" && configured && isDoc(s.rotationNames) && typeof s.rotationNames[s.readingKey] === "string" && s.rotationNames[s.readingKey].trim() !== "" ? s.rotationNames[s.readingKey].trim() : null;
+		const named = kind === "dial" && configured ? rotationName(s, s.readingKey) : null;
 		const custom = label ?? named;
-		setText(document.getElementById("head-reading"), !configured ? "No reading selected" : reading !== null ? (custom ?? reading.label) : (custom ?? "Saved reading"));
-		setText(
-			document.getElementById("head-source"),
-			reading !== null ? `${custom !== null ? `${reading.label} · ` : ""}${reading.source}` : configured && custom !== null ? "Saved reading" : ""
-		);
+		if (stripJoined(p)) {
+			// The face is this dial's strip slice: the header names the strip,
+			// never the dial's own saved reading, which is not on the face.
+			const role = stripRole(p);
+			setText(document.getElementById("head-reading"), role.title);
+			setText(document.getElementById("head-source"), role.source);
+		} else {
+			const lines = reading !== null ? headLines(custom, reading) : null;
+			setText(document.getElementById("head-reading"), !configured ? "No reading selected" : lines !== null ? lines[0] : (custom ?? "Saved reading"));
+			setText(document.getElementById("head-source"), lines !== null ? lines[1] : configured && custom !== null ? "Saved reading" : "");
+		}
+		// No room while the saved reading is missing: no step can happen
+		// until it is back (sensor-dial.ts advance and autoCycle hold).
+		if (kind === "dial") {
+			holdHeadRoom(stripJoined(p) || p?.missing === true ? [] : stepLines(s));
+			shareLines();
+			// Copy takes HWiNFO's own name for the reading, whatever the dial
+			// calls it; with no reading to name (a strip slice, a saved
+			// reading that is gone), the name and source line as shown.
+			syncWhole(reading !== null && !stripJoined(p) ? `${reading.label} · ${reading.source}` : ["head-reading", "head-source"].map((id) => document.getElementById(id).textContent).filter((line) => line !== "").join(" · "));
+		}
 		const ds = dataState();
 		const stateEl = document.getElementById("head-state");
 		if (stateEl !== null) {
 			setText(stateEl, ds.text);
 			stateEl.dataset.tone = ds.tone;
+			// Only a counting age keeps room: the age is the one part of this
+			// line that changes while the data state stays the same.
+			holdRoom(stateEl, ds.room ?? []);
 		}
 		const img = document.getElementById("face-img");
 		const figure = document.getElementById("face");
@@ -748,7 +1339,9 @@ self.hwShell = (() => {
 				faceText = drawnText(state.face);
 			}
 			// Every render: the palettes can arrive after the first face.
-			if (kind === "dial" && state.face !== "") {
+			// A see-through dial or key face shows the board through it; an
+			// opaque face covers it.
+			if (state.face !== "") {
 				const tone = seeThroughTone(state.face);
 				if (img.dataset.clear !== tone) img.dataset.clear = tone;
 			}
@@ -758,6 +1351,17 @@ self.hwShell = (() => {
 			const alt = `${kind === "dial" ? "Dial" : "Key"} face now: ${faceText !== "" ? faceText : (custom ?? reading?.label ?? ds.text)}`;
 			if (img.alt !== alt) img.alt = alt;
 		}
+	}
+
+	/** The recovery a missing saved key gets when it belongs to the other
+	 * provider: open Reading links with it in focus. Null otherwise. */
+	function pairAction(key, source) {
+		if (typeof key !== "string" || document.getElementById("sec-links") === null) return null;
+		const sharedMemoryKey = /^[a-f0-9]+:[a-f0-9]+:[a-f0-9]+$/i.test(key);
+		const gadgetKey = /^g2?:/.test(key);
+		if (sharedMemoryKey && source === "gadget") return ["pair", "Link it to a Gadget reading"];
+		if (gadgetKey && source === "shared-memory") return ["pair", "Link it to a Shared Memory reading"];
+		return null;
 	}
 
 	/** The Reading section's status block: a reason and the local repair. */
@@ -793,16 +1397,26 @@ self.hwShell = (() => {
 		} else if (p !== null && configured && p.missing !== true && p.holding === true) {
 			tone = "warn";
 			lines = [`The plugin is reopening HWiNFO's data source (a sensor layout change, an HWiNFO restart or a busy source). The ${kind === "dial" ? "dial" : "key"} stays as it was for up to 15 s after the last new data, then shows live values or the problem. Your reading and settings are unchanged.`];
-		} else if (p !== null && ((configured && p.missing === true) || p.state === "stale")) {
+		} else if (p !== null && ((configured && p.missing === true && !stripJoined(p)) || p.state === "stale")) {
 			// A missing reading and a stale source are separate facts, and a
 			// stale snapshot can carry both: each gets its own lines.
 			tone = "warn";
-			const missing = configured && p.missing === true;
-			if (missing) {
+			const missing = configured && p.missing === true && !stripJoined(p);
+			if (missing && s.readingKey.startsWith("calc:")) {
+				// A calculated reading lives in the plugin's own settings, not in
+				// HWiNFO's list: no sensor wake or restart brings it back.
+				lines.push("The saved calculated reading is no longer defined: it was deleted, or it came from another computer's settings. It stays saved with its label and colors until you pick another reading.");
+				actions.push(["pick", "Pick another reading"]);
+				if (document.getElementById("sec-calc") !== null) actions.push(["calc", "Calculated readings"]);
+			} else if (missing) {
 				lines.push(
 					`The saved reading is not in HWiNFO's current sensor list${tree !== null && Array.isArray(tree.groups) && tree.groups.length === 0 ? " (HWiNFO publishes no readings right now)" : ""}. It stays saved with its label and colors, and shows again if HWiNFO publishes it (for example after a sensor wakes or HWiNFO restarts).`
 				);
 				actions.push(["retry", "Reload sensor list"], ["pick", "Pick another reading"]);
+				// The saved key belongs to the provider that is not in use:
+				// a Reading link can carry it over (Advanced > Reading links).
+				const pair = pairAction(s.readingKey, p.source);
+				if (pair !== null) actions.push(pair);
 			}
 			if (p.state === "stale") {
 				// The words follow the plugin's evidence-based status. Gadget's
@@ -925,18 +1539,45 @@ self.hwShell = (() => {
 			reveal("shared-source");
 		} else if (button.dataset.statusAction === "pick") {
 			reveal("picker-search");
+		} else if (button.dataset.statusAction === "calc") {
+			reveal("sec-calc");
+		} else if (button.dataset.statusAction === "pair") {
+			emit("pair", state.settings.readingKey);
+			reveal("sec-links");
 		}
 	});
 
+	/**
+	 * Rebuilds a container's children and keeps keyboard focus when it was
+	 * inside: on the control at the same place in the new children (the next
+	 * row's control after a row goes), else on `fallback`. A removed focused
+	 * element would otherwise drop focus to the page.
+	 */
+	function replaceKeepingFocus(container, nodes, fallback) {
+		const active = document.activeElement;
+		const inside = active !== null && active !== undefined && active !== container && container.contains(active);
+		const controls = () => Array.from(container.querySelectorAll("button,select,input,textarea"));
+		const place = inside ? controls().indexOf(active) : -1;
+		container.replaceChildren(...nodes);
+		if (!inside || container.contains(active)) return;
+		const now = controls();
+		const target = place >= 0 && now.length > 0 ? now[Math.min(place, now.length - 1)] : fallback;
+		target?.focus({ preventScroll: true });
+	}
+
 	function renderSummaries() {
-		for (const [section, fn] of summaries) {
+		for (const [section, [fn, room]] of summaries) {
 			let text = "";
+			let texts = [];
 			try {
 				text = fn(state);
+				if (room !== undefined) texts = room(state);
 			} catch (err) {
 				console.error(`hw panel: ${section} summary failed`, err);
 			}
-			setText(document.querySelector(`[data-summary="${section}"]`), text);
+			const el = document.querySelector(`[data-summary="${section}"]`);
+			setText(el, text);
+			if (room !== undefined) holdRoom(el, texts);
 		}
 	}
 
@@ -956,17 +1597,36 @@ self.hwShell = (() => {
 		reveal,
 		markPanelScroll,
 		labelOf: (key) => labelOf(key)?.label ?? null,
-		summary: (section, fn) => {
-			summaries.set(section, fn);
+		/** `room`: every text the line can show on a live change, which its
+		 * cell (.hw-room in the markup) keeps room for (holdRoom). */
+		summary: (section, fn, room) => {
+			summaries.set(section, [fn, room]);
 			scheduleRender();
 		},
 		scheduleRender,
 		resyncBound,
+		redirect,
+		/** The strip's value of a redirected field, else `fallback` (the
+		 * dial's own), and whether the field is redirected now. */
+		fieldValue: (setting, fallback) => shownOf(setting, fallback),
+		redirected: (setting) => redirects.has(setting),
+		sendRedirected: (setting, value) => sentElsewhere(setting, value),
 		// Text the panel commits itself (rotation and group names, detail
 		// cell labels) joins the same leave flush as the bound fields.
 		addLeaveFlush: (flush) => pendingFlushes.add(flush),
 		dropLeaveFlush: (flush) => pendingFlushes.delete(flush),
+		// The number check and its error line, for number fields the panel
+		// binds itself (a reading's separate limits).
+		validateNumber: (el, typed = false) => validateNumber(el, typed),
+		// A select the panel binds itself shows a stored value no option
+		// offers as kept, as a bound one does.
+		showValue: (el, value) => showValue(el, value),
 		announce,
+		replaceKeepingFocus,
+		// The Reading links and Calculated readings editors commit through
+		// the plugin; text typed elsewhere is saved first.
+		applyGlobalField,
+		flushPending,
 		model: hwModel
 	};
 })();

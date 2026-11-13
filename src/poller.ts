@@ -41,8 +41,11 @@ import streamDeck from "@elgato/streamdeck";
 import { EventEmitter } from "node:events";
 
 import { monotonicNow } from "./clock";
+import { HistoryStore, type HistoryTick } from "./history/store";
+import { calculatedReadingsSignature, measurementIdentityOf, NO_CALCULATED_READINGS, parseCalculatedReadings, withCalculatedReadings, type CalculatedPlan } from "./hwinfo/calculated";
 import { GadgetRegistryProvider } from "./hwinfo/gadget-registry";
-import { applyReadingLinks, liveKeyOf, parseReadingLinks, readingLinksSignature, type ReadingLink } from "./hwinfo/reading-links";
+import { ReadingCatalog } from "./hwinfo/link-pairing";
+import { applyReadingLinks, parseReadingLinks, readingLinksSignature, type ReadingLink } from "./hwinfo/reading-links";
 import { SharedMemoryProvider, type SnapshotProvider, type SnapshotSource } from "./hwinfo/provider";
 import { HwinfoError, type HwinfoUnavailableReason, type Reading, type SensorSnapshot } from "./hwinfo/types";
 import { pushSample } from "./series";
@@ -52,9 +55,20 @@ export type PollerStatus =
 	| { state: "stale"; snapshot: SensorSnapshot; source: SnapshotSource; staleForMs: number }
 	| { state: "unavailable"; reason: HwinfoUnavailableReason; message: string };
 
-type SourceMode = "auto" | "shared-memory" | "gadget";
+export type SourceMode = "auto" | "shared-memory" | "gadget";
 
 const DEFAULT_INTERVAL_MS = 1000;
+/**
+ * A busy read is a collision with a hold of about a millisecond, so one more
+ * look a moment later gets the same snapshot. Measured on HWiNFO 8.48: holds
+ * on a strict 1000 ms grid, swept by a 1007 ms tick about every 139 s, and
+ * the first look 15 ms later succeeded every time. Bounded, so a mutex that
+ * stays held still ends in a skipped read and the freshness check. Only the
+ * running timer retries: a direct tick (a page return's first read) has a
+ * caller reading the status right after it, so it is judged at once.
+ */
+export const BUSY_RETRY_MS = 25;
+export const BUSY_RETRIES = 6;
 const MIN_INTERVAL_MS = 250;
 const MAX_INTERVAL_MS = 60_000;
 // Both timings are env-overridable so the resilience e2e can force the
@@ -95,6 +109,9 @@ class HwinfoPoller extends EventEmitter {
 	private timer: NodeJS.Timeout | null = null;
 	private refs = 0;
 	private intervalMs = DEFAULT_INTERVAL_MS;
+	private busyRetries = 0;
+	private busyTimer: NodeJS.Timeout | null = null;
+	private busyLogged = false;
 	private mode: SourceMode = "auto";
 	private lastPollTime = -1;
 	private lastValueRevision: number | undefined;
@@ -108,6 +125,12 @@ class HwinfoPoller extends EventEmitter {
 	/** The empty list's signature, so the first delivery of an absent or
 	 * empty document (every launch) is not a pairing change. */
 	private readingLinksSignature = readingLinksSignature([]);
+	/** The plugin-side calculated readings (src/hwinfo/calculated.ts),
+	 * derived after links on every published snapshot. */
+	private calculated: CalculatedPlan = NO_CALCULATED_READINGS;
+	/** The empty plan's signature, so an absent or empty first delivery is
+	 * not a change (the readingLinks rule). */
+	private calculatedSignature = calculatedReadingsSignature(NO_CALCULATED_READINGS);
 	private bindingRevision = 0;
 	/** Monotonic time of the last accepted observation that carried new
 	 * producer evidence; 0 until the first one. Never set by an open. */
@@ -139,6 +162,21 @@ class HwinfoPoller extends EventEmitter {
 	// sparkline's sample cap, so the whole map stays kilobytes-small. Native
 	// values; converted only at render.
 	private readonly series = new Map<string, number[]>();
+	/**
+	 * The timestamped history behind Trend windows (src/history/store.ts):
+	 * fed once per tick, after the staleness decision, beside the legacy
+	 * rings above, which it never touches. Consumers set and drop their
+	 * interest by id and read frozen views; the poller alone ingests.
+	 */
+	readonly history = new HistoryStore({ log: (line) => this.logger.warn(line), scheduledIntervalMs: DEFAULT_INTERVAL_MS });
+	/**
+	 * The readings each provider showed in this session (metadata only,
+	 * bounded per provider), for the settings panel's link editor: a pair
+	 * can still be confirmed after Auto fell back to Gadget. Fed the
+	 * provider's own snapshot on every accepted read; an unchanged skeleton
+	 * costs one comparison. Never consulted by the read path itself.
+	 */
+	readonly catalog = new ReadingCatalog();
 
 	/** Latest status; safe to read at any time (e.g. right after willAppear). */
 	getStatus(): PollerStatus {
@@ -170,14 +208,81 @@ class HwinfoPoller extends EventEmitter {
 		this.readingLinksSignature = signature;
 		this.readingLinks = links;
 		this.bindingRevision++;
-		if (this.lastRaw !== null && this.status.state !== "unavailable") {
-			const snapshot = applyReadingLinks(this.lastRaw.snapshot, links, this.bindingRevision);
-			this.status = this.status.state === "ok" ? { state: "ok", snapshot, source: this.status.source } : { ...this.status, snapshot };
-			// A ring whose saved key now stands for another measurement (or
-			// for nothing) ends before anyone draws it under the new pairing.
-			for (const [key, ring] of this.series) this.alignRing(key, ring, snapshot);
-			this.emit("tick", this.status);
-		}
+		this.republish();
+	}
+
+	/**
+	 * Adopts the deck's calculated readings (the global calculatedReadings
+	 * list), compared by meaning like the links: a re-delivery of the same
+	 * definitions, or of a document that differs only in fields the parser
+	 * does not read, changes nothing. A real change republishes the held
+	 * observation at once, with no read: a recalculation is never new
+	 * evidence, so rings and sessions gain no sample from it, and a
+	 * definition whose meaning changed (its definitionRevision) ends its
+	 * ring, session and history segment through the measurement identity.
+	 * A label edit repaints and resets nothing.
+	 */
+	setCalculatedReadings(raw: unknown): void {
+		const plan = parseCalculatedReadings(raw);
+		const signature = calculatedReadingsSignature(plan);
+		if (signature === this.calculatedSignature) return;
+		this.calculatedSignature = signature;
+		this.calculated = plan;
+		this.bindingRevision++;
+		this.republish();
+	}
+
+	/** The calculated readings in force (the panel's editor reads verdicts
+	 * and expressions from it). */
+	getCalculatedPlan(): CalculatedPlan {
+		return this.calculated;
+	}
+
+	/** The provider's own observation behind the published status, before
+	 * links and calculations, with its provenance; null
+	 * while unavailable. Read-only: the link editor judges link health
+	 * against it. */
+	getRawObservation(): { readonly snapshot: SensorSnapshot; readonly source: SnapshotSource } | null {
+		return this.lastRaw;
+	}
+
+	/** The held observation with the links in force applied, and no
+	 * calculated readings: what the calculation editor evaluates a draft
+	 * over (with its own plan). Null while unavailable. Read-only. */
+	getLinkedObservation(): SensorSnapshot | null {
+		if (this.lastRaw === null || this.status.state === "unavailable") return null;
+		return applyReadingLinks(this.lastRaw.snapshot, this.readingLinks, this.bindingRevision);
+	}
+
+	/** The Data source preference (Auto, or one provider forced). */
+	getSourceMode(): SourceMode {
+		return this.mode;
+	}
+
+	/** Re-derives the held observation under the current links and
+	 * calculations and tells consumers once, through the
+	 * same tick event a read emits. The re-emit carries no new measurement,
+	 * so sessions and rings (which dedupe on producer evidence and identity)
+	 * gain no samples from it. A ring or history segment whose saved key now
+	 * stands for another measurement (or for nothing) ends before anyone
+	 * draws it under the new view. */
+	private republish(): void {
+		if (this.lastRaw === null || this.status.state === "unavailable") return;
+		const snapshot = this.derive(this.lastRaw);
+		this.status = this.status.state === "ok" ? { state: "ok", snapshot, source: this.status.source } : { ...this.status, snapshot };
+		for (const [key, ring] of this.series) this.alignRing(key, ring, snapshot);
+		this.history.realign(snapshot, this.status.source);
+		this.emit("tick", this.status);
+	}
+
+	/**
+	 * The published view of a raw local observation: the reading links,
+	 * then the calculated readings over the linked view (so an input saved
+	 * as either endpoint of a pair resolves). With no links and no
+	 * definitions this is the provider's snapshot itself, the same instance.
+	 */
+	private derive(raw: { snapshot: SensorSnapshot; source: SnapshotSource }): SensorSnapshot {
+		return withCalculatedReadings(applyReadingLinks(raw.snapshot, this.readingLinks, this.bindingRevision), this.calculated);
 	}
 
 	/**
@@ -192,7 +297,7 @@ class HwinfoPoller extends EventEmitter {
 			ring.length = 0;
 			return undefined;
 		}
-		const identity = `${liveKeyOf(reading)}|${reading.type}:${reading.unit}`;
+		const identity = `${measurementIdentityOf(reading)}|${reading.type}:${reading.unit}`;
 		if (this.seriesIdentity.get(key) !== identity) ring.length = 0;
 		this.seriesIdentity.set(key, identity);
 		return reading;
@@ -213,6 +318,14 @@ class HwinfoPoller extends EventEmitter {
 
 	onTick(listener: (status: PollerStatus) => void): void {
 		this.on("tick", listener);
+	}
+
+	/** The system woke from sleep (the SDK's systemDidWakeUp): every open
+	 * history segment ended before it, unless the overdue tick on resume
+	 * already ended them through the tick-gap rule (then what is open began
+	 * after the wake). The tick-gap rule alone covers a missed event. */
+	noteWake(): void {
+		this.history.noteWake(monotonicNow());
 	}
 
 	/** An action subscribes a reading so the poller collects that sparkline's
@@ -252,6 +365,9 @@ class HwinfoPoller extends EventEmitter {
 			return;
 		}
 		this.intervalMs = ms;
+		// Timestamped history needs no reset: only its tick-gap threshold
+		// follows the scheduled interval.
+		this.history.setScheduledInterval(ms);
 		// The ring is index-spaced, not timestamped, so it cannot honestly
 		// span a cadence change: empty every ring in place. The map KEYS are
 		// the subscriptions (see subscribeSeries), so clearing the map would
@@ -265,7 +381,7 @@ class HwinfoPoller extends EventEmitter {
 		this.logger.info(`Poll interval set to ${ms} ms`);
 		if (this.timer !== null) {
 			clearInterval(this.timer);
-			this.timer = setInterval(() => this.tick(), this.intervalMs).unref(); // see start()
+			this.timer = setInterval(() => this.tick(true), this.intervalMs).unref(); // see start()
 		}
 	}
 
@@ -297,7 +413,7 @@ class HwinfoPoller extends EventEmitter {
 		// plugin polling HWiNFO forever, painting into nothing, with no log
 		// line. With the timer unref'd the loop drains and the process exits,
 		// which is exactly what the e2e already asserts for the idle case.
-		this.timer = setInterval(() => this.tick(), this.intervalMs).unref();
+		this.timer = setInterval(() => this.tick(true), this.intervalMs).unref();
 		this.tick();
 	}
 
@@ -306,6 +422,7 @@ class HwinfoPoller extends EventEmitter {
 			clearInterval(this.timer);
 			this.timer = null;
 		}
+		this.clearBusyRetry();
 		// On a single deck every page change, drill-down entry and Back
 		// releases the last action before the first one of the next page
 		// retains: the record must outlive that gap, or a Gadget source would
@@ -313,6 +430,9 @@ class HwinfoPoller extends EventEmitter {
 		// stamp would read as new.
 		this.preserveFreshness();
 		this.dropProvider();
+		// History segments stay open: the next tick's gap decides (a page
+		// change restarts within milliseconds and must not cut every line).
+		this.history.noteStopped(monotonicNow());
 		// Info on purpose: the e2e exit-hygiene check greps for this line to
 		// prove the poller idles (timer cleared, provider closed) with no keys.
 		this.logger.info("Stopped (no visible actions)");
@@ -403,7 +523,21 @@ class HwinfoPoller extends EventEmitter {
 		}
 	}
 
-	private tick(): void {
+	private clearBusyRetry(): void {
+		if (this.busyTimer !== null) clearTimeout(this.busyTimer);
+		this.busyTimer = null;
+		this.busyRetries = 0;
+	}
+
+	private tick(polling = false): void {
+		// A tick that arrives during a retry takes its place.
+		if (this.busyTimer !== null) {
+			clearTimeout(this.busyTimer);
+			this.busyTimer = null;
+		}
+		// One acquisition time per tick places every history sample.
+		const tickAt = monotonicNow();
+		let historyTick: HistoryTick = { kind: "skipped", at: tickAt };
 		try {
 			if (this.provider === null) {
 				this.provider = this.openProvider();
@@ -413,6 +547,9 @@ class HwinfoPoller extends EventEmitter {
 			this.maybeUpgradeToSharedMemory();
 
 			let snapshot: SensorSnapshot | null;
+			let historyEvidence = false;
+			let historyStampAdvanced = false;
+			let historyEvidenceAgeMs = 0;
 			try {
 				snapshot = this.provider.read();
 			} catch (err) {
@@ -435,14 +572,33 @@ class HwinfoPoller extends EventEmitter {
 					? `Data source layout changed; reopened in place (${this.provider.source})`
 					: `Opened HWiNFO data source: ${this.provider.source} (${poisoned} became unreadable)`);
 			}
+			if (snapshot === null && polling && this.provider.source === "shared-memory") {
+				if (this.busyRetries < BUSY_RETRIES) {
+					this.busyRetries++;
+					this.busyTimer = setTimeout(() => {
+						this.busyTimer = null;
+						this.tick(true);
+					}, BUSY_RETRY_MS).unref();
+					return;
+				}
+				if (!this.busyLogged) {
+					this.busyLogged = true;
+					this.logger.info(`HWiNFO's mutex stayed busy through ${BUSY_RETRIES} retries; this read is skipped`);
+				}
+			}
+			if (snapshot !== null) this.busyLogged = false;
+			this.busyRetries = 0;
 			for (const line of this.provider.notices?.() ?? []) this.logger.warn(line);
 			this.holdingSince = 0;
-			if (snapshot !== null) {
-				this.lastRaw = { snapshot, source: this.provider.source };
+			// Evidence is judged on the provider's own observation, before the
+			// links and calculated readings derive the published view.
+			const raw = snapshot;
+			let evidenceChanged = false;
+			let stampChanged = false;
+			if (raw !== null) {
+				this.lastRaw = { snapshot: raw, source: this.provider.source };
 				this.lastAcceptedAt = monotonicNow();
-				snapshot = applyReadingLinks(snapshot, this.readingLinks, this.bindingRevision);
-			}
-			if (snapshot !== null) {
+				this.catalog.observe(raw, this.provider.source, this.lastAcceptedAt);
 				const sourceChanged = this.seriesSource !== this.provider.source;
 				if (sourceChanged) {
 					for (const ring of this.series.values()) ring.length = 0;
@@ -455,17 +611,21 @@ class HwinfoPoller extends EventEmitter {
 					this.lastValueRevision = undefined;
 					this.lastFreshnessRevision = undefined;
 				}
-				const stampChanged = snapshot.pollTime !== this.lastPollTime;
+				stampChanged = raw.pollTime !== this.lastPollTime;
 				// Revisions belong to one parser, not the producer. Its initial
 				// decode after reopen must never refresh a frozen timestamp.
 				// freshnessRevision counts finite value changes only; stamp-only
 				// evidence must keep its producer age even within one parser.
-				const evidenceRevision = snapshot.freshnessRevision ?? snapshot.valueRevision;
+				const evidenceRevision = raw.freshnessRevision ?? raw.valueRevision;
 				const previousEvidenceRevision = this.lastFreshnessRevision ?? this.lastValueRevision;
 				const revisionChanged = this.revisionProvider === this.provider && evidenceRevision !== undefined && evidenceRevision !== previousEvidenceRevision;
-				const evidenceChanged = this.provider.source === "gadget"
-					? (snapshot.freshnessRevision ?? 0) > 0 && (stampChanged || snapshot.freshnessRevision !== this.lastFreshnessRevision)
+				evidenceChanged = this.provider.source === "gadget"
+					? (raw.freshnessRevision ?? 0) > 0 && (stampChanged || raw.freshnessRevision !== this.lastFreshnessRevision)
 					: stampChanged || revisionChanged;
+				// Gadget has no per-row stamp: a scan that moved any row makes
+				// every row's value a fresh sample, an unchanged one included.
+				historyEvidence = evidenceChanged;
+				historyStampAdvanced = stampChanged || (this.provider.source === "gadget" && raw.freshnessRevision !== this.lastFreshnessRevision);
 				if (evidenceChanged) {
 					// A stamp is as old as the wall clock it was written from says:
 					// a producer that polled once more and then stopped while no
@@ -474,9 +634,25 @@ class HwinfoPoller extends EventEmitter {
 					// session are evidence of now. The evidence clock never runs
 					// backwards, whatever the wall clock does.
 					const stampOnly = this.provider.source === "shared-memory" && !revisionChanged;
-					const at = monotonicNow() - (stampOnly ? stampAgeMs(snapshot.pollTime) : 0);
+					// History keeps this age beside the sample (a data-age
+					// readout); the sample itself sits at the tick's time.
+					historyEvidenceAgeMs = stampOnly ? stampAgeMs(raw.pollTime) : 0;
+					const at = monotonicNow() - historyEvidenceAgeMs;
 					this.lastAdvanceAt = (this.lastAdvanceAt === 0 ? at : Math.max(this.lastAdvanceAt, at)) || -1;
 				}
+				this.lastPollTime = raw.pollTime;
+				this.lastValueRevision = raw.valueRevision;
+				this.revisionProvider = this.provider;
+				this.lastFreshnessRevision = raw.freshnessRevision;
+			}
+			// Freshness is judged even when the read was skipped (mutex busy) —
+			// a consumer wedged on the mutex must not freeze us at "ok" forever.
+			// With no accepted observation yet there is nothing to be stale:
+			// the source stays open and the read is simply retried next tick.
+			const staleForMs = monotonicNow() - this.lastAdvanceAt;
+			const stale = this.lastAdvanceAt !== 0 && staleForMs > STALE_AFTER_MS;
+			snapshot = raw === null ? null : this.derive({ snapshot: raw, source: this.provider.source });
+			if (snapshot !== null) {
 				// Feed every tracked ring, on-screen or not, but only on a
 				// genuinely fresh snapshot: a frozen or stale source must never
 				// push duplicate points (that would flatten the line in place
@@ -487,24 +663,19 @@ class HwinfoPoller extends EventEmitter {
 				// segment ends in place.
 				for (const [key, ring] of this.series) {
 					const reading = this.alignRing(key, ring, snapshot);
-					if (reading !== undefined && evidenceChanged && (stampChanged || ring.length === 0 || ring.at(-1) !== reading.value)) {
+					if (reading === undefined) continue;
+					if (evidenceChanged && (stampChanged || ring.length === 0 || ring.at(-1) !== reading.value)) {
 						pushSample(ring, reading.value);
 					}
 				}
-				this.lastPollTime = snapshot.pollTime;
-				this.lastValueRevision = snapshot.valueRevision;
-				this.revisionProvider = this.provider;
-				this.lastFreshnessRevision = snapshot.freshnessRevision;
 			} else {
 				for (const ring of this.series.values()) ring.length = 0;
 			}
-			// Freshness is judged even when the read was skipped (mutex busy) —
-			// a consumer wedged on the mutex must not freeze us at "ok" forever.
-			// With no accepted observation yet there is nothing to be stale:
-			// the source stays open and the read is simply retried next tick.
-			const staleForMs = monotonicNow() - this.lastAdvanceAt;
-			if (this.lastAdvanceAt !== 0 && staleForMs > STALE_AFTER_MS) {
+			if (stale) {
 				for (const ring of this.series.values()) ring.length = 0;
+				// A tick judged stale records nothing; history segments end at
+				// their last sample (an unavailable probe below overrides).
+				historyTick = { kind: "stale", at: tickAt };
 				// The data is frozen. If HWiNFO exited we would never notice through
 				// our held handles — probe a fresh open. What gets published is
 				// the snapshot's own provenance: a fresh read names the provider
@@ -525,10 +696,15 @@ class HwinfoPoller extends EventEmitter {
 				this.status = this.provider.source === "gadget" && snapshot.pollTime === 0
 					? { state: "stale", snapshot, source: "gadget", staleForMs }
 					: { state: "ok", snapshot, source: this.provider.source };
+				historyTick = this.status.state === "ok"
+					? { kind: "ok", at: tickAt, snapshot, source: this.status.source, evidence: historyEvidence, stampAdvanced: historyStampAdvanced, evidenceAgeMs: historyEvidenceAgeMs }
+					: { kind: "stale", at: tickAt };
 			}
 			// Otherwise (skipped read, still fresh): keep the previous status.
 		} catch (err) {
 			for (const ring of this.series.values()) ring.length = 0;
+			// Any thrown tick, a transient hold included, ends history runs.
+			historyTick = { kind: "unavailable", at: tickAt };
 			this.preserveFreshness();
 			this.dropProvider();
 			if (err instanceof HwinfoError) {
@@ -562,6 +738,12 @@ class HwinfoPoller extends EventEmitter {
 				this.status = { state: "unavailable", reason: "invalid", message: String(err) };
 				this.lastRaw = null;
 			}
+		}
+		// Isolated: a history fault must never cost a tick its status.
+		try {
+			this.history.ingest(historyTick);
+		} catch (err) {
+			this.logger.error("History ingest failed", err);
 		}
 		this.emit("tick", this.status);
 	}

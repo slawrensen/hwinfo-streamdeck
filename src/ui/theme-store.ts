@@ -14,6 +14,7 @@ import { parseDataUnitsPref, type DataUnitsPref, type MeasureOptions } from "./m
 import { effectiveTextSettings, parseTextSettings, type TextSettings } from "./text-colors";
 import { loadThemes } from "./themes";
 import { faceFont, parseFaceFont, setFaceFont } from "./face-font";
+import { ownLooksCount, parseSharedLooks, setSharedLooks, sharedLooks, sweepOwnLooks } from "./shared-looks";
 
 let deckTheme: string | undefined;
 let typeAccentsOn = true;
@@ -79,7 +80,24 @@ function notify(): void {
 }
 
 /** Ingests the global settings (startup read and every later change). */
-export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccents?: unknown; textMode?: unknown; textColor?: unknown; textDimSecondary?: unknown; dataUnits?: unknown; textFont?: unknown }): void {
+export function applyGlobalThemeSettings(settings: {
+	theme?: unknown;
+	typeAccents?: unknown;
+	textMode?: unknown;
+	textColor?: unknown;
+	textDimSecondary?: unknown;
+	dataUnits?: unknown;
+	textFont?: unknown;
+	keyBackground?: unknown;
+	keyAccentWords?: unknown;
+	dialBackground?: unknown;
+	dialAccentWords?: unknown;
+	keyStars?: unknown;
+	dialStars?: unknown;
+	keySkyColor?: unknown;
+	dialSkyColor?: unknown;
+	looksResetGen?: unknown;
+}): void {
 	const config = loadThemes();
 	const themeValid = typeof settings.theme === "string" && Object.hasOwn(config.themes, settings.theme);
 	const nextTheme = themeValid ? (settings.theme as string) : deckTheme;
@@ -87,6 +105,11 @@ export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccent
 	const nextText = parseTextSettings(settings);
 	const nextUnits = parseDataUnitsPref(settings.dataUnits);
 	const nextFont = parseFaceFont(settings.textFont);
+	// The shared Background and Words defaults (shared-looks.ts) go in
+	// force here, before the early return, so a change to them alone
+	// repaints too.
+	const resetBefore = sharedLooks().resetGen;
+	const looksChanged = setSharedLooks(parseSharedLooks(settings));
 	// Only a VALID stored theme counts as "the user (or migration) decided" —
 	// an empty/invalid value must not lock out the legacy migration while
 	// silently failing to apply.
@@ -94,7 +117,7 @@ export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccent
 		migrationDecided = true;
 	}
 	const textChanged = JSON.stringify(nextText) !== JSON.stringify(deckText);
-	if (nextTheme === deckTheme && nextAccents === typeAccentsOn && !textChanged && nextUnits === dataUnits && nextFont === faceFont().id) {
+	if (nextTheme === deckTheme && nextAccents === typeAccentsOn && !textChanged && nextUnits === dataUnits && nextFont === faceFont().id && !looksChanged) {
 		return;
 	}
 	deckTheme = nextTheme;
@@ -103,6 +126,16 @@ export function applyGlobalThemeSettings(settings: { theme?: unknown; typeAccent
 	dataUnits = nextUnits;
 	setFaceFont(nextFont);
 	streamDeck.logger.info(`Deck theme = ${getDeckTheme()} (type accents ${typeAccentsOn ? "on" : "off"}, text ${deckText?.mode ?? "theme"}, data units ${dataUnits}, text font ${nextFont}, source: global settings)`);
+	// "Use it everywhere" (a higher looksResetGen, or the first delivery
+	// of one at start): every visible action's older own Background and
+	// Words go, one write each, before the repaint; the open panel's count
+	// line hears the new count.
+	const resetGen = sharedLooks().resetGen;
+	if (resetGen > resetBefore) {
+		sweepOwnLooks(resetGen);
+		streamDeck.logger.info(`Shared looks reset to generation ${resetGen}: own Background and Words before it go back to Default`);
+		if (streamDeck.ui.action !== undefined) void streamDeck.ui.sendToPropertyInspector({ event: "ownLooks", ...ownLooksCount() });
+	}
 	notify();
 }
 

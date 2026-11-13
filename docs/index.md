@@ -79,8 +79,10 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
   <h2 id="start-here">Find what you need</h2>
   <ul>
     <li><a href="{{ '/themes.html' | relative_url }}">Compare the seven themes <span aria-hidden="true">→</span></a><span>Pick a palette and set reading colors.</span></li>
-    <li><a href="{{ '/data-sources.html' | relative_url }}">Understand your data source <span aria-hidden="true">→</span></a><span>Sharing, freshness, history and reading links.</span></li>
+    <li><a href="{{ '/strip-display.html' | relative_url }}">Join dials across the touch strip <span aria-hidden="true">→</span></a><span>One graph across the strip, or two side by side.</span></li>
+    <li><a href="{{ '/data-sources.html' | relative_url }}">Understand your data source <span aria-hidden="true">→</span></a><span>Sharing, freshness, history, reading links and calculated readings.</span></li>
     <li><a href="{{ '/troubleshooting.html' | relative_url }}">Fix a status message <span aria-hidden="true">→</span></a><span>Find the exact message and the next step.</span></li>
   </ul>
+  <p class="channel-note">1.8 joins Sensor Dials into one graph across the touch strip and adds time windows, limits for each reading, calculated readings and deck backgrounds. Some of it is not yet checked on real hardware; the strip page and the background sections say what was tested.</p>
   <p class="channel-note">GitHub: {{ site.plugin_release.package_version }}. Marketplace: {{ site.plugin_release.marketplace_version }} as checked {{ site.plugin_release.checked }}. <a href="{{ '/installation.html' | relative_url }}">Choose an install channel</a>.</p>
 </section>

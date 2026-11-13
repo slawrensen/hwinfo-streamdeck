@@ -27,14 +27,21 @@ const config = {
 	external: [],
 	// @elgato/utils declares no sideEffects, so rollup keeps its barrel's
 	// Option/OptionGroup modules for their top-level z.object() calls even
-	// though nothing imports a binding from them — dragging all of zod
+	// though nothing imports a binding from them, dragging all of zod
 	// (~14 KB minified) into the bundle. The SDK runtime only uses
 	// Enumerable/EventEmitter/withResolvers/Lazy. Marking the lists/ modules
 	// side-effect free lets rollup drop them, and zod falls out with its
 	// last importer; if a future SDK version starts importing Option, the
-	// modules are retained again automatically.
+	// modules are retained again automatically, and the bundle gate
+	// (scripts/bundle-inventory.mjs, in the unit suite and in CI) fails on
+	// the zod that comes back with them.
+	// ws's ESM entry (wrapper.mjs) re-exports WebSocketServer,
+	// createWebSocketStream and subprotocol. The SDK imports only the default
+	// client, but rollup keeps CommonJS modules for their side effects, so
+	// about 7.5 KB of server code shipped. Marked side-effect free, the three
+	// drop out. They come back on their own if the client ever requires one.
 	treeshake: {
-		moduleSideEffects: (id) => !/[\\/]@elgato[\\/]utils[\\/]dist[\\/]lists[\\/]/.test(id)
+		moduleSideEffects: (id) => !/[\\/]@elgato[\\/]utils[\\/]dist[\\/]lists[\\/]/.test(id) && !/[\\/]ws[\\/]lib[\\/](?:websocket-server|stream|subprotocol)\.js/.test(id)
 	},
 	plugins: [
 		typescript({

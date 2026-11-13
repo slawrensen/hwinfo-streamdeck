@@ -3,9 +3,9 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>Sensor Reading settings</title>
-		<script src="sdpi-components.js"></script>
+		<script src="pi-client.js?v=1.8.0.0-54"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.1.0-1" />
+		<link rel="stylesheet" href="pi.css?v=1.8.0.0-54" />
 	</head>
 	<body data-kind="key">
 		<header class="hw-head" id="hw-head" data-kind="key" data-pin>
@@ -22,12 +22,21 @@
 				</div>
 				<p class="hw-head-reading" id="head-reading">No reading selected</p>
 				<p class="hw-head-source" id="head-source"></p>
-				<p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p>
+				<div class="hw-room"><p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p></div>
 			</div>
 		</header>
 
 		<div class="hw-hint hw-lede" id="role-note" hidden>
 			This is the <b>Back tile</b> of the sensor detail view. Set its reading, layout and look like any key; pressing it always returns to the profile you came from, so press settings do not apply here.
+		</div>
+
+		<!-- A key placed by hand on the shared detail page: which sensors'
+		     detail pages it shows on. Shown only on a detail page or once the
+		     key is limited; every button saves detailScope alone, in one frame. -->
+		<div class="hw-hint hw-lede hw-detail-scope" id="detail-scope" hidden>
+			<p class="hw-help" id="scope-help"></p>
+			<button type="button" class="hw-btn" id="scope-add" hidden></button>
+			<ul class="hw-detail-scope-list" id="scope-list" aria-label="Detail pages this key shows on" hidden></ul>
 		</div>
 
 		<!-- What is wrong with the data or the saved reading, and its repair,
@@ -153,13 +162,12 @@
 			<div class="hw-sec-body">
 				<div class="hw-field">
 					<label for="f-text">Text color</label>
-					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
-						<option value="">Default</option>
+					<select id="f-text" data-setting="textMode" data-default="">
+						<option value="">Theme text (shared)</option>
 						<option value="theme">Theme text</option>
 						<option value="dim">Dimmed</option>
 						<option value="custom">Custom color</option>
 					</select>
-					<p class="hw-help" id="text-help">Numbers and labels. Graphs, bars and stat badges use the accent color; warn and critical colors always win.</p>
 				</div>
 				<div id="text-custom" hidden>
 					<div class="hw-field">
@@ -170,6 +178,52 @@
 						</div>
 					</div>
 					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
+				</div>
+				<div class="hw-field">
+					<label for="f-background" data-l10n="pi.keyBackground.background">Background</label>
+					<select id="f-background" data-setting="keyBackground" data-default="" aria-describedby="background-help art-help">
+						<option value="">Theme (shared)</option>
+						<option value="theme" data-l10n="pi.keyBackground.theme">Theme</option>
+						<option value="glass" data-l10n="pi.keyBackground.glass">Glass</option>
+						<option value="tint" data-l10n="pi.keyBackground.tint">Tint</option>
+						<option value="outline" data-l10n="pi.keyBackground.outline">Outline</option>
+						<option value="clear" data-l10n="pi.keyBackground.clear">Clear</option>
+						<option value="stars" data-l10n="pi.keyBackground.stars">Stars</option>
+						<option value="dusk" data-l10n="pi.keyBackground.dusk">Dusk</option>
+						<option value="nebula" data-l10n="pi.keyBackground.nebula">Nebula</option>
+					</select>
+					<p class="hw-help" id="background-help" data-l10n="pi.keyBackground.showsThePagePicture" hidden>Shows the page picture; an alert still fills the key.</p>
+					<p class="hw-help" id="art-help" data-l10n="pi.keyBackground.artPaper" hidden>Paper draws no sky; a dark theme shows it.</p>
+				</div>
+				<div class="hw-field hw-inline-field" id="accent-words" hidden>
+					<label for="f-accent-words" data-l10n="pi.keyBackground.wordsInTheAccent">Words in the accent color</label>
+					<select id="f-accent-words">
+						<option value="">Off (shared)</option>
+						<option value="on" data-l10n="pi.keyBackground.on">On</option>
+						<option value="off" data-l10n="pi.keyBackground.off">Off</option>
+					</select>
+				</div>
+				<div class="hw-row2" id="art-sky" hidden>
+					<div class="hw-field">
+						<label for="f-art-stars" data-l10n="pi.keyBackground.starsLabel">Stars</label>
+						<select id="f-art-stars" aria-describedby="art-help">
+							<option value="">All (shared)</option>
+							<option value="all" data-l10n="pi.keyBackground.starsAll">All</option>
+							<option value="few" data-l10n="pi.keyBackground.starsFew">Few</option>
+							<option value="off" data-l10n="pi.keyBackground.starsOff">Off</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="f-art-sky-color" data-l10n="pi.keyBackground.skyColor">Sky color</label>
+						<select id="f-art-sky-color" aria-describedby="art-help">
+							<option value="">Theme (shared)</option>
+							<option value="theme" data-l10n="pi.keyBackground.skyTheme">Theme</option>
+							<option value="deep" data-l10n="pi.keyBackground.skyDeep">Deep</option>
+							<option value="warm" data-l10n="pi.keyBackground.skyWarm">Warmer</option>
+							<option value="cool" data-l10n="pi.keyBackground.skyCool">Cooler</option>
+							<option value="mono" data-l10n="pi.keyBackground.skyMono">Mono</option>
+						</select>
+					</div>
 				</div>
 
 				<div class="hw-row3">
@@ -198,6 +252,15 @@
 					</div>
 				</div>
 
+				<details class="hw-sub" id="sec-formats">
+					<summary><span class="hw-sub-title" data-l10n="pi.formats.unitAndDecimals">Unit and decimals per reading</span><span class="hw-sec-sum" data-summary="formats"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" id="formats-help" data-l10n="pi.formats.staysAtAnyValue">A unit picked here stays at any value.</p>
+						<div id="format-rows" class="hw-format-rows" role="group" aria-label="Unit and decimals for each reading" data-l10n-aria-label="pi.formats.unitAndDecimalsFor" aria-describedby="formats-help"></div>
+						<p class="hw-help" id="formats-note" aria-live="polite" hidden></p>
+					</div>
+				</details>
+
 				<div class="hw-field" id="display-item">
 					<label for="display-mode">Graph under the value</label>
 					<select id="display-mode" aria-describedby="display-help">
@@ -207,6 +270,15 @@
 						<option value="ring">Ring (value in its range)</option>
 					</select>
 					<p class="hw-help" id="display-help" hidden>Spans 0 to 100 for percentages and 0 to 1 for Yes/No readings, otherwise the observed range (Shared Memory: HWiNFO's session min and max; Gadget: the last 36 samples), with amber and red zones at your alert thresholds.</p>
+					<div class="hw-field" id="trend-window-item" hidden>
+						<label for="f-trend-window">Time window</label>
+						<select id="f-trend-window" data-setting="historyWindow" data-default="">
+							<option value="">Recent samples</option>
+							<option value="1m">1 minute</option>
+							<option value="5m">5 minutes</option>
+							<option value="15m">15 minutes</option>
+						</select>
+					</div>
 				</div>
 
 				<div id="quad-display" hidden>
@@ -236,7 +308,7 @@
 		</details>
 
 		<details class="hw-sec" id="sec-alerts">
-			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum" data-summary="alerts"></span></summary>
+			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum hw-room"><span data-summary="alerts"></span></span></summary>
 			<div class="hw-sec-body">
 				<div class="hw-row2">
 					<div class="hw-field">
@@ -251,7 +323,41 @@
 					</div>
 				</div>
 				<label class="hw-check"><input type="checkbox" data-setting="alertBelow" /><span>Alert when the value drops to or below these numbers (for fans and clocks)</span></label>
-				<p class="hw-help" id="alerts-help">At or past Warn the key turns amber, at or past Critical red. Alerts check the current value in the reading's own unit (°F when °F is on); for bytes and rates that is HWiNFO's number and unit, which the key may show rescaled.<span id="alerts-first" hidden> Only reading 1 is checked; it recolors the whole key.</span></p>
+				<p class="hw-help" id="alert-notes-0" aria-live="polite" hidden></p>
+				<p class="hw-help" id="alerts-help">At or past Warn the key turns amber, at or past Critical red. Bytes and rates use HWiNFO's number and unit, even where the key shows another.<span id="alerts-first" hidden> These are reading 1's unless a row below gives it its own; the key takes the highest level.</span></p>
+				<div id="alert-rows" hidden></div>
+				<details class="hw-sub" id="sec-timing">
+					<summary><span class="hw-sub-title" data-l10n="pi.timing.timing">Timing</span><span class="hw-sec-sum" data-summary="alert-timing"></span></summary>
+					<div class="hw-sub-body">
+						<div class="hw-row2">
+							<div class="hw-field">
+								<label for="f-dwell" data-l10n="pi.timing.alertAfter">Alert after</label>
+								<select id="f-dwell" data-setting="alertDwellMs" data-default="0">
+									<option value="0" data-l10n="pi.timing.immediately">Immediately</option>
+									<option value="2000" data-l10n="pi.timing.seconds2">2 seconds</option>
+									<option value="5000" data-l10n="pi.timing.seconds5">5 seconds</option>
+									<option value="10000" data-l10n="pi.timing.seconds10">10 seconds</option>
+									<option value="30000" data-l10n="pi.timing.seconds30">30 seconds</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="f-hyst" data-l10n="pi.timing.clearBy">Clear by</label>
+								<input id="f-hyst" type="text" inputmode="decimal" data-setting="alertHysteresis" data-validate="number" placeholder="0" aria-describedby="f-hyst-error" autocomplete="off" />
+								<p class="hw-error" id="f-hyst-error" hidden></p>
+							</div>
+						</div>
+						<div class="hw-field" id="snooze-item">
+							<label for="f-snooze" data-l10n="pi.timing.snoozeLasts">Snooze lasts</label>
+							<select id="f-snooze" data-setting="alertSnoozeMs" data-default="" aria-describedby="snooze-help">
+								<option value="" data-l10n="pi.timing.offAPress">Off (a press keeps its action)</option>
+								<option value="300000" data-l10n="pi.common.minutes5">5 minutes</option>
+								<option value="900000" data-l10n="pi.common.minutes15">15 minutes</option>
+								<option value="3600000" data-l10n="pi.timing.hour1">1 hour</option>
+							</select>
+							<p class="hw-help" id="snooze-help" data-l10n="pi.timing.aHoldStillDoes">A hold still does what Press sets for it.</p>
+						</div>
+					</div>
+				</details>
 			</div>
 		</details>
 
@@ -262,7 +368,7 @@
 				<div id="press-block">
 					<div class="hw-field">
 						<label for="f-press">A press</label>
-						<select id="f-press" data-setting="pressBehavior" data-default="">
+						<select id="f-press" data-setting="pressBehavior" data-default="" data-kept="default">
 							<option value="">Cycles current, min, max, avg</option>
 							<option value="open-details">Opens sensor details</option>
 							<option value="tap-cycle-hold-details">Tap cycles; hold opens details</option>
@@ -316,7 +422,34 @@
 								<input id="f-filter" type="text" data-setting="detailFilter" placeholder="*4090*" aria-describedby="detail-filter-count filter-help" autocomplete="off" spellcheck="false" />
 							</div>
 							<div class="hw-status" id="detail-filter-count" aria-live="polite" hidden></div>
-							<p class="hw-help" id="filter-help">Matches sensor name and label together, across every sensor. Plain text matches anywhere; * spans anything and ? one character (*gpu*fan*).</p>
+							<p class="hw-help" id="filter-help">Matches sensor name and label together, across every sensor. Plain text matches anywhere; * spans anything, ? one character, and | adds another pattern (*gpu*fan* | pump).</p>
+						</div>
+						<!-- The opener's own empty cells, per page, for this kind of deck.
+						     The preview comes from the plugin; a cell press saves
+						     detailGaps alone, in one frame. Opening, paging and folding
+						     save nothing. -->
+						<div id="detail-layout" hidden>
+							<details class="hw-sub hw-layout">
+								<summary><span class="hw-sub-title">Page layout</span></summary>
+								<div class="hw-sub-body">
+									<div class="hw-layout-pager">
+										<button type="button" class="hw-btn" id="layout-prev" data-repeat data-step="detail-page-previous" aria-label="Previous detail page">Previous</button>
+										<span class="hw-layout-page" id="layout-page" role="status">Page 1 of 1</span>
+										<button type="button" class="hw-btn" id="layout-next" data-repeat data-step="detail-page-next" aria-label="Next detail page">Next</button>
+									</div>
+									<div class="hw-layout-grid" id="layout-grid" role="group" aria-label="Cells on this detail page" aria-describedby="layout-help"></div>
+									<!-- Every note is always here, stacked in one place, the
+									     shown one visible: the area keeps the tallest note's
+									     height, so a note coming or going on live data moves
+									     nothing below the grid. -->
+									<div class="hw-layout-notes" id="layout-note" aria-live="polite">
+										<p class="hw-help" data-note="unresolved" data-shown="false">Readings show here once HWiNFO sends data. Empty cells you set still apply.</p>
+										<p class="hw-help" data-note="ignored" data-shown="false">No cell is left for readings here, so the deck ignores this page's empty cells. Press one to let a reading back in.</p>
+										<p class="hw-help" data-note="limit" data-shown="false">Empty cells reach page 16. Later pages fill every cell.</p>
+									</div>
+									<p class="hw-help" id="layout-help">Press a cell to keep it empty; readings move to the next free one.</p>
+								</div>
+							</details>
 						</div>
 						<div class="hw-hint" id="detail-unsupported" hidden></div>
 						<details class="hw-how">
@@ -335,7 +468,6 @@
 				<details class="hw-sub" id="sec-shared">
 					<summary><span class="hw-sub-title">Shared defaults</span><span class="hw-scope">All keys and dials</span><span class="hw-sec-sum" data-summary="shared"></span></summary>
 					<div class="hw-sub-body" id="shared-defaults">
-						<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. A key or dial with its own choice keeps it.</p>
 						<div class="hw-row2">
 							<div class="hw-field">
 								<label for="shared-theme">Theme</label>
@@ -369,6 +501,41 @@
 							<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
 						</div>
 						<div class="hw-field">
+							<label for="shared-background" data-l10n="pi.keyBackground.background">Background</label>
+							<select id="shared-background">
+								<option value="theme" data-l10n="pi.keyBackground.theme">Theme</option>
+								<option value="glass" data-l10n="pi.keyBackground.glass">Glass</option>
+								<option value="tint" data-l10n="pi.keyBackground.tint">Tint</option>
+								<option value="outline" data-l10n="pi.keyBackground.outline">Outline</option>
+								<option value="clear" data-l10n="pi.keyBackground.clear">Clear</option>
+								<option value="stars" data-l10n="pi.keyBackground.stars">Stars</option>
+								<option value="dusk" data-l10n="pi.keyBackground.dusk">Dusk</option>
+								<option value="nebula" data-l10n="pi.keyBackground.nebula">Nebula</option>
+							</select>
+						</div>
+						<label class="hw-check" id="shared-words-item" hidden><input type="checkbox" id="shared-accent-words" /><span data-l10n="pi.sharedLooks.wordsLabel">Words in the accent color</span></label>
+						<div class="hw-row2" id="shared-sky-item" hidden>
+							<div class="hw-field">
+								<label for="shared-stars" data-l10n="pi.keyBackground.starsLabel">Stars</label>
+								<select id="shared-stars">
+									<option value="all" data-l10n="pi.keyBackground.starsAll">All</option>
+									<option value="few" data-l10n="pi.keyBackground.starsFew">Few</option>
+									<option value="off" data-l10n="pi.keyBackground.starsOff">Off</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="shared-sky-color" data-l10n="pi.keyBackground.skyColor">Sky color</label>
+								<select id="shared-sky-color">
+									<option value="theme" data-l10n="pi.keyBackground.skyTheme">Theme</option>
+									<option value="deep" data-l10n="pi.keyBackground.skyDeep">Deep</option>
+									<option value="warm" data-l10n="pi.keyBackground.skyWarm">Warmer</option>
+									<option value="cool" data-l10n="pi.keyBackground.skyCool">Cooler</option>
+									<option value="mono" data-l10n="pi.keyBackground.skyMono">Mono</option>
+								</select>
+							</div>
+						</div>
+						<div class="hw-status" id="own-looks" role="status" aria-live="polite" data-tone=""><p><span id="own-looks-text"></span> <button type="button" class="hw-link" id="own-looks-use" hidden data-l10n="pi.sharedLooks.useItEverywhere">Use it everywhere</button></p></div>
+						<div class="hw-field">
 							<label for="shared-font">Text font</label>
 							<select id="shared-font" data-setting="textFont" data-global data-default="tahoma" aria-describedby="font-help">
 								<option value="tahoma">Tahoma</option>
@@ -382,7 +549,7 @@
 								<option value="on">By sensor type</option>
 								<option value="off">Theme accent everywhere</option>
 							</select>
-							<p class="hw-help" id="accents-help">Accents color graphs, bars and stat badges, never the numbers (Text color does that). Paper keeps its own accent.</p>
+							<p class="hw-help" id="accents-help">For graphs, bars and marks; numbers follow Text color.</p>
 						</div>
 						<div class="hw-field">
 							<label for="shared-units">Data units</label>
@@ -417,16 +584,82 @@
 								</select>
 							</div>
 						</div>
-						<p class="hw-help" id="source-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
+						<p class="hw-help" id="source-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget readings under Reading links below (<a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">how it works</a>).</p>
 						<p class="hw-help" id="source-now" hidden></p>
 						<details class="hw-inline-help" id="setup-help">
 							<summary>HWiNFO setup steps</summary>
 							<ol class="hw-help">
 								<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
-								<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
+								<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want.</li>
 								<li>Pick a reading under Reading.</li>
 							</ol>
 						</details>
+					</div>
+				</details>
+
+				<details class="hw-sub" id="sec-links">
+					<summary><span class="hw-sub-title" data-l10n="pi.links.readingLinks">Reading links</span><span class="hw-scope" data-l10n="pi.common.allKeysAnd">All keys and dials</span><span class="hw-sec-sum" data-summary="links"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" data-l10n="pi.links.keepsAReadingShowing">Keeps a reading showing when Auto switches source.</p>
+						<div class="hw-field" id="links-focus-row" hidden>
+							<label for="links-focus" data-l10n="pi.links.readingToLink">Reading to link</label>
+							<select id="links-focus"></select>
+						</div>
+						<div class="hw-link-card" id="links-card"></div>
+						<div class="hw-actions"><button class="hw-btn" id="links-scan" type="button">Look on Gadget</button></div>
+						<div class="hw-field">
+							<label for="links-filter" data-l10n="pi.links.filterTheOther">Filter the other source's readings</label>
+							<input id="links-filter" type="search" autocomplete="off" spellcheck="false" />
+						</div>
+						<div class="hw-field">
+							<label for="links-candidate" data-l10n="pi.links.matchingReading">Matching reading</label>
+							<select id="links-candidate"></select>
+						</div>
+						<div class="hw-link-card" id="links-chosen" hidden></div>
+						<p class="hw-help" id="links-scope" hidden></p>
+						<div class="hw-actions"><button class="hw-btn" id="links-link" type="button" aria-disabled="true" aria-describedby="links-note" data-l10n="pi.links.link">Link</button></div>
+						<div class="hw-status" id="links-note" role="status" aria-live="polite" data-tone=""></div>
+						<ul class="hw-link-list" id="links-list" aria-label="Stored links" data-l10n-aria-label="pi.links.storedLinksLabel"></ul>
+						<ul class="hw-help hw-link-prereq" id="links-prereq" hidden></ul>
+					</div>
+				</details>
+
+				<details class="hw-sub" id="sec-calc">
+					<summary><span class="hw-sub-title" data-l10n="pi.calc.calculatedReadings">Calculated readings</span><span class="hw-scope" data-l10n="pi.common.allKeysAnd">All keys and dials</span><span class="hw-sec-sum" data-summary="calc"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" data-l10n="pi.calc.listedUnderCalculated">Listed under Calculated (plugin) in every reading picker.</p>
+						<ul class="hw-calc-list" id="calc-list" aria-label="Calculated readings" data-l10n-aria-label="pi.calc.calculatedReadingsLabel"></ul>
+						<div class="hw-actions"><button class="hw-btn" id="calc-new" type="button" data-l10n="pi.calc.newCalculatedReading">New calculated reading</button></div>
+						<div class="hw-calc-form" id="calc-form" hidden>
+							<div class="hw-field">
+								<label for="calc-op" data-l10n="pi.calc.operation">Operation</label>
+								<select id="calc-op">
+									<option value="sum" data-l10n="pi.calc.sum">Sum</option>
+									<option value="avg" data-l10n="pi.calc.average">Average</option>
+									<option value="min" data-l10n="pi.calc.lowest">Lowest</option>
+									<option value="max" data-l10n="pi.calc.highest">Highest</option>
+									<option value="diff" data-l10n="pi.calc.differenceAB">Difference (A - B)</option>
+									<option value="ratio" data-l10n="pi.calc.ratioAB">Ratio (A / B)</option>
+								</select>
+							</div>
+							<fieldset class="hw-calc-inputs">
+								<legend data-l10n="pi.common.readings">Readings</legend>
+								<div id="calc-inputs"></div>
+								<div class="hw-actions"><button class="hw-btn" id="calc-add-input" type="button" data-l10n="pi.calc.addAReading">Add a reading</button></div>
+							</fieldset>
+							<label class="hw-check" id="calc-percent-row" hidden><input type="checkbox" id="calc-percent" /><span data-l10n="pi.calc.showAAs">Show A as a percentage of B</span></label>
+							<div class="hw-field">
+								<label for="calc-label" data-l10n="pi.calc.labelOptional">Label (optional)</label>
+								<input id="calc-label" type="text" maxlength="64" autocomplete="off" spellcheck="false" />
+							</div>
+							<div class="hw-calc-preview" aria-live="polite">
+								<p class="hw-calc-value" id="calc-preview-value"></p>
+								<p class="hw-help" id="calc-preview-expression"></p>
+								<p class="hw-help" id="calc-preview-message"></p>
+							</div>
+							<div class="hw-actions"><button class="hw-btn" id="calc-save" type="button" aria-disabled="true" aria-describedby="calc-preview-message" data-l10n="pi.calc.save">Save</button><button class="hw-link" id="calc-cancel" type="button" data-l10n="pi.common.cancel">Cancel</button></div>
+						</div>
+						<div class="hw-status" id="calc-note" role="status" aria-live="polite" data-tone=""></div>
 					</div>
 				</details>
 
@@ -464,9 +697,12 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.1.0-1"></script>
-		<script src="pi-shell.js?v=1.7.1.0-1"></script>
-		<script src="pi-common.js?v=1.7.1.0-1"></script>
-		<script src="pi-control.js?v=1.7.1.0-1"></script>
+		<script src="pi-model.js?v=1.8.0.0-54"></script>
+		<script src="pi-strings.js?v=1.8.0.0-54"></script>
+		<script src="pi-shell.js?v=1.8.0.0-54"></script>
+		<script src="pi-common.js?v=1.8.0.0-54"></script>
+		<script src="pi-control.js?v=1.8.0.0-54"></script>
+		<script src="pi-links.js?v=1.8.0.0-54"></script>
+		<script src="pi-calc.js?v=1.8.0.0-54"></script>
 	</body>
 </html>

@@ -1,0 +1,211 @@
+{
+	"note": "Written by an older 1.8 build (integration 4826ff08, before Meters had a Look) from the stored copy in `doc`: what it writes back after an edit of the window and after an edit of the right half's readings, and whether it takes an edit of meterLook.",
+	"doc": {
+		"layout": "split",
+		"encoders": 6,
+		"window": "5m",
+		"readingFormats": {
+			"f0000300:0:7000021": {
+				"decimals": "0"
+			},
+			"f0000301:0:8000005": {
+				"decimals": "0"
+			}
+		},
+		"panes": [
+			{
+				"style": "meters",
+				"meterLook": "liquid",
+				"series": [
+					{
+						"key": "f0000300:0:7000021",
+						"name": "CPU usage"
+					}
+				]
+			},
+			{
+				"style": "meters",
+				"meterLook": "full",
+				"series": [
+					{
+						"key": "f0000301:0:8000005",
+						"name": "RAM usage"
+					}
+				]
+			}
+		],
+		"screens": [
+			{
+				"style": "meters",
+				"meterLook": "flat",
+				"series": [
+					{
+						"key": "f0000300:0:7000021"
+					}
+				],
+				"screenId": "0a1b2c3d"
+			}
+		]
+	},
+	"window": {
+		"layout": "split",
+		"encoders": 6,
+		"window": "1m",
+		"sharedWindow": true,
+		"textDimSecondary": false,
+		"fahrenheit": false,
+		"decimals": "auto",
+		"panes": [
+			{
+				"meterLook": "liquid",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000300:0:7000021",
+						"name": "CPU usage"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"screenId": "8ec4ccec"
+			},
+			{
+				"meterLook": "full",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000301:0:8000005",
+						"name": "RAM usage"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": []
+			}
+		],
+		"screens": [
+			{
+				"meterLook": "flat",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000300:0:7000021"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"screenId": "0a1b2c3d"
+			}
+		],
+		"readingFormats": {
+			"f0000300:0:7000021": {
+				"decimals": "0"
+			},
+			"f0000301:0:8000005": {
+				"decimals": "0"
+			}
+		}
+	},
+	"series": {
+		"layout": "split",
+		"encoders": 6,
+		"window": "5m",
+		"sharedWindow": true,
+		"textDimSecondary": false,
+		"fahrenheit": false,
+		"decimals": "auto",
+		"panes": [
+			{
+				"meterLook": "liquid",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000300:0:7000021",
+						"name": "CPU usage"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"screenId": "8b6dfa04"
+			},
+			{
+				"meterLook": "full",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000301:0:8000005"
+					},
+					{
+						"key": "f0000300:0:7000021"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": []
+			}
+		],
+		"screens": [
+			{
+				"meterLook": "flat",
+				"style": "meters",
+				"series": [
+					{
+						"key": "f0000300:0:7000021"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"screenId": "0a1b2c3d"
+			}
+		],
+		"readingFormats": {
+			"f0000300:0:7000021": {
+				"decimals": "0"
+			},
+			"f0000301:0:8000005": {
+				"decimals": "0"
+			}
+		}
+	},
+	"lookEditTaken": false
+}

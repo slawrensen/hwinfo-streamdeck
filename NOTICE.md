@@ -16,10 +16,10 @@ This plugin is free software (MIT licensed) with **no ads and no telemetry**.
 - Built with the official **Elgato Stream Deck SDK** (`@elgato/streamdeck`,
   with its `@elgato/utils` and `@elgato/schemas`, MIT, Corsair Memory Inc.,
   bundled into `bin/plugin.js`) and **sdpi-components** (MIT, Elgato,
-  <https://sdpi-components.dev>; vendored as `ui/sdpi-components.js` from the
-  official distribution, which bundles **Lit**, BSD-3-Clause, Google LLC). The
-  HWiNFO bridge (`bin/hwsm.node`) is this project's own N-API addon, built
-  from `native/hwsm` and covered by the same MIT license.
+  <https://sdpi-components.dev>; `ui/pi-client.js` ports its socket client
+  and settings stores). The HWiNFO bridge (`bin/hwsm.node`) is this
+  project's own N-API addon, built from `native/hwsm` and covered by the
+  same MIT license.
 - **ws** (MIT, Einar Otto Stangvik and contributors,
   <https://github.com/websockets/ws>), the SDK's WebSocket client to the
   local Stream Deck app, bundled into `bin/plugin.js`.
@@ -140,35 +140,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-## Lit license (BSD-3-Clause), bundled in sdpi-components
-
-Copyright 2019 Google LLC
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## ws license (MIT)
 

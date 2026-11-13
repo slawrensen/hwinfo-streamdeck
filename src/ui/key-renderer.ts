@@ -8,11 +8,17 @@
  * then settled at 114 when the spark span was inset for its stroke);
  * value and label glyph sizes flex with content.
  */
+import type { HistoryView } from "../history/types";
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, cutToFit, estimateKeyTextWidth, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, inkEdges, inksWithin, legacyLabelSize, truncateLabel, type FittedText, type TextRun } from "./format";
+import { cappedUnit, cutToFit, estimateKeyTextWidth, exactRung, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, inkEdges, inksWithin, legacyLabelSize, truncateLabel, type FittedText, type TextRun } from "./format";
+import type { Measurement } from "./measure";
 import { themeTextColors, type QuadIdentity, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
-import { faceFont, isTahoma } from "./face-font";
+import { faceFont, isTahoma, type FaceFontProfile } from "./face-font";
+import { SEE_THROUGH_FALLBACK_ADVANCE_12 } from "./dial-background";
+import { keyFace, keyStructureFill, keyStructurePaint, keyUnderFill, seeThrough, type KeyBackground } from "./key-background";
+import { svgOpen } from "./svg-canvas";
+import { timelineSvg } from "./timeline";
 
 // One family name, never a fallback list: the Stream Deck app draws faces
 // with QtSvg, which takes the whole attribute as a single family. The deck's
@@ -44,13 +50,19 @@ export type KeyGauge = {
 	zones: readonly DrawnZone[];
 };
 
-/** The canvas open every renderer shares: the SVG header plus the full-bleed
- * background rect. */
-export function svgOpen(w: number, h: number, bg: string): string[] {
-	return [
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`,
-		`<rect width="${w}" height="${h}" fill="${bg}"/>`
-	];
+/** The canvas open every renderer shares (svg-canvas.ts), re-exported for
+ * the renderers that take it from here. */
+export { svgOpen };
+
+/**
+ * The snoozed cue: a 3 px band along the top edge of the area the key's
+ * lens shows (columns 10..133, from row 10). Drawn right after the
+ * background, under everything else, so no text or graph ever loses ink to
+ * it. It appears only after a deliberate snooze; with no band set, every
+ * face is byte for byte what it was.
+ */
+export function snoozeBandSvg(color: string): string {
+	return `<rect x="10" y="10" width="124" height="3" fill="${color}"/>`;
 }
 
 /** Spark strip box: x 8–136, line span y 122–134 (underfill bottom stays
@@ -61,6 +73,12 @@ export function svgOpen(w: number, h: number, bg: string): string[] {
  * session low and the r=5 end dot (down to y≈139) never clip the 144 key
  * edge. */
 const SPARK = { x: 8, y: 122, w: 128, h: 12 } as const;
+/** The strip on a see-through Back tile: it starts clear of the return
+ * hook (x 15..33) where a Theme face masks that corner with its
+ * background, so the whole graph stays visible, a little narrower. */
+const SPARK_HOOK_CLEAR = { x: 40, y: 122, w: 96, h: 12 } as const;
+/** A Trend window's columns on the key: one per pixel of the strip. */
+export const KEY_TREND_WIDTH_PX = SPARK.w;
 /** Accent polyline stroke; the spec's absolute minimum is 3. */
 const SPARK_STROKE = 4;
 
@@ -70,6 +88,8 @@ const SPARK_STROKE = 4;
  * x8/y124 ran into the crop). 10 px tall is 5 physical px on the 72 px
  * key — clearly readable, with 14 px of bottom clearance. */
 const KEY_BAR = { x: 16, y: 120, w: 112, h: 10, r: 5 } as const;
+/** The bar on a see-through Back tile, clear of the return hook. */
+const KEY_BAR_HOOK_CLEAR = { x: 40, y: 120, w: 88, h: 10, r: 5 } as const;
 
 /** Ring gauge: an automotive-style arc opening DOWNWARD (the gauge pattern
  * every tachometer and dashboard meter trains: sweep starts bottom-left,
@@ -126,9 +146,27 @@ function drawnAs160(runs: readonly TextRun[]): boolean {
  * or the size 1.6.0 drew the same label at (its look, the same ink), inside
  * the title band; else cut inside the lens at the floor. */
 function fitLensLabel(label: string, sizes: readonly number[]): FittedText {
+	// Pure in the label, the ladder and the face font's fixed tables, and
+	// asked again for every label on every repaint: remembered per font.
+	const font = faceFont();
+	let memo = LENS_LABEL_MEMO.get(font);
+	if (memo === undefined) {
+		memo = new Map();
+		LENS_LABEL_MEMO.set(font, memo);
+	}
+	const key = `${sizes.join(",")}|${label}`;
+	const known = memo.get(key);
+	if (known !== undefined) return known;
 	const drew = legacyLabelSize(label, sizes);
-	return fitLadderBy(label, sizes, (line, size) => inKeyLens([{ text: line, fontSize: size }]) || (line === label && size === drew && estimateKeyTextWidth(line, size) <= labelBand()));
+	const fitted = Object.freeze(fitLadderBy(label, sizes, (line, size) => inKeyLens([{ text: line, fontSize: size }]) || (line === label && size === drew && estimateKeyTextWidth(line, size) <= labelBand())));
+	if (memo.size >= LENS_LABEL_MEMO_MAX) memo.clear();
+	memo.set(key, fitted);
+	return fitted;
 }
+/** Fitted lens labels per face font (see fitLensLabel); a deck holds a few
+ * hundred labels at most, and a full memo starts over. */
+const LENS_LABEL_MEMO = new WeakMap<FaceFontProfile, Map<string, FittedText>>();
+const LENS_LABEL_MEMO_MAX = 2048;
 /** The single key's value: the 1.6.0 char-count size (kept while it draws
  * as 1.6.0 did), stepping down 2 px only while Tahoma's ink would leave the
  * lens. */
@@ -138,6 +176,36 @@ function singleValueSize(text: string): number {
 	if (drawnAs160([{ text, fontSize: size, fontWeight: 700 }])) return size;
 	while (size > 20 && !inKeyLens([{ text, fontSize: size, fontWeight: 700 }])) size -= 2;
 	return size;
+}
+/**
+ * A single key's value when the reading has its own format (exact text):
+ * the size the face draws it at while that keeps it inside the lens (the
+ * 1.6.0 tolerance included), else 2 px steps down to 20 on either face
+ * font; null when it cannot fit whole at all (the key then draws the next
+ * of the reading's texts, singleExactRung). The Ring keeps its own
+ * char-count size and needs the lens there.
+ */
+export function exactSingleValueSize(text: string, ring: boolean): number | null {
+	const run = (size: number): TextRun[] => [{ text, fontSize: size, fontWeight: 700 }];
+	if (ring) {
+		const size = ringValueFontSize(text);
+		return inKeyLens(run(size)) || drawnAs160(run(size)) ? size : null;
+	}
+	let size = valueFontSize(text);
+	if (drawnAs160(run(size))) return size;
+	while (size > 20 && !inKeyLens(run(size))) size -= 2;
+	return inKeyLens(run(size)) ? size : null;
+}
+
+/** A reading's texts in the order a face tries them: the exact one, then
+ * measure.ts exactFallback's. */
+export type ExactTexts = readonly [Measurement, ...Measurement[]];
+type ExactPick = { rung: Measurement; index: number; fits: boolean };
+
+/** Which of a reading's texts a single key draws (exactRung): the first
+ * exactSingleValueSize holds. */
+export function singleExactRung(rungs: ExactTexts, ring: boolean): ExactPick {
+	return exactRung(rungs, (r) => exactSingleValueSize(r.valueText, ring) !== null);
 }
 /** The stat badge's shared-badge rows: gap 38..52, caps on baseline 48 —
  * between the label band and the widest value's digit tops (y≈56.6). */
@@ -267,9 +335,15 @@ export function barSegment(x: number, w: number, y: number, h: number, r: number
 
 /** The key Bar gauge: pill track in the sparkline strip's row, threshold
  * zones on the track, accent fill following the live value. */
-function keyBarSvg(gauge: KeyGauge, palette: Palette): string[] {
-	const { x, y, w, h, r } = KEY_BAR;
-	const parts = [`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${palette.track}"/>`];
+function keyBarSvg(gauge: KeyGauge, palette: Palette, look?: KeyBackground, box: { x: number; y: number; w: number; h: number; r: number } = KEY_BAR): string[] {
+	const { x, y, w, h, r } = box;
+	// Clear: the track is the fill's backing, 1 px larger all round, so the
+	// fill and the zones never touch the picture (the dial's Clear groove).
+	const parts = [
+		look === "clear"
+			? `<rect x="${x - 1}" y="${y - 1}" width="${w + 2}" height="${h + 2}" rx="${r + 1}" fill="${palette.track}"/>`
+			: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" ${keyStructureFill(look, palette)}/>`
+	];
 	for (const zone of gauge.zones) {
 		const zx = x + zone.from * w;
 		const zw = (zone.to - zone.from) * w;
@@ -293,30 +367,49 @@ function ringPoint(deg: number): { x: number; y: number } {
 
 /** One stroked arc along the ring from `fromDeg` to `toDeg` (clockwise).
  * Arc path commands are proven on this engine (the status-key lock icon). */
-function ringArc(fromDeg: number, toDeg: number, color: string): string {
+function ringArc(fromDeg: number, toDeg: number, color: string, width: number = RING.stroke): string {
 	const from = ringPoint(fromDeg);
 	const to = ringPoint(toDeg);
 	const large = toDeg - fromDeg > 180 ? 1 : 0;
-	return `<path d="M${from.x.toFixed(1)},${from.y.toFixed(1)} A${RING.r},${RING.r} 0 ${large} 1 ${to.x.toFixed(1)},${to.y.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${RING.stroke}" stroke-linecap="round"/>`;
+	return `<path d="M${from.x.toFixed(1)},${from.y.toFixed(1)} A${RING.r},${RING.r} 0 ${large} 1 ${to.x.toFixed(1)},${to.y.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
+}
+
+/** Degrees either side of 12 o'clock a see-through ring leaves open for
+ * the stat badge, where a Theme ring is notched by the badge's background
+ * rect (x 47..97): the crown's centerline crosses the gap's edges at about
+ * 33 degrees, and the round cap (5 px) needs about 8 more. */
+export const RING_BADGE_HOLE_DEG = 41;
+
+/** The arcs of `fromDeg`..`toDeg` outside the crown hole (none when the
+ * hole is 0): one arc, or the pieces either side of 12 o'clock (360). */
+function ringArcs(fromDeg: number, toDeg: number, color: string, hole: number, width: number = RING.stroke): string[] {
+	if (hole <= 0) return [ringArc(fromDeg, toDeg, color, width)];
+	const pieces: [number, number][] = [
+		[fromDeg, Math.min(toDeg, 360 - hole)],
+		[Math.max(fromDeg, 360 + hole), toDeg]
+	];
+	return pieces.filter(([a, b]) => b - a > 0).map(([a, b]) => ringArc(a, b, color, width));
 }
 
 /** The key Ring gauge: one restrained arc around the value, opening
  * downward like a meter dial. Track, threshold zones, then the accent fill
- * sweeping clockwise from the bottom-left end. */
-function keyRingSvg(gauge: KeyGauge, palette: Palette): string[] {
+ * sweeping clockwise from the bottom-left end. A see-through face draws the
+ * track as structure (Glass ink, a 1 px wider backing on Clear) and, under
+ * a stat badge, leaves the crown open (`hole`). */
+function keyRingSvg(gauge: KeyGauge, palette: Palette, look?: KeyBackground, hole = 0): string[] {
 	const start = 180 + RING.gapDeg / 2;
 	const sweep = 360 - RING.gapDeg;
-	const parts = [ringArc(start, start + sweep, palette.track)];
+	const parts = ringArcs(start, start + sweep, keyStructurePaint(look, palette), hole, look === "clear" ? RING.stroke + 2 : RING.stroke);
 	for (const zone of gauge.zones) {
 		if (zone.to - zone.from <= 0) {
 			continue;
 		}
-		parts.push(ringArc(start + zone.from * sweep, start + zone.to * sweep, zone.color));
+		parts.push(...ringArcs(start + zone.from * sweep, start + zone.to * sweep, zone.color, hole));
 	}
 	if (Number.isFinite(gauge.fraction) && gauge.fraction > 0) {
 		// Round caps keep a minimum sweep visible, like the bar's h-wide floor.
 		const fillSweep = Math.max(4, Math.min(1, gauge.fraction) * sweep);
-		parts.push(ringArc(start, start + fillSweep, palette.accent));
+		parts.push(...ringArcs(start, start + fillSweep, palette.accent, hole));
 	}
 	return parts;
 }
@@ -329,6 +422,9 @@ export interface ReadingKeyOptions {
 	statBadge: string;
 	/** Recent values (display unit); rendered as a sparkline when 2+ points. */
 	history?: readonly number[];
+	/** A Trend window's time-axis view (Sparkline display only). When set
+	 * it is drawn in the strip instead of `history`. */
+	timeline?: HistoryView;
 	/** Bounded-value gauge (Bar or Ring display); the caller passes either
 	 * this or `history`, never both. */
 	gauge?: KeyGauge;
@@ -338,6 +434,18 @@ export interface ReadingKeyOptions {
 	text?: TextColors;
 	/** Detail view's Back tile: a restrained return arrow, bottom-left. */
 	returnMark?: boolean;
+	/** A deliberate snooze is silencing an alert: the band color
+	 * (snoozeBandSvg). Absent draws no band. */
+	snoozeBand?: string;
+	/** What the key draws behind its readout (key-background.ts); absent
+	 * is Theme, today's face byte for byte. */
+	background?: KeyBackground;
+	/** The reading has its own format: draw valueText whole
+	 * (exactSingleValueSize), else the first of exactFallback that fits.
+	 * Absent keeps the established sizing byte for byte. */
+	exactValue?: boolean;
+	/** With exactValue: measure.ts exactFallback for this value. */
+	exactFallback?: readonly Measurement[];
 }
 
 /** The Back tile's return arrow: a small enter-key hook drawn as a vector
@@ -361,43 +469,115 @@ function dividerReturnMarkSvg(midlineY: number, bg: string, color: string): [str
 	return [`<rect x="12" y="${midlineY - 8}" width="28" height="16" fill="${bg}"/>`, returnMarkSvg(color, 15, midlineY - 6)];
 }
 
+/** The gaps a see-through rule leaves for the badge and the hook (none on
+ * a Theme face, which paints them over instead). */
+function ruleGaps(see: boolean, badge: boolean, hook: boolean): (readonly [number, number])[] {
+	if (!see) return [];
+	return [...(hook ? [HOOK_GAP_X] : []), ...(badge ? [BADGE_GAP_X] : [])];
+}
+
+/** The hook on a divider: in its painted gap (Theme), or alone on a
+ * see-through face, whose divider already starts past it. */
+function hookParts(see: boolean, midlineY: number, bg: string, color: string): string[] {
+	const parts = dividerReturnMarkSvg(midlineY, bg, color);
+	return see ? [parts[1]] : parts;
+}
+
+/** A horizontal rule from x0 to x1 (2 px by default) with gaps left out:
+ * one rect when there are none, the form every Theme face draws. A
+ * see-through face leaves the badge's and the hook's gaps out here, where a
+ * Theme face paints them over with its background. */
+function hRule(x0: number, x1: number, y: number, fill: string, gaps: readonly (readonly [number, number])[] = [], h = 2): string {
+	return spans(x0, x1, gaps)
+		.map(([a, b]) => `<rect x="${a}" y="${y}" width="${b - a}" height="${h}" ${fill}/>`)
+		.join("");
+}
+
+/** The vertical twin of hRule (the quad cross's upright arm). */
+function vRule(x: number, y0: number, y1: number, fill: string, gaps: readonly (readonly [number, number])[] = [], w = 2): string {
+	return spans(y0, y1, gaps)
+		.map(([a, b]) => `<rect x="${x}" y="${a}" width="${w}" height="${b - a}" ${fill}/>`)
+		.join("");
+}
+
+/** [from, to] minus the gaps, in order, empty pieces dropped. */
+function spans(from: number, to: number, gaps: readonly (readonly [number, number])[]): [number, number][] {
+	let pieces: [number, number][] = [[from, to]];
+	for (const [g0, g1] of gaps) {
+		pieces = pieces.flatMap(([a, b]): [number, number][] => (g1 <= a || g0 >= b ? [[a, b]] : ([[a, g0], [g1, b]] as [number, number][]).filter(([c, d]) => d > c)));
+	}
+	return pieces;
+}
+
+/** The shared badge's gap along a rule (x 47..97, DUAL_BADGE_GAP's span). */
+const BADGE_GAP_X = [47, 97] as const;
+/** The return hook's gap at a rule's left end (x 12..40). */
+const HOOK_GAP_X = [12, 40] as const;
+
+/** The shared badge with its gap (Theme), or the word alone on a
+ * see-through face, whose structure already leaves the gap open. */
+function badgeParts(see: boolean, badge: string, palette: Palette, badgeColor: string, gapY?: number, textY?: number): string[] {
+	const parts = sharedBadgeSvg(badge, palette, badgeColor, gapY, textY);
+	return see ? [parts[1]] : parts;
+}
+
 export function renderReadingKey(opts: ReadingKeyOptions): string {
-	const { valueText, unitText, statBadge, history, gauge, palette } = opts;
+	const { statBadge, history, gauge, palette, background } = opts;
 	const text = opts.text ?? themeTextColors(palette);
+	const see = seeThrough(background);
 	const ring = gauge?.kind === "ring";
+	// A reading with its own format: its exact text where it fits, else the
+	// next of its texts; the last draws at the layout's own size.
+	const exact = opts.exactValue === true ? singleExactRung([{ valueText: opts.valueText, unitText: opts.unitText }, ...(opts.exactFallback ?? [])], ring) : null;
+	const { valueText, unitText } = exact?.rung ?? opts;
+	const exactSize = exact?.fits === true ? exactSingleValueSize(valueText, ring) : null;
+	const valueSize = exactSize ?? (ring ? ringValueFontSize(valueText) : singleValueSize(valueText));
 	const label = isTahoma() ? fitLensLabel(opts.label, LABEL_SIZES) : fitTextLadder(opts.label, labelBand(), LABEL_SIZES);
-	const parts: string[] = svgOpen(144, 144, palette.bg);
+	const face = keyFace(background, palette);
+	if (opts.snoozeBand !== undefined) {
+		face.structure(snoozeBandSvg(opts.snoozeBand));
+	}
 	if (ring && gauge !== undefined) {
 		// The ring draws first so the value, unit and badge paint over its field.
-		parts.push(...keyRingSvg(gauge, palette));
+		face.mark(...keyRingSvg(gauge, palette, background, see && statBadge !== "" ? RING_BADGE_HOLE_DEG : 0));
 	}
-	parts.push(`<text x="72" y="32" text-anchor="middle" font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}</text>`);
+	face.mark(`<text x="72" y="32" text-anchor="middle" font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}</text>`);
 	if (statBadge !== "") {
 		// The stat reads as part of the whole "title / stat / number" stack, in
 		// the family's shared-badge gap idiom: the bg rect notches the Ring
 		// crown the way the dual gap notches its divider, and the label keeps
 		// its full band — a stat must never cost title width.
-		parts.push(...sharedBadgeSvg(statBadge, palette, text.badge, BADGE_GAP_Y, BADGE_TEXT_Y));
+		face.mark(...badgeParts(see, statBadge, palette, text.badge, BADGE_GAP_Y, BADGE_TEXT_Y));
 	}
-	parts.push(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${ring ? ringValueFontSize(valueText) : singleValueSize(valueText)}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
+	face.mark(`<text x="72" y="94" text-anchor="middle" font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}</text>`);
 	if (unitText !== "") {
 		// Baseline 114/18: worst-case spark/bar ink starts at y=120 (the spark
 		// span is inset for its stroke), so the corridor is optically balanced
 		// with the larger gap against the heavier neighbor — measured ink air
 		// 6.5–7.0 up to the value vs 5.9 down to the band, and descender units
 		// (Mbps) keep the same ≥1.9 px band clearance the 112 baseline had.
-		parts.push(`<text x="72" y="114" text-anchor="middle" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.unit}">${escapeXml(unitText)}</text>`);
+		face.mark(`<text x="72" y="114" text-anchor="middle" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.unit}">${escapeXml(unitText)}</text>`);
 	}
+	// A see-through Back tile sets its strip clear of the hook instead of
+	// masking the corner they share.
+	const hookClear = see && opts.returnMark === true;
 	let stripDrawn = false;
 	if (gauge !== undefined && gauge.kind === "bar") {
-		parts.push(...keyBarSvg(gauge, palette));
+		face.mark(...keyBarSvg(gauge, palette, background, hookClear ? KEY_BAR_HOOK_CLEAR : KEY_BAR));
 		stripDrawn = true;
 	}
-	if (gauge === undefined && history !== undefined) {
+	const sparkBox = hookClear ? SPARK_HOOK_CLEAR : SPARK;
+	const underFill = keyUnderFill(background, palette);
+	if (gauge === undefined && opts.timeline !== undefined) {
+		const trend = timelineSvg(opts.timeline, sparkBox, SPARK_STROKE, 5, palette, underFill);
+		face.mark(...trend);
+		stripDrawn = trend.length > 0;
+	} else if (gauge === undefined && history !== undefined) {
 		const samples = history.slice(-HISTORY_LENGTH);
-		const points = sparklinePoints(samples, SPARK.x, SPARK.y, SPARK.w, SPARK.h);
+		const points = sparklinePoints(samples, sparkBox.x, sparkBox.y, sparkBox.w, sparkBox.h);
 		if (points.length > 0) {
-			parts.push(...sparklineSvg(points, SPARK.y + SPARK.h, SPARK_STROKE, 5, palette));
+			const spark = sparklineSvg(points, sparkBox.y + sparkBox.h, SPARK_STROKE, 5, palette, underFill ?? undefined);
+			face.mark(...(underFill === null ? spark.slice(1) : spark));
 			stripDrawn = true;
 		}
 	}
@@ -405,13 +585,12 @@ export function renderReadingKey(opts: ReadingKeyOptions): string {
 		// A Bar or sparkline strip shares the hook's bottom band: mask its
 		// left segment first so the hook stays legible over the strip. The
 		// ring needs no mask (its arc caps end at x≈36, clear of the hook).
-		if (stripDrawn) {
-			parts.push(`<rect x="0" y="116" width="40" height="28" fill="${palette.bg}"/>`);
+		if (stripDrawn && !see) {
+			face.mark(`<rect x="0" y="116" width="40" height="28" fill="${palette.bg}"/>`);
 		}
-		parts.push(returnMarkSvg(text.unit));
+		face.mark(returnMarkSvg(text.unit));
 	}
-	parts.push("</svg>");
-	return parts.join("");
+	return face.end();
 }
 
 /** Dual rows: label baselines y=22/94, value baselines y=56/128 — row B is
@@ -539,6 +718,35 @@ function badgedValueFit(valueText: string, unitText: string, badge: string): Bad
 	return { size, unit, spaced: false };
 }
 
+/** Whether a badged value line keeps its whole unit inside the lens. */
+function badgedLineFits(valueText: string, unitText: string, fit: BadgedLine, badge: string): boolean {
+	return fit.unit === unitText && inKeyLens([
+		{ text: valueText, fontSize: fit.size, fontWeight: 700 },
+		...(unitText === "" ? [] : [{ text: (fit.spaced ? DUAL_UNIT_GAP : "") + unitText, fontSize: 14 }]),
+		{ text: (fit.spaced ? inlineGap(DUAL_ROW_BADGE_SIZE) : "") + badge, fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 as const }
+	]);
+}
+
+/**
+ * Whether a two-reading row with its own format draws its text whole with
+ * its whole unit: no code-point cut, and the tight line (the narrowest the
+ * row draws) keeps the unit inside the lens (Tahoma by ink, Segoe UI by its
+ * width estimate in the 120 px band). Otherwise the row draws the next of
+ * its texts (dualExactRung).
+ */
+export function exactDualValueFits(valueText: string, unitText: string): boolean {
+	if (Array.from(valueText).length > DUAL_VALUE_MAX) return false;
+	const fit = dualValueFit(valueText, unitText, 0);
+	if (fit.unitText !== unitText) return false;
+	if (isTahoma()) return true;
+	return estimateKeyTextWidth(valueText, fit.valueSize, { fontWeight: 700 }) + (unitText === "" ? 0 : estimateKeyTextWidth(unitText, 14)) <= LABEL_BUDGET;
+}
+
+/** Which of a reading's texts a two-reading row draws (exactRung). */
+export function dualExactRung(rungs: ExactTexts): ExactPick {
+	return exactRung(rungs, (r) => exactDualValueFits(r.valueText, r.unitText));
+}
+
 function badgedValueSvg(valueText: string, fit: BadgedLine, badge: string, valueY: number, text: TextColors): string {
 	const unitSpan = fit.unit === "" ? "" : `<tspan font-size="14" font-weight="600" fill="${text.unit}">${fit.spaced ? DUAL_UNIT_GAP : ""}${escapeXml(fit.unit)}</tspan>`;
 	const badgeSpan = `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${fit.spaced ? inlineGap(DUAL_ROW_BADGE_SIZE) : ""}${escapeXml(badge)}</tspan>`;
@@ -553,6 +761,16 @@ export interface DualKeyRow {
 	 * label keeps its size there, else after the value as 1.6.0 drew it;
 	 * empty for the live value or when sharedBadge covers both rows. */
 	statBadge: string;
+	/** This row's value color in place of the text value token: a key with
+	 * per-reading alert rules draws a row that is not alerting in the alert
+	 * palette's unit token. Absent keeps the shared value color. */
+	valueColor?: string;
+	/** The reading has its own format: its text draws whole
+	 * (exactDualValueFits), else the first of fallback that fits, never
+	 * cut, its unit never shortened. */
+	exact?: boolean;
+	/** With exact: measure.ts exactFallback for this value. */
+	fallback?: readonly Measurement[];
 }
 
 export interface DualKeyOptions {
@@ -570,6 +788,11 @@ export interface DualKeyOptions {
 	/** Detail view's Back tile: the return hook seated in a masked gap at
 	 * the left end of the divider. Absent or false changes nothing. */
 	returnMark?: boolean;
+	/** The snoozed cue's color (snoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+	/** What the key draws behind its readout (key-background.ts); absent
+	 * is Theme, today's face byte for byte. */
+	background?: KeyBackground;
 }
 
 /**
@@ -578,11 +801,19 @@ export interface DualKeyOptions {
  * sparkline in this layout — two rows use the full face.
  */
 export function renderDualKey(opts: DualKeyOptions): string {
-	const { palette } = opts;
+	const { palette, background } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const sharedBadge = opts.sharedBadge ?? "";
-	const parts: string[] = svgOpen(144, 144, palette.bg);
-	const rows = [opts.top, opts.bottom];
+	const see = seeThrough(background);
+	const face = keyFace(background, palette);
+	if (opts.snoozeBand !== undefined) {
+		face.structure(snoozeBandSvg(opts.snoozeBand));
+	}
+	const picks = [opts.top, opts.bottom].map((row) => (row.exact === true ? dualExactRung([{ valueText: row.valueText, unitText: row.unitText }, ...(row.fallback ?? [])]) : null));
+	const rows = [opts.top, opts.bottom].map((row, i) => {
+		const pick = picks[i];
+		return pick === null || pick === undefined ? row : { ...row, valueText: pick.rung.valueText, unitText: pick.rung.unitText };
+	});
 	const values = rows.map((row) => truncateLabel(row.valueText, DUAL_VALUE_MAX));
 	// The word space at the face font's own measured width, rounded up.
 	const gapPx = Math.ceil(((faceFont().advance12[DUAL_UNIT_GAP] as number) * 14) / 12 * 10) / 10;
@@ -600,16 +831,34 @@ export function renderDualKey(opts: DualKeyOptions): string {
 		return !(fit.text === row.label && inKeyLens([{ text: row.label, fontSize: fit.fontSize }, { text: inlineGap(DUAL_ROW_BADGE_SIZE) + row.statBadge.toUpperCase(), fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 }]));
 	});
 	const badgedFits = rows.map((row, i) => (onValue[i] === true ? badgedValueFit(values[i] as string, row.unitText, row.statBadge.toUpperCase()) : null));
+	// A row with its own format never gives up its unit to a badge: where the
+	// badged value line would shorten it, the badge stays on the label line
+	// and the label yields instead.
+	rows.forEach((row, i) => {
+		const fit = badgedFits[i];
+		if (row.exact === true && fit !== null && fit !== undefined && !badgedLineFits(values[i] as string, row.unitText, fit, row.statBadge.toUpperCase())) {
+			onValue[i] = false;
+			badgedFits[i] = null;
+		}
+	});
 	const gap = spaced.every((fit, i) => onValue[i] === true || (fit.valueSize === tight[i]?.valueSize && fit.unitText === tight[i]?.unitText)) ? DUAL_UNIT_GAP : "";
-	const fits = gap === "" ? tight : spaced;
+	const ownFits = gap === "" ? tight : spaced;
+	// Two rows that both have their own format (issue #59 G3) draw their
+	// values at one size, the smaller of the two fits, so two readings in
+	// one unit compare at a glance (the quad already shares one size); a
+	// smaller size only frees room, so each row keeps the unit it fitted.
+	// A row without a format, with its badge on its value line, or past
+	// its exact text keeps its own size, byte for byte.
+	const shared = rows.every((row, i) => row.exact === true && picks[i]?.index === 0 && onValue[i] !== true) ? Math.min(...ownFits.map((fit) => fit.valueSize)) : undefined;
+	const fits = shared === undefined ? ownFits : ownFits.map((fit) => ({ ...fit, valueSize: shared }));
 	rows.forEach((row, i) => {
 		const labelY = DUAL.labelY + i * DUAL.rowPitch;
 		const valueY = DUAL.valueY + i * DUAL.rowPitch;
 		const badge = row.statBadge.toUpperCase();
 		const lensFit = plain[i];
 		if (onValue[i] === true && lensFit !== null && lensFit !== undefined) {
-			parts.push(`<text x="72" y="${labelY}" text-anchor="middle" font-family="${fontFamily()}" font-size="${lensFit.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(lensFit.text)}</text>`);
-			parts.push(badgedValueSvg(values[i] as string, badgedFits[i] as BadgedLine, badge, valueY, text));
+			face.mark(`<text x="72" y="${labelY}" text-anchor="middle" font-family="${fontFamily()}" font-size="${lensFit.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(lensFit.text)}</text>`);
+			face.mark(badgedValueSvg(values[i] as string, badgedFits[i] as BadgedLine, badge, valueY, row.valueColor === undefined ? text : { ...text, value: row.valueColor }));
 			return;
 		}
 		const label =
@@ -620,21 +869,20 @@ export function renderDualKey(opts: DualKeyOptions): string {
 					: fitLadderBy(row.label, ladder(i), (line, size) => inKeyLens([{ text: line, fontSize: size }, { text: inlineGap(DUAL_ROW_BADGE_SIZE) + badge, fontSize: DUAL_ROW_BADGE_SIZE, fontWeight: 700 }]));
 		const badgeSpan = badge === "" ? "" : `<tspan font-size="${DUAL_ROW_BADGE_SIZE}" font-weight="700" fill="${text.badge}">${inlineGap(DUAL_ROW_BADGE_SIZE)}${escapeXml(badge)}</tspan>`;
 		// One middle-anchored chunk: the label and its badge center as a unit.
-		parts.push(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
+		face.mark(`<text x="72" y="${labelY}" text-anchor="middle"${badge === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${label.fontSize}" font-weight="600" fill="${text.label}">${escapeXml(label.text)}${badgeSpan}</text>`);
 		const valueText = values[i] as string;
 		const { valueSize, unitText } = fits[i] as DualValueFit;
 		const unit = unitText !== "" ? `<tspan font-size="14" font-weight="600" fill="${text.unit}">${gap}${escapeXml(unitText)}</tspan>` : "";
-		parts.push(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" || gap === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
+		face.mark(`<text x="72" y="${valueY}" text-anchor="middle"${unit === "" || gap === "" ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${row.valueColor ?? text.value}">${escapeXml(valueText)}${unit}</text>`);
 	});
-	parts.push(`<rect x="12" y="${DUAL.dividerY}" width="120" height="2" fill="${palette.track}"/>`);
+	face.structure(hRule(12, 132, DUAL.dividerY, keyStructureFill(background, palette), ruleGaps(see, sharedBadge !== "", opts.returnMark === true)));
 	if (sharedBadge !== "") {
-		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge));
+		face.mark(...badgeParts(see, sharedBadge, palette, text.badge));
 	}
 	if (opts.returnMark === true) {
-		parts.push(...dividerReturnMarkSvg(DUAL.dividerY + 1, palette.bg, text.unit));
+		face.mark(...hookParts(see, DUAL.dividerY + 1, palette.bg, text.unit));
 	}
-	parts.push("</svg>");
-	return parts.join("");
+	return face.end();
 }
 
 /** Triple rows: three 48 px horizontal bands, each one compact readout with
@@ -700,6 +948,14 @@ export interface TripleKeyRow {
 	label: string;
 	valueText: string;
 	unitText: string;
+	/** This row's value color in place of the text value token (see
+	 * DualKeyRow.valueColor). Absent keeps the shared value color. */
+	valueColor?: string;
+	/** The reading has its own format: whole text (exactTripleValueFits),
+	 * else the first of fallback that fits, never cut. */
+	exact?: boolean;
+	/** With exact: measure.ts exactFallback for this value. */
+	fallback?: readonly Measurement[];
 }
 
 export interface TripleKeyOptions {
@@ -716,6 +972,11 @@ export interface TripleKeyOptions {
 	/** Detail view's Back tile: the return hook seated in a masked gap at
 	 * the left end of the first separator. Absent or false changes nothing. */
 	returnMark?: boolean;
+	/** The snoozed cue's color (snoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+	/** What the key draws behind its readout (key-background.ts); absent
+	 * is Theme, today's face byte for byte. */
+	background?: KeyBackground;
 }
 
 /** Estimated width of one row's end-anchored value+unit chunk at the given
@@ -729,6 +990,27 @@ function tripleChunkWidth(row: TripleKeyRow, valueSize: number): number {
 		width += estimateKeyTextWidth(row.unitText, TRIPLE_UNIT_SIZE);
 	}
 	return width;
+}
+
+/**
+ * Whether a three-row row with its own format draws its text whole: no
+ * code-point cut, and its value+unit chunk at the smallest value size stays
+ * on the key (Tahoma: its ink starts inside the lens; Segoe UI: the 120 px
+ * row by its width estimate). The label is what yields first, as always.
+ */
+export function exactTripleValueFits(valueText: string, unitText: string): boolean {
+	if (Array.from(valueText).length > TRIPLE_VALUE_MAX) return false;
+	const floor = TRIPLE_VALUE_SIZES[TRIPLE_VALUE_SIZES.length - 1] as number;
+	const unit = cappedUnit(unitText, TRIPLE_UNIT_MAX);
+	if (isTahoma()) {
+		return inkEdges([{ text: valueText, fontSize: floor, fontWeight: 700 }, { text: unit, fontSize: TRIPLE_UNIT_SIZE }], "end", TRIPLE.valueRight).left >= LENS.first;
+	}
+	return tripleChunkWidth({ label: "", valueText, unitText: unit }, floor) <= TRIPLE.rowWidth;
+}
+
+/** Which of a reading's texts a three-row row draws (exactRung). */
+export function tripleExactRung(rungs: ExactTexts): ExactPick {
+	return exactRung(rungs, (r) => exactTripleValueFits(r.valueText, r.unitText));
 }
 
 /**
@@ -756,12 +1038,18 @@ export function tripleValueFontSize(rows: readonly (TripleKeyRow | null)[]): num
  * estimation miss can never strike through the numbers.
  */
 export function renderTripleKey(opts: TripleKeyOptions): string {
-	const { palette } = opts;
+	const { palette, background } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const sharedBadge = opts.sharedBadge ?? "";
+	const see = seeThrough(background);
+	// Cut, not mask: a see-through face has no value mask, so its labels
+	// price fallback glyphs (emoji, symbols) at their measured width.
+	const fallback = see ? SEE_THROUGH_FALLBACK_ADVANCE_12 : undefined;
 	const rows = [0, 1, 2].map((i) => {
 		const row = opts.rows[i] ?? null;
-		return row === null ? null : { ...row, valueText: truncateLabel(row.valueText, TRIPLE_VALUE_MAX), unitText: cappedUnit(row.unitText, TRIPLE_UNIT_MAX) };
+		if (row === null) return null;
+		const shown = row.exact === true ? tripleExactRung([{ valueText: row.valueText, unitText: row.unitText }, ...(row.fallback ?? [])]).rung : row;
+		return { ...row, valueText: truncateLabel(shown.valueText, TRIPLE_VALUE_MAX), unitText: cappedUnit(shown.unitText, TRIPLE_UNIT_MAX) };
 	});
 	const valueSize = tripleValueFontSize(rows);
 	// Fit every label first: the face-wide spread cap needs the smallest
@@ -775,20 +1063,23 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 		const tahoma = isTahoma();
 		// Tahoma: the label's ink ends a clear gap before the chunk's first ink
 		// column, both measured; Segoe UI keeps its advance budget and gap.
-		const chunkInk = tahoma ? inkEdges([{ text: row.valueText, fontSize: valueSize, fontWeight: 700 }, { text: row.unitText, fontSize: TRIPLE_UNIT_SIZE }], "end", TRIPLE.valueRight).left : 0;
+		const chunkInk = tahoma ? inkEdges([{ text: row.valueText, fontSize: valueSize, fontWeight: 700, fallbackAdvance12: fallback }, { text: row.unitText, fontSize: TRIPLE_UNIT_SIZE, fallbackAdvance12: fallback }], "end", TRIPLE.valueRight).left : 0;
 		const labelBudget = tahoma ? chunkInk - INK_CLEAR_GAP - TRIPLE.labelX : TRIPLE.rowWidth - chunkWidth - TRIPLE_LABEL_GAP;
 		if (labelBudget < TRIPLE_LABEL_MIN_BUDGET) {
 			return { chunkWidth, chunkInk, label: null };
 		}
-		const fitsInk = (line: string, size: number): boolean => inkEdges([{ text: line, fontSize: size }], "start", TRIPLE.labelX).right <= chunkInk - INK_CLEAR_GAP;
-		let label = tahoma ? fitLadderBy(row.label, TRIPLE_LABEL_SIZES, fitsInk) : fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, { minimumSlack: 2 });
+		const fitsInk = (line: string, size: number): boolean => inkEdges([{ text: line, fontSize: size, fallbackAdvance12: fallback }], "start", TRIPLE.labelX).right <= chunkInk - INK_CLEAR_GAP;
+		let label = tahoma ? fitLadderBy(row.label, TRIPLE_LABEL_SIZES, fitsInk) : fitTextLadder(row.label, labelBudget, TRIPLE_LABEL_SIZES, see ? { minimumSlack: 2, fallbackAdvance12: fallback } : { minimumSlack: 2 });
 		if (tahoma && label.text !== row.label && fitsInk(row.label, TRIPLE_LABEL_WHOLE_MIN)) {
 			label = { text: row.label, fontSize: TRIPLE_LABEL_WHOLE_MIN };
 		}
 		return { chunkWidth, chunkInk, label: label.text === "" || label.text === "…" ? null : label };
 	});
 	const minLabelSize = Math.min(...fitted.map((f) => (f !== null && f.label !== null ? f.label.fontSize : Number.POSITIVE_INFINITY)));
-	const parts: string[] = svgOpen(144, 144, palette.bg);
+	const face = keyFace(background, palette);
+	if (opts.snoozeBand !== undefined) {
+		face.structure(snoozeBandSvg(opts.snoozeBand));
+	}
 	rows.forEach((row, i) => {
 		if (row === null) {
 			return;
@@ -801,17 +1092,19 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 			// so the fitted text stays valid at the capped size. A whole label
 			// under the floor caps its peers as the floor would, no lower.
 			const size = Math.min(fit.label.fontSize, Math.max(minLabelSize, TRIPLE_LABEL_SIZES[TRIPLE_LABEL_SIZES.length - 1] as number) + TRIPLE_LABEL_SPREAD);
-			parts.push(
-				`<text x="${TRIPLE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${size}" font-weight="600" fill="${text.label}">${escapeXml(fit.label.text)}</text>`,
-				// Tahoma: the mask starts 1.5 px before the chunk's ink, past the
-				// label's last ink column, which ends the clear gap before it.
-				isTahoma()
-					? `<rect x="${(fit.chunkInk - 1.5).toFixed(1)}" y="${band.top}" width="${(141.5 - fit.chunkInk).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
-					: `<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
-			);
+			face.mark(`<text x="${TRIPLE.labelX}" y="${baseline}" text-anchor="start" font-family="${fontFamily()}" font-size="${size}" font-weight="600" fill="${text.label}">${escapeXml(fit.label.text)}</text>`);
+			if (!see) {
+				face.mark(
+					// Tahoma: the mask starts 1.5 px before the chunk's ink, past the
+					// label's last ink column, which ends the clear gap before it.
+					isTahoma()
+						? `<rect x="${(fit.chunkInk - 1.5).toFixed(1)}" y="${band.top}" width="${(141.5 - fit.chunkInk).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
+						: `<rect x="${(TRIPLE.valueRight - fit.chunkWidth - 4).toFixed(1)}" y="${band.top}" width="${(fit.chunkWidth + 12).toFixed(1)}" height="${band.height}" fill="${palette.bg}"/>`
+				);
+			}
 		}
 		const unit = row.unitText !== "" ? `<tspan font-size="${TRIPLE_UNIT_SIZE}" font-weight="600" fill="${text.unit}">${escapeXml(row.unitText)}</tspan>` : "";
-		parts.push(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${text.value}">${escapeXml(row.valueText)}${unit}</text>`);
+		face.mark(`<text x="${TRIPLE.valueRight}" y="${baseline}" text-anchor="end" font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${row.valueColor ?? text.value}">${escapeXml(row.valueText)}${unit}</text>`);
 	});
 	// A separator draws only between configured rows: a trailing rule over
 	// an unpicked band would read as a row that failed to load. The empty
@@ -820,17 +1113,17 @@ export function renderTripleKey(opts: TripleKeyOptions): string {
 		const above = rows.slice(0, k + 1).some((r) => r !== null);
 		const below = rows.slice(k + 1).some((r) => r !== null);
 		if (above && below) {
-			parts.push(`<rect x="12" y="${y}" width="120" height="2" fill="${palette.track}"/>`);
+			// The badge and the hook sit on the first separator only.
+			face.structure(hRule(12, 132, y, keyStructureFill(background, palette), k === 0 ? ruleGaps(see, sharedBadge !== "", opts.returnMark === true) : []));
 		}
 	});
 	if (sharedBadge !== "") {
-		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge, TRIPLE_BADGE_GAP_Y, TRIPLE_BADGE_TEXT_Y));
+		face.mark(...badgeParts(see, sharedBadge, palette, text.badge, TRIPLE_BADGE_GAP_Y, TRIPLE_BADGE_TEXT_Y));
 	}
 	if (opts.returnMark === true) {
-		parts.push(...dividerReturnMarkSvg((TRIPLE.separatorYs[0] as number) + 1, palette.bg, text.unit));
+		face.mark(...hookParts(see, (TRIPLE.separatorYs[0] as number) + 1, palette.bg, text.unit));
 	}
-	parts.push("</svg>");
-	return parts.join("");
+	return face.end();
 }
 
 /** Quad grid: four readouts in a 2x2 grid split by a hairline track-color
@@ -884,6 +1177,65 @@ export function quadValueFontSize(text: string, labeled = false): number {
 	return Math.max(12, base - (count - 4) * 4);
 }
 
+/** The columns a quad value with its own format may ink, either side of
+ * its cell center: the ink of a four-digit value ("9999", 26 px, Tahoma)
+ * as quads have drawn since 1.2.0, keeping two columns clear of the cross.
+ * Fitted in BOTH columns, so moving a reading between slots keeps its size. */
+const QUAD_EXACT_COLUMNS = [
+	{ cx: 36, first: 3.5, last: 68 },
+	{ cx: 108, first: 75, last: 140.5 }
+] as const;
+/** The step-down ladder below the cell's base size. */
+const QUAD_EXACT_SIZES = [26, 24, 22, 20, 18, 16] as const;
+/** The smallest size a cell draws a reading's exact text at; below it the
+ * cell drops the decimals instead. */
+const QUAD_EXACT_FLOOR = 18;
+/** The smallest size a cell draws that value with no decimals at; below it
+ * the cell takes the quad's four glyphs at its normal size. */
+const QUAD_WHOLE_FLOOR = 16;
+
+/**
+ * The size a quad value with its own format draws at: the largest step,
+ * from the cell's base size (26, or 24 labeled) down to `floor`, at which
+ * the whole text inks inside its column in either column; null when even
+ * the floor cannot hold it.
+ */
+export function quadExactValueSize(text: string, labeled: boolean, floor: number = QUAD_EXACT_FLOOR): number | null {
+	const base = labeled ? 24 : 26;
+	for (const size of QUAD_EXACT_SIZES) {
+		if (size > base || size < floor) continue;
+		const run: TextRun[] = [{ text, fontSize: size, fontWeight: 700 }];
+		if (QUAD_EXACT_COLUMNS.every((col) => inksWithin(run, "middle", col.cx, col.first, col.last))) return size;
+	}
+	return null;
+}
+
+/**
+ * Which of a reading's texts a quad cell draws, and at what size: the
+ * exact text down to 18 px, else the value with no decimals down to 16 px,
+ * else the quad's four glyphs (the last text) at the cell's normal size
+ * (quadValueFontSize); never a lone "…".
+ */
+export function quadExactRung(rungs: ExactTexts, labeled: boolean): ExactPick & { size: number } {
+	const floors = [QUAD_EXACT_FLOOR, QUAD_WHOLE_FLOOR];
+	const pick = exactRung(rungs, (r, i) => i < floors.length && quadExactValueSize(r.valueText, labeled, floors[i]) !== null);
+	const size = pick.fits ? (quadExactValueSize(pick.rung.valueText, labeled, floors[pick.index]) as number) : quadValueFontSize(pick.rung.valueText, labeled);
+	return { ...pick, size };
+}
+
+/**
+ * The size each quad cell with its own format draws at: the cells that
+ * draw their exact text share the smallest of their sizes (18 px or more),
+ * so two compared readings draw alike; a cell past its exact text keeps
+ * its own size, so one long number never pulls an unrelated short one
+ * down. Cells without a format are null here and keep the legacy size.
+ */
+function quadExactCellSizes(picks: readonly ((ExactPick & { size: number }) | null)[]): (number | null)[] {
+	const exactSizes = picks.filter((p): p is ExactPick & { size: number } => p !== null && p.index === 0 && p.fits).map((p) => p.size);
+	const shared = Math.min(...exactSizes);
+	return picks.map((p) => (p === null ? null : p.index === 0 && p.fits ? shared : p.size));
+}
+
 export interface QuadKeyCell {
 	/** Micro-label source; drawn only in the labeled variant, hard-cut to 4
 	 * code points and uppercased. Empty draws no label. */
@@ -895,6 +1247,16 @@ export interface QuadKeyCell {
 	 * one. On alert the caller passes the alert palette's own text token
 	 * instead, so the whole key stays inside the global alert palette. */
 	color: string;
+	/** The labeled variant's value color in place of the text value token
+	 * (a cell that is not alerting on a key with per-reading alert rules).
+	 * The default variant's value takes `color`. */
+	valueColor?: string;
+	/** The reading has its own format: its text is kept whole and fitted by
+	 * size (quadExactRung), its decimals dropped and then the four-glyph
+	 * squeeze only when no size the cell allows holds it; never cut. */
+	exact?: boolean;
+	/** With exact: measure.ts exactFallback for this value (four glyphs). */
+	fallback?: readonly Measurement[];
 }
 
 export interface QuadKeyOptions {
@@ -917,6 +1279,11 @@ export interface QuadKeyOptions {
 	 * the left end of the horizontal cross arm. Absent or false changes
 	 * nothing. */
 	returnMark?: boolean;
+	/** The snoozed cue's color (snoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+	/** What the key draws behind its readout (key-background.ts); absent
+	 * is Theme, today's face byte for byte. */
+	background?: KeyBackground;
 }
 
 /**
@@ -925,11 +1292,19 @@ export interface QuadKeyOptions {
  * face and the one shared badge sits at the cross center.
  */
 export function renderQuadKey(opts: QuadKeyOptions): string {
-	const { palette } = opts;
+	const { palette, background } = opts;
 	const text = opts.text ?? themeTextColors(palette);
 	const labeled = opts.labels === true;
 	const sharedBadge = opts.sharedBadge ?? "";
-	const parts: string[] = svgOpen(144, 144, palette.bg);
+	const see = seeThrough(background);
+	const face = keyFace(background, palette);
+	if (opts.snoozeBand !== undefined) {
+		face.structure(snoozeBandSvg(opts.snoozeBand));
+	}
+	// Cells with their own format: their text and size by quadExactRung,
+	// the ones drawing their exact text at one shared size.
+	const picks = opts.cells.map((cell) => (cell !== null && cell !== undefined && cell.exact === true ? quadExactRung([{ valueText: cell.valueText, unitText: cell.unitText }, ...(cell.fallback ?? [])], labeled) : null));
+	const drawnSizes = quadExactCellSizes(picks);
 	for (let i = 0; i < 4; i++) {
 		const cell = opts.cells[i] ?? null;
 		if (cell === null) {
@@ -937,7 +1312,10 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 		}
 		const cx = QUAD.cellCenterX[i % 2] as number;
 		const top = QUAD.rowTop[i < 2 ? 0 : 1] as number;
-		const valueText = truncateLabel(cell.valueText, QUAD_VALUE_MAX);
+		const pick = picks[i] ?? null;
+		const valueText = pick !== null ? pick.rung.valueText : truncateLabel(cell.valueText, QUAD_VALUE_MAX);
+		const unitText = pick !== null ? pick.rung.unitText : cell.unitText;
+		const valueSize = pick !== null ? (drawnSizes[i] as number) : quadValueFontSize(valueText, labeled);
 		if (labeled) {
 			// Uppercase before the cut: locale expansions (ß to SS) must never
 			// push a micro-label past its 4-glyph budget.
@@ -953,29 +1331,31 @@ export function renderQuadKey(opts: QuadKeyOptions): string {
 				const fit = isTahoma()
 					? fitLadderBy(micro, QUAD_LABEL_SIZES, (line, size) => inksWithin([{ text: line, fontSize: size, fontWeight: 700 }], "middle", cx, Math.max(LENS.first, cx - 26), Math.min(LENS.last, cx + 26)))
 					: fitTextLadder(micro, QUAD_LABEL_BUDGET, QUAD_LABEL_SIZES, { fontWeight: 700 });
-				parts.push(`<text x="${cx}" y="${top + 20}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="700" fill="${cell.color}">${escapeXml(fit.text)}</text>`);
+				face.mark(`<text x="${cx}" y="${top + 20}" text-anchor="middle" font-family="${fontFamily()}" font-size="${fit.fontSize}" font-weight="700" fill="${cell.color}">${escapeXml(fit.text)}</text>`);
 			}
 		}
-		parts.push(`<text x="${cx}" y="${top + (labeled ? 45 : 40)}" text-anchor="middle" font-family="${fontFamily()}" font-size="${quadValueFontSize(valueText, labeled)}" font-weight="700" fill="${labeled ? text.value : cell.color}">${escapeXml(valueText)}</text>`);
-		if (cell.unitText !== "") {
+		face.mark(`<text x="${cx}" y="${top + (labeled ? 45 : 40)}" text-anchor="middle" font-family="${fontFamily()}" font-size="${valueSize}" font-weight="700" fill="${labeled ? (cell.valueColor ?? text.value) : cell.color}">${escapeXml(valueText)}</text>`);
+		if (unitText !== "") {
 			// 14 px matches the dual layout's unit step (single 16, dual 14,
 			// quad 14): the empty band under the value has the room, and the
 			// unit is what tells 1785 RPM from 1785 MHz at a glance.
-			parts.push(`<text x="${cx}" y="${top + (labeled ? 61 : 58)}" text-anchor="middle" font-family="${fontFamily()}" font-size="14" font-weight="600" fill="${text.unit}">${escapeXml(cell.unitText)}</text>`);
+			face.mark(`<text x="${cx}" y="${top + (labeled ? 61 : 58)}" text-anchor="middle" font-family="${fontFamily()}" font-size="14" font-weight="600" fill="${text.unit}">${escapeXml(unitText)}</text>`);
 		}
 	}
-	parts.push(
-		`<rect x="${QUAD_CROSS_H.x}" y="${QUAD_CROSS_H.y}" width="${QUAD_CROSS_H.w}" height="${QUAD_CROSS_H.h}" fill="${palette.track}"/>`,
-		`<rect x="${QUAD_CROSS_V.x}" y="${QUAD_CROSS_V.y}" width="${QUAD_CROSS_V.w}" height="${QUAD_CROSS_V.h}" fill="${palette.track}"/>`
+	const structure = keyStructureFill(background, palette);
+	// A see-through cross leaves the badge's gap open in both arms (the
+	// upright arm crosses it at y 63..77) and the hook's gap at the left end.
+	face.structure(
+		hRule(QUAD_CROSS_H.x, QUAD_CROSS_H.x + QUAD_CROSS_H.w, QUAD_CROSS_H.y, structure, ruleGaps(see, sharedBadge !== "", opts.returnMark === true), QUAD_CROSS_H.h),
+		vRule(QUAD_CROSS_V.x, QUAD_CROSS_V.y, QUAD_CROSS_V.y + QUAD_CROSS_V.h, structure, see && sharedBadge !== "" ? [[DUAL_BADGE_GAP.y, DUAL_BADGE_GAP.y + DUAL_BADGE_GAP.h]] : [], QUAD_CROSS_V.w)
 	);
 	if (sharedBadge !== "") {
-		parts.push(...sharedBadgeSvg(sharedBadge, palette, text.badge));
+		face.mark(...badgeParts(see, sharedBadge, palette, text.badge));
 	}
 	if (opts.returnMark === true) {
-		parts.push(...dividerReturnMarkSvg(QUAD_CROSS_H.y + 1, palette.bg, text.unit));
+		face.mark(...hookParts(see, QUAD_CROSS_H.y + 1, palette.bg, text.unit));
 	}
-	parts.push("</svg>");
-	return parts.join("");
+	return face.end();
 }
 
 /** Every adaptive text ladder on the key faces, exported so the policy

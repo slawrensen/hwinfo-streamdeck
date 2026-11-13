@@ -116,7 +116,7 @@ checkCopy("scripts/marketplace-shots.mjs");
 
 // Runtime strings users see on keys, dials and the settings panel. Em-dash
 // check only: identifiers like unlock() would false-positive the word list.
-for (const f of ["src/ui/state-screens.ts", "src/probe.ts", `${SD}/ui/pi-common.js`, `${SD}/ui/pi-control.js`, `${SD}/ui/pi-shell.js`, `${SD}/ui/pi-model.js`, `${SD}/ui/pi-command.js`, `${SD}/ui/pi-slot.js`]) {
+for (const f of ["src/ui/state-screens.ts", "src/i18n-catalog.ts", "src/probe.ts", `${SD}/ui/pi-strings.js`, `${SD}/ui/pi-strip.js`, `${SD}/ui/pi-strip-model.js`, `${SD}/ui/pi-common.js`, `${SD}/ui/pi-control.js`, `${SD}/ui/pi-shell.js`, `${SD}/ui/pi-model.js`, `${SD}/ui/pi-command.js`, `${SD}/ui/pi-slot.js`, `${SD}/ui/pi-links.js`, `${SD}/ui/pi-calc.js`]) {
 	checkCopy(f, { emDashOnly: true });
 }
 
@@ -136,10 +136,13 @@ const HISTORY_FILES = new Set(["CHANGELOG.md", "docs/changelog.md"]);
 const GUIDANCE_FILES = [
 	...PROSE_FILES.filter((f) => !HISTORY_FILES.has(f.replaceAll("\\", "/"))),
 	"src/ui/state-screens.ts",
+	"src/i18n-catalog.ts",
 	"src/probe.ts",
 	`${SD}/ui/pi-common.js`,
 	`${SD}/ui/pi-shell.js`,
 	`${SD}/ui/pi-model.js`,
+	`${SD}/ui/pi-links.js`,
+	`${SD}/ui/pi-calc.js`,
 ];
 for (const rel of GUIDANCE_FILES) {
 	if (!exists(rel)) continue;
@@ -148,6 +151,53 @@ for (const rel of GUIDANCE_FILES) {
 			if (re.test(line)) fail(rel, i + 1, why);
 		}
 	});
+}
+
+// ---------------------------------------------------------------------------
+// 1c. One name per concept: a label the panels retired stays out of the
+// current guidance.
+// ---------------------------------------------------------------------------
+
+// The 1.8 rows of the naming table (cohesion rule 1): a concept has one name
+// in the panels, the docs, the README and the newest CHANGELOG entry. Older
+// entries and the generated changelog page stay as they were released. A
+// "(was ...)" note may name the old label. Each pattern spans line breaks,
+// because the CHANGELOG wraps inside a label.
+const RETIRED_NAMES = [
+	{ re: /\bTrend\s+windows?\b/gi, now: "Time window" },
+	{ re: /\bClear\s+after\s+it\s+comes\s+back\s+by\b/gi, now: "Clear by" },
+	{ re: /\bclears?\s+once\s+back\s+by\b/gi, now: "Clear by (Its clear by for a reading's separate limits)" },
+	{ re: /\bA\s+press\s+while\s+alerting\s+snoozes\s+it\s+for\b/gi, now: "Snooze lasts" },
+	{ re: /\bA\s+snooze\s+lasts\b/gi, now: "Snooze lasts" },
+	{ re: /\*\*Machine\*\*|\bMachine\s+selector\b|\bAll\s+machines\b/g, now: "the PC selector and All PCs" },
+	{ re: /\*\*Target\*\*|\b(?:the|an?|empty)\s+Target\b/g, now: "Link ID on the HWiNFO Control key" },
+	{ re: /\bA\s+reset\s+clears\b/g, now: "A stats reset clears" },
+	{ re: /\brecipes?\b/gi, now: "Build screens (recipe stays a code and file-format word)" },
+	{ re: /\bQuick\s+setup\b/g, now: "Build screens" },
+];
+function newestEntry(text) {
+	const start = text.search(/^## /m);
+	if (start < 0) return { text: "", offset: 0 };
+	const next = text.slice(start + 3).search(/^## /m);
+	return { text: next < 0 ? text.slice(start) : text.slice(start, start + 3 + next), offset: start };
+}
+const NAMING_FILES = [
+	"README.md",
+	...mdFilesUnder("docs").map((f) => f.replaceAll("\\", "/")).filter((f) => f !== "docs/changelog.md" && !f.startsWith("docs/release/")),
+];
+// A missing file is already a failure of the copy check above.
+const namingTexts = NAMING_FILES.filter(exists).map((rel) => ({ rel, text: read(rel), offset: 0 }));
+if (exists("CHANGELOG.md")) namingTexts.push({ rel: "CHANGELOG.md", ...newestEntry(read("CHANGELOG.md")) });
+for (const { rel, text, offset } of namingTexts) {
+	const whole = offset === 0 ? text : read(rel);
+	// A "(was ...)" note keeps its length, so line numbers still hold.
+	const masked = text.replace(/\(was\b[^)]*\)/g, (note) => note.replace(/[^\n]/g, " "));
+	for (const { re, now } of RETIRED_NAMES) {
+		for (const m of masked.matchAll(re)) {
+			const line = whole.slice(0, offset + m.index).split("\n").length;
+			fail(rel, line, `"${m[0].replace(/\s+/g, " ")}" is a retired name; the panels say ${now}`);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +234,86 @@ if (manifest) {
 	}
 	if (!exists(`${SD}/${manifest.CodePath}`)) {
 		warn(`${SD}/manifest.json`, `CodePath ${manifest.CodePath} missing (run \`npm run build\` before packing)`);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 2b. Language files: every <code>.json beside the manifest (en.json today).
+// A language file replaces the manifest's text in its language, so each one
+// is release copy: it parses, names only the Stream Deck app's languages,
+// keeps the Marketplace's 250-character Description, carries every manifest
+// string and every Localization key en.json carries (and no others), and
+// follows the copy rules. en.json must repeat the manifest word for word
+// (npm run l10n writes it). The REALiX non-affiliation line follows the
+// manifest: a language Description names REALiX exactly when the English
+// manifest Description does (today it does: the manifest Description
+// ends with it, and the README and the Marketplace listing carry it too,
+// checked below).
+// ---------------------------------------------------------------------------
+
+const LANGUAGES = ["de", "en", "es", "fr", "ja", "ko", "zh_CN", "zh_TW"];
+const NOT_LANGUAGE = new Set(["manifest.json", "themes.json"]);
+const languageFiles = exists(SD) ? readdirSync(join(ROOT, SD)).filter((name) => name.endsWith(".json") && !NOT_LANGUAGE.has(name)) : [];
+const leafKeys = (node, prefix = "") =>
+	node !== null && typeof node === "object" && !Array.isArray(node)
+		? Object.entries(node).flatMap(([k, v]) => (typeof v === "string" ? [`${prefix}${k}`] : leafKeys(v, `${prefix}${k}.`)))
+		: [];
+let enLocalization = null;
+if (!languageFiles.includes("en.json")) fail(`${SD}/en.json`, 0, "missing (run npm run l10n)");
+for (const name of ["en.json", ...languageFiles.filter((n) => n !== "en.json").sort()]) {
+	const rel = `${SD}/${name}`;
+	if (!exists(rel)) continue;
+	const code = name.slice(0, -".json".length);
+	if (!LANGUAGES.includes(code)) {
+		fail(rel, 0, `"${code}" is not a Stream Deck app language (${LANGUAGES.join(", ")})`);
+		continue;
+	}
+	// Copy rules: the English word list only reads English.
+	checkCopy(rel, { emDashOnly: code !== "en" });
+	let doc;
+	try {
+		doc = JSON.parse(read(rel));
+	} catch (err) {
+		fail(rel, 0, `does not parse: ${err.message}`);
+		continue;
+	}
+	for (const field of ["Name", "Description"]) {
+		if (typeof doc[field] !== "string" || doc[field].trim() === "") fail(rel, 0, `no ${field}`);
+	}
+	if (typeof doc.Description === "string" && doc.Description.length < 250) fail(rel, 0, `Description under the 250-char Marketplace minimum (${doc.Description.length})`);
+	if (manifest && typeof doc.Description === "string" && /not affiliated|REALiX/i.test(manifest.Description) && !/REALiX/.test(doc.Description)) {
+		fail(rel, 0, "Description drops the REALiX non-affiliation line the manifest Description carries");
+	}
+	const known = new Set(["Name", "Description", "Localization", ...(manifest?.Actions ?? []).map((a) => a.UUID)]);
+	for (const key of Object.keys(doc)) if (!known.has(key)) fail(rel, 0, `unknown top-level key ${key}`);
+	for (const action of manifest?.Actions ?? []) {
+		const entry = doc[action.UUID];
+		if (entry === null || typeof entry !== "object") {
+			fail(rel, 0, `no strings for ${action.UUID}`);
+			continue;
+		}
+		for (const field of ["Name", "Tooltip"]) if (typeof entry[field] !== "string" || entry[field].trim() === "") fail(rel, 0, `${action.UUID} has no ${field}`);
+		const want = Object.keys(action.Encoder?.TriggerDescription ?? {}).sort().join(",");
+		const have = Object.keys(entry.Encoder?.TriggerDescription ?? {}).sort().join(",");
+		if (want !== have) fail(rel, 0, `${action.UUID} TriggerDescription has [${have}], the manifest [${want}]`);
+		if (code === "en") {
+			if (entry.Name !== action.Name || entry.Tooltip !== action.Tooltip) fail(rel, 0, `${action.UUID} Name or Tooltip differs from the manifest (run npm run l10n)`);
+			for (const [gesture, text] of Object.entries(action.Encoder?.TriggerDescription ?? {})) {
+				if (entry.Encoder?.TriggerDescription?.[gesture] !== text) fail(rel, 0, `${action.UUID} TriggerDescription.${gesture} differs from the manifest (run npm run l10n)`);
+			}
+		}
+	}
+	if (code === "en" && manifest && (doc.Name !== manifest.Name || doc.Description !== manifest.Description)) fail(rel, 0, "Name or Description differs from the manifest (run npm run l10n)");
+	const keys = leafKeys(doc.Localization);
+	if (code === "en") {
+		if (keys.length === 0) fail(rel, 0, "no Localization strings");
+		enLocalization = new Set(keys);
+	} else if (enLocalization !== null) {
+		const have = new Set(keys);
+		const missing = [...enLocalization].filter((k) => !have.has(k));
+		const unknown = keys.filter((k) => !enLocalization.has(k));
+		if (missing.length > 0) fail(rel, 0, `Localization lacks ${missing.length} key(s) en.json has, e.g. ${missing.slice(0, 3).join(", ")}`);
+		if (unknown.length > 0) fail(rel, 0, `Localization has ${unknown.length} key(s) en.json lacks, e.g. ${unknown.slice(0, 3).join(", ")}`);
 	}
 }
 

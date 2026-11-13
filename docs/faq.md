@@ -47,7 +47,7 @@ If you restart HWiNFO at least every 12 hours, the free version with Shared Memo
 
 Check whether the free version's Shared Memory timer expired. It disables sharing after 12 hours of runtime. Other freezes need the [troubleshooting checks](troubleshooting.md#values-are-frozen--not-updating). For timer expiry, what you see depends on your data source:
 
-- **Auto mode** (default): the plugin detects the disabled mapping and tries the **Gadget registry**. Enable Gadget reporting and select its readings, or configure explicit reading links (new in 1.7). Without links, a saved Shared Memory selection is missing on Gadget.
+- **Auto mode** (default): the plugin detects the disabled mapping and tries the **Gadget registry**. Enable Gadget reporting and select its readings, or link each reading to its Gadget counterpart under **Advanced > Reading links** ([reading links](data-sources.md#link-readings-across-providers)). Without links, a saved Shared Memory selection is missing on Gadget.
 - **Shared Memory only mode**: no fallback; keys show `Shared Memory / is off` until you re-enable Shared Memory Support in HWiNFO (Settings → Shared Memory Support) or restart HWiNFO.
 
 After the timer expires:
@@ -64,7 +64,7 @@ After the timer expires:
 
 **Auto** is the default. It prefers Shared Memory, tries Gadget when Shared Memory is unavailable, and switches back when it returns. Saved reading identities need [explicit links](data-sources.md#link-readings-across-providers) to work across providers.
 
-Shared Memory supplies hardware identities, a producer timestamp and HWiNFO statistics, but free HWiNFO disables it after 12 hours. Gadget has no timer, exposes only ticked current values, and cannot prove freshness from a steady reading.
+Shared Memory supplies hardware identities, a producer timestamp and HWiNFO statistics, but free HWiNFO disables it after 12 hours; HWiNFO's [license page](https://www.hwinfo.com/licenses/) lists that limit for Shared Memory Support. Gadget exposes only ticked current values and cannot prove freshness from a steady reading.
 
 Choose **Advanced → Connection → Data source** to keep Auto or force one provider. The choice affects **All keys and dials**. See the [source comparison](data-sources.md#shared-memory-vs-gadget-registry).
 
@@ -108,9 +108,15 @@ Changing the plugin's **Read every** interval (Advanced, Connection) *does* clea
 
 ### Does it slow down my PC? How much CPU and RAM?
 
-[PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md) records the build, hardware, harness and conditions for measurements. Historical live-page runs at a one-second poll measured about **0.2% of one CPU core** and **40–48 MB RSS**. These are recorded results, not a guarantee for 1.7.1 or another machine.
+[PERF.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/main/PERF.md) records the build, hardware, harness and conditions for measurements. These are recorded results from live pages at a one-second poll, not a guarantee for another build or machine:
 
-Source choice and the number of ticked Gadget readings affect scan cost. Visible keys add rendering work. With no Sensor Reading key or Sensor Dial visible, source polling stops; the process still maintains its Stream Deck connection.
+- **CPU:** 0.21% of one core over a 106.7-hour field run of 1.7.1 on my + XL.
+- **Memory:** 45 to 53 MB RSS over the 24-hour 1.7.0 soak, and 64.4 to 64.9 MB private bytes in the 1.7.1 runs, flat across the soaks. PERF.md carries the measured slopes.
+- These are 1.7.x figures. 1.8 keeps timed history for time windows and strip graphs, capped at 2 MiB plus a separate 768 KiB for Group and Ambient strip graphs. A bench comparison of the 1.8 candidate's plugin process with 1.7.1 under a mock Stream Deck app (PERF.md, "memory follow-up", 2026-10-25) measured 0.25% of one core against 0.21% on a deck with live HWiNFO readings, and 64.3 MB private bytes against 67.0 MB with a full 15-minute time window. A 48-hour soak of the 1.8 plugin on my decks logged no warnings or errors and held 184 to 185 handles, at 0.22% of one core and 64.7 to 68.0 MB private bytes in hourly means (PERF.md, 2026-11-11). Under the same mock app, a strip showing a Group or Ambient graph held about 99 MB private bytes before a fix in 1.8 and about 71 MB after it, at 0.48% of one core against 0.30% (PERF.md, 2026-10-27).
+
+Source choice and the number of ticked Gadget readings affect scan cost. Visible keys add rendering work. With no Sensor Reading key or Sensor Dial visible, source polling stops and no source reads happen; the process still maintains its Stream Deck connection.
+
+One poll tick decoding 548 live readings measured **8.5 µs** mean on 1.6.0, the last recorded run (PERF.md, 2026-09-04). Most of the memory is the Node runtime the Stream Deck app hosts plugins in, not the plugin's own data. The native sensor bridge is one 156 KB addon.
 
 ### Does it get slower or use more CPU if I add more keys?
 
@@ -174,7 +180,7 @@ Because a per-key pick always wins. The shared **Theme** (Advanced → Shared de
 
 The native addon, `bin/hwsm.node`, is **unsigned** and has no Authenticode certificate. A loader error alone does not establish whether a file is damaged, missing or blocked.
 
-For a **GitHub release**, compare the downloaded package with that release's **pack SHA-256**, as shown in [Install](installation.md#github-release). Compare the installed native addon with the **addon SHA-256** for the same version:
+For a **GitHub release**, compare the downloaded package with that release's **pack SHA-256**, as shown in [Install](installation.md#github-release). Compare the installed native addon with its **addon SHA-256** for the same version:
 
 ```powershell
 Get-FileHash "$env:APPDATA\Elgato\StreamDeck\Plugins\com.lawrensen.hwinfo.sdPlugin\bin\hwsm.node" -Algorithm SHA256

@@ -93,6 +93,19 @@ describe("pack through a staged copy", () => {
 		assert.ok(sameSnapshot(before_, snapshotDir(source)));
 	});
 
+	it("a native manifest that does not describe the packed binaries refuses the archive and removes it", () => {
+		assert.throws(() => packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: cliLike, log: () => {}, expectedNative: new Map([["bin/hwsm.node", "0".repeat(64)]]) }), /bin\/hwsm\.node in the archive .* is not the binary the native manifest records/);
+		assert.equal(fs.existsSync(path.join(outputDir, archiveName)), false);
+		assert.ok(sameSnapshot(before_, snapshotDir(source)));
+		const lines = [];
+		const archive = packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: cliLike, log: (line) => lines.push(line) });
+		const payload = validatePack({ archiveBytes: fs.readFileSync(archive), stagingDir: source, packageVersion: FIXTURE_VERSION }).payload;
+		const matched = [];
+		packWithStaging({ sourceDir: source, outputDir, packageVersion: FIXTURE_VERSION, runPacker: cliLike, log: (line) => matched.push(line), expectedNative: new Map([["bin/hwsm.node", payload.get("bin/hwsm.node")]]) });
+		assert.ok(lines.some((line) => line.startsWith("  bin/hwsm.node ")), lines.join("\n"));
+		assert.ok(matched.some((line) => line.endsWith("(matches the native manifest)") && line.includes("bin/hwsm.node")), matched.join("\n"));
+	});
+
 	it("an unrelated edit in the source survives packing untouched", () => {
 		fs.writeFileSync(path.join(source, "themes.json"), "{ \"edited\": true }\n");
 		const edited = snapshotDir(source);

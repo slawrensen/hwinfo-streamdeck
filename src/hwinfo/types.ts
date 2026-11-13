@@ -79,6 +79,11 @@ export interface SensorSnapshot {
 	/** Gadget rows withheld because the formatted value contradicts the raw
 	 * value; the plugin log names the slot. */
 	readonly contradictoryReadingCount?: number;
+	/** How long the producer says it waits between scans, in ms: Shared Memory
+	 * reads it from HWiNFO's header (reader.ts), and follows a change in place.
+	 * Absent for Gadget and for an older header. It only widens what a skipped
+	 * read may count as brief (history/store.ts); nothing is placed by it. */
+	readonly producerPeriodMs?: number;
 	/** Finite same-measurement value changes, distinct from render/topology
 	 * revision. Initial decoding is zero. Producer timestamps travel only in
 	 * pollTime so their evidence can be aged independently of value changes. */

@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { PLUGIN_ROOT, SHIPPED_MEMBERS } from "../scripts/lib/pack-contract.mjs";
-import { validatePack } from "../scripts/lib/pack-validation.mjs";
+import { nativeExpectationsFromManifest, validatePack } from "../scripts/lib/pack-validation.mjs";
+import { buildPe, fakeSign } from "../scripts/lib/pe-fixture.mjs";
 import { listZip, readZipEntry, writeZip } from "../scripts/lib/zip.mjs";
 import { archiveEntries, archiveFor, FIXTURE_VERSION, makeStaging } from "../scripts/lib/pack-fixture.mjs";
 
@@ -18,7 +19,7 @@ describe("packed-archive gate", () => {
 	before(() => { staging = makeStaging(); });
 	after(() => fs.rmSync(staging, { recursive: true, force: true }));
 
-	const run = (archiveBytes, packageVersion = FIXTURE_VERSION, stagingDir = staging) => validatePack({ archiveBytes, stagingDir, packageVersion });
+	const run = (archiveBytes, packageVersion = FIXTURE_VERSION, stagingDir = staging, expectedNative = new Map()) => validatePack({ archiveBytes, stagingDir, packageVersion, expectedNative });
 	const member = (rel) => `${PLUGIN_ROOT}/${rel}`;
 
 	it("accepts the archive the packer produces, manifest re-serialized and all members deflated", () => {
@@ -34,20 +35,82 @@ describe("packed-archive gate", () => {
 		assert.ok(failures.some((line) => /themes\.json.*method 12/.test(line)), failures.join("\n"));
 	});
 
-	it("rejects a missing required member", () => {
-		const failures = run(archiveFor(staging, (entries) => entries.filter((entry) => entry.name !== member("bin/hwsm.node")))).failures;
-		assert.ok(failures.includes('missing member "bin/hwsm.node"'), failures.join("\n"));
+	it("rejects a missing required member, the native binary included", () => {
+		for (const rel of ["bin/hwsm.node"]) {
+			const failures = run(archiveFor(staging, (entries) => entries.filter((entry) => entry.name !== member(rel)))).failures;
+			assert.ok(failures.includes(`missing member "${rel}"`), failures.join("\n"));
+		}
 	});
 
 	it("rejects forbidden and unlisted extras", () => {
-		const extras = ["logs/com.lawrensen.hwinfo.0.log", "bin/hwsm_test.node", "bin/hwsm.pdb", "bin/hwsm.node.staging-123", "README.md", "src/plugin.ts", "ui/extra.js", ".env"];
+		const extras = ["logs/com.lawrensen.hwinfo.0.log", "bin/hwsm_test.node", "bin/hwsm_protomm.node", "bin/hwsm.pdb", "bin/hwsm.node.staging-123", "bin/stale.node", "README.md", "src/plugin.ts", "ui/extra.js", ".env"];
 		const failures = run(archiveFor(staging, (entries) => [...entries, ...extras.map((rel) => ({ name: member(rel), data: Buffer.from("x") }))])).failures;
 		for (const rel of extras) assert.ok(failures.some((line) => line.includes(`"${rel}"`)), `${rel}: ${failures.join("\n")}`);
 		assert.ok(failures.some((line) => /hwsm_test\.node.*test-only/.test(line)));
+		assert.ok(failures.some((line) => /hwsm_protomm\.node.*test-only/.test(line)));
 		assert.ok(failures.some((line) => /hwsm\.pdb.*debug symbols/.test(line)));
 		assert.ok(failures.some((line) => /README\.md.*internal document/.test(line)));
 		assert.ok(failures.some((line) => /\.0\.log.*log file/.test(line)));
 		assert.ok(failures.some((line) => /"ui\/extra\.js".*unexpected/.test(line) || line === 'unexpected member "ui/extra.js"'));
+	});
+
+	it("holds every native member to the PE checks: PE32+, x64, nothing after the last section", () => {
+		const replaced = (rel, data) => archiveFor(staging, (entries) => entries.map((entry) => entry.name === member(rel) ? { ...entry, data } : entry));
+		for (const rel of ["bin/hwsm.node"]) {
+			const junk = run(replaced(rel, Buffer.concat([Buffer.from("MZ"), Buffer.alloc(200, 7)]))).failures;
+			assert.ok(junk.some((line) => line.startsWith(`${rel} is not a PE image`)), junk.join("\n"));
+			const arm = buildPe({ pdb: "x.pdb" });
+			arm.writeUInt16LE(0xaa64, arm.readUInt32LE(0x3c) + 4);
+			assert.ok(run(replaced(rel, arm)).failures.some((line) => line === `${rel} is a arm64 image, not x64`));
+			const overlay = run(replaced(rel, buildPe({ pdb: "x.pdb", overlay: Buffer.from("tail") }))).failures;
+			assert.ok(overlay.some((line) => line === `${rel} carries 4 bytes after its last section and no certificate table`), overlay.join("\n"));
+		}
+	});
+
+	it("refuses a native member that carries a test-only hook, whatever its name says", () => {
+		const replaced = (rel, data) => archiveFor(staging, (entries) => entries.map((entry) => entry.name === member(rel) ? { ...entry, data } : entry));
+		for (const [rel, hook] of [["bin/hwsm.node", "_testControl"], ["bin/hwsm.node", "_testHookOfAnotherBuild"]]) {
+			const failures = run(replaced(rel, buildPe({ pdb: "x.pdb", code: Buffer.from(`\u0000${hook}\u0000`) }))).failures;
+			assert.ok(failures.includes(`${rel} carries the test-only hook ${hook} (a test build under the shipped name)`), failures.join("\n"));
+			const clean = run(replaced(rel, buildPe({ pdb: "x.pdb", code: Buffer.from("\u0000_testing lower case\u0000") }))).failures;
+			assert.ok(!clean.some((line) => line.includes("test-only hook")), clean.join("\n"));
+		}
+	});
+
+	it("passes a signed native member and refuses data after its certificate table", () => {
+		// The staging copy must hold the same bytes, or the payload check
+		// (not the PE check) would be what fails.
+		const signedStaging = makeStaging("hwinfo-pack-signed-");
+		try {
+			const file = path.join(signedStaging, "bin", "hwsm.node");
+			const signed = fakeSign(fs.readFileSync(file), { digestHex: "22".repeat(32) });
+			fs.writeFileSync(file, signed);
+			assert.deepEqual(run(archiveFor(signedStaging), FIXTURE_VERSION, signedStaging).failures, []);
+			const trailing = Buffer.concat([signed, Buffer.alloc(8)]);
+			fs.writeFileSync(file, trailing);
+			const failures = run(archiveFor(signedStaging), FIXTURE_VERSION, signedStaging).failures;
+			assert.ok(failures.includes("bin/hwsm.node carries a certificate table signing would not produce: 8 bytes follow the certificate table; it must end the file"), failures.join("\n"));
+		} finally {
+			fs.rmSync(signedStaging, { recursive: true, force: true });
+		}
+	});
+
+	it("holds the native members to the hashes a native manifest records", () => {
+		const archive = archiveFor(staging);
+		const payload = run(archive).payload;
+		const recorded = new Map([["bin/hwsm.node", payload.get("bin/hwsm.node")]]);
+		assert.deepEqual(run(archive, FIXTURE_VERSION, staging, recorded).failures, []);
+		const wrong = run(archive, FIXTURE_VERSION, staging, new Map([["bin/hwsm.node", "0".repeat(64)]])).failures;
+		assert.ok(wrong.some((line) => /^bin\/hwsm\.node in the archive \([0-9a-f]{12}\) is not the binary the native manifest records \(000000000000\)/.test(line)), wrong.join("\n"));
+		// A manifest of other binaries describes nothing this pack carries.
+		const partial = run(archive, FIXTURE_VERSION, staging, new Map([["bin/next.node", "1".repeat(64)]])).failures;
+		assert.ok(partial.includes("the native manifest does not describe bin/hwsm.node; regenerate it with node scripts/native-manifest.mjs"), partial.join("\n"));
+	});
+
+	it("reads native expectations from version 2 and version 1 manifests", () => {
+		assert.deepEqual([...nativeExpectationsFromManifest({ sha256: "a", binaries: [{ file: "hwsm.node", sha256: "a" }, { file: "next.node", sha256: "b" }] })], [["bin/hwsm.node", "a"], ["bin/next.node", "b"]]);
+		assert.deepEqual([...nativeExpectationsFromManifest({ file: "hwsm.node", sha256: "a" })], [["bin/hwsm.node", "a"]]);
+		assert.deepEqual([...nativeExpectationsFromManifest({})], []);
 	});
 
 	it("rejects a payload that does not match the staged build", () => {

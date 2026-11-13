@@ -8,9 +8,7 @@
  * nothing checked it) makes the console line vouch for bytes the panel
  * never loaded. This gate reads the shipped files themselves: every
  * *.html under ui/ is enumerated, every first-party reference must carry
- * a token, and every token must equal PI_BUILD. sdpi-components.js is
- * vendored and stays untokened on purpose; it changes only with a vendor
- * bump.
+ * a token, and every token must equal PI_BUILD.
  */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -21,8 +19,7 @@ import { fileURLToPath } from "node:url";
 const UI_DIR = fileURLToPath(new URL("../com.lawrensen.hwinfo.sdPlugin/ui/", import.meta.url));
 // Every first-party panel asset: pi.css and every pi-*.js the panels load
 // (pi-model, pi-shell, pi-common, pi-control, pi-command, pi-slot, and any
-// added later). The vendored sdpi-components.js never matches: the name
-// must start at the attribute's opening quote.
+// added later).
 const FIRST_PARTY = /(?:href|src)="(pi(?:-[\w-]+)?\.(?:css|js))(\?v=([^"]*))?"/g;
 // Any spelling of a first-party asset name, however it is quoted or
 // prefixed. Matched counts must agree with FIRST_PARTY or the gate is

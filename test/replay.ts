@@ -135,6 +135,10 @@ export function replayTrace(fixture: TraceFixture, snapshot: SensorSnapshot = st
 				return;
 			case "resetStats":
 				return; // recorded; stats themselves are covered by stats.test.ts
+			case "snooze":
+				// Recorded. A snooze changes no selection, stat, pause or pin;
+				// what it silences is covered by test/dial-alerts.test.ts.
+				return;
 		}
 	};
 

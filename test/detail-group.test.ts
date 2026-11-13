@@ -110,6 +110,13 @@ describe("detail settings parsing", () => {
 		assert.equal(detailFilterOf({ detailFilter: 42 }), undefined);
 	});
 
+	it("detailFilter: a pattern of only | separators and spaces is unset; any alternative keeps it whole", () => {
+		assert.equal(detailFilterOf({ detailFilter: "|" }), undefined);
+		assert.equal(detailFilterOf({ detailFilter: " | | " }), undefined);
+		assert.equal(detailFilterOf({ detailFilter: " gpu | " }), "gpu |");
+		assert.equal(detailFilterOf({ detailFilter: "4090 | ccd2" }), "4090 | ccd2");
+	});
+
 	it("detailTiles: capped without erroring", () => {
 		const many = Array.from({ length: DETAIL_TILES_MAX + 40 }, () => ({ size: 2 }));
 		assert.equal(detailTilesOf({ detailTiles: many }).length, DETAIL_TILES_MAX);
@@ -182,7 +189,7 @@ describe("compileDetailFilter (glob matching)", () => {
 	});
 
 	it("case folds per code unit like the old non-unicode i regex, hand-mirrored in the panel", () => {
-		// The fold is duplicated in ui/pi-common.js detailFilterMatcher;
+		// The fold is duplicated in ui/pi-model.js detailFilterMatcher;
 		// these pin the mirror-sensitive non-ASCII rules on this side.
 		assert.equal(compileDetailFilter("µ")("rail μV noise"), true); // micro sign folds onto Greek mu
 		assert.equal(compileDetailFilter("μ")("rail µV noise"), true); // and the reverse
@@ -219,6 +226,22 @@ describe("source-mode resolution", () => {
 		// (it lives on the Back tile as Sensor missing, like custom mode).
 		const orphaned = resolveDetailGroup(snapshot, { readingKey: "gone:0:0", detailMode: "filter", detailFilter: "hotspot" });
 		assert.deepEqual(orphaned?.keys, ["b:0:2"]);
+	});
+
+	it("filter mode lists the union of | alternatives in snapshot order, each reading once (issue #35)", () => {
+		// CCD1 sits after GPU Temp in the snapshot: the list follows HWiNFO's
+		// order, never the order the alternatives were typed in.
+		const union = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "ccd1 | gpu temp" });
+		assert.deepEqual(union?.keys, ["b:0:1", "a:0:3"]);
+		assert.equal(union?.title, "ccd1 | gpu temp");
+		const overlap = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "gpu|*hotspot|gpu" });
+		assert.deepEqual(overlap?.keys, ["b:0:1", "b:0:2"]);
+		const padded = resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "tdie||  |" });
+		assert.deepEqual(padded?.keys, ["a:0:2"]);
+		const opener = resolveDetailGroup(snapshot, { readingKey: "a:0:2", detailMode: "filter", detailFilter: "tdie|tctl" });
+		assert.deepEqual(opener?.keys, ["a:0:1"], "the opener stays out of a union");
+		assert.equal(resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: "|" }), null);
+		assert.equal(resolveDetailGroup(snapshot, { readingKey: "a:0:1", detailMode: "filter", detailFilter: " | | " }), null);
 	});
 
 	it("filter mode without a usable pattern (or snapshot) is unresolvable", () => {

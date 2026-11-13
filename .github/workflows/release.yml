@@ -17,12 +17,54 @@
 # build headers are pinned deliberately; see ci.yml for the reasoning and
 # for what the label pin does not hold still (the MSVC toolset).
 #
+# Jobs, in order, each with only the access it needs:
+#
+#   build    verifies the tag, runs every gate, builds the native addon
+#            twice (the bytes must match), records the toolchain, writes
+#            the unsigned native manifest, classifies drift against the
+#            previous release, carries forward each binary whose native
+#            source did not change since that release (below), and hands
+#            the unsigned binaries on. No secret and a read-only token.
+#   sign     only when the repository variable SIGNING_MODE is "required":
+#            in the protected `release-signing` environment (Stephen
+#            approves each run), signs and timestamps the addon through
+#            Azure Artifact Signing with an OIDC login (no stored
+#            credential), then verifies each signature (signtool /pa,
+#            Get-AuthenticodeSignature, a timestamp, the pinned signer) and
+#            that each signed file minus its signature is the unsigned
+#            build. Installs no dependency and runs no npm.
+#   package  vendors those exact bytes (signed, or the unsigned build when
+#            signing is off) into the plugin through HWSM_VENDOR, rebuilds
+#            plugin.js (it must equal the build job's), writes the final native manifest, packs, and
+#            qualifies the package: the ABI check and producer recovery
+#            run on the EXTRACTED bytes, the native gate on the staging
+#            copy the archive stage proves equal to them. Read-only token,
+#            no secret.
+#   stage    downloads the validated files and stages the draft. The only
+#            job with a write token; it runs no repository code.
+#
+# SIGNING_MODE unset or "off": no sign job, and the release ships the
+# unsigned build exactly as before. "required": any signing or
+# verification failure stops the release; there is no automatic unsigned
+# fallback. Any other value fails the build job.
+#
+# NATIVE_CARRY_FORWARD unset or "on": a binary whose native source id is
+# the one the previous public release recorded ships as that release's
+# exact unsigned file (held to its manifest and to the digest GitHub records
+# for its pack), with that release's PDB; this run's rebuild of it passes
+# the same gates and is kept as evidence, its hash recorded next to the
+# carried one. Unchanged source has rebuilt to different bytes on newer
+# runner images, and the carried file keeps the hash users and antivirus
+# vendors already know. A carry that cannot be proven stops the release.
+# "off": every binary ships as this run built it. Any other value fails
+# the build job.
+#
 # Each release publishes two verifiable facts: the outer package SHA-256 and
-# release-native-manifest.json (the exact hwsm.node hash, PE hardening,
-# imports, and toolchain). A double clean build proves the native binary is
-# reproducible in this pinned environment before anything is published, and
-# the drift check below says when the bytes moved against the previous
-# release without a native source change.
+# release-native-manifest.json (the exact hwsm.node hash, the unsigned
+# build each signed file was made from, the verified
+# signature, PE hardening, imports, section hashes, and the toolchain
+# record: every compiler, linker and SDK file each binary was built from,
+# hashed).
 name: release
 
 on:
@@ -37,9 +79,8 @@ jobs:
     runs-on: windows-2025
     outputs:
       ver: ${{ steps.verify.outputs.ver }}
-      sha: ${{ steps.hash.outputs.sha }}
-      size: ${{ steps.hash.outputs.size }}
-      nativesha: ${{ steps.hash.outputs.nativesha }}
+      unsignedsha: ${{ steps.unsigned.outputs.hwsm }}
+      pluginsha: ${{ steps.unsigned.outputs.plugin }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,6 +96,16 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/verify-release-tag.mjs
+
+      - name: Check the signing mode
+        env:
+          SIGNING_MODE: ${{ vars.SIGNING_MODE }}
+        run: node scripts/signing-config-check.mjs --mode
+
+      - name: Check the native carry-forward mode
+        env:
+          NATIVE_CARRY_FORWARD: ${{ vars.NATIVE_CARRY_FORWARD }}
+        run: node scripts/native-carry-forward.mjs --check-mode
 
       - run: npm ci
       - name: Print toolchain versions
@@ -86,84 +137,361 @@ jobs:
       - name: Reproducibility check (second clean build must be byte-identical)
         shell: pwsh
         run: |
-          $first = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
+          $binaries = @("native/hwsm/build/Release/hwsm.node")
+          $first = $binaries | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
           npm run build:native
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $second = (Get-FileHash native/hwsm/build/Release/hwsm.node -Algorithm SHA256).Hash
-          if ($first -ne $second) {
-            Write-Error "native build is not reproducible: $first != $second"
-            exit 1
+          $second = $binaries | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+          for ($i = 0; $i -lt $binaries.Count; $i++) {
+            if ($first[$i] -ne $second[$i]) {
+              Write-Error "native build is not reproducible: $($binaries[$i]) $($first[$i]) != $($second[$i])"
+              exit 1
+            }
+            Write-Output "reproducible: $($binaries[$i]) $($first[$i])"
           }
-          Write-Output "reproducible: $first"
+
+      # What actually built the binaries: the tracking logs' headers and
+      # libraries, the tools, node.lib and the Node headers, all hashed.
+      # Compared with native/toolchain-policy.json in record-only mode: a
+      # difference is a warning annotation, not a failure, this release.
+      - name: Native toolchain record
+        run: node scripts/native-toolchain.mjs --out native-toolchain.json
 
       - run: npm run build
+      - name: Bundle inventory
+        run: node scripts/bundle-inventory.mjs
       - name: Native integration suite
         run: npm run test:native
 
       # One command per step: a multi-line run block reports only its last
       # command's exit code, so a manifest refusal would pass as green here
-      # and surface two steps later as a missing file.
-      - name: Native manifest
-        run: node scripts/native-manifest.mjs
+      # and surface two steps later as a missing file. This is the unsigned
+      # build's manifest; the package job writes the final one.
+      - name: Native manifest of the unsigned build
+        run: node scripts/native-manifest.mjs --toolchain native-toolchain.json
       - name: Native packaging gate
         run: node scripts/validate-native.mjs
 
-      # The reproducibility check above only proves two builds inside this job
-      # agree. The toolset inside the pinned runner image moves with image
-      # updates, so unchanged native source built different hwsm.node bytes
-      # for 1.5.1 and 1.6.0 with nothing saying so. Compare with the previous
-      # public release's manifest and annotate the run when the source id is
-      # unchanged but the bytes moved; the runbook's pre-publish comparison
-      # then has both compiler versions in front of it. A missing previous
-      # manifest or an API failure is reported, not fatal: this is a release
-      # gate the maintainer reads, not one the runner image can veto.
-      - name: Native drift check against the previous release
+      # The previous public release, read once for the drift check and the
+      # carry-forward step: its native manifest, its pack and its PDBs, each
+      # held to the digest GitHub records for the asset (a mismatch fails the
+      # step). previous/release.json says what was found: "read", "none" (no
+      # published release, or one without a native manifest) or "unreadable"
+      # (an API or download failure), with the tag, the reason, and which
+      # assets matched a digest GitHub records (a carry rests on no other).
+      - name: Read the previous release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          New-Item -ItemType Directory -Force previous | Out-Null
+          $verified = [ordered]@{}
+          function Save-Previous([string]$status, [string]$tag, [string]$reason) {
+            [ordered]@{ status = $status; tag = $tag; reason = $reason; digestVerified = $verified } | ConvertTo-Json | Out-File -FilePath previous/release.json -Encoding utf8
+            Write-Output "previous release: $status $tag $reason"
+          }
           $api = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
+          $download = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/octet-stream" }
           try {
             $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GH_REPO/releases/latest" -Headers $api
           } catch {
-            Write-Output "::notice title=native drift check skipped::no previous release readable ($($_.Exception.Message))"
+            if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) { Save-Previous "none" "" "no published release"; exit 0 }
+            Save-Previous "unreadable" "" "the latest release could not be read: $($_.Exception.Message)"
             exit 0
           }
-          $asset = $latest.assets | Where-Object { $_.name -eq "release-native-manifest.json" } | Select-Object -First 1
-          if (-not $asset) {
-            Write-Output "::notice title=native drift check skipped::previous release $($latest.tag_name) carries no release-native-manifest.json"
-            exit 0
+          $tag = $latest.tag_name -replace '[^0-9A-Za-z._-]', ''
+          $failed = @()
+          foreach ($name in @("release-native-manifest.json", "com.lawrensen.hwinfo.streamDeckPlugin", "hwsm.pdb")) {
+            $asset = $latest.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
+            if (-not $asset) { continue }
+            try {
+              Invoke-WebRequest -Uri $asset.url -Headers $download -OutFile "previous/$name"
+            } catch {
+              Remove-Item -Force -ErrorAction SilentlyContinue "previous/$name"
+              $failed += "$name ($($_.Exception.Message))"
+              continue
+            }
+            # Outside the try: bytes that are not the ones GitHub recorded
+            # fail the step instead of turning into a notice.
+            $got = (Get-FileHash "previous/$name" -Algorithm SHA256).Hash.ToLower()
+            if ($asset.digest -and $asset.digest -ne "sha256:$got") {
+              Write-Output "::error title=previous release asset digest mismatch::$name downloaded sha256:$got, GitHub records $($asset.digest)"
+              exit 1
+            }
+            $verified[$name] = [bool]$asset.digest
           }
-          try {
-            Invoke-WebRequest -Uri $asset.url -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = "application/octet-stream" } -OutFile previous-native-manifest.json
-            $prev = Get-Content previous-native-manifest.json -Raw | ConvertFrom-Json
-          } catch {
-            Write-Output "::notice title=native drift check skipped::could not read the previous manifest ($($_.Exception.Message))"
-            exit 0
-          }
-          $cur = Get-Content release-native-manifest.json -Raw | ConvertFrom-Json
-          Write-Output "previous $($latest.tag_name): sha256 $($prev.sha256) source $($prev.nativeSourceId) compiler $($prev.compilerVersion) sdk $($prev.windowsSdkVersion)"
-          Write-Output "this build: sha256 $($cur.sha256) source $($cur.nativeSourceId) compiler $($cur.compilerVersion) sdk $($cur.windowsSdkVersion)"
-          if ($prev.nativeSourceId -eq $cur.nativeSourceId -and $prev.sha256 -ne $cur.sha256) {
-            Write-Output "::warning title=native bytes drifted::hwsm.node changed with unchanged native source: $($latest.tag_name) built $($prev.sha256) with compiler $($prev.compilerVersion); this run built $($cur.sha256) with compiler $($cur.compilerVersion). Compare before publishing (RELEASE_RUNBOOK.md)."
-          } elseif ($prev.sha256 -eq $cur.sha256) {
-            Write-Output "hwsm.node is byte-identical to $($latest.tag_name)"
-          } else {
-            Write-Output "native source changed since $($latest.tag_name); different bytes are expected"
-          }
+          foreach ($line in $failed) { Write-Output "::notice title=previous release asset not read::$line" }
+          if (Test-Path previous/release-native-manifest.json) { Save-Previous "read" $tag ""; exit 0 }
+          if ($failed | Where-Object { $_ -like "release-native-manifest.json*" }) { Save-Previous "unreadable" $tag "its release-native-manifest.json could not be downloaded"; exit 0 }
+          Save-Previous "none" $tag "$tag publishes no release-native-manifest.json"
 
-      # The pack script shells out to the Elgato CLI (`streamdeck pack`); it is a
-      # global tool, not a project dependency, so install it here. Pinned to an
-      # exact top-level version so a new CLI publish is a reviewed diff here,
-      # not a silent change to what packs the release. Known limit: `npm i -g`
-      # has no lockfile, so the CLI's transitive dependencies still resolve at
-      # job time. Bumped by hand; Dependabot cannot see a `run:` install.
-      - name: Install Elgato Stream Deck CLI
-        run: npm install -g @elgato/cli@1.7.4
+      # The reproducibility check above only proves two builds inside this job
+      # agree. The toolset inside the pinned runner image moves with image
+      # updates, so unchanged native source built different hwsm.node bytes
+      # for 1.5.1, 1.6.0 and 1.7.1. scripts/native-drift.mjs compares this
+      # build's manifest with the previous public release's and names the
+      # recorded input that moved (a library, a tool, the SDK servicing
+      # build); a previous manifest without a toolchain record (1.7.1 and
+      # earlier) is explained from the binaries in the previous pack. A
+      # signed previous release is compared by its recorded unsigned build,
+      # and a binary it carried forward by its rebuild. The step fails only
+      # when the bytes moved and no recorded input did. No previous release,
+      # or one that could not be read, is a notice, not a failure.
+      - name: Native drift check against the previous release
+        shell: pwsh
+        run: |
+          $previous = Get-Content previous/release.json -Raw | ConvertFrom-Json
+          if ($previous.status -ne "read") {
+            Write-Output "::notice title=native drift check skipped::previous release $($previous.status): $($previous.reason)"
+            exit 0
+          }
+          $packArgs = @()
+          if (Test-Path previous/com.lawrensen.hwinfo.streamDeckPlugin) { $packArgs = @("--previous-pack", "previous/com.lawrensen.hwinfo.streamDeckPlugin") }
+          else { Write-Output "::notice title=previous pack not read::drift is classified from the manifests alone" }
+          node scripts/native-drift.mjs --previous previous/release-native-manifest.json --previous-label $previous.tag @packArgs
+          exit $LASTEXITCODE
 
-      - name: Pack plugin
-        run: npm run pack
+      # The unsigned binaries, their PDBs (signing leaves the CodeView record
+      # alone, so they serve the signed files too), the toolchain record and
+      # the unsigned manifest go to the next jobs as one artifact; the hashes
+      # travel separately as job outputs, so each consumer checks it got
+      # these bytes.
+      - name: Stage the unsigned native build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force native-unsigned | Out-Null
+          Copy-Item native/hwsm/build/Release/hwsm.node, native/hwsm/build/Release/hwsm.pdb, native-toolchain.json, release-native-manifest.json -Destination native-unsigned
+
+      # A binary whose native source is unchanged since the previous release
+      # ships as that release's file, with its PDB; this run's rebuild moves
+      # to native-unsigned/rebuilt/ and carry-forward.json records every
+      # decision for the package job's manifest. A carry that cannot be
+      # proven fails here and changes nothing.
+      - name: Carry forward native binaries whose source did not change
+        env:
+          NATIVE_CARRY_FORWARD: ${{ vars.NATIVE_CARRY_FORWARD }}
+        run: node scripts/native-carry-forward.mjs --dir native-unsigned --previous-dir previous
+
+      - name: Record the unsigned native hashes
+        id: unsigned
+        shell: pwsh
+        run: |
+          $hwsm = (Get-FileHash native-unsigned/hwsm.node -Algorithm SHA256).Hash.ToLower()
+          $plugin = (Get-FileHash com.lawrensen.hwinfo.sdPlugin/bin/plugin.js -Algorithm SHA256).Hash.ToLower()
+          "hwsm=$hwsm" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "plugin=$plugin" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "unsigned hwsm.node $hwsm; plugin.js $plugin"
+
+      - name: Transfer the unsigned native build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-unsigned
+          path: native-unsigned/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The only job that can reach the signing service. The environment holds
+  # the OIDC identity (AZURE_CLIENT_ID, AZURE_TENANT_ID,
+  # AZURE_SUBSCRIPTION_ID as environment secrets) and requires Stephen's
+  # approval; the federated credential trusts exactly
+  # repo:slawrensen/hwinfo-streamdeck:environment:release-signing. Nothing
+  # here installs a dependency: the steps are pinned actions and the
+  # repository's own builtins-only scripts.
+  sign:
+    needs: build
+    if: vars.SIGNING_MODE == 'required'
+    runs-on: windows-2025
+    environment: release-signing
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      hwsm: ${{ steps.signed.outputs.hwsm }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+
+      - name: Download the unsigned native build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-unsigned
+          path: unsigned
+
+      - name: hwsm.node is the build job's
+        env:
+          EXPECT_SHA: ${{ needs.build.outputs.unsignedsha }}
+        run: node scripts/authenticode-strip.mjs expect unsigned/hwsm.node
+
+      - name: Check the signing configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          ARTIFACT_SIGNING_EXPECTED_SUBJECT: ${{ vars.ARTIFACT_SIGNING_EXPECTED_SUBJECT }}
+        run: node scripts/signing-config-check.mjs
+
+      - name: Copy the unsigned binary for signing
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force signed | Out-Null
+          Copy-Item unsigned/hwsm.node -Destination signed
+
+      - name: Sign in to Azure with the workflow's OIDC token
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Artifact Signing certificates live 3 days, so the RFC 3161 timestamp
+      # is what keeps a signature valid; the verify step refuses a signature
+      # without one. Only the Azure CLI login above may authenticate, and
+      # the action's dependency cache stays off so nothing restored from a
+      # cache runs in this job.
+      - name: Sign and timestamp the native addon
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          # One line: the action turns newlines into commas, so a block
+          # scalar's trailing newline would hand the module an empty name.
+          files: ${{ github.workspace }}\signed\hwsm.node
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: HWiNFO Sensors for Stream Deck native addon
+          description-url: https://github.com/slawrensen/hwinfo-streamdeck
+          correlation-id: ${{ github.run_id }}
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          cache-dependencies: false
+
+      - name: Verify the signatures and that only a signature was added
+        env:
+          EXPECTED_SUBJECT: ${{ vars.ARTIFACT_SIGNING_EXPECTED_SUBJECT }}
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          SIGNING_ACTION: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 (v2.0.0)
+        run: node scripts/verify-signed-native.mjs --signed signed --unsigned unsigned --out signed/signature.json
+
+      - name: Record the signed hashes
+        id: signed
+        shell: pwsh
+        run: |
+          $hwsm = (Get-FileHash signed/hwsm.node -Algorithm SHA256).Hash.ToLower()
+          "hwsm=$hwsm" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "signed hwsm.node $hwsm"
+
+      - name: Transfer the signed binary and its verified facts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-signed
+          path: signed/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Runs when the build passed and either signing passed or signing is not
+  # required. With SIGNING_MODE "required", a skipped or failed sign job
+  # leaves this job, and so the release, unrun.
+  package:
+    needs: [build, sign]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.sign.result == 'success' || (needs.sign.result == 'skipped' && vars.SIGNING_MODE != 'required')) }}
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.hash.outputs.sha }}
+      size: ${{ steps.hash.outputs.size }}
+      nativesha: ${{ steps.hash.outputs.nativesha }}
+      unsignedsha: ${{ steps.hash.outputs.unsignedsha }}
+      signed: ${{ steps.hash.outputs.signed }}
+      signer: ${{ steps.hash.outputs.signer }}
+      timestamp: ${{ steps.hash.outputs.timestamp }}
+      carried: ${{ steps.hash.outputs.carried }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download the unsigned native build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-unsigned
+          path: native-unsigned
+
+      - name: Download the signed binary
+        if: needs.sign.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-signed
+          path: native-signed
+
+      # The vendor step refuses any file whose hash is not the one the
+      # producing job reported, and plugin.js must come out byte-identical
+      # to the build job's bundle.
+      - name: Build the plugin around the exact native bytes
+        env:
+          HWSM_VENDOR: ${{ github.workspace }}/${{ needs.sign.result == 'success' && 'native-signed' || 'native-unsigned' }}/hwsm.node
+          HWSM_VENDOR_SHA256: ${{ needs.sign.result == 'success' && needs.sign.outputs.hwsm || needs.build.outputs.unsignedsha }}
+        run: npm run build
+
+      - name: plugin.js is the build job's bundle
+        shell: pwsh
+        env:
+          EXPECTED: ${{ needs.build.outputs.pluginsha }}
+        run: |
+          $got = (Get-FileHash com.lawrensen.hwinfo.sdPlugin/bin/plugin.js -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $env:EXPECTED) {
+            Write-Output "::error title=plugin.js differs from the build job's::rebuilt $got, built $($env:EXPECTED)"
+            exit 1
+          }
+          Write-Output "plugin.js $got matches the build job's bundle"
+
+      - name: Native manifest of the shipped bytes (unsigned)
+        if: needs.sign.result != 'success'
+        run: node scripts/native-manifest.mjs --build-manifest native-unsigned/release-native-manifest.json --unsigned native-unsigned --carry-forward native-unsigned/carry-forward.json
+      - name: Native manifest of the shipped bytes (signed)
+        if: needs.sign.result == 'success'
+        run: node scripts/native-manifest.mjs --build-manifest native-unsigned/release-native-manifest.json --unsigned native-unsigned --carry-forward native-unsigned/carry-forward.json --signature native-signed/signature.json
+
+      - name: Native packaging gate
+        env:
+          HWSM_REQUIRE_SIGNED: ${{ needs.sign.result == 'success' && '1' || '' }}
+        run: node scripts/validate-native.mjs
+
+      # Record that bin/ holds the bytes the earlier jobs produced (the
+      # native-identity stage, against the files they handed on and the
+      # final manifest), pack through the staged copy (held to the
+      # manifest's native hashes), validate the archive, extract it and
+      # hold every member to the staging copy, run the ABI check and
+      # producer recovery on the EXTRACTED bytes, and the native gate on
+      # that staging copy.
+      - name: Pack and qualify the extracted package
+        timeout-minutes: 8
+        shell: pwsh
+        env:
+          HWSM_REQUIRE_SIGNED: ${{ needs.sign.result == 'success' && '1' || '' }}
+          NATIVE_DIR: ${{ needs.sign.result == 'success' && 'native-signed' || 'native-unsigned' }}
+        run: node scripts/qualify.mjs --stages native-identity,bundle,pack,archive,abi,recovery,native-gate,cli-validate,tree --out qualification-release --native $env:NATIVE_DIR --native-manifest release-native-manifest.json
 
       - name: Compute SHA-256
         id: hash
@@ -173,10 +501,26 @@ jobs:
           $sha = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
           $size = (Get-Item $f).Length
           $native = Get-Content release-native-manifest.json -Raw | ConvertFrom-Json
-          "sha=$sha"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $hwsm = $native.binaries | Where-Object { $_.file -eq "hwsm.node" } | Select-Object -First 1
+          foreach ($value in @($hwsm.sha256, $hwsm.unsignedSha256)) {
+            if (-not ($value -match '^[0-9a-f]{64}$')) { Write-Error "release-native-manifest.json does not record hwsm.node and its unsigned build"; exit 1 }
+          }
+          $signed = $null -ne $hwsm.signature
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "size=$size" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          "nativesha=$($native.sha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Output "pack SHA-256 $sha ($size bytes); hwsm.node SHA-256 $($native.sha256)"
+          "nativesha=$($hwsm.sha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "unsignedsha=$($hwsm.unsignedSha256)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "signed=$(if ($signed) { 'true' } else { 'false' })" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          if ($signed) {
+            "signer=$($hwsm.signature.signer.subject -replace '[\r\n]', ' ')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            "timestamp=$($hwsm.signature.timestamp -replace '[\r\n]', ' ')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+          # One sentence per binary carried forward from an earlier release.
+          $carried = @($native.binaries | Where-Object { $_.reproducibility.carriedFrom } | ForEach-Object {
+            '{0} is the same file {1} shipped: its native source has not changed, so I kept that build instead of shipping a new one, and this run''s rebuild is recorded in `release-native-manifest.json`.' -f $_.file, $_.reproducibility.carriedFrom.firstShippedIn
+          }) -join " "
+          "carried=$($carried -replace '[\r\n]', ' ')" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "pack SHA-256 $sha ($size bytes); hwsm.node $($hwsm.sha256); signed: $signed"
 
       - name: Transfer only the validated release files
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -185,14 +529,30 @@ jobs:
           path: |
             release/com.lawrensen.hwinfo.streamDeckPlugin
             release-native-manifest.json
-            native/hwsm/build/Release/hwsm.pdb
+            native-unsigned/hwsm.pdb
           if-no-files-found: error
           retention-days: 7
 
+      - name: Retain the release qualification record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-qualification
+          path: qualification-release/
+          if-no-files-found: warn
+          retention-days: 30
+
   # Dependency installs, repository scripts and native builds never receive
   # the release token. This job downloads data and invokes pinned actions.
+  #
+  # The explicit condition is load-bearing: without one, a job gets the
+  # implicit success(), which looks at every job upstream, not only the
+  # ones it names. With signing off the sign job is skipped, so the
+  # implicit check would skip this job too, after package passed, and the
+  # run would end green with no draft.
   stage:
-    needs: build
+    needs: [build, package]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.package.result == 'success' }}
     runs-on: windows-2025
     permissions:
       contents: write
@@ -215,15 +575,17 @@ jobs:
           files: |
             candidate/release/com.lawrensen.hwinfo.streamDeckPlugin
             candidate/release-native-manifest.json
-            candidate/native/hwsm/build/Release/hwsm.pdb
+            candidate/native-unsigned/hwsm.pdb
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
             Built automatically for version `${{ needs.build.outputs.ver }}` and staged for maintainer verification.
 
-            **Pack SHA-256:** `${{ needs.build.outputs.sha }}` (${{ needs.build.outputs.size }} bytes)
-            **Native hwsm.node SHA-256:** `${{ needs.build.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
+            **Pack SHA-256:** `${{ needs.package.outputs.sha }}` (${{ needs.package.outputs.size }} bytes)
+            **Native hwsm.node SHA-256:** `${{ needs.package.outputs.nativesha }}` (full build facts in `release-native-manifest.json`)
 
-            The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell). Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.sha }}/SECURITY.md).
+            ${{ needs.package.outputs.carried }}
+
+            ${{ needs.package.outputs.signed == 'true' && format('The native addon is Authenticode-signed by {0} through Azure Artifact Signing, timestamped {1}. The signed file minus its signature is the unsigned build this run reproduced (hwsm.node `{2}`). Check a signature with `Get-AuthenticodeSignature <file>` and a hash with `Get-FileHash <file> -Algorithm SHA256` (PowerShell).', needs.package.outputs.signer, needs.package.outputs.timestamp, needs.package.outputs.unsignedsha) || 'The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell).' }} Details in [SECURITY.md](https://github.com/slawrensen/hwinfo-streamdeck/blob/${{ github.sha }}/SECURITY.md).
 
             Install: download the `.streamDeckPlugin` below and double-click it, or install from the Elgato Marketplace once approved. See the [documentation](https://docs.slawrensen.com/hwinfo-streamdeck/) for setup and troubleshooting.

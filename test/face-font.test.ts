@@ -331,6 +331,98 @@ describe("Tahoma, the default face", () => {
 	});
 });
 
+describe("a reading renamed in Japanese or Cyrillic", () => {
+	// HWiNFO lets a person rename a reading in any script, and the plugin
+	// decodes HWiNFO's UTF-8 names. Neither face font's width table has a CJK
+	// glyph, so a CJK glyph is priced at a full em, the advance a CJK font
+	// draws it at; Cyrillic is in both tables. A name keeps its own letters
+	// (whole, or cut with an ellipsis), and its line stays on the key: inside
+	// the lens on a one-reading key, and short of its row's value mask on a
+	// three-reading key.
+	const NAMES = ["CPU温度", "水冷ポンプ回転数", "グラフィックスカード温度", "ЦП", "Температура ЦП", "Вентилятор процессора"];
+	const CJK = /[぀-ヿ一-鿿]/u;
+	type Drawn = { x: number; y: number; size: number; weight: 600 | 700; anchor: string; text: string; unit: string };
+	/** Every text line of a face, with its unit tspan split off. */
+	const lines = (svg: string): Drawn[] =>
+		[...svg.matchAll(/<text( [^>]*)>(.*?)<\/text>/g)].map((m) => {
+			const attrs = m[1] as string;
+			const unit = /<tspan[^>]*>([^<]*)<\/tspan>/.exec(m[2] as string)?.[1] ?? "";
+			return { x: Number(attr(attrs, "x")), y: Number(attr(attrs, "y")), size: Number(attr(attrs, "font-size")), weight: attr(attrs, "font-weight") === "700" ? 700 : 600, anchor: attr(attrs, "text-anchor"), text: (m[2] as string).replace(/<tspan.*$/, ""), unit };
+		});
+	/** The drawn line is the name, or a prefix of it with an ellipsis: the
+	 * name's own letters, never a replacement glyph or an empty line. */
+	const keepsName = (drawn: string, name: string): void => {
+		const kept = drawn.endsWith("…") ? drawn.slice(0, -1) : drawn;
+		assert.ok(kept !== "" && name.startsWith(kept), `"${drawn}" is not "${name}" or its prefix`);
+		assert.ok(drawn === name || drawn.endsWith("…"), `"${drawn}" is cut without an ellipsis`);
+		assert.doesNotMatch(drawn, /[�?]/u, `"${drawn}" carries a replacement character`);
+	};
+
+	for (const font of ["tahoma", "segoe-ui"] as const) {
+		it(`${font}: every CJK glyph adds a full em, so the fit is not an underestimate`, () => {
+			// The line's one end-bearing credit aside (Segoe UI), each CJK glyph
+			// costs the full em a CJK font advances it by.
+			setFaceFont(font);
+			for (const ch of "温度水冷ポンプ回転数グラフィックス") {
+				for (const size of [12, 14, 16, 20]) {
+					const added = estimateKeyTextWidth(`${ch}${ch}`, size, { fontWeight: 600 }) - estimateKeyTextWidth(ch, size, { fontWeight: 600 });
+					assert.ok(added >= size - 1e-9, `${ch} at ${size} adds ${added.toFixed(2)} px`);
+				}
+			}
+			setFaceFont("tahoma");
+		});
+
+		it(`${font}: a one-reading key draws the name inside the lens`, () => {
+			setFaceFont(font);
+			for (const name of NAMES) {
+				const svg = single(name);
+				assert.ok(svg.includes(`>${[...name][0]}`), `${name}: the first letter is drawn`);
+				const label = lines(svg).find((line) => line.y === 32);
+				assert.ok(label !== undefined, `${name}: no label line`);
+				keepsName(label.text, name);
+				assert.equal(label.anchor, "middle");
+				assert.equal(label.x, 72);
+				// The lens shows ink columns 10 to 133; a CJK glyph inks its whole em.
+				assert.ok(inKeyLens([{ text: label.text, fontSize: label.size, fontWeight: label.weight }]), `${name}: "${label.text}" at ${label.size} px leaves the lens`);
+				if (CJK.test(label.text)) {
+					const width = estimateKeyTextWidth(label.text, label.size, { fontWeight: label.weight });
+					assert.ok(72 - width / 2 >= 10 && 72 + width / 2 <= 133, `${name}: "${label.text}" is ${width.toFixed(1)} px wide`);
+				}
+			}
+			setFaceFont("tahoma");
+		});
+
+		it(`${font}: a three-reading key draws each name short of its value, inside the key`, () => {
+			setFaceFont(font);
+			for (const name of NAMES) {
+				const rows: TripleKeyRow[] = [
+					{ label: name, valueText: "56.3", unitText: "°C" },
+					{ label: name, valueText: "61.0", unitText: "°C" },
+					{ label: name, valueText: "1450", unitText: "RPM" }
+				];
+				const svg = renderTripleKey({ rows, palette: VOID });
+				const drawn = lines(svg);
+				const masks = [...svg.matchAll(/<rect x="([\d.]+)" y="(\d+)" width="[\d.]+" height="(\d+)" fill="#000000"\/>/g)].map((m) => ({ x: Number(m[1]), top: Number(m[2]), bottom: Number(m[2]) + Number(m[3]) }));
+				const labels = drawn.filter((line) => line.anchor === "start");
+				assert.equal(labels.length, 3, `${name}: three label lines`);
+				for (const label of labels) {
+					keepsName(label.text, name);
+					const value = drawn.find((line) => line.anchor === "end" && line.y === label.y);
+					const mask = masks.find((m) => m.top <= label.y && label.y <= m.bottom && m.x > 0);
+					assert.ok(value !== undefined && mask !== undefined, `${name}: row at y=${label.y} has its value and mask`);
+					const right = label.x + estimateKeyTextWidth(label.text, label.size, { fontWeight: label.weight });
+					assert.ok(label.x >= 10, `${name}: the label starts inside the lens`);
+					assert.ok(right <= mask.x, `${name}: "${label.text}" at ${label.size} px ends at ${right.toFixed(1)}, under the value mask at ${mask.x}`);
+					const chunk = estimateKeyTextWidth(value.text, value.size, { fontWeight: 700 }) + estimateKeyTextWidth(value.unit, 14);
+					assert.ok(right <= value.x - chunk, `${name}: "${label.text}" runs into ${value.text}${value.unit}`);
+					assert.ok(value.x <= 133, `${name}: the value ends inside the lens`);
+				}
+			}
+			setFaceFont("tahoma");
+		});
+	}
+});
+
 describe("Segoe UI, the option", () => {
 	it("names Segoe UI alone", () => {
 		setFaceFont("segoe-ui");

@@ -120,6 +120,30 @@ export function sampleSnapshot() {
 	return { pollTime: 1_000_000, version: 1, revision: 1, sensors, readings, byKey: new Map(readings.map((r) => [r.key, r])) };
 }
 
+/** The sample tree plus two folders for the strip's Group style: a CPU with
+ * 48 core clocks and 8 core temperatures (one folder, two units), and 16
+ * core temperatures on their own. `extraTemps` adds readings to that last
+ * folder; `rename` gives readings there another label (by index).
+ * `threads` cores of two threads add the main CPU sensor's per-thread
+ * usages ("Core 0 T0 Usage" ...) beside its "Max CPU/Thread Usage", before
+ * the two folders (so the last folder stays the temperatures). */
+export function groupSnapshot({ extraTemps = 0, rename = {}, threads = 0 } = {}) {
+	const base = sampleSnapshot();
+	const sensors = [...base.sensors];
+	const readings = [...base.readings];
+	const add = (name, id, rows) => {
+		const index = sensors.length;
+		sensors.push({ index, id, instance: 0, name });
+		rows.forEach(([label, unit, value, type], i) => {
+			readings.push({ key: `${hex(id)}:0:${(0x1000000 + i).toString(16)}`, type, sensorIndex: index, id: 0x1000000 + i, label, unit, value, valueMin: value - 3, valueMax: value + 3, valueAvg: value });
+		});
+	};
+	if (threads > 0) add("CPU [#0]: Example 16-Core Processor", 0xf0000200, [["Max CPU/Thread Usage", "%", 71, T.usage], ...Array.from({ length: threads * 2 }, (_, i) => [`Core ${i >> 1} T${i & 1} Usage`, "%", (i * 23) % 90, T.usage])]);
+	add("CPU [#1]: Example 24-Core Processor", 0xf0000400, [...Array.from({ length: 48 }, (_, i) => [`Core ${i} Clock`, "MHz", 4800 + ((i * 37) % 300), T.clock]), ...Array.from({ length: 8 }, (_, i) => [`Core ${i} Temperature`, "°C", 55 + i, T.temp])]);
+	add("Example Core Temperatures", 0xf0000500, Array.from({ length: 16 + extraTemps }, (_, i) => [rename[i] ?? `Core ${i} Temp`, "°C", 50 + ((i * 7) % 30), T.temp]));
+	return { ...base, sensors, readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+}
+
 /** A synthetic tree of `count` readings for the scale runs: long and
  * non-ASCII labels, duplicate labels across sources, 25 readings per source. */
 export function scaledSnapshot(count) {
@@ -171,9 +195,17 @@ export function scenarios() {
 	const drive1 = keyOf(snap, 4, "Drive Temperature");
 	const offset = keyOf(snap, 2, "Vcore Offset");
 	const throttle = keyOf(snap, 0, "Thermal Throttling (HTC)");
+	const memUsed = keyOf(snap, 6, "Physical Memory Used");
+	const memCommitted = keyOf(snap, 6, "Virtual Memory Committed");
+	const gpuMem = keyOf(snap, 1, "GPU Memory Allocated");
+	const readRate = keyOf(snap, 3, "Read Rate");
 	const globals = { theme: "void", typeAccents: "on" };
+	// Per-reading formats (issue #59): junk under a prototype name must stay
+	// an own entry, which only a JSON parse (or defineProperty) gives.
+	const junkFormats = JSON.parse(`{"__proto__": {"unit": "GB"}, "constructor": "junk"}`);
+	Object.defineProperty(junkFormats, memUsed, { value: { unit: "gb", decimals: 2 }, enumerable: true, writable: true, configurable: true });
 	return {
-		keys: { cpu, cpuPower, ccd1, ccd2, gpu, hot, gpuPower, gpuFan2, drive0, drive1, offset, throttle },
+		keys: { cpu, cpuPower, ccd1, ccd2, gpu, hot, gpuPower, gpuFan2, drive0, drive1, offset, throttle, memUsed, memCommitted, gpuMem, readRate },
 		list: {
 			// --- Sensor Reading key ---
 			"key-empty": { page: "sensor-reading.html", data: "ok", settings: {}, globals: {} },
@@ -198,6 +230,22 @@ export function scenarios() {
 				settings: { readingKey: cpu, pressBehavior: "tap-cycle-hold-details", detailMode: "custom", detailKeys: [gpu, hot, gpuPower, drive0, drive1], detailTiles: [{ size: 2, labels: ["", ""], colors: [null, null], cellLabels: true, futureTile: { x: 1 } }], detailTitle: "Gaming", futureBlob: FUTURE_BLOB },
 				globals
 			},
+			"key-formats": {
+				page: "sensor-reading.html",
+				data: "ok",
+				settings: {
+					readingKey: memUsed,
+					secondaryReadingKey: gpuMem,
+					quadReadingKey3: gpu,
+					quadReadingKey4: memCommitted,
+					keyLayout: "quad",
+					readingFormats: { [memUsed]: { unit: "GB", decimals: "2" }, [gpuMem]: { unit: "GB", decimals: "2", future: { keep: true } }, "f0099999:0:1000000": { unit: "PB", note: "dormant" } },
+					futureBlob: FUTURE_BLOB
+				},
+				globals
+			},
+			"key-formats-junk": { page: "sensor-reading.html", data: "ok", settings: { readingKey: memUsed, keyLayout: "dual", secondaryReadingKey: readRate, readingFormats: junkFormats, futureBlob: FUTURE_BLOB }, globals },
+			"key-formats-shape": { page: "sensor-reading.html", data: "ok", settings: { readingKey: memUsed, readingFormats: [{ unit: "GB" }], futureBlob: FUTURE_BLOB }, globals },
 			"key-zero-negative": { page: "sensor-reading.html", data: "ok", settings: { readingKey: offset, secondaryReadingKey: gpuFan2, keyLayout: "dual", futureBlob: FUTURE_BLOB }, globals },
 			// --- Sensor Dial ---
 			"dial-empty": { page: "sensor-dial.html", data: "ok", settings: {}, globals: {} },
@@ -220,9 +268,52 @@ export function scenarios() {
 				globals
 			},
 			"dial-alert": { page: "sensor-dial.html", data: "ok", settings: { readingKey: hot, rotationKeys: [gpu, hot], dialView: "overview", warnValue: "60", critValue: "70", alertUnit: "°C", futureBlob: FUTURE_BLOB }, globals },
+			"dial-formats": {
+				page: "sensor-dial.html",
+				data: "ok",
+				settings: { readingKey: gpuMem, dialView: "overview", rotationKeys: [memUsed, gpuMem, gpu, readRate], readingFormats: { [gpuMem]: { unit: "GB", decimals: "2" } }, futureBlob: FUTURE_BLOB },
+				globals
+			},
+			"dial-formats-twins": { page: "sensor-dial.html", data: "ok", settings: { readingKey: drive0, rotationKeys: [drive0, drive1, memUsed], readingFormats: { [drive1]: { decimals: "2" } }, futureBlob: FUTURE_BLOB }, globals },
 			"dial-custom-gestures": { page: "sensor-dial.html", data: "ok", settings: { readingKey: cpu, controlPreset: "custom", touchZones: "two", gestureTap: "pin", linkId: "cpu-dial", futureBlob: FUTURE_BLOB }, globals },
 			"dial-unavailable": { page: "sensor-dial.html", data: "unavailable", settings: { readingKey: gpu, futureBlob: FUTURE_BLOB }, globals },
 			"dial-missing": { page: "sensor-dial.html", data: "ok", settings: { readingKey: "f0099999:0:1000000", rotationKeys: ["f0099999:0:1000000", gpu], futureBlob: FUTURE_BLOB }, globals },
+			// --- Sensor Dial in a strip (pi-strip-sim.mjs runs the plugin's
+			// strip runtime over a simulated deck; `strip.dials` are the other
+			// Sensor Dials by encoder column, a column left out is empty) ---
+			"dial-strip-plus": {
+				page: "sensor-dial.html",
+				data: "ok",
+				settings: { readingKey: gpu, dialBackground: "glass", rotationKeys: [gpu, hot], futureBlob: FUTURE_BLOB },
+				globals,
+				strip: { type: 7, column: 1, dials: [[0, { readingKey: cpu }], [2, { readingKey: hot }], [3, { readingKey: gpuPower }]] }
+			},
+			"dial-strip-member": {
+				page: "sensor-dial.html",
+				data: "ok",
+				settings: { readingKey: gpu, label: "My GPU", warnValue: "80", futureBlob: FUTURE_BLOB },
+				globals,
+				strip: {
+					type: 7,
+					column: 1,
+					dials: [[0, { readingKey: cpu }], [2, { readingKey: hot }], [3, { readingKey: gpuPower }]],
+					create: { layout: "split", from: 1, patch: [{ op: "set", path: "panes.1.style", value: "lanes" }, { op: "set", path: "panes.1.series", value: [{ key: cpu }, { key: cpuPower }] }] }
+				}
+			},
+			"dial-strip-missing": {
+				page: "sensor-dial.html",
+				data: "ok",
+				settings: { readingKey: cpu, futureBlob: FUTURE_BLOB },
+				globals,
+				strip: { type: 7, column: 0, dials: [[1, { readingKey: gpu }], [2, { readingKey: hot }]] }
+			},
+			"dial-strip-xl": {
+				page: "sensor-dial.html",
+				data: "ok",
+				settings: { readingKey: hot, futureBlob: FUTURE_BLOB },
+				globals,
+				strip: { type: 13, column: 2, dials: [[0, { readingKey: cpu }], [1, { readingKey: gpu }], [3, { readingKey: gpuPower }], [4, { readingKey: drive0 }], [5, { readingKey: cpuPower }]] }
+			},
 			// --- HWiNFO Control ---
 			"control-default": { page: "control.html", data: "ok", settings: {}, globals },
 			"control-reset": { page: "control.html", data: "ok", settings: { command: "resetStats", target: "cpu-dial", resetScope: "all", futureBlob: FUTURE_BLOB }, globals },

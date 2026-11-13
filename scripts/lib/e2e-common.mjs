@@ -7,6 +7,7 @@
  * fault-injection family) and the frames array expectFrame scans.
  */
 import { execSync } from "node:child_process";
+import path from "node:path";
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -69,6 +70,15 @@ export function buildInfo({ devices, plugin = { uuid: "com.lawrensen.hwinfo", ve
 		devices,
 		plugin
 	};
+}
+
+/**
+ * The plugin directory a harness drives: HWINFO_E2E_PLUGIN_DIR when set
+ * (an extracted release pack or another checkout's .sdPlugin, so an older
+ * build runs through the same harness), otherwise the checkout's own.
+ */
+export function resolvePluginDir(repoRoot, env = process.env) {
+	return env.HWINFO_E2E_PLUGIN_DIR ? path.resolve(env.HWINFO_E2E_PLUGIN_DIR) : path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
 }
 
 /** The argv every script hands the plugin process. */

@@ -221,18 +221,6 @@ try {
 		if (!look) return "missing";
 		return { y: 0, h: Math.ceil(look.getBoundingClientRect().bottom + window.scrollY + 2) };
 	})()`));
-	// The same band folded: its row keeps the checked chip in its own
-	// colors and where it comes from, and Reading follows directly. A
-	// script toggle, so nothing is remembered. Feeds
-	// docs/assets/img/pi-theme-folded.png.
-	await captureClipped("pi-theme-folded.png", await evaluate(`(() => {
-		const band = document.getElementById("sec-theme");
-		const reading = document.querySelector("#sec-reading > summary");
-		if (!band || !reading) return "missing";
-		band.open = false;
-		return { y: 0, h: Math.ceil(reading.getBoundingClientRect().bottom + window.scrollY + 2) };
-	})()`));
-	await evaluate(`document.getElementById("sec-theme").open = true`);
 	// A theme picked for this key: Make shared takes Change's place. The
 	// pick goes to the harness's own settings and is put back after. Feeds
 	// docs/assets/img/pi-theme-share.png.
@@ -450,15 +438,24 @@ try {
 	await setSelect("detailMode", "filter");
 	await sleep(900);
 	expectOk("filter editor revealed", await evaluate(`document.getElementById("detail-filter").hidden === false ? "ok" : "hidden"`));
-	// The Filter field is a plain labeled input bound to detailFilter.
-	await evaluate(`(() => { const input = document.getElementById("f-filter"); input.focus(); input.value = ${JSON.stringify(process.env.PI_CAPTURE_FILTER ?? "*4090*")}; input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+	// The Filter field is a plain labeled input bound to detailFilter. The
+	// default matches the GPU of whatever PC runs the capture (the bench has
+	// changed cards since `*4090*`, and HWiNFO 8.48 names a discrete card
+	// "dGPU [#0]", so the pattern is unanchored); PI_CAPTURE_FILTER names
+	// another.
+	await evaluate(`(() => { const input = document.getElementById("f-filter"); input.focus(); input.value = ${JSON.stringify(process.env.PI_CAPTURE_FILTER ?? "*GPU*")}; input.dispatchEvent(new Event("input", { bubbles: true })); input.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 	await sleep(1200); // the setting echo, the 400 ms follow poll, the count
-	expectOk("live match count shown", await evaluate(`(() => { const el = document.getElementById("detail-filter-count"); return el && !el.hidden && /Matches \\d+ readings right now/.test(el.textContent) ? "ok" : (el ? "text: " + el.textContent : "missing"); })()`));
+	expectOk("live match count shown", await evaluate(`(() => { const el = document.getElementById("detail-filter-count"); return el && !el.hidden && /Matches \\d+ readings? right now/.test(el.textContent) ? "ok" : (el ? "text: " + el.textContent : "missing"); })()`));
+	// From the "A press" row, not the block under it: the block's top less a
+	// margin sheared the bottom edge of that select into the shot (shot 4's
+	// third panel), and the row is what its caption names.
 	await captureClipped("pi-key-detail-filter.png", await evaluate(`(() => {
+		const sel = document.querySelector('[data-setting="pressBehavior"]');
 		const block = document.getElementById("detail-config");
-		if (!block) return "missing";
-		const r = block.getBoundingClientRect();
-		return { y: Math.max(0, Math.floor(r.top + window.scrollY - 10)), h: Math.ceil(r.height + 20) };
+		if (!sel || !block) return "missing";
+		const top = (sel.closest(".hw-field") ?? sel).getBoundingClientRect().top + window.scrollY;
+		const bottom = block.getBoundingClientRect().bottom + window.scrollY;
+		return { y: Math.max(0, Math.floor(top - 2)), h: Math.ceil(bottom - top + 14) };
 	})()`));
 
 	// Back to the plain panel so the later layout shots stay untouched.
@@ -551,13 +548,15 @@ try {
 		const sel = document.querySelector('[data-setting="keyLayout"]');
 		const block = document.getElementById("quad-rows");
 		if (!sel || !block) return "missing";
-		const item = sel.closest(".hw-field") ?? sel;
-		// Start at the "Layout" section heading: clipping from the item
-		// shears the heading in half (same lesson as the dial rename shot).
-		const heading = item.previousElementSibling?.classList.contains("hw-section") ? item.previousElementSibling : item;
-		const top = Math.min(heading.getBoundingClientRect().top, block.getBoundingClientRect().top) + window.scrollY;
+		// The select shares a row with "Label on the key", and that row starts
+		// where the Reading picker's search box ends: 10 px above the field
+		// sheared the box into the top of the shot (shot 4's middle panel).
+		// A few px above the labels stays inside the row.
+		const field = sel.closest(".hw-field") ?? sel;
+		const row = field.closest(".hw-row2") ?? field;
+		const top = Math.max(row.getBoundingClientRect().top, field.getBoundingClientRect().top - 6) + window.scrollY;
 		const bottom = block.getBoundingClientRect().bottom + window.scrollY;
-		return { y: Math.max(0, Math.floor(top - 10)), h: Math.ceil(bottom - top + 22) };
+		return { y: Math.max(0, Math.ceil(top)), h: Math.ceil(bottom - top + 12) };
 		})()`));
 	await viewport(880);
 
@@ -614,7 +613,10 @@ try {
 		expectOk(what, await evaluate(`(() => {
 			const chip = document.querySelectorAll("#rotation-set .hw-set-chip")[${index}];
 			if (!chip) return "missing chip";
+			// A press is a down and an up: the panel holds outside clicks
+			// while a pointer is down, so a lone down leaves the list open.
 			chip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+			chip.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
 			chip.click();
 			const rename = document.querySelector('#rotation-set .hw-set-tools button[data-tool="rename"]');
 			if (!rename) return "no Rename in the toolbar";

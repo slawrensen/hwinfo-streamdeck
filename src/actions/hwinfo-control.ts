@@ -11,6 +11,9 @@
  * variants are idempotent under repeats.
  * The destructive all-dials stats reset exists only as an explicit scope
  * choice in this action's settings, never as a default.
+ * The Strip commands (stripLive, stripInspect, ...) steer Strip Display
+ * groups instead, matched by the strip's own Link ID; every other command
+ * skips dials joined to a strip. The tick counts what was reached either way.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

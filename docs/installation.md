@@ -21,7 +21,7 @@ Devices without displays, including Pedal and Corsair G-Keys, can use **HWiNFO C
 
 ### GitHub release
 
-1. Download [com.lawrensen.hwinfo.streamDeckPlugin, version 1.7.1](https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin). [Release notes and hashes](https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1).
+1. Download [com.lawrensen.hwinfo.streamDeckPlugin, version 1.8.0](https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.8.0/com.lawrensen.hwinfo.streamDeckPlugin). [Release notes and hashes](https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.8.0).
 2. To verify the download, compare its SHA-256 with the **pack** hash in that release's notes:
 
    ```powershell
@@ -45,7 +45,7 @@ No administrator rights are required to install the plugin. If reading sensors l
 
 ## One-time HWiNFO setup
 
-Enable at least one source. **Auto** prefers Shared Memory when readable.
+Enable at least one source. **Auto** prefers Shared Memory when readable and can switch to Gadget on its own; a reading saved on one source needs an [explicit link](data-sources.md#link-readings-across-providers) to keep working on the other.
 
 ### Recommended: Shared Memory Support
 
@@ -55,7 +55,7 @@ Enable at least one source. **Auto** prefers Shared Memory when readable.
 
 Shared Memory supplies HWiNFO's published readings and min/max/average. **I recommend [buying HWiNFO Pro](https://www.hwinfo.com/licenses/) for continuous Shared Memory use without the 12-hour limit.**
 
-**Free HWiNFO disables Shared Memory after 12 hours.** Re-enable sharing or restart HWiNFO to resume. Auto can fall back to Gadget, but saved selections need [explicit provider links](data-sources.md#link-readings-across-providers) to identify the same reading on another source.
+**Free HWiNFO disables Shared Memory after 12 hours.** Re-enable sharing or restart HWiNFO to resume. Auto can fall back to Gadget, but saved selections need [explicit provider links](data-sources.md#link-readings-across-providers) to identify the same reading on another source. 1.7 added those links, and 1.8 lets you make them in the settings panel.
 
 ### Free path: Gadget reporting
 
@@ -63,7 +63,7 @@ Shared Memory supplies HWiNFO's published readings and min/max/average. **I reco
 2. Enable **Enable reporting to Gadget**.
 3. Tick **Report value in Gadget** for each reading you need, then click **OK**.
 
-Gadget has no 12-hour timer. It exposes only ticked readings and current values, with no HWiNFO min/max/average or producer timestamp. The plugin shows **Age unknown** until it observes a value change, and again after 15 seconds without another. Steady values can be live or left behind by a stopped HWiNFO.
+HWiNFO's [license page](https://www.hwinfo.com/licenses/) lists the free version's 12-hour limit for Shared Memory Support; I have not run Gadget reporting past 12 hours to check it myself. Gadget exposes only ticked readings and current values, with no HWiNFO min/max/average or producer timestamp. The plugin shows **Age unknown** until it observes a value change, and again after 15 seconds without another. Steady values can be live or left behind by a stopped HWiNFO.
 
 Tick only the readings you use. Duplicate source-name/reading-label pairs are withheld; untick or rename the unwanted duplicate in HWiNFO. Enabling reporting without ticking a reading may leave no registry data and show **Start HWiNFO / not detected**. A present but empty store shows **Tick sensors / in Gadget**. [Data sources](data-sources.md#enabling-gadget-reporting) explains these limits.
 

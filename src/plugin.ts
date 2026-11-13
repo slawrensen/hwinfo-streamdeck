@@ -5,23 +5,31 @@ import { DetailSlotAction } from "./actions/detail-slot";
 import { HwinfoControlAction } from "./actions/hwinfo-control";
 import { SensorDialAction } from "./actions/sensor-dial";
 import { SensorReadingAction } from "./actions/sensor-reading";
+import { keyAlerts } from "./alerts/key-alerts";
+import { alertStore } from "./alerts/store";
 import { DetailController } from "./detail/controller";
 import { DetailNavigator } from "./detail/navigation";
 import { deriveCapabilities, deviceCapabilities } from "./devices";
 import { registerDiagnostics } from "./diagnostics";
-import { readGlobalSettings } from "./global-settings";
+import { onGlobalSettingsWritten, readGlobalSettings } from "./global-settings";
 import { initHwsm } from "./hwinfo/hwsm-loader";
+import { setTranslator } from "./i18n";
 import { classifyProbeError, ParentLiveness, type ParentProbe, probeErrorCode } from "./parent-liveness";
 import { parsePollInterval, parseSourceMode, poller } from "./poller";
 import { hashId, traceEnabled } from "./recorder";
+import { setArtAlignment } from "./ui/deck-art";
 import { applyGlobalThemeSettings, decideLegacyDefault, onThemeChange } from "./ui/theme-store";
 
 /** Plugin-wide settings (written by the PI's "Advanced" and theme sections). */
 type GlobalSettings = {
 	pollIntervalMs?: string;
 	source?: string;
-	/** Explicit cross-provider reading pairs, editable through Config. */
+	/** Explicit cross-provider reading pairs: written by the plugin for the
+	 * panel's Reading links editor, or by hand through Config. */
 	readingLinks?: JsonValue;
+	/** Plugin-side calculated readings (src/hwinfo/calculated.ts): written by
+	 * the plugin for the panel's Calculated readings editor. */
+	calculatedReadings?: JsonValue;
 	/** Deck-wide default theme id from themes.json. */
 	theme?: string;
 	/** "on" (default) | "off" — color accents by sensor type. */
@@ -56,6 +64,14 @@ if (streamDeck.logger.level !== logLevel) {
 	streamDeck.logger.info(`Log level = ${logLevel} (HWINFO_LOG_LEVEL)`);
 }
 
+// Bench only: Stars and Nebula draw the deck alignment pattern instead of
+// their art, to check the published panel layout on a real deck. Read once
+// here; no panel reaches it.
+if (process.env.HWINFO_BG_ALIGNMENT === "1") {
+	setArtAlignment(true);
+	streamDeck.logger.info("Deck backgrounds draw the alignment pattern (HWINFO_BG_ALIGNMENT)");
+}
+
 // A monitoring widget should log-and-continue rather than die silently; every
 // per-tick failure mode is already handled in the poller, so anything landing
 // here is unexpected and worth a trace.
@@ -65,6 +81,12 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
 	streamDeck.logger.error("Unhandled rejection", reason);
 });
+
+// Faces and panel hints ask the SDK's language files first (en.json and any
+// <language>.json beside the manifest, read from the plugin folder); a
+// missing file, key or registration info keeps the compiled English text.
+// The SDK lookup is plugin-side file reading, so it works under the 6.9 floor.
+setTranslator((key) => streamDeck.i18n.translate(key));
 
 // Load the native bridge before anything can poll: on machines without an
 // hwsm build (e.g. Windows-on-ARM) this records the failure so the poller
@@ -81,7 +103,7 @@ initHwsm();
 // A parent PID is a hint, never proof: on the machine in issue #17 this probe
 // throws while the app runs normally, and the old catch-all exited 30 seconds
 // after every launch. The rules now live in parent-liveness.ts, and the app
-// itself gets the last word before anything exits (see confirmAppIsGone).
+// itself gets the last word before anything exits (see appAnswers).
 const parentPid = process.ppid;
 const PARENT_CHECK_MS = Number(process.env.HWINFO_PARENT_CHECK_MS ?? "") || 30_000;
 /** How long the app gets to answer before we accept that it is gone. Generous
@@ -164,15 +186,13 @@ const detailNavigator = new DetailNavigator({
 	onLeaving: (deviceId) => detailController.renderDevice(deviceId),
 	log: detailLog
 });
-const detailController = new DetailController(detailNavigator, { getStatus: () => poller.getStatus(), log: detailLog });
-poller.onTick((status) => {
-	// Isolated like the action listeners: a detail rendering bug must not
-	// starve the other subscribers on the shared tick event.
-	try {
-		detailController.onTick(status);
-	} catch (err) {
-		streamDeck.logger.error("DetailController tick failed", err);
-	}
+const detailController = new DetailController(detailNavigator, {
+	getStatus: () => poller.getStatus(),
+	log: detailLog,
+	// The Back tile stands for the key that opened the view: it shows that
+	// key's live alert, and repaints when it changes with time alone.
+	openerAlert: (openerContext, identity) => keyAlerts.shownFor(openerContext, identity),
+	alertEpoch: () => alertStore.epoch
 });
 onThemeChange(() => {
 	try {
@@ -183,9 +203,22 @@ onThemeChange(() => {
 });
 
 const sensorReadingAction = new SensorReadingAction(detailNavigator);
+// Registered after the key action's own tick listener (its constructor),
+// so every key's alerts are stepped before the detail view paints: a Back
+// tile then shows its opener's alert from the same tick, not one later.
+poller.onTick((status) => {
+	// Isolated like the action listeners: a detail rendering bug must not
+	// starve the other subscribers on the shared tick event.
+	try {
+		detailController.onTick(status);
+	} catch (err) {
+		streamDeck.logger.error("DetailController tick failed", err);
+	}
+});
 readingRepaint.fire = (): void => sensorReadingAction.repaint();
 streamDeck.actions.registerAction(sensorReadingAction);
-streamDeck.actions.registerAction(new SensorDialAction());
+const sensorDialAction = new SensorDialAction();
+streamDeck.actions.registerAction(sensorDialAction);
 streamDeck.actions.registerAction(new HwinfoControlAction());
 streamDeck.actions.registerAction(new DetailSlotAction(detailController));
 
@@ -203,12 +236,16 @@ const ingestDevice = (d: Pick<Device, "id" | "type" | "size">): void => {
 };
 streamDeck.devices.onDeviceDidConnect((ev) => {
 	ingestDevice(ev.device);
+	sensorDialAction.deviceConnected(ev.device.id);
 	streamDeck.logger.info(`Device connected: ${describeDevice(ev.device)}`);
 });
 streamDeck.devices.onDeviceDidDisconnect((ev) => {
 	// Only this device's drill-down session dies with it; another deck's
 	// detail view keeps its own state and page untouched.
 	detailNavigator.deviceDisconnected(ev.device.id);
+	// The strip members on that deck leave their groups with it; the rest
+	// keep drawing (a willDisappear may never come for a gone deck).
+	sensorDialAction.deviceDisconnected(ev.device.id);
 });
 // deviceDidChange (grid resizes on Mobile/Virtual decks) is a Stream Deck
 // 7.0 API and the SDK refuses to register it while the manifest floor is
@@ -222,8 +259,18 @@ try {
 } catch {
 	streamDeck.logger.debug("deviceDidChange unavailable below Stream Deck 7.0; using connect-time device info");
 }
+// Trend windows end every open history segment at a system wake. Guarded
+// like deviceDidChange: if the event cannot be registered, the poller's
+// tick-gap rule still closes the gap a sleep leaves.
+try {
+	streamDeck.system.onSystemDidWakeUp(() => poller.noteWake());
+} catch {
+	streamDeck.logger.debug("systemDidWakeUp unavailable; history gaps rely on the tick-gap rule");
+}
 
 registerDiagnostics("dataSource", () => poller.diagnostics());
+// Counts and bytes only: no reading key and no value.
+registerDiagnostics("history", () => poller.history.diagnostics());
 // Device ids are hashed here like the device table's own; the report must
 // never carry a raw device identifier.
 registerDiagnostics("detailNav", () => detailNavigator.diagnostics().map(({ deviceId, ...rest }) => ({ device: hashId(deviceId), ...rest })));
@@ -231,13 +278,18 @@ if (traceEnabled()) {
 	streamDeck.logger.info("Event trace recorder is ON (HWINFO_TRACE_EVENTS=1): redacted input traces in logs/");
 }
 
-// Every delivery is applied here, the startup read's reply included.
-streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
-	poller.setReadingLinks(ev.settings.readingLinks);
-	poller.setIntervalMs(parsePollInterval(ev.settings.pollIntervalMs));
-	poller.setSourceMode(parseSourceMode(ev.settings.source));
-	applyGlobalThemeSettings(ev.settings);
-});
+// Every delivery is applied here, the startup read's reply included, and
+// so is every document the plugin writes itself (the panel's link and
+// calculation editors): the app does not echo a plugin's own write.
+const applyGlobals = (settings: GlobalSettings): void => {
+	poller.setReadingLinks(settings.readingLinks);
+	poller.setCalculatedReadings(settings.calculatedReadings);
+	poller.setIntervalMs(parsePollInterval(settings.pollIntervalMs));
+	poller.setSourceMode(parseSourceMode(settings.source));
+	applyGlobalThemeSettings(settings);
+};
+streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => applyGlobals(ev.settings));
+onGlobalSettingsWritten((doc) => applyGlobals(doc as GlobalSettings));
 
 await streamDeck.connect();
 

@@ -1,0 +1,160 @@
+{
+	"window": {
+		"layout": "split",
+		"encoders": 6,
+		"window": "15m",
+		"sharedWindow": true,
+		"textDimSecondary": false,
+		"fahrenheit": false,
+		"decimals": "auto",
+		"panes": [
+			{
+				"style": "trend",
+				"series": [
+					{
+						"key": "f0:0:1"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {
+					"displayUnit": "°C",
+					"displayUnitFor": {
+						"min": "30",
+						"max": "90"
+					},
+					"min": 30,
+					"max": 90
+				},
+				"bands": [
+					{
+						"displayUnit": "°C",
+						"displayUnitFor": {
+							"warn": "80",
+							"crit": "90"
+						},
+						"key": "f0:0:1",
+						"warn": 80,
+						"crit": 90,
+						"below": false,
+						"unit": "°C"
+					}
+				]
+			},
+			{
+				"style": "group",
+				"series": [],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"group": {
+					"from": "filter",
+					"filter": "*core*",
+					"keys": [],
+					"view": "auto",
+					"limits": {
+						"displayUnit": "°C",
+						"displayUnitFor": {
+							"warn": "85",
+							"crit": "95"
+						},
+						"warn": 85,
+						"crit": 95,
+						"below": false,
+						"unit": "°C"
+					}
+				}
+			}
+		]
+	},
+	"numbers": {
+		"layout": "split",
+		"encoders": 6,
+		"window": "5m",
+		"sharedWindow": true,
+		"textDimSecondary": false,
+		"fahrenheit": false,
+		"decimals": "auto",
+		"panes": [
+			{
+				"style": "trend",
+				"series": [
+					{
+						"key": "f0:0:1"
+					}
+				],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {
+					"displayUnit": "°C",
+					"displayUnitFor": {
+						"min": "30",
+						"max": "90"
+					},
+					"min": 30,
+					"max": 91
+				},
+				"bands": [
+					{
+						"displayUnit": "°C",
+						"displayUnitFor": {
+							"warn": "80",
+							"crit": "90"
+						},
+						"key": "f0:0:1",
+						"warn": 80,
+						"crit": 90,
+						"below": false,
+						"unit": "°C"
+					}
+				]
+			},
+			{
+				"style": "group",
+				"series": [],
+				"overlays": {
+					"current": true,
+					"minmax": false,
+					"unit": true,
+					"legend": true,
+					"time": true
+				},
+				"scale": {},
+				"bands": [],
+				"group": {
+					"from": "filter",
+					"filter": "*core*",
+					"keys": [],
+					"view": "auto",
+					"limits": {
+						"displayUnit": "°C",
+						"displayUnitFor": {
+							"warn": "85",
+							"crit": "95"
+						},
+						"warn": 86,
+						"crit": 95,
+						"below": false,
+						"unit": "°C"
+					}
+				}
+			}
+		]
+	}
+}

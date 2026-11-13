@@ -2,14 +2,15 @@
 	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
 	"UUID": "com.lawrensen.hwinfo",
 	"Name": "HWiNFO Sensors",
-	"Version": "1.7.1.0",
+	"Version": "1.8.0.0",
 	"Author": "Stephen Lawrensen",
-	"Description": "Live HWiNFO sensor readings on your Stream Deck: temperatures, clocks, fan speeds, voltages, power and usage, rendered with seven display themes, sensor-type accents, warn/critical alert colors, sparklines, bar and ring gauges with threshold zones, and stat modes, plus dial and touchscreen support on the Stream Deck + and Stream Deck + XL. A key can stack two readings, list three as compact rows, or show four in a quad grid with per-cell colors, and a dial's touchscreen can list the rotation set as an overview: three compact rows, or two rows with big values and trend sparklines, and a dial can let the touch strip picture show behind it. A key press can also open a detail view: a bundled one-page profile listing every reading of that sensor's HWiNFO source, a custom list you order by hand, or everything matching a glob filter, with the key you pressed staying live as the way back; in a custom list each tile can carry one to four readings, with labels and colors that travel with the reading as you regroup. Text color sets the number and label color per key, per dial or deck-wide, a dial can give each reading its own number color, and data units render decimal (MB, Mbps) or binary (MiB, MiB/s). Requires HWiNFO with Shared Memory Support or Gadget reporting enabled; auto mode picks the best available source and recovers on its own when HWiNFO restarts.",
+	"Description": "Live HWiNFO sensor readings on your Stream Deck: temperatures, clocks, fan speeds, voltages, power and usage, with seven display themes, sensor-type accents, warn and critical alert colors, sparklines that can span the last 1, 5 or 15 minutes, and bar and ring gauges. A key can show one reading or stack two, three or four, and each reading can carry its own alert limits with an optional wait, recovery margin and snooze. On the Stream Deck + and + XL, a dial shows one reading or a rotation overview over the theme or the touch strip picture, and the dials can join into one graph across the touch strip or two side by side. A key press can open a detail page of related readings. Calculated readings combine 2 to 8 readings, and reading links made in the settings panel keep a saved reading working on both sources. Requires HWiNFO with Shared Memory Support or Gadget reporting enabled; Auto can switch to Gadget, and saved readings need explicit source links. Not affiliated with or endorsed by REALiX, s.r.o. (HWiNFO) or Elgato.",
 	"Category": "HWiNFO Sensors",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
 	"Icon": "imgs/plugin/marketplace",
 	"URL": "https://docs.slawrensen.com/hwinfo-streamdeck/",
+	"SupportURL": "https://docs.slawrensen.com/hwinfo-streamdeck/troubleshooting.html",
 	"SDKVersion": 3,
 	"Software": {
 		"MinimumVersion": "6.9"
@@ -30,6 +31,7 @@
 			"Icon": "imgs/actions/reading/icon",
 			"Tooltip": "Display up to four live HWiNFO sensor readings on a key: single, stacked, three rows or a quad grid, with alert thresholds on every layout and a sparkline, bar or ring on the single layout.",
 			"PropertyInspectorPath": "ui/sensor-reading.html",
+			"SupportURL": "https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html",
 			"Controllers": [
 				"Keypad"
 			],
@@ -45,8 +47,9 @@
 			"Name": "HWiNFO Control",
 			"UUID": "com.lawrensen.hwinfo.control",
 			"Icon": "imgs/actions/control/icon",
-			"Tooltip": "Control Sensor Dials from any key, pedal or Multi Action: switch readings, pause the auto cycle, pin, reset session stats.",
+			"Tooltip": "Control Sensor Dials and strips from any key, pedal or Multi Action: switch readings or strip screens, pause the auto cycle, pin, reset session stats.",
 			"PropertyInspectorPath": "ui/control.html",
+			"SupportURL": "https://docs.slawrensen.com/hwinfo-streamdeck/controls.html#the-hwinfo-control-key-action",
 			"Controllers": [
 				"Keypad"
 			],
@@ -63,6 +66,7 @@
 			"Icon": "imgs/actions/reading/icon",
 			"Tooltip": "Internal tile of the plugin-managed sensor detail view. Not placeable by hand: it appears only inside the bundled detail profiles.",
 			"PropertyInspectorPath": "ui/detail-slot.html",
+			"SupportURL": "https://docs.slawrensen.com/hwinfo-streamdeck/sensor-details.html",
 			"VisibleInActionsList": false,
 			"UserTitleEnabled": false,
 			"SupportedInMultiActions": false,
@@ -80,8 +84,9 @@
 			"Name": "Sensor Dial",
 			"UUID": "com.lawrensen.hwinfo.dial",
 			"Icon": "imgs/actions/dial/icon",
-			"Tooltip": "Show a HWiNFO sensor on the touchscreen, as one readout or a three-row overview. Rotate to switch readings, press to reset session min/max.",
+			"Tooltip": "Show HWiNFO readings on the touchscreen as one reading or a two- or three-row overview, or join the other dials in one graph across the touch strip.",
 			"PropertyInspectorPath": "ui/sensor-dial.html",
+			"SupportURL": "https://docs.slawrensen.com/hwinfo-streamdeck/sensor-dial.html",
 			"Controllers": [
 				"Encoder"
 			],

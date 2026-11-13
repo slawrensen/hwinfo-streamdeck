@@ -1,0 +1,127 @@
+{
+	"ambient": {
+		"style": "trend",
+		"storedStyle": "ambient",
+		"words": [
+			"Choose readings in the dial settings",
+			"LIVE",
+			"15 min"
+		],
+		"rewritten": {
+			"layout": "whole",
+			"encoders": 6,
+			"window": "1m",
+			"sharedWindow": true,
+			"textDimSecondary": false,
+			"background": "theme",
+			"accentWords": false,
+			"fahrenheit": false,
+			"decimals": "auto",
+			"panes": [
+				{
+					"ambient": {
+						"look": "silk"
+					},
+					"style": "ambient",
+					"series": [],
+					"overlays": {
+						"current": true,
+						"minmax": false,
+						"unit": true,
+						"legend": true,
+						"time": true
+					},
+					"scale": {},
+					"bands": [],
+					"group": {
+						"unit": "°C",
+						"from": "folder",
+						"keys": [],
+						"view": "auto"
+					}
+				},
+				{
+					"style": "trend",
+					"series": [],
+					"overlays": {
+						"current": true,
+						"minmax": false,
+						"unit": true,
+						"legend": true,
+						"time": true
+					},
+					"scale": {},
+					"bands": []
+				}
+			]
+		}
+	},
+	"fleet": {
+		"style": "trend",
+		"storedStyle": "fleet",
+		"words": [
+			"Choose readings in the dial settings",
+			"LIVE",
+			"5 min"
+		],
+		"rewritten": {
+			"layout": "split",
+			"encoders": 6,
+			"window": "1m",
+			"sharedWindow": true,
+			"textDimSecondary": false,
+			"background": "theme",
+			"accentWords": false,
+			"fahrenheit": false,
+			"decimals": "auto",
+			"panes": [
+				{
+					"style": "fleet",
+					"series": [
+						{
+							"key": "f0:0:1"
+						}
+					],
+					"overlays": {
+						"current": true,
+						"minmax": false,
+						"unit": true,
+						"legend": true,
+						"time": true
+					},
+					"scale": {},
+					"bands": [],
+					"group": {
+						"from": "filter",
+						"filter": "*core*",
+						"keys": [],
+						"view": "auto",
+						"limits": {
+							"warn": 85,
+							"crit": 95,
+							"below": false,
+							"unit": "°C"
+						}
+					}
+				},
+				{
+					"style": "trend",
+					"series": [
+						{
+							"key": "f0:0:2"
+						}
+					],
+					"overlays": {
+						"current": true,
+						"minmax": false,
+						"unit": true,
+						"legend": true,
+						"time": true
+					},
+					"scale": {},
+					"bands": []
+				}
+			]
+		}
+	}
+}

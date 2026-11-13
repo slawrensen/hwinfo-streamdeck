@@ -1,0 +1,27 @@
+{
+	"name": "snooze only where Custom maps it: an unknown stored command falls back to the gesture's Legacy command, and Elite and Legacy ignore a stored snooze",
+	"contexts": {
+		"ctxFuture": { "settings": { "readingKey": "a:0:1", "controlPreset": "custom", "gestureShortPress": "snoozeAll", "gestureTap": "snooze" }, "device": "devA" },
+		"ctxElite": { "settings": { "readingKey": "a:0:1", "controlPreset": "elite", "gestureShortPress": "snooze", "gestureTap": "snooze" }, "device": "devA" },
+		"ctxLegacy": { "settings": { "readingKey": "a:0:1", "gestureShortPress": "snooze", "gestureTap": "snooze" }, "device": "devB" },
+		"ctxTurn": { "settings": { "readingKey": "a:0:1", "controlPreset": "custom", "gestureRotate": "snooze" }, "device": "devB" }
+	},
+	"events": [
+		{ "context": "ctxFuture", "event": "dialDown", "mono": 1000 },
+		{ "context": "ctxFuture", "event": "dialUp", "mono": 1100 },
+		{ "context": "ctxFuture", "event": "touchTap", "mono": 1500, "hold": false, "tapX": 100 },
+		{ "context": "ctxElite", "event": "dialDown", "mono": 2000 },
+		{ "context": "ctxElite", "event": "dialUp", "mono": 2100 },
+		{ "context": "ctxElite", "event": "touchTap", "mono": 2500, "hold": false, "tapX": 100 },
+		{ "context": "ctxLegacy", "event": "dialDown", "mono": 3000 },
+		{ "context": "ctxLegacy", "event": "dialUp", "mono": 3100 },
+		{ "context": "ctxLegacy", "event": "touchTap", "mono": 3500, "hold": false, "tapX": 100 },
+		{ "context": "ctxTurn", "event": "dialRotate", "mono": 4000, "ticks": 2, "pressed": false }
+	],
+	"expect": {
+		"ctxFuture": { "commands": ["resetStats", "snooze"], "statMode": "current" },
+		"ctxElite": { "commands": ["pauseResume", "cycleStat"], "paused": true, "statMode": "min" },
+		"ctxLegacy": { "commands": ["resetStats", "cycleStat"], "statMode": "min" },
+		"ctxTurn": { "commands": ["snooze:2"], "selection": "a:0:1" }
+	}
+}

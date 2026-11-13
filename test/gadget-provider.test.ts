@@ -1831,7 +1831,7 @@ describe("integrity: a key emptied under a live session is an empty key", { skip
 				assert.equal(emptied.state, "unavailable");
 				assert.equal(emptied.state === "unavailable" ? emptied.reason : "", "gadget-empty");
 				assert.deepEqual(statusScreen(emptied)?.lines, ["Tick sensors", "in Gadget"]);
-				assert.deepEqual(statusDialText(emptied), { title: "Gadget empty", value: "tick sensors" });
+				assert.deepEqual(statusDialText(emptied), { title: "Tick sensors", value: "in Gadget" });
 				assert.match(statusSentence(emptied), /present but has no readable sensor rows/);
 				for (let i = 0; i < 3; i++) subject.tick();
 				assert.deepEqual(subject.getStatus(), emptied, "the screen stands while the key stays empty");

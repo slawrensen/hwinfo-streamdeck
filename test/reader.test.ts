@@ -6,11 +6,46 @@
  * rejection.
  */
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, HEADER_SIZE, MAGIC_ACTIVE, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "../src/hwinfo/layout";
+import { ENTRY, ENTRY_CLASSIC_SIZE, ENTRY_UTF8_SIZE, HEADER, HEADER_SIZE, MAGIC_ACTIVE, MAGIC_DEAD, MAX_ELEMENT_COUNT, MAX_REGION_BYTES, SENSOR, SENSOR_CLASSIC_SIZE, SENSOR_UTF8_SIZE } from "../src/hwinfo/layout";
 import { parseSnapshot, SnapshotParser } from "../src/hwinfo/reader";
 import { HwinfoError, SensorType } from "../src/hwinfo/types";
+import { readProbeSnapshot } from "../src/hwinfo/probe-read";
+import type { SensorSnapshot } from "../src/hwinfo/types";
+
+describe("the standalone probe's bounded contention retry", () => {
+	const snapshot: SensorSnapshot = { pollTime: 1, version: 1, revision: 1, sensors: [], readings: [], byKey: new Map() };
+	it("returns an available snapshot unchanged without a busy notice", async () => {
+		let notices = 0;
+		assert.equal(await readProbeSnapshot({ read: () => snapshot }, () => { notices++; }), snapshot);
+		assert.equal(notices, 0);
+	});
+	it("yields so a temporarily held mutex can become available", async () => {
+		let busy = true;
+		let notices = 0;
+		let calls = 0;
+		const timer = setTimeout(() => { busy = false; }, 30);
+		try {
+			const result = await readProbeSnapshot({ read: () => { calls++; return busy ? null : snapshot; } }, () => { notices++; });
+			assert.equal(result, snapshot);
+			assert.ok(calls > 1);
+			assert.equal(notices, 1);
+		} finally { clearTimeout(timer); }
+	});
+	it("ends a sustained hold without inventing a snapshot or spinning", async () => {
+		let calls = 0;
+		assert.equal(await readProbeSnapshot({ read: () => { calls++; return null; } }, () => {}), null);
+		assert.ok(calls > 1 && calls <= 20, `${calls} guarded attempts`);
+	});
+	it("does not swallow a provider failure after an initial busy read", async () => {
+		const error = new HwinfoError("invalid", "layout changed");
+		let calls = 0;
+		await assert.rejects(readProbeSnapshot({ read: () => { if (calls++ === 0) return null; throw error; } }, () => {}), (actual) => actual === error);
+	});
+});
 
 interface FakeSensor {
 	id: number;
@@ -36,6 +71,8 @@ interface FakeEntry {
 }
 
 interface ComposeOptions {
+	/** HWiNFO's scan interval, in a header 48 bytes long. */
+	pollingPeriod?: number;
 	utf8?: boolean;
 	revision?: number;
 	pollTime?: number;
@@ -46,7 +83,7 @@ function compose(sensors: FakeSensor[], entries: FakeEntry[], opts: ComposeOptio
 	const utf8 = opts.utf8 === true;
 	const sensorSize = utf8 ? SENSOR_UTF8_SIZE : SENSOR_CLASSIC_SIZE;
 	const entrySize = utf8 ? ENTRY_UTF8_SIZE : ENTRY_CLASSIC_SIZE;
-	const sensorOff = HEADER_SIZE;
+	const sensorOff = opts.pollingPeriod === undefined ? HEADER_SIZE : HEADER.pollingPeriod + 4;
 	const entryOff = sensorOff + sensors.length * sensorSize;
 	const buf = Buffer.alloc(entryOff + entries.length * entrySize);
 
@@ -54,6 +91,7 @@ function compose(sensors: FakeSensor[], entries: FakeEntry[], opts: ComposeOptio
 	buf.writeUInt32LE(1, HEADER.version);
 	buf.writeUInt32LE(opts.revision ?? 2, HEADER.revision);
 	buf.writeBigInt64LE(BigInt(opts.pollTime ?? 1_751_600_000), HEADER.pollTime);
+	if (opts.pollingPeriod !== undefined) buf.writeUInt32LE(opts.pollingPeriod, HEADER.pollingPeriod);
 	buf.writeUInt32LE(sensorOff, HEADER.sensorSectionOffset);
 	buf.writeUInt32LE(sensorSize, HEADER.sensorElementSize);
 	buf.writeUInt32LE(sensors.length, HEADER.sensorElementCount);
@@ -133,6 +171,40 @@ describe("producer evidence is distinct from topology revisions", () => {
 	});
 });
 const TEMP: FakeEntry = { type: SensorType.Temperature, sensorIndex: 0, id: 0x1000000, orig: "Tctl/Tdie", unit: "°C", value: 55.5, min: 40, max: 90, avg: 60 };
+
+describe("HWiNFO's scan interval from the header", () => {
+	const entry: FakeEntry = { type: SensorType.Temperature, sensorIndex: 0, id: 1, orig: "Temperature", unit: "°C", value: 40 };
+	it("is read at offset 44 when the sensor section starts at 48 or later", () => {
+		assert.equal(HEADER.pollingPeriod, 44);
+		assert.equal(HEADER_SIZE, 44, "the header's validated size stays what it was");
+		for (const period of [100, 1000, 2000, 10_000, 3_600_000]) assert.equal(parseSnapshot(compose([CPU], [entry], { pollingPeriod: period })).producerPeriodMs, period);
+	});
+	it("an older header, with its sensor section at 44, reports none and keeps its shape", () => {
+		const snap = parseSnapshot(compose([CPU], [entry]));
+		assert.equal(snap.producerPeriodMs, undefined);
+		assert.equal(Object.hasOwn(snap, "producerPeriodMs"), false);
+	});
+	it("a value outside 100 ms to one hour reports none", () => {
+		for (const period of [0, 1, 99, 3_600_001, 0xffffffff]) assert.equal(parseSnapshot(compose([CPU], [entry], { pollingPeriod: period })).producerPeriodMs, undefined, String(period));
+	});
+	it("a buffer that ends at the header with empty sections reads no field past its end", () => {
+		const empty = compose([], [], { pollingPeriod: 2000 }).subarray(0, HEADER_SIZE);
+		assert.equal(parseSnapshot(empty).producerPeriodMs, undefined);
+	});
+	it("follows a change in place on the fast path, with no rebuild and no value revision", () => {
+		const parser = new SnapshotParser();
+		const bytes = compose([CPU], [entry], { pollingPeriod: 2000 });
+		const first = parser.parse(bytes);
+		const revision = first.valueRevision;
+		bytes.writeUInt32LE(5000, HEADER.pollingPeriod);
+		const second = parser.parse(bytes);
+		assert.equal(second, first, "the same snapshot, so no rebuild");
+		assert.equal(second.producerPeriodMs, 5000);
+		assert.equal(second.valueRevision, revision, "an interval is not a value");
+		bytes.writeUInt32LE(0, HEADER.pollingPeriod);
+		assert.equal(parser.parse(bytes).producerPeriodMs, undefined);
+	});
+});
 
 describe("parseSnapshot — classic 264/316 layout", () => {
 	it("decodes sensors, readings, keys and stats", () => {
@@ -492,6 +564,21 @@ describe("parseSnapshot — malformed input", () => {
 		one.copy(big);
 		big.writeUInt32LE(count, HEADER.entryElementCount);
 		assert.throws(() => parseSnapshot(big), invalid);
+	});
+
+	it("the native reader's bounds and magics are the ones layout.ts names", () => {
+		// hwsm.c mirrors these by hand; a drift would let one reader take a
+		// header the other refuses.
+		const source = fs.readFileSync(fileURLToPath(new URL("../native/hwsm/hwsm.c", import.meta.url)), "utf8");
+		const defined = (name: string): number => {
+			const value = new RegExp(`^#define ${name} \\(?([^)\\r\\n]+?)\\)?\\r?$`, "m").exec(source)?.[1];
+			assert.ok(value !== undefined, `hwsm.c defines ${name}`);
+			return value.split("*").reduce((product, factor) => product * Number(factor.trim().replace(/u$/, "")), 1);
+		};
+		assert.equal(defined("HWSM_MAGIC_ACTIVE"), MAGIC_ACTIVE);
+		assert.equal(defined("HWSM_MAGIC_DEAD"), MAGIC_DEAD);
+		assert.equal(defined("HWSM_MAX_REGION_BYTES"), MAX_REGION_BYTES);
+		assert.equal(defined("HWSM_MAX_ELEMENT_COUNT"), MAX_ELEMENT_COUNT);
 	});
 
 	it("a cached skeleton never reads a shorter buffer on the fast path", () => {

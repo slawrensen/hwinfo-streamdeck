@@ -514,6 +514,16 @@ async function scenario(send) {
 			results.deckDimFrame = dispLatest();
 			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
 			await sleep(400);
+			// The shared key Background (src/ui/shared-looks.ts): the key has no
+			// look of its own, so it repaints on the shared Glass at once, and
+			// back to the same bytes when the shared default goes.
+			results.sharedLookPlainFrame = dispLatest();
+			send({ event: "didReceiveGlobalSettings", payload: { settings: { keyBackground: "glass", keyAccentWords: true } } });
+			await sleep(500);
+			results.sharedLookFrame = dispLatest();
+			send({ event: "didReceiveGlobalSettings", payload: { settings: {} } });
+			await sleep(500);
+			results.sharedLookBackFrame = dispLatest();
 			// None of the reads above may write settings back (no rewrite on read).
 			results.displayContextWrites = results.setSettings.filter((s) => s.context === "ctx-key-disp").length;
 			send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-key-disp", device: "dev1", payload: { settings: {}, coordinates: { column: 4, row: 0 }, controller: "Keypad", isInMultiAction: false } });
@@ -604,7 +614,7 @@ async function scenario(send) {
 		send({ event: "keyUp", action: "com.lawrensen.hwinfo.control", context: "ctx-ctl", device: "dev1", payload: { settings: { command: "showCurrent", target: 42 }, coordinates: { column: 1, row: 0 }, isInMultiAction: false } });
 		await sleep(300);
 		results.controlMalformedTargetOk = ctlOks() === 2 && !results.showAlerts.includes("ctx-ctl");
-		// Reset-all ignores the Target, exactly as the settings panel says.
+		// Reset-all ignores the Link ID, exactly as the settings panel says.
 		dialSet({ readingKey: k1, rotationKeys: [k1, k2], controlPreset: "", linkId: "xl-dial" });
 		await sleep(200);
 		send({ event: "keyUp", action: "com.lawrensen.hwinfo.control", context: "ctx-ctl", device: "dev1", payload: { settings: { command: "resetStats", target: "no-such-link", resetScope: "all" }, coordinates: { column: 1, row: 0 }, isInMultiAction: false } });
@@ -1064,6 +1074,16 @@ async function finish() {
 		"deck-wide dim reaches a key with no local Text setting",
 		typeof results.deckDimFrame === "string" && typeof results.deckDimPlainFrame === "string" && valueFillOf(results.deckDimPlainFrame) !== undefined && valueFillOf(results.deckDimFrame) !== undefined && valueFillOf(results.deckDimFrame) !== valueFillOf(results.deckDimPlainFrame),
 		`plain value fill ${valueFillOf(results.deckDimPlainFrame)}, dimmed ${valueFillOf(results.deckDimFrame)}`
+	);
+
+	// Live readings move between frames, so the look is compared, not the
+	// bytes: the theme's full-face fill and the drawing's element tags.
+	const themeFaceOf = (svg) => /<rect width="144" height="144" fill="#[0-9A-Fa-f]{6}"\/>/.exec(svg ?? "")?.[0];
+	const tagsOf = (svg) => (svg ?? "").match(/<[a-z]+\b/g)?.join("") ?? "";
+	check(
+		"a shared key Background repaints a key with none of its own, and its removal restores the Theme face",
+		themeFaceOf(results.sharedLookPlainFrame) !== undefined && typeof results.sharedLookFrame === "string" && !results.sharedLookFrame.includes(themeFaceOf(results.sharedLookPlainFrame)) && results.sharedLookBackFrame?.includes(themeFaceOf(results.sharedLookPlainFrame)) && tagsOf(results.sharedLookBackFrame) === tagsOf(results.sharedLookPlainFrame),
+		`plain ${themeFaceOf(results.sharedLookPlainFrame)}, shared draws it ${results.sharedLookFrame?.includes(themeFaceOf(results.sharedLookPlainFrame) ?? "?")}, back tags equal ${tagsOf(results.sharedLookBackFrame) === tagsOf(results.sharedLookPlainFrame)}`
 	);
 
 	// Data units: decimal vs binary re-tiering, PI preview via the same authority.

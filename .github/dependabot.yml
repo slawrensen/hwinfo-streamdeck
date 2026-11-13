@@ -11,7 +11,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Room for the whole weekly batch: at 5, later bumps (rollup, eslint,
+    # the terser plugin) waited behind the cap for weeks.
+    open-pull-requests-limit: 10
+    groups:
+      # @elgato/streamdeck pins @elgato/utils to an exact version, so a
+      # utils bump on its own only nests a second copy beside the SDK's
+      # (PR #53). They move together, in one PR, when the SDK moves.
+      elgato-sdk:
+        patterns:
+          - "@elgato/streamdeck"
+          - "@elgato/utils"
     # Retained pins; the reasons live in .github/workflows/ci.yml under
     # "Retained pins". Minor and patch updates still arrive by PR.
     ignore:

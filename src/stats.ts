@@ -10,8 +10,10 @@
  * thrash the moment the sampled set outgrew it, silently resetting every
  * session each tick.
  */
-import { liveKeyOf } from "./hwinfo/reading-links";
+import { identityBreak } from "./history/identity";
+import { measurementIdentityOf } from "./hwinfo/calculated";
 import type { Reading, SensorSnapshot } from "./hwinfo/types";
+import type { StatMode } from "./ui/format";
 
 export type SessionStats = {
 	min: number;
@@ -22,15 +24,27 @@ export type SessionStats = {
 	mean?: number;
 };
 
-export type SessionResetReason = "source" | "unit" | "type" | "binding" | "gap";
+export type SessionResetReason = "source" | "unit" | "type" | "binding" | "definition" | "gap" | "strip";
 
 const RESET_MESSAGES: Record<SessionResetReason, string> = {
 	source: "stats reset: source changed",
 	unit: "stats reset: units changed",
 	type: "stats reset: reading changed",
 	binding: "stats reset: pairing changed",
-	gap: "stats reset: data gap"
+	definition: "stats reset: calculation changed",
+	gap: "stats reset: data gap",
+	// A dial back from a strip: its readings were not observed for it.
+	strip: "stats reset: left the strip"
 };
+
+/** The session stat a dial row displays; the live value when no session
+ * yet. The dial faces and the panel's overflow note both read it. */
+export function rowStatValue(live: number, stats: SessionStats | undefined, mode: StatMode): number {
+	if (stats === undefined || mode === "current") {
+		return live;
+	}
+	return mode === "min" ? stats.min : mode === "max" ? stats.max : (stats.mean ?? stats.sum / stats.count);
+}
 
 export function sessionResetMessage(reason: SessionResetReason): string {
 	return RESET_MESSAGES[reason];
@@ -42,19 +56,18 @@ type Observation = {
 	source: string;
 	type: Reading["type"];
 	unit: string;
-	/** The provider key the saved key stood for when this was observed. A
-	 * saved key that comes to stand for another measurement (a re-paired
-	 * link) starts a new session; merely gaining or losing an alias while it
-	 * keeps resolving to the same measurement does not. */
+	/** The measurement the saved key stood for when this was observed
+	 * (measurementIdentityOf: the provider key, or a calculated reading and
+	 * its revision). A saved key that comes to stand for another measurement
+	 * (a re-paired link, a changed calculation) starts a new session; merely
+	 * gaining or losing an alias while it keeps resolving to the same
+	 * measurement does not. */
 	identity: string;
 };
 
+/** The shared identity rule (history segments end on the same changes). */
 function observationResetReason(previous: Observation, reading: Reading, source: string): SessionResetReason | undefined {
-	if (previous.source !== source) return "source";
-	if (previous.unit !== reading.unit) return "unit";
-	if (previous.type !== reading.type) return "type";
-	if (previous.identity !== liveKeyOf(reading)) return "binding";
-	return undefined;
+	return identityBreak(previous, reading, source);
 }
 
 export class SessionStatsStore {
@@ -86,7 +99,7 @@ export class SessionStatsStore {
 		}
 		if (reason === undefined && previous?.pollTime === snapshot.pollTime && Object.is(previous.value, reading.value)) return;
 		this.sample(reading.key, reading.value);
-		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, identity: liveKeyOf(reading) });
+		this.observations.set(reading.key, { pollTime: snapshot.pollTime, value: reading.value, source, type: reading.type, unit: reading.unit, identity: measurementIdentityOf(reading) });
 		return reason;
 	}
 

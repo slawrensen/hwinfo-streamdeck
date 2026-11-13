@@ -1,0 +1,33 @@
+{
+	"name": "custom snooze gestures: a short push, a tap and a long touch snooze; pin blocks turns but never a snooze; a press that turned snoozes nothing",
+	"contexts": {
+		"ctx1": {
+			"settings": {
+				"readingKey": "a:0:1",
+				"controlPreset": "custom",
+				"gestureShortPress": "snooze",
+				"gestureLongPress": "pin",
+				"gestureTap": "snooze",
+				"gestureTouchHold": "snooze"
+			},
+			"device": "devA"
+		}
+	},
+	"events": [
+		{ "context": "ctx1", "event": "dialDown", "mono": 1000 },
+		{ "context": "ctx1", "event": "dialUp", "mono": 1200 },
+		{ "context": "ctx1", "event": "dialDown", "mono": 2000 },
+		{ "context": "ctx1", "event": "dialRotate", "mono": 2100, "ticks": 1, "pressed": true },
+		{ "context": "ctx1", "event": "dialUp", "mono": 2300 },
+		{ "context": "ctx1", "event": "dialDown", "mono": 3000 },
+		{ "context": "ctx1", "event": "dialUp", "mono": 3600 },
+		{ "context": "ctx1", "event": "dialRotate", "mono": 4000, "ticks": 1, "pressed": false },
+		{ "context": "ctx1", "event": "touchTap", "mono": 5000, "hold": false, "tapX": 100 },
+		{ "context": "ctx1", "event": "touchTap", "mono": 6000, "hold": true, "tapX": 100 },
+		{ "context": "ctx1", "event": "dialDown", "mono": 7000 },
+		{ "context": "ctx1", "event": "dialUp", "mono": 7100 }
+	],
+	"expect": {
+		"ctx1": { "commands": ["snooze", "step:1", "pin", "snooze", "snooze", "snooze"], "selection": "a:0:2", "statMode": "current", "paused": false, "pinned": true }
+	}
+}

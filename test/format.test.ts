@@ -37,6 +37,15 @@ describe("convertUnit", () => {
 			assert.deepEqual(convertUnit(1200, unit, false), { value: 1200, unit });
 		}
 	});
+
+	it("scales a temperature difference by 1.8 with no offset", () => {
+		// A calculated difference of two temperatures is published as Δ°C: a
+		// 10 degree gap is an 18 degree Fahrenheit gap, never 50.
+		assert.deepEqual(convertUnit(10, "Δ°C", true), { value: 18, unit: "Δ°F" });
+		assert.deepEqual(convertUnit(-5, "Δ°C", true), { value: -9, unit: "Δ°F" });
+		assert.deepEqual(convertUnit(10, "Δ°C", false), { value: 10, unit: "Δ°C" });
+		assert.deepEqual(convertUnit(18, "Δ°F", true), { value: 18, unit: "Δ°F" });
+	});
 });
 
 describe("alertLevel, higher is worse (default)", () => {

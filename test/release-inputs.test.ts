@@ -99,43 +99,222 @@ describe("release copy gate", () => {
 	});
 });
 
+/** Each job's text under `jobs:`, keyed by job id, in file order, with
+ * comment lines dropped (a comment above the next job must neither satisfy
+ * nor trip an assertion about this one). */
+function jobsOf(workflow: string): Map<string, string> {
+	const body = workflow
+		.slice(workflow.indexOf("\njobs:\n") + "\njobs:\n".length)
+		.split("\n")
+		.filter((line) => !/^\s*#/.test(line))
+		.join("\n");
+	const jobs = new Map<string, string>();
+	const starts = [...body.matchAll(/^ {2}([a-z][a-z0-9-]*):\n/gm)];
+	starts.forEach((match, i) => jobs.set(match[1]!, body.slice(match.index, i + 1 < starts.length ? starts[i + 1]!.index : body.length)));
+	return jobs;
+}
+
+/** The text of every `run:` value (inline or block scalar). */
+function runBlocks(workflow: string): string[] {
+	const lines = workflow.split("\n");
+	const blocks: string[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		const match = /^(\s*)(?:- )?run:\s*(.*)$/.exec(lines[i]!);
+		if (!match) continue;
+		const indent = match[1]!.length;
+		if (match[2] !== "|" && match[2] !== ">") {
+			blocks.push(match[2]!);
+			continue;
+		}
+		const block: string[] = [];
+		while (i + 1 < lines.length && (lines[i + 1]!.trim() === "" || lines[i + 1]!.search(/\S/) > indent)) block.push(lines[++i]!);
+		blocks.push(block.join("\n"));
+	}
+	return blocks;
+}
+
 describe("ci workflow privilege boundary", () => {
+	const workflow = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
 	it("runs dependency installs and native builds under a read-only token", () => {
-		const workflow = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
 		const permissions = workflow.match(/^permissions:\n((?: {2}.*\n)+)/m);
 		assert.ok(permissions, "ci.yml must declare workflow-level permissions");
 		assert.equal(permissions[1], "  contents: read\n");
 		assert.doesNotMatch(workflow, /^ {4}permissions:/m, "no job widens the workflow token");
 	});
+
+	it("packs with the locked CLI, gates the bundle, and proves the signing checks on real signtool output", () => {
+		assert.doesNotMatch(workflow, /npm (?:i|install) -g/, "no global install: the Elgato CLI is a locked devDependency");
+		assert.match(jobsOf(workflow).get("verify") ?? "", /run: node scripts\/bundle-inventory\.mjs/);
+		const selftest = jobsOf(workflow).get("signing-structure") ?? "";
+		assert.match(selftest, /needs: verify/);
+		assert.match(selftest, /run: node scripts\/signing-structure-selftest\.mjs --hwsm built\/hwsm\.node\n/);
+		assert.doesNotMatch(selftest, /secrets\.|id-token/, "the selftest needs no credential");
+	});
 });
 
 describe("release workflow privilege boundary", () => {
-	it("validates a data-only tag before npm and restricts write access to staging", () => {
-		const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8");
-		const build = workflow.slice(workflow.indexOf("  build:"), workflow.indexOf("  stage:"));
-		const stage = workflow.slice(workflow.indexOf("  stage:"));
-		assert.match(workflow, /permissions:\s*\n {2}contents: read/);
+	const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8");
+	const jobs = jobsOf(workflow);
+	const job = (id: string): string => {
+		const text = jobs.get(id);
+		assert.ok(text, `release.yml has a ${id} job`);
+		return text;
+	};
+
+	it("runs build, sign, package and stage, in that order", () => {
+		assert.deepEqual([...jobs.keys()], ["build", "sign", "package", "stage"]);
+		assert.match(workflow, /^permissions:\n {2}contents: read\n/m);
+	});
+
+	it("validates a data-only tag before npm, and checks the signing mode there", () => {
+		const build = job("build");
 		assert.match(build, /RELEASE_TAG: \$\{\{ github.ref_name \}\}/);
 		const verifyIndex = build.indexOf("node scripts/verify-release-tag.mjs");
+		const modeIndex = build.indexOf("node scripts/signing-config-check.mjs --mode");
 		const installIndex = build.indexOf("run: npm ci");
-		assert.ok(verifyIndex >= 0, "release verifier command must exist");
-		assert.ok(installIndex >= 0, "dependency install command must exist");
+		assert.ok(verifyIndex >= 0 && modeIndex >= 0 && installIndex >= 0);
 		assert.ok(verifyIndex < installIndex, "release verifier must run before dependency installation");
-		assert.doesNotMatch(build, /contents: write/);
-		assert.match(stage, /needs: build/);
-		assert.match(stage, /permissions:\s*\n {6}contents: write/);
-		assert.doesNotMatch(stage, /run:|actions\/checkout|npm /);
+		assert.ok(modeIndex < installIndex, "a mistyped SIGNING_MODE fails before anything is built");
+		assert.match(build, /SIGNING_MODE: \$\{\{ vars.SIGNING_MODE \}\}/);
 		// The only ref expression is the env value. Ref text never becomes run
 		// script source; action inputs/body receive verified build outputs.
 		assert.equal(workflow.match(/\$\{\{ github.ref_name \}\}/g)?.length, 1);
+	});
+
+	it("gives write access to the stage job alone, and stage runs no repository code", () => {
+		for (const [id, text] of jobs) {
+			if (id === "stage") assert.match(text, /permissions:\n {6}contents: write\n/);
+			else assert.doesNotMatch(text, /contents: write/, id);
+		}
+		const stage = job("stage");
+		assert.match(stage, /needs: \[build, package\]/);
+		assert.doesNotMatch(stage, /run:|actions\/checkout|npm /);
+	});
+
+	it("stages the draft whenever package passed, including when signing is off and the sign job is skipped", () => {
+		// The implicit success() of a job without a condition covers every
+		// upstream job, so the skipped sign job (signing off) would skip stage
+		// even after package passed. Each job after sign needs a condition of
+		// its own that does not reach past the jobs it names.
+		assert.ok(job("stage").includes("\n    if: ${{ !cancelled() && needs.build.result == 'success' && needs.package.result == 'success' }}\n"), "stage must not inherit the skipped sign job's status");
+		const order = [...jobs.keys()];
+		for (const id of order.slice(order.indexOf("sign") + 1)) assert.match(job(id), /\n {4}if: \$\{\{ !cancelled\(\) && /, `${id} runs after the optional sign job and needs an explicit condition`);
+	});
+
+	it("lets only the sign job reach the signing identity, behind the protected environment and the explicit switch", () => {
+		for (const [id, text] of jobs) {
+			if (id === "sign") continue;
+			assert.doesNotMatch(text, /id-token|environment:|secrets\./, id);
+		}
+		const sign = job("sign");
+		assert.match(sign, /\n {4}needs: build\n/);
+		assert.match(sign, /\n {4}if: vars\.SIGNING_MODE == 'required'\n/);
+		assert.match(sign, /\n {4}environment: release-signing\n/);
+		assert.match(sign, /\n {4}permissions:\n {6}contents: read\n {6}id-token: write\n {4}outputs:/);
+		assert.doesNotMatch(sign, /npm |npx |cache: npm/, "the sign job installs nothing and runs no npm");
+		assert.match(sign, /persist-credentials: false/);
+	});
+
+	it("signs through the pinned actions, OIDC only, timestamped, then verifies before anything leaves the job", () => {
+		const sign = job("sign");
+		const login = sign.indexOf("uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0");
+		const signing = sign.indexOf("uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0");
+		const config = sign.indexOf("run: node scripts/signing-config-check.mjs");
+		const expect = sign.indexOf("run: node scripts/authenticode-strip.mjs expect unsigned/hwsm.node");
+		const verify = sign.indexOf("run: node scripts/verify-signed-native.mjs --signed signed --unsigned unsigned --out signed/signature.json");
+		const upload = sign.indexOf("name: native-signed");
+		assert.ok(expect >= 0 && config > expect && login > config && signing > login && verify > signing && upload > verify, "expect, config, login, sign, verify, upload");
+		assert.doesNotMatch(sign, /client-secret|azure-password|creds:/, "no stored credential");
+		for (const line of ["timestamp-rfc3161: http://timestamp.acs.microsoft.com", "timestamp-digest: SHA256", "file-digest: SHA256", "exclude-environment-credential: true", "exclude-workload-identity-credential: true", "exclude-managed-identity-credential: true", "cache-dependencies: false", "files: ${{ github.workspace }}\\signed\\hwsm.node\n"]) {
+			assert.ok(sign.includes(line), line);
+		}
+		assert.match(sign, /EXPECT_SHA: \$\{\{ needs\.build\.outputs\.unsignedsha \}\}/);
+	});
+
+	it("packages only after signing passed, or when signing is not required", () => {
+		const pack = job("package");
+		assert.match(pack, /\n {4}needs: \[build, sign\]\n/);
+		assert.ok(pack.includes("\n    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.sign.result == 'success' || (needs.sign.result == 'skipped' && vars.SIGNING_MODE != 'required')) }}\n"), "a required signature that did not happen never packages");
+		assert.match(pack, /\n {4}permissions:\n {6}contents: read\n {4}outputs:/);
+	});
+
+	it("packs the exact bytes the earlier jobs produced and qualifies the extracted package", () => {
+		const pack = job("package");
+		for (const variable of ["HWSM_VENDOR"]) {
+			assert.match(pack, new RegExp(`${variable}: \\$\\{\\{ github\\.workspace \\}\\}/\\$\\{\\{ needs\\.sign\\.result == 'success' && 'native-signed' \\|\\| 'native-unsigned' \\}\\}/`));
+		}
+		assert.ok(pack.includes("HWSM_VENDOR_SHA256: ${{ needs.sign.result == 'success' && needs.sign.outputs.hwsm || needs.build.outputs.unsignedsha }}"));
+		assert.match(pack, /EXPECTED: \$\{\{ needs\.build\.outputs\.pluginsha \}\}/);
+		assert.match(pack, /run: node scripts\/native-manifest\.mjs --build-manifest native-unsigned\/release-native-manifest\.json --unsigned native-unsigned --carry-forward native-unsigned\/carry-forward\.json\n/);
+		assert.match(pack, /run: node scripts\/native-manifest\.mjs --build-manifest native-unsigned\/release-native-manifest\.json --unsigned native-unsigned --carry-forward native-unsigned\/carry-forward\.json --signature native-signed\/signature\.json/);
+		assert.match(pack, /HWSM_REQUIRE_SIGNED: \$\{\{ needs\.sign\.result == 'success' && '1' \|\| '' \}\}\n {8}run: node scripts\/validate-native\.mjs/);
+		const qualify = /run: node scripts\/qualify\.mjs --stages (\S+) --out qualification-release/.exec(pack);
+		assert.ok(qualify, "the package job runs the qualification");
+		for (const stage of ["bundle", "pack", "archive", "abi", "recovery", "native-gate", "tree"]) assert.ok(qualify[1]!.split(",").includes(stage), stage);
+		assert.ok(qualify[1]!.split(",").includes("native-identity"), "the record says which native bytes were qualified");
+		assert.ok(pack.includes("--out qualification-release --native $env:NATIVE_DIR --native-manifest release-native-manifest.json"), "qualified against the files the earlier jobs handed on and the final manifest");
+		assert.ok(pack.includes("NATIVE_DIR: ${{ needs.sign.result == 'success' && 'native-signed' || 'native-unsigned' }}"));
+		const build = pack.indexOf("run: npm run build");
+		const manifest = pack.indexOf("run: node scripts/native-manifest.mjs");
+		const gate = pack.indexOf("run: node scripts/validate-native.mjs");
+		const qualifyAt = pack.indexOf("run: node scripts/qualify.mjs");
+		assert.ok(build >= 0 && manifest > build && gate > manifest && qualifyAt > gate, "build, manifest, gate, then pack and qualify");
+	});
+
+	it("never fails open: no continue-on-error, no global installs, and every action pinned to a commit", () => {
+		for (const file of [".github/workflows/release.yml", ".github/workflows/ci.yml"]) {
+			const text = readFileSync(join(ROOT, file), "utf8");
+			for (const [, ref] of text.matchAll(/uses: ([^\s#]+)/g)) assert.match(ref!, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, `${file}: ${ref}`);
+			assert.doesNotMatch(text, /continue-on-error/, file);
+			assert.doesNotMatch(text, /npm (?:i|install) -g/, file);
+		}
+	});
+
+	it("reads the previous release once, held to GitHub's digests, and carries forward before the unsigned hashes are taken", () => {
+		const build = job("build");
+		const at = (text: string): number => {
+			const index = build.indexOf(text);
+			assert.ok(index >= 0, text);
+			return index;
+		};
+		const install = at("run: npm ci");
+		assert.ok(at("run: node scripts/native-carry-forward.mjs --check-mode") < install, "a mistyped NATIVE_CARRY_FORWARD fails before anything is built");
+		const read = at("name: Read the previous release");
+		const drift = at("node scripts/native-drift.mjs --previous previous/release-native-manifest.json");
+		const staged = at("name: Stage the unsigned native build");
+		const carry = at("run: node scripts/native-carry-forward.mjs --dir native-unsigned --previous-dir previous");
+		const hashes = at("name: Record the unsigned native hashes");
+		const upload = at("name: native-unsigned");
+		assert.ok(at("run: node scripts/validate-native.mjs") < read && read < drift && drift < staged && staged < carry && carry < hashes && hashes < upload, "gate, read, drift, stage, carry, hash, upload");
+		assert.equal(build.match(/releases\/latest/g)?.length, 1, "one read of the previous release serves the drift check and the carry");
+		for (const asset of ["release-native-manifest.json", "com.lawrensen.hwinfo.streamDeckPlugin", "hwsm.pdb"]) assert.ok(build.includes(`"${asset}"`), asset);
+		assert.ok(build.includes('if ($asset.digest -and $asset.digest -ne "sha256:$got")'), "every previous asset is held to the digest GitHub records");
+		assert.ok(build.includes("$verified[$name] = [bool]$asset.digest"), "the carry step learns which assets a digest actually checked");
+		assert.equal(workflow.match(/NATIVE_CARRY_FORWARD: \$\{\{ vars\.NATIVE_CARRY_FORWARD \}\}/g)?.length, 2, "the switch reaches the check and the carry step, through env only");
+		assert.match(build, /\n {6}unsignedsha: \$\{\{ steps\.unsigned\.outputs\.hwsm \}\}\n/, "the hashes the sign and package jobs hold the bytes to are taken after the carry");
+		assert.ok(job("stage").includes("${{ needs.package.outputs.carried }}"), "the release notes say when a binary is the earlier release's file");
+	});
+
+	it("passes expression data to scripts only through env, never into run text", () => {
+		for (const file of [".github/workflows/release.yml", ".github/workflows/ci.yml"]) {
+			for (const block of runBlocks(readFileSync(join(ROOT, file), "utf8"))) assert.doesNotMatch(block, /\$\{\{/, `${file}: ${block.slice(0, 80)}`);
+		}
+	});
+
+	it("keeps the unsigned release text when signing is off and names the signer and timestamp when on", () => {
+		const stage = job("stage");
+		assert.ok(stage.includes("${{ needs.package.outputs.signed == 'true' && format('The native addon is Authenticode-signed by {0} through Azure Artifact Signing, timestamped {1}."));
+		assert.ok(stage.includes("|| 'The native addon is unsigned; verify your download against the hashes above with `Get-FileHash <file> -Algorithm SHA256` (PowerShell).' }} Details in [SECURITY.md]"));
+		assert.doesNotMatch(stage, /SmartScreen|Smart App Control|antivirus|VirusTotal|Defender/i, "a signature is not a reputation or antivirus claim");
+		for (const output of ["sha", "size", "nativesha", "unsignedsha", "signed", "signer", "timestamp", "carried"]) assert.match(job("package"), new RegExp(`\\n {6}${output}: \\$\\{\\{ steps\\.hash\\.outputs\\.${output} \\}\\}\\n`), output);
 	});
 });
 
 describe("the shipped NOTICE carries every bundled license (external review AX32)", () => {
 	// What rollup bundles into bin/plugin.js (measured: @elgato/streamdeck,
-	// @elgato/utils, @elgato/schemas, ws, tslib), the Lit code inside the
-	// vendored sdpi-components.js, and the icon path data copied from Lucide
-	// and Feather into the panels. Each license ships whole, under its own
+	// @elgato/utils, @elgato/schemas, ws, tslib), the sdpi-components client
+	// and stores ui/pi-client.js ports, and the icon path data copied from
+	// Lucide and Feather into the panels. Each license ships whole, under its own
 	// top-level heading, once, and visible: the file is read as the section
 	// list it renders to, so a deleted, demoted, doubled or commented-out
 	// license fails (external review AX53).
@@ -151,7 +330,7 @@ describe("the shipped NOTICE carries every bundled license (external review AX32
 	const read = (file: string): string => readFileSync(join(ROOT, "node_modules", file), "utf8");
 	const sdk = read("@elgato/streamdeck/LICENSE");
 	const mitTerms = sdk.slice(sdk.indexOf("Permission is hereby granted"));
-	const header = readFileSync(join(ROOT, "com.lawrensen.hwinfo.sdPlugin/ui/sdpi-components.js"), "utf8").slice(0, 400);
+	const header = readFileSync(join(ROOT, "com.lawrensen.hwinfo.sdPlugin/ui/pi-client.js"), "utf8").slice(0, 400);
 
 	it("lists each license once, as a top-level section, with nothing hidden", () => {
 		assert.deepEqual(headings, [
@@ -160,7 +339,6 @@ describe("the shipped NOTICE carries every bundled license (external review AX32
 			"Elgato Stream Deck SDK and @elgato/utils license (MIT)",
 			"@elgato/schemas license (MIT)",
 			"sdpi-components license (MIT)",
-			"Lit license (BSD-3-Clause), bundled in sdpi-components",
 			"ws license (MIT)",
 			"tslib license (0BSD)"
 		]);
@@ -200,38 +378,6 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.`)
-		);
-	});
-	it("Lit, inside sdpi-components: its copyright, the three conditions and the disclaimer", () => {
-		assert.match(header, /Lit, Copyright 2019 Google LLC, SPDX-License-Identifier: BSD-3-Clause/);
-		assert.equal(
-			sections.get("Lit license (BSD-3-Clause), bundled in sdpi-components"),
-			flat(`Copyright 2019 Google LLC
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`)
 		);
 	});
 });

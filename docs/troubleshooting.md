@@ -10,44 +10,47 @@ Start with the exact message on your key, dial or settings header. HWiNFO must b
 | --- | --- |
 | Start HWiNFO | [Enable the selected source](#keys-show-start-hwinfo) |
 | Shared Memory off, often after 12 hours | [Re-enable sharing](#keys-show-shared-memory-off) |
-| Not updating / No new data | [Check freshness](#values-are-frozen--not-updating) |
+| Not updating / check sharing | [Check freshness](#values-are-frozen--not-updating) |
 | Age unknown / check Gadget | [Check HWiNFO and Gadget reporting](#age-unknown) |
 | Sensor missing / pick again | [Check the saved reading](#keys-show-sensor-missing) |
 | Access denied | [Collect the access evidence](#keys-show-access-denied) |
+| Bridge failed | [Check for a blocked file](#a-scanner-or-smart-app-control-blocks-a-file) |
 
 For first-time setup, follow [Get started](getting-started.md).
 
 ## How to read a status screen
 
-When a key cannot show a reading, it shows a two-line status message. Dials use similar wording. The message names the observed state; it may not identify the underlying cause.
+When a key cannot show a reading, it shows a two-line status message. A dial shows the same first line; its second line can differ. The message names the observed state; it may not identify the underlying cause.
 
 | Key shows | Dial shows | Meaning |
 | --- | --- | --- |
 | **Start HWiNFO** / not detected | Start HWiNFO / not detected | No data from the selected source; in Auto, from neither Shared Memory nor Gadget. |
 | **Source busy** / retrying | Source busy / retrying | The sensor source was busy or changed during a read. The plugin retries automatically on the next poll. |
 | **Shared Memory** / is off | Shared Memory off / enable in HWiNFO | Mapping exists but HWiNFO marked it disabled. |
-| **Not updating** / check sharing | No new data / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
+| **Not updating** / check sharing | Not updating / check sharing | No new Shared Memory measurement evidence has been observed within the grace period. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads. |
 | **Age unknown** / check Gadget | Age unknown / check Gadget | Gadget has no heartbeat. Steady readings look the same as ones a killed or crashed HWiNFO left. |
 | **Access denied** / open settings | Access denied / open settings | Windows denied access needed to read the sensor source; the error does not identify which access rule failed. Open settings and choose **Copy support report** for support. Review the Windows account, session and privilege settings of HWiNFO and Stream Deck. |
-| **Tick sensors** / in Gadget | Gadget empty / tick sensors | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
-| **Pick a sensor** / in settings | HWiNFO / rotate to pick | No sensor selected on this key/dial yet. |
+| **Tick sensors** / in Gadget | Tick sensors / in Gadget | The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab; check Enable reporting to Gadget and tick the readings you need. |
+| **Pick a sensor** / in settings | Pick a sensor / rotate to pick | No sensor selected on this key/dial yet. |
 | **Sensor missing** / pick again | Sensor missing / waiting | The saved sensor isn't in HWiNFO's current output. |
 | **Needs x64** / Windows | Needs x64 Windows | 32-bit or Windows-on-ARM: unsupported. |
 | **Source error** / open settings | Source error / open settings | The sensor source could not be opened or validated. Open settings and choose **Copy support report** for support. |
 | **Bridge failed** / reinstall | Bridge failed / reinstall it | The native HWiNFO bridge (`bin/hwsm.node`) could not load; this does not identify the cause. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A checksum identifies bytes; it does not establish safety. |
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on the key and No new data / check sharing on the dial for Shared Memory; and Age unknown / check Gadget on both for Gadget."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on both for Shared Memory; and Age unknown / check Gadget on both for Gadget."></a>
 
-*Simulated source states rendered by the 1.7 production code, not a hardware photograph.*
+*Simulated source states rendered by the 1.8 production code, not a hardware photograph.*
 
 ---
 
 ## Keys show "Start HWiNFO"
 
-The plugin found no data from the source it reads. With **Shared Memory only** or **Gadget registry only** under **Advanced > Connection > Data source**, it reads that one and never checks the other, so check that setting first. In **Auto** it found neither. In order of likelihood:
+The plugin found no data from the source it reads. With **Shared Memory only** or **Gadget registry only** under **Advanced > Connection > Data source**, it reads that one and never checks the other, so check that setting first. In **Auto** it found neither. Older HWiNFO plugins for Stream Deck showed "Please Launch HWiNFO64" in this state, and forum threads call it "sensors no longer displaying" (that can also be [Shared Memory off](#keys-show-shared-memory-off)).
+
+In order of likelihood:
 
 1. **HWiNFO isn't running.** Start it. If you use the free version, run it in **Sensors-only** mode.
-2. **HWiNFO is running but not publishing where the plugin reads.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want (no 12-hour limit). Enabling reporting alone is not enough: HWiNFO writes nothing to the registry until a reading is ticked, so this screen stays. See [Data sources](data-sources.md).
+2. **HWiNFO is running but not publishing where the plugin reads.** Open **HWiNFO → Settings** and tick **Shared Memory Support**. On the free version you can instead open **Configure Sensors → HWiNFO Gadget**, tick **"Enable reporting to Gadget"** and then **"Report value in Gadget"** on the readings you want. Enabling reporting alone is not enough: HWiNFO writes nothing to the registry until a reading is ticked, so this screen stays. See [Data sources](data-sources.md).
 3. **HWiNFO exited or stopped publishing sensors.** Start it and check Shared Memory Support or Gadget reporting. Minimizing a window is different from exiting the application.
 4. **Wrong bitness.** This plugin reads 64-bit HWiNFO. Use `HWiNFO64`, not the 32-bit build, on 64-bit Windows.
 5. **HWiNFO just launched.** It may not have published Shared Memory yet. The plugin retries on each poll.
@@ -162,17 +165,27 @@ HWiNFO gives every reading you tick **Report value in Gadget** a numbered regist
 3. **Not on Windows / wrong architecture.** The plugin is Windows x64 only; macOS and Windows-on-ARM are unsupported (you'll see **"Needs x64 Windows"** if it loads at all).
 4. **Install got corrupted.** Remove the plugin and reinstall by double-clicking the `.streamDeckPlugin` file, then restart Stream Deck.
 
+## A scanner or Smart App Control blocks a file
+
+The plugin's native addon, `bin/hwsm.node`, reads HWiNFO and is unsigned. A security scanner or Windows can block, quarantine or delete an unsigned file. When `hwsm.node` cannot load, keys show **Bridge failed / reinstall**.
+
+1. **Compare the file with the release.** Run `Get-FileHash` on the installed file and compare the SHA-256 with the one that version's GitHub release publishes; the [FAQ](faq.md#is-the-native-binary-signed-how-do-i-verify-what-i-installed) has the commands and paths. A Marketplace install is a separate package with DRM applied; do not hold it to the GitHub hashes. A matching hash identifies the published bytes; it does not establish safety.
+2. **Reinstall from the release package** of the channel you use ([Install](installation.md#install-the-plugin)), then restart the Stream Deck app: **Bridge failed** stays until the plugin restarts.
+3. **Report a false positive to the scanner's vendor** if the hash matches and the scanner still flags the file, through that vendor's own submission form. Keep the scanner's report and the hash for support.
+
+I have not tested the plugin under Smart App Control, so I cannot say whether it blocks this file or what it shows when it does.
+
 ## A reading shows the wrong unit
 
 Each key/dial has a per-key **°F** checkbox (under **Temperature** in Display). It only affects `°C` readings. If a temperature reads in the wrong unit, toggle that checkbox on the specific key. Sparkline shape is unaffected; it's stored in native units and just relabelled.
 
-Byte quantities and transfer rates follow a separate, shared control: **Advanced → Shared defaults → Data units**, either **Decimal (KB, MB, GB; rates in Mbps)** or **Binary (KiB, MiB, GiB; rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (shared by all keys and dials)](sensor-reading.md#advanced-shared-by-all-keys-and-dials).
+Byte quantities and transfer rates follow a separate, shared control: **Advanced → Shared defaults → Data units**, either **Decimal (KB, MB, GB; rates in Mbps)** or **Binary (KiB, MiB, GiB; rates in MiB/s)**. If a drive reading shows MiB where you expected MB, or a network reading shows MiB/s where you expected Mbps, change that setting; it applies to every key and dial at once. Full detail in [Advanced (shared by all keys and dials)](sensor-reading.md#advanced-shared-by-all-keys-and-dials). A reading set to a fixed unit under **Display → Unit and decimals per reading** (new in 1.8) keeps that unit whatever Data units says; set its **Unit** back to **Auto** to follow Data units again.
 
 ## Thresholds (warn/critical) don't fire
 
 Check these three first:
 
-1. **Check the threshold unit.** The warn/critical fields compare the **live** reading. If you enabled **°F**, enter the threshold in °F (e.g. `176`), not °C (`80`). For byte and rate readings, use HWiNFO's original number and unit before **Data units** changes the display scale: `12000000 B/s` compares as `12000000` even when the key shows `96.0 Mbps`. See [Thresholds & alerts](thresholds-alerts.md#how-the-comparison-works).
+1. **Check the threshold unit.** The warn/critical fields compare the **live** reading in the unit the face shows. Limits typed in 1.8 keep the unit they were typed in, so ticking **°F** converts them (`80` typed in °C fires at 176 °F). Limits saved by 1.7.1 or earlier and not edited since compare in the unit the face shows: with **°F** ticked, type them again in °F (`176`, not `80`). For byte and rate readings, use HWiNFO's original number and unit before **Data units** changes the display scale: `12000000 B/s` compares as `12000000` even when the key shows `96.0 Mbps`. See [Thresholds & alerts](thresholds-alerts.md#how-the-comparison-works).
 2. **Wrong direction.** By default the key alerts when the value goes **at or above** the threshold. For things where *low* is bad (fan RPM, free disk space, remaining battery), tick **Alerts → Alert when the value drops to or below these numbers**.
 3. **A dial rotated to a different unit.** Warn/critical values are anchored to the unit they were typed against, so `80` typed while a °C reading was on screen stands down on the 3000 RPM fan you rotate to; the manual **Bar from** / **Bar to** stand down with it and the bar falls back to the session low/high. Edit the threshold while the reading you want is on screen and it re-anchors to that reading's unit. Thresholds saved before this behavior existed keep their old apply-everywhere reach until you next edit one. See [Dial controls & presets](controls.md#thresholds-and-mixed-units).
 
@@ -188,7 +201,7 @@ The yellow Stream Deck alert cue on a drill-down press means entry was refused, 
 - **This deck type has no bundled detail view** (Mobile, Studio, Galleon, pedals, G-keys, or a Virtual Stream Deck smaller than 3x2). The key's settings panel says so under Press. Check [Hardware compatibility](hardware.md) for the other actions supported on that model.
 - **HWiNFO is not publishing data** and the detail list is set to *Every reading from this reading's sensor* or *Readings matching a filter*: with no snapshot there is nothing to resolve or match. Fix the data (see the status screens above) and press again. Only *A custom list* opens while HWiNFO is down.
 - **The selected sensor is missing** from HWiNFO's current output, so its source cannot be identified. Reopen settings and pick it again.
-- **The filter pattern is empty** (*Readings matching a filter*): there is nothing to list until you type one. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
+- **The filter pattern is empty** (*Readings matching a filter*), or holds only `|` and spaces: there is nothing to list until you type a pattern. The panel shows a live match count under the field, so you can see what a pattern gathers before pressing the key.
 
 If instead nothing at all happens on the first press: the Stream Deck app shows an install prompt for the deck's detail profile the first time, and until it is accepted the deck stays put. The plugin drops the attempt after 30 seconds, without a message; accepting later than that returns you to where you were, and the next press opens the view directly (the profile is installed now, so there is no second prompt).
 
@@ -199,7 +212,7 @@ The detail profile is visible but the plugin was restarted underneath it (plugin
 ## Dial gestures do nothing
 
 1. **You're on a plain Stream Deck, not a Stream Deck + or + XL.** The **Sensor Dial** action needs a Stream Deck + or Stream Deck + XL encoder (dial + touchscreen). Regular keys use the **Sensor Reading** action instead.
-2. **No sensor picked yet**: a fresh dial shows **HWiNFO** / **rotate to pick**. Turn the dial to select a reading, or pick one under **On the dial now** in the settings panel.
+2. **No sensor picked yet**: a fresh dial shows **Pick a sensor** / **rotate to pick**. Turn the dial to select a reading, or pick one under **On the dial now** in the settings panel.
 3. **Turns specifically do nothing**: check whether **Ignore turns** is on, whether the dial is **pinned** (it shows "pinned" where it normally says "session"; unpin with the gesture or an HWiNFO Control key), whether its reading is missing (**Sensor missing / waiting** holds the saved pick until the sensor returns), and on Custom whether **Turn** is set to **Do nothing**. The line under **On the dial now** in the settings panel names what changes the reading on this dial, and the list under **Gestures** (Controls) says what each gesture does now.
 
 Dial gesture reference (Legacy preset, the default): a **turn** cycles your rotation set if you built one, otherwise the readings of the same sensor source · **push** resets session min/max/avg · **touch** cycles current/min/max/avg · **long touch** returns to the live value. The Elite and Custom presets remap these; see [Dial controls & presets](controls.md).
@@ -239,7 +252,7 @@ Files rotate as `com.lawrensen.hwinfo.0.log` (newest) through `.9.log`. Each lin
 Useful lines to look for:
 
 - `Opened HWiNFO data source: shared-memory` / `gadget`: which interface is actually in use.
-- A `Shared memory returned` line: auto-fallback recovered and upgraded from the gadget registry.
+- A `Shared memory returned` line: Auto was on the Gadget registry and switched back to Shared Memory (it checks about every 15 seconds while on Gadget).
 - `HWiNFO unavailable [<reason>]: …` names the exact failure reason (`not-running`, `disabled`, `busy`, `access-denied`, `gadget-empty`, `bridge-failed`, `invalid`, `unsupported-platform`).
 - `Data source layout changed; reopened in place (shared-memory)`: HWiNFO's sensor list grew or shrank (starting a game that adds GPU readings does it) and the poller reopened at the new size and re-read within the same tick, so the values never left the keys. Logged at INFO; it is not an error.
 - `Holding last values while the data source reopens [<reason>]: …`: a transient open failure (`invalid`, `not-running` or `busy`). The last values stay on the keys for up to 15 seconds after the last fresh reading, then a status screen appears.

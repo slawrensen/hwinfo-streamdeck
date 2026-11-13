@@ -1,10 +1,13 @@
 /** Maps poller/selection states to key art and short dial texts. */
+import { t } from "../i18n";
 import type { PollerStatus } from "../poller";
 import type { StatusKeyOptions } from "./key-renderer";
 
 const BLUE = "#4cc2ff";
 const AMBER = "#f5a623";
 const RED = "#ff5d52";
+/** The "no value" glyph a face draws (not a word, so not in the catalog). */
+const NO_VALUE = "—";
 
 /**
  * Key art for a non-data state, or `null` when live data is available.
@@ -17,37 +20,43 @@ export function statusScreen(status: PollerStatus): StatusKeyOptions | null {
 	}
 	if (status.state === "stale") {
 		// Sub-line matches the source in use (like the dial text + PI hint).
-		return { icon: "clock", accent: AMBER, lines: [status.source === "gadget" ? "Age unknown" : "Not updating", status.source === "gadget" ? "check Gadget" : "check sharing"] };
+		return { icon: "clock", accent: AMBER, lines: status.source === "gadget" ? [t("face.staleGadget.title"), t("face.staleGadget.hint")] : [t("face.staleShared.title"), t("face.staleShared.hint")] };
 	}
 	switch (status.reason) {
 		case "not-running":
-			return { icon: "power", accent: BLUE, lines: ["Start HWiNFO", "not detected"] };
+			return { icon: "power", accent: BLUE, lines: [t("face.notRunning.title"), t("face.notRunning.hint")] };
 		case "busy":
 			// Both shared-memory contention and a changing Gadget scan can
 			// reach this reason; neither proves the producer's process state.
-			return { icon: "clock", accent: AMBER, lines: ["Source busy", "retrying"] };
+			return { icon: "clock", accent: AMBER, lines: [t("face.busy.title"), t("face.busy.hint")] };
 		case "gadget-empty":
-			return { icon: "target", accent: AMBER, lines: ["Tick sensors", "in Gadget"] };
+			return { icon: "target", accent: AMBER, lines: [t("face.gadgetEmpty.title"), t("face.gadgetEmpty.hint")] };
 		case "disabled":
-			return { icon: "warning", accent: AMBER, lines: ["Shared Memory", "is off"] };
+			return { icon: "warning", accent: AMBER, lines: [t("face.disabled.title"), t("face.disabled.hint")] };
 		case "access-denied":
-			return { icon: "lock", accent: RED, lines: ["Access denied", "open settings"] };
+			return { icon: "lock", accent: RED, lines: [t("face.accessDenied.title"), t("face.accessDenied.hint")] };
 		case "unsupported-platform":
-			return { icon: "warning", accent: RED, lines: ["Needs x64", "Windows"] };
+			return { icon: "warning", accent: RED, lines: [t("face.unsupported.title"), t("face.unsupported.hint")] };
 		case "bridge-failed":
 			// A bridge load failure does not identify damage or a security block.
-			return { icon: "warning", accent: RED, lines: ["Bridge failed", "reinstall"] };
+			return { icon: "warning", accent: RED, lines: [t("face.bridgeFailed.title"), t("face.bridgeFailed.hint")] };
 		default:
-			return { icon: "warning", accent: RED, lines: ["Source error", "open settings"] };
+			return { icon: "warning", accent: RED, lines: [t("face.sourceError.title"), t("face.sourceError.hint")] };
 	}
 }
 
 export function noSelectionScreen(): StatusKeyOptions {
-	return { icon: "target", accent: BLUE, lines: ["Pick a sensor", "in settings"] };
+	return { icon: "target", accent: BLUE, lines: [t("face.noSelection.title"), t("face.noSelection.hint")] };
 }
 
 export function missingReadingScreen(): StatusKeyOptions {
-	return { icon: "question", accent: AMBER, lines: ["Sensor missing", "pick again"] };
+	return { icon: "question", accent: AMBER, lines: [t("face.missing.title"), t("face.missing.hint")] };
+}
+
+/** The placeholder row label for a configured key the snapshot does not
+ * publish (its value is the one permitted em dash). */
+export function missingRowLabel(): string {
+	return t("face.missing.title");
 }
 
 /** Short two-line text for the Stream Deck + touchscreen. */
@@ -59,25 +68,25 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
 		// Match the recovery hint to the source in use, like statusScreen and
 		// statusSentence do; a gadget-source dial must not be told to check
 		// Shared Memory sharing that isn't even the source it's reading from.
-		return { title: status.source === "gadget" ? "Age unknown" : "No new data", value: status.source === "gadget" ? "check Gadget" : "check sharing" };
+		return status.source === "gadget" ? { title: t("dial.staleGadget.title"), value: t("dial.staleGadget.value") } : { title: t("dial.staleShared.title"), value: t("dial.staleShared.value") };
 	}
 	switch (status.reason) {
 		case "not-running":
-			return { title: "Start HWiNFO", value: "not detected" };
+			return { title: t("dial.notRunning.title"), value: t("dial.notRunning.value") };
 		case "busy":
-			return { title: "Source busy", value: "retrying" };
+			return { title: t("dial.busy.title"), value: t("dial.busy.value") };
 		case "gadget-empty":
-			return { title: "Gadget empty", value: "tick sensors" };
+			return { title: t("dial.gadgetEmpty.title"), value: t("dial.gadgetEmpty.value") };
 		case "disabled":
-			return { title: "Shared Memory off", value: "enable in HWiNFO" };
+			return { title: t("dial.disabled.title"), value: t("dial.disabled.value") };
 		case "access-denied":
-			return { title: "Access denied", value: "open settings" };
+			return { title: t("dial.accessDenied.title"), value: t("dial.accessDenied.value") };
 		case "unsupported-platform":
-			return { title: "Needs x64 Windows", value: "—" };
+			return { title: t("dial.unsupported.title"), value: NO_VALUE };
 		case "bridge-failed":
-			return { title: "Bridge failed", value: "reinstall it" };
+			return { title: t("dial.bridgeFailed.title"), value: t("dial.bridgeFailed.value") };
 		default:
-			return { title: "Source error", value: "open settings" };
+			return { title: t("dial.sourceError.title"), value: t("dial.sourceError.value") };
 	}
 }
 
@@ -85,37 +94,36 @@ export function statusDialText(status: PollerStatus): { title: string; value: st
  * shared name is withheld only while two ticked readings carry it, so the
  * remedy is to act on one of them. */
 function gadgetWithheldNotes(snapshot: { blockedReadingCount?: number; contradictoryReadingCount?: number }): string {
-	return (snapshot.blockedReadingCount ? " Gadget rows with an incomplete name are withheld, and so are two ticked readings that share a source name and label (HWiNFO lists some twice, such as a fan in RPM and in percent). Untick or relabel one of the two in HWiNFO and the other comes back on its own." : "")
-		+ (snapshot.contradictoryReadingCount ? " A Gadget row whose formatted value contradicts its raw value is withheld; the plugin log names the slot." : "");
+	return (snapshot.blockedReadingCount ? ` ${t("sentence.gadgetWithheldNames")}` : "") + (snapshot.contradictoryReadingCount ? ` ${t("sentence.gadgetContradictory")}` : "");
 }
 
 /** Human sentence for PI hints. */
 export function statusSentence(status: PollerStatus): string {
 	if (status.state === "ok") {
-		return status.source === "gadget" ? "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs." + gadgetWithheldNotes(status.snapshot) : "";
+		return status.source === "gadget" ? t("sentence.gadgetOk") + gadgetWithheldNotes(status.snapshot) : "";
 	}
 	if (status.state === "stale") {
 		return status.source === "gadget"
-			? "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support." + gadgetWithheldNotes(status.snapshot)
-			: `No new Shared Memory measurement evidence for ${Math.round(status.staleForMs / 1000)}s. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads.`;
+			? t("sentence.gadgetStale") + gadgetWithheldNotes(status.snapshot)
+			: t("sentence.sharedStale", { seconds: Math.round(status.staleForMs / 1000) });
 	}
 	switch (status.reason) {
 		case "not-running":
-			return "The plugin could not open a sensor feed. Check that HWiNFO is running in Sensors-only mode with Shared Memory Support enabled, or enable Gadget reporting and tick the sensors you need.";
+			return t("sentence.notRunning");
 		case "busy":
-			return "The sensor source was busy or changed during a read. The plugin retries automatically. If this persists, choose \"Copy support report\" under Advanced, Support.";
+			return t("sentence.busy");
 		case "gadget-empty":
-			return "The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab. Check Enable reporting to Gadget and tick \"Report value in Gadget\" for the readings you need.";
+			return t("sentence.gadgetEmpty");
 		case "disabled":
-			return "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.";
+			return t("sentence.disabled");
 		case "access-denied":
-			return "Windows denied access needed to read the sensor source. Choose \"Copy support report\" under Advanced, Support. This error alone does not identify which access rule failed.";
+			return t("sentence.accessDenied");
 		case "unsupported-platform":
-			return "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).";
+			return t("sentence.unsupported");
 		case "bridge-failed":
-			return "The native HWiNFO bridge (bin/hwsm.node) could not load. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A load failure alone does not identify the cause.";
+			return t("sentence.bridgeFailed");
 		default:
-			return "The sensor source could not be opened or validated. Choose \"Copy support report\" under Advanced, Support.";
+			return t("sentence.sourceError");
 	}
 }
 

@@ -1,0 +1,21 @@
+{
+	"policyVersion": 1,
+	"mode": "record-only",
+	"reviewed": "2026-10-24",
+	"basis": "The release runner that built v1.7.1 (GitHub Actions run 40072008109, image windows-2025-vs2026 20261021.278.1, Visual Studio 18.11.12315.225): cl 19.51.36260 from MSVC 14.51.36231, Windows SDK 10.0.26100.0, Node 20.20.0 headers, node-gyp 12.4.0. Fields set to null were not recorded by that run and are filled from the first release run that writes a toolchain record.",
+	"notes": [
+		"This file is not an input of any native source id. Changing it never changes a binary.",
+		"mode record-only: scripts/native-toolchain.mjs reports differences as warnings. Set mode to enforce (or pass --enforce) to make a difference fail the step.",
+		"A deliberate toolchain update (a security fix in the MSVC or SDK libraries, a new node-gyp) is a reviewed change to this file, made together with the drift report from scripts/native-drift.mjs for the release that adopts it.",
+		"nodeLibSha256 is node.lib for Node 20.20.0 win-x64 as node-gyp downloads it, and matches the SHASUMS256 list nodejs.org publishes for that release.",
+		"No pinned SDK library package and no second-VM rebuild for this release: the record says what moved, it does not hold the image still."
+	],
+	"msvcToolsVersion": "14.51.36231",
+	"clVersion": "19.51.36260",
+	"linkVersion": null,
+	"windowsSdkTargetPlatform": "10.0.26100.0",
+	"windowsSdkServicing": null,
+	"nodeHeaders": "20.20.0",
+	"nodeLibSha256": "919d900bb9d589ebbcfda17e6f6e8f6b49d8d6a8d782b6f5efd6b6c6c5f0d1b1",
+	"nodeGyp": "12.4.0"
+}

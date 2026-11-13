@@ -32,10 +32,12 @@ import { composeDialSvg, type DialRenderState } from "../src/actions/sensor-dial
 import { resolveDetailGroup } from "../src/detail/detail-group";
 import { composeChunkFace } from "../src/detail/detail-faces";
 import { detailTilesOf } from "../src/detail/detail-settings";
+import { DETAIL_PROFILES } from "../src/detail/managed-profiles";
 import { DetailNavigator, type DeviceDetailState } from "../src/detail/navigation";
+import { layoutSlotIndexByCell } from "../src/detail/placement";
 import { applyReadingLinks, parseReadingLinks } from "../src/hwinfo/reading-links";
 import { SensorType, type Reading, type SensorSnapshot } from "../src/hwinfo/types";
-import { buildPreview, buildSensorTree } from "../src/pi-protocol";
+import { buildPreview, buildSensorTree, detailPreviewPayloadOf, detailSupportPayloadOf } from "../src/pi-protocol";
 import type { PollerStatus } from "../src/poller";
 import { rotationReadings } from "../src/rotation";
 import { SessionStatsStore } from "../src/stats";
@@ -139,6 +141,8 @@ class FakeElement {
 	innerHTML = "";
 	htmlFor = "";
 	draggable = false;
+	/** A details element's open state (the Page layout fold). */
+	open = false;
 	spellcheck = true;
 	dataset: Record<string, string> = {};
 	style: Record<string, string> = {};
@@ -372,14 +376,14 @@ type Mounted = {
 };
 
 const SHARED_IDS = ["hw-head", "head-reading", "head-source", "head-state", "reading-status", "face", "face-img", "theme-gallery", "picker-list", "picker-refresh", "config-key", "config-deck", "config-note", "config-key-copy", "config-key-apply", "config-deck-copy", "config-deck-apply"];
-const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors", "accent-words", "accent-words-toggle"];
-const READING_IDS = ["detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
+const DIAL_IDS = ["rotation-set", "rotation-help", "pickerr-list", "reading-color-list", "overview-rows", "sensor-value-colors", "accent-words", "f-accent-words", "background-help"];
+const READING_IDS = ["accent-words", "f-accent-words", "background-help", "detail-config", "detail-custom", "detail-filter", "detail-list", "detail-filter-count", "pickerd-list", "show-help", "press-block", "role-note", "detail-unsupported"];
 
 /** Loads the production panel over a fresh DOM, store and socket. */
-function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}, replies?: { settings?: () => Promise<Record<string, unknown>>; globals?: () => Promise<Record<string, unknown>>; textControls?: boolean }): Mounted {
+function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, globalSeed: Record<string, unknown> = {}, replies?: { settings?: () => Promise<Record<string, unknown>>; globals?: () => Promise<Record<string, unknown>>; textControls?: boolean; placement?: boolean }): Mounted {
 	const doc = new FakeDocument(shape === "dial" ? "Sensor Dial settings" : "Sensor Reading settings");
 	doc.body.dataset.kind = shape === "dial" ? "dial" : "key";
-	for (const id of [...SHARED_IDS, ...(shape === "dial" ? DIAL_IDS : READING_IDS)]) doc.make(id, id.endsWith("-copy") || id.endsWith("-apply") ? "button" : id.startsWith("config-") && !id.endsWith("-note") ? "textarea" : "div");
+	for (const id of [...SHARED_IDS, ...(shape === "dial" ? DIAL_IDS : READING_IDS)]) doc.make(id, id.endsWith("-copy") || id.endsWith("-apply") ? "button" : id.startsWith("config-") && !id.endsWith("-note") ? "textarea" : id.startsWith("f-") ? "select" : "div");
 	const pickerWrap = doc.createElement("div");
 	pickerWrap.className = "hw-picker";
 	doc.body.appendChild(pickerWrap);
@@ -387,6 +391,28 @@ function mountPanel(shape: "dial" | "reading", seed: Record<string, unknown>, gl
 	if (replies?.textControls) {
 		doc.make("text-custom", "div");
 		doc.make("text-color", "input");
+	}
+	if (replies?.placement === true) {
+		// The Page layout editor (a fold inside #detail-layout) and the
+		// detail-page scope lede, as sensor-reading.html nests them.
+		const box = doc.make("detail-layout", "div");
+		const fold = doc.createElement("details");
+		box.appendChild(fold);
+		doc.make("layout-page", "span", fold);
+		doc.make("layout-prev", "button", fold);
+		doc.make("layout-next", "button", fold);
+		doc.make("layout-grid", "div", fold);
+		const notes = doc.make("layout-note", "div", fold);
+		for (const note of ["unresolved", "ignored", "limit"]) {
+			const line = doc.createElement("p");
+			line.dataset.note = note;
+			line.dataset.shown = "false";
+			notes.appendChild(line);
+		}
+		doc.make("detail-scope", "div");
+		doc.make("scope-help", "p");
+		doc.make("scope-add", "button");
+		doc.make("scope-list", "ul");
 	}
 	if (shape === "dial") {
 		doc.make("reading-color-preset", "select").value = "automatic";
@@ -616,7 +642,7 @@ const applyDocument = async (m: Mounted, docValue: Record<string, unknown>): Pro
 
 applyGlobalThemeSettings({ theme: "void", typeAccents: "off", textMode: "theme" });
 
-describe("the dial's Words in the accent color box", () => {
+describe("the dial's Words in the accent color select", () => {
 	it("shows on Glass, Tint and Outline only, follows the Background as it changes, and writes nothing", async () => {
 		const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "outline", dialAccentWords: true });
 		await m.flush();
@@ -626,9 +652,30 @@ describe("the dial's Words in the accent color box", () => {
 			await m.flush();
 			assert.equal(m.el("accent-words").hidden, hidden, JSON.stringify(look));
 		}
-		assert.equal(m.writes.length, 0, "showing and hiding the box never saves");
-		assert.equal(m.store.dialAccentWords, true, "a hidden box keeps its value");
-	})
+		assert.equal(m.writes.length, 0, "showing and hiding the select never saves");
+		assert.equal(m.store.dialAccentWords, true, "a hidden select keeps its value");
+	});
+
+	it("follows the shared Background where the dial has none, and its own look wins", async () => {
+		const m = mountPanel("dial", { readingKey: SM[0] }, { dialBackground: "tint" });
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, false, "Default follows the shared Tint");
+		assert.equal(m.el("background-help").hidden, false, "a see-through look shows its one help line");
+		m.echo("dialBackground", "theme");
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, true, "the dial's own Theme wins over the shared Tint");
+		assert.equal(m.el("background-help").hidden, true, "Theme shows no help line");
+		m.echo("dialBackground", "");
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, false, "Default (the empty value) follows the shared look again");
+		m.echoGlobal("dialBackground", "clear");
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, true, "a shared Clear takes no accent words");
+		m.echoGlobal("keyBackground", "glass");
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, true, "a dial panel ignores the key's shared look");
+		assert.equal(m.writes.length, 0, "following a shared look never saves");
+	});
 	it("previews a see-through face over the board its drawn theme calls for, Dimmed and accent words included", async () => {
 		const status = linkedStatus();
 		const config = loadThemes();
@@ -648,24 +695,77 @@ describe("the dial's Words in the accent color box", () => {
 		}
 	});
 
-	it("ticks only for the exact true the plugin reads, saves nothing on open, and a click saves the boolean", async () => {
-		for (const [raw, ticked] of [[true, true], ["true", false], [1, false], [false, false], [undefined, false]] as const) {
+	it("shows On and Off only for the exact booleans the plugin reads, Default for anything else, and saves nothing on open", async () => {
+		for (const [raw, shown] of [[true, "on"], [false, "off"], ["true", ""], [1, ""], ["", ""], [undefined, ""]] as const) {
 			const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "tint", ...(raw === undefined ? {} : { dialAccentWords: raw }) });
 			await m.flush();
-			assert.equal(m.el("accent-words-toggle").checked, ticked, JSON.stringify(raw));
+			assert.equal(m.el("f-accent-words").value, shown, JSON.stringify(raw));
 			assert.equal(m.lastWrite("dialAccentWords"), undefined, `${JSON.stringify(raw)}: opening the panel saves nothing`);
 		}
+	});
+
+	it("a pick saves the boolean, and Default saves the empty value, as Text color's Default does", async () => {
 		const m = mountPanel("dial", { readingKey: SM[0], dialBackground: "tint", dialAccentWords: "true" });
 		await m.flush();
-		const box = m.el("accent-words-toggle");
-		box.checked = true;
-		box.fire("change");
+		const select = m.el("f-accent-words");
+		for (const [pick, saved] of [["on", true], ["off", false], ["", ""]] as const) {
+			select.value = pick;
+			select.fire("change");
+			await m.flush();
+			assert.equal(m.lastWrite("dialAccentWords"), saved, pick);
+		}
+		assert.deepEqual(m.writes.map((w) => w.name), ["dialAccentWords", "dialAccentWords", "dialAccentWords"], "each pick is one write of that field alone");
+	});
+});
+
+describe("the key's Words in the accent color select", () => {
+	it("shows on Glass, Tint and Outline only, follows the key's Background, and writes nothing", async () => {
+		const m = mountPanel("reading", { readingKey: SM[0], keyBackground: "glass", keyAccentWords: true });
 		await m.flush();
-		assert.equal(m.lastWrite("dialAccentWords"), true, "a tick saves the boolean the plugin reads");
-		box.checked = false;
-		box.fire("change");
+		assert.equal(m.el("accent-words").hidden, false, "glass");
+		assert.equal(m.el("f-accent-words").value, "on");
+		for (const [look, hidden] of [["tint", false], ["clear", true], ["theme", true], ["Glass", true], [undefined, true], ["outline", false]] as const) {
+			m.echo("keyBackground", look);
+			await m.flush();
+			assert.equal(m.el("accent-words").hidden, hidden, JSON.stringify(look));
+		}
+		m.echo("dialBackground", "clear");
 		await m.flush();
-		assert.equal(m.lastWrite("dialAccentWords"), false);
+		assert.equal(m.el("accent-words").hidden, false, "a key panel ignores the dial's field");
+		assert.equal(m.writes.length, 0, "showing and hiding the select never saves");
+	});
+
+	it("follows the shared key Background where the key has none, never the dial's", async () => {
+		const m = mountPanel("reading", { readingKey: SM[0] }, { keyBackground: "glass", dialBackground: "clear" });
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, false, "Default follows the shared Glass");
+		assert.equal(m.el("background-help").hidden, false);
+		m.echoGlobal("keyBackground", "theme");
+		await m.flush();
+		assert.equal(m.el("accent-words").hidden, true, "a shared Theme hides it at once");
+		assert.equal(m.el("background-help").hidden, true);
+		assert.equal(m.writes.length, 0, "following a shared look never saves");
+	});
+
+	it("shows On and Off only for the exact booleans, saves nothing on open, and a pick saves keyAccentWords", async () => {
+		for (const [raw, shown] of [[true, "on"], [false, "off"], ["true", ""], [1, ""], [undefined, ""]] as const) {
+			const m = mountPanel("reading", { readingKey: SM[0], keyBackground: "tint", ...(raw === undefined ? {} : { keyAccentWords: raw }) });
+			await m.flush();
+			assert.equal(m.el("f-accent-words").value, shown, JSON.stringify(raw));
+			assert.equal(m.writes.length, 0, `${JSON.stringify(raw)}: opening the panel saves nothing`);
+		}
+		const m = mountPanel("reading", { readingKey: SM[0], keyBackground: "tint" });
+		await m.flush();
+		const select = m.el("f-accent-words");
+		select.value = "on";
+		select.fire("change");
+		await m.flush();
+		assert.equal(m.lastWrite("keyAccentWords"), true);
+		select.value = "";
+		select.fire("change");
+		await m.flush();
+		assert.equal(m.lastWrite("keyAccentWords"), "", "Default saves the empty value, which follows the shared default");
+		assert.equal(m.lastWrite("dialAccentWords"), undefined);
 	});
 });
 
@@ -1358,6 +1458,33 @@ describe("version 2 tile plans keep each label on its reading through links and 
 		assert.deepEqual(own, ["CPU"]);
 		assert.equal(count(), counted(own.length));
 		assert.deepEqual(m.writes.map((w) => w.name), ["readingKey"]);
+	});
+
+	it("a | union counts in the panel what the deck lists, and an all-empty union refuses on both", async () => {
+		// Issue #35: the panel's live count and the deck's list come from two
+		// copies of the grammar; both run here through production code.
+		const seed = { ...base, detailMode: "filter", detailFilter: "pump | ssd|gpu temp", readingKey: S5[0] };
+		const status = gst(PAIR0);
+		const m = await openPanel("reading", seed, status);
+		const deckKeys = async (detailFilter: string): Promise<string[] | "unresolved"> => {
+			const nav = new DetailNavigator({ switchProfile: async () => {} });
+			const entered = await nav.enter({ deviceId: "u", deviceType: 0, settings: { ...seed, detailFilter }, snapshot: status.snapshot });
+			const keys = entered === "entered" ? nav.stateFor("u")!.group.keys.map(nameOf) : "unresolved";
+			nav.shutdown();
+			return keys;
+		};
+		const count = (): string => m.el("detail-filter-count").textContent;
+		assert.deepEqual(await deckKeys(seed.detailFilter), ["GPU", "PUMP", "SSD"], "HWiNFO's order, not the typed order");
+		assert.equal(count(), "Matches 3 readings right now.");
+		m.echo("detailFilter", "cpu|gpu|U Temp");
+		await m.flush();
+		assert.deepEqual(await deckKeys("cpu|gpu|U Temp"), ["GPU"], "the linked opener CPU stays out, and GPU is listed once");
+		assert.equal(count(), "Matches 1 reading right now.");
+		m.echo("detailFilter", " | | ");
+		await m.flush();
+		assert.equal(await deckKeys(" | | "), "unresolved");
+		assert.equal(count(), "Type a pattern; the view refuses to open while it is empty.");
+		assert.equal(m.writes.length, 0, "following the filter writes nothing");
 	});
 
 	it("a plan marked with the string \"2\" reads as version 2 in the panel and on the deck", async () => {
@@ -2983,5 +3110,368 @@ describe("the no-answer status", () => {
 		await m.flush();
 		assert.match(m.el("reading-status").children.map((child) => child.textContent).join(" "), /plugin is not answering this panel/);
 		assert.equal(m.writes.length, 0);
+	});
+});
+
+// The Page layout editor (detailGaps) and the detail-page scope
+// (detailScope), through the production panel: opening the panel, opening
+// the editor, every page step, the plugin's preview answers and folding the
+// editor away save nothing; each cell press and each scope button saves its
+// one field, in one frame, with every other field (the detail triplet
+// above all) carried byte for byte.
+describe("the Page layout editor and the detail-page scope save one field per press, and nothing else", () => {
+	const standard = DETAIL_PROFILES.find((p) => p.key === "standard")!;
+	const OPENER_CELL = { column: 4, row: 2 };
+	const sentOf = (m: Mounted, event: string): Record<string, unknown>[] => m.sent.map((msg) => msg.payload as Record<string, unknown>).filter((p) => p.event === event);
+	async function openEditorPanel(seed: Record<string, unknown>, status: OkStatus = linkedStatus()): Promise<Mounted> {
+		const m = mountPanel("reading", seed, {}, { placement: true });
+		await m.flush();
+		m.feed(buildSensorTree(status));
+		m.feed(buildPreview(status, m.store as { readingKey?: string }, false));
+		m.feed(detailSupportPayloadOf(standard, "Stream Deck", OPENER_CELL));
+		await m.flush();
+		return m;
+	}
+	/** Answers the panel's last preview question the way the plugin does. */
+	async function answer(m: Mounted, status: OkStatus = linkedStatus()): Promise<void> {
+		const asked = sentOf(m, "getDetailPreview").at(-1);
+		assert.ok(asked !== undefined, "the panel asked for a preview");
+		m.feed(detailPreviewPayloadOf(status.snapshot, plain(asked.draft), standard, OPENER_CELL, asked.page, ""));
+		await m.flush();
+	}
+	const fold = (m: Mounted): FakeElement => m.el("layout-grid").parent!;
+	async function setOpen(m: Mounted, open: boolean): Promise<void> {
+		fold(m).open = open;
+		fold(m).fire("toggle");
+		await m.flush();
+	}
+	const cellAt = (m: Mounted, column: number, row: number): FakeElement | undefined => m.el("layout-grid").querySelectorAll("button").find((b) => b.dataset.column === String(column) && b.dataset.row === String(row));
+	async function pressCell(m: Mounted, column: number, row: number): Promise<void> {
+		const button = cellAt(m, column, row);
+		assert.ok(button !== undefined, `a cell button at ${column},${row}`);
+		m.el("layout-grid").fire("click", { target: button });
+		await m.flush();
+	}
+	const withoutField = (doc: Record<string, unknown>, field: string): Record<string, unknown> => Object.fromEntries(Object.entries(plain(doc)).filter(([k]) => k !== field));
+	const base = { readingKey: G[0], pressBehavior: "open-details" };
+
+	it("opening the panel and the editor, every page step, each preview and folding it away save nothing", async () => {
+		const seed = { ...base, detailGaps: { standard: [[], [{ column: 2, row: 0 }]] } };
+		const m = await openEditorPanel(seed);
+		assert.equal(m.el("detail-layout").hidden, false, "a supported deck shows the editor");
+		assert.equal(sentOf(m, "getDetailPreview").length, 0, "folded, it asks nothing");
+		await setOpen(m, true);
+		assert.equal(sentOf(m, "getDetailPreview").length, 1);
+		assert.equal(sentOf(m, "getDetailPreview")[0]?.page, 0);
+		await answer(m);
+		assert.equal(m.el("layout-grid").querySelectorAll("button").length, standard.layout.readings.length, "one button per reading cell");
+		assert.equal(m.el("layout-grid").querySelectorAll("span[data-kind=nav]").length, 4, "the navigation cells are drawn, never toggles");
+		assert.equal(cellAt(m, 2, 0)?.dataset.kind, "reading");
+		assert.equal(cellAt(m, 4, 2)?.dataset.kind, "back", "the opener's own cell is the mirror Back");
+		assert.equal(cellAt(m, 4, 2)?.getAttribute("aria-disabled"), "true");
+		assert.equal(m.el("layout-page").textContent, "Page 1 of 2", "a stored second page counts");
+		m.el("layout-next").fire("click");
+		await m.flush();
+		assert.equal(sentOf(m, "getDetailPreview").at(-1)?.page, 1);
+		await answer(m);
+		assert.equal(m.el("layout-page").textContent, "Page 2 of 2");
+		assert.equal(cellAt(m, 2, 0)?.dataset.kind, "gap");
+		assert.equal(cellAt(m, 2, 0)?.getAttribute("aria-pressed"), "true");
+		m.el("layout-prev").fire("click");
+		await m.flush();
+		await answer(m);
+		assert.equal(m.el("layout-page").textContent, "Page 1 of 2");
+		await setOpen(m, false);
+		assert.equal(m.writes.length, 0, "nothing was saved");
+		assert.deepEqual(plain(m.store), seed);
+	});
+
+	it("a cell press saves detailGaps alone, in one frame, keeping other decks and fields; the deck reads it", async () => {
+		const seed = { ...base, detailMode: "custom", detailKeys: [G[1], G[2]], detailGaps: { xl: [[{ column: 1, row: 0 }]], later: "kept" } };
+		const m = await openEditorPanel(seed);
+		await setOpen(m, true);
+		await answer(m);
+		await pressCell(m, 3, 0);
+		assert.equal(m.writes.length, 1, "one press, one save");
+		assert.equal(m.writes[0]?.name, "detailGaps");
+		assert.deepEqual(m.writes[0]?.value, { xl: [[{ column: 1, row: 0 }]], later: "kept", standard: [[{ column: 3, row: 0 }]] });
+		assert.deepEqual(withoutField(m.store, "detailGaps"), withoutField(seed, "detailGaps"), "every other field as stored");
+		// The deck walks the saved layout: slot 1 (3,0) is kept empty.
+		const nav = new DetailNavigator({ switchProfile: async () => {} });
+		assert.equal(await nav.enter({ deviceId: "gaps", deviceType: 0, settings: plain(m.store), snapshot: linkedStatus().snapshot, openerCell: OPENER_CELL }), "entered");
+		nav.setSlotCells("gaps", layoutSlotIndexByCell(standard.layout.readings));
+		nav.setMirrorSlotIndex("gaps", 10);
+		const page = nav.pageFor(nav.stateFor("gaps")!);
+		nav.shutdown();
+		assert.deepEqual(page.reserved, [1, 10]);
+		assert.deepEqual(page.chunks.slice(0, 3), [[G[1]], [], [G[2]]]);
+		// The panel re-asked after its own save; the answer shows the space.
+		await answer(m);
+		assert.equal(cellAt(m, 3, 0)?.dataset.kind, "gap");
+		await pressCell(m, 3, 0);
+		assert.equal(m.writes.length, 2);
+		assert.deepEqual(m.writes[1]?.value, { xl: [[{ column: 1, row: 0 }]], later: "kept" }, "letting the reading back in drops the empty page");
+	});
+
+	it("the last free cell on a page cannot be emptied", async () => {
+		const others = standard.layout.readings.filter((c) => !(c.column === OPENER_CELL.column && c.row === OPENER_CELL.row) && !(c.column === 2 && c.row === 0));
+		const m = await openEditorPanel({ ...base, detailGaps: { standard: [others.map((c) => ({ column: c.column, row: c.row }))] } });
+		await setOpen(m, true);
+		await answer(m);
+		assert.equal(cellAt(m, 2, 0)?.getAttribute("aria-disabled"), "true", "the one cell left for readings");
+		assert.equal(cellAt(m, 2, 0)?.title, "The last cell left for readings on this page cannot be emptied", "it says why a press does nothing");
+		assert.equal(cellAt(m, 3, 0)?.getAttribute("aria-disabled"), "false", "a kept-empty cell can always be let back in");
+		m.el("layout-grid").fire("click", { target: cellAt(m, 2, 0)! });
+		await m.flush();
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("a 1.7.0 plan whose two hidden spellings trail keeps its triplet byte for byte through gap edits", async () => {
+		const seed = { pressBehavior: "open-details", detailMode: "custom", readingKey: SM[0], detailKeys: [G[1], G[2], SM[0], G[0]], detailTiles: [{ size: 3, labels: ["GPU", "PUMP", "CPU"] }] };
+		const m = await openEditorPanel(seed);
+		await setOpen(m, true);
+		await answer(m);
+		await pressCell(m, 2, 0);
+		await answer(m);
+		await pressCell(m, 2, 0);
+		assert.deepEqual(m.writes.map((w) => w.name), ["detailGaps", "detailGaps"], "only the gap field was saved");
+		assert.equal(JSON.stringify(m.store.detailKeys), JSON.stringify(seed.detailKeys));
+		assert.equal(JSON.stringify(m.store.detailTiles), JSON.stringify(seed.detailTiles));
+		assert.equal(m.store.detailTilesVersion, undefined, "the 1.7.0 rule stands");
+	});
+
+	it("the scope offer appears on a detail page; each button saves detailScope alone; asking writes nothing", async () => {
+		const seed = { readingKey: G[1], detailScope: { sources: ["Old sensor"], future: 1 } };
+		const m = await openEditorPanel(seed);
+		assert.equal(sentOf(m, "getDetailScope").length, 1, "the panel asks once at load");
+		m.feed({ event: "detailScope", context: "", onDetailPage: false, opener: null, sources: [{ id: "Old sensor", name: null }] });
+		await m.flush();
+		assert.equal(m.el("detail-scope").hidden, false, "a limited key lists its sensors anywhere");
+		assert.equal(m.el("scope-add").hidden, true, "off a detail page there is nothing to add");
+		assert.match(m.el("scope-list").querySelectorAll("span")[0]?.textContent ?? "", /not in HWiNFO now/);
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: { id: "Sample sensors", name: "Sample sensors" }, sources: [{ id: "Old sensor", name: null }] });
+		await m.flush();
+		assert.equal(m.el("scope-add").hidden, false);
+		assert.equal(m.el("scope-add").textContent, "Also show on Sample sensors detail pages");
+		assert.equal(m.writes.length, 0, "answers and renders save nothing");
+		m.el("scope-add").fire("click");
+		await m.flush();
+		assert.equal(m.writes.length, 1);
+		assert.equal(m.writes[0]?.name, "detailScope");
+		assert.deepEqual(m.writes[0]?.value, { sources: ["Old sensor", "Sample sensors"], future: 1 });
+		assert.deepEqual(withoutField(m.store, "detailScope"), withoutField(seed, "detailScope"));
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: { id: "Sample sensors", name: "Sample sensors" }, sources: [{ id: "Old sensor", name: null }, { id: "Sample sensors", name: "Sample sensors" }] });
+		await m.flush();
+		assert.equal(m.el("scope-add").hidden, false, "listed: the button keeps its place");
+		assert.equal(m.el("scope-add").getAttribute("aria-disabled"), "true", "listed: no second offer");
+		assert.equal(m.el("scope-add").textContent, "Shows on Sample sensors detail pages");
+		m.el("scope-add").fire("click");
+		await m.flush();
+		assert.equal(m.writes.length, 1, "a press on the listed offer saves nothing");
+		const remove = m.el("scope-list").querySelectorAll("button").find((b) => b.dataset.source === "Old sensor");
+		assert.ok(remove !== undefined);
+		m.el("scope-list").fire("click", { target: remove });
+		await m.flush();
+		assert.equal(m.writes.length, 2);
+		assert.deepEqual(m.writes[1]?.value, { sources: ["Sample sensors"], future: 1 });
+	});
+
+	it("an unscoped key on a detail page is offered the opener's sensor; a Back tile never is", async () => {
+		const m = await openEditorPanel({ readingKey: G[1] });
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: { id: "f0000501:0", name: "CPU [#0]" }, sources: [] });
+		await m.flush();
+		assert.equal(m.el("scope-add").textContent, "Show only on CPU [#0] detail pages");
+		m.el("scope-add").fire("click");
+		await m.flush();
+		assert.deepEqual(
+			m.writes.map((w) => [w.name, w.value]),
+			[["detailScope", { sources: ["f0000501:0"] }]]
+		);
+		const back = await openEditorPanel({ detailRole: "back" });
+		back.feed({ event: "detailScope", context: "", onDetailPage: true, opener: { id: "f0000501:0", name: "CPU [#0]" }, sources: [] });
+		await back.flush();
+		assert.equal(back.el("detail-scope").hidden, true);
+		const off = await openEditorPanel({ readingKey: G[1] });
+		off.feed({ event: "detailScope", context: "", onDetailPage: false, opener: null, sources: [] });
+		await off.flush();
+		assert.equal(off.el("detail-scope").hidden, true, "an ordinary key off the detail page sees nothing new");
+		assert.equal(back.writes.length + off.writes.length, 0);
+	});
+
+	/** The fake document's focused element, through the element's own document. */
+	const focusedOf = (el: FakeElement): unknown => (el as unknown as { doc: { activeElement: unknown } }).doc.activeElement;
+
+	it("a list that gets shorter while a later page shows brings the page down and asks for it", async () => {
+		// Fifteen listed readings on the standard deck: two pages.
+		const many = Array.from({ length: 15 }, (_, i) => `f0000501:0:${(0x2000 + i).toString(16)}`);
+		const m = await openEditorPanel({ ...base, detailMode: "custom", detailKeys: many });
+		await setOpen(m, true);
+		await answer(m);
+		m.el("layout-next").fire("click");
+		await m.flush();
+		await answer(m);
+		assert.equal(m.el("layout-page").textContent, "Page 2 of 2");
+		m.echo("detailKeys", many.slice(0, 5));
+		await m.flush();
+		await answer(m); // the answer for page 2 says there is one page now
+		assert.equal(m.el("layout-page").textContent, "Page 1 of 1");
+		assert.equal(sentOf(m, "getDetailPreview").at(-1)?.page, 0, "the page now shown is asked for at once");
+		await answer(m);
+		const buttons = m.el("layout-grid").querySelectorAll("button");
+		assert.ok(buttons.some((b) => b.getAttribute("aria-disabled") === "false"), "the grid takes presses again");
+		assert.equal(cellAt(m, 2, 0)?.dataset.kind, "reading");
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("taking the only empty cell off a page past the list end brings the editor back to the last page", async () => {
+		const m = await openEditorPanel({ ...base, detailGaps: { standard: [[], [], [{ column: 2, row: 0 }]] } });
+		await setOpen(m, true);
+		await answer(m);
+		for (let i = 0; i < 2; i++) {
+			m.el("layout-next").fire("click");
+			await m.flush();
+			await answer(m);
+		}
+		assert.equal(m.el("layout-page").textContent, "Page 3 of 3");
+		await pressCell(m, 2, 0);
+		assert.deepEqual(m.writes.at(-1)?.value, {}, "the press took the stored page away");
+		await answer(m);
+		const page = sentOf(m, "getDetailPreview").at(-1)?.page;
+		assert.ok(typeof page === "number" && page < 2, "the page shown came down and was asked for");
+		await answer(m);
+		assert.ok(m.el("layout-grid").querySelectorAll("button").some((b) => b.getAttribute("aria-disabled") === "false"));
+	});
+
+	it("stored empty cells the deck ignores on a full page read as kept empty, and a press lets a reading in", async () => {
+		// Every reading cell but the opener's own is stored as empty; with
+		// the second Back on that cell, the page has no cell for readings.
+		const others = standard.layout.readings.filter((c) => !(c.column === OPENER_CELL.column && c.row === OPENER_CELL.row)).map((c) => ({ column: c.column, row: c.row }));
+		const m = await openEditorPanel({ ...base, detailGaps: { standard: [others] } });
+		await setOpen(m, true);
+		await answer(m);
+		const cell = cellAt(m, 2, 0)!;
+		assert.equal(cell.dataset.kind, "gap");
+		assert.equal(cell.dataset.ignored, "true");
+		assert.equal(cell.getAttribute("aria-pressed"), "true", "it reads as kept empty, as stored");
+		assert.match(cell.title, /ignored/);
+		const shown = m.el("layout-note").querySelectorAll("[data-note]").filter((n) => n.dataset.shown === "true");
+		assert.deepEqual(shown.map((n) => n.dataset.note), ["ignored"], "the fold says why");
+		await pressCell(m, 2, 0);
+		assert.equal(m.writes.length, 1);
+		const saved = (m.writes[0]?.value as { standard: { column: number; row: number }[][] }).standard[0]!;
+		assert.ok(!saved.some((c) => c.column === 2 && c.row === 0), "the press took the cell out of the stored page, the way it reads");
+		assert.equal(saved.length, others.length - 1);
+	});
+
+	it("a press that would leave a page no cell for readings saves nothing, even on a stale grid", async () => {
+		// Two cells left for readings: (2,0) and (3,0). Two quick presses,
+		// the second before the plugin redrew the page.
+		const others = standard.layout.readings.filter((c) => !(c.column === OPENER_CELL.column && c.row === OPENER_CELL.row) && !(c.column === 2 && c.row === 0) && !(c.column === 3 && c.row === 0)).map((c) => ({ column: c.column, row: c.row }));
+		const m = await openEditorPanel({ ...base, detailGaps: { standard: [others] } });
+		await setOpen(m, true);
+		await answer(m);
+		await pressCell(m, 2, 0);
+		assert.equal(m.writes.length, 1);
+		await pressCell(m, 3, 0);
+		assert.equal(m.writes.length, 1, "the second press would have voided the page's layout");
+	});
+
+	it("the label counts every page the list fills; Next stops at page 16 and the fold says so", async () => {
+		const readings = Array.from({ length: 300 }, (_, i) => sample(`f0000501:0:${(0x1000 + i).toString(16)}`, i, `R${i}`, SensorType.Temperature, "°C", 40 + (i % 10)));
+		const snapshot: SensorSnapshot = { pollTime: 1, valueRevision: 1, version: 2, revision: 0, sensors: [{ index: 0, id: 0xf0000501, instance: 0, name: "CPU" }], readings, byKey: new Map(readings.map((r) => [r.key, r])) };
+		const status = { state: "ok", source: "shared-memory", snapshot } as OkStatus;
+		const m = await openEditorPanel({ readingKey: readings[0]!.key, pressBehavior: "open-details" }, status);
+		await setOpen(m, true);
+		await answer(m, status);
+		assert.equal(m.el("layout-page").textContent, "Page 1 of 30");
+		for (let i = 0; i < 20; i++) {
+			m.el("layout-next").fire("click");
+			await m.flush();
+		}
+		await answer(m, status);
+		assert.equal(m.el("layout-page").textContent, "Page 16 of 30");
+		assert.equal(sentOf(m, "getDetailPreview").at(-1)?.page, 15);
+		assert.equal(m.el("layout-next").getAttribute("aria-disabled"), "true");
+		const shown = m.el("layout-note").querySelectorAll("[data-note]").filter((n) => n.dataset.shown === "true");
+		assert.deepEqual(shown.map((n) => n.dataset.note), ["limit"]);
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("a cell press, a preview answer and a page step keep focus on the same button", async () => {
+		const m = await openEditorPanel({ ...base });
+		await setOpen(m, true);
+		await answer(m);
+		const cell = cellAt(m, 2, 0)!;
+		cell.focus();
+		await pressCell(m, 2, 0);
+		await answer(m);
+		assert.equal(cellAt(m, 2, 0), cell, "the same button, updated in place");
+		assert.equal(cell.dataset.kind, "gap");
+		assert.equal(cell.parent, m.el("layout-grid"), "still in the grid");
+		assert.equal(focusedOf(cell), cell, "focus stayed on the cell");
+		m.el("layout-next").fire("click");
+		await m.flush();
+		await answer(m);
+		assert.equal(cellAt(m, 2, 0), cell, "a page step reuses the buttons too");
+	});
+
+	it("a scope Remove hands focus to the next sensor's Remove, never to the page", async () => {
+		const m = await openEditorPanel({ readingKey: G[1], detailScope: { sources: ["A", "B"] } });
+		const both = { event: "detailScope", context: "", onDetailPage: false, opener: null, sources: [{ id: "A", name: "A", state: "present" }, { id: "B", name: "B", state: "present" }] };
+		m.feed(both);
+		await m.flush();
+		const removeA = m.el("scope-list").querySelectorAll("button").find((b) => b.dataset.source === "A")!;
+		removeA.focus();
+		m.el("scope-list").fire("click", { target: removeA });
+		await m.flush();
+		assert.deepEqual(m.writes.at(-1)?.value, { sources: ["B"] });
+		m.feed({ ...both, sources: [{ id: "B", name: "B", state: "present" }] });
+		await m.flush();
+		const removeB = m.el("scope-list").querySelectorAll("button").find((b) => b.dataset.source === "B")!;
+		assert.equal(focusedOf(removeB), removeB);
+	});
+
+	it("the scope box holds its place on live data: shown on a detail page before the sensor is known, and it stays", async () => {
+		const m = await openEditorPanel({ readingKey: G[1] });
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: null, sources: [] });
+		await m.flush();
+		assert.equal(m.el("detail-scope").hidden, false, "on a detail page the box shows before HWiNFO names the sensor");
+		assert.equal(m.el("scope-add").hidden, false);
+		assert.equal(m.el("scope-add").getAttribute("aria-disabled"), "true", "nothing to add yet");
+		m.el("scope-add").fire("click");
+		await m.flush();
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: { id: "f0000501:0", name: "CPU [#0]" }, sources: [] });
+		await m.flush();
+		assert.equal(m.el("scope-add").getAttribute("aria-disabled"), "false");
+		assert.equal(m.el("scope-add").textContent, "Show only on CPU [#0] detail pages");
+		m.feed({ event: "detailScope", context: "", onDetailPage: true, opener: null, sources: [] });
+		await m.flush();
+		assert.equal(m.el("detail-scope").hidden, false, "HWiNFO stopping does not take the box away");
+		assert.equal(m.el("scope-add").hidden, false);
+		assert.equal(m.writes.length, 0);
+	});
+
+	it("a scope entry saved under the other data source says so, never that the sensor is gone", async () => {
+		const m = await openEditorPanel({ readingKey: G[1], detailScope: { sources: ["e000:1", "GPU", "abcd:9", "f000:0"] } });
+		m.feed({
+			event: "detailScope",
+			context: "",
+			onDetailPage: false,
+			opener: null,
+			sources: [
+				{ id: "e000:1", name: null, state: "other-source", savedWith: "shared-memory" },
+				{ id: "GPU", name: "GPU", state: "other-source", savedWith: "gadget" },
+				{ id: "abcd:9", name: null, state: "absent" },
+				{ id: "f000:0", name: null, state: "no-data" }
+			]
+		});
+		await m.flush();
+		const texts = m.el("scope-list").querySelectorAll("span").map((n) => n.textContent);
+		assert.deepEqual(texts, [
+			"Sensor e000:1, saved with Shared Memory; the plugin reads the Gadget registry now",
+			"GPU, saved with the Gadget registry; the plugin reads Shared Memory now",
+			"Sensor abcd:9, not in HWiNFO now",
+			"Sensor f000:0, waiting for HWiNFO data"
+		]);
 	});
 });

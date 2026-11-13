@@ -7,10 +7,10 @@
  * for the device faces), fed a fixture snapshot from pi-fixtures.mjs.
  *
  * What this proves and what it does not: the shipped HTML, CSS, scripts and
- * vendored sdpi-components run unmodified in Chromium against the exact
- * message shapes the plugin builds. It does not prove the Stream Deck app's
- * embedded webview, its fonts or its message timing; captures made here are
- * labeled "simulated host, sample data".
+ * the panel client (ui/pi-client.js) run unmodified in Chromium against the
+ * exact message shapes the plugin builds. It does not prove the Stream Deck
+ * app's embedded webview, its fonts or its message timing; captures made
+ * here are labeled "simulated host, sample data".
  *
  * Every PI message is recorded, and setSettings/setGlobalSettings payloads
  * are kept in arrival order, so suites can assert exact write counts.
@@ -22,13 +22,25 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
 import { compose } from "../../src/actions/sensor-reading.ts";
+import { immediateKeyView, keyAlertPanelOf, NORMAL_VIEW } from "../../src/alerts/key-alerts.ts";
 import { composeDialSvg } from "../../src/actions/sensor-dial.ts";
+import { CalcEditor } from "../../src/editors/calc-editor.ts";
+import { EditorService } from "../../src/editors/editor-service.ts";
+import { LinkEditor } from "../../src/editors/link-editor.ts";
+import { GlobalSettingsWriter } from "../../src/global-writer.ts";
+import { mintCalculatedId, parseCalculatedReadings, withCalculatedReadings } from "../../src/hwinfo/calculated.ts";
+import { ReadingCatalog } from "../../src/hwinfo/link-pairing.ts";
+import { applyReadingLinks, parseReadingLinks } from "../../src/hwinfo/reading-links.ts";
+import { HwinfoError } from "../../src/hwinfo/types.ts";
 import { PanelFoldMemory, panelKindOf } from "../../src/panel-folds.ts";
-import { buildPreview, buildSensorTree, buildThemesPayload } from "../../src/pi-protocol.ts";
-import { poller } from "../../src/poller.ts";
+import { DETAIL_PROFILES } from "../../src/detail/managed-profiles.ts";
+import { buildPreview, buildSensorTree, buildThemesPayload, detailPreviewPayloadOf, detailSupportPayloadOf } from "../../src/pi-protocol.ts";
+import { looksGenOf, NO_OWN_LOOKS } from "../../src/ui/shared-looks.ts";
+import { parseSourceMode, poller } from "../../src/poller.ts";
 import { SessionStatsStore } from "../../src/stats.ts";
 import { applyGlobalThemeSettings } from "../../src/ui/theme-store.ts";
 import { frozenHistory, sampleSnapshot, scenarios } from "./pi-fixtures.mjs";
+import { createStripRig } from "./pi-strip-sim.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // PI_SIM_PLUGIN_DIR serves another checkout's panels (a baseline worktree)
@@ -57,6 +69,8 @@ function statusFor(data, snapshot) {
 	return { state: "ok", snapshot, source: "shared-memory" };
 }
 
+const standardDetail = DETAIL_PROFILES.find((p) => p.key === "standard");
+
 export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {} }) {
 	const all = scenarios();
 	const sim = {
@@ -71,6 +85,15 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		globalWrites: [],
 		piMessages: [],
 		toPiLog: [],
+		/** Opt-in detail placement for a reading panel: null answers
+		 * getDetailSupport the old way (no grid, so the Page layout editor
+		 * stays hidden). { opener, scope } answers as a standard 15-key deck
+		 * with the opener on `opener`, the plugin's own preview builder for
+		 * getDetailPreview, and `scope(settings)` (a detailScope payload
+		 * without its event and context) for getDetailScope and again after
+		 * every save, as the plugin pushes it. Set per fixture through
+		 * setFixture's overrides.detailPlacement. */
+		detailPlacement: null,
 		/** Reply latency for sendToPlugin requests (ms), for race suites. */
 		replyDelayMs: 0,
 		/** Extra latency for the remembered-folds answer alone (ms), so a
@@ -84,6 +107,12 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		stats: new SessionStatsStore(),
 		/** The plugin's in-memory fold memory; a fresh sim is a fresh plugin. */
 		folds: new PanelFoldMemory(),
+		/** The plugin's count of the visible actions keeping their own
+		 * Background or Words (the getOwnLooks answer); null is none. */
+		ownLooks: null,
+		/** A fixture with `strip` gets the plugin's real strip runtime over a
+		 * simulated deck of Sensor Dials (pi-strip-sim.mjs); else null. */
+		strip: null,
 		piWs: null
 	};
 	// Session stats and frozen sparkline history for every fixture reading,
@@ -102,7 +131,56 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	};
 	seedHistory();
 
-	const status = () => statusFor(sim.data, sim.snapshot);
+	// The published view the plugin derives: links, then calculated
+	// readings, from the shared document. With neither stored it is the
+	// fixture snapshot itself, so every older fixture renders as before.
+	const derived = (snapshot) => withCalculatedReadings(applyReadingLinks(snapshot, parseReadingLinks(sim.globals.readingLinks), 0), parseCalculatedReadings(sim.globals.calculatedReadings));
+	const status = () => statusFor(sim.data, derived(sim.snapshot));
+	// The plugin side's serialized global-settings writer: the Reading links
+	// and Calculated readings editors commit through it. A commit writes the
+	// sim's shared document as the plugin would; the host does not pass it on
+	// to the open panel (the model the editors were built for).
+	const pluginWriter = new GlobalSettingsWriter({
+		read: async () => structuredClone(sim.globals),
+		write: async (doc) => {
+			sim.globals = structuredClone(doc);
+		}
+	});
+	// The Reading links and Calculated readings editors, answered by the
+	// production modules over the fixture. The other provider cannot be
+	// read here.
+	const catalog = new ReadingCatalog();
+	const rawObservation = () => {
+		const st = statusFor(sim.data, sim.snapshot);
+		return st.state === "unavailable" ? null : { snapshot: sim.snapshot, source: st.source };
+	};
+	const editors = new EditorService({
+		links: new LinkEditor({
+			status,
+			raw: () => {
+				const raw = rawObservation();
+				if (raw !== null) catalog.observe(raw.snapshot, raw.source, performance.now());
+				return raw;
+			},
+			mode: () => parseSourceMode(sim.globals.source),
+			catalog,
+			now: () => performance.now(),
+			globals: () => sim.globals,
+			peek: () => {
+				throw new HwinfoError("not-running", "The simulated host has no second provider.");
+			},
+			dataUnits: () => (sim.globals.dataUnits === "binary" ? "binary" : "decimal")
+		}),
+		calc: new CalcEditor({
+			status,
+			linked: () => (rawObservation() === null ? null : applyReadingLinks(sim.snapshot, parseReadingLinks(sim.globals.readingLinks), 0)),
+			globals: () => sim.globals,
+			dataUnits: () => (sim.globals.dataUnits === "binary" ? "binary" : "decimal"),
+			mintId: () => mintCalculatedId()
+		}),
+		writer: pluginWriter,
+		send: (payload) => toPi(JSON.parse(JSON.stringify(payload)))
+	});
 	const face = () => {
 		const kind = PAGES[sim.page]?.kind;
 		if (kind === "key") {
@@ -110,6 +188,9 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 			return compose(sim.settings, status(), back);
 		}
 		if (kind === "dial") {
+			// A joined strip member's face is its slice, as the dial action sends.
+			const slice = sim.strip?.faceOf();
+			if (typeof slice === "string") return slice;
 			return composeDialSvg({ settings: sim.settings, stats: sim.stats, statMode: "current", overlay: null, cyclePaused: false, pinned: false }, status());
 		}
 		return undefined;
@@ -119,6 +200,10 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	// object arrived alphabetized). The sim does the same, so a panel that
 	// leans on key order fails here first.
 	const sortedKeys = (value) => (Array.isArray(value) ? value.map(sortedKeys) : value !== null && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortedKeys(value[k])])) : value);
+	/** The plugin's detailScope answer, when the fixture opts in. */
+	const pushScope = () => {
+		if (typeof sim.detailPlacement?.scope === "function") toPi({ event: "detailScope", context: sim.context, ...sim.detailPlacement.scope(sim.settings) });
+	};
 	const toPi = (payload) => {
 		if (sim.piWs === null) return;
 		sim.toPiLog.push(payload);
@@ -130,7 +215,16 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	sim.pushPreview = () => {
 		const kind = PAGES[sim.page]?.kind;
 		if (kind !== "key" && kind !== "dial") return;
-		toPi(buildPreview(status(), sim.settings, kind === "key", { context: sim.context, face: face(), kind, holding: sim.data === "holding" }));
+		const strip = kind === "dial" ? sim.strip?.previewOf() : undefined;
+		toPi(buildPreview(status(), sim.settings, kind === "key", { context: sim.context, face: face(), kind, holding: sim.data === "holding", ...(kind === "key" ? keyExtras() : {}), ...(strip === undefined ? {} : { strip }) }));
+	};
+	/** What the key action adds to its preview: the alert path (compared
+	 * once, as a key shows it at "Alert after: Immediately"), from the
+	 * production builders. */
+	const keyExtras = () => {
+		const st = status();
+		const view = st.state === "ok" ? immediateKeyView(sim.settings, st.snapshot) : NORMAL_VIEW;
+		return { keyAlerts: keyAlertPanelOf(sim.settings, st.state === "unavailable" ? null : st.snapshot, view) };
 	};
 	sim.face = face;
 	sim.status = status;
@@ -168,6 +262,8 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		sim.globals = structuredClone(overrides.globals ?? fx.globals);
 		sim.data = overrides.data ?? fx.data;
 		sim.snapshot = overrides.snapshot ?? sampleSnapshot();
+		sim.detailPlacement = overrides.detailPlacement ?? null;
+		sim.ownLooks = overrides.ownLooks ?? null;
 		sim.writes.length = 0;
 		sim.globalWrites.length = 0;
 		sim.piMessages.length = 0;
@@ -175,6 +271,8 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		sim.heldGlobals.length = 0;
 		applyGlobalThemeSettings(sim.globals);
 		seedHistory();
+		sim.strip?.stop();
+		sim.strip = fx.strip === undefined ? null : createStripRig(sim, overrides.strip ?? fx.strip);
 	};
 
 	const info = {
@@ -190,28 +288,34 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 		ws.on("message", (raw) => {
 			const msg = JSON.parse(raw.toString());
 			sim.piMessages.push(msg);
-			const page = PAGES[sim.page];
 			switch (msg.event) {
 				case "registerPropertyInspector":
 					sim.piWs = ws;
-					break;
-				case "getSettings":
-					ws.send(JSON.stringify({ event: "didReceiveSettings", action: page.action, context: sim.context, device: "dev1", payload: { settings: sim.settings, coordinates: { column: 0, row: 0 } } }));
+					sim.strip?.ready();
 					break;
 				case "setSettings":
 					sim.writes.push(structuredClone(msg.payload ?? {}));
 					sim.settings = structuredClone(msg.payload ?? {});
+					sim.strip?.panelWrote(sim.settings);
 					// The plugin repaints on didReceiveSettings and the redesigned
 					// actions push the new face to the open panel at once.
 					setTimeout(sim.pushPreview, 5);
+					setTimeout(pushScope, 5);
 					break;
 				case "getGlobalSettings":
 					if (sim.holdGlobalsReplies) sim.heldGlobals.push(ws);
 					else ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
 					break;
-				case "setGlobalSettings":
+				case "setGlobalSettings": {
+					// "Use it everywhere" (a higher looksResetGen): the plugin resets
+					// every own look it can see and the open panel hears the count.
+					const reset = looksGenOf(msg.payload?.looksResetGen) > looksGenOf(sim.globals?.looksResetGen);
 					sim.globalWrites.push(structuredClone(msg.payload ?? {}));
 					sim.globals = structuredClone(msg.payload ?? {});
+					if (reset) {
+						sim.ownLooks = null;
+						setTimeout(() => toPi({ event: "ownLooks", ...NO_OWN_LOOKS }), 5);
+					}
 					applyGlobalThemeSettings(sim.globals);
 					ws.send(JSON.stringify({ event: "didReceiveGlobalSettings", payload: { settings: sim.globals } }));
 					setTimeout(() => {
@@ -219,14 +323,23 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 						sim.pushPreview();
 					}, 5);
 					break;
+				}
 				case "sendToPlugin": {
 					const event = msg.payload?.event;
 					const reply = () => {
 						if (event === "getSensorTree") toPi(buildSensorTree(status()));
 						else if (event === "getThemes") toPi(JSON.parse(JSON.stringify(buildThemesPayload())));
+						else if (event === "getDetailSupport" && sim.detailPlacement !== null) toPi(detailSupportPayloadOf(standardDetail, "Stream Deck", sim.detailPlacement.opener ?? null));
 						else if (event === "getDetailSupport") toPi({ event: "detailSupport", supported: true, model: "Stream Deck +" });
+						else if (event === "getDetailPreview" && sim.detailPlacement !== null) {
+							const now = status();
+							toPi(detailPreviewPayloadOf(now.state === "unavailable" ? null : now.snapshot, msg.payload?.draft, standardDetail, sim.detailPlacement.opener ?? null, msg.payload?.page, sim.context));
+						} else if (event === "getDetailScope") pushScope();
 						else if (event === "getSupportReport") toPi({ event: "supportReport", requestId: msg.payload.requestId, report: "(simulated support report)" });
 						else if (event === "getPreview") sim.pushPreview();
+						else if (event === "getOwnLooks") toPi({ event: "ownLooks", ...(sim.ownLooks ?? NO_OWN_LOOKS) });
+						else if (editors.handle(msg.payload ?? {})) return;
+						else if (typeof event === "string" && event.startsWith("strip")) sim.strip?.request(msg.payload);
 						else if (event === "getPanelFolds" || event === "setPanelFolds") {
 							const kind = panelKindOf(msg.payload?.kind);
 							if (kind === undefined) return;
@@ -299,6 +412,7 @@ export async function startPiSim({ httpPort, wsPort, tickMs = 0, extraRoutes = {
 	sim.fixtures = all.list;
 	sim.stop = async () => {
 		if (ticker !== null) clearInterval(ticker);
+		sim.strip?.stop();
 		for (const client of wss.clients) client.terminate();
 		await new Promise((resolve) => wss.close(resolve));
 		// A browser that outlived its launcher keeps connections open;

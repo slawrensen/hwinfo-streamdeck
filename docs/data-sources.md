@@ -6,7 +6,7 @@ description: Choose Shared Memory or Gadget and understand reading identity and 
 
 The plugin reads one local HWiNFO source at a time. Auto prefers Shared Memory and can fall back to the Gadget registry. Switching sources does not automatically match saved readings.
 
-For setup, use [Install](installation.md#one-time-hwinfo-setup). This reference covers 1.7 and 1.7.1; [upgrade changes](whats-new-1.7.md) describe differences from 1.6.
+For setup, use [Install](installation.md#one-time-hwinfo-setup). This reference covers 1.7 and later; linking from the settings panel and Calculated readings are new in 1.8. [Upgrade changes](whats-new-1.7.md) describe differences from 1.6.
 
 ## Shared Memory vs. Gadget registry
 
@@ -15,11 +15,11 @@ For setup, use [Install](installation.md#one-time-hwinfo-setup). This reference 
 | What it reads | `Global\HWiNFO_SENS_SM2` mapping | `HKCU\Software\HWiNFO64\VSB` registry key |
 | Sensor coverage | readings HWiNFO publishes through Shared Memory | only the sensors you tick in HWiNFO |
 | Min / max / average | HWiNFO's statistics since start or its last reset | current value only; historical modes display **N/A** |
-| Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | no time limit |
+| Free version | auto-disables after **12 hours** (HWiNFO Pro: unlimited) | not timed by me; see below |
 | Windows access | depends on account, session and object permissions | reads the current user's registry; depends on account and key permissions |
 | Enable in HWiNFO | Settings → **Shared Memory Support** | **Configure Sensors** → **HWiNFO Gadget** tab → **Enable reporting to Gadget**, then **Report value in Gadget** per reading |
 
-Shared Memory provides hardware identities, a producer timestamp and HWiNFO's statistics. On the free version it switches off after 12 hours. Gadget has no such timer, but provides current values under name-based identities, without a producer timestamp or historical statistics.
+Shared Memory provides hardware identities, a producer timestamp and HWiNFO's statistics. On the free version it switches off after 12 hours: HWiNFO's [license page](https://www.hwinfo.com/licenses/) lists the 12-hour limit for Shared Memory Support. I have not run Gadget reporting past 12 hours to check it myself. Gadget provides current values under name-based identities, without a producer timestamp or historical statistics.
 
 > **Note:** Because the Gadget source has no historical stats, a key with **Value shown** set to **Minimum**, **Maximum** or **Average**, or a detail tile showing one of those, displays **N/A** with an empty value while reading from it. While a Gadget source is live, the message under the settings panel's header says "Gadget registry: current values only, no min, max or average." (unless a note about withheld readings takes its place), and the plugin's full note about the source sits under **Advanced → Connection**.
 
@@ -87,7 +87,7 @@ Both the Sensor Reading (key) and Sensor Dial actions expose the same two data-s
 | --- | --- |
 | **Auto (Shared Memory, else Gadget)** *(default)* | The fallback/upgrade logic above. Recommended. |
 | **Shared Memory only** | Never touches the Gadget registry. If Shared Memory is off or expired, keys show a status screen instead of falling back. |
-| **Gadget registry only** | Reads only the registry. Current values only, but immune to the 12-hour limit. |
+| **Gadget registry only** | Reads only the registry. Current values only; for the free version's 12-hour limit, see [Shared Memory vs. Gadget registry](#shared-memory-vs-gadget-registry). |
 
 With either single-provider choice, when that provider has no data the message under the settings panel's header says which setting keeps the other provider out, with a **Data source setting** button that opens it.
 
@@ -100,24 +100,62 @@ How often the plugin reads the source, from **250 ms** to **5 seconds** (default
 ## How this shows up elsewhere
 
 - On the Gadget source, a key with **Value shown** on **Minimum**, **Maximum** or **Average** displays N/A; dials use explicitly local session statistics. There is no HWiNFO-provided history on Gadget; see [Sensor Reading](sensor-reading.md) and [Sensor Dial](sensor-dial.md).
-- On Shared Memory, if the source stops updating (HWiNFO's Sensors window closed, or HWiNFO stopped polling), keys switch to a **Not updating** screen with **check sharing** (dials: **No new data**). Gadget shows **Age unknown / check Gadget**: steady values look the same as ones a killed or crashed HWiNFO left. The free version's 12-hour expiry is different: it shows **Shared Memory off**, or Auto mode falls back to Gadget on its own. Full list in [Troubleshooting](troubleshooting.md).
+- On Shared Memory, if the source stops updating (HWiNFO's Sensors window closed, or HWiNFO stopped polling), keys and dials switch to a **Not updating** screen with **check sharing**. Gadget shows **Age unknown / check Gadget**: steady values look the same as ones a killed or crashed HWiNFO left. The free version's 12-hour expiry is different: it shows **Shared Memory off**, or Auto mode switches to Gadget on its own, where saved Shared Memory readings need [links](#link-readings-across-providers). Full list in [Troubleshooting](troubleshooting.md).
 
 ## Link readings across providers
 
-This is an advanced, explicit pairing step. Set **Data source** to each
-provider in turn, select the reading on that provider, then open
-**Advanced > Configuration documents**, press **Copy** under **This key's
-settings** (**This dial's settings** on a dial) and take the `readingKey`
-value (the key before the appended friendly name; the picker itself never
-shows keys). Select the reading afresh on the Gadget source first: a key
-saved by 1.6.0 for a source name with a colon is an alias spelling, and a
-link only accepts the current key the picker writes. Verify the source,
-label, native unit and reading type against HWiNFO. Return to Auto, then
-add `readingLinks` to the existing **Shared settings** document in the same
-group and press **Replace shared settings**, which asks for a second click
-because it changes every HWiNFO key and dial. Replace swaps the whole
-document, so edit the one the well shows and keep its other fields. Example
-only; use your own keys:
+A link marks a Shared Memory reading and a Gadget reading as the same
+sensor, so a key or dial keeps showing it when Auto switches source. Links
+apply to every HWiNFO key and dial and are kept in the shared settings.
+
+### Link from the settings panel
+
+1. Select a key or dial that shows the reading and open **Advanced >
+   Reading links**. The card at the top shows the reading with its source,
+   sensor, native unit, value and whether it is live. A key with several
+   readings offers them under **Reading to link**.
+2. Press **Look on Gadget** (or **Look on Shared Memory**). The plugin reads
+   the other source once; it never does this on its own, at most once every
+   5 seconds, and not while **Data source** is set to one provider only.
+   Readings the plugin saw earlier in the session also count, so after Auto
+   fell back to Gadget you can still pair against the Shared Memory
+   readings it saw before.
+3. Pick the counterpart under **Matching reading**. Readings with the same
+   source name, label and unit are listed first as suggestions; nothing is
+   picked for you. A reading that cannot be linked says why (another unit,
+   already in another link, an older Gadget spelling).
+4. Read the line under the list ("Links CPU Package (Shared Memory, °C)
+   with CPU Package (Gadget, °C) for every key and dial.") and press
+   **Link**.
+
+Each stored link shows both readings, which one is in use, and whether the
+other one would take over (seen in this session in the same unit). Rows
+the plugin ignores (malformed, conflicting, over the limit) are shown as
+stored and left alone. **Unlink** asks for a second press. When a key's
+saved reading belongs to the source that is not in use, the status block
+under **Reading** offers **Link it to a Gadget reading** (or **Link it to a
+Shared Memory reading**), which opens this section on it.
+
+Opening the section, picking, filtering and leaving write nothing. A
+**Link** or **Unlink** press changes only its own row: the plugin re-reads
+the shared settings, refuses the change if the links were edited in
+another panel or document since the list was shown (the list refreshes;
+press again), and keeps every other field and row, including ones this
+version does not know. A Gadget value read once is shown with "age
+unknown": an unchanged Gadget value is never treated as live.
+
+### Link by hand
+
+The panel writes the same `readingLinks` list you can edit in
+**Advanced > Configuration documents**. To edit it there, copy each
+reading's `readingKey` from **This key's settings** (**This dial's
+settings** on a dial) while that source is active (a Gadget reading saved
+by 1.6.0 for a source name with a colon must be picked again first: a link
+takes only the current key the picker writes), add the rows to the
+**Shared settings** document and press **Replace shared settings**, which
+asks for a second click because it changes every HWiNFO key and dial.
+Replace swaps the whole document, so edit the one the well shows and keep
+its other fields. Example only; use your own keys:
 
 ```json
 {
@@ -165,8 +203,55 @@ settings panel shows a linked saved key as present, with its label, tick and
 color. Removing a pair stops that fallback without rewriting any action. A
 dial session or sparkline segment ends for a pairing edit only when its
 saved key now stands for a different measurement; adding or removing an
-alias for the same measurement resets nothing. There is no picker-based pairing
-flow yet; the Configuration documents step is required.
+alias for the same measurement resets nothing.
+
+## Calculated readings
+
+**Advanced > Calculated readings** adds a reading the plugin works out
+from other readings: a sum, average, lowest or highest of 2 to 8
+readings, or a difference (A - B) or ratio (A / B, optionally as a
+percentage of B) of two. It is listed under **Calculated (plugin)** in
+every reading picker and can be used on keys, dials, rotation sets and
+detail lists like any other reading. If HWiNFO can compute the value
+itself (a custom sensor in HWiNFO), use that one: it keeps HWiNFO's own
+minimum, maximum and average.
+
+- **New calculated reading** opens a draft: an operation, the readings and
+  an optional label. The line under it shows what the plugin would publish
+  (value, unit, the expression with every input named) before you press
+  **Save**. Editing the draft and **Cancel** write nothing.
+- All inputs need one unit (°C and °F, and data sizes or rates of one kind,
+  convert). Temperatures, clocks, voltages, fan speeds and percentages can
+  be averaged, compared or subtracted but not summed. A difference of two
+  temperatures is shown in Δ°C (Δ°F with Fahrenheit on), converted by 1.8
+  with no offset.
+- Without a label the plugin names the reading after its inputs, for
+  example "CPU Package Power + GPU Power". A sum of reported powers is what
+  those sensors report, not what the PC draws from the wall, so a label on
+  a sum of powers cannot name wall, system, total, PSU or outlet power; the
+  generated label is used instead.
+- A calculated reading can use a calculated reading listed above it, up to
+  3 levels deep. Counting one reading twice (directly, through a link, or
+  through a nested sum) is refused. At most 32 calculated readings can be
+  stored.
+- When an input is missing, has no value, changed unit, or a ratio divides
+  by zero, the calculated reading has no value and the list says why; it
+  never shows 0 in its place. It is as fresh as its inputs: recalculating
+  is not new data.
+- Calculated readings have no minimum, maximum or average from HWiNFO. A
+  changed definition (operation, inputs) starts a new dial session and a
+  new trend line; a label change does not. **Delete** asks for a second
+  press, and is refused while another calculated reading uses the one you
+  delete. A key showing a deleted calculated reading says the reading is
+  missing.
+- A detail filter matches a calculated reading as "Calculated (plugin)"
+  followed by its label, so a saved filter of `*` lists them too once any
+  are defined.
+
+Saving works like a link press: the plugin re-reads the shared settings,
+refuses the change if the list changed elsewhere since it was shown, and
+writes only that row. The definitions are kept in the shared settings as
+`calculatedReadings`; editing them by hand is not needed.
 
 ## Freshness and local history
 
@@ -239,6 +324,23 @@ With no Sensor Reading key or Sensor Dial visible, polling stops and history
 stays in memory. Returning can append to those retained samples; a period
 without observations is not a measured continuous history. The line is spaced
 by samples, not elapsed time.
+
+A [Time window](sensor-reading.md#time-window) of 1, 5 or 15 minutes, on a
+key's sparkline or a two-row dial, places those samples at the time the
+plugin read them instead. Its line ends at the last sample and breaks where
+no sample came in, including a sleep or a pause in polling longer than three
+**Read every** intervals (at least 5 seconds). A **Read every** change does
+not clear it.
+
+Gadget publishes no timestamp per row, only the values. The plugin knows a
+scan is new because some row in it changed, and then records every row of
+that scan as a new sample. So when HWiNFO stops updating a block of rows
+while other rows still change (one large untick in HWiNFO's Gadget settings
+can leave such a block until HWiNFO exits), the frozen rows are recorded as
+flat lines instead of gaps, in a time window and in the 36-sample line
+alike, and their keys keep showing the frozen values without **Age
+unknown**. The plugin cannot tell such a row from a steady reading.
+Restarting HWiNFO clears the block.
 
 Dial statistics are local, sample-weighted observations for selected and
 rotation/view readings. Repeated held frames do not count. Reset, missing or

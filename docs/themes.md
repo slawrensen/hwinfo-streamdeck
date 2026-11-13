@@ -4,9 +4,9 @@ nav_order: 6
 description: Compare the seven themes and control text, accents and shared defaults.
 ---
 
-Pick a theme in the strip below a key or dial's settings header. Choose **Default** to follow the shared theme, or a named preset for that key or dial only.
+Pick a theme in the strip below a key or dial's settings header. Choose **Default** to follow the shared theme, or a named preset for that key or dial only. A key's **Background** can show the page background set in the Stream Deck app ([Background](sensor-reading.md#background), new in 1.8).
 
-For a see-through touch strip, use **Display → Background** on a dial. [Transparent backgrounds](sensor-dial.md#transparent-background) are available in 1.7.1.
+For a see-through touch strip, use **Display → Background** on a dial. [Transparent backgrounds](sensor-dial.md#transparent-background) are available in 1.7.1. **Stars**, **Dusk** and **Nebula** draw a picture of the plugin's own across the whole deck ([Deck backgrounds](#deck-backgrounds-stars-dusk-and-nebula), new in 1.8).
 
 ## The seven presets
 
@@ -28,7 +28,7 @@ The layout stays consistent when you change themes. [Individual dial colors](sen
 
 Built-in value, unit and numeric session-statistic colors have a calculated **4.5:1 contrast floor** against their authored backgrounds. Dimmed labels stay at least as readable as units.
 
-That floor does **not** cover badges, a **Custom color** for text, individually chosen reading/cell/tile colors, or text drawn directly on a picture with **Clear**. For **Glass**, contrast is calculated against the panel over its worst-case picture. **Tint** and **Outline** use the outline behind each word. Physical readability still requires device testing.
+That floor does **not** cover badges, a **Custom color** for text, individually chosen reading/cell/tile colors, or text drawn directly on a picture with **Clear**. For **Glass**, contrast is calculated against the panel over its worst-case picture. **Tint** and **Outline** use the outline behind each word. A key's **Background** follows the same rules over the page background, and a key in alert keeps its alert face ([Background](sensor-reading.md#background)). Physical readability still requires device testing.
 
 Use a readable custom foreground and check it on your display, especially over a bright or busy strip picture. See the [background limits](sensor-dial.md#transparent-background).
 
@@ -37,6 +37,8 @@ Use a readable custom foreground and check it on your display, especially over a
 Set the shared theme in **Advanced → Shared defaults → Theme**. It applies to every HWiNFO key and dial set to **Default**, across all connected decks.
 
 A named preset stays local. This lets you keep one dial in Ember while the rest follow Midnight, for example.
+
+**Background** and **Words in the accent color** (new in 1.8, on the key and the dial panel alike) set the shared [Background](sensor-reading.md#background) and accent words for every key, dial and [strip display](strip-display.md) whose own choice is **Default**. One with its own choice keeps it. Below them, a line counts the keys, dials and strips on screen that keep their own choice, for example "4 dials and 1 strip use their own background". **Use it everywhere** (press it twice: the first press asks) sets every HWiNFO key, dial and strip back to **Default** for these two choices only: the ones on screen at once, the others the next time they appear. A choice made after that stays.
 
 ### Precedence
 
@@ -49,11 +51,42 @@ A per-key or per-dial theme wins over the shared theme. Change that key or dial 
 - **Change** opens the shared Theme setting.
 - **Make shared** appears when a local theme differs from the shared one. It makes that theme shared, returns the key or dial to Default, and keeps its appearance.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-theme-share.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-theme-share.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The theme strip with Ember selected and the Make shared command."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-theme-share.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-theme-share.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The top of a key&#x27;s settings panel: the header with the key&#x27;s live face in Ember, then the theme line reading Theme, Ember (set on this key) and a Make shared link, above eight named chips: Default, Void, Graphite, Ultraviolet, Midnight, Forest, Ember, selected, and Paper."></a>
 
 *Settings-panel capture.*
 
 Folding the strip keeps the chosen chip and its source visible. A new key with no reading shows the theme after you select one.
+
+## Deck backgrounds: Stars, Dusk and Nebula
+
+> **New in 1.8, checked on my Stream Deck + XL.** These three looks ran on my + XL; on the other decks they place a picture on (+, XL, 15-key and Neo) they are checked in renderer tests only.
+
+**Stars**, **Dusk** and **Nebula** are the last three choices under a key's or dial's **Background**, in the strip display's **Background**, and under **Advanced → Shared defaults → Background**. Instead of showing a picture set in the Stream Deck app, the plugin draws its own: one picture across the deck, of which each key and dial draws its part. Each part is placed from Elgato's published layout of the device's display, so a cloud, the glow or the band of stars continues behind the gaps between keys and into the touch strip.
+
+| Background | What the plugin draws |
+| --- | --- |
+| **Stars** | The theme's background with a faint diagonal band and small stars of different sizes and brightness; a few have a soft glow. |
+| **Dusk** | One soft glow rising from below the keys, brightest on the lower key rows and fading toward the top, in two colors that follow the theme (blue to violet on Void, Graphite and Midnight; violet to blue on Ultraviolet and Ember; green to teal on Forest), with a few early stars in the dark part. The touch strip draws the same glow at a fifth of its light, so the strip stays dark under its words. |
+| **Nebula** | Soft clouds in two colors that follow the theme (blue and teal on Void, Graphite and Midnight; violet and blue on Ultraviolet and Ember; green and blue on Forest), over the theme's background made darker, with a few faint stars. The clouds stop where the theme's value color would lose its lead over the labels, so they are fainter on Ember than on the cool themes. |
+
+- **Same sky every time.** Each deck draws its own picture, chosen from the device's id, and draws the same one every time the plugin starts. Nothing moves: a face changes only when its readings do.
+- **Text.** Built-in values, units, labels and statistics keep 4.5:1 contrast against the brightest color the picture can draw behind them (a calculation), so labels and units draw lighter than on Theme. No star is drawn under a word. A **Custom color** for text stays exact.
+- **No alert colors.** The picture never uses amber, orange or red, and a key in alert keeps its alert face.
+- **Devices.** Keys and dials line up on the Stream Deck + XL and +; keys on the Stream Deck XL, the 15-key Stream Deck and the Neo. On another device, and for a key inside a Multi Action, each key draws its own small picture that does not line up with its neighbours. Keys of other plugins and empty cells do not show the picture.
+- **Stars and Sky color.** On these three looks, **Stars** (All, Few or Off) sets how many stars draw and **Sky color** (Theme, Deep, Warmer, Cooler or Mono) moves the picture's colors. Both are also in **Advanced → Shared defaults**. On **Paper** the art does not draw: the panel says so under **Background** and shows both settings as idle. The **Stars** look keeps at least Few, so it offers no Off.
+- **Paper** draws Theme with any of the three looks.
+- **Cost.** The picture is drawn as SVG with each key image: no image files. On a full + XL page it adds under 1.6 KB per key image at the median (a unit test).
+
+## A space picture behind the deck
+
+The Stream Deck app can show one picture behind all the keys of a page and another behind the touch strip (right-click a key or the strip, **Set from File...**). That is the way to put a photograph behind the plugin: it costs nothing per frame, and it also shows in empty cells. Set the keys' and dials' **Background** to **Tint** or **Outline** (or **Glass**) so built-in text keeps its 4.5:1 floor over the picture. A dark, calm picture such as a deep field reads best.
+
+The plugin ships no pictures. Many space pictures can be used freely, under conditions:
+
+- **NASA** material is generally not under copyright in the United States. Acknowledge NASA as the source. Pictures on NASA sites credited to someone else, and NASA logos, are not covered, and nothing may suggest NASA endorses what you make.
+- **ESA/Hubble** ([esahubble.org](https://esahubble.org/copyright/)) and **ESA/Webb** ([esawebb.org](https://esawebb.org/copyright/)) pictures are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): give the picture's credit line in full, link the license, and say what you changed (cropped, darkened).
+- **Webb** pictures are credited "NASA, ESA, CSA, and STScI".
+- Check each picture's own credit line: some list more names, and those belong in the credit too.
 
 ## Text: Theme, Dim, or Custom
 
@@ -72,7 +105,7 @@ Text and accents are separate. **Text color** changes numbers and labels; graphs
 
 Automatic quad identity colors adjust for their backgrounds. Individually chosen colors stay exact in Theme mode and are only dimmed in Dim mode, so they can fall below the contrast floor.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-text.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-text.png' | relative_url }}" width="800" height="354" loading="lazy" decoding="async" alt="Custom color selected, with a color well, hex value and Dim labels, units and stats checkbox."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-key-text.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-key-text.png' | relative_url }}" width="800" height="284" loading="lazy" decoding="async" alt="Text color on Custom color, with the Custom text color well set to #660000 and the unticked Dim labels, units and stats (the value keeps the exact color) checkbox."></a>
 
 *Settings-panel capture.*
 

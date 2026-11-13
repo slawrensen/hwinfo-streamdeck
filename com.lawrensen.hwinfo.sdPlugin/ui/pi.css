@@ -153,10 +153,11 @@ html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
 	border-radius: 6px;
 }
 
-/* A dial face drawn without the opaque background (issue #41: Glass,
+/* A dial or key face drawn without the opaque background (Glass, Tint,
    Outline, Clear) previews over a checkerboard, since the panel cannot show
-   the touch strip picture behind it: a dark one under light text, a light
-   one under dark text (Paper), set from the face itself (pi-shell.js). */
+   the touch strip picture or the page background behind it: a dark one
+   under light text, a light one under dark text (Paper), set from the face
+   itself (pi-shell.js). */
 .hw-face img[data-clear="dark"] {
 	background: repeating-conic-gradient(#3a3a3a 0% 25%, #242424 0% 50%) 0 0 / 12px 12px;
 }
@@ -190,12 +191,6 @@ html[data-pin]:not([data-pin-off]) .hw-head[data-pin] {
 .hw-head-text p {
 	margin: 0;
 	overflow-wrap: anywhere;
-}
-
-/* The state line's age counts up; fixed-width digits keep it from
-   jittering the line it sits on. */
-.hw-state {
-	font-variant-numeric: tabular-nums;
 }
 
 .hw-head-kind {
@@ -308,6 +303,123 @@ html[data-folds-pending] .hw-sec > summary::before {
 	font-size: var(--hw-size-sm);
 }
 
+/* Beside the dial's face the text column is narrow, and HWiNFO names a
+   sensor by board and model, so a source line could run to four lines or
+   more: the header passed a third of the panel and lost its pin. The
+   dial's name and source line share four lines, the rest cut with an
+   ellipsis. The name takes two at most. The source line takes two as
+   well, and a third where every name the dial can show takes one line
+   (pi-shell.js shareLines sets data-source-lines on their cell). The
+   unseen lines that keep their room (.hw-room) are cut the same, so the
+   room is four lines at most. The whole text stays the line's text, and
+   while a shown line is cut the name and source line are the handle
+   (data-cut) of the card below. */
+.hw-head[data-kind="dial"] .hw-head-lines p {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.hw-head[data-kind="dial"] [data-source-lines="3"] .hw-head-lines .hw-head-source {
+	-webkit-line-clamp: 3;
+}
+
+.hw-head-lines[data-cut] {
+	border-radius: var(--hw-radius);
+	cursor: pointer;
+}
+
+/* The whole name and source line, with Copy, in a card laid over the form
+   (pi-shell.js shows it): it hangs from the header, so it follows a pinned
+   one, and it takes no room, so showing it moves nothing. Copy floats in
+   its top corner and the text runs beside it, then under it at the card's
+   full width. The card is no taller than the panel's room under the
+   header (it scrolls past that), so it stays above the panel's bottom
+   edge and never makes the page longer. The 120 px floor is for a panel
+   so short that the header fills it (189 by 205 px, the app's panel at
+   twice the size): the card then reaches past the panel's edge, over a
+   page that scrolls there anyway. */
+.hw-head[data-kind="dial"] {
+	position: relative;
+}
+
+.hw-head-whole {
+	position: absolute;
+	top: calc(100% - 6px);
+	left: var(--hw-gutter);
+	right: var(--hw-gutter);
+	z-index: 61; /* over the picker list and the "Add readings" dock when the header is not pinned */
+	max-height: max(120px, calc(100vh - var(--hw-head-h, 90px) - 2px));
+	box-sizing: border-box;
+	overflow-y: auto;
+	padding: var(--hw-s2) var(--hw-s3);
+	background: var(--hw-raised);
+	border: 1px solid var(--hw-edge);
+	border-radius: 6px;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+}
+
+.hw-head-whole p {
+	margin: 0;
+	overflow-wrap: anywhere;
+	cursor: text;
+}
+
+.hw-whole-name {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.hw-whole-source {
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+/* Copy keeps one width through "Copied" and "Copy failed" (.hw-room). */
+.hw-head-whole button {
+	float: right;
+	margin: 0 0 var(--hw-s1) var(--hw-s3);
+}
+
+.hw-head-whole button .hw-room {
+	justify-items: center;
+}
+
+/* Where the text sits under the face, a name beside Copy would be a word
+   wide: Copy goes under the text. */
+@media (max-width: 239px) {
+	.hw-head-whole {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.hw-head-whole button {
+		order: 1;
+		align-self: flex-end;
+		margin: var(--hw-s2) 0 0;
+	}
+}
+
+/* A line that keeps the room of the longest text a live change can bring
+   to it: every one is laid out unseen in the same cell (pi-shell.js
+   holdRoom), so the change never moves the panel and every word stays
+   whole. A dial's name and source lines are one block that keeps the
+   tallest name over the tallest source line its steps bring (a cell of
+   names over a cell of source lines), the spare room under the source;
+   the folded Alerts line keeps its live endings ("critical now"). */
+.hw-room {
+	display: grid;
+}
+
+.hw-room > * {
+	grid-area: 1 / 1;
+}
+
+.hw-room > [aria-hidden="true"] {
+	visibility: hidden;
+}
+
 .hw-state {
 	display: inline-flex;
 	align-items: center;
@@ -315,6 +427,7 @@ html[data-folds-pending] .hw-sec > summary::before {
 	margin-top: 2px !important;
 	font-size: var(--hw-size-sm);
 	color: var(--hw-muted);
+	font-variant-numeric: tabular-nums; /* the age counts up without jitter */
 }
 
 .hw-state::before {
@@ -378,11 +491,6 @@ body[data-kind="control"] > .hw-lede {
    own palette with the theme's name written in that palette's text
    color). Every name stays on screen, so no theme is known only by
    hover. */
-.hw-look {
-	padding: 6px var(--hw-gutter) var(--hw-s2);
-	border-bottom: 1px solid var(--hw-rule);
-}
-
 .hw-look-row {
 	display: flex;
 	flex-wrap: wrap;
@@ -390,76 +498,29 @@ body[data-kind="control"] > .hw-lede {
 	gap: 4px var(--hw-s2);
 }
 
-.hw-look-name {
-	display: flex;
-	flex: 1 1 100%;
-	flex-direction: row;
-	align-items: baseline;
-	gap: 6px;
-	min-width: 0;
-	margin: 0;
-}
-
 .hw-look-name .hw-label {
 	flex: none;
 	margin: 0;
-	color: var(--hw-muted);
-	font-size: var(--hw-size-sm);
 }
 
 .hw-look-current {
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-weight: 600;
 }
 
 .hw-look-current .hw-look-scope {
 	color: var(--hw-muted);
-	font-weight: 400;
 }
 
-/* Change follows the line, outside its ellipsis, so its 24 px hit area and
-   focus ring are never clipped. On an explicit pick it keeps its place
-   unseen: the line and the chips under it stay where they are. */
+/* Change sits outside the theme line (the fold row below places it), so
+   its 24 px hit area and focus ring are never clipped. On an explicit pick
+   it keeps its place unseen: the line and the chips under it stay where
+   they are. */
 .hw-look-change {
 	flex: none;
 }
 
 .hw-look-change-off {
 	visibility: hidden;
-}
-
-/* Too narrow for the whole line (zoomed): the label and Change share the
-   first row and the name wraps under them inside two reserved lines, so
-   every pick keeps one height and the resolved theme is never cut. */
-@media (max-width: 311px) {
-	.hw-look-name {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		grid-template-areas: "label change" "current current";
-		row-gap: 1px;
-	}
-
-	.hw-look-name .hw-label {
-		grid-area: label;
-	}
-
-	.hw-look-change {
-		grid-area: change;
-	}
-
-	.hw-look-current {
-		grid-area: current;
-		min-height: 2lh;
-		white-space: normal;
-		overflow-wrap: anywhere;
-	}
-}
-
-.hw-look > .hw-help {
-	margin-top: 3px;
 }
 
 /* Four to a row: two rows of about 83 x 32 px chips on the app's 373 px
@@ -495,9 +556,7 @@ body[data-kind="control"] > .hw-lede {
 	border-radius: 5px;
 }
 
-.hw-look .hw-theme-value,
-.hw-look .hw-theme-deck .hw-theme-value {
-	display: block;
+.hw-look .hw-theme-value {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -533,8 +592,7 @@ body[data-kind="control"] > .hw-lede {
 		padding: 0 3px;
 	}
 
-	.hw-look .hw-theme-value,
-	.hw-look .hw-theme-deck .hw-theme-value {
+	.hw-look .hw-theme-value {
 		font-size: 11px;
 	}
 }
@@ -775,6 +833,40 @@ body[data-kind="control"] > .hw-lede {
 	gap: 0 var(--hw-gap);
 }
 
+/* The Sky's pair (Stars, Sky color) on a light theme, where the art draws
+   no sky: still a person's to set, read as idle, with the line under
+   Background saying why. */
+.hw-row2.hw-idle > .hw-field > label,
+.hw-row2.hw-idle select {
+	color: var(--hw-muted);
+}
+
+/* A pair stacks where a select in it cannot show an option whole
+   (pi-common.js fitPair): a kept stored value, a long translation. */
+.hw-row2.hw-stack {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+/* A short select on its label's line (Words in the accent color): one row,
+   like the checkbox it replaced. It wraps under the label where both do
+   not fit (a narrow panel, a long translation, zoom). */
+.hw-inline-field {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--hw-s1) var(--hw-gap);
+}
+
+.hw-inline-field > label {
+	flex: 1 1 auto;
+	margin: 0;
+}
+
+.hw-field.hw-inline-field > select {
+	flex: 0 1 auto;
+	width: auto;
+}
+
 /* Value shown, Decimals and the unit switch: two selects and a checkbox. */
 .hw-row3 {
 	display: grid;
@@ -789,7 +881,7 @@ body[data-kind="control"] > .hw-lede {
 	}
 }
 
-.hw-row3 .hw-field > .hw-check {
+.hw-field > .hw-check {
 	display: flex;
 	gap: var(--hw-s1);
 	align-items: center;
@@ -815,6 +907,7 @@ body[data-kind="control"] > .hw-lede {
 
 .hw-field select,
 .hw-field input[type="text"],
+.hw-field input[type="search"],
 .hw-field textarea {
 	box-sizing: border-box;
 	width: 100%;
@@ -847,6 +940,39 @@ body[data-kind="control"] > .hw-lede {
 
 .hw-field input[aria-invalid="true"] {
 	border-color: var(--hw-danger-text);
+}
+
+/* A field that waits for its checkbox (a reading's separate limits): it
+   keeps its place and size, so ticking the box or rotating the dial never
+   moves the panel; only its fill and text step back. */
+.hw-field input[type="text"]:disabled {
+	background: transparent;
+	border-style: dashed;
+	color: var(--hw-muted);
+	cursor: default;
+}
+
+/* A checkbox label that names the live reading stays on one line and
+   fills it, so a longer or shorter name after a rotation never changes a
+   box's size. A row of Build's list does too, its whole text in its
+   title. */
+.hw-check-line > span {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* The unit after a label whose reading changes with rotation, "(°C)":
+   a fixed width, so a longer or shorter unit never rewraps the label. */
+.hw-unit-tag {
+	display: inline-block;
+	width: 5.5em;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	vertical-align: bottom;
 }
 
 .hw-error {
@@ -887,9 +1013,20 @@ body[data-kind="control"] > .hw-lede {
 	line-height: 1.4;
 }
 
+/* A note that follows the reading on the dial (the limits' notes): one
+   line that is always laid out, so a note coming or going as the dial
+   rotates never moves the panel. The whole note is its tooltip. */
+.hw-note-line {
+	min-height: 1lh;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
 /* Status blocks: a tone, a sentence, and the local repair next to it. */
 .hw-hint,
-.hw-status {
+.hw-status,
+.hw-strip-confirm {
 	margin: var(--hw-s2) 0 0;
 	padding: var(--hw-s2) 10px;
 	border-radius: var(--hw-radius);
@@ -983,11 +1120,6 @@ body[data-kind="control"] > .hw-lede {
 	background: var(--hw-field-hover);
 }
 
-.hw-config-row button[data-armed="true"] {
-	background: var(--hw-danger-bg);
-	border-color: var(--hw-danger-text);
-}
-
 /* A text action ("Change" after a sentence) keeps its place in the line
    and gains a 24 px hit area: the padding is paid back by an equal
    negative margin, so nothing around it moves. */
@@ -1009,11 +1141,6 @@ body[data-kind="control"] > .hw-lede {
 	flex-wrap: wrap;
 	gap: 6px;
 	margin-top: var(--hw-s2);
-}
-
-.hw-support:disabled {
-	color: var(--hw-muted);
-	cursor: default;
 }
 
 /* --- reading pickers: combobox + listbox, checklists --------------------- */
@@ -1038,6 +1165,10 @@ body[data-kind="control"] > .hw-lede {
 	font: inherit;
 }
 
+.hw-picker > select {
+	flex: 1 1 0;
+}
+
 .hw-picker > input::placeholder {
 	color: var(--hw-placeholder);
 }
@@ -1051,6 +1182,9 @@ body[data-kind="control"] > .hw-lede {
 }
 
 .hw-picker > button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex: none;
 	min-width: 32px;
 	background: var(--hw-field);
@@ -1067,12 +1201,6 @@ body[data-kind="control"] > .hw-lede {
 
 /* Reload draws Lucide's rotate-cw at the fold pair's stroke, one icon
    language with the header (round 3, R49). */
-.hw-picker > button {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-}
-
 .hw-picker > button svg {
 	width: 16px;
 	height: 16px;
@@ -1313,8 +1441,7 @@ body[data-kind="control"] > .hw-lede {
 	font-style: italic;
 }
 
-/* A chip's pill: the smallest words in the panel, still at the swatch
-   faces' 11 px, in a pill that fits the 28 px chip. */
+/* A chip's pill: 11 px words in a pill that fits the 28 px chip. */
 .hw-chip-badge {
 	padding: 0 5px;
 	border: 1px solid currentColor;
@@ -1349,20 +1476,6 @@ body[data-kind="control"] > .hw-lede {
 	min-height: var(--hw-field-h);
 }
 
-/* Armed (a second press removes or merges): the button says what will go,
-   in words, in the danger style the Replace button uses. */
-.hw-group-remove[data-armed="true"],
-.hw-set-actions button[data-armed="true"] {
-	background: var(--hw-danger-bg);
-	border: 1px solid var(--hw-danger-text);
-	color: var(--hw-text);
-}
-
-.hw-group-remove[data-armed="true"]:hover,
-.hw-set-actions button[data-armed="true"]:hover {
-	background: var(--hw-danger-bg);
-}
-
 .hw-support[aria-disabled="true"] {
 	color: var(--hw-muted);
 	cursor: default;
@@ -1379,10 +1492,6 @@ body[data-kind="control"] > .hw-lede {
    24 px line, not just its text's height. */
 .hw-set-chip > .hw-set-name[role="button"] {
 	line-height: var(--hw-target);
-}
-
-.hw-set-chip.current .hw-set-remove {
-	color: #dcebff;
 }
 
 .hw-set-remove:hover,
@@ -1508,8 +1617,7 @@ body[data-kind="control"] > .hw-lede {
 	margin-top: 0;
 }
 
-.hw-group-head + .hw-set-list,
-.hw-group-head + .hw-set-list + .hw-set-tools {
+.hw-group-head + .hw-set-list {
 	padding-left: 28px;
 }
 
@@ -1565,13 +1673,6 @@ body[data-kind="control"] > .hw-lede {
 
 .hw-set-tools button:hover {
 	background: var(--hw-field-hover);
-}
-
-.hw-set-tools button[aria-disabled="true"] {
-	color: var(--hw-muted);
-	border-color: var(--hw-rule);
-	background: none;
-	cursor: default;
 }
 
 .hw-rename-row {
@@ -1630,23 +1731,12 @@ body[data-kind="control"] > .hw-lede {
 
 /* --- theme gallery ------------------------------------------------------ */
 
-/* Every theme stays named and visible: a swatch drawn in its palette with
-   the name beside it, four to a row at the app's width (two rows for the
-   eight choices), three at 320 px. */
-.hw-themes {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
-	gap: 4px;
-}
-
 .hw-theme {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
 	gap: 4px;
 	min-width: 0;
-	min-height: 28px;
-	padding: 1px;
 	background: none;
 	border: 1px solid transparent;
 	border-radius: var(--hw-radius);
@@ -1668,22 +1758,13 @@ body[data-kind="control"] > .hw-lede {
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
-	width: 24px;
-	height: 22px;
 	overflow: hidden;
 	border: 1px solid #1f1f1f;
-	border-radius: var(--hw-radius);
 }
 
-.hw-theme[aria-checked="true"] .hw-theme-face,
-.hw-theme.selected .hw-theme-face {
+.hw-theme[aria-checked="true"] .hw-theme-face {
 	outline: 2px solid var(--hw-text);
 	outline-offset: 1px;
-}
-
-.hw-theme[aria-checked="true"] .hw-theme-name {
-	color: var(--hw-text);
-	font-weight: 600;
 }
 
 .hw-theme-deck .hw-theme-face {
@@ -1696,45 +1777,13 @@ body[data-kind="control"] > .hw-lede {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 14px;
-	height: 14px;
-	border-radius: 3px;
-	background: rgba(8, 10, 14, 0.78);
-	color: var(--hw-link);
 	pointer-events: none;
-}
-
-.hw-theme-badge svg {
-	display: block;
-	width: 10px;
-	height: 10px;
-}
-
-.hw-theme-value {
-	font-size: 10px;
-	font-weight: 700;
-	line-height: 1;
-}
-
-.hw-theme-deck .hw-theme-value {
-	display: none;
 }
 
 .hw-theme-spark {
 	position: absolute;
-	left: 3px;
-	right: 3px;
-	bottom: 2px;
 	height: 2px;
 	border-radius: 1px;
-}
-
-.hw-theme-name {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: 11px;
 }
 
 /* --- colors -------------------------------------------------------------- */
@@ -1751,15 +1800,22 @@ body[data-kind="control"] > .hw-lede {
 }
 
 /* Dial reading colors reuse the quad wells; names keep large rotation
-   sets clear. */
+   sets clear. The list has no scroll of its own: it grows and the page
+   scrolls. */
 .hw-reading-colors {
-	max-height: 220px;
 	padding-inline: 3px;
-	overflow-y: auto;
 }
 
 .hw-reading-colors .hw-quad-colors {
 	margin-bottom: 4px;
+}
+
+/* Under a dial's whole-sensor list (Reading colors, Unit and decimals per
+   reading) while it shows its first rows only: one plain button, on the
+   lists' 3 px sides. */
+.hw-show-all {
+	display: block;
+	margin: var(--hw-s2) 3px 0;
 }
 
 /* Auto is already in effect: the button reads as unavailable. */
@@ -1989,10 +2045,146 @@ body[data-kind="control"] > .hw-lede {
 	color: var(--hw-link);
 }
 
+/* --- the opener's page layout and a placed key's detail pages (7E) -----
+   The grid draws the bundle's cells at a fixed size: a preview answer
+   changes words and marks inside them, never a box, and the notes under
+   it keep the tallest note's height, so the editor never jumps while it
+   is read. A control that would do nothing wears aria-disabled, stays
+   focusable and looks muted. */
+.hw-layout-pager {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: var(--hw-s2) 0;
+}
+
+.hw-layout-page {
+	flex: 1;
+	text-align: center;
+	color: var(--hw-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.hw-layout-grid {
+	--hw-layout-cols: 5;
+	display: grid;
+	grid-template-columns: repeat(var(--hw-layout-cols), minmax(0, 1fr));
+	gap: 3px;
+	max-width: calc(var(--hw-layout-cols) * 64px);
+}
+
+.hw-layout-cell {
+	box-sizing: border-box;
+	aspect-ratio: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px;
+	overflow: hidden;
+	border: 1px solid var(--hw-rule);
+	border-radius: var(--hw-radius);
+	background: var(--hw-field);
+	color: var(--hw-text);
+	font: inherit;
+	font-size: 10px;
+	line-height: 1.15;
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+
+.hw-layout-cell > span {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+button.hw-layout-cell {
+	cursor: pointer;
+}
+
+button.hw-layout-cell:hover:not([aria-disabled="true"]) {
+	background: var(--hw-field-hover);
+}
+
+button.hw-layout-cell[aria-disabled="true"] {
+	cursor: default;
+	color: var(--hw-muted);
+	opacity: 0.6;
+}
+
+.hw-layout-notes {
+	display: grid;
+}
+
+.hw-layout-notes > [data-note] {
+	grid-area: 1 / 1;
+}
+
+.hw-layout-notes > [data-shown="false"] {
+	visibility: hidden;
+}
+
+.hw-layout-cell[data-kind="nav"],
+.hw-layout-cell[data-kind="back"] {
+	background: transparent;
+	color: var(--hw-muted);
+	border-style: dotted;
+}
+
+.hw-layout-cell[data-kind="empty"] {
+	background: var(--hw-raised);
+}
+
+.hw-layout-cell[data-kind="gap"] {
+	background: transparent;
+	border: 1px dashed var(--hw-edge);
+	color: var(--hw-muted);
+}
+
+.hw-detail-scope > .hw-help {
+	margin: 0;
+}
+
+.hw-detail-scope > .hw-btn {
+	margin-top: var(--hw-s2);
+	max-width: 100%;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.hw-detail-scope-list {
+	display: grid;
+	gap: 4px;
+}
+
+.hw-detail-scope-list > li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.hw-detail-scope-list > li > span {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
 /* Windows High Contrast: shadows and fills vanish, so the marks that
    carry state switch to outlines in system colors, and theme swatches
    keep their real colors (they ARE the content). */
 @media (forced-colors: active) {
+	/* A kept-empty cell keeps its dashed frame; the others a solid one. */
+	.hw-layout-cell {
+		border-color: CanvasText;
+	}
+
+	.hw-layout-cell[data-kind="gap"] {
+		border-style: dashed;
+	}
+
 	.hw-set-list .hw-set-chip[aria-selected="true"],
 	.hw-row.active,
 	.hw-theme[aria-checked="true"] .hw-theme-face {
@@ -2015,12 +2207,6 @@ body[data-kind="control"] > .hw-lede {
 	   over it, so both marks show. */
 	.hw-set-list .hw-set-chip.current[aria-selected="true"] {
 		outline-offset: -4px;
-	}
-
-	.hw-set-tools button[aria-disabled="true"],
-	.hw-folds button[aria-disabled="true"] {
-		color: GrayText;
-		border-color: GrayText;
 	}
 
 	.hw-theme-face,
@@ -2060,7 +2246,8 @@ body[data-kind="control"] > .hw-lede {
 	}
 
 	.hw-status:not([data-tone=""]),
-	.hw-hint {
+	.hw-hint,
+	.hw-strip-confirm {
 		border: 1px solid CanvasText;
 	}
 }
@@ -2094,46 +2281,20 @@ body[data-kind="control"] > .hw-lede {
 	display: inline-flex;
 }
 details .hw-look-mini .hw-theme-face {
-	position: relative;
-	display: flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
 	gap: 4px;
-	box-sizing: border-box;
 	width: auto;
 	min-width: 72px;
 	height: 24px;
 	padding: 0 8px 4px;
-	overflow: hidden;
-	border: 1px solid #1f1f1f;
-	border-radius: 5px;
 }
-details .hw-look-mini .hw-theme-deck .hw-theme-face {
-	border: 2px dashed;
-}
-details .hw-look-mini .hw-theme-value,
-details .hw-look-mini .hw-theme-deck .hw-theme-value {
-	display: block;
+details .hw-look-mini .hw-theme-value {
 	font-size: 11.5px;
-	font-weight: 600;
-	line-height: 1.2;
-	white-space: nowrap;
 }
 details .hw-look-mini .hw-theme-spark {
-	position: absolute;
-	left: 8px;
-	right: 8px;
 	bottom: 2px;
-	height: 2px;
-	border-radius: 1px;
 }
 details .hw-look-mini .hw-theme-badge {
-	display: flex;
-	order: -1;
 	width: 14px;
-	height: 14px;
-	background: none;
 }
 details .hw-look-mini .hw-theme-badge svg {
 	width: 12px;
@@ -2157,15 +2318,8 @@ details.hw-look-fold:not([open]) {
 	padding-bottom: 0;
 }
 details.hw-look-fold > summary.hw-look-name {
-	flex-wrap: nowrap;
 	align-items: center;
-	column-gap: var(--hw-s2);
-	min-height: var(--hw-row-h);
-	margin: 0;
 	padding: 3px var(--hw-gutter) 3px 28px;
-}
-details.hw-look-fold > summary.hw-look-name::before {
-	top: 10px;
 }
 details.hw-look-fold > summary.hw-look-name > .hw-label {
 	color: var(--hw-text);
@@ -2173,9 +2327,6 @@ details.hw-look-fold > summary.hw-look-name > .hw-label {
 	font-weight: 600;
 }
 details.hw-look-fold > summary.hw-look-name .hw-look-current {
-	overflow: visible;
-	font-weight: 400;
-	white-space: normal;
 	overflow-wrap: anywhere;
 }
 
@@ -2226,7 +2377,6 @@ details.hw-look-fold:not([open]):not(.hw-mini-none) #theme-current > span:first-
 	display: none;
 }
 details.hw-look-fold:not([open]) > summary.hw-look-name {
-	flex-wrap: wrap;
 	row-gap: 0;
 }
 details.hw-look-fold:not([open]) > summary.hw-look-name > .hw-look-note.shown {
@@ -2242,11 +2392,6 @@ details.hw-look-fold:not([open]) > summary.hw-look-name > .hw-look-note.shown {
    "Default (shared: Ultraviolet)", needs two at 160 px). Folded, the
    chip sits beside the title and the scope wraps under it. */
 @media (max-width: 311px) {
-	details.hw-look-fold > summary.hw-look-name {
-		display: flex;
-		flex-wrap: wrap;
-		row-gap: 2px;
-	}
 	details.hw-look-fold[open] > summary.hw-look-name {
 		margin-right: 0;
 		padding-right: var(--hw-gutter);
@@ -2255,15 +2400,10 @@ details.hw-look-fold:not([open]) > summary.hw-look-name > .hw-look-note.shown {
 		position: static;
 		display: block;
 		width: max-content;
-		margin: 0 -2px 2px auto;
 	}
 	details.hw-look-fold[open] > summary.hw-look-name .hw-look-current {
 		flex: 1 1 100%;
 		min-height: 2lh;
-	}
-	details.hw-look-fold:not([open]) > summary.hw-look-name .hw-look-current {
-		flex: 1 1 60px;
-		min-height: 0;
 	}
 }
 
@@ -2271,9 +2411,6 @@ details.hw-look-fold:not([open]) > summary.hw-look-name > .hw-look-note.shown {
    line box is the chip's 24 px, so the first flex line always centers on
    the marker, and a line that does not fit beside the title wraps whole
    onto the next flex line (UXR01). */
-details.hw-look-fold > summary.hw-look-name {
-	flex-wrap: wrap;
-}
 details.hw-look-fold > summary.hw-look-name > .hw-label {
 	line-height: 24px;
 }
@@ -2295,5 +2432,1090 @@ details.hw-look-fold > summary.hw-look-name > .hw-label {
 	}
 	details.hw-look-fold .hw-look-change {
 		margin: 4px -2px 2px auto;
+	}
+}
+
+/* --- Advanced > Reading links and Calculated readings ----------------------
+   Both lists change while the panel is open (live values, link health).
+   Every line that can change on its own is one line high and ellipsized,
+   with tabular figures, so a refresh never moves a box; only a person's
+   change (a link added, a definition saved) changes the list's shape. */
+.hw-link-card,
+.hw-calc-preview {
+	margin: var(--hw-s2) 0 0;
+}
+
+.hw-link-list,
+.hw-calc-list,
+.hw-link-prereq,
+.hw-detail-scope-list,
+.hw-strip-series,
+.hw-strip-bands,
+.hw-strip-proposals {
+	margin: var(--hw-s2) 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hw-link-prereq li + li {
+	margin-top: var(--hw-s1);
+}
+
+.hw-link-row,
+.hw-calc-row,
+.hw-link-empty,
+.hw-calc-empty {
+	margin: 0 0 var(--hw-s2);
+}
+
+.hw-link-card,
+.hw-calc-preview,
+.hw-link-row,
+.hw-calc-row,
+.hw-link-empty,
+.hw-calc-empty {
+	padding: var(--hw-s1) var(--hw-s2);
+	border: 1px solid var(--hw-rule);
+	border-radius: var(--hw-radius);
+	font-size: var(--hw-size-sm);
+	line-height: 1.4;
+}
+
+.hw-link-card p,
+.hw-calc-preview p,
+.hw-link-row p,
+.hw-calc-row p {
+	margin: 0;
+}
+
+.hw-link-value,
+.hw-calc-value {
+	height: 1.4em;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-variant-numeric: tabular-nums;
+	color: var(--hw-text);
+}
+
+.hw-link-end,
+.hw-calc-detail,
+.hw-link-health {
+	color: var(--hw-muted);
+	overflow-wrap: anywhere;
+}
+
+.hw-calc-name {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+/* Health that needs a look gets the warning edge, a fill only. */
+.hw-link-row[data-health="unit-changed"],
+.hw-link-row[data-health="type-changed"],
+.hw-link-row[data-health="both-live"],
+.hw-link-row[data-health="malformed"],
+.hw-link-row[data-health="conflict"],
+.hw-link-row[data-health="cap"],
+.hw-calc-row[data-ok="false"] {
+	box-shadow: inset 3px 0 0 var(--hw-warn-text);
+}
+
+.hw-link-row .hw-actions,
+.hw-calc-row .hw-actions {
+	margin-top: var(--hw-s1);
+}
+
+/* Armed: a second press confirms, and the button says so in words
+   ("Press again to ..."), in the danger style. */
+:is(.hw-config-row button, .hw-group-remove, .hw-set-actions button, .hw-link-unlink, .hw-calc-delete, .hw-strip-act .hw-btn, .hw-strip-screens .hw-set-tools button)[data-armed="true"] {
+	background: var(--hw-danger-bg);
+	border: 1px solid var(--hw-danger-text);
+	color: var(--hw-text);
+}
+
+/* The one disabled look of the button family: no fill, nothing lit under
+   the pointer. It ties .hw-set-tools button:hover (0,2,1), so it stays
+   after that rule, and the GrayText rule for it sits in the forced-colors
+   block below, after it. */
+:is(.hw-btn, .hw-set-tools button, .hw-strip-step)[aria-disabled="true"] {
+	color: var(--hw-muted);
+	border-color: var(--hw-rule);
+	background: none;
+	cursor: default;
+}
+
+.hw-calc-inputs {
+	margin: var(--hw-s2) 0 0;
+	padding: 0;
+	border: none;
+	min-width: 0;
+}
+
+.hw-calc-inputs legend {
+	padding: 0;
+	margin-bottom: 3px;
+}
+
+.hw-calc-input {
+	display: flex;
+	gap: 6px;
+	margin-bottom: var(--hw-s1);
+}
+
+.hw-calc-input select {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+@media (forced-colors: active) {
+	.hw-link-row[data-health="unit-changed"],
+	.hw-link-row[data-health="type-changed"],
+	.hw-link-row[data-health="both-live"],
+	.hw-link-row[data-health="malformed"],
+	.hw-link-row[data-health="conflict"],
+	.hw-link-row[data-health="cap"],
+	.hw-calc-row[data-ok="false"] {
+		outline: 2px dashed CanvasText;
+		outline-offset: -2px;
+	}
+	.hw-link-unlink[data-armed="true"],
+	.hw-calc-delete[data-armed="true"] {
+		outline: 2px solid Highlight;
+		outline-offset: -4px;
+	}
+	:is(.hw-btn, .hw-set-tools button, .hw-strip-step, .hw-folds button, button.hw-layout-cell)[aria-disabled="true"] {
+		color: GrayText;
+		border-color: GrayText;
+	}
+}
+
+/* Per-reading alert rows (reading PI, multi-reading keys): the reading's
+   name, then Warn at, Critical at and Clear by side by side, each column
+   as wide as the others, stacking only on a very narrow panel. */
+.hw-alert-row {
+	margin-top: var(--hw-s2);
+	padding-top: var(--hw-s2);
+	border-top: 1px solid var(--hw-rule);
+}
+
+.hw-alert-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0 var(--hw-gap);
+}
+
+@media (max-width: 299px) {
+	.hw-alert-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* A row field that cannot be edited yet (the reading is not reporting, or
+   the direction box and Clear by before a limit is typed) dims in place:
+   same box, same size. */
+.hw-alert-row input:disabled,
+.hw-alert-row .hw-check:has(input:disabled) > span {
+	opacity: 0.55;
+}
+
+/* Per-reading unit and decimals (issue #59): "Unit" and "Decimals" head
+   the two columns once, then each reading is its name, its Unit and
+   Decimals selects side by side, then a note line that is always laid out
+   (hw-note-line), so a note coming or going never moves a box. The list
+   has no scroll of its own: it grows with the fold and the page scrolls.
+   Side by side, each select's label is screen reader text (the heads say
+   it once, aria-hidden; the select's aria-label names its reading). Where
+   a select would get less than a pair's 128 px (.hw-row2), on a narrow or
+   zoomed panel, the selects stack, the heads step aside and each label
+   shows again. Nothing in a row changes with live data. */
+#sec-formats > .hw-sub-body {
+	container-type: inline-size;
+}
+
+.hw-format-rows {
+	padding-inline: 3px;
+}
+
+.hw-format-heads {
+	display: none;
+	gap: 0 var(--hw-gap);
+	margin-top: var(--hw-s2);
+	padding-inline: 3px;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-format-row {
+	margin-top: var(--hw-s1);
+	padding-top: 6px;
+	border-top: 1px solid var(--hw-rule);
+}
+
+.hw-format-row .hw-row2 {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.hw-format-row .hw-field {
+	margin-top: var(--hw-s1);
+}
+
+.hw-format-row .hw-note-line {
+	margin-top: 2px;
+}
+
+/* Two 128 px selects, the 8 px gap and the list's 3 px sides. */
+@container (min-width: 270px) {
+	.hw-format-heads,
+	.hw-format-row .hw-row2 {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.hw-format-row .hw-field {
+		margin-top: 2px;
+	}
+
+	/* As .hw-sr-only. */
+	.hw-format-row .hw-field > label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+		border: 0;
+	}
+}
+
+.hw-format-row .hw-label {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hw-format-row select:disabled {
+	opacity: 0.55;
+}
+
+/* --- Strip (dial panel): layout, the dials taking part, panes, preview --- */
+
+/* The three layouts sit on one row while they fit, as native radios: one
+   Tab stop, arrow keys move and check. */
+.hw-strip-layout,
+.hw-strip-overlays {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 var(--hw-s3);
+	margin: 0;
+	padding: 0;
+	border: none;
+	min-width: 0;
+}
+
+.hw-strip-layout > legend,
+.hw-strip-overlays > legend {
+	flex-basis: 100%;
+	padding: 0;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	font-weight: 600;
+}
+
+.hw-strip-overlays {
+	margin-top: var(--hw-s2);
+}
+
+/* While a strip runs here, the section's two blocks are named: Whole strip
+   over its first fields, This screen over the screen the box edits. */
+.hw-strip-block {
+	margin: var(--hw-s1) 0 0;
+	font-weight: 600;
+}
+
+/* The deck's dials in one row, a mark per dial slot spaced like the dials,
+   and one line beside it with the one action of the dial it names (the
+   row shows only while a dial needs the person or a strip is being made).
+   A mark is a 28 px button around a 20 px
+   circle (20 and 14 on a narrow panel): filled in the strip's accent for
+   a dial of this strip, hollow for a Sensor Dial outside it, a dot for
+   one in another strip, dashed where no Sensor Dial is; this dial wears a
+   bright ring. A state changes fills and borders only, so a live push
+   never moves a box. */
+.hw-strip-map {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--hw-s1) var(--hw-s2);
+	min-height: 28px;
+	margin-top: var(--hw-s1);
+}
+
+/* Laid out at the row's height even before the marks arrive (waiting for
+   the plugin, a deck without a strip), so they never move the line. */
+.hw-strip-dials {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	min-height: 28px;
+}
+
+.hw-strip-map[data-dials="0"] {
+	gap: 0;
+}
+
+.hw-strip-dial {
+	position: relative;
+	flex: 0 0 auto;
+	width: 28px;
+	height: 28px;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+}
+
+/* The seam of an Equal split: a gap between the two halves. */
+.hw-strip-dial[data-seam] {
+	margin-left: var(--hw-s2);
+}
+
+.hw-strip-dial::before {
+	content: "";
+	position: absolute;
+	inset: 4px;
+	box-sizing: border-box;
+	border: 2px solid var(--hw-muted);
+	border-radius: 50%;
+	background: transparent;
+}
+
+.hw-strip-dial[data-look="on"]::before {
+	border-color: var(--hw-strip-accent, var(--hw-ok));
+	background: color-mix(in srgb, var(--hw-strip-accent, var(--hw-ok)) 70%, transparent);
+}
+
+.hw-strip-dial[data-look="dashed"]::before {
+	border-style: dashed;
+}
+
+.hw-strip-dial[data-look="dot"]::before {
+	border-color: transparent;
+	background: radial-gradient(circle, var(--hw-muted) 0 4px, transparent 4.5px);
+}
+
+.hw-strip-dial[data-kind="conflict"]::before {
+	border-color: var(--hw-warn-text);
+}
+
+.hw-strip-dial[data-self]::before {
+	box-shadow: 0 0 0 2px var(--hw-bg), 0 0 0 4px #ffffff;
+}
+
+.hw-strip-dial[aria-expanded="true"]::after {
+	content: "";
+	position: absolute;
+	left: 9px;
+	right: 9px;
+	bottom: -3px;
+	height: 2px;
+	background: var(--hw-text);
+}
+
+.hw-strip-dial:hover::before {
+	border-color: var(--hw-text);
+}
+
+.hw-strip-dial[data-look="on"]:hover::before {
+	border-color: var(--hw-text);
+}
+
+.hw-strip-dial:focus-visible {
+	outline-offset: 0;
+}
+
+.hw-strip-status {
+	flex: 1 1 6em;
+	min-width: 6em;
+	margin: 0;
+	overflow: hidden;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.hw-strip-status[data-tone="warn"] {
+	color: var(--hw-warn-text);
+}
+
+/* No dials to draw (waiting, a deck without a strip): the sentence wraps. */
+.hw-strip-map[data-dials="0"] .hw-strip-status {
+	white-space: normal;
+}
+
+/* Narrower than the app's panel: the layout or deck name gives way first,
+   then the marks shrink, so the row stays one line. */
+@media (max-width: 339px) {
+	.hw-strip-lead {
+		display: none;
+	}
+}
+
+@media (max-width: 299px) {
+	.hw-strip-dial {
+		width: 20px;
+		height: 20px;
+	}
+
+	.hw-strip-dial::before {
+		inset: 3px;
+	}
+
+	.hw-strip-dial[data-look="dot"]::before {
+		background: radial-gradient(circle, var(--hw-muted) 0 3px, transparent 3.5px);
+	}
+
+	.hw-strip-dial[aria-expanded="true"]::after {
+		left: 6px;
+		right: 6px;
+	}
+}
+
+/* The one action of the dial the line names (Rejoin, Add, Move here, or
+   Include while a strip is made), at the line's end. */
+.hw-strip-act {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	margin-left: auto;
+}
+
+.hw-strip-act .hw-btn {
+	min-height: var(--hw-target);
+	padding: 0 8px;
+}
+
+.hw-strip-act .hw-strip-take {
+	margin: 0;
+	padding: 0;
+	align-items: center;
+}
+
+/* A dial that left a strip: one line in the dial row's look, saying so
+   and ending in its actions; on a narrow panel the actions wrap under
+   the words instead of cutting them. */
+.hw-strip-left {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--hw-s1) var(--hw-s2);
+	min-height: 28px;
+	margin-top: var(--hw-s1);
+}
+
+.hw-strip-left > .hw-strip-status {
+	flex: 1 1 auto;
+	white-space: normal;
+}
+
+.hw-strip-left > .hw-strip-act {
+	flex: 0 1 auto;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--hw-s1) var(--hw-s2);
+	min-width: 0;
+}
+
+/* Build screens' list: a tick per screen, its name leading its line. */
+.hw-strip-proposals .hw-strip-screen-name {
+	font-weight: 600;
+}
+
+.hw-strip-proposals .hw-check {
+	gap: var(--hw-s1);
+	min-height: 0;
+	margin: 0;
+	padding: 3px 0;
+}
+
+.hw-strip-proposals .hw-check input {
+	width: 16px;
+	height: 16px;
+}
+
+.hw-strip-proposals > li:not(:has(.hw-check)) {
+	padding: 3px 0;
+}
+
+/* One line, ellipsized. Its title names the reading and its sensor, or
+   gives the saved key of a reading HWiNFO does not list now. */
+.hw-strip-reading-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.hw-strip-reading {
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s1);
+	min-height: var(--hw-target);
+	font-size: var(--hw-size-sm);
+}
+
+/* A reading the style keeps but does not draw: the row says so beside its
+   name, which steps back; the name gives way first. */
+.hw-strip-reading[data-drawn="false"] .hw-strip-reading-text {
+	color: var(--hw-muted);
+}
+
+.hw-strip-reading-note {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--hw-warn-text);
+}
+
+.hw-strip-fit {
+	font-size: inherit;
+}
+
+/* More: each pane's overlays, scale and bands, named when there are two. */
+.hw-strip-extra {
+	margin: 0 0 var(--hw-s2);
+	padding: 0;
+	border: none;
+	min-width: 0;
+}
+
+.hw-strip-extra > legend {
+	padding: 0;
+	font-weight: 600;
+}
+
+.hw-strip-check {
+	margin: var(--hw-s1) 0 0;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-strip-check:empty {
+	display: none;
+}
+
+.hw-strip-check[data-tone="warn"] {
+	color: var(--hw-warn-text);
+}
+
+.hw-strip-pane {
+	position: relative;
+	padding-top: var(--hw-s2);
+	border-top: 1px solid var(--hw-rule);
+}
+
+/* Time window alone (a Whole strip of one screen): its label on its line,
+   under it where both do not fit. 90 px shows 15 minutes whole, with the
+   padding a narrow panel gives up. */
+.hw-strip-window-row:has(> #strip-shared-item[hidden]):has(> #strip-cycle-item[hidden]) > .hw-field:has(> #strip-window) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 clamp(4px, 2vw, 8px);
+}
+
+.hw-strip-window-row:has(> #strip-shared-item[hidden]):has(> #strip-cycle-item[hidden]) > .hw-field:has(> #strip-window) > label {
+	flex: 0 0 auto;
+	margin: 0;
+}
+
+.hw-strip-window-row:has(> #strip-shared-item[hidden]):has(> #strip-cycle-item[hidden]) > .hw-field:has(> #strip-window) > select {
+	flex: 1 1 90px;
+	width: auto;
+}
+
+@media (max-width: 240px) {
+	.hw-strip-window-row:has(> #strip-shared-item[hidden]):has(> #strip-cycle-item[hidden]) > .hw-field:has(> #strip-window) > select {
+		padding-inline: 0;
+	}
+}
+
+/* Graph with its View or Readout: one row where each shows its longest name
+   whole (Lanes · up to 3, own scales; Large values on the left), else one
+   under the other. Alone, each takes the row. */
+.hw-strip-graph-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--hw-s2) var(--hw-gap);
+	margin-top: var(--hw-s1);
+}
+
+.hw-strip-graph-row > .hw-field {
+	flex: 1 1 156px;
+	margin-top: 0;
+}
+
+.hw-strip-graph-row > .hw-field:first-child {
+	flex-basis: 172px;
+}
+
+/* Scale and alerts with Strip Link ID: one line while both are closed and
+   fit. The one opened takes the whole width, and the other a line of its own. */
+.hw-strip-folds {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.hw-strip-folds > .hw-sub {
+	flex: 0 1 auto;
+	min-width: 0;
+	margin-right: 0;
+}
+
+.hw-strip-folds > .hw-sub[open] {
+	flex: 1 0 100%;
+	margin-right: calc(-1 * var(--hw-gutter));
+}
+
+/* This screen (a running Whole strip): its name, and with two or more
+   screens one row to pick it (the screen before, the list of names, the
+   screen after, its place and Edit), on the rule that opens the block.
+   Picking a screen changes the select's text only, so the row never moves;
+   Edit opens the tools row under it. */
+.hw-strip-screens {
+	margin: var(--hw-s3) 0 0;
+	padding-top: var(--hw-s2);
+	border-top: 1px solid var(--hw-rule);
+}
+
+.hw-strip-screen-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--hw-s1) var(--hw-s2);
+	min-height: var(--hw-field-h);
+}
+
+.hw-strip-screen-head > .hw-strip-block {
+	flex: 0 1 auto;
+	min-width: 0;
+	margin: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+/* One screen: Add a screen and Build screens end the row that names it
+   while both fit beside a name cut to about 130 px; else they take their own
+   quiet row under it, so the name keeps its line. */
+.hw-strip-links {
+	display: flex;
+	flex: 0 0 auto;
+	flex-wrap: wrap;
+	gap: 0 var(--hw-s2);
+	margin: 0 0 0 auto;
+}
+
+.hw-strip-screen-head:has(> .hw-strip-links:not([hidden])) > .hw-strip-block {
+	flex: 1 1 130px;
+}
+
+.hw-strip-add-screen {
+	flex: 0 0 auto;
+	margin: 0;
+	font-size: var(--hw-size-sm);
+}
+
+.hw-field.hw-strip-pick {
+	display: flex;
+	flex: 1 1 220px;
+	align-items: center;
+	gap: var(--hw-s1);
+	min-width: 0;
+	margin: 0;
+}
+
+.hw-strip-pick > select,
+.hw-strip-pick > input[type="text"] {
+	flex: 1 1 0;
+	width: auto;
+}
+
+.hw-strip-step {
+	display: grid;
+	flex: 0 0 auto;
+	place-items: center;
+	width: var(--hw-field-h);
+	height: var(--hw-field-h);
+	padding: 0;
+	background: var(--hw-field);
+	border: 1px solid var(--hw-edge);
+	border-radius: var(--hw-radius);
+	color: var(--hw-text);
+	cursor: pointer;
+}
+
+.hw-strip-step:hover {
+	background: var(--hw-field-hover);
+}
+
+.hw-strip-step svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.hw-strip-place {
+	flex: 0 0 auto;
+	color: var(--hw-muted);
+	font-size: var(--hw-size-sm);
+	font-variant-numeric: tabular-nums;
+}
+
+.hw-strip-edit {
+	flex: 0 0 auto;
+	min-width: 3.2em;
+	text-align: center;
+}
+
+/* Under 300 px the row already takes two lines. The place and Edit end
+   This screen's line, and the screen before, the list and the screen after
+   take the next, so the list keeps room for a name. */
+@media (max-width: 299px) {
+	.hw-strip-screen-head:has(> .hw-strip-pick:not([hidden])) {
+		gap: 0 var(--hw-s1);
+	}
+
+	/* The line break between the two lines. */
+	.hw-strip-screen-head:has(> .hw-strip-pick:not([hidden]))::after {
+		content: "";
+		flex: 0 0 100%;
+		order: 3;
+	}
+
+	.hw-field.hw-strip-pick {
+		display: contents;
+	}
+
+	.hw-strip-pick > .hw-strip-place {
+		order: 1;
+		margin-left: auto;
+	}
+
+	.hw-strip-pick > .hw-strip-edit {
+		order: 2;
+	}
+
+	.hw-strip-pick > .hw-strip-step,
+	.hw-strip-pick > select,
+	.hw-strip-pick > input[type="text"] {
+		order: 4;
+		margin-top: var(--hw-s1);
+	}
+}
+
+.hw-strip-screens > .hw-set-tools {
+	margin: var(--hw-s1) 0 0;
+}
+
+.hw-strip-screens:not([hidden]) + .hw-strip-pane {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+
+/* The Filter field's examples: links in the count slot, never help. */
+.hw-strip-example {
+	margin: -4px 1px;
+	font-size: inherit;
+}
+
+.hw-strip-band {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--hw-target);
+	gap: var(--hw-s1) var(--hw-gap);
+	align-items: center;
+	padding: var(--hw-s1) 0;
+	border-bottom: 1px solid var(--hw-rule);
+}
+
+.hw-strip-band > select {
+	grid-column: 1 / -1;
+}
+
+.hw-strip-band > .hw-check {
+	grid-column: 1 / 3;
+	margin: 0;
+}
+
+.hw-strip-band > select,
+.hw-strip-band > input {
+	min-width: 0;
+}
+
+.hw-strip-confirm-title {
+	margin: 0;
+	font-weight: 600;
+}
+
+#strip-fill-also {
+	margin: var(--hw-s1) 0 0;
+}
+
+/* A name with no place to break (a filter, an underscored name) wraps
+   inside the question too. */
+#strip-fill-ask-text {
+	overflow-wrap: anywhere;
+}
+
+/* While Fill asks, the line's Use and Cancel keep their place unseen, so
+   nothing on it moves and the question's Cancel is the only one shown. */
+.hw-strip-capline[data-asking="true"] :is(#strip-fill-use, #strip-fill-cancel) {
+	visibility: hidden;
+}
+
+.hw-strip-proposals li[data-found="false"] {
+	color: var(--hw-warn-text);
+}
+
+.hw-strip-proposals li[data-found="same"] {
+	color: var(--hw-muted);
+}
+
+/* The preview reserves its box before the first frame (each row N slices
+   of 2:1 side by side, no gap, like the strip), and each picture swaps
+   inside its own cell. A row holds at most four slices: a + XL's six show
+   as its two halves, dials 1 to 3 above dials 4 to 6, so a slice is
+   twice the height one row of six leaves it. The checkerboard stands in
+   for the strip picture a see-through background shows on the deck. */
+.hw-strip-preview {
+	margin: var(--hw-s3) 0 0;
+}
+
+.hw-strip-shots {
+	display: grid;
+	row-gap: var(--hw-s1);
+	width: 100%;
+}
+
+.hw-strip-shot-row {
+	display: grid;
+	grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
+	aspect-ratio: calc(var(--n, 4) * 2) / 1;
+	overflow: hidden;
+	border-radius: 6px;
+	background: repeating-conic-gradient(#3a3a3a 0% 25%, #242424 0% 50%) 0 0 / 12px 12px;
+}
+
+.hw-strip-shot-row img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+}
+
+.hw-strip-shot-row img:not([src]) {
+	visibility: hidden;
+}
+
+/* The caption's line: the caption and, on a strip being made or a running
+   Equal split, the words that name its start. One line of the caption's
+   height whatever it holds, so nothing under it moves. */
+.hw-strip-capline {
+	display: flex;
+	align-items: center;
+	gap: var(--hw-s2);
+	height: 1.4em;
+	margin-top: var(--hw-s1);
+	font-size: var(--hw-size-sm);
+}
+
+.hw-strip-caption {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--hw-muted);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-variant-numeric: tabular-nums;
+}
+
+.hw-strip-capctl {
+	display: flex;
+	flex: 0 1 auto;
+	align-items: center;
+	gap: var(--hw-s2);
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.hw-strip-fill-cancel > .hw-narrow {
+	display: none;
+}
+
+/* Words that name a start, in the link color with a chevron: a native
+   select laid over them, see-through, takes the press and opens the host's
+   own list, so the words size the control. The hit area's padding is paid
+   back by a negative margin, as a text link's is, and a hover only
+   underlines, so nothing moves. With one start it is plain words. */
+.hw-quiet {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+	max-width: 100%;
+	padding: 4px 2px;
+	margin: -4px -2px;
+	color: var(--hw-link);
+	cursor: pointer;
+}
+
+.hw-quiet:hover > .hw-quiet-text {
+	text-decoration: underline;
+}
+
+.hw-quiet:focus-within {
+	outline: 2px solid var(--hw-focus);
+	outline-offset: -1px;
+	border-radius: 2px;
+}
+
+.hw-quiet > select {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	opacity: 0;
+	font: inherit;
+	cursor: pointer;
+}
+
+.hw-quiet > select option {
+	background: var(--hw-field);
+	color: var(--hw-text);
+}
+
+.hw-quiet-text {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.hw-quiet > svg {
+	flex: 0 0 auto;
+	width: 14px;
+	height: 14px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2.4;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.hw-quiet[data-single="true"] {
+	color: inherit;
+	cursor: default;
+}
+
+.hw-quiet[data-single="true"] > select,
+.hw-quiet[data-single="true"] > svg {
+	display: none;
+}
+
+.hw-quiet[data-single="true"]:hover > .hw-quiet-text {
+	text-decoration: none;
+}
+
+/* A pair previewed on a narrow panel: its name, Use and an x for Cancel
+   take the line. */
+@media (max-width: 299px) {
+	.hw-strip-capline[data-armed="true"] > .hw-strip-caption,
+	.hw-strip-fill-cancel > [data-l10n] {
+		display: none;
+	}
+
+	.hw-strip-fill-cancel > .hw-narrow {
+		display: inline;
+	}
+}
+
+/* A dial in a running strip: Display edits the strip's text color, look,
+   decimals, °F and unit and decimals per reading (the strip's readings);
+   the dial's own view, trend, rows, colors and bar range do nothing there
+   and step aside until it leaves. The per-reading rows keep no help line
+   there: the panel's help never grows (issue #59). */
+#sec-display.hw-strip-joined > .hw-sec-body > :is(.hw-field:has(> #f-view), #trend-window-item, #overview-rows, #sensor-value-colors, #bar-range, .hw-how) {
+	display: none !important;
+}
+#sec-display.hw-strip-joined #formats-help {
+	display: none;
+}
+
+@media (forced-colors: active) {
+	.hw-strip-shots {
+		forced-color-adjust: none;
+	}
+
+	/* The dial marks keep a border in every state, in system colors. */
+	.hw-strip-dial {
+		forced-color-adjust: none;
+	}
+
+	.hw-strip-dial::before {
+		border-color: ButtonText;
+		background: Canvas;
+	}
+
+	.hw-strip-dial[data-look="on"]::before {
+		border-color: Highlight;
+		background: Highlight;
+	}
+
+	.hw-strip-dial[data-look="dot"]::before {
+		border-color: GrayText;
+		border-style: dotted;
+		background: radial-gradient(circle, GrayText 0 4px, Canvas 4.5px);
+	}
+
+	.hw-strip-dial[data-kind="conflict"]::before {
+		border-style: double;
+	}
+
+	.hw-strip-dial[data-self]::before {
+		box-shadow: 0 0 0 2px Canvas, 0 0 0 4px CanvasText;
+	}
+
+	.hw-strip-dial[aria-expanded="true"]::after {
+		background: CanvasText;
+	}
+
+	.hw-strip-dial:focus-visible {
+		outline: 2px solid Highlight;
+	}
+
+	.hw-quiet:not([data-single="true"]) {
+		color: LinkText;
+	}
+
+	.hw-quiet:focus-within {
+		outline-color: Highlight;
 	}
 }

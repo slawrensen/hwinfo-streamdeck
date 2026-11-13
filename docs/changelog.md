@@ -13,6 +13,107 @@ One entry per version. A tagged version is built and staged as a draft GitHub
 release by the workflow; I publish the draft by hand. The Elgato Marketplace
 listing is a separate track.
 
+## 1.8.0.0 - 2026-11-13
+
+Sensor Dials can join into one graph across the touch strip.
+
+- **Strip display** on a Stream Deck + or + XL: one graph across the dials,
+  or two with **Equal split**. See
+  [Strip display](https://docs.slawrensen.com/hwinfo-streamdeck/strip-display.html).
+- **Build screens** proposes up to seven graphs from this PC's sensors, and
+  **Make the strip** creates them.
+- **Equal split** starts from a pair of graphs this PC's sensors fill, such
+  as **CPU and GPU**, and **Fill both halves** puts one on a running split.
+- **Meters** has a **Look**: **Thin bar**, **Full bar** or **Liquid**.
+  **CPU and RAM usage**, the first pair, is a **Liquid** of each.
+- **Screens**: a whole strip keeps up to eight graphs and shows one at a
+  time.
+- A strip graph is **Trend**, **Area**, **Compare**, **Lanes**, **Heat**,
+  **Group**, **Ambient**, **Meters** or **Events**, over the last 1, 5 or 15
+  minutes.
+- **Group** draws up to 32 readings of a folder, a filter, a list or a unit.
+  Its **Tiles** view gives each reading a small graph of its own.
+- **Time window** on a key's sparkline or a two-row dial: 1, 5 or 15
+  minutes. History is capped at 2 MiB plus a separate 768 KiB for Group and
+  Ambient strip graphs.
+- **Brief gaps** sets how a strip draws a reading missed for a moment.
+- Sensor Reading keys have a **Background** setting, so a page picture can
+  show behind them. **Stars**, **Dusk** and **Nebula** draw the plugin's own
+  picture across the whole deck.
+- **Advanced → Shared defaults** sets one **Background** for every key, dial
+  and strip that has none of its own.
+- **Unit and decimals per reading**
+  ([issue #59](https://github.com/slawrensen/hwinfo-streamdeck/issues/59)):
+  a reading's own decimals, and one unit for a byte reading.
+- **Binary data units read HWiNFO's KB to TB as 1024-based**: with 2
+  decimals, 12,100 MB read 11.27 GiB in 1.7.1 and read 11.82 GiB now.
+- Limits for each reading on a key, **Separate limits for** a reading on
+  a dial, and **Alert after**, **Clear by** and **Snooze lasts** on both.
+- An **HWiNFO Control** key can **Snooze alerts**, **End alert snooze** and
+  drive a strip: its screens, its time window, the highlighted reading and
+  **Strip: inspect (pause the view)**.
+- A Shared Memory read that finds HWiNFO busy looks again, up to six times
+  25 ms apart, before it counts as missed. Before, graphs broke about every
+  139 seconds.
+- Limits typed in 1.8 keep their unit, so a later **°F** switch converts
+  them.
+- **Page layout** keeps chosen cells of the detail page empty for one key's
+  drill-down
+  ([issue #5](https://github.com/slawrensen/hwinfo-streamdeck/issues/5)).
+- **Detail filters take `|`**
+  ([issue #35](https://github.com/slawrensen/hwinfo-streamdeck/issues/35)):
+  `4090 | pump` lists every reading either pattern matches.
+- **Advanced → Reading links** pairs a Shared Memory reading with its Gadget
+  counterpart.
+- **Advanced → Calculated readings**: the sum, average, lowest or highest
+  of 2 to 8 readings, or the difference or ratio of two.
+- In the settings panels, a held Enter presses once (the screen and page
+  arrows keep stepping), and a double click or a pen's double tap acts once
+  on a button, a checkbox, a section heading or a reading in a list. Quick
+  presses still repeat where repeating is the point: a tile's size, the
+  screen and page arrows, and **Earlier** and **Later** in the rotation list
+  and in **This screen → Edit**.
+- Renamed: **Not updating** (was **No new data**) on a dial; **Link ID**
+  (was **Target**) and **A stats reset clears** (was **A reset clears**) on
+  an HWiNFO Control key.
+
+Compatibility:
+
+- 1.8 only adds settings, and reads every 1.7.1 setting as before.
+  **Use it everywhere** (**Advanced → Shared defaults**) is the one button
+  that removes fields: each key's, dial's and strip's own **Background** and
+  **Words in the accent color**.
+- Going back to 1.7.1 ignores the new fields: keys draw Recent samples and
+  alert only from the first reading's **Warn at** and **Critical at**, at
+  once and with no snooze; an HWiNFO Control key set to **Snooze alerts**,
+  **End alert snooze** or a **Strip** command shows the Stream Deck alert
+  when pressed; joined dials show their own readings; every key, and a dial
+  on **Default**, **Stars**, **Dusk** or **Nebula**, draws the theme's
+  background; and calculated readings show **Sensor missing**.
+- A dial's **Background** picked on 1.7.1 after **Use it everywhere** can go
+  back to **Default** on the way back to 1.8. Pick it again.
+- A known gap: a Sensor Dial pasted from a second copy of a strip's profile
+  can bring that copy's setup to the whole strip without asking.
+  [Copies and other decks](https://docs.slawrensen.com/hwinfo-streamdeck/strip-display.html#copies-and-other-decks)
+  says how to undo it.
+- Requirements are unchanged.
+
+Checked so far:
+
+- A whole strip ran on my Stream Deck + XL, through a 13-hour soak of an
+  earlier 1.8 build (PERF.md). The equal split and the Stream Deck + ran on a simulated deck
+  only, and slice seams and input latency are not measured.
+- **Stars**, **Dusk** and **Nebula** ran on my + XL. Other decks, and a key's
+  see-through **Background**, are checked in renderer tests only.
+- The Sensor Reading page now covers framerate readings, read live from
+  HWiNFO 8.48. A real game and RTSS are untested.
+- PERF.md compares the plugin with 1.7.1 under a mock Stream Deck app, and
+  records a 48-hour soak of the 1.8 plugin with my + XL and a 15-key Stream
+  Deck: one process through two deck reconnects, no warning or error lines,
+  64.7 to 68.0 MB private memory in hourly means. The same plugin came back on
+  its own from a Stream Deck app restart, HWiNFO restarts and a sleep and wake.
+  The app's own cost and the installed package are not measured.
+
 ## 1.7.1.0 - 2026-10-24
 
 A Background setting for Sensor Dials, so the touch strip picture can show

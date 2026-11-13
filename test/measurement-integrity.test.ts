@@ -974,9 +974,10 @@ describe("a held key keeps the document it was pressed under (external review AX
 		pushPanelPreview(): void;
 		openDetails(id: string): Promise<void>;
 		cycleStat(id: string): Promise<void>;
-		detailNavigator: { leave(deviceId: string): Promise<void> };
-		onKeyDown(ev: { action: Handle }): Promise<void>;
-		onKeyUp(ev: { action: Handle }): void;
+		detailNavigator: { leave(deviceId: string): Promise<void>; stateFor(deviceId: string): undefined };
+		snoozeTaps: Set<string>;
+		onKeyDown(ev: { action: Handle; payload: { settings: ReadingSettings; isInMultiAction: boolean } }): Promise<void>;
+		onKeyUp(ev: { action: Handle; payload: { settings: ReadingSettings; isInMultiAction: boolean } }): void;
 		onDidReceiveSettings(ev: { action: Handle; payload: { settings: ReadingSettings } }): void;
 		onWillAppear(ev: { action: Handle; payload: { settings: ReadingSettings } }): void;
 	};
@@ -998,7 +999,8 @@ describe("a held key keeps the document it was pressed under (external review AX
 		const record = (outcome: string) => async (id: string): Promise<void> => void outcomes.push({ outcome, readingKey: action.instances.get(id)?.settings.readingKey });
 		action.openDetails = record("hold");
 		action.cycleStat = record("tap");
-		action.detailNavigator = { leave: async () => void outcomes.push({ outcome: "back", readingKey: action.instances.get("ctx")?.settings.readingKey }) };
+		// No detail session anywhere: an appear records none (detailScope).
+		action.detailNavigator = { leave: async () => void outcomes.push({ outcome: "back", readingKey: action.instances.get("ctx")?.settings.readingKey }), stateFor: () => undefined };
 		// The production dispatch, with the hold timer under the test's hand.
 		const timers = new Map<number, () => void>();
 		let next = 0;
@@ -1009,11 +1011,15 @@ describe("a held key keeps the document it was pressed under (external review AX
 			},
 			clearTimer: (h) => void timers.delete(h as unknown as number)
 		});
+		// The snooze bookkeeping the constructor makes; none of these
+		// settings names a snooze.
+		action.snoozeTaps = new Set();
 		const handle: Handle = { id: "ctx", device: { id: "dev", name: "fixture" }, isKey: () => true };
+		const press = { action: handle, payload: { settings: initial, isInMultiAction: false } };
 		const hold = (): void => {
 			for (const fn of [...timers.values()]) fn();
 		};
-		return { action, outcomes, handle, hold };
+		return { action, outcomes, handle, press, hold };
 	}
 	for (const route of ["settings", "replayed appear"] as const) {
 		for (const [name, settings] of Object.entries(changes)) {
@@ -1024,19 +1030,19 @@ describe("a held key keeps the document it was pressed under (external review AX
 					const subscribe = mock.method(poller, "subscribeSeries", () => {});
 					try {
 						const f = fixture();
-						await f.action.onKeyDown({ action: f.handle });
+						await f.action.onKeyDown(f.press);
 						if (route === "settings") f.action.onDidReceiveSettings({ action: f.handle, payload: { settings } });
 						else f.action.onWillAppear({ action: f.handle, payload: { settings } });
 						if (end === "hold") f.hold();
-						else f.action.onKeyUp({ action: f.handle });
+						else f.action.onKeyUp(f.press);
 						if (keeps) {
 							assert.deepEqual(f.outcomes, [{ outcome: end, readingKey: "a:0:1" }]);
 							return;
 						}
 						assert.equal(f.outcomes.length, 0, "nothing runs under the replacement settings");
-						f.action.onKeyUp({ action: f.handle });
-						await f.action.onKeyDown({ action: f.handle });
-						f.action.onKeyUp({ action: f.handle });
+						f.action.onKeyUp(f.press);
+						await f.action.onKeyDown(f.press);
+						f.action.onKeyUp(f.press);
 						assert.equal(f.outcomes.length, 1, "the next press runs once, under the new settings");
 						assert.equal(f.outcomes[0]?.readingKey, settings.readingKey);
 					} finally {
@@ -1060,19 +1066,19 @@ describe("a held key keeps the document it was pressed under (external review AX
 					const subscribe = mock.method(poller, "subscribeSeries", () => {});
 					try {
 						const f = fixture();
-						await f.action.onKeyDown({ action: f.handle });
+						await f.action.onKeyDown(f.press);
 						if (route === "settings") f.action.onDidReceiveSettings({ action: f.handle, payload: { settings } });
 						else f.action.onWillAppear({ action: f.handle, payload: { settings } });
-						for (let i = 0; i < repeats; i++) await f.action.onKeyDown({ action: f.handle });
-						f.action.onKeyUp({ action: f.handle });
+						for (let i = 0; i < repeats; i++) await f.action.onKeyDown(f.press);
+						f.action.onKeyUp(f.press);
 						if (keeps) {
 							assert.deepEqual(f.outcomes, [{ outcome: "tap", readingKey: "a:0:1" }]);
 							return;
 						}
 						assert.deepEqual(f.outcomes, [], "nothing runs under the replacement settings");
-						await f.action.onKeyDown({ action: f.handle });
+						await f.action.onKeyDown(f.press);
 						f.hold();
-						f.action.onKeyUp({ action: f.handle });
+						f.action.onKeyUp(f.press);
 						assert.equal(f.outcomes.length, 1, "the next press runs once, under the new settings");
 					} finally {
 						getStatus.mock.restore();
@@ -1086,11 +1092,11 @@ describe("a held key keeps the document it was pressed under (external review AX
 		const getStatus = mock.method(poller, "getStatus", (): PollerStatus => ({ state: "unavailable", reason: "not-running", message: "fixture" }));
 		try {
 			const f = fixture();
-			await f.action.onKeyDown({ action: f.handle });
+			await f.action.onKeyDown(f.press);
 			f.hold();
-			await f.action.onKeyDown({ action: f.handle });
+			await f.action.onKeyDown(f.press);
 			f.hold();
-			f.action.onKeyUp({ action: f.handle });
+			f.action.onKeyUp(f.press);
 			assert.deepEqual(f.outcomes, [{ outcome: "hold", readingKey: "a:0:1" }]);
 		} finally {
 			getStatus.mock.restore();

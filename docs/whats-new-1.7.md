@@ -27,10 +27,10 @@ The key, dial and Control panels use the same section layout. On keys and dials,
 
 The theme strip names the current theme and whether it is local or shared. **Default** follows the shared theme. **Make shared** applies a local theme to all keys and dials that follow Default. [Themes & colors](themes.md) explains the choices.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-theme-strip.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-theme-strip.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The top of the key&#x27;s settings panel: the header with the key&#x27;s live face, the reading&#x27;s name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-theme-strip.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-theme-strip.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The top of the key&#x27;s settings panel: the header with the key&#x27;s live face, the reading&#x27;s name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper."></a>
 
-*Actual settings-panel capture using live HWiNFO readings in a mock Stream
-Deck host. This is not a photograph of the physical deck.*
+*Actual 1.7.0 settings-panel capture using live HWiNFO readings in a mock
+Stream Deck host. This is not a photograph of the physical deck.*
 
 The sections follow: **Reading**, **Display**, **Alerts**, **Press**
 (**Controls** on a dial) and **Advanced**, which holds **Shared defaults**,
@@ -44,10 +44,10 @@ Control key has **Command** and **Advanced**.
 - **Replacing shared settings and destructive group edits ask for a second press.** Opening a panel writes nothing, and an edit keeps unrelated or unknown stored settings.
 - **Keyboard and narrow-panel handling improved.** Stream Deck still reserves Escape, so the reading picker also closes on another click in its box or when the panel loses focus.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-rotation.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The dial&#x27;s settings panel: the header with the dial&#x27;s face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and filled as the one on the dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, and Title on the dial beside Title when the dial moves on."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-dial-rotation.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-dial-rotation.png' | relative_url }}" width="800" height="1760" loading="lazy" decoding="async" alt="The dial&#x27;s settings panel: the header with the dial&#x27;s face, the theme strip, then Reading with On the dial now, the Rotation list of three readings with CPU (Tctl/Tdie) selected and filled as the one on the dial, the Earlier, Later, Rename and Remove buttons under it, Split into groups, Title on the dial beside Title when the dial moves on, and the start of Display with Text color and View."></a>
 
-*Actual settings-panel capture using live HWiNFO readings in a mock Stream
-Deck host.*
+*Actual 1.7.0 settings-panel capture using live HWiNFO readings in a mock
+Stream Deck host.*
 
 ### Renamed labels
 
@@ -117,15 +117,15 @@ changes. Upgrading from **1.6.0** adds all of it.
 removes that reading's override, and the **Automatic** preset clears the
 color of every reading in the list.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors."></a>
 
 *Production dial renderer with fixed sample readings and generated histories.
 The layouts and values are identical on both sides; only number colors change.*
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The dial&#x27;s Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The dial&#x27;s Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button."></a>
 
-*Actual settings-panel capture using live HWiNFO readings in a mock Stream
-Deck host. This is not a photograph of the physical deck.*
+*Actual 1.7.1 settings-panel capture using live HWiNFO readings in a mock
+Stream Deck host. This is not a photograph of the physical deck.*
 
 Colors follow reading identity through rotation and reordering. On a
 confirmed source link, an exact color for the displayed key wins; otherwise
@@ -140,7 +140,7 @@ history, or withhold both readings while they share the name. Shared Memory
 remains the preferred source because it supplies hardware identifiers,
 history and a consistency mutex.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age."></a>
 
 *Production status renderers with controlled failure scenarios. These are
 rendered examples, not measurements from a hardware fault test.*

@@ -3,9 +3,9 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>Sensor Dial settings</title>
-		<script src="sdpi-components.js"></script>
+		<script src="pi-client.js?v=1.8.0.0-54"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.1.0-1" />
+		<link rel="stylesheet" href="pi.css?v=1.8.0.0-54" />
 	</head>
 	<body data-kind="dial">
 		<header class="hw-head" id="hw-head" data-kind="dial" data-pin>
@@ -20,9 +20,20 @@
 						<button type="button" data-folds="fold" tabindex="-1" aria-label="Fold all sections" title="Fold all sections (or Alt-click a section title)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m7 20 5-5 5 5" /><path d="m7 4 5 5 5-5" /></svg></button>
 					</div>
 				</div>
-				<p class="hw-head-reading" id="head-reading">No reading selected</p>
-				<p class="hw-head-source" id="head-source"></p>
-				<p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p>
+				<div class="hw-room"><div class="hw-head-lines" id="head-lines"><p class="hw-head-reading" id="head-reading">No reading selected</p><p class="hw-head-source" id="head-source"></p></div></div>
+				<div class="hw-room"><p class="hw-state" id="head-state" data-tone="muted">Connecting to the plugin</p></div>
+			</div>
+			<!-- The name and source line above share four lines, the rest cut
+			     (the shell's shareLines). This card shows them whole, laid over
+			     the form so nothing moves, while one of them is cut: on a rest
+			     of the pointer on them, on keyboard focus, or held open by a
+			     click. Its name and source line repeat the header's own text,
+			     which a screen reader already has, so only Copy is announced
+			     here. -->
+			<div class="hw-head-whole" id="head-whole" hidden>
+				<button type="button" class="hw-btn" id="head-copy" aria-label="Copy the reading's name"><span class="hw-room"><span id="head-copy-label">Copy</span><span aria-hidden="true">Copied</span><span aria-hidden="true">Copy failed</span></span></button>
+				<p class="hw-whole-name" id="head-whole-name" aria-hidden="true"></p>
+				<p class="hw-whole-source" id="head-whole-source" aria-hidden="true"></p>
 			</div>
 		</header>
 
@@ -49,6 +60,403 @@
 				<span class="hw-sr-only" id="theme-desc" hidden></span>
 			</div>
 			<p class="hw-help" id="theme-help"></p>
+		</details>
+
+		<!-- Strip display: the dial joins a group whose slices make one graph
+		     across the touch strip. On a strip, every control here is sent to
+		     the plugin the moment it changes (a stripEdit against the revision
+		     shown), and the section shows what the plugin wrote back: what
+		     the strip draws. The plugin is the only writer of stripGroup.
+		     Making a strip keeps its own button; leaving one is a layout
+		     choice like the others. -->
+		<details class="hw-sec" id="sec-strip">
+			<summary><span class="hw-sec-title" data-l10n="pi.strip.strip">Strip</span><span class="hw-sec-sum" data-summary="strip"></span></summary>
+			<div class="hw-sec-body">
+				<fieldset class="hw-strip-layout" id="strip-layout" aria-describedby="strip-device">
+					<legend class="hw-sr-only" data-l10n="pi.strip.layout">Layout</legend>
+					<label class="hw-check"><input type="radio" name="strip-layout" value="independent" /><span data-l10n="pi.strip.independentDials">Independent dials</span></label>
+					<label class="hw-check"><input type="radio" name="strip-layout" value="whole" /><span data-l10n="pi.strip.wholeStrip">Whole strip</span></label>
+					<label class="hw-check"><input type="radio" name="strip-layout" value="split" /><span data-l10n="pi.strip.equalSplit">Equal split</span></label>
+				</fieldset>
+				<!-- The deck's dials in one row, a mark per dial slot as the deck
+				     holds them, and one line beside them, shown only while a
+				     dial needs the person (missing, left, in another strip, a
+				     different copy) or a strip is being made. The line names
+				     one dial and holds its one action; a mark (one Tab stop,
+				     arrows between them) picks the dial the line names. A
+				     running strip whose dials are all in it shows no row. -->
+				<div class="hw-strip-map" id="strip-map">
+					<div class="hw-strip-dials" id="strip-slots" role="toolbar" aria-label="Dials on this strip" data-l10n-aria-label="pi.strip.dialsOnThisLabel"></div>
+					<p class="hw-strip-status" id="strip-device" role="status" data-l10n="pi.strip.waitingForThe">Waiting for the plugin.</p>
+					<span class="hw-strip-act" id="strip-slot-detail" hidden></span>
+				</div>
+				<!-- A dial that left a strip: one line saying so, ending in its
+				     actions (Rejoin, then Every dial leaves while other dials of
+				     the strip are still in it here, else Restore the strip). -->
+				<div class="hw-strip-left" id="strip-restore" hidden>
+					<p class="hw-strip-status" id="strip-restore-text"></p>
+					<span class="hw-strip-act"><button type="button" class="hw-btn" id="strip-rejoin" data-l10n="pi.strip.actionRejoin">Rejoin</button><button type="button" class="hw-btn" id="strip-leave-all" data-l10n="pi.strip.everyDialLeaves">Every dial leaves</button><button type="button" class="hw-btn" id="strip-restore-all" data-l10n="pi.strip.restoreTheStrip">Restore the strip</button></span>
+				</div>
+				<div id="strip-resolve" hidden>
+					<p class="hw-help" id="strip-resolve-text"></p>
+					<div class="hw-actions"><button type="button" class="hw-btn" id="strip-keep-group" data-l10n="pi.strip.keepTheStrip">Keep the strip's setup</button><button type="button" class="hw-btn" id="strip-use-dial" data-l10n="pi.strip.useThisDial">Use this dial's copy</button></div>
+				</div>
+				<div id="strip-retarget" hidden>
+					<p class="hw-help" id="strip-retarget-text"></p>
+					<div class="hw-actions"><button type="button" class="hw-btn" id="strip-retarget-go" data-l10n="pi.strip.useThisDeck">Use this deck's dials</button></div>
+				</div>
+				<!-- The plugin's own slices and what the last change did, above the
+				     controls they answer for. The caption's line keeps one line:
+				     a strip being made names its start there in place of the
+				     caption, and a running Equal split ends it in Fill both
+				     halves (a pair previewed, then Use or Cancel). Use over a
+				     half a person made asks first, in a box under the
+				     preview drawn as Build's list is: Cancel, then Replace. -->
+				<figure class="hw-strip-preview" id="strip-preview">
+					<div class="hw-strip-shots" id="strip-shots" role="img" aria-label="No preview yet"></div>
+					<figcaption class="hw-strip-capline" id="strip-capline"><span class="hw-strip-caption" id="strip-caption" data-l10n="pi.strip.noPreviewYet">No preview yet</span><span class="hw-strip-capctl" id="strip-capctl" hidden><span class="hw-quiet" id="strip-fill-pick" hidden><span class="hw-quiet-text" id="strip-fill-text" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6" /></svg><select id="strip-fill" aria-label="Fill both halves" data-l10n-aria-label="pi.strip.fillBothHalves"></select></span><button type="button" class="hw-link" id="strip-fill-one" hidden></button><button type="button" class="hw-link" id="strip-fill-use" hidden data-l10n="pi.strip.fillUse">Use</button><button type="button" class="hw-link hw-strip-fill-cancel" id="strip-fill-cancel" hidden aria-label="Cancel" data-l10n-aria-label="pi.common.cancel"><span data-l10n="pi.common.cancel">Cancel</span><span class="hw-narrow" aria-hidden="true">×</span></button></span></figcaption>
+				</figure>
+				<div class="hw-strip-confirm" id="strip-fill-ask" role="group" aria-labelledby="strip-fill-ask-text" tabindex="-1" hidden>
+					<p class="hw-strip-confirm-title" id="strip-fill-ask-text"></p>
+					<p id="strip-fill-also" hidden data-l10n="pi.strip.fillAlsoWhole">This also changes the Whole strip's first screen.</p>
+					<div class="hw-actions"><button type="button" class="hw-link" id="strip-fill-no" data-l10n="pi.common.cancel">Cancel</button><button type="button" class="hw-btn" id="strip-fill-yes" data-l10n="pi.strip.fillReplace">Replace</button></div>
+				</div>
+				<div class="hw-status" id="strip-note" role="status" aria-live="polite" data-tone=""></div>
+				<!-- Build screens: what this PC's sensors fill, each screen ticked,
+				     a row a line, and the one button that uses them. A Whole
+				     strip being made shows it here, with Make the strip as that
+				     button; the title's first words are the start, a quiet
+				     dropdown (Screens for this PC, or One reading only, which
+				     takes the dropdown to the caption's line). On a running strip
+				     the Build screens link opens it under the screen row (the
+				     panel script moves it there), with Cancel as the way out.
+				     Nothing is written before the button. -->
+				<div class="hw-strip-confirm" id="strip-build-box" role="group" aria-labelledby="strip-build-head" hidden>
+					<p class="hw-strip-confirm-title" id="strip-build-head"><span class="hw-quiet" id="strip-start-pick" hidden><span class="hw-quiet-text" id="strip-start-text" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6" /></svg><select id="strip-start" aria-label="Start from" data-l10n-aria-label="pi.strip.startFrom"></select></span><span id="strip-build-title"></span></p>
+					<ul class="hw-strip-proposals" id="strip-build-list"></ul>
+					<div class="hw-actions"><button type="button" class="hw-btn" id="strip-build-use" aria-describedby="strip-note" data-l10n="pi.strip.makeTheStrip">Make the strip</button><button type="button" class="hw-link" id="strip-build-no" data-l10n="pi.common.cancel">Cancel</button></div>
+				</div>
+				<div id="strip-edit" hidden>
+					<div class="hw-row2 hw-strip-window-row">
+						<div class="hw-field" id="strip-shared-item" hidden>
+							<span class="hw-label" aria-hidden="true" data-l10n="pi.strip.bothHalves">Both halves</span>
+							<label class="hw-check"><input type="checkbox" id="strip-shared" /><span data-l10n="pi.strip.sameWindow">Same window</span></label>
+						</div>
+						<div class="hw-field">
+							<label for="strip-window" data-l10n="pi.strip.timeWindow">Time window</label>
+							<select id="strip-window">
+								<option value="1m" data-l10n="pi.strip.minute1">1 minute</option>
+								<option value="5m" data-l10n="pi.common.minutes5">5 minutes</option>
+								<option value="15m" data-l10n="pi.common.minutes15">15 minutes</option>
+							</select>
+						</div>
+						<!-- Screens: with two or more, how the strip moves on by
+						     itself. By hand is the stored absence of a cycle. -->
+						<div class="hw-field" id="strip-cycle-item" hidden>
+							<label for="strip-cycle" data-l10n="pi.strip.nextScreen">Next screen</label>
+							<select id="strip-cycle">
+								<option value="0" data-l10n="pi.strip.byHand">By hand</option>
+								<option value="10" data-l10n="pi.strip.every10Seconds">Every 10 seconds</option>
+								<option value="30" data-l10n="pi.strip.every30Seconds">Every 30 seconds</option>
+								<option value="60" data-l10n="pi.strip.everyMinute">Every minute</option>
+								<option value="300" data-l10n="pi.strip.every5Minutes">Every 5 minutes</option>
+							</select>
+						</div>
+					</div>
+					<div id="strip-panes">
+					<!-- This screen (a running Whole strip): its name, and with two
+					     or more screens one row to pick it: the screen before, a
+					     list of their names, the screen after, its place and Edit.
+					     Picking shows that screen on the strip (no settings write)
+					     and the box below edits it. Edit opens one row that
+					     renames, moves, removes, adds and builds. One screen: Add a
+					     screen and Build screens beside its name. -->
+					<div class="hw-strip-screens" id="strip-screens" hidden>
+						<div class="hw-strip-screen-head">
+							<span class="hw-strip-block" id="strip-screen-label" data-l10n="pi.strip.thisScreen">This screen</span>
+							<span class="hw-strip-links" id="strip-links" hidden>
+								<button type="button" class="hw-link hw-strip-add-screen" id="strip-add-screen" data-l10n="pi.strip.addAScreen">Add a screen</button>
+								<button type="button" class="hw-link hw-strip-add-screen" id="strip-build" aria-expanded="false" aria-controls="strip-build-box" data-l10n="pi.strip.buildLink">Build screens</button>
+							</span>
+							<div class="hw-field hw-strip-pick" id="strip-screen-pick" hidden>
+								<button type="button" class="hw-strip-step" id="strip-screen-prev" data-repeat data-step="strip-screen-before" aria-label="Show the screen before" data-l10n-aria-label="pi.strip.screenBefore"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 6-6 6 6 6" /></svg></button>
+								<select id="strip-screen-select" aria-labelledby="strip-screen-label" aria-describedby="strip-screen-place strip-screen-keys" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Alt+Home Alt+End F2 Delete"></select>
+								<input type="text" class="hw-strip-screen-name" id="strip-screen-name" hidden maxlength="64" autocomplete="off" spellcheck="false" />
+								<button type="button" class="hw-strip-step" id="strip-screen-next" data-repeat data-step="strip-screen-after" aria-label="Show the screen after" data-l10n-aria-label="pi.strip.screenAfter"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6" /></svg></button>
+								<span class="hw-strip-place" id="strip-screen-place"></span>
+								<button type="button" class="hw-link hw-strip-edit" id="strip-screen-edit" aria-expanded="false" aria-controls="strip-screen-tools" data-l10n="pi.strip.editScreens">Edit</button>
+							</div>
+						</div>
+						<div class="hw-set-tools" id="strip-screen-tools" role="toolbar" aria-label="Screen on the strip" data-l10n-aria-label="pi.strip.screenToolsLabel" hidden>
+							<button type="button" data-tool="rename"><span data-l10n="pi.strip.rename">Rename</span></button>
+							<button type="button" data-tool="earlier" tabindex="-1"><span aria-hidden="true">← </span><span data-l10n="pi.strip.earlier">Earlier</span></button>
+							<button type="button" data-tool="later" tabindex="-1"><span data-l10n="pi.strip.later">Later</span><span aria-hidden="true"> →</span></button>
+							<button type="button" data-tool="remove" tabindex="-1"><span aria-hidden="true">× </span><span data-l10n="pi.strip.remove">Remove</span></button>
+							<button type="button" data-tool="add" tabindex="-1"><span aria-hidden="true">+ </span><span data-l10n="pi.strip.add">Add</span></button>
+							<button type="button" data-tool="build" tabindex="-1" aria-controls="strip-build-box"><span data-l10n="pi.strip.buildLink">Build screens</span></button>
+						</div>
+						<p class="hw-sr-only" id="strip-screen-keys" data-l10n="pi.strip.screenKeys">Left and Right show the screen before or after on the strip, Home and End the first or the last. Alt with an arrow moves the screen on the strip, Alt+Home and Alt+End to either end; F2 renames it; Delete twice removes it.</p>
+					</div>
+					<fieldset class="hw-group-box hw-strip-pane" id="sp0" data-pane="0">
+						<legend id="sp0-name" data-l10n="pi.strip.theStrip">The strip</legend>
+						<!-- Graph with its View, Readout or Look on one row where both fit. -->
+						<div class="hw-strip-graph-row" id="sp0-graph-row">
+						<div class="hw-field hw-field-first">
+							<label for="sp0-style" data-l10n="pi.strip.graph">Graph</label>
+							<select id="sp0-style" aria-describedby="sp0-check">
+								<option value="trend" data-l10n="pi.strip.styleTrend">Trend · up to 3</option>
+								<option value="area" data-l10n="pi.strip.styleArea">Area · up to 3</option>
+								<option value="compare" data-l10n="pi.strip.styleCompare">Compare · up to 4</option>
+								<option value="lanes" data-l10n="pi.strip.styleLanes">Lanes · up to 3, own scales</option>
+								<option value="heat" data-l10n="pi.strip.styleHeat">Heat · 1, colored bins</option>
+								<option value="group" data-l10n="pi.strip.styleGroup">Group · up to 32, one unit</option>
+								<option value="ambient" data-l10n="pi.strip.styleAmbient">Ambient · up to 48</option>
+								<option value="meters" data-l10n="pi.strip.styleMeters">Meters · one per dial</option>
+								<option value="events" data-l10n="pi.strip.styleEvents">Events · up to 4</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp0-view-item" hidden>
+							<label for="sp0-view" data-l10n="pi.strip.view">View</label>
+							<select id="sp0-view">
+								<option value="auto" data-l10n="pi.strip.viewAuto">Auto</option>
+								<option value="rows" data-l10n="pi.strip.viewRows">Rows</option>
+								<option value="now" data-l10n="pi.strip.viewNow">Now</option>
+								<option value="spread" data-l10n="pi.strip.viewSpread">Spread</option>
+								<option value="tiles" data-l10n="pi.strip.viewTiles">Tiles</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp0-readout-item">
+							<label for="sp0-readout" data-l10n="pi.strip.readout">Readout</label>
+							<select id="sp0-readout">
+								<option value="off" data-l10n="pi.strip.readoutOff">Off</option>
+								<option value="left" data-l10n="pi.strip.readoutLeft">Large values on the left</option>
+								<option value="only" data-l10n="pi.strip.readoutOnly">Large values only</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp0-look-item" hidden>
+							<label for="sp0-look" data-l10n="pi.strip.look">Look</label>
+							<select id="sp0-look">
+								<option value="thin" data-l10n="pi.strip.lookThin">Thin bar</option>
+								<option value="full" data-l10n="pi.strip.lookFull">Full bar</option>
+								<option value="liquid" data-l10n="pi.strip.lookLiquid">Liquid</option>
+							</select>
+						</div>
+						</div>
+						<div class="hw-field" id="sp0-from-item" hidden>
+							<label for="sp0-from" data-l10n="pi.strip.readingsFrom">Readings from</label>
+							<select id="sp0-from" aria-describedby="sp0-check">
+								<option value="folder" data-l10n="pi.strip.fromFolder">The folder of a ticked reading</option>
+								<option value="filter" data-l10n="pi.strip.fromFilter">Readings matching a filter</option>
+								<option value="list" data-l10n="pi.strip.fromList">A custom list</option>
+								<option value="unit" data-l10n="pi.strip.fromUnit">Every reading in a unit</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp0-unit-item" hidden>
+							<label for="sp0-unit" data-l10n="pi.strip.unitPick">Unit</label>
+							<div class="hw-picker"><select id="sp0-unit" aria-describedby="sp0-check"></select></div>
+						</div>
+						<div class="hw-field" id="sp0-filter-item" hidden>
+							<label for="sp0-filter" data-l10n="pi.strip.filter">Filter</label>
+							<div class="hw-picker"><input id="sp0-filter" type="text" placeholder="*gpu*temp*" aria-describedby="sp0-check" autocomplete="off" spellcheck="false" /></div>
+						</div>
+						<div class="hw-field">
+							<label id="sp0-label" for="sp0-search" data-l10n="pi.common.readings">Readings</label>
+							<div class="hw-picker" id="sp0-picker">
+								<input id="sp0-search" type="text" aria-controls="sp0-list" aria-describedby="sp0-help" placeholder="Search readings to tick" data-l10n-placeholder="pi.strip.searchReadingsToPlaceholder" autocomplete="off" spellcheck="false" />
+								<div class="hw-picker-list hw-inline" id="sp0-list" role="group" aria-labelledby="sp0-label" hidden></div>
+							</div>
+							<p class="hw-help" id="sp0-help" data-l10n="pi.strip.tickedReadingsDrawIn">Ticked readings draw in the order you tick them.<span class="hw-sr-only" data-l10n="pi.strip.downArrowMovesInto"> Down Arrow moves into the search results, arrows move inside them, Tab leaves them.</span></p>
+							<ol class="hw-strip-series" id="sp0-series" aria-label="Readings in this graph" data-l10n-aria-label="pi.strip.readingsInThisLabel"></ol>
+							<p class="hw-strip-check" id="sp0-check" data-tone=""></p>
+						</div>
+						<div class="hw-field" id="sp0-window-item" hidden>
+							<label for="sp0-window" data-l10n="pi.strip.timeWindow">Time window</label>
+							<select id="sp0-window">
+								<option value="1m" data-l10n="pi.strip.minute1">1 minute</option>
+								<option value="5m" data-l10n="pi.common.minutes5">5 minutes</option>
+								<option value="15m" data-l10n="pi.common.minutes15">15 minutes</option>
+							</select>
+						</div>
+					</fieldset>
+					<fieldset class="hw-group-box hw-strip-pane" id="sp1" data-pane="1" hidden>
+						<legend id="sp1-name" data-l10n="pi.strip.rightHalf">Right half</legend>
+						<!-- Graph with its View, Readout or Look on one row where both fit. -->
+						<div class="hw-strip-graph-row" id="sp1-graph-row">
+						<div class="hw-field hw-field-first">
+							<label for="sp1-style" data-l10n="pi.strip.graph">Graph</label>
+							<select id="sp1-style" aria-describedby="sp1-check">
+								<option value="trend" data-l10n="pi.strip.styleTrend">Trend · up to 3</option>
+								<option value="area" data-l10n="pi.strip.styleArea">Area · up to 3</option>
+								<option value="compare" data-l10n="pi.strip.styleCompare">Compare · up to 4</option>
+								<option value="lanes" data-l10n="pi.strip.styleLanes">Lanes · up to 3, own scales</option>
+								<option value="heat" data-l10n="pi.strip.styleHeat">Heat · 1, colored bins</option>
+								<option value="group" data-l10n="pi.strip.styleGroup">Group · up to 32, one unit</option>
+								<option value="ambient" data-l10n="pi.strip.styleAmbient">Ambient · up to 48</option>
+								<option value="meters" data-l10n="pi.strip.styleMeters">Meters · one per dial</option>
+								<option value="events" data-l10n="pi.strip.styleEvents">Events · up to 4</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp1-view-item" hidden>
+							<label for="sp1-view" data-l10n="pi.strip.view">View</label>
+							<select id="sp1-view">
+								<option value="auto" data-l10n="pi.strip.viewAuto">Auto</option>
+								<option value="rows" data-l10n="pi.strip.viewRows">Rows</option>
+								<option value="now" data-l10n="pi.strip.viewNow">Now</option>
+								<option value="spread" data-l10n="pi.strip.viewSpread">Spread</option>
+								<option value="tiles" data-l10n="pi.strip.viewTiles">Tiles</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp1-readout-item">
+							<label for="sp1-readout" data-l10n="pi.strip.readout">Readout</label>
+							<select id="sp1-readout">
+								<option value="off" data-l10n="pi.strip.readoutOff">Off</option>
+								<option value="left" data-l10n="pi.strip.readoutLeft">Large values on the left</option>
+								<option value="only" data-l10n="pi.strip.readoutOnly">Large values only</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp1-look-item" hidden>
+							<label for="sp1-look" data-l10n="pi.strip.look">Look</label>
+							<select id="sp1-look">
+								<option value="thin" data-l10n="pi.strip.lookThin">Thin bar</option>
+								<option value="full" data-l10n="pi.strip.lookFull">Full bar</option>
+								<option value="liquid" data-l10n="pi.strip.lookLiquid">Liquid</option>
+							</select>
+						</div>
+						</div>
+						<div class="hw-field" id="sp1-from-item" hidden>
+							<label for="sp1-from" data-l10n="pi.strip.readingsFrom">Readings from</label>
+							<select id="sp1-from" aria-describedby="sp1-check">
+								<option value="folder" data-l10n="pi.strip.fromFolder">The folder of a ticked reading</option>
+								<option value="filter" data-l10n="pi.strip.fromFilter">Readings matching a filter</option>
+								<option value="list" data-l10n="pi.strip.fromList">A custom list</option>
+								<option value="unit" data-l10n="pi.strip.fromUnit">Every reading in a unit</option>
+							</select>
+						</div>
+						<div class="hw-field" id="sp1-unit-item" hidden>
+							<label for="sp1-unit" data-l10n="pi.strip.unitPick">Unit</label>
+							<select id="sp1-unit" aria-describedby="sp1-check"></select>
+						</div>
+						<div class="hw-field" id="sp1-filter-item" hidden>
+							<label for="sp1-filter" data-l10n="pi.strip.filter">Filter</label>
+							<input id="sp1-filter" type="text" placeholder="*gpu*temp*" aria-describedby="sp1-check" autocomplete="off" spellcheck="false" />
+						</div>
+						<div class="hw-field">
+							<label id="sp1-label" for="sp1-search" data-l10n="pi.common.readings">Readings</label>
+							<div class="hw-picker" id="sp1-picker">
+								<input id="sp1-search" type="text" aria-controls="sp1-list" aria-describedby="sp1-help" placeholder="Search readings to tick" data-l10n-placeholder="pi.strip.searchReadingsToPlaceholder" autocomplete="off" spellcheck="false" />
+								<div class="hw-picker-list hw-inline" id="sp1-list" role="group" aria-labelledby="sp1-label" hidden></div>
+							</div>
+							<p class="hw-help" id="sp1-help" data-l10n="pi.strip.tickedReadingsDrawIn">Ticked readings draw in the order you tick them.<span class="hw-sr-only" data-l10n="pi.strip.downArrowMovesInto"> Down Arrow moves into the search results, arrows move inside them, Tab leaves them.</span></p>
+							<ol class="hw-strip-series" id="sp1-series" aria-label="Readings in this graph" data-l10n-aria-label="pi.strip.readingsInThisLabel"></ol>
+							<p class="hw-strip-check" id="sp1-check" data-tone=""></p>
+						</div>
+						<div class="hw-field" id="sp1-window-item" hidden>
+							<label for="sp1-window" data-l10n="pi.strip.timeWindow">Time window</label>
+							<select id="sp1-window">
+								<option value="1m" data-l10n="pi.strip.minute1">1 minute</option>
+								<option value="5m" data-l10n="pi.common.minutes5">5 minutes</option>
+								<option value="15m" data-l10n="pi.common.minutes15">15 minutes</option>
+							</select>
+						</div>
+					</fieldset>
+					</div>
+					<!-- The two folds share a line while both are closed and fit. -->
+					<div class="hw-strip-folds">
+					<!-- Everything past the readings, closed until opened: what
+					     the graph shows, its scale and alert bands, per pane. -->
+					<details class="hw-sub" id="sec-stripmore">
+						<summary><span class="hw-sub-title" data-l10n="pi.strip.scaleAndAlerts">Scale and alerts</span><span class="hw-sec-sum" id="strip-more-sum"></span></summary>
+						<div class="hw-sub-body" id="strip-more-body">
+							<fieldset class="hw-strip-extra" id="sp0-extra">
+								<legend id="sp0-extra-name" data-l10n="pi.strip.theStrip">The strip</legend>
+								<fieldset class="hw-strip-overlays" id="sp0-overlays">
+									<legend data-l10n="pi.strip.showOnThe">Show on the graph</legend>
+									<label class="hw-check"><input type="checkbox" data-overlay="current" /><span data-l10n="pi.strip.currentValue">Current value</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="minmax" /><span data-l10n="pi.strip.minAndMax">Min and max</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="unit" /><span data-l10n="pi.strip.unit">Unit</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="legend" /><span data-l10n="pi.strip.names">Names</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="time" /><span data-l10n="pi.strip.timeSpan">Time span</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="axes" /><span data-l10n="pi.strip.scaleAndGrid">Scale and grid</span></label>
+								</fieldset>
+								<div class="hw-row2" id="sp0-scale-row">
+									<div class="hw-field">
+										<label for="sp0-min" data-l10n="pi.strip.scaleFrom">Scale from <span class="hw-unit-tag" data-scale-unit></span></label>
+										<input id="sp0-min" type="text" inputmode="decimal" placeholder="Auto" data-l10n-placeholder="pi.strip.autoPlaceholder" autocomplete="off" />
+									</div>
+									<div class="hw-field">
+										<label for="sp0-max" data-l10n="pi.strip.scaleTo">Scale to <span class="hw-unit-tag" data-scale-unit></span></label>
+										<input id="sp0-max" type="text" inputmode="decimal" placeholder="Auto" data-l10n-placeholder="pi.strip.autoPlaceholder" autocomplete="off" />
+									</div>
+								</div>
+								<p class="hw-help" id="sp0-scale-help" data-l10n="pi.strip.scaleNotUsed" hidden>This graph does not use these ends.</p>
+								<div class="hw-field">
+									<span class="hw-label" id="sp0-bands-label" data-l10n="pi.strip.alertBands">Alert bands</span>
+									<ul class="hw-strip-bands" id="sp0-bands" aria-labelledby="sp0-bands-label"></ul>
+									<div class="hw-actions"><button type="button" class="hw-btn" id="sp0-band-add" data-l10n="pi.strip.addABand">Add a band</button></div>
+								</div>
+							</fieldset>
+							<fieldset class="hw-strip-extra" id="sp1-extra" hidden>
+								<legend id="sp1-extra-name" data-l10n="pi.strip.rightHalf">Right half</legend>
+								<fieldset class="hw-strip-overlays" id="sp1-overlays">
+									<legend data-l10n="pi.strip.showOnThe">Show on the graph</legend>
+									<label class="hw-check"><input type="checkbox" data-overlay="current" /><span data-l10n="pi.strip.currentValue">Current value</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="minmax" /><span data-l10n="pi.strip.minAndMax">Min and max</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="unit" /><span data-l10n="pi.strip.unit">Unit</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="legend" /><span data-l10n="pi.strip.names">Names</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="time" /><span data-l10n="pi.strip.timeSpan">Time span</span></label>
+									<label class="hw-check"><input type="checkbox" data-overlay="axes" /><span data-l10n="pi.strip.scaleAndGrid">Scale and grid</span></label>
+								</fieldset>
+								<div class="hw-row2" id="sp1-scale-row">
+									<div class="hw-field">
+										<label for="sp1-min" data-l10n="pi.strip.scaleFrom">Scale from <span class="hw-unit-tag" data-scale-unit></span></label>
+										<input id="sp1-min" type="text" inputmode="decimal" placeholder="Auto" data-l10n-placeholder="pi.strip.autoPlaceholder" autocomplete="off" />
+									</div>
+									<div class="hw-field">
+										<label for="sp1-max" data-l10n="pi.strip.scaleTo">Scale to <span class="hw-unit-tag" data-scale-unit></span></label>
+										<input id="sp1-max" type="text" inputmode="decimal" placeholder="Auto" data-l10n-placeholder="pi.strip.autoPlaceholder" autocomplete="off" />
+									</div>
+								</div>
+								<p class="hw-help" id="sp1-scale-help" data-l10n="pi.strip.scaleNotUsed" hidden>This graph does not use these ends.</p>
+								<div class="hw-field">
+									<span class="hw-label" id="sp1-bands-label" data-l10n="pi.strip.alertBands">Alert bands</span>
+									<ul class="hw-strip-bands" id="sp1-bands" aria-labelledby="sp1-bands-label"></ul>
+									<div class="hw-actions"><button type="button" class="hw-btn" id="sp1-band-add" data-l10n="pi.strip.addABand">Add a band</button></div>
+								</div>
+							</fieldset>
+							<!-- The whole strip's, whichever screen is shown: a missed read
+							     misses every reading at once. -->
+							<div class="hw-field" id="strip-gap-mode-item" hidden>
+								<label for="strip-gap-mode"><span data-l10n="pi.strip.briefGaps">Brief gaps</span> <span class="hw-scope" data-l10n="pi.strip.thisStrip">This strip</span></label>
+								<select id="strip-gap-mode">
+									<option value="connect" data-l10n="pi.strip.gapConnect">Connect</option>
+									<option value="mark" data-l10n="pi.strip.gapMark">Connect in color</option>
+									<option value="gaps" data-l10n="pi.strip.gapLeave">Leave gaps</option>
+								</select>
+							</div>
+						</div>
+					</details>
+					<!-- The name HWiNFO Control keys reach the strip by: only for
+					     them, so it waits in a closed fold that names it when set.
+					     The strip's look is the Theme band's and Display's while
+					     this dial is in the strip. -->
+					<details class="hw-sub" id="sec-striplink">
+						<summary><span class="hw-sub-title" id="strip-link-title" data-l10n="pi.strip.stripLinkId">Strip Link ID</span><span class="hw-sec-sum" id="strip-link-sum"></span></summary>
+						<div class="hw-sub-body">
+							<div class="hw-field hw-field-first">
+								<input id="strip-link" type="text" placeholder="Optional name" data-l10n-placeholder="pi.strip.optionalNamePlaceholder" title="For HWiNFO Control keys with a Strip command." data-l10n-title="pi.strip.forHwinfoControlKeys" aria-labelledby="strip-link-title" aria-describedby="strip-link-help" autocomplete="off" spellcheck="false" />
+								<span class="hw-sr-only" id="strip-link-help" data-l10n="pi.strip.forHwinfoControlKeys">For HWiNFO Control keys with a Strip command.</span>
+							</div>
+						</div>
+					</details>
+					</div>
+				</div>
+				<div class="hw-actions" id="strip-bar" hidden><button type="button" class="hw-btn" id="strip-go" aria-describedby="strip-note" data-l10n="pi.strip.makeTheStrip">Make the strip</button></div>
+				<details class="hw-how">
+					<summary data-l10n="pi.strip.howTheStrip">How the strip works</summary>
+					<p class="hw-help" data-l10n="pi.strip.everySlotNeeds">Every slot needs a Sensor Dial; the app updates the slices one by one.</p>
+					<dl class="hw-gestures" id="strip-controls"></dl>
+				</details>
+			</div>
 		</details>
 
 		<details class="hw-sec" id="sec-reading" open>
@@ -97,17 +505,16 @@
 		</details>
 
 		<details class="hw-sec" id="sec-display" open>
-			<summary><span class="hw-sec-title">Display</span><span class="hw-sec-sum" data-summary="display"></span></summary>
+			<summary><span class="hw-sec-title">Display</span><span class="hw-scope" id="display-scope" hidden data-l10n="pi.strip.thisStrip">This strip</span><span class="hw-sec-sum" data-summary="display"></span></summary>
 			<div class="hw-sec-body">
 				<div class="hw-field">
 					<label for="f-text">Text color</label>
-					<select id="f-text" data-setting="textMode" data-default="" aria-describedby="text-help">
-						<option value="">Default</option>
+					<select id="f-text" data-setting="textMode" data-default="">
+						<option value="">Theme text (shared)</option>
 						<option value="theme">Theme text</option>
 						<option value="dim">Dimmed</option>
 						<option value="custom">Custom color</option>
 					</select>
-					<p class="hw-help" id="text-help">Numbers and labels. The bar and selection marks use the accent color; in an overview, a row in alert shows its value in the alert color.</p>
 				</div>
 				<div id="text-custom" hidden>
 					<div class="hw-field">
@@ -120,19 +527,50 @@
 					<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" /><span>Dim labels, units and stats (the value keeps the exact color)</span></label>
 				</div>
 				<div class="hw-field">
-					<label for="f-background">Background</label>
-					<select id="f-background" data-setting="dialBackground" data-default="theme" aria-describedby="background-help">
-						<option value="theme">Theme</option>
-						<option value="glass">Glass</option>
-						<option value="tint">Tint</option>
-						<option value="outline">Outline</option>
-						<option value="clear">Clear</option>
+					<label for="f-background" data-l10n="pi.keyBackground.background">Background</label>
+					<select id="f-background" data-setting="dialBackground" data-default="" aria-describedby="background-help art-help">
+						<option value="">Theme (shared)</option>
+						<option value="theme" data-l10n="pi.keyBackground.theme">Theme</option>
+						<option value="glass" data-l10n="pi.keyBackground.glass">Glass</option>
+						<option value="tint" data-l10n="pi.keyBackground.tint">Tint</option>
+						<option value="outline" data-l10n="pi.keyBackground.outline">Outline</option>
+						<option value="clear" data-l10n="pi.keyBackground.clear">Clear</option>
+						<option value="stars" data-l10n="pi.keyBackground.stars">Stars</option>
+						<option value="dusk" data-l10n="pi.keyBackground.dusk">Dusk</option>
+						<option value="nebula" data-l10n="pi.keyBackground.nebula">Nebula</option>
 					</select>
-					<p class="hw-help" id="background-help">Glass, Tint, Outline and Clear show the touch strip picture set in the Stream Deck app. Clear needs a plain, contrasting one.</p>
+					<p class="hw-help" id="background-help" data-l10n="pi.keyBackground.showsTheStripPicture" hidden>Shows the touch strip picture set in the Stream Deck app.</p>
+					<p class="hw-help" id="art-help" data-l10n="pi.keyBackground.artPaper" hidden>Paper draws no sky; a dark theme shows it.</p>
 				</div>
-				<div id="accent-words" hidden>
-					<label class="hw-check"><input type="checkbox" id="accent-words-toggle" aria-describedby="accent-words-help" /><span>Words in the accent color</span></label>
-					<p class="hw-help" id="accent-words-help">The title and the selected row's name take the accent color, and units, statistics and other names move halfway to it. Values, alert colors and a Custom text color stay as they are.</p>
+				<div class="hw-field hw-inline-field" id="accent-words" hidden>
+					<label for="f-accent-words" data-l10n="pi.keyBackground.wordsInTheAccent">Words in the accent color</label>
+					<select id="f-accent-words">
+						<option value="">Off (shared)</option>
+						<option value="on" data-l10n="pi.keyBackground.on">On</option>
+						<option value="off" data-l10n="pi.keyBackground.off">Off</option>
+					</select>
+				</div>
+				<div class="hw-row2" id="art-sky" hidden>
+					<div class="hw-field">
+						<label for="f-art-stars" data-l10n="pi.keyBackground.starsLabel">Stars</label>
+						<select id="f-art-stars" aria-describedby="art-help">
+							<option value="">All (shared)</option>
+							<option value="all" data-l10n="pi.keyBackground.starsAll">All</option>
+							<option value="few" data-l10n="pi.keyBackground.starsFew">Few</option>
+							<option value="off" data-l10n="pi.keyBackground.starsOff">Off</option>
+						</select>
+					</div>
+					<div class="hw-field">
+						<label for="f-art-sky-color" data-l10n="pi.keyBackground.skyColor">Sky color</label>
+						<select id="f-art-sky-color" aria-describedby="art-help">
+							<option value="">Theme (shared)</option>
+							<option value="theme" data-l10n="pi.keyBackground.skyTheme">Theme</option>
+							<option value="deep" data-l10n="pi.keyBackground.skyDeep">Deep</option>
+							<option value="warm" data-l10n="pi.keyBackground.skyWarm">Warmer</option>
+							<option value="cool" data-l10n="pi.keyBackground.skyCool">Cooler</option>
+							<option value="mono" data-l10n="pi.keyBackground.skyMono">Mono</option>
+						</select>
+					</div>
 				</div>
 
 				<div class="hw-field">
@@ -141,6 +579,15 @@
 						<option value="single">One reading</option>
 						<option value="tworow">Overview, two rows (big values and trend)</option>
 						<option value="overview">Overview, three rows</option>
+					</select>
+				</div>
+				<div class="hw-field" id="trend-window-item" hidden>
+					<label for="f-trend-window">Time window</label>
+					<select id="f-trend-window" data-setting="dialHistoryWindow" data-default="">
+						<option value="">Recent samples</option>
+						<option value="1m">1 minute</option>
+						<option value="5m">5 minutes</option>
+						<option value="15m">15 minutes</option>
 					</select>
 				</div>
 				<div class="hw-row3">
@@ -159,6 +606,15 @@
 						<label class="hw-check"><input type="checkbox" data-setting="fahrenheit" aria-label="Show temperatures in °F" /><span>°F</span></label>
 					</div>
 				</div>
+
+				<details class="hw-sub" id="sec-formats">
+					<summary><span class="hw-sub-title" data-l10n="pi.formats.unitAndDecimals">Unit and decimals per reading</span><span class="hw-sec-sum" data-summary="formats"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" id="formats-help" data-l10n="pi.formats.staysAtAnyValue">A unit picked here stays at any value.</p>
+						<div id="format-rows" class="hw-format-rows" role="group" aria-label="Unit and decimals for each reading" data-l10n-aria-label="pi.formats.unitAndDecimalsFor" aria-describedby="formats-help"></div>
+						<p class="hw-help" id="formats-note" aria-live="polite" hidden></p>
+					</div>
+				</details>
 				<div id="overview-rows" hidden>
 					<div class="hw-field">
 						<label for="f-row-labels">Row labels</label>
@@ -217,7 +673,7 @@
 							<p class="hw-error" id="f-bar-max-error" hidden></p>
 						</div>
 					</div>
-					<p class="hw-help" id="bar-help">Blank ends follow the session low and high.</p>
+					<p class="hw-help" id="bar-help">Blank ends follow the session low and high. Type ends in HWiNFO's unit for the reading.</p>
 				</div>
 
 				<details class="hw-how">
@@ -229,7 +685,7 @@
 		</details>
 
 		<details class="hw-sec" id="sec-alerts">
-			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum" data-summary="alerts"></span></summary>
+			<summary><span class="hw-sec-title">Alerts</span><span class="hw-sec-sum hw-room"><span data-summary="alerts"></span></span></summary>
 			<div class="hw-sec-body">
 				<div class="hw-row2">
 					<div class="hw-field">
@@ -245,7 +701,68 @@
 				</div>
 				<label class="hw-check"><input type="checkbox" data-setting="alertBelow" /><span>Alert when the value drops to or below these numbers (for fans and clocks)</span></label>
 				<label class="hw-check"><input type="checkbox" data-setting="alertInterrupt" /><span>Auto cycle jumps to a critical reading in the rotation and holds there while it stays critical</span></label>
-				<p class="hw-help" id="alerts-help">Warn, Critical and the bar ends apply only to readings in the unit that was on the dial when you last changed any of them, so a temperature limit never fires on a fan. The dial stays themed; the bar, or an overview row's value, takes the alert color. Alerts check the current value in the reading's own unit (°F when °F is on); for bytes and rates that is HWiNFO's number and unit, which the dial may show rescaled.</p>
+				<!-- Separate limits for the reading on the dial: one alertRules
+				     entry, keyed by the reading and carrying its unit. The
+				     fields stay in place (disabled while the box is clear), the
+				     unit after each label has a fixed width, and a field that is
+				     not a number says so in the one-line note below instead of
+				     an error line of its own, so the panel never changes height
+				     as the dial rotates between readings with and without
+				     limits. -->
+				<fieldset class="hw-group-box" id="alert-own-box">
+					<legend class="hw-sr-only">Separate limits</legend>
+					<label class="hw-check hw-check-line"><input type="checkbox" id="alert-own" aria-describedby="alert-notes" /><span id="alert-own-label">Separate limits for the reading on the dial</span></label>
+					<div class="hw-row2">
+						<div class="hw-field">
+							<label for="alert-own-warn">Its warn at <span class="hw-unit-tag" data-alert-unit></span></label>
+							<input id="alert-own-warn" type="text" inputmode="decimal" data-validate="number" placeholder="Off" aria-describedby="alert-notes" autocomplete="off" disabled />
+						</div>
+						<div class="hw-field">
+							<label for="alert-own-crit">Its critical at <span class="hw-unit-tag" data-alert-unit></span></label>
+							<input id="alert-own-crit" type="text" inputmode="decimal" data-validate="number" placeholder="Off" aria-describedby="alert-notes" autocomplete="off" disabled />
+						</div>
+					</div>
+					<label class="hw-check"><input type="checkbox" id="alert-own-below" disabled /><span>Its alert is for a drop to or below these numbers</span></label>
+				</fieldset>
+				<details class="hw-sub" id="sec-timing">
+					<summary><span class="hw-sub-title" data-l10n="pi.timing.timing">Timing</span><span class="hw-sec-sum" data-summary="alert-timing"></span></summary>
+					<div class="hw-sub-body">
+						<div class="hw-row2">
+							<div class="hw-field">
+								<label for="f-dwell" data-l10n="pi.timing.alertAfter">Alert after</label>
+								<select id="f-dwell" data-setting="alertDwellMs" data-default="0">
+									<option value="0" data-l10n="pi.timing.immediately">Immediately</option>
+									<option value="2000" data-l10n="pi.timing.seconds2">2 seconds</option>
+									<option value="5000" data-l10n="pi.timing.seconds5">5 seconds</option>
+									<option value="10000" data-l10n="pi.timing.seconds10">10 seconds</option>
+									<option value="30000" data-l10n="pi.timing.seconds30">30 seconds</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="f-snooze" data-l10n="pi.timing.snoozeLasts">Snooze lasts</label>
+								<select id="f-snooze" data-setting="alertSnoozeMs" data-default="900000" aria-describedby="timing-help">
+									<option value="300000" data-l10n="pi.common.minutes5">5 minutes</option>
+									<option value="900000" data-l10n="pi.common.minutes15">15 minutes</option>
+									<option value="3600000" data-l10n="pi.timing.hour1">1 hour</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="f-hyst" data-l10n="pi.timing.clearBy">Clear by</label>
+								<input id="f-hyst" type="text" inputmode="decimal" data-setting="alertHysteresis" data-validate="number" placeholder="0 (at the limit)" data-l10n-placeholder="pi.timing.zeroAtLimitPlaceholder" aria-describedby="timing-help f-hyst-error" autocomplete="off" />
+								<p class="hw-error" id="f-hyst-error" hidden></p>
+							</div>
+							<div class="hw-field">
+								<label for="alert-own-hyst" data-l10n="pi.timing.itsClearBy">Its clear by <span class="hw-unit-tag" data-alert-unit></span></label>
+								<input id="alert-own-hyst" type="text" inputmode="decimal" data-validate="number" placeholder="0 (at the limit)" data-l10n-placeholder="pi.timing.zeroAtLimitPlaceholder" aria-describedby="timing-help alert-notes" autocomplete="off" disabled />
+							</div>
+						</div>
+						<p class="hw-help" id="timing-help" data-l10n="pi.timing.snoozeWithA">Snooze with a Custom gesture or an HWiNFO Control key.</p>
+					</div>
+				</details>
+				<!-- Not a live region: it changes as the auto cycle moves, with
+				     no action of the user's; the fields it describes link it. -->
+				<p class="hw-help hw-note-line" id="alert-notes"></p>
+				<p class="hw-help" id="alerts-help">Limits apply only to readings in the unit they were set in, so a temperature limit never fires on a fan. Bytes and rates use HWiNFO's number and unit, even where the dial shows another.</p>
 			</div>
 		</details>
 
@@ -289,6 +806,7 @@
 								<option value="pin">Pin/unpin this reading</option>
 								<option value="cycleStat">Cycle stat mode</option>
 								<option value="backToCurrent">Back to current value</option>
+								<option value="snooze">Snooze alerts</option>
 								<option value="none">Do nothing</option>
 							</select>
 						</div>
@@ -300,6 +818,7 @@
 								<option value="pin">Pin/unpin this reading</option>
 								<option value="cycleStat">Cycle stat mode</option>
 								<option value="backToCurrent">Back to current value</option>
+								<option value="snooze">Snooze alerts</option>
 								<option value="none">Do nothing</option>
 							</select>
 						</div>
@@ -311,6 +830,7 @@
 								<option value="pauseResume">Pause/resume auto cycle</option>
 								<option value="pin">Pin/unpin this reading</option>
 								<option value="resetStats">Reset session stats</option>
+								<option value="snooze">Snooze alerts</option>
 								<option value="none">Do nothing</option>
 							</select>
 						</div>
@@ -322,6 +842,7 @@
 								<option value="pauseResume">Pause/resume auto cycle</option>
 								<option value="pin">Pin/unpin this reading</option>
 								<option value="resetStats">Reset session stats</option>
+								<option value="snooze">Snooze alerts</option>
 								<option value="none">Do nothing</option>
 							</select>
 						</div>
@@ -364,7 +885,7 @@
 				<div class="hw-field">
 					<label for="f-link">Link ID</label>
 					<input id="f-link" type="text" data-setting="linkId" placeholder="Optional name" aria-describedby="link-help" autocomplete="off" spellcheck="false" />
-					<p class="hw-help" id="link-help">HWiNFO Control keys whose Target is this name steer this dial, from any key, pedal or Multi Action.</p>
+					<p class="hw-help" id="link-help">HWiNFO Control keys with this Link ID steer this dial, from any key, pedal or Multi Action.</p>
 				</div>
 				<details class="hw-how">
 					<summary>How the presets work</summary>
@@ -379,7 +900,6 @@
 				<details class="hw-sub" id="sec-shared">
 					<summary><span class="hw-sub-title">Shared defaults</span><span class="hw-scope">All keys and dials</span><span class="hw-sec-sum" data-summary="shared"></span></summary>
 					<div class="hw-sub-body" id="shared-defaults">
-						<p class="hw-help">Used by every HWiNFO key and dial, on every Stream Deck, that is set to Default. A key or dial with its own choice keeps it.</p>
 						<div class="hw-row2">
 							<div class="hw-field">
 								<label for="shared-theme">Theme</label>
@@ -413,6 +933,41 @@
 							<label class="hw-check"><input type="checkbox" data-setting="textDimSecondary" data-global /><span>Dim labels, units and stats</span></label>
 						</div>
 						<div class="hw-field">
+							<label for="shared-background" data-l10n="pi.keyBackground.background">Background</label>
+							<select id="shared-background">
+								<option value="theme" data-l10n="pi.keyBackground.theme">Theme</option>
+								<option value="glass" data-l10n="pi.keyBackground.glass">Glass</option>
+								<option value="tint" data-l10n="pi.keyBackground.tint">Tint</option>
+								<option value="outline" data-l10n="pi.keyBackground.outline">Outline</option>
+								<option value="clear" data-l10n="pi.keyBackground.clear">Clear</option>
+								<option value="stars" data-l10n="pi.keyBackground.stars">Stars</option>
+								<option value="dusk" data-l10n="pi.keyBackground.dusk">Dusk</option>
+								<option value="nebula" data-l10n="pi.keyBackground.nebula">Nebula</option>
+							</select>
+						</div>
+						<label class="hw-check" id="shared-words-item" hidden><input type="checkbox" id="shared-accent-words" /><span data-l10n="pi.sharedLooks.wordsLabel">Words in the accent color</span></label>
+						<div class="hw-row2" id="shared-sky-item" hidden>
+							<div class="hw-field">
+								<label for="shared-stars" data-l10n="pi.keyBackground.starsLabel">Stars</label>
+								<select id="shared-stars">
+									<option value="all" data-l10n="pi.keyBackground.starsAll">All</option>
+									<option value="few" data-l10n="pi.keyBackground.starsFew">Few</option>
+									<option value="off" data-l10n="pi.keyBackground.starsOff">Off</option>
+								</select>
+							</div>
+							<div class="hw-field">
+								<label for="shared-sky-color" data-l10n="pi.keyBackground.skyColor">Sky color</label>
+								<select id="shared-sky-color">
+									<option value="theme" data-l10n="pi.keyBackground.skyTheme">Theme</option>
+									<option value="deep" data-l10n="pi.keyBackground.skyDeep">Deep</option>
+									<option value="warm" data-l10n="pi.keyBackground.skyWarm">Warmer</option>
+									<option value="cool" data-l10n="pi.keyBackground.skyCool">Cooler</option>
+									<option value="mono" data-l10n="pi.keyBackground.skyMono">Mono</option>
+								</select>
+							</div>
+						</div>
+						<div class="hw-status" id="own-looks" role="status" aria-live="polite" data-tone=""><p><span id="own-looks-text"></span> <button type="button" class="hw-link" id="own-looks-use" hidden data-l10n="pi.sharedLooks.useItEverywhere">Use it everywhere</button></p></div>
+						<div class="hw-field">
 							<label for="shared-font">Text font</label>
 							<select id="shared-font" data-setting="textFont" data-global data-default="tahoma" aria-describedby="font-help">
 								<option value="tahoma">Tahoma</option>
@@ -426,7 +981,7 @@
 								<option value="on">By sensor type</option>
 								<option value="off">Theme accent everywhere</option>
 							</select>
-							<p class="hw-help" id="accents-help">Accents color graphs, bars and selection marks; numbers follow Text color unless Color numbers by sensor type is on under Display. Paper keeps its own accent.</p>
+							<p class="hw-help" id="accents-help">For graphs, bars and marks; numbers follow Text color.</p>
 						</div>
 						<div class="hw-field">
 							<label for="shared-units">Data units</label>
@@ -461,16 +1016,82 @@
 								</select>
 							</div>
 						</div>
-						<p class="hw-help" id="source-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget keys in the shared Config document; see <a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">reading links</a>.</p>
+						<p class="hw-help" id="source-help">Auto switches providers. To keep a selection working on both, link its Shared Memory and Gadget readings under Reading links below (<a href="https://docs.slawrensen.com/hwinfo-streamdeck/data-sources.html#link-readings-across-providers" target="_blank" rel="noopener">how it works</a>).</p>
 						<p class="hw-help" id="source-now" hidden></p>
 						<details class="hw-inline-help" id="setup-help">
 							<summary>HWiNFO setup steps</summary>
 							<ol class="hw-help">
 								<li>Install and start HWiNFO (hwinfo.com) in Sensors-only mode.</li>
-								<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want (no 12-hour limit).</li>
+								<li>In HWiNFO Settings, enable Shared Memory Support. On the free version you can instead click Configure Sensors in the sensor window, open the HWiNFO Gadget tab, tick Enable reporting to Gadget, then tick "Report value in Gadget" on the readings you want.</li>
 								<li>Pick a reading under Reading.</li>
 							</ol>
 						</details>
+					</div>
+				</details>
+
+				<details class="hw-sub" id="sec-links">
+					<summary><span class="hw-sub-title" data-l10n="pi.links.readingLinks">Reading links</span><span class="hw-scope" data-l10n="pi.common.allKeysAnd">All keys and dials</span><span class="hw-sec-sum" data-summary="links"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" data-l10n="pi.links.keepsAReadingShowing">Keeps a reading showing when Auto switches source.</p>
+						<div class="hw-field" id="links-focus-row" hidden>
+							<label for="links-focus" data-l10n="pi.links.readingToLink">Reading to link</label>
+							<select id="links-focus"></select>
+						</div>
+						<div class="hw-link-card" id="links-card"></div>
+						<div class="hw-actions"><button class="hw-btn" id="links-scan" type="button">Look on Gadget</button></div>
+						<div class="hw-field">
+							<label for="links-filter" data-l10n="pi.links.filterTheOther">Filter the other source's readings</label>
+							<input id="links-filter" type="search" autocomplete="off" spellcheck="false" />
+						</div>
+						<div class="hw-field">
+							<label for="links-candidate" data-l10n="pi.links.matchingReading">Matching reading</label>
+							<select id="links-candidate"></select>
+						</div>
+						<div class="hw-link-card" id="links-chosen" hidden></div>
+						<p class="hw-help" id="links-scope" hidden></p>
+						<div class="hw-actions"><button class="hw-btn" id="links-link" type="button" aria-disabled="true" aria-describedby="links-note" data-l10n="pi.links.link">Link</button></div>
+						<div class="hw-status" id="links-note" role="status" aria-live="polite" data-tone=""></div>
+						<ul class="hw-link-list" id="links-list" aria-label="Stored links" data-l10n-aria-label="pi.links.storedLinksLabel"></ul>
+						<ul class="hw-help hw-link-prereq" id="links-prereq" hidden></ul>
+					</div>
+				</details>
+
+				<details class="hw-sub" id="sec-calc">
+					<summary><span class="hw-sub-title" data-l10n="pi.calc.calculatedReadings">Calculated readings</span><span class="hw-scope" data-l10n="pi.common.allKeysAnd">All keys and dials</span><span class="hw-sec-sum" data-summary="calc"></span></summary>
+					<div class="hw-sub-body">
+						<p class="hw-help" data-l10n="pi.calc.listedUnderCalculated">Listed under Calculated (plugin) in every reading picker.</p>
+						<ul class="hw-calc-list" id="calc-list" aria-label="Calculated readings" data-l10n-aria-label="pi.calc.calculatedReadingsLabel"></ul>
+						<div class="hw-actions"><button class="hw-btn" id="calc-new" type="button" data-l10n="pi.calc.newCalculatedReading">New calculated reading</button></div>
+						<div class="hw-calc-form" id="calc-form" hidden>
+							<div class="hw-field">
+								<label for="calc-op" data-l10n="pi.calc.operation">Operation</label>
+								<select id="calc-op">
+									<option value="sum" data-l10n="pi.calc.sum">Sum</option>
+									<option value="avg" data-l10n="pi.calc.average">Average</option>
+									<option value="min" data-l10n="pi.calc.lowest">Lowest</option>
+									<option value="max" data-l10n="pi.calc.highest">Highest</option>
+									<option value="diff" data-l10n="pi.calc.differenceAB">Difference (A - B)</option>
+									<option value="ratio" data-l10n="pi.calc.ratioAB">Ratio (A / B)</option>
+								</select>
+							</div>
+							<fieldset class="hw-calc-inputs">
+								<legend data-l10n="pi.common.readings">Readings</legend>
+								<div id="calc-inputs"></div>
+								<div class="hw-actions"><button class="hw-btn" id="calc-add-input" type="button" data-l10n="pi.calc.addAReading">Add a reading</button></div>
+							</fieldset>
+							<label class="hw-check" id="calc-percent-row" hidden><input type="checkbox" id="calc-percent" /><span data-l10n="pi.calc.showAAs">Show A as a percentage of B</span></label>
+							<div class="hw-field">
+								<label for="calc-label" data-l10n="pi.calc.labelOptional">Label (optional)</label>
+								<input id="calc-label" type="text" maxlength="64" autocomplete="off" spellcheck="false" />
+							</div>
+							<div class="hw-calc-preview" aria-live="polite">
+								<p class="hw-calc-value" id="calc-preview-value"></p>
+								<p class="hw-help" id="calc-preview-expression"></p>
+								<p class="hw-help" id="calc-preview-message"></p>
+							</div>
+							<div class="hw-actions"><button class="hw-btn" id="calc-save" type="button" aria-disabled="true" aria-describedby="calc-preview-message" data-l10n="pi.calc.save">Save</button><button class="hw-link" id="calc-cancel" type="button" data-l10n="pi.common.cancel">Cancel</button></div>
+						</div>
+						<div class="hw-status" id="calc-note" role="status" aria-live="polite" data-tone=""></div>
 					</div>
 				</details>
 
@@ -508,9 +1129,14 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.1.0-1"></script>
-		<script src="pi-shell.js?v=1.7.1.0-1"></script>
-		<script src="pi-common.js?v=1.7.1.0-1"></script>
-		<script src="pi-control.js?v=1.7.1.0-1"></script>
+		<script src="pi-model.js?v=1.8.0.0-54"></script>
+		<script src="pi-strings.js?v=1.8.0.0-54"></script>
+		<script src="pi-shell.js?v=1.8.0.0-54"></script>
+		<script src="pi-common.js?v=1.8.0.0-54"></script>
+		<script src="pi-control.js?v=1.8.0.0-54"></script>
+		<script src="pi-links.js?v=1.8.0.0-54"></script>
+		<script src="pi-calc.js?v=1.8.0.0-54"></script>
+		<script src="pi-strip-model.js?v=1.8.0.0-54"></script>
+		<script src="pi-strip.js?v=1.8.0.0-54"></script>
 	</body>
 </html>

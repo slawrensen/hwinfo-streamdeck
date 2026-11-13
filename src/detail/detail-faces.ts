@@ -13,12 +13,20 @@
  */
 import type { PollerStatus } from "../poller";
 import type { Reading } from "../hwinfo/types";
+import { t } from "../i18n";
+import { immediateLevel } from "../alerts/key-alerts";
+import { parseAlertConfig } from "../alerts/rules";
+import { alertIdentityOf } from "../alerts/store";
+import type { ShownAlert } from "../alerts/types";
+import { ZONE_BG_BLEND } from "../ui/gauge";
 import { renderDetailBlankKey, renderDetailIdleBackKey, renderDetailIdleKey, renderDetailPagerKey, renderDetailTitleKey, renderDetailVoidKey } from "../ui/detail-renderer";
-import { alertLevel, convertUnit, parseThreshold, readingStatBadge, sharedStatBadge, statValue } from "../ui/format";
+import { readingStatBadge, sharedStatBadge, statValue, type AlertLevel } from "../ui/format";
+import { backgroundOption, keyIdentitySurface, keyLookOf, type KeyBackground } from "../ui/key-background";
 import { quadIdentityOf, renderDualKey, renderQuadKey, renderReadingKey, renderStatusKey, renderTripleKey, type DualKeyRow, type QuadKeyCell, type TripleKeyRow } from "../ui/key-renderer";
-import { formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
-import { keyLabel, missingReadingScreen, statusScreen } from "../ui/state-screens";
-import { quadIdentityColor, resolveTextColors, type TextSettings } from "../ui/text-colors";
+import { exactFallback, formatMeasurement, formatQuadMeasurement, type MeasureOptions } from "../ui/measure";
+import { measureFor } from "../ui/reading-format";
+import { keyLabel, missingReadingScreen, missingRowLabel, statusScreen } from "../ui/state-screens";
+import { mixToward, quadIdentityColor, type TextColors, type TextSettings } from "../ui/text-colors";
 import { classifyTypeAccent, resolvePalette, type Palette, type ThemesConfig } from "../ui/themes";
 import type { DetailPage } from "./detail-group";
 import type { DetailTileSpec } from "./detail-settings";
@@ -35,12 +43,34 @@ export type DetailFaceContext = {
 	readonly measure: MeasureOptions;
 	/** The opener's effective Text setting (own override else deck-wide). */
 	readonly text: TextSettings;
+	/**
+	 * What the opener key shows for one reading (by measurement identity):
+	 * its live alert state with dwell, recovery band and snooze. Undefined
+	 * (or no lookup at all) while that key is not being stepped, and the
+	 * Back tile then compares the opener's rule once, as 1.7.1 compared the
+	 * legacy pair.
+	 */
+	readonly openerAlert?: (identity: string) => ShownAlert | undefined;
 };
+
+/** One reading's options on a detail face: the opener's, with the opener's
+ * own format for that reading (the presentation carries only the entries
+ * filed under readings the opener draws), else exactly the opener's. */
+function measureOf(state: DeviceDetailState, ctx: DetailFaceContext, reading: Reading): MeasureOptions {
+	return measureFor(ctx.measure, state.presentation.readingFormats, reading);
+}
 
 function themePaletteFor(state: DeviceDetailState, ctx: DetailFaceContext, accent: ReturnType<typeof classifyTypeAccent> | null, level: "normal" | "warn" | "crit"): Palette {
 	const theme = state.presentation.theme;
 	const themeId = typeof theme === "string" && theme !== "" ? theme : ctx.deckThemeId;
 	return resolvePalette(ctx.config, themeId, accent, level);
+}
+
+/** The opener's key look on a detail tile at a level, and the tile's text
+ * colors under it (keyLookOf: Theme at an alert, Theme byte for byte when
+ * the opener stored no look). */
+function lookFor(state: DeviceDetailState, ctx: DetailFaceContext, palette: Palette, level: AlertLevel = "normal"): { background: KeyBackground; text: TextColors } {
+	return keyLookOf(state.presentation, palette, ctx.text, level);
 }
 
 /** The Back tile: the opener's live reading (its theme, text, units and
@@ -57,11 +87,14 @@ export function composeBackFace(state: DeviceDetailState, status: PollerStatus, 
 		return renderStatusKey({ ...missingReadingScreen(), returnMark: true });
 	}
 	const p = state.presentation;
-	const level = alertLevel(convertUnit(reading.value, reading.unit, ctx.measure.fahrenheit).value, parseThreshold(p.warnValue), parseThreshold(p.critValue), p.alertBelow === true);
+	const shown = ctx.openerAlert?.(alertIdentityOf(reading));
+	const level = shown?.level ?? immediateLevel(parseAlertConfig(p), reading, 0, ctx.measure.fahrenheit);
 	const accent = ctx.typeAccents ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, level);
-	const text = resolveTextColors(palette, ctx.text, level);
-	const measured = formatMeasurement(reading.value, reading.unit, ctx.measure);
+	const snoozed = shown?.snoozed ?? null;
+	const { background, text } = lookFor(state, ctx, palette, level);
+	const measure = measureOf(state, ctx, reading);
+	const measured = formatMeasurement(reading.value, reading.unit, measure);
 	return renderReadingKey({
 		label: keyLabel(p.label, reading.label),
 		valueText: measured.valueText,
@@ -69,7 +102,10 @@ export function composeBackFace(state: DeviceDetailState, status: PollerStatus, 
 		statBadge: "",
 		palette,
 		text,
-		returnMark: true
+		returnMark: true,
+		...(measure.exact === true ? { exactValue: true, exactFallback: exactFallback(reading.value, reading.unit, measure, false) } : {}),
+		...(snoozed !== null ? { snoozeBand: mixToward(ctx.config.alerts[snoozed].bg, palette.bg, ZONE_BG_BLEND) } : {}),
+		...backgroundOption(background)
 	});
 }
 
@@ -82,8 +118,9 @@ export function composeReadingFace(state: DeviceDetailState, key: string | undef
 		return renderStatusKey(screen);
 	}
 	const blankPalette = themePaletteFor(state, ctx, null, "normal");
+	const blank = lookFor(state, ctx, blankPalette);
 	if (key === undefined) {
-		return renderDetailBlankKey(blankPalette);
+		return blank.background === "theme" ? renderDetailBlankKey(blankPalette) : renderDetailBlankKey(blankPalette, blank.background);
 	}
 	const { snapshot } = status as Extract<PollerStatus, { state: "ok" }>;
 	const reading: Reading | undefined = snapshot.byKey.get(key);
@@ -92,25 +129,30 @@ export function composeReadingFace(state: DeviceDetailState, key: string | undef
 		// (custom-mode order is positional); the placeholder value is the
 		// key face's one permitted em dash.
 		return renderReadingKey({
-			label: keyLabel(customLabel, "Sensor missing"),
+			label: keyLabel(customLabel, missingRowLabel()),
 			valueText: "—",
 			unitText: "",
 			statBadge: "",
 			palette: blankPalette,
-			text: resolveTextColors(blankPalette, ctx.text, "normal")
+			text: blank.text,
+			...backgroundOption(blank.background)
 		});
 	}
 	const accent = ctx.typeAccents ? classifyTypeAccent(reading.type, reading.unit, reading.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, "normal");
-	const text = resolveTextColors(palette, ctx.text, "normal");
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, ctx.measure);
+	const { background, text } = lookFor(state, ctx, palette);
+	const measure = measureOf(state, ctx, reading);
+	const value = statValue(reading, mode);
+	const measured = formatMeasurement(value, reading.unit, measure);
 	return renderReadingKey({
 		label: keyLabel(customLabel, reading.label),
 		valueText: measured.valueText,
 		unitText: measured.unitText,
 		statBadge: readingStatBadge(reading, mode),
 		palette,
-		text
+		text,
+		...(measure.exact === true ? { exactValue: true, exactFallback: exactFallback(value, reading.unit, measure, false) } : {}),
+		...backgroundOption(background)
 	});
 }
 
@@ -147,12 +189,14 @@ export function chunkMicroLabels(labels: readonly (string | undefined)[]): strin
  * dash). `statBadge` stays "" everywhere except a dual row pinned to a
  * stat of its own; a missing reading never badges.
  */
-export function readingRow(reading: Reading | undefined, mode: StatMode, measure: MeasureOptions, customLabel?: string, statBadge = ""): DualKeyRow & TripleKeyRow {
+export function readingRow(reading: Reading | undefined, mode: StatMode, measure: MeasureOptions, customLabel?: string, statBadge = "", missingLabel = t("face.missing.title"), valueColor?: string): DualKeyRow & TripleKeyRow {
+	const color = valueColor === undefined ? {} : { valueColor };
 	if (reading === undefined) {
-		return { label: keyLabel(customLabel, "Sensor missing"), valueText: "—", unitText: "", statBadge: "" };
+		return { label: keyLabel(customLabel, missingLabel), valueText: "—", unitText: "", statBadge: "", ...color };
 	}
-	const measured = formatMeasurement(statValue(reading, mode), reading.unit, measure);
-	return { label: keyLabel(customLabel, reading.label), valueText: measured.valueText, unitText: measured.unitText, statBadge };
+	const value = statValue(reading, mode);
+	const measured = formatMeasurement(value, reading.unit, measure);
+	return { label: keyLabel(customLabel, reading.label), valueText: measured.valueText, unitText: measured.unitText, statBadge, ...color, ...(measure.exact === true ? { exact: true, fallback: exactFallback(value, reading.unit, measure, false) } : {}) };
 }
 
 /** A hand-grouped tile's label override for one cell; "" means none. */
@@ -203,23 +247,27 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 	const first = readings[0];
 	const accent = ctx.typeAccents && first !== undefined ? classifyTypeAccent(first.type, first.unit, first.label) : null;
 	const palette = themePaletteFor(state, ctx, accent, "normal");
-	const text = resolveTextColors(palette, ctx.text, "normal");
+	const { background, text } = lookFor(state, ctx, palette);
+	const look = backgroundOption(background);
 	const sharedBadge = sharedStatBadge(readings, mode);
+	const rowMeasure = (reading: Reading | undefined): MeasureOptions => (reading === undefined ? ctx.measure : measureOf(state, ctx, reading));
 	if (keys.length === 2) {
 		return renderDualKey({
-			top: readingRow(readings[0], mode, ctx.measure, specLabel(spec, 0)),
-			bottom: readingRow(readings[1], mode, ctx.measure, specLabel(spec, 1)),
+			top: readingRow(readings[0], mode, rowMeasure(readings[0]), specLabel(spec, 0), "", missingRowLabel()),
+			bottom: readingRow(readings[1], mode, rowMeasure(readings[1]), specLabel(spec, 1), "", missingRowLabel()),
 			sharedBadge,
 			palette,
-			text
+			text,
+			...look
 		});
 	}
 	if (keys.length === 3) {
 		return renderTripleKey({
-			rows: readings.map((reading, i) => readingRow(reading, mode, ctx.measure, specLabel(spec, i))),
+			rows: readings.map((reading, i) => readingRow(reading, mode, rowMeasure(reading), specLabel(spec, i), "", missingRowLabel())),
 			sharedBadge,
 			palette,
-			text
+			text,
+			...look
 		});
 	}
 	const labeled = spec === undefined ? true : spec.cellLabels;
@@ -229,42 +277,58 @@ export function composeChunkFace(state: DeviceDetailState, keys: readonly string
 			// A moved automatic hue keeps its contrast correction; an existing
 			// saved color remains chosen unless provenance explicitly says otherwise.
 			const identity = quadIdentityOf(spec?.colors[i], i);
-			const color = quadIdentityColor(spec?.automaticColors?.[i] === true ? { ...identity, chosen: false } : identity, labeled, ctx.text, text, palette);
+			const color = quadIdentityColor(spec?.automaticColors?.[i] === true ? { ...identity, chosen: false } : identity, labeled, ctx.text, text, keyIdentitySurface(background, palette));
 			const label = specLabel(spec, i) ?? micros[i] ?? "";
 			if (reading === undefined) {
 				// The same positional placeholder as the rows above.
 				return { label, valueText: "—", unitText: "", color };
 			}
-			const measured = formatQuadMeasurement(statValue(reading, mode), reading.unit, ctx.measure);
-			return { label, valueText: measured.valueText, unitText: measured.unitText, color };
+			const measure = measureOf(state, ctx, reading);
+			const value = statValue(reading, mode);
+			const measured = formatQuadMeasurement(value, reading.unit, measure);
+			return { label, valueText: measured.valueText, unitText: measured.unitText, color, ...(measure.exact === true ? { exact: true, fallback: exactFallback(value, reading.unit, measure, true) } : {}) };
 		}),
 		labels: labeled,
 		sharedBadge,
 		palette,
-		text
+		text,
+		...look
 	});
 }
 
 /** The title/page tile: group title over the visible range. */
 export function composeTitleFace(state: DeviceDetailState, page: DetailPage, ctx: DetailFaceContext): string {
 	const palette = themePaletteFor(state, ctx, null, "normal");
+	const { background, text } = lookFor(state, ctx, palette);
 	return renderDetailTitleKey({
 		title: state.group.title,
 		rangeText: page.rangeText,
 		palette,
-		text: resolveTextColors(palette, ctx.text, "normal")
+		text,
+		...backgroundOption(background)
 	});
 }
 
 /** A pager tile, visibly disabled at its boundary. */
 export function composePagerFace(direction: "previous" | "next", page: DetailPage, state: DeviceDetailState, ctx: DetailFaceContext): string {
 	const palette = themePaletteFor(state, ctx, null, "normal");
+	const { background, text } = lookFor(state, ctx, palette);
 	return renderDetailPagerKey({
 		direction,
 		enabled: direction === "previous" ? page.hasPrevious : page.hasNext,
 		palette,
-		text: resolveTextColors(palette, ctx.text, "normal")
+		text,
+		...backgroundOption(background)
 	});
+}
+
+/** An intentional empty cell of the opener's page layout (detailGaps):
+ * the same themed blank as a slot past the list end, drawn in every
+ * state, status screens included, so the space reads as space. */
+export function composeGapFace(state: DeviceDetailState, ctx: DetailFaceContext): string {
+	const palette = themePaletteFor(state, ctx, null, "normal");
+	const { background } = lookFor(state, ctx, palette);
+	return background === "theme" ? renderDetailBlankKey(palette) : renderDetailBlankKey(palette, background);
 }
 
 /** Faces for a visible detail surface with NO selected state (plugin

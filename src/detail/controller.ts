@@ -12,9 +12,12 @@
  */
 import type { PollerStatus } from "../poller";
 import type { SensorSnapshot } from "../hwinfo/types";
+import type { ShownAlert } from "../alerts/types";
+import { withArtSky } from "../ui/deck-art";
+import { keySkyFor } from "../ui/shared-looks";
 import { effectiveTextFor, getDeckTheme, measureOptionsFrom, typeAccentsEnabled } from "../ui/theme-store";
 import { loadThemes } from "../ui/themes";
-import { composeBackFace, composeChunkFace, composeIdleFace, composePagerFace, composeTitleFace, composeVoidFace, type DetailFaceContext } from "./detail-faces";
+import { composeBackFace, composeChunkFace, composeGapFace, composeIdleFace, composePagerFace, composeTitleFace, composeVoidFace, type DetailFaceContext } from "./detail-faces";
 import type { DetailPage } from "./detail-group";
 import type { DetailNavigator, DeviceDetailState } from "./navigation";
 import { parseSlotBinding, type DetailSlotBinding } from "./slot-bindings";
@@ -38,6 +41,14 @@ type SlotRegistration = {
 type ControllerDeps = {
 	getStatus: () => PollerStatus;
 	log?: { warn(msg: string): void };
+	/** What the opener key (by action context) shows for one reading, or
+	 * undefined while that key is not being stepped (the Back tile then
+	 * compares the opener's rule once). Absent: always the comparison. */
+	openerAlert?: (openerContext: string, identity: string) => ShownAlert | undefined;
+	/** Moves whenever any shown alert changes (the alert store's epoch), so
+	 * a Back tile repaints when the opener's alert changes with time alone
+	 * (a dwell completing, a snooze ending). Absent: data changes only. */
+	alertEpoch?: () => number;
 };
 
 export class DetailController {
@@ -113,11 +124,14 @@ export class DetailController {
 	}
 
 	/**
-	 * Recomputes the device's mirror Back slot: the READING slot whose
-	 * cell matches the session's opener cell. Nav cells never mirror (the
-	 * bindings differ), and a session without a known opener cell (older
-	 * events, multi-action edge) simply has no mirror. The navigator
-	 * repaints only when the value actually changes.
+	 * Recomputes what the device's registered slot coordinates decide:
+	 * the mirror Back slot (the READING slot whose cell matches the
+	 * session's opener cell) and the reading-slot index at every cell,
+	 * which maps the opener's intentional empty cells onto the slots
+	 * actually there. Nav cells never mirror or take a gap (the bindings
+	 * differ), and a session without a known opener cell (older events,
+	 * multi-action edge) simply has no mirror. The navigator repaints only
+	 * when either result actually changes.
 	 */
 	private refreshMirror(deviceId: string): void {
 		const state = this.navigator.stateFor(deviceId);
@@ -125,14 +139,18 @@ export class DetailController {
 			return;
 		}
 		let mirror: number | null = null;
-		if (state.openerCell !== null) {
-			for (const slot of this.slots.values()) {
-				if (slot.deviceId === deviceId && slot.cell !== null && slot.binding !== null && slot.binding.slot === "reading" && slot.cell.column === state.openerCell.column && slot.cell.row === state.openerCell.row) {
-					mirror = slot.binding.index;
-					break;
-				}
+		const cells = new Map<string, number>();
+		for (const slot of this.slots.values()) {
+			if (slot.deviceId !== deviceId || slot.cell === null || slot.binding === null || slot.binding.slot !== "reading") {
+				continue;
+			}
+			const id = `${slot.cell.column},${slot.cell.row}`;
+			if (!cells.has(id)) cells.set(id, slot.binding.index);
+			if (mirror === null && state.openerCell !== null && slot.cell.column === state.openerCell.column && slot.cell.row === state.openerCell.row) {
+				mirror = slot.binding.index;
 			}
 		}
+		this.navigator.setSlotCells(deviceId, cells);
 		this.navigator.setMirrorSlotIndex(deviceId, mirror);
 	}
 
@@ -163,7 +181,12 @@ export class DetailController {
 				void this.navigator.leave(slot.deviceId);
 				return;
 			}
-			const chunk = this.navigator.pageFor(state).chunks[binding.index];
+			const page = this.navigator.pageFor(state);
+			if (page.reserved.includes(binding.index)) {
+				// An intentional empty cell: nothing to cycle, nothing to do.
+				return;
+			}
+			const chunk = page.chunks[binding.index];
 			if (chunk !== undefined && chunk.length > 0) {
 				// The whole tile cycles together, like a standalone dense key.
 				this.navigator.cycleChunkStat(slot.deviceId, chunk);
@@ -184,16 +207,24 @@ export class DetailController {
 	 * (staleForMs is deliberately not displayed).
 	 */
 	private lastTickSignature = "";
+	private lastAlertEpoch = 0;
 
 	onTick(status: PollerStatus): void {
 		const signature = tickSignature(status);
-		if (signature === this.lastTickSignature) {
+		const alertEpoch = this.deps.alertEpoch?.() ?? 0;
+		if (signature === this.lastTickSignature && alertEpoch === this.lastAlertEpoch) {
 			return;
 		}
-		this.lastTickSignature = signature;
-		const snapshot: SensorSnapshot | null = status.state === "unavailable" ? null : status.snapshot;
-		for (const deviceId of this.navigator.activeDeviceIds()) {
-			this.navigator.refresh(deviceId, snapshot);
+		this.lastAlertEpoch = alertEpoch;
+		if (signature !== this.lastTickSignature) {
+			// Groups re-resolve on new data only; an alert-only change just
+			// repaints (the Back tile is the one face that follows it).
+			this.lastTickSignature = signature;
+			const snapshot: SensorSnapshot | null = status.state === "unavailable" ? null : status.snapshot;
+			const source = status.state === "unavailable" ? undefined : status.source;
+			for (const deviceId of this.navigator.activeDeviceIds()) {
+				this.navigator.refresh(deviceId, snapshot, source);
+			}
 		}
 		this.renderAll(status);
 	}
@@ -230,7 +261,8 @@ export class DetailController {
 			}
 			let svg: string;
 			try {
-				svg = this.composeSlot(slot, state, page, ctx, status);
+				// An art tile carries the opener's Sky (deck-art.ts withArtSky).
+				svg = withArtSky(this.composeSlot(slot, state, page, ctx, status), keySkyFor(state?.presentation));
 			} catch (err) {
 				// One bad face must not take down the tick for the whole page.
 				this.deps.log?.warn(`detail slot render failed (${slot.contextId}): ${String(err)}`);
@@ -245,12 +277,15 @@ export class DetailController {
 
 	/** The per-device presentation context (resolved once per pass). */
 	private contextFor(state: DeviceDetailState): DetailFaceContext {
+		const opener = state.openerContext;
+		const lookup = this.deps.openerAlert;
 		return {
 			config: loadThemes(),
 			deckThemeId: getDeckTheme(),
 			typeAccents: typeAccentsEnabled(),
 			measure: measureOptionsFrom(state.presentation),
-			text: effectiveTextFor(state.presentation)
+			text: effectiveTextFor(state.presentation),
+			...(opener !== undefined && lookup !== undefined ? { openerAlert: (identity: string) => lookup(opener, identity) } : {})
 		};
 	}
 
@@ -284,6 +319,11 @@ export class DetailController {
 					// The mirror Back tile renders exactly like the canonical
 					// Back: the opener's live reading plus the return mark.
 					return composeBackFace(state, status, ctx);
+				}
+				if (page.reserved.includes(binding.index)) {
+					// The opener's intentional empty cell reads as space in
+					// every state, status screens included.
+					return composeGapFace(state, ctx);
 				}
 				const chunk = page.chunks[binding.index] ?? [];
 				// The tile's stat derives from its first reading (the cell the

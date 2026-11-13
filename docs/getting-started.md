@@ -6,17 +6,17 @@ description: Put your first HWiNFO reading on a Stream Deck key in five steps.
 
 Put one live reading on a key, then customize it.
 
-**You need:** Windows 10 or later **x64**, Stream Deck software **6.9+**, and [HWiNFO](https://www.hwinfo.com/download/) running on the same PC. Check [hardware compatibility](hardware.md) for your deck.
+**You need:** Windows 10 or later **x64**, Stream Deck software **6.9+**, and [HWiNFO](https://www.hwinfo.com/download/) running on the same PC. The plugin reads no hardware itself: HWiNFO reads the sensors and shares them, and the plugin shows what HWiNFO shares. Check [hardware compatibility](hardware.md) for your deck.
 
 ## 1. Install the plugin
 
-Download [version 1.7.1](https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin), open `com.lawrensen.hwinfo.streamDeckPlugin`, and confirm the installation in Stream Deck. The actions list gains an **HWiNFO Sensors** category. [Installation and verification](installation.md#install-the-plugin) covers both GitHub and Marketplace packages.
+Download [version 1.8.0](https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.8.0/com.lawrensen.hwinfo.streamDeckPlugin), open `com.lawrensen.hwinfo.streamDeckPlugin`, and confirm the installation in Stream Deck. The actions list gains an **HWiNFO Sensors** category. [Installation and verification](installation.md#install-the-plugin) covers both GitHub and Marketplace packages.
 
 ## 2. Enable sharing in HWiNFO
 
 Start HWiNFO in **Sensors-only** mode. Open **Settings**, enable **Shared Memory Support**, and leave HWiNFO running.
 
-**Free HWiNFO stops Shared Memory after 12 hours.** Re-enable it or restart HWiNFO to resume. Pro removes the limit. [Gadget reporting](installation.md#free-path-gadget-reporting) has no timer, but lacks HWiNFO history and a producer timestamp. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to follow a change between sources.
+**Free HWiNFO stops Shared Memory after 12 hours.** Re-enable it or restart HWiNFO to resume. Pro removes the limit. HWiNFO's [license page](https://www.hwinfo.com/licenses/) lists this 12-hour limit for Shared Memory Support. [Gadget reporting](installation.md#free-path-gadget-reporting) is the other source; it lacks HWiNFO history and a producer timestamp. Saved readings need [explicit links](data-sources.md#link-readings-across-providers) to follow a change between sources.
 
 <a id="2-drag-sensor-reading-onto-a-key"></a>
 ## 3. Add Sensor Reading
@@ -44,5 +44,6 @@ If you see **Start HWiNFO**, **Shared Memory off**, **Age unknown**, or **Sensor
 
 - [Sensor Reading](sensor-reading.md): layouts, graphs, labels and key presses.
 - [Sensor Dial](sensor-dial.md): touchscreen readings, rotation and transparent backgrounds.
+- [Strip display](strip-display.md): Sensor Dials joined into one graph across the touch strip.
 - [Themes & colors](themes.md): one look for a key or the whole deck.
 - [Troubleshooting](troubleshooting.md): find a status message and its next step.

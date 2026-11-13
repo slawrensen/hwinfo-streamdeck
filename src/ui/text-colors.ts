@@ -7,6 +7,7 @@
  * Precedence, in order: warn/critical alert palettes, then the effective
  * local/global text mode, then plain theme text.
  */
+import { chromaHue, gamutColor, hexToLab } from "./color-difference";
 import type { AlertLevel } from "./format";
 import type { Palette } from "./themes";
 
@@ -83,6 +84,21 @@ export function contrastRatio(a: string, b: string): number {
  * better on `background` remains byte-identical. Otherwise retain the hue
  * while moving toward the higher-contrast endpoint until it passes. */
 export function readableColor(color: string, background: string, floor: number): string {
+	// Pure, over a handful of theme and settings colors, and asked for
+	// every face on every repaint: remembered.
+	const key = `${color}|${background}|${floor}`;
+	const known = READABLE_MEMO.get(key);
+	if (known !== undefined) return known;
+	const result = liftToFloor(color, background, floor);
+	if (READABLE_MEMO.size >= READABLE_MEMO_MAX) READABLE_MEMO.clear();
+	READABLE_MEMO.set(key, result);
+	return result;
+}
+
+const READABLE_MEMO = new Map<string, string>();
+const READABLE_MEMO_MAX = 4096;
+
+function liftToFloor(color: string, background: string, floor: number): string {
 	if (contrastRatio(color, background) >= floor) return color;
 	const bg = luminance(background);
 	const target = (bg + 0.05) / 0.05 >= 1.05 / (bg + 0.05) ? "#000000" : "#FFFFFF";
@@ -103,6 +119,47 @@ export function readableColor(color: string, background: string, floor: number):
 	}
 	return result;
 }
+
+/**
+ * A lift that holds a CIELAB hue. A color that already reads at `floor`:1
+ * on `background` remains byte-identical. Otherwise the result keeps `hue`
+ * (the color's own when absent), moves its lightness toward the
+ * higher-contrast end only as far as the floor asks, and takes the most
+ * chroma the sRGB gamut holds there, never more than its own. readableColor
+ * mixes toward white or black, which keeps the HSL hue but turns the CIELAB
+ * hue and drains the chroma (crit on Glass's Graphite panel: hue 36 to 27,
+ * chroma 89 to 37), so a lifted red drifts toward a lifted reddish purple.
+ */
+export function readableColorAtHue(color: string, background: string, floor: number, hue?: number): string {
+	if (contrastRatio(color, background) >= floor) return color;
+	const key = `${color}|${background}|${floor}|${hue ?? ""}`;
+	const known = HUE_MEMO.get(key);
+	if (known !== undefined) return known;
+	const lab = hexToLab(color);
+	const own = chromaHue(lab);
+	const h = hue ?? own.hue;
+	const bg = luminance(background);
+	const lighter = (bg + 0.05) / 0.05 < 1.05 / (bg + 0.05);
+	let near = lab[0];
+	let far = lighter ? 100 : 0;
+	let result = lighter ? "#FFFFFF" : "#000000";
+	// Keep the passing, quantized candidate nearest the color's lightness.
+	for (let i = 0; i < 24; i++) {
+		const middle = (near + far) / 2;
+		const candidate = gamutColor(middle, h, own.chroma);
+		if (contrastRatio(candidate, background) >= floor) {
+			far = middle;
+			result = candidate;
+		} else {
+			near = middle;
+		}
+	}
+	if (HUE_MEMO.size >= READABLE_MEMO_MAX) HUE_MEMO.clear();
+	HUE_MEMO.set(key, result);
+	return result;
+}
+
+const HUE_MEMO = new Map<string, string>();
 
 /** Built-in numeric foregrounds use a 4.5:1 floor on their actual surface.
  * Custom Text and chosen per-reading or quad cell colors deliberately
@@ -177,8 +234,29 @@ export function quadIdentityColor(identity: QuadIdentity, labeled: boolean, sett
 	if (mode === "custom") {
 		return labeled ? text.label : text.value;
 	}
-	const color = mode === "dim" ? mixToward(identity.color, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : identity.color;
-	return identity.chosen ? color : readableValueColor(color, palette.bg);
+	if (identity.chosen) {
+		return mode === "dim" ? mixToward(identity.color, palette.bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : identity.color;
+	}
+	// The automatic lift is a binary search asked for by every cell on every
+	// frame, and on Glass it runs on the hardest panel, where most hues move.
+	// A deck draws a handful of hue, mode and surface combinations.
+	const key = `${identity.color}|${mode}|${labeled}|${palette.bg}`;
+	const cached = IDENTITY_CACHE.get(key);
+	if (cached !== undefined) return cached;
+	if (IDENTITY_CACHE.size >= 128) IDENTITY_CACHE.clear();
+	const resolved = automaticIdentityColor(identity.color, mode, labeled, palette.bg);
+	IDENTITY_CACHE.set(key, resolved);
+	return resolved;
+}
+
+const IDENTITY_CACHE = new Map<string, string>();
+
+/** An automatic quad identity under Theme or Dim on a surface, uncached:
+ * blended toward the surface in Dim, then lifted to the numeric floor.
+ * quadIdentityColor caches it; exported so a test can hold the two equal. */
+export function automaticIdentityColor(color: string, mode: "theme" | "dim", labeled: boolean, background: string): string {
+	const blended = mode === "dim" ? mixToward(color, background, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : color;
+	return readableValueColor(blended, background);
 }
 
 /**

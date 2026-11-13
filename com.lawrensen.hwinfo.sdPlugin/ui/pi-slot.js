@@ -28,6 +28,6 @@
 		}
 		const [role, explain] = describe(settings);
 		document.getElementById("slot-role").textContent = role;
-		document.getElementById("slot-explain").textContent = `${explain} This tile has no settings of its own.`;
+		document.getElementById("slot-explain").textContent = explain;
 	};
 })();

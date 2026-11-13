@@ -12,6 +12,8 @@
       url: /sensor-reading.html
     - title: Sensor Dial
       url: /sensor-dial.html
+    - title: Strip display
+      url: /strip-display.html
     - title: Sensor details
       url: /sensor-details.html
     - title: Themes & colors
@@ -34,6 +36,8 @@
       url: /data-sources.html
     - title: Hardware compatibility
       url: /hardware.html
+    - title: Languages
+      url: /localization.html
     - title: What's new in 1.7
       url: /whats-new-1.7.html
     - title: Changelog

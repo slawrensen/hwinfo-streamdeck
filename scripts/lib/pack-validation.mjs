@@ -11,7 +11,10 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { FORBIDDEN_MEMBER_PATTERNS, PLUGIN_ROOT, PLUGIN_UUID, SHIPPED_MEMBERS, STAGING_ONLY, TEXT_MEMBER_FORBIDDEN, TEXT_MEMBER_PATTERN } from "./pack-contract.mjs";
+import { FORBIDDEN_MEMBER_PATTERNS, NATIVE_MEMBERS, PLUGIN_ROOT, PLUGIN_UUID, SHIPPED_MEMBERS, STAGING_ONLY, TEXT_MEMBER_FORBIDDEN, TEXT_MEMBER_PATTERN } from "./pack-contract.mjs";
+import { authenticodeStructureProblem } from "./authenticode.mjs";
+import { testHookIn } from "./native-binaries.mjs";
+import { parsePe } from "./pe.mjs";
 import { listZip, readZipEntry } from "./zip.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -53,12 +56,51 @@ function unsafeName(name, rawName) {
 }
 
 /**
+ * The native hashes a release-native-manifest.json records, as a map from
+ * archive path to sha256: every binary of a version 2 manifest, or hwsm.node
+ * alone from a version 1 manifest (which describes nothing else).
+ */
+export function nativeExpectationsFromManifest(manifest) {
+	const expected = new Map();
+	if (Array.isArray(manifest?.binaries)) {
+		for (const binary of manifest.binaries) {
+			if (typeof binary?.file === "string" && typeof binary?.sha256 === "string") expected.set(`bin/${binary.file}`, binary.sha256);
+		}
+	} else if (typeof manifest?.sha256 === "string") {
+		expected.set(`bin/${typeof manifest.file === "string" ? manifest.file : "hwsm.node"}`, manifest.sha256);
+	}
+	return expected;
+}
+
+/** Why a shipped native member is not a plausible linker output, or null. */
+function nativeImageProblem(data) {
+	let pe;
+	try {
+		pe = parsePe(data);
+	} catch (err) {
+		return `is not a PE image (${err.message})`;
+	}
+	if (pe.machine !== "x64") return `is a ${pe.machine} image, not x64`;
+	if (pe.certificateTable === null && pe.overlayBytes !== 0) return `carries ${pe.overlayBytes} bytes after its last section and no certificate table`;
+	// A signed member: the certificate table must be laid out the way
+	// signing lays it out (8-aligned after the image, ending the file).
+	const layout = authenticodeStructureProblem(data);
+	if (layout !== null) return `carries a certificate table signing would not produce: ${layout}`;
+	const hook = testHookIn(data);
+	if (hook !== null) return `carries the test-only hook ${hook} (a test build under the shipped name)`;
+	return null;
+}
+
+/**
  * Validates `archiveBytes` against `stagingDir` and the contract.
  * `packageVersion` is package.json's version (the manifest must read
- * `${packageVersion}.0`). Returns { failures, members, payload } where
- * payload maps each contract member to its sha256 as found in the archive.
+ * `${packageVersion}.0`). `expectedNative`, when given, maps a native member
+ * (bin/hwsm.node) to the sha256 the native manifest
+ * records for it; the archive must carry exactly those bytes. Returns
+ * { failures, members, payload } where payload maps each contract member to
+ * its sha256 as found in the archive.
  */
-export function validatePack({ archiveBytes, stagingDir, packageVersion, contract = {} }) {
+export function validatePack({ archiveBytes, stagingDir, packageVersion, contract = {}, expectedNative = new Map() }) {
 	const members = contract.members ?? SHIPPED_MEMBERS;
 	const root = contract.root ?? PLUGIN_ROOT;
 	const uuid = contract.uuid ?? PLUGIN_UUID;
@@ -144,7 +186,24 @@ export function validatePack({ archiveBytes, stagingDir, packageVersion, contrac
 			for (const { pattern, why } of TEXT_MEMBER_FORBIDDEN) if (pattern.test(text)) fail(`member "${rel}" contains a ${why}`);
 		}
 		if (rel === "bin/plugin.js" && /require\(["']koffi/.test(data.toString("utf8"))) fail("bin/plugin.js references koffi");
-		if (rel === "bin/hwsm.node" && !(data.length > 64 && data[0] === 0x4d && data[1] === 0x5a)) fail("bin/hwsm.node is not a PE image");
+		if (NATIVE_MEMBERS.includes(rel)) {
+			const problem = nativeImageProblem(data);
+			if (problem !== null) fail(`${rel} ${problem}`);
+		}
+	}
+
+	// 4b. The native members are the bytes the native manifest describes.
+	for (const [rel, sha] of expectedNative) {
+		const actual = payload.get(rel);
+		if (actual === undefined) {
+			if (archiveRel.has(rel)) continue; // unreadable: reported above
+			fail(`the native manifest describes ${rel}, which the archive does not carry`);
+		} else if (actual !== sha) {
+			fail(`${rel} in the archive (${actual.slice(0, 12)}) is not the binary the native manifest records (${sha.slice(0, 12)}); regenerate release-native-manifest.json with node scripts/native-manifest.mjs, or remove a stale one`);
+		}
+	}
+	for (const rel of NATIVE_MEMBERS) {
+		if (expectedNative.size > 0 && !expectedNative.has(rel) && payload.has(rel)) fail(`the native manifest does not describe ${rel}; regenerate it with node scripts/native-manifest.mjs`);
 	}
 
 	// 5. The manifest's own claims: version, identity, and that every asset

@@ -34,9 +34,14 @@ export type GestureCommandId =
 	/** Pin: ignore turns and pause the auto cycle until unpinned. */
 	| "pin"
 	/** Reset session stats; the scope comes from the resetScope setting. */
-	| "resetStats";
+	| "resetStats"
+	/** Snooze this dial's alerts that show now, for the alertSnoozeMs
+	 * setting's length (15 minutes when unset). */
+	| "snooze";
 
-const COMMAND_IDS: readonly GestureCommandId[] = ["none", "step", "stepGroup", "cycleStat", "backToCurrent", "pauseResume", "pin", "resetStats"];
+/** Append-only: a stored value this build does not list falls back to the
+ * gesture's legacy command. */
+const COMMAND_IDS: readonly GestureCommandId[] = ["none", "step", "stepGroup", "cycleStat", "backToCurrent", "pauseResume", "pin", "resetStats", "snooze"];
 
 /** Statistics-reset reach. Destructive scopes are explicit, never a default. */
 export type ResetScope = "current" | "set" | "all";
@@ -152,7 +157,8 @@ const HINT_LABELS: Record<GestureCommandId, string | undefined> = {
 	backToCurrent: "Back to current",
 	pauseResume: "Pause/resume",
 	pin: "Pin/unpin",
-	resetStats: "Reset stats"
+	resetStats: "Reset stats",
+	snooze: "Snooze alerts"
 };
 
 /**
@@ -168,7 +174,8 @@ const SUFFIX_LABELS: Record<GestureCommandId, string | undefined> = {
 	backToCurrent: "current",
 	pauseResume: "pause/resume",
 	pin: "pin/unpin",
-	resetStats: "reset stats"
+	resetStats: "reset stats",
+	snooze: "snooze alerts"
 };
 
 /**

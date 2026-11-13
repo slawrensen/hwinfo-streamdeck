@@ -4,6 +4,8 @@
 // plugin process (CPU cumulative seconds, RSS, handles) every 15 s via
 // CIM and prints a PERF.md-ready summary plus per-sample CSV lines.
 //   node scripts/perf-detail.mjs          (PERF_DETAIL_SEC=480 default)
+//   HWINFO_E2E_PLUGIN_DIR=<dir>           another build's .sdPlugin (e.g. an
+//                                         extracted release pack)
 //   PERF_DETAIL_DENSITY=2|3|4  readings per tile (detailDensity); at 4
 //                              every tile composes a quad face and one
 //                              page carries up to 128 readings
@@ -17,7 +19,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { buildInfo, pluginArgv, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, pluginArgv, resolvePluginDir, sleep } from "./lib/e2e-common.mjs";
 import { profileCells } from "./lib/profile-cells.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -25,7 +27,7 @@ const PORT = 28993;
 const DURATION_SEC = Number(process.env.PERF_DETAIL_SEC ?? "") || 480;
 const SAMPLE_SEC = 15;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+const pluginDir = resolvePluginDir(repoRoot);
 
 const cells = profileCells(pluginDir, "profiles/detail-plus-xl");
 

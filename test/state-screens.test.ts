@@ -4,11 +4,14 @@
 // Memory. statusScreen and statusSentence already branch on source; this locks
 // statusDialText to the same behavior.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import type { HwinfoUnavailableReason, SensorSnapshot } from "../src/hwinfo/types";
+import { EN } from "../src/i18n-catalog";
 import type { PollerStatus } from "../src/poller";
-import { keyLabel, statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
+import { keyLabel, noSelectionScreen, statusDialText, statusScreen, statusSentence } from "../src/ui/state-screens";
 
 const EMPTY_SNAPSHOT: SensorSnapshot = {
 	pollTime: 1,
@@ -119,7 +122,7 @@ describe("state-screens: every unavailable reason has its own guidance", () => {
 	});
 
 	it("missing update evidence is not diagnosed as a stalled process", () => {
-		assert.equal(statusDialText(stale("shared-memory"))?.title, "No new data");
+		assert.equal(statusDialText(stale("shared-memory"))?.title, "Not updating");
 		assert.match(statusSentence(stale("shared-memory")), /No new Shared Memory.*20s/);
 		assert.doesNotMatch(statusSentence(stale("shared-memory")), /HWiNFO stopped updating/);
 	});
@@ -160,6 +163,56 @@ describe("state-screens: failure reasons shared by both providers", () => {
 			// Keep the existing two-line geometry with short recovery wording.
 			assert.ok(statusScreen(status)?.lines.every((line) => line.length <= 13));
 		}
+	});
+});
+
+describe("state-screens: one state, one name", () => {
+	// A source or selection state has the same first line on a key and on a
+	// dial; only the second line may differ, to fit or to name a dial step.
+	// Two states keep the key's words but split them differently: the dial
+	// has room for "Shared Memory off" and "Needs x64 Windows" on one line.
+	const SPLIT_DIFFERENTLY = new Set(["disabled", "unsupported"]);
+	const titleOf = (entry: object): string | undefined => ("title" in entry && typeof entry.title === "string" ? entry.title : undefined);
+	const shared = Object.keys(EN.face).filter((k) => Object.hasOwn(EN.dial, k));
+
+	it("covers every state a key and a dial both show", () => {
+		assert.deepEqual(shared, ["staleGadget", "staleShared", "notRunning", "busy", "gadgetEmpty", "disabled", "accessDenied", "unsupported", "bridgeFailed", "sourceError", "noSelection", "missing"]);
+	});
+
+	for (const k of shared) {
+		it(`${k}: the dial's title is the key's title`, () => {
+			const face = titleOf(EN.face[k as keyof typeof EN.face]);
+			const dial = titleOf(EN.dial[k as keyof typeof EN.dial]);
+			assert.ok(face !== undefined && dial !== undefined, `${k} has a title on both`);
+			if (SPLIT_DIFFERENTLY.has(k)) assert.ok(dial.startsWith(`${face} `), `${k}: "${dial}" starts with the key's "${face}"`);
+			else assert.equal(dial, face, k);
+		});
+	}
+
+	it("the drawn faces agree for every source state, and for a dial with no reading picked", () => {
+		const unavailable = (reason: HwinfoUnavailableReason): PollerStatus => ({ state: "unavailable", reason, message: "" });
+		const statuses: PollerStatus[] = [stale("shared-memory"), stale("gadget"), ...(["not-running", "busy", "gadget-empty", "access-denied", "invalid", "bridge-failed"] as const).map(unavailable)];
+		for (const status of statuses) assert.equal(statusDialText(status)?.title, statusScreen(status)?.lines[0], JSON.stringify(status));
+		assert.equal(EN.dial.noSelection.title, noSelectionScreen().lines[0]);
+		assert.equal(EN.dial.noSelection.value, "rotate to pick");
+	});
+});
+
+describe("state-screens: docs/status-screens.md lists every face", () => {
+	const page = readFileSync(fileURLToPath(new URL("../docs/status-screens.md", import.meta.url)), "utf8");
+	/** Every string leaf of a catalog branch, with its dotted path. */
+	const leaves = (node: object, prefix: string): Array<[string, string]> =>
+		Object.entries(node).flatMap(([name, value]): Array<[string, string]> => (typeof value === "string" ? [[`${prefix}.${name}`, value]] : leaves(value as object, `${prefix}.${name}`)));
+
+	it("names every key and dial face line", () => {
+		const strings = [...leaves(EN.face, "face"), ...leaves(EN.dial, "dial")];
+		assert.ok(strings.length >= 45, `expected the face and dial strings, found ${strings.length}`);
+		const absent = strings.filter(([, text]) => !page.includes(text)).map(([key, text]) => `${key} "${text}"`);
+		assert.deepEqual(absent, [], "docs/status-screens.md lacks these face strings");
+	});
+
+	it("describes the current release, not 1.7", () => {
+		assert.doesNotMatch(page, /This page describes 1\.7/);
 	});
 });
 

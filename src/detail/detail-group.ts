@@ -217,25 +217,63 @@ export type DetailPage = {
 	/** "3-7 / 12" style range text counting READINGS, never tiles;
 	 *  "0 / 0" for an empty group. */
 	readonly rangeText: string;
+	/** Which logical page this is, 0 for the first. */
+	readonly pageIndex: number;
+	/** The tile indices this page reserved (the mirror Back and the
+	 *  opener's intentional empty cells), ascending; their chunks are
+	 *  empty. Empty when nothing was reserved. */
+	readonly reserved: readonly number[];
 };
 
+/** Reserved tile indices: one index on every page (the mirror Back, the
+ * original form), or a per-page set (the mirror plus the opener's
+ * intentional empty cells, detailGaps). */
+export type ReservedSlots = number | ((pageIndex: number) => ReadonlySet<number>);
+
+const NO_RESERVED: ReadonlySet<number> = new Set<number>();
+
+/** Normalizes either reserved form to a per-page set of valid tile
+ * indices. An index outside 0..pageSize-1 never counts, and a page whose
+ * reservations would leave no tile at all keeps none, so every page
+ * carries at least one reading tile and the walk always advances. The
+ * single-index form keeps its original rule exactly (ignored on a
+ * one-tile page), which is the same set the per-page form yields for it. */
+function reservedSetsOf(reserved: ReservedSlots | undefined, pageSize: number): (pageIndex: number) => ReadonlySet<number> {
+	const valid = (index: number): boolean => Number.isInteger(index) && index >= 0 && index < pageSize;
+	if (typeof reserved === "function") {
+		return (pageIndex) => {
+			const out = new Set<number>();
+			for (const index of reserved(pageIndex)) {
+				if (valid(index)) out.add(index);
+			}
+			return out.size >= pageSize ? NO_RESERVED : out;
+		};
+	}
+	const single = reserved !== undefined && valid(reserved) && pageSize > 1 ? new Set([reserved]) : NO_RESERVED;
+	return () => single;
+}
+
 /**
- * Projects one logical page; pure math, safe for any offset. An optional
- * RESERVED slot index (the mirror Back tile riding on the opener's own
- * cell) is skipped by the key mapping: readings flow around it, every
- * page pays exactly one TILE for it, and no reading is ever hidden. A
- * reserved index outside 0..pageSize-1 (or a one-slot page) is ignored.
+ * Projects one logical page; pure math, safe for any offset. RESERVED
+ * tile indices are skipped by the key mapping: readings flow around
+ * them and no reading is ever hidden. The single-index form is the
+ * mirror Back tile riding on the opener's own cell, and every page pays
+ * exactly one TILE for it. The per-page form adds the opener's
+ * intentional empty cells (detailGaps), so each page has its own
+ * capacity and page boundaries are found by walking the pages in order.
+ * A reserved index outside 0..pageSize-1 is ignored, and so is a page
+ * whose reservations would leave no tile (a one-slot page included).
  * `density` readings ride on each tile (issue #5 follow-up), and an
  * optional hand-grouped tile `plan` overrides the uniform density tile
  * by tile: plan tiles take their own sizes (and carry their specs onto
  * the page), readings past the plan flow on at the density. The default
  * inputs reproduce the original one-reading pages exactly, chunk for
- * chunk.
+ * chunk, and `pageOf(k, o, s, m)` equals `pageOf(k, o, s, () => new
+ * Set([m]))` for any inputs.
  */
-export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlot?: number, density: DetailDensity = 1, plan: readonly DetailTileSpec[] = []): DetailPage {
+export function pageOf(keys: readonly string[], offset: number, pageSize: number, reservedSlots?: ReservedSlots, density: DetailDensity = 1, plan: readonly DetailTileSpec[] = []): DetailPage {
 	const safeSize = Math.max(1, Math.trunc(pageSize));
-	const reserved = reservedSlot !== undefined && Number.isInteger(reservedSlot) && reservedSlot >= 0 && reservedSlot < safeSize && safeSize > 1 ? reservedSlot : null;
-	const capacity = reserved === null ? safeSize : safeSize - 1;
+	const reservedAt = reservedSetsOf(reservedSlots, safeSize);
 	// The whole group as a tile run: plan entries first, then the uniform
 	// fill. Tiles exist only while readings remain, so a plan longer than
 	// the list never mints styled empties.
@@ -246,12 +284,18 @@ export function pageOf(keys: readonly string[], offset: number, pageSize: number
 		tiles.push({ start: cursor, size, spec });
 		cursor += size;
 	}
-	// Page boundaries in tile units, then the page holding the offset
-	// (snapping DOWN onto a boundary, like the offset always clamped).
+	// Page boundaries in tile units, each page advancing by its own
+	// capacity (never zero, see reservedSetsOf), then the page holding the
+	// offset (snapping DOWN onto a boundary, like the offset always clamped).
 	const pageStarts: number[] = [];
-	for (let t = 0; t === 0 || t < tiles.length; t += capacity) {
-		pageStarts.push(t);
-	}
+	const pageReserved: ReadonlySet<number>[] = [];
+	let boundary = 0;
+	do {
+		const reserved = reservedAt(pageStarts.length);
+		pageStarts.push(boundary);
+		pageReserved.push(reserved);
+		boundary += safeSize - reserved.size;
+	} while (boundary < tiles.length);
 	const wanted = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0;
 	let pageIndex = 0;
 	for (let i = 1; i < pageStarts.length; i++) {
@@ -262,17 +306,20 @@ export function pageOf(keys: readonly string[], offset: number, pageSize: number
 		}
 	}
 	const firstTile = pageStarts[pageIndex] as number;
+	const reserved = pageReserved[pageIndex] as ReadonlySet<number>;
+	const capacity = safeSize - reserved.size;
 	const start = tiles[firstTile]?.start ?? 0;
 	const nextStart = tiles[firstTile + capacity]?.start;
 	const chunks: (readonly string[])[] = [];
 	const specs: (DetailTileSpec | undefined)[] = [];
+	let ordinal = 0;
 	for (let i = 0; i < safeSize; i++) {
-		if (reserved !== null && i === reserved) {
+		if (reserved.has(i)) {
 			chunks.push([]);
 			specs.push(undefined);
 		} else {
-			const ordinal = reserved !== null && i > reserved ? i - 1 : i;
 			const tile = tiles[firstTile + ordinal];
+			ordinal++;
 			chunks.push(tile === undefined ? [] : keys.slice(tile.start, tile.start + tile.size));
 			specs.push(tile?.spec);
 		}
@@ -289,6 +336,8 @@ export function pageOf(keys: readonly string[], offset: number, pageSize: number
 		previousOffset: pageIndex > 0 ? ((tiles[pageStarts[pageIndex - 1] as number] as { start: number }).start ?? 0) : start,
 		hasPrevious: pageIndex > 0,
 		hasNext: nextStart !== undefined,
-		rangeText
+		rangeText,
+		pageIndex,
+		reserved: [...reserved].sort((a, b) => a - b)
 	};
 }

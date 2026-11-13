@@ -5,6 +5,8 @@
 // listed all fail. Adding a shipping file therefore means adding it here,
 // in the same change, and a file that must never ship is named below by
 // pattern. Paths are archive paths under the plugin root, forward slashes.
+import { NATIVE_BINARIES, TEST_ONLY_NATIVE_PATTERN } from "./native-binaries.mjs";
+
 export const PLUGIN_ROOT = "com.lawrensen.hwinfo.sdPlugin";
 export const PLUGIN_UUID = "com.lawrensen.hwinfo";
 
@@ -12,6 +14,7 @@ export const PLUGIN_UUID = "com.lawrensen.hwinfo";
 export const SHIPPED_MEMBERS = Object.freeze([
 	"LICENSE",
 	"NOTICE.md",
+	"en.json",
 	"manifest.json",
 	"themes.json",
 	"bin/hwsm.node",
@@ -47,17 +50,27 @@ export const SHIPPED_MEMBERS = Object.freeze([
 	"profiles/detail-xl.streamDeckProfile",
 	"ui/control.html",
 	"ui/detail-slot.html",
+	"ui/pi-calc.js",
+	"ui/pi-client.js",
 	"ui/pi-command.js",
 	"ui/pi-common.js",
 	"ui/pi-control.js",
+	"ui/pi-links.js",
 	"ui/pi-model.js",
 	"ui/pi-shell.js",
 	"ui/pi-slot.js",
+	"ui/pi-strings.js",
+	"ui/pi-strip-model.js",
+	"ui/pi-strip.js",
 	"ui/pi.css",
-	"ui/sdpi-components.js",
 	"ui/sensor-dial.html",
 	"ui/sensor-reading.html"
 ]);
+
+/** The shipped native binaries (scripts/lib/native-binaries.mjs) as
+ * archive paths: each is held to the PE checks and, when a native manifest
+ * is given, to its recorded hash. */
+export const NATIVE_MEMBERS = Object.freeze(NATIVE_BINARIES.map((binary) => `bin/${binary.file}`));
 
 /** Files the staging directory may hold without shipping: the plugin's own
  * log directory (written by every local run) and the vendoring script's
@@ -65,7 +78,7 @@ export const SHIPPED_MEMBERS = Object.freeze([
  * drift and fails. */
 export const STAGING_ONLY = Object.freeze([
 	/^logs\//,
-	/^bin\/hwsm\.node\.staging-/
+	new RegExp(`^bin/(?:${NATIVE_BINARIES.map((binary) => binary.file.replaceAll(".", "\\.")).join("|")})\\.staging-`)
 ]);
 
 /** Names that must never appear in an archive whatever the list says:
@@ -75,7 +88,7 @@ export const FORBIDDEN_MEMBER_PATTERNS = Object.freeze([
 	{ pattern: /\.log$/i, why: "log file" },
 	{ pattern: /\.pdb$/i, why: "debug symbols" },
 	{ pattern: /\.(?:obj|iobj|ipdb|ilk|exp|lib)$/i, why: "build intermediate" },
-	{ pattern: /hwsm_test|hwsm_protomm/i, why: "test-only native addon" },
+	{ pattern: TEST_ONLY_NATIVE_PATTERN, why: "test-only native addon" },
 	{ pattern: /koffi/i, why: "koffi (test-only FFI)" },
 	{ pattern: /\.staging-/i, why: "vendoring staging leftover" },
 	{ pattern: /(^|\/)\.env(?:\.|$)/i, why: "environment file" },

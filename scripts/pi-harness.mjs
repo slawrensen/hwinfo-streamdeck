@@ -76,18 +76,6 @@ wss.on("connection", (ws) => {
 			case "sendToPlugin":
 				toPlugin({ event: "sendToPlugin", action: current.action, context: current.context, payload: msg.payload });
 				break;
-			case "getSettings": {
-				// The PI's own messages carry its registration uuid ("pi-ctx"),
-				// never an action context; only plugin messages name a real one.
-				// device rides along like the real app sends it: the sdpi
-				// client's getSettings filters replies on action, context AND
-				// device, and a missing field hangs that promise, which left
-				// the Config wells empty under this harness.
-				const ctx = store.settings[msg.context] !== undefined ? msg.context : current.context;
-				const page = Object.values(PAGES).find((p) => p.context === ctx) ?? current;
-				ws.send(JSON.stringify({ event: "didReceiveSettings", action: page.action, context: ctx, device: "dev1", payload: { settings: store.settings[ctx], coordinates: page.coordinates } }));
-				break;
-			}
 			case "setSettings": {
 				const ctx = store.settings[msg.context] !== undefined ? msg.context : current.context;
 				const page = Object.values(PAGES).find((p) => p.context === ctx) ?? current;
@@ -133,12 +121,14 @@ const info = {
 	application: { font: "Segoe UI", language: "en", platform: "windows", platformVersion: "10.0.19044", version: "7.4.2.22730" },
 	colors: {},
 	devicePixelRatio: 1,
-	devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 5, rows: 3 }, type: 0 }],
+	// A Stream Deck + XL, so the dial panel shows what a dial owner sees
+	// (a 15-key deck has no dials, and its Strip section says so).
+	devices: [{ id: "dev1", name: "Harness Deck", size: { columns: 9, rows: 4 }, type: 13 }],
 	plugin: { uuid: "com.lawrensen.hwinfo", version: "1.0.0.0" }
 };
-/** Built per request: sdpi-components seeds its settings cache from the
- * registration actionInfo, so a PI reload must carry the LIVE store.settings
- * or settings written by the PI appear lost on refresh. */
+/** Built per request: the panel client (ui/pi-client.js) seeds its settings
+ * cache from the registration actionInfo, so a PI reload must carry the
+ * LIVE store.settings or settings written by the PI appear lost on refresh. */
 function bootstrap(page) {
 	const actionInfo = {
 		action: page.action,

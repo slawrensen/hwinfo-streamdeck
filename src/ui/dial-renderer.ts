@@ -13,15 +13,34 @@
  * same words in the same places (cut where a Theme face would hide a run
  * under a background-colored rect) and change only what sits behind them.
  */
+import type { HistoryView } from "../history/types";
 import { HISTORY_LENGTH } from "../series";
-import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextFitOptions, type TextRun } from "./format";
+import { cappedUnit, cutToFit, estimateFooterWidth, estimateKeyTextWidth, exactRung, fitFooter, fitLadderBy, fitTextLadder, INK_CLEAR_GAP, INK_RIGHT_SLACK, inkEdges, inksWithin, truncateLabel, wrapLabelTwoLines, wrapLabelTwoLinesBy, type FittedText, type TextFitOptions, type TextRun } from "./format";
 import { faceFont, isTahoma } from "./face-font";
 import { dialBackgroundTraits, dialFaceOpen, HALO_CLOSE, HALO_GROUP, haloRingColor, SEE_THROUGH_FALLBACK_ADVANCE_12, structureFill, type DialBackground } from "./dial-background";
-import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, type DrawnZone } from "./key-renderer";
+import { barSegment, escapeXml, fontFamily, inlineGap, PRESERVE, sparklinePoints, sparklineSvg, type DrawnZone, type ExactTexts } from "./key-renderer";
+import type { Measurement } from "./measure";
 import { noDimmerThan, themeTextColors, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
+import { timelineSvg } from "./timeline";
 
 const BAR = { x: 12, y: 84, w: 176, h: 6, r: 3 } as const;
+
+/**
+ * The snoozed cue on a dial: the key's 3 px edge band (snoozeBandSvg),
+ * here across the slot's top edge. Drawn right after the face's background,
+ * outside any halo group and under everything else, so no word or bar loses
+ * ink to it. It appears only after a deliberate snooze; with no band set,
+ * every face is byte for byte what it was.
+ */
+export function dialSnoozeBandSvg(color: string): string {
+	return `<rect x="0" y="0" width="200" height="3" fill="${color}"/>`;
+}
+
+/** The band's part list: one rect, or nothing when no snooze is set. */
+function bandParts(color: string | undefined): string[] {
+	return color === undefined ? [] : [dialSnoozeBandSvg(color)];
+}
 
 /**
  * Cut, not mask (issue #41): a run fitted for a face with no overflow rect.
@@ -96,6 +115,22 @@ const WIDE_GEO = {
 	bottom: { lineBaseline: 95, rule: 81, rowsTop: 2, rowsBottom: 80, bandH: 24 }
 } as const;
 const ROW_VALUE_MAX = 12;
+/** Whether a two-row or three-row value with its own format draws whole:
+ * the rows cut values past ROW_VALUE_MAX code points, which for a number
+ * would read as another number, so such a row draws the next of its texts
+ * instead (rowExactRung). */
+export function exactRowValueFits(valueText: string): boolean {
+	return Array.from(valueText).length <= ROW_VALUE_MAX;
+}
+/** Which of a reading's texts a two-row or three-row row draws. */
+export function rowExactRung(rungs: ExactTexts): { rung: Measurement; index: number; fits: boolean } {
+	return exactRung(rungs, (r) => exactRowValueFits(r.valueText));
+}
+/** A row's value and unit as drawn: a reading with its own format by
+ * rowExactRung, any other as given. */
+function rowShownOf(row: { valueText: string; unitText: string; exact?: boolean; fallback?: readonly Measurement[] }): Measurement {
+	return row.exact === true ? rowExactRung([{ valueText: row.valueText, unitText: row.unitText }, ...(row.fallback ?? [])]).rung : row;
+}
 /** Units cap at 4 code points ("Mbps" stays whole, "Mbit/s" ellipsizes).
  * The cap counts glyphs, not pixels: wideUnitShift below is what keeps the
  * capped unit on the canvas. */
@@ -174,6 +209,11 @@ export interface OverviewRow {
 	 * mirroring how the single view passes barColor). Alerts recolor the
 	 * value TEXT only; nothing else on the face tints. */
 	valueColor: string;
+	/** The reading has its own format: whole text, else the first of
+	 * fallback that fits, never cut. */
+	exact?: boolean;
+	/** With exact: measure.ts exactFallback for this value. */
+	fallback?: readonly Measurement[];
 }
 
 export interface DialOverviewOptions {
@@ -198,6 +238,14 @@ export interface DialOverviewOptions {
 	/** What the dial draws behind its readout (issue #41); absent is Theme.
 	 * Text arrives resolved for it (dialTextColors). */
 	background?: DialBackground;
+	/** The snoozed cue's color (dialSnoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+}
+
+/** Whether the three-row context line draws these stats whole (it pixel-fits
+ * them to the whole line otherwise). */
+export function overviewStatsFit(statsText: string): boolean {
+	return estimateFooterWidth(statsText) <= WIDE.lineRight - WIDE.lineLeft;
 }
 
 /** The context line: the name yields into the remainder at 13 px, dropping
@@ -254,8 +302,8 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 	const g = WIDE_GEO[opts.header === "bottom" ? "bottom" : "top"];
 	const separators = opts.separators !== false;
 	const rows = opts.rows.slice(0, 3).map((row) => {
-		const valueText = truncateLabel(row.valueText, ROW_VALUE_MAX);
-		return { ...row, valueText, unitText: cappedUnit(row.unitText, WIDE_UNIT_MAX) };
+		const shown = rowShownOf(row);
+		return { ...row, valueText: truncateLabel(shown.valueText, ROW_VALUE_MAX), unitText: cappedUnit(shown.unitText, WIDE_UNIT_MAX) };
 	});
 	const fit = wideValueFit(rows.map((row) => row.valueText));
 	// Both columns move together, so the value-to-unit gap never changes;
@@ -279,7 +327,8 @@ export function renderDialOverview(opts: DialOverviewOptions): string {
 	}
 	// An Outline face keeps the separators hairlines outside its halo group:
 	// a ring would turn each into a 3 px dark bar across the slot.
-	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), ...rules, HALO_GROUP, groove] : [...dialFaceOpen(background, palette), groove, ...rules];
+	const band = bandParts(opts.snoozeBand);
+	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), ...band, ...rules, HALO_GROUP, groove] : [...dialFaceOpen(background, palette), ...band, groove, ...rules];
 	// A face with no overflow rect prices glyphs its font lacks at their
 	// fallback width, so a cut run ends where it is drawn.
 	const seeThrough = traits.overflowRects ? undefined : SEE_THROUGH_FALLBACK_ADVANCE_12;
@@ -377,9 +426,18 @@ export interface TwoRowRow {
 	selected: boolean;
 	/** Fully resolved value color (alert tint applied by the caller). */
 	valueColor: string;
+	/** The reading has its own format: whole text, else the first of
+	 * fallback that fits, never cut. */
+	exact?: boolean;
+	/** With exact: measure.ts exactFallback for this value. */
+	fallback?: readonly Measurement[];
 	/** Recent native values; drawn as a sparkline when the label does not
 	 * need its second line and 2+ points exist. */
 	history?: readonly number[];
+	/** A Trend window for this row, asked at the trend's own width (known
+	 * only here). Drawn instead of `history`; undefined from it (the history
+	 * budget refused the window) falls back to `history`. */
+	timeline?: (widthPx: number) => HistoryView | undefined;
 }
 
 export interface DialTwoRowOptions {
@@ -393,6 +451,52 @@ export interface DialTwoRowOptions {
 	text?: TextColors;
 	/** What the dial draws behind its readout (issue #41); absent is Theme. */
 	background?: DialBackground;
+	/** The snoozed cue's color (dialSnoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+}
+
+/** Where a two-row row's trend starts: the label's left margin. */
+const TWO_ROW_TREND_X = 12;
+
+export interface TwoRowColumns {
+	/** Where every row's unit text starts. */
+	readonly unitX: number;
+	/** Where every row's value text ends (its end anchor). */
+	readonly valueEndX: number;
+	/** The value column's booked left edge: the widest visible value. */
+	readonly valueStartEst: number;
+	/** The box a row's trend fills when its label leaves the value line
+	 * free: from the label margin to 12 px short of the value column. */
+	readonly trend: { readonly x: number; readonly w: number };
+}
+
+/**
+ * The two-row view's shared table columns, like the three-row view's: the
+ * widest unit, then the widest value, place the anchors every row uses.
+ * The texts are the ones the face draws (value truncated, unit capped).
+ * Exported so the Trend window e2e can find a row's time axis on a face
+ * the built plugin sent.
+ */
+export function twoRowColumns(rows: readonly { readonly valueText: string; readonly unitText: string }[], overflowRects: boolean): TwoRowColumns {
+	const maxUnitW = Math.max(0, ...rows.map((row) => (row.unitText === "" ? 0 : isTahoma() ? Math.ceil(estimateKeyTextWidth(row.unitText, 13)) : Array.from(row.unitText).length * EST_UNIT_CHAR)));
+	const unitX = RIGHT_EDGE - maxUnitW;
+	const valueEndX = maxUnitW === 0 ? RIGHT_EDGE : unitX - VALUE_UNIT_GAP;
+	// Tahoma books measured bold widths (one digit of flicker damping on odd
+	// counts), so the second label line is sized to the room the value
+	// really leaves. A face with no overflow rect books at no less than the
+	// measured ink: Segoe UI's booking counts characters, which wide text
+	// values outrun.
+	const maxValueW = Math.max(
+		0,
+		...rows.map((row) => {
+			const size = twoRowValueFontSize(row.valueText);
+			return isTahoma()
+				? estimateKeyTextWidth(row.valueText, size, { fontWeight: 700 }) + (Array.from(row.valueText).length % 2 === 1 ? estimateKeyTextWidth("0", size, { fontWeight: 700 }) : 0)
+				: Math.max(Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[size], overflowRects ? 0 : estimateKeyTextWidth(row.valueText, size, { fontWeight: 700 }));
+		})
+	);
+	const valueStartEst = valueEndX - maxValueW;
+	return { unitX, valueEndX, valueStartEst, trend: { x: TWO_ROW_TREND_X, w: valueStartEst - TWO_ROW_TREND_X - 12 } };
 }
 
 /**
@@ -410,35 +514,19 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 	const structure = structureFill(background, palette);
 	const seeThrough = traits.overflowRects ? undefined : SEE_THROUGH_FALLBACK_ADVANCE_12;
 	const rows = opts.rows.slice(0, 2).map((row) => {
-		const valueText = truncateLabel(row.valueText, ROW_VALUE_MAX);
+		const shown = rowShownOf(row);
+		const valueText = truncateLabel(shown.valueText, ROW_VALUE_MAX);
 		return {
 			...row,
 			valueText,
-			unitText: cappedUnit(row.unitText, ROW_UNIT_MAX),
+			unitText: cappedUnit(shown.unitText, ROW_UNIT_MAX),
 			size: twoRowValueFontSize(valueText)
 		};
 	});
-	// Shared table columns, like the three-row view: widest unit, then the
-	// widest value, place the anchors every row uses.
-	const maxUnitW = Math.max(0, ...rows.map((row) => (row.unitText === "" ? 0 : isTahoma() ? Math.ceil(estimateKeyTextWidth(row.unitText, 13)) : Array.from(row.unitText).length * EST_UNIT_CHAR)));
-	const unitX = RIGHT_EDGE - maxUnitW;
-	const valueEndX = maxUnitW === 0 ? RIGHT_EDGE : unitX - VALUE_UNIT_GAP;
-	// Tahoma books measured bold widths (one digit of flicker damping on odd
-	// counts), so the second label line is sized to the room the value
-	// really leaves. A face with no overflow rect books at no less than the
-	// measured ink: Segoe UI's booking counts characters, which wide text
-	// values outrun.
-	const maxValueW = Math.max(
-		0,
-		...rows.map((row) =>
-			isTahoma()
-				? estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }) + (Array.from(row.valueText).length % 2 === 1 ? estimateKeyTextWidth("0", row.size, { fontWeight: 700 }) : 0)
-				: Math.max(Math.ceil(Array.from(row.valueText).length / 2) * 2 * EST_TWO_ROW_VALUE[row.size], traits.overflowRects ? 0 : estimateKeyTextWidth(row.valueText, row.size, { fontWeight: 700 }))
-		)
-	);
-	const valueStartEst = valueEndX - maxValueW;
+	const { unitX, valueEndX, valueStartEst, trend } = twoRowColumns(rows, traits.overflowRects);
 	const line2Max = Math.max(ROW_LABEL_MIN, Math.floor((valueStartEst - 20) / EST_LABEL_CHAR));
-	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), HALO_GROUP] : dialFaceOpen(background, palette);
+	const band = bandParts(opts.snoozeBand);
+	const parts: string[] = traits.halo ? [...dialFaceOpen(background, palette), ...band, HALO_GROUP] : [...dialFaceOpen(background, palette), ...band];
 	rows.forEach((row, i) => {
 		const top = TWO_ROW.tops[i] as number;
 		const rowBg = row.selected ? palette.track : palette.bg;
@@ -485,18 +573,26 @@ export function renderDialTwoRow(opts: DialTwoRowOptions): string {
 					`<text x="12" y="${top + TWO_ROW.valueBaseline}" text-anchor="start" font-family="${fontFamily()}" font-size="13" font-weight="600" fill="${labelColor}">${escapeXml(line2)}</text>`
 				);
 			}
-		} else if (row.history !== undefined) {
-			// The freed line hosts the trend: self-normalized over its own
-			// samples, drawn only when it has real width and 2+ points. It ends
-			// 8 px before the value's window by construction.
-			const sparkW = valueStartEst - 12 - 12;
-			const samples = row.history.slice(-HISTORY_LENGTH);
-			const points = sparkW >= TWO_ROW_SPARK.minW ? sparklinePoints(samples, 12, top + TWO_ROW_SPARK.y, sparkW, TWO_ROW_SPARK.h) : [];
-			if (points.length > 0) {
-				// An Outline face draws the line and its end dot without the
-				// shaded area, which would be a dark wedge over the picture.
-				const spark = sparklineSvg(points, top + TWO_ROW_SPARK.y + TWO_ROW_SPARK.h, 3, 3.5, palette, structure);
-				parts.push(...(traits.underFill ? spark : spark.slice(1)));
+		} else if (row.timeline !== undefined || row.history !== undefined) {
+			// The freed line hosts the trend, drawn only when it has real
+			// width. It ends 8 px before the value's window by construction.
+			const sparkW = trend.w;
+			const view = row.timeline !== undefined && sparkW >= TWO_ROW_SPARK.minW ? row.timeline(Math.floor(sparkW)) : undefined;
+			if (view !== undefined) {
+				// A Trend window: the row's time axis over the same box. An
+				// Outline face draws no under-fill, as below.
+				parts.push(...timelineSvg(view, { x: trend.x, y: top + TWO_ROW_SPARK.y, w: sparkW, h: TWO_ROW_SPARK.h }, 3, 3.5, palette, traits.underFill ? structure : null));
+			} else if (row.history !== undefined) {
+				// Recent samples: self-normalized over its own samples, drawn
+				// only with 2+ points.
+				const samples = row.history.slice(-HISTORY_LENGTH);
+				const points = sparkW >= TWO_ROW_SPARK.minW ? sparklinePoints(samples, trend.x, top + TWO_ROW_SPARK.y, sparkW, TWO_ROW_SPARK.h) : [];
+				if (points.length > 0) {
+					// An Outline face draws the line and its end dot without the
+					// shaded area, which would be a dark wedge over the picture.
+					const spark = sparklineSvg(points, top + TWO_ROW_SPARK.y + TWO_ROW_SPARK.h, 3, 3.5, palette, structure);
+					parts.push(...(traits.underFill ? spark : spark.slice(1)));
+				}
 			}
 		}
 		if (traits.overflowRects) {
@@ -535,10 +631,25 @@ export interface DialRenderOptions {
 	/** Threshold zones on the bar track, colors resolved by the caller;
 	 * absent or empty keeps the established track+fill bar untouched. */
 	zones?: readonly DrawnZone[];
+	/** The whole track's color while alerting, when the bar's normal color
+	 * is too close to the alert fill for the fill alone to show the change
+	 * (alertTrackFill, Ember's accent). Drawn over the track and under the
+	 * zones and the fill; absent keeps the bar byte for byte. */
+	trackColor?: string;
 	/** Resolved textual fills; defaults to the palette's own text tokens. */
 	text?: TextColors;
 	/** What the dial draws behind its readout (issue #41); absent is Theme. */
 	background?: DialBackground;
+	/** The snoozed cue's color (dialSnoozeBandSvg); absent draws no band. */
+	snoozeBand?: string;
+	/** The reading has its own format: the value line draws whole
+	 * (exactDialValueFit), else the first of exactFallback that fits, never
+	 * cut and never with its unit past the slot edge. Absent keeps the
+	 * established fit byte for byte. */
+	exactValue?: boolean;
+	/** With exactValue: measure.ts exactFallback for this value, each unit
+	 * with the stat badge as unitText carries it. */
+	exactFallback?: readonly Measurement[];
 }
 
 /** One zone segment on the dial bar: squared mid-track, pill-rounded where
@@ -567,6 +678,29 @@ function tahomaDialValueFit(value: string, unit: string): { size: 34 | 24 | 17; 
 	return { size: 17, gap: unit === "" };
 }
 
+/**
+ * The single dial's value line for a reading with its own format: the
+ * char-count tier or a smaller one at which the whole line (value, gap,
+ * unit) inks inside the slot from x=12, the gap giving way before the size
+ * as above; on either face font, never cut. Null when even 17 px cannot
+ * hold it (the dial then draws the next of its texts, dialExactRung).
+ */
+export function exactDialValueFit(value: string, unit: string): { size: 34 | 24 | 17; gap: boolean } | null {
+	const tier = valueFontSize(value);
+	const line = (size: number, gap: boolean): TextRun[] => [{ text: value, fontSize: size, fontWeight: 700 }, ...(unit === "" ? [] : [{ text: (gap ? inlineGap(17) : "") + unit, fontSize: 17 }])];
+	for (const s of [34, 24, 17] as const) {
+		if (s > tier) continue;
+		if (dialLineFits(line(s, true), 12)) return { size: s, gap: true };
+		if (unit !== "" && dialLineFits(line(s, false), 12)) return { size: s, gap: false };
+	}
+	return null;
+}
+
+/** Which of a reading's texts the single dial draws (exactRung). */
+export function dialExactRung(rungs: ExactTexts): { rung: Measurement; index: number; fits: boolean } {
+	return exactRung(rungs, (r) => exactDialValueFit(r.valueText, r.unitText) !== null);
+}
+
 /** Segoe UI's stats line room, from x=12. Tahoma fits by ink to the slot
  * edge; Segoe UI has only its per-class footer estimate, which can price a
  * line about a pixel under its ink, so it keeps 4 px of margin
@@ -578,13 +712,20 @@ const SEGOE_STATS_LINE_BUDGET = 182;
  * cycle paused" and a long rate line keep every word. Only a line 11 px
  * cannot hold leaves off its quiet "session" tag, and only then is it cut.
  * A whole line keeps its own bytes. */
+function statsWholeSize(line: string): number {
+	if (isTahoma()) return dialLineFits([{ text: line, fontSize: 12 }], 12) ? 12 : dialLineFits([{ text: line, fontSize: 11 }], 12) ? 11 : 0;
+	const width = estimateFooterWidth(line);
+	return width <= SEGOE_STATS_LINE_BUDGET ? 12 : (width * 11) / 12 <= SEGOE_STATS_LINE_BUDGET ? 11 : 0;
+}
+
+/** Whether the single dial draws this stats line whole (at 12 or 11 px). */
+export function dialStatsLineFits(stats: string): boolean {
+	return statsWholeSize(stats.replace(/\s+/g, " ").trim()) !== 0;
+}
+
 function fitStatsLine(stats: string): FittedText {
 	const drawn = stats.replace(/\s+/g, " ").trim();
-	const wholeSize = (line: string): number => {
-		if (isTahoma()) return dialLineFits([{ text: line, fontSize: 12 }], 12) ? 12 : dialLineFits([{ text: line, fontSize: 11 }], 12) ? 11 : 0;
-		const width = estimateFooterWidth(line);
-		return width <= SEGOE_STATS_LINE_BUDGET ? 12 : (width * 11) / 12 <= SEGOE_STATS_LINE_BUDGET ? 11 : 0;
-	};
+	const wholeSize = statsWholeSize;
 	const size = wholeSize(drawn);
 	if (size !== 0) return { text: stats, fontSize: size };
 	const quiet = drawn.startsWith("▼") ? drawn.replace(/ session$/, "") : drawn;
@@ -616,9 +757,14 @@ export function renderDial(opts: DialRenderOptions): string {
 	const texts: string[] = [
 		`<text x="12" y="24" text-anchor="start" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${text.label}">${escapeXml(isTahoma() ? fitDialLine(opts.title, 12, 18) : truncateLabel(opts.title, TITLE_MAX))}</text>`
 	];
-	const valueText = truncateLabel(opts.valueText, VALUE_MAX);
-	const valueFit = isTahoma() ? tahomaDialValueFit(valueText, opts.unitText) : { size: valueFontSize(valueText), gap: true };
-	const unit = opts.unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${valueFit.gap ? inlineGap(17) : ""}${escapeXml(opts.unitText)}</tspan>` : "";
+	// A reading with its own format: its exact text where it fits, else the
+	// next of its texts; the last draws by the dial's own fit.
+	const exact = opts.exactValue === true ? dialExactRung([{ valueText: opts.valueText, unitText: opts.unitText }, ...(opts.exactFallback ?? [])]) : null;
+	const unitText = exact?.rung.unitText ?? opts.unitText;
+	const valueText = exact !== null ? exact.rung.valueText : truncateLabel(opts.valueText, VALUE_MAX);
+	const exactFit = exact?.fits === true ? exactDialValueFit(valueText, unitText) : null;
+	const valueFit = exactFit ?? (isTahoma() ? tahomaDialValueFit(valueText, unitText) : { size: valueFontSize(valueText), gap: true });
+	const unit = unitText !== "" ? `<tspan font-size="17" font-weight="600" fill="${text.unit}">${valueFit.gap ? inlineGap(17) : ""}${escapeXml(unitText)}</tspan>` : "";
 	texts.push(`<text x="12" y="58" text-anchor="start"${unit === "" || !valueFit.gap ? "" : PRESERVE} font-family="${fontFamily()}" font-size="${valueFit.size}" font-weight="700" fill="${text.value}">${escapeXml(valueText)}${unit}</text>`);
 	if (opts.statsText !== "") {
 		const stats = fitStatsLine(opts.statsText);
@@ -640,6 +786,9 @@ export function renderDial(opts: DialRenderOptions): string {
 			bar.push(surround(haloRingColor(palette)));
 		}
 		bar.push(traits.backings ? surround(palette.track) : `<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" ${structureFill(background, palette)}/>`);
+		if (live && opts.trackColor !== undefined) {
+			bar.push(`<rect x="${BAR.x}" y="${BAR.y}" width="${BAR.w}" height="${BAR.h}" rx="${BAR.r}" fill="${opts.trackColor}"/>`);
+		}
 		for (const zone of opts.zones ?? []) {
 			bar.push(dialZoneSvg(zone));
 		}
@@ -651,7 +800,7 @@ export function renderDial(opts: DialRenderOptions): string {
 	if (traits.halo) {
 		// The bar first, outside the filter, then the text lines in the halo
 		// group: the filter's region is the text band only.
-		return [...dialFaceOpen(background, palette, SINGLE_HALO.top, SINGLE_HALO.height), ...bar, HALO_GROUP, ...texts, HALO_CLOSE].join("");
+		return [...dialFaceOpen(background, palette, SINGLE_HALO.top, SINGLE_HALO.height), ...bandParts(opts.snoozeBand), ...bar, HALO_GROUP, ...texts, HALO_CLOSE].join("");
 	}
-	return [...dialFaceOpen(background, palette), ...texts, ...bar, "</svg>"].join("");
+	return [...dialFaceOpen(background, palette), ...bandParts(opts.snoozeBand), ...texts, ...bar, "</svg>"].join("");
 }

@@ -1,6 +1,6 @@
 // Property-inspector settings-persistence regression (issue #5 revision
-// 2): drives the REAL sensor-reading panel — the shipped sensor-reading
-// .html, pi-common.js and the vendored sdpi-components — in headless
+// 2): drives the REAL sensor-reading panel (the shipped sensor-reading
+// .html, pi-common.js and the panel client, ui/pi-client.js) in headless
 // Chrome against a mock Stream Deck socket, and proves on the actual
 // setSettings traffic that
 //   1. merely opening the panel writes nothing,
@@ -184,7 +184,7 @@ const SEEDS = {
 };
 
 let mode = "back";
-/** The action the page served last registers as; getSettings replies carry it. */
+/** The action the page served last registers as; the replies and pushes sent to the page carry it. */
 let pageAction = "com.lawrensen.hwinfo.reading";
 const store = { settings: structuredClone(SEEDS.back) };
 const writes = []; // every setSettings payload, in arrival order
@@ -323,11 +323,8 @@ wss.on("connection", (ws) => {
 				piWs = ws;
 				break;
 			case "getSettings":
-				// device rides along like the real app sends it: the sdpi
-				// client's getSettings filters replies on action, context
-				// AND device, and a missing field hangs that promise. The
-				// action is the one the open page registered as (the dial
-				// page registers the encoder action), for the same reason.
+				// No panel sends getSettings (pi-client.js has none). A reply
+				// here is a read the Copy check below counts and refuses.
 				{
 					const reply = JSON.stringify({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
 					if (deferConfigReplies) configReplies.push(() => ws.send(reply));
@@ -693,6 +690,25 @@ try {
 	check("text color well driven", well.result?.value === "ok", String(well.result?.value));
 	await sleep(700);
 	assertPreserved("text color edit", mark, { textColor: "#ff8800" });
+
+	// The key's Background, then Words in the accent color, which shows only
+	// on a look that draws it (Glass, Tint, Outline).
+	mark = writes.length;
+	await setSelect("keyBackground", "outline");
+	await sleep(700);
+	assertPreserved("Background edit", mark, { keyBackground: "outline" });
+	mark = writes.length;
+	const accent = await evaluate(`(() => {
+		const el = document.getElementById("f-accent-words");
+		if (!el) return "missing";
+		if (document.getElementById("accent-words").hidden) return "hidden";
+		el.value = "on";
+		el.dispatchEvent(new Event("change", { bubbles: true }));
+		return "ok";
+	})()`);
+	check("accent words select shown on Outline and set to On", accent.result?.value === "ok", String(accent.result?.value));
+	await sleep(700);
+	assertPreserved("accent words edit", mark, { keyAccentWords: true });
 
 	mark = writes.length;
 	await setSelect("keyLayout", "dual");
@@ -2967,8 +2983,9 @@ try {
 	await sleep(350);
 	check("preview-only recovery refreshes its tree", treeRequests === recoveryRequests + 1, `${treeRequests - recoveryRequests} requests`);
 
-	// Settings loaded through the real sdpi store must not select inherited
-	// dictionary entries as palettes or leave the custom color seed broken.
+	// Settings loaded through the panel client's real store must not select
+	// inherited dictionary entries as palettes or leave the custom color seed
+	// broken.
 	store.settings = { ...store.settings, theme: "__proto__", textMode: "custom" };
 	toPi({ event: "didReceiveSettings", action: pageAction, context: `ctx-${mode}`, device: "dev1", payload: { settings: store.settings, coordinates: { column: 0, row: 0 } } });
 	sendGadgetPayload({ ...THEMES, effectiveDeckTheme: "constructor" });

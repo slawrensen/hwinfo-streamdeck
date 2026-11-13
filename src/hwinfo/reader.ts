@@ -51,6 +51,20 @@ function toSensorType(raw: number): SensorType {
 	return raw >= SensorType.None && raw <= SensorType.Other ? (raw as SensorType) : SensorType.Other;
 }
 
+/** The longest and shortest scan interval believed from a header. */
+const MIN_PRODUCER_PERIOD_MS = 100;
+const MAX_PRODUCER_PERIOD_MS = 3_600_000;
+/** The first byte past the scan interval field. */
+const POLLING_PERIOD_END = HEADER.pollingPeriod + 4;
+
+/** HWiNFO's scan interval, from a header whose sensor section starts past
+ * the field, when it is plausible. Never a reason to refuse a snapshot. */
+function producerPeriodOf(dv: DataView): number | undefined {
+	if (dv.byteLength < POLLING_PERIOD_END || dv.getUint32(HEADER.sensorSectionOffset, true) < POLLING_PERIOD_END) return undefined;
+	const ms = dv.getUint32(HEADER.pollingPeriod, true);
+	return ms >= MIN_PRODUCER_PERIOD_MS && ms <= MAX_PRODUCER_PERIOD_MS ? ms : undefined;
+}
+
 /** i64 pollTime as a plain number — avoids a BigInt allocation per tick. */
 function readPollTime(dv: DataView): number {
 	return dv.getInt32(HEADER.pollTime + 4, true) * 4294967296 + dv.getUint32(HEADER.pollTime, true);
@@ -72,6 +86,7 @@ interface MutableReading {
 
 interface MutableSnapshot {
 	pollTime: number;
+	producerPeriodMs?: number;
 	valueRevision: number;
 	freshnessRevision: number;
 	version: number;
@@ -245,6 +260,10 @@ export class SnapshotParser {
 			snap.valueRevision++;
 		}
 		if (evidenceChanged) snap.freshnessRevision++;
+		// Not a value: a changed scan interval moves no revision.
+		const producerPeriodMs = producerPeriodOf(dv);
+		if (producerPeriodMs === undefined) delete snap.producerPeriodMs;
+		else snap.producerPeriodMs = producerPeriodMs;
 		return true;
 	}
 
@@ -367,7 +386,8 @@ export class SnapshotParser {
 			return old !== undefined && old.type === reading.type && old.unit === reading.unit && Number.isFinite(old.value) && Number.isFinite(reading.value) && !Object.is(old.value, reading.value);
 		});
 		this.extent = extent;
-		this.snapshot = { pollTime, valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
+		const producerPeriodMs = producerPeriodOf(dv);
+		this.snapshot = { pollTime, ...(producerPeriodMs === undefined ? {} : { producerPeriodMs }), valueRevision: (previous?.valueRevision ?? 0) + 1, freshnessRevision: (previous?.freshnessRevision ?? 0) + (evidenceChanged ? 1 : 0), version, revision, sensors, readings, byKey };
 		return this.snapshot;
 	}
 }

@@ -60,6 +60,20 @@ async function scenario(name) {
 		deliverAs("the-read", NEWER);
 		return { read: await read };
 	}
+	if (name === "plugin write") {
+		// The link and calculation editors write through writeGlobalSettings:
+		// the document goes out once, becomes the newest known document and
+		// is applied through the written listeners, with no echo needed.
+		const globalSettings = await import(new URL("../src/global-settings.ts", import.meta.url));
+		const applied = [];
+		globalSettings.onGlobalSettingsWritten((doc) => applied.push(doc));
+		deliver(OLD);
+		await settle();
+		const before = globalSettings.latestGlobalSettings();
+		const written = { ...OLD, readingLinks: [{ row: 1 }] };
+		await globalSettings.writeGlobalSettings(written);
+		return { before, after: globalSettings.latestGlobalSettings(), applied, writes: sent.filter((m) => m.event === "setGlobalSettings").map((m) => m.payload) };
+	}
 	themes.decideLegacyDefault(true);
 	if (name === "migration, newer document behind the reply") deliver(OLD, NEWER);
 	if (name === "migration, newer theme behind the reply") deliver(OLD, { ...NEWER, theme: "ember" });
@@ -92,26 +106,37 @@ if (process.env.GLOBAL_SETTINGS_SCENARIO !== undefined) {
 	// plugin.ts is the entry and cannot be imported: its startup read must
 	// not apply the reply again after the listener did, which put an older
 	// document back when a newer one followed it (review of d15). Every call
-	// that applies global settings sits inside the delivery listener.
+	// that applies global settings sits inside applyGlobals, and applyGlobals
+	// runs only from the delivery listener and for a document the plugin
+	// wrote itself (the app does not echo a plugin's own write).
 	test("plugin.ts applies global settings only in its delivery listener", async () => {
 		const { default: ts } = await import("typescript");
 		const source = readFileSync(new URL("../src/plugin.ts", import.meta.url), "utf8");
 		const tree = ts.createSourceFile("plugin.ts", source, ts.ScriptTarget.Latest, true);
-		const APPLY = /^(?:poller\.(?:setReadingLinks|setIntervalMs|setSourceMode)|applyGlobalThemeSettings)$/;
-		const inListener = (node) => {
-			for (let n = node.parent; n !== undefined; n = n.parent) {
-				if (ts.isCallExpression(n) && n.expression.getText(tree) === "streamDeck.settings.onDidReceiveGlobalSettings") return true;
-			}
+		const APPLY = /^(?:poller\.(?:setReadingLinks|setCalculatedReadings|setIntervalMs|setSourceMode)|applyGlobalThemeSettings)$/;
+		const LISTENERS = new Set(["streamDeck.settings.onDidReceiveGlobalSettings", "onGlobalSettingsWritten"]);
+		const enclosedBy = (node, test) => {
+			for (let n = node.parent; n !== undefined; n = n.parent) if (test(n)) return true;
 			return false;
 		};
+		const inApplier = (node) => enclosedBy(node, (n) => ts.isVariableDeclaration(n) && n.name.getText(tree) === "applyGlobals");
+		const inListener = (node) => enclosedBy(node, (n) => ts.isCallExpression(n) && LISTENERS.has(n.expression.getText(tree)));
 		const calls = [];
+		const appliers = [];
 		const visit = (node) => {
-			if (ts.isCallExpression(node) && APPLY.test(node.expression.getText(tree))) calls.push({ call: node.expression.getText(tree), inListener: inListener(node), line: tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1 });
+			if (ts.isCallExpression(node)) {
+				const callee = node.expression.getText(tree);
+				const line = tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1;
+				if (APPLY.test(callee)) calls.push({ call: callee, inApplier: inApplier(node), line });
+				if (callee === "applyGlobals") appliers.push({ inListener: inListener(node), line });
+			}
 			ts.forEachChild(node, visit);
 		};
 		visit(tree);
-		assert.equal(calls.length, 4, JSON.stringify(calls));
-		assert.deepEqual(calls.filter((c) => !c.inListener), []);
+		assert.equal(calls.length, 5, JSON.stringify(calls));
+		assert.deepEqual(calls.filter((c) => !c.inApplier), []);
+		assert.equal(appliers.length, 2, JSON.stringify(appliers));
+		assert.deepEqual(appliers.filter((c) => !c.inListener), []);
 		assert.match(source, /const globals = await readGlobalSettings<GlobalSettings>\(\);/);
 	});
 
@@ -124,6 +149,15 @@ if (process.env.GLOBAL_SETTINGS_SCENARIO !== undefined) {
 		const { writes, theme } = run("migration, newer theme behind the reply");
 		assert.deepEqual(writes, []);
 		assert.equal(theme, "ember");
+	});
+
+	test("a document the plugin writes itself is sent once, then adopted and applied without an echo", () => {
+		const { before, after, applied, writes } = run("plugin write");
+		const written = { pollIntervalMs: "1000", future: { keep: "old" }, readingLinks: [{ row: 1 }] };
+		assert.deepEqual(before, { pollIntervalMs: "1000", future: { keep: "old" } });
+		assert.deepEqual(writes, [written]);
+		assert.deepEqual(after, written);
+		assert.deepEqual(applied, [written]);
 	});
 
 	test("with one reply, the migration still persists onto it", () => {

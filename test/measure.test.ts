@@ -175,8 +175,32 @@ describe("formatMeasurement: byte quantities", () => {
 	it("binary tiers by 1024 through TiB", () => {
 		assert.deepEqual(formatMeasurement(512, "B", BIN), { valueText: "512", unitText: "B" });
 		assert.deepEqual(formatMeasurement(8192, "MiB", BIN), { valueText: "8.00", unitText: "GiB" });
-		// 8192 MB = 8.192e9 B = 7.63 GiB: the label conversion is real.
-		assert.deepEqual(formatMeasurement(8192, "MB", BIN), { valueText: "7.63", unitText: "GiB" });
+	});
+
+	it("binary reads HWiNFO's KB, MB, GB and TB as 1024-based (issue #59)", () => {
+		// HWiNFO counts its own MB in steps of 1024 (16,303 MB of a 16 GiB
+		// card is nvidia-smi's 16,303 MiB), so Binary prints the true GiB:
+		// 8192 MB is 8.00 GiB, not 7.63, and 12,100 MB is 11.82 GiB, not 11.27.
+		assert.deepEqual(formatMeasurement(8192, "MB", BIN), { valueText: "8.00", unitText: "GiB" });
+		assert.deepEqual(formatMeasurement(12_100, "MB", BIN), { valueText: "11.8", unitText: "GiB" });
+		assert.deepEqual(formatMeasurement(12_100, "MB", { ...BIN, decimals: "2" }), { valueText: "11.82", unitText: "GiB" });
+		assert.deepEqual(formatMeasurement(16_303, "MB", { ...BIN, decimals: "2" }), { valueText: "15.92", unitText: "GiB" });
+		assert.deepEqual(formatMeasurement(453, "MB", BIN), { valueText: "453", unitText: "MiB" });
+		assert.deepEqual(formatMeasurement(1024, "KB", BIN), { valueText: "1.00", unitText: "MiB" });
+		assert.deepEqual(formatMeasurement(1536, "kB", BIN), { valueText: "1.50", unitText: "MiB" });
+		assert.deepEqual(formatMeasurement(2, "GB", BIN), { valueText: "2.00", unitText: "GiB" });
+		assert.deepEqual(formatMeasurement(1.5, "TB", BIN), { valueText: "1.50", unitText: "TiB" });
+		assert.deepEqual(formatQuadMeasurement(12_100, "MB", BIN), { valueText: "11.8", unitText: "GiB" });
+		assert.equal(formatStat(12_100, "MB", { ...BIN, decimals: "2" }), "11.82GiB");
+		// Decimal is HWiNFO's number rescaled by 1000, byte for byte as before.
+		assert.deepEqual(formatMeasurement(12_100, "MB", { ...DEC, decimals: "2" }), { valueText: "12.10", unitText: "GB" });
+		assert.deepEqual(formatMeasurement(8192, "MB", DEC), { valueText: "8.19", unitText: "GB" });
+	});
+
+	it("binary keeps today's basis for transfer rates (not verified against HWiNFO)", () => {
+		assert.deepEqual(formatMeasurement(1.5, "MB/s", BIN), { valueText: "1.43", unitText: "MiB/s" });
+		assert.deepEqual(formatMeasurement(2048, "KB/s", BIN), { valueText: "1.95", unitText: "MiB/s" });
+		assert.deepEqual(formatMeasurement(100, "Mbps", BIN), { valueText: "11.9", unitText: "MiB/s" });
 	});
 
 	it("already-prefixed units round-trip without double scaling", () => {
@@ -243,8 +267,19 @@ describe("formatMeasurement: passthrough and edge cases", () => {
 		assert.deepEqual(formatMeasurement(Number.NaN, "W", DEC), { valueText: "—", unitText: "W" });
 	});
 
+	it("zero bytes in Auto read 0 B, not 0.00 B (issue #59)", () => {
+		for (const opts of [DEC, BIN]) {
+			assert.deepEqual(formatMeasurement(0, "MB", opts), { valueText: "0", unitText: "B" });
+			assert.deepEqual(formatMeasurement(-0, "GB", opts), { valueText: "0", unitText: "B" });
+			assert.deepEqual(formatQuadMeasurement(0, "MB", opts), { valueText: "0", unitText: "B" });
+			assert.equal(formatStat(0, "KB", opts), "0B");
+		}
+		// Fixed decimals keep their places; rates keep their text.
+		assert.deepEqual(formatMeasurement(0, "MB", { ...DEC, decimals: "2" }), { valueText: "0.00", unitText: "B" });
+		assert.deepEqual(formatMeasurement(0, "MB/s", DEC), { valueText: "0.00", unitText: "bps" });
+	});
+
 	it("zero and negatives tier at base without a stray sign", () => {
-		assert.deepEqual(formatMeasurement(0, "MB", DEC), { valueText: "0.00", unitText: "B" });
 		assert.deepEqual(formatMeasurement(-1500, "MB", DEC), { valueText: "-1.50", unitText: "GB" });
 	});
 });

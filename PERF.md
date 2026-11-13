@@ -27,6 +27,557 @@ zero orphan processes after the full suite.
 
 ## Entries
 
+### 2026-11-12: an app restart, an HWiNFO restart and a sleep on the 1.8 plugin
+
+The soak below held none of the three events the release runbook asks
+for, so I ran them on the same plugin bytes the next day, sampled by
+`scripts/soak-monitor.mjs`; `native/hwsm/TESTING.md` rows 11 to 13 have
+the times. After the Stream Deck app restart, a new plugin process
+opened HWiNFO's shared memory 19 s after the app started. After the
+HWiNFO restart, the plugin logged one WARN while HWiNFO was down and
+reopened 13 s after it came back. Through an S3 sleep of 2 minutes the
+plugin process stayed the same, both decks reconnected and the + XL's
+dials were restored, with nothing at WARN or ERROR until I restarted
+HWiNFO about 6 minutes after the wake. That restart was needed because
+HWiNFO's readings from my USB-attached PSU had stopped changing after
+the sleep; it and one more by my HWiNFO launcher, after it reset the
+PSU's USB link, went the same way for the plugin (one WARN each,
+reopened 6 and 8 s after HWiNFO came back). No ERROR line in any of it.
+
+### 2026-11-11: a 48 hour soak of the 1.8 plugin on the deck
+
+**Soak.** The 1.8 candidate's plugin (`bin/plugin.js` `72ddfa37…`, with
+its `manifest.json` and `en.json`) with live HWiNFO, my Stream Deck + XL
+and a 15-key Stream Deck connected (and three Virtual Stream Decks),
+sampled every 60 s by `scripts/soak-monitor.mjs`, 2026-11-09 23:03 to
+2026-11-11 23:04 local:
+
+| Soak | Value |
+| --- | ---: |
+| Window | 48.0 h, 2,884 samples, none more than 61 s apart |
+| Plugin restarts / Stream Deck app restarts | 0 / 0 |
+| New log WARN / ERROR lines | 0 / 0 |
+| Samples without HWiNFO running | 0 |
+| RSS slope | -0.19 MB/30 min |
+| Private bytes slope | +0.02 MB/30 min |
+| Private bytes, hourly means (hours from the first sample) | 64.7 to 68.0 MB |
+| Handles / threads | 184 to 185 / 12 |
+| Avg CPU | 0.22% |
+
+One plugin process ran the whole window, and so did one Stream Deck app
+and one HWiNFO (running since 2026-11-06). The plugin's private bytes held
+64.7 to 67.4 MB in hourly means on the first day and 66.7 to 68.0 MB on
+the second, against 64 to 67 MB in the quiet 7.2 hour run of the
+2026-10-27 entry. Both physical decks reconnected twice, at 23:38 on
+2026-11-10 and 08:16 on 2026-11-11; each time the plugin logged "Restored
+6 dials after their deck reconnected" and went on. Five times HWiNFO's
+mutex stayed busy through the plugin's retries, and each time the plugin
+skipped at least one read (logged once per busy run, at INFO).
+
+The plugin's files did not change during the window. The settings panels
+did: I put three panel builds on the deck in it without restarting the
+plugin (a panel's files load when it opens), so the candidate's own
+panels ran only its last 7.5 hours. The app's saved profiles hold 1,584
+Sensor Reading keys, 172 Sensor Dials, 167 detail slots and 7 HWiNFO
+Control keys; which pages the decks showed, and when, is not recorded.
+The PC did not sleep. In ten single minutes the monitor saw a second
+process running a `bin/plugin.js`; each fell within two minutes of one of
+my panel capture runs, whose harness (`scripts/pi-harness.mjs`) starts its
+own copy, and the monitor kept to the one plugin process.
+
+### 2026-11-08: the settings panels drop the vendored component library
+
+The 2026-07-04 footprint entry ruled `ui/sdpi-components.js` (55,823 B)
+a keep. Then each sensor panel drew 28 sdpi elements (v1.1.0). Since
+1.7.0 (11b9645b) the panels are native controls and draw none: they call
+only the library's socket client and its two settings stores. I ported
+those to `ui/pi-client.js` (6,867 B) from sdpi-components v4.0.1, and
+the vendored file leaves the pack with the Lit 2.4 it bundles. This
+supersedes that ruling and the "sdpi-components keep" in the DONE entry;
+both stay below as history.
+
+| Measure | ui/sdpi-components.js | ui/pi-client.js |
+| --- | ---: | ---: |
+| Bytes (gzip -9) | 55,823 (16,925) | 6,867 (2,500) |
+| V8 compile, node 24.16.0 `vm.Script`, median of 380 | 0.79 ms | 0.09 ms |
+
+Each compile pass ran on a fresh source string, so V8's cache never
+served one. The library's run at load (Lit and its element definitions)
+is not in these numbers.
+
+| Panel scripts, the client swap alone | Before | After |
+| --- | ---: | ---: |
+| Sensor Dial | 889,390 B | 840,230 B |
+| Sensor Reading (key) | 618,052 B | 568,892 B |
+| HWiNFO Control | 212,595 B | 163,435 B (23% less) |
+
+The detail tile page never loaded the library. The port keeps the
+library's order and names: `SDPIComponents`, the settings channel first,
+at most one shared-settings read per panel (the Control panel makes
+none), and every save through the client's
+own setSettings or setGlobalSettings, so the shell still counts it. A
+one-off harness drove both clients through the same fake socket and
+found every frame, dispatch and save the same. Every e2e:pi suite passes
+on the port.
+
+### 2026-10-27: the 1.8 soak on the deck, and what a strip graph screen cost in memory
+
+**Soak.** The 1.8 candidate (`bin/plugin.js` `0a5d794a…`) on my + XL
+with live HWiNFO, sampled every 60 s by `scripts/soak-monitor.mjs`,
+2026-10-26 21:17 to 2026-10-27 10:18 local:
+
+| Soak | Value |
+| --- | ---: |
+| Window | 13.0 h, 782 samples |
+| New log WARN / ERROR lines | 0 / 0 |
+| Handles | 175 to 175 (max 175) |
+| Longest same-PID run | 7.2 h, 431 samples |
+| RSS slope, that run | -0.21 MB/30 min |
+| Private bytes slope, that run | +0.20 MB/30 min |
+| Avg CPU, that run | 0.12% |
+| Stream Deck app restarts / plugin restarts | 5 / 5 |
+
+The app restarted 5 times in the window, 4 of them overnight with no one
+at the desk. Windows logged no crash for it, and nothing in my scripts
+stops the app. The plugin started again with the app each time. The
+quiet 7.2 hour run held 64 to 67 MB private bytes in hourly means.
+
+One run did not stay flat. From 21:58 it held 65 to 71 MB private bytes
+until 00:10, then rose to 78, 85 and 100 MB and held 102 to 105 MB until
+the app restart at 00:51 ended it. Handles (175) and threads (12) stayed
+flat. The rise falls in a window of work in the strip panel on the deck;
+I did not record which screen the strip showed.
+
+**Cause: a strip graph screen, through V8's young generation.** Under a
+mock Stream Deck app (headless, the plugin's own process), a
+strip showing a Group, Fleet or Ambient graph (Every temperature,
+Cooling, Core clocks; the Fleet look left the strip before 1.8) held 95
+to 104 MB private bytes against about 60 MB for a Trend strip. The heap after a full collection stayed at 11
+to 12 MB in every run, so nothing was retained: as in the entry below,
+V8 grew the new space to 32 MB while allocation stayed over about
+1 MB/s. Two causes in the strip code:
+
+- A strip that held the widest slice width built its scene three times
+  a frame, starting its ladder from the finest width each time. Fixed in
+  `bf65d7a`: between probes (every 15 frames, and whenever the strip's
+  settings or screen change) the ladder starts at the width it holds.
+  `test/strip-slice-ladder.test.ts`.
+- One rule-screen frame allocated 1.9 to 5.9 MB: arrays and copies per
+  bucket, per cell and per path step. Fixed in lane34 (`1fd9888` to
+  `af4916f`): bins, heat cells, trails and points sit in typed arrays a
+  build reuses, path data goes through one reused byte buffer, and the
+  scratch gives back every 30 builds what those builds did not use. The
+  slices are the same bytes: 12,009 frames and 62,317 slices against the
+  old code, and two more corpora of about 10,400 frames each from
+  different seeds, 0 differing on Node 24 and Node 20.
+  `test/strip-frame-scratch.test.ts` pins a digest of 514 frames,
+  `test/strip-frame-garbage.test.ts` fails if any view a person can
+  pick allocates more than 0.2 MB a frame over what it does now, and
+  `test/strip-scratch-giveback.test.ts` checks the scratch gives back
+  what the rule screens grew.
+
+Bytes allocated per frame, median of 3 after 50 warm-up frames, Node 20,
+at the readings a pane draws (`cff212c` / after):
+
+| Strip | MB a frame |
+| --- | ---: |
+| Group rows, 32 readings | 1.89 / 0.35 |
+| Group Now, 32 | 3.49 / 0.46 |
+| Group Spread, 32 | 5.87 / 0.57 |
+| Group lines, 8, Theme | 2.15 / 0.94 |
+| Ambient, 48 | 2.25 / 0.41 |
+| Trend, 1 reading | 0.78 / 0.44 |
+
+The plugin with the Every temperature strip on view, 12 minutes each,
+before then after, minutes 5 to 12:
+
+| | `cff212c` | after |
+| --- | ---: | ---: |
+| Private MB, last 5 min | 98.7 | 71.3 |
+| New space, max | 32 MB | 8 MB |
+| Allocation | 1.80 MB/s | 1.00 MB/s |
+| CPU | 0.178 s/min | 0.288 s/min |
+| Scavenges / major collections, whole run | 271 / 6 | 693 / 18 |
+
+The trade is CPU: about 0.11 s a minute more on this screen (0.30% to
+0.48% of one core) for about 27 MB less. The smaller young generation is
+collected more often. V8's own collection phases account for about a
+quarter of the rise (0.004 to 0.030 s/min); I did not pin down the rest.
+In a separate set of four runs at once, 16 minutes each, the same code
+made to allocate 0.58 MB a frame more put the new space back at 32 MB
+and private bytes at 94 to 101 MB, and used 0.08 s/min against 0.27 for
+the plain code, so the cost follows the young generation, not the
+drawing. Frame CPU went down in every case measured (median of 300
+frames; Ambient at 48, for example, 0.47 to 0.32 ms on Node 20).
+
+**Open.**
+
+- The soak above ran the bytes before these fixes. A soak of the final
+  1.8 bytes on the deck is owed. Update: the 2026-11-11 entry soaks the
+  1.8 candidate's plugin for 48 hours; which strip screens showed is not
+  recorded.
+- Every temperature allocates 0.87 to 0.91 MB/s after the fix, close to
+  the rate at which V8 stops shrinking the new space. Data with a gap
+  every 3 columns still allocates 3.4 to 4.9 MB a frame.
+
+### 2026-10-25: memory follow-up, Trend windows and the live sweep
+
+Two figures from the entry below: a full 15 minute Trend window deck held
+about 44 MB more private bytes than the same deck without windows and
+allocated 9.3 MB/s, although the history store is capped at 2 MiB; and
+on live HWiNFO the 555-key sweep held 105.2 MB in 1.8 against 68.6 MB in
+1.7.1 while the synthetic sweep showed no gap.
+
+**Cause, both cases: V8's young generation, not retained data.**
+
+- Heap snapshots (`v8.writeHeapSnapshot` from a preload in the plugin
+  under the harness) put the live heap at 15.5 MB on the 5 minute Trend
+  deck at 6 minutes, and 14.5 MB (1.7.1) against 16.5 MB (1.8) on the live
+  sweep. The 2 MB difference is mostly code and strings.
+- The difference is committed young-generation space.
+  `v8.getHeapSpaceStatistics()` sampled every 5 s showed the new space
+  stepping 8, 16, then 32 MB during the 5 minute Trend warm-up, and
+  reaching 64 MB on the live sweep in 1.8 within 90 s while 1.7.1 sat at
+  32 MB. In these runs V8 grew the space as allocation stayed high and only
+  shrank it while allocation stayed near or under 1 MB/s, so private bytes
+  follow allocation and run length.
+- The synthetic sweep allocates 8.6 to 10.2 MB/s in every build, so all
+  of them reach the same 64 MB within the window. That is why it showed
+  no gap.
+- A live sweep held for 10 minutes before measuring puts every build at
+  the same level (table below): 169.4 MB for 1.7.1, 176.5 MB for 1.8
+  before the fix, 171.7 MB after. The 1.7.1 / 1.8 gap at 90 s was 1.8
+  getting there sooner.
+
+**Where the allocation came from.** A sampling heap profile counting
+collected objects too (inspector `HeapProfiler.startSampling`, 1 KB
+interval, 30 s, after warm-up) attributes:
+
+- 5 minute Trend deck, 9.4 MB/s in total: 7.5 MB/s to the Trend drawing
+  (`timelineSvg` 4.1, its path writer 3.4). Measured alone, one key face
+  cost 192 KB (5 minutes) and 230 KB (15 minutes): a tuple per point, a
+  rest copy and a string per path step. View building was 0.36 MB/s.
+- Live sweep, 6.5 MB/s against 4.8 MB/s for 1.7.1:
+  - the key alert tick, 0.72 MB/s: a copy of every tracked key plus fresh
+    arrays and views per key every tick, for keys with no limits;
+  - the Tahoma lens label fit, 0.98 MB/s against 0.73 for 1.7.1's;
+  - the contrast search for lifted colors.
+
+**Fixes** (lane4/memory):
+
+- `89b5296` The Trend drawing keeps points in reused float64 arrays and
+  writes path data into one reused byte buffer. About 4 KB per key face.
+  The bytes drawn are the same: 86,400 randomized drawings compared
+  byte for byte against the old code, and a digest test in
+  `test/history-payload.test.ts`.
+- `683f4b8` A view copies its columns out at their count into one
+  buffer, and the store hands back the frozen view it last built from a
+  ring while the series revision, width, instant and linked keys are the
+  same (a dial repaints every tick while the data holds still).
+  `f3e24b0` took that reuse out on a suspicion that kept views were being
+  promoted; the rerun below disproved it and `bfea79b` reverted it, so
+  the code measured as "after" is the code on the branch.
+- `5a0309e` A key without limits and without alert state steps without
+  building anything; the tick walks the map in place.
+- `6e4502e` The fitted lens label (per face font) and lifted colors are
+  remembered in bounded memos.
+
+**Method.** `npm run perf:plugin`, harness hash `17419ba0…` (this tree's
+harness, so these runs do not merge with the entry below). Subjects:
+1.7.1 is the release pack `f6f5c28d…` (`bin/plugin.js` `8fa6fdfc…`);
+"before" is the integration tree at `952a926`, `bin/plugin.js`
+`f09b076f…`; "after" is `6e4502e`, `cfce3899…`. Three subjects in the
+order A B C C B A, a fresh plugin process per run, warm-up as in the
+entry below; trend-15m ran as three invocations (A B, C A, B C) pooled.
+Same bench, 2026-10-25 04:31 to 08:15 local, other lanes building and
+testing meanwhile. Medians, 1.7.1 / before / after:
+
+| Workload | Runs | CPU % | Private MB | Alloc MB/s | GC ms/s | Image B/s | Feedback B/s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| trend-none | 2+2+2 | 0.286 / 0.329 / 0.319 | 40.2 / 42.9 / 44.8 | 1.54 / 1.73 / 1.50 | 0.11 / 0.15 / 0.17 | 56,516 / 56,521 / 56,512 | 29,454 / 29,456 / 29,452 |
+| trend-1m | 2+2+2 | 0.274 / 0.370 / 0.454 | 40.8 / 51.7 / 51.3 | 1.52 / 3.85 / 1.08 | 0.11 / 0.11 / 0.79 | 56,509 / 39,614 / 39,613 | 29,450 / 23,014 / 23,001 |
+| trend-5m | 2+2+2 | 0.250 / 0.552 / 0.341 | 48.5 / 75.7 / 55.2 | 1.44 / 9.27 / 1.25 | 0.03 / 0.16 / 0.07 | 55,889 / 82,491 / 82,494 | 29,127 / 35,397 / 35,380 |
+| trend-15m | 2+2+2 | 0.233 / 0.449 / 0.347 | 67.0 / 110.5 / 64.3 | 1.42 / 9.37 / 1.25 | 0.03 / 0.08 / 0.03 | 55,877 / 85,344 / 85,360 | 29,121 / 36,910 / 36,909 |
+| sweep | 2+2+2 | 0.940 / 1.001 / 1.024 | 100.0 / 102.4 / 100.9 | 8.64 / 10.17 / 8.96 | 0.12 / 0.11 / 0.15 | 636,418 / 636,411 / 636,383 | 7,822 / 7,821 / 7,821 |
+| deck | 2+2+2 | 0.236 / 0.315 / 0.270 | 32.1 / 41.1 / 35.0 | 0.70 / 0.94 / 0.86 | 0.13 / 0.44 / 0.22 | 18,722 / 18,722 / 18,721 | 7,821 / 7,821 / 7,821 |
+| live sweep | 2+2+2 | 0.663 / 0.870 / 0.671 | 68.7 / 108.0 / 70.8 | 5.01 / 6.84 / 4.71 | 0.11 / 0.21 / 0.09 | 275,688 / 272,601 / 264,608 | 2,326 / 2,346 / 2,119 |
+| live deck | 2+2+2 | 0.208 / 0.287 / 0.250 | 33.9 / 40.4 / 37.8 | 0.48 / 0.88 / 0.80 | 0.16 / 0.40 / 0.25 | 17,938 / 17,641 / 17,595 | 2,159 / 2,280 / 2,089 |
+| live sweep, 600 s warm-up | 1+1+1 | 0.480 / 0.569 / 0.415 | 169.4 / 176.5 / 171.7 | 4.57 / 6.10 / 4.39 | 0.02 / 0.06 / 0.02 | 244,542 / 241,511 / 232,365 | 2,688 / 2,505 / 2,478 |
+
+A rerun of trend-none and trend-1m (08:35 to 08:57, same order, "after"
+replaced by `f3e24b0` without the view reuse, `bin/plugin.js`
+`499f0868…`) gave trend-1m 0.279 / 0.356 / 0.395% CPU, 41.0 / 50.8 /
+50.0 MB private, 1.52 / 3.85 / 1.03 MB/s and 0.13 / 0.10 / 0.70 ms/s GC
+(45 and 52 collections per run against 21 and 22), and trend-none
+40.5 / 42.1 / 44.9 MB.
+
+What the numbers say:
+
+- **Trend windows.** At 5 and 15 minutes, allocation drops from 9.3 to
+  1.25 MB/s, under 1.7.1's 1.42 to 1.44 on the same documents, and CPU
+  from 0.449 to 0.347% (15 minutes) and 0.552 to 0.341% (5 minutes).
+  Private bytes at 15 minutes go from 110.5 to 64.3 MB (1.7.1: 67.0; the
+  two "after" runs held 58.1 and 70.5). At 5 minutes 75.7 to 55.2 MB
+  (1.7.1: 48.5). The faces are the same bytes:
+  image and feedback bytes per second match "before" within 0.02%.
+- **Live sweep.** 108.0 to 70.8 MB private at 90 s (1.7.1: 68.7),
+  allocation 6.84 to 4.71 MB/s (1.7.1: 5.01), CPU 0.870 to 0.671%. Held
+  10 minutes, all three builds sit at 169 to 177 MB. That level is V8
+  sizing for a 555-key deck, and 1.7.1 reaches it too.
+- **Deck.** The 42-context deck drops from 41.1 to 35.0 MB (1.7.1: 32.1)
+  and its GC pause from 0.44 to 0.22 ms/s.
+- **trend-1m** is the exception. Allocation drops from 3.85 to about
+  1.05 MB/s, private bytes stay at 50 to 51 MB, and CPU rises by 0.04 to
+  0.08 points of one core (0.356 to 0.395%, and 0.370 to 0.454% in the
+  first set). Every extra collection is a scavenge: `PerformanceObserver`
+  GC entries from a preload showed only minor collections and the new
+  space at 1 to 4 MB (8 to 16 MB before the fix), so V8 scavenges about
+  once a second. The kept view is not the cause (rerun above).
+- **trend-none** moved from 42.9 and 42.1 MB to 44.8 and 44.9 MB
+  private (the two sets) with less allocation and fewer collections. I did not
+  find a retained cost behind it; the label and color memos and the
+  alert path hold a few hundred small entries at most.
+
+**Open.**
+
+- Where private bytes settle over hours is still the soak's question,
+  for every build: on a 555-key deck the plugin reached about 170 MB in
+  11 minutes in 1.7.1 as well. The plugin cannot set V8's young-generation
+  limit, because the Stream Deck app starts Node.
+- trend-1m's extra scavenges (about 0.6 ms/s) and the 2 MB on
+  trend-none are not explained beyond the V8 sizing above.
+- All of this ran on the harness's Node 24. The app runs plugins on
+  Node 20, whose V8 may size its young generation differently.
+
+### 2026-10-25: the 1.8 candidate against 1.7.1.0, plugin process only
+
+A matched comparison of what the plugin process costs and sends: both
+builds under the same mock Stream Deck app, the same settings documents
+and the same producer. Nothing here measures the Stream Deck app, QtSvg
+or a device; those are listed as owed at the end. Remote PCs and the
+launch addon (`hwlaunch.node`) were later parked to 1.8.1; their rows
+stay here as a record of these runs and are not in 1.8.
+
+**Subjects.** 1.7.1 is the release asset itself, pack `f6f5c28d…`
+(388,579 B), extracted by the harness: `bin/plugin.js` `8fa6fdfc…`
+(246,422 B), `hwsm.node` `7aa0d75a…`. 1.8 is the integration branch at
+`0974a2b` built in a lane worktree (`npm run build`): `bin/plugin.js`
+`d1844eb8…` (460,094 B; 144,485 B gzip against 76,102 B for 1.7.1), a
+local `hwsm.node` `95ae41e5…` and `hwlaunch.node`. Not a pack.
+
+**Harness.** `npm run perf:plugin` (`scripts/perf-plugin.mjs`, harness
+hash `c8d53e87…` as recorded in each result file):
+
+```
+node scripts/perf-plugin.mjs --subject 1.7.1=<1.7.1 pack> \
+  --subject 1.8=com.lawrensen.hwinfo.sdPlugin --workload <names> \
+  [--source live] [--repeat 1] --out <file.json>
+node scripts/perf-plugin.mjs --merge <file.json ...>
+```
+
+Method:
+
+- ABBA order, two runs per build per workload, each run a fresh plugin
+  process. trend-15m ran as two invocations (A B, then B A) pooled with
+  `--merge`.
+- Warm-up 45 s, or the workload's history window plus 15 s so its graphs
+  are full when measured (75 s for the strips and trend-1m, 315 s for
+  trend-5m, 915 s for trend-15m), then a 45 s window. Default 1 s poll.
+- Session 2026-10-24 21:14 to 2026-10-25 01:37 local on this bench
+  (Ryzen 9 9950X3D2, 32 threads, Windows 10 19044). Other lanes were
+  building and testing on the machine meanwhile; the e2e lock kept other
+  plugin harnesses off it.
+- The plugin ran under the harness's Node v24.16.0. The Stream Deck app
+  runs plugins on its bundled Node 20, so the absolute figures belong to
+  this runtime.
+- `catalog` is `scripts/fake-hwinfo-catalog.mjs`: a real named mapping of
+  600 synthetic readings (25 sensors x 24), republished every second,
+  every fifth reading holding still. `live` reads this PC's running
+  HWiNFO (Shared Memory, read-only, 555 readings, written every 2 s),
+  with the inventory taken once from `src/probe.ts --json` so both builds
+  bind the same keys.
+- CPU is the plugin process's cycle counter (`QueryProcessCycleTime`),
+  converted at a calibrated 4.295 GHz. At 0.1 to 1% of a core, the
+  15.6 ms ticks behind process times give a few ticks a minute, so that
+  figure stays in the JSON as a cross-check only.
+- RSS, heap and GC come from an in-process sampler
+  (`node --import scripts/lib/perf-probe-preload.mjs`, once a second).
+  Allocation is the sum of every rise in used heap between collections,
+  from `v8.GCProfiler`. Private bytes and handles come from an external
+  PowerShell sampler every 2 s.
+- Traffic is every message the plugin sends to the mock app, counted as
+  whole messages on the socket (JSON and data URI included), per context
+  and in aggregate.
+
+The table gives medians (1.7.1 / 1.8) over each build's runs. The result
+files hold every run and the full per-metric tables: busiest second,
+event-loop share, RSS, heap, per-context rates, and p50/p95 bytes per
+call.
+
+**Workloads** (`node scripts/perf-plugin.mjs --list`). Both builds get the
+same documents, and 1.7.1 draws what it draws for fields it does not
+know:
+
+- strip-*: six (or four) independent dials.
+- trend-*: its plain sparkline and two-row dial.
+- calc32: Sensor missing on 32 keys.
+- remote: Sensor missing on 4 keys.
+
+So on those rows the 1.7.1 column is the old build on the same deck, not
+the same function. The `-base` rows and `trend-none` are 1.8 on the same
+deck without the feature. Every row runs on the simulated + XL (type 13)
+except `dials-plus` and `strip-*-plus` on the simulated + (type 7), and
+`sweep`, a key for every catalog reading on a simulated 5 x 3 deck plus
+six dials. Strips use a 1 minute window: a strip repaints only the
+slices whose pixels change, so a window that is not yet full understates
+its cost.
+
+Synthetic catalog, 600 readings:
+
+| Workload | Runs | CPU % (1.7.1 / 1.8) | Private MB (1.7.1 / 1.8) | Handles (1.7.1 / 1.8) | Alloc MB/s (1.7.1 / 1.8) | Image B/s (1.7.1 / 1.8) | Feedback/s (1.7.1 / 1.8) | Feedback B/s (1.7.1 / 1.8) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| deck | 2+2 | 0.246 / 0.371 | 32.1 / 39.4 | 205 / 205 | 0.69 / 0.90 | 18,723 / 18,724 | 6.0 / 6.0 | 7,821 / 7,822 |
+| dense | 2+2 | 0.353 / 0.530 | 38.5 / 44.0 | 205 / 205 | 1.07 / 1.33 | 73,307 / 73,316 | 6.0 / 6.0 | 7,821 / 7,821 |
+| sweep | 2+2 | 0.987 / 1.040 | 99.6 / 101.6 | 205 / 205 | 8.63 / 9.68 | 636,390 / 636,432 | 6.0 / 6.0 | 7,821 / 7,822 |
+| dials-theme | 2+2 | 0.143 / 0.179 | 30.9 / 32.0 | 205 / 205 | 0.20 / 0.35 | 0 / 0 | 6.0 / 6.0 | 7,822 / 7,822 |
+| dials-glass | 2+2 | 0.171 / 0.207 | 31.2 / 32.3 | 205 / 205 | 0.39 / 0.54 | 0 / 0 | 6.0 / 6.0 | 12,026 / 12,025 |
+| dials-tint | 2+2 | 0.157 / 0.193 | 30.5 / 32.4 | 205 / 205 | 0.27 / 0.43 | 0 / 0 | 6.0 / 6.0 | 17,306 / 17,304 |
+| dials-outline | 2+2 | 0.152 / 0.185 | 30.7 / 32.4 | 205 / 205 | 0.25 / 0.38 | 0 / 0 | 6.0 / 6.0 | 14,659 / 14,661 |
+| dials-clear | 2+2 | 0.146 / 0.181 | 30.6 / 32.1 | 205 / 205 | 0.20 / 0.34 | 0 / 0 | 6.0 / 6.0 | 7,347 / 7,349 |
+| dials-plus | 2+2 | 0.136 / 0.142 | 30.4 / 31.7 | 205 / 205 | 0.13 / 0.24 | 0 / 0 | 4.0 / 4.0 | 5,246 / 5,246 |
+| strip-whole-xl | 2+2 | 0.171 / 0.260 | 30.4 / 32.8 | 205 / 205 | 0.19 / 0.51 | 0 / 0 | 6.0 / 6.0 | 7,826 / 9,510 |
+| strip-split-xl | 2+2 | 0.165 / 0.276 | 30.4 / 33.0 | 205 / 205 | 0.19 / 0.51 | 0 / 0 | 6.0 / 6.0 | 7,827 / 9,157 |
+| strip-whole-plus | 2+2 | 0.150 / 0.220 | 30.0 / 32.9 | 205 / 205 | 0.13 / 0.41 | 0 / 0 | 4.0 / 4.0 | 5,249 / 7,510 |
+| strip-split-plus | 2+2 | 0.147 / 0.238 | 30.0 / 32.6 | 205 / 205 | 0.13 / 0.42 | 0 / 0 | 4.0 / 4.0 | 5,248 / 7,418 |
+| strip-whole-xl-tint | 2+2 | 0.183 / 0.267 | 31.3 / 32.7 | 205 / 205 | 0.26 / 0.55 | 0 / 0 | 6.0 / 6.0 | 17,313 / 18,279 |
+| strip-whole-xl-outline | 2+2 | 0.180 / 0.268 | 31.3 / 32.7 | 205 / 205 | 0.23 / 0.53 | 0 / 0 | 6.0 / 6.0 | 14,666 / 15,462 |
+| strip-whole-xl-glass | 2+2 | 0.197 / 0.282 | 31.4 / 33.2 | 205 / 205 | 0.37 / 0.59 | 0 / 0 | 6.0 / 6.0 | 12,033 / 13,722 |
+| strip-whole-xl-clear | 2+2 | 0.168 / 0.272 | 30.6 / 33.1 | 205 / 205 | 0.18 / 0.54 | 0 / 0 | 6.0 / 6.0 | 7,352 / 13,840 |
+| calc32 | 2+2 | 0.221 / 0.452 | 31.6 / 43.3 | 205 / 205 | 0.40 / 1.22 | 2,587 / 28,251 | 6.0 / 6.0 | 7,821 / 7,821 |
+| calc32-base | 2+2 | 0.260 / 0.313 | 32.1 / 33.8 | 205 / 205 | 0.55 / 0.74 | 23,719 / 23,719 | 6.0 / 6.0 | 7,821 / 7,821 |
+| remote | 2+2 | 0.246 / 0.321 | 31.8 / 34.9 | 205 / 207 | 0.51 / 0.72 | 20,062 / 20,720 | 6.0 / 5.9 | 7,821 / 7,735 |
+| remote-base | 2+2 | 0.244 / 0.294 | 32.5 / 33.8 | 205 / 205 | 0.52 / 0.71 | 20,061 / 20,060 | 6.0 / 6.0 | 7,821 / 7,821 |
+| trend-none | 2+2 | 0.339 / 0.395 | 40.7 / 41.8 | 205 / 205 | 1.54 / 1.66 | 56,506 / 56,506 | 6.0 / 6.0 | 29,449 / 29,448 |
+| trend-1m | 2+2 | 0.311 / 0.411 | 40.2 / 50.8 | 205 / 205 | 1.52 / 3.79 | 56,516 / 39,610 | 6.0 / 6.0 | 29,454 / 23,001 |
+| trend-5m | 2+2 | 0.317 / 0.605 | 47.4 / 75.4 | 205 / 205 | 1.44 / 9.27 | 56,511 / 82,501 | 6.0 / 6.0 | 29,451 / 35,395 |
+| trend-15m | 2+2 | 0.237 / 0.522 | 65.6 / 109.5 | 205 / 205 | 1.42 / 9.34 | 56,511 / 86,298 | 6.0 / 6.0 | 29,451 / 37,317 |
+
+Live HWiNFO on this bench, 555 readings:
+
+| Workload | Runs | CPU % (1.7.1 / 1.8) | Private MB (1.7.1 / 1.8) | Handles (1.7.1 / 1.8) | Alloc MB/s (1.7.1 / 1.8) | Image B/s (1.7.1 / 1.8) | Feedback/s (1.7.1 / 1.8) | Feedback B/s (1.7.1 / 1.8) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| deck | 2+2 | 0.231 / 0.314 | 33.8 / 40.5 | 205 / 205 | 0.49 / 0.86 | 18,222 / 18,294 | 1.9 / 1.9 | 2,471 / 2,526 |
+| sweep | 2+2 | 0.799 / 0.969 | 68.6 / 105.2 | 205 / 205 | 4.06 / 6.14 | 229,566 / 271,112 | 1.8 / 1.8 | 2,383 / 2,353 |
+
+CPU of every run (% of one core from cycles), the busiest one-second step,
+and GC pause:
+
+| Workload | Warm-up s | 1.7.1 CPU % per run | 1.8 CPU % per run | 1.7.1 busiest s % | 1.8 busiest s % | 1.7.1 GC ms/s | 1.8 GC ms/s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| deck | 45 | 0.240, 0.251 | 0.355, 0.387 | 0.54, 0.63 | 0.68, 1.74 | 0.14, 0.14 | 0.45, 0.47 |
+| dense | 45 | 0.393, 0.313 | 0.604, 0.456 | 1.08, 0.69 | 1.20, 0.96 | 0.60, 0.51 | 1.44, 0.76 |
+| sweep | 45 | 0.986, 0.989 | 1.035, 1.044 | 2.13, 2.64 | 1.98, 2.41 | 0.13, 0.13 | 0.11, 0.15 |
+| dials-theme | 45 | 0.140, 0.146 | 0.173, 0.184 | 0.50, 0.62 | 0.58, 0.68 | 0.04, 0.04 | 0.06, 0.06 |
+| dials-glass | 45 | 0.170, 0.171 | 0.207, 0.206 | 0.60, 0.63 | 1.07, 0.84 | 0.07, 0.07 | 0.10, 0.09 |
+| dials-tint | 45 | 0.156, 0.157 | 0.189, 0.197 | 0.57, 0.55 | 0.67, 0.70 | 0.05, 0.05 | 0.08, 0.08 |
+| dials-outline | 45 | 0.151, 0.154 | 0.188, 0.182 | 0.48, 0.55 | 0.59, 0.55 | 0.04, 0.04 | 0.07, 0.07 |
+| dials-clear | 45 | 0.143, 0.149 | 0.184, 0.178 | 0.49, 0.46 | 0.55, 0.56 | 0.03, 0.03 | 0.06, 0.06 |
+| dials-plus | 45 | 0.121, 0.150 | 0.142, 0.142 | 0.17, 0.24 | 0.26, 0.33 | 0.03, 0.03 | 0.04, 0.05 |
+| strip-whole-xl | 75 | 0.170, 0.173 | 0.256, 0.265 | 0.71, 0.62 | 0.54, 0.56 | 0.05, 0.06 | 0.12, 0.13 |
+| strip-split-xl | 75 | 0.161, 0.168 | 0.273, 0.280 | 0.65, 0.78 | 1.58, 0.57 | 0.04, 0.04 | 0.12, 0.13 |
+| strip-whole-plus | 75 | 0.151, 0.149 | 0.220, 0.220 | 0.35, 0.36 | 0.41, 0.44 | 0.03, 0.03 | 0.09, 0.09 |
+| strip-split-plus | 75 | 0.144, 0.149 | 0.235, 0.241 | 0.30, 0.33 | 0.44, 0.50 | 0.03, 0.04 | 0.09, 0.09 |
+| strip-whole-xl-tint | 75 | 0.179, 0.186 | 0.270, 0.264 | 0.66, 0.60 | 0.61, 0.72 | 0.06, 0.05 | 0.13, 0.14 |
+| strip-whole-xl-outline | 75 | 0.179, 0.181 | 0.265, 0.270 | 0.82, 0.76 | 0.68, 0.79 | 0.05, 0.06 | 0.13, 0.13 |
+| strip-whole-xl-glass | 75 | 0.194, 0.199 | 0.280, 0.283 | 0.86, 0.70 | 0.73, 0.76 | 0.09, 0.08 | 0.14, 0.14 |
+| strip-whole-xl-clear | 75 | 0.166, 0.170 | 0.270, 0.274 | 0.73, 0.52 | 0.56, 0.57 | 0.04, 0.04 | 0.12, 0.13 |
+| calc32 | 45 | 0.227, 0.214 | 0.451, 0.453 | 0.56, 0.54 | 1.43, 1.45 | 0.08, 0.08 | 0.63, 0.66 |
+| calc32-base | 45 | 0.259, 0.262 | 0.311, 0.314 | 0.59, 0.66 | 0.72, 0.73 | 0.12, 0.12 | 0.19, 0.20 |
+| remote | 45 | 0.245, 0.246 | 0.322, 0.320 | 0.65, 0.65 | 0.65, 0.63 | 0.11, 0.11 | 0.18, 0.19 |
+| remote-base | 45 | 0.243, 0.245 | 0.290, 0.298 | 0.60, 0.60 | 0.84, 0.76 | 0.11, 0.10 | 0.16, 0.16 |
+| trend-none | 45 | 0.344, 0.334 | 0.405, 0.385 | 0.86, 0.82 | 2.68, 0.85 | 0.14, 0.13 | 0.17, 0.17 |
+| trend-1m | 75 | 0.298, 0.324 | 0.416, 0.406 | 0.62, 0.50 | 1.34, 1.38 | 0.12, 0.11 | 0.13, 0.12 |
+| trend-5m | 315 | 0.338, 0.296 | 0.615, 0.594 | 0.70, 0.59 | 1.92, 1.66 | 0.04, 0.05 | 0.20, 0.16 |
+| trend-15m | 915 | 0.253, 0.220 | 0.506, 0.537 | 0.63, 0.60 | 1.46, 2.81 | 0.03, 0.03 | 0.08, 0.11 |
+| live deck | 45 | 0.230, 0.231 | 0.312, 0.315 | 0.70, 0.48 | 0.85, 0.77 | 0.16, 0.13 | 0.44, 0.40 |
+| live sweep | 45 | 0.830, 0.768 | 0.957, 0.980 | 2.80, 2.95 | 2.92, 3.15 | 0.16, 0.09 | 0.18, 0.15 |
+
+What the numbers say:
+
+- **Old documents, old output.** On every workload whose documents carry
+  no 1.8 field, 1.8 sends the same setImage and setFeedback calls per
+  second and the same bytes per call (p50 and p95) as 1.7.1. Those
+  workloads are deck, dense, sweep, the five dial looks, dials-plus,
+  calc32-base, remote-base and trend-none. Aggregate bytes per second
+  agree within 0.01% on the synthetic catalog; the live rows move by a
+  few percent because live values differ between runs.
+- **Fixed cost.** On those same workloads 1.8 takes between +0.006
+  points of one core (dials-plus) and +0.18 (dense) more CPU: six dials
+  0.14 to 0.18%, the 42-context deck 0.25 to 0.37%, the live deck 0.23 to
+  0.31%. It also holds 1.1 to 7.3 MB more private bytes (the live sweep below
+  is the exception) and allocates 0.1 to 1.1 MB/s more on the V8 heap. GC pause on the deck goes from 0.14 to
+  0.46 ms/s. Handles are 205 in both (207 with two remote PCs).
+- **Strips.** A whole strip or an equal split costs 0.22 to 0.28% of one
+  core, against 0.15 to 0.20% for 1.7.1's independent dials on the same
+  documents. It sends one setFeedback per dial per poll, the same as
+  independent dials, at up to 1.9 times the bytes (Clear: 7,352 to
+  13,840 B/s for six slices).
+- **Looks.** In 1.8 the plugin's own CPU stays inside 0.18 to 0.21% for
+  dials and 0.26 to 0.28% for a whole strip across the five looks. Tint
+  and Outline send the largest faces (17.3 and 14.7 KB/s for six dials,
+  the same as 1.7.1). What a look costs the app to draw is not measured
+  here.
+- **Trend windows are the largest new cost.** With the 15 minute window
+  full:
+  - Private bytes 65.6 to 109.5 MB, heap allocation 1.4 to 9.3 MB/s, CPU
+    0.24 to 0.52%.
+  - Key frames go from 2,355 to 3,637 bytes per message and dial frames
+    from 4,910 to 6,265.
+
+  At 5 minutes: private bytes 47.4 to 75.4 MB, allocation 1.4 to
+  9.3 MB/s, CPU 0.32 to 0.61%. At 1 minute: private bytes 40.2 to
+  50.8 MB, allocation 1.5 to 3.8 MB/s. 1.7.1's private bytes also rise
+  with run length (40.2, 47.4 and 65.6 MB after about 2, 6 and 16 minutes of running), so
+  compare within a row, not down the column. The 15 minute figure is
+  after 16 minutes of running; where 1.8 levels off over hours needs the
+  soak. Update: the allocation came from the Trend drawing and is fixed;
+  see "memory follow-up" above (15 minutes: 110.5 to 64.3 MB private,
+  9.37 to 1.25 MB/s).
+- **Calculated readings.** 32 sums of 8 inputs on keys, against the same
+  deck on plain readings (calc32-base, both 1.8): CPU 0.31 to 0.45%,
+  private bytes 33.8 to 43.3 MB, allocation 0.74 to 1.22 MB/s.
+- **Remote PCs.** Two synthetic remote PCs, one frozen, with four keys,
+  against Remote off (both 1.8): CPU 0.29 to 0.32%, private bytes
+  +1.1 MB, two more handles.
+- **Open question.** On the live sweep (555 keys), 1.7.1 holds 68.6 MB
+  private and 1.8 holds 105.2 MB, the same in both runs of each. On the
+  synthetic sweep (600 keys) the two hold 99.6 and 101.6 MB. I have not
+  found the cause. It is the first thing to look at before the soak.
+  Update: answered in "memory follow-up" above. It is V8's young
+  generation, which 1.8 grew sooner because it allocated more per key;
+  after the fix the live sweep holds 70.8 MB against 68.7 for 1.7.1.
+- **`npm run e2e:load` passes for both builds**
+  (`HWINFO_E2E_PLUGIN_DIR=<extracted 1.7.1> LOAD_SOAK_SEC=60`, then the
+  checkout). RSS peaked at 95.6 MB for 1.7.1 and 130.9 MB for 1.8, against
+  the 300 MB gate.
+
+**Not measured here, owed on hardware or by the owner.**
+
+- Stream Deck app CPU and working set for each strip layout, for
+  independent dials and for each look. This uses the 1.7.1.0 hand method
+  (`--runinbk`, 100 s settle, 60 s, two passes reversed) and restarts the
+  app, so it is the owner's run.
+- Physical + and + XL behavior: slice seams, input latency, slice-update
+  skew, data age and recovery. The harness measures none of latency,
+  skew or age.
+- The installed package: the candidate pack installed by the app, running
+  on the app's Node 20.
+- A soak with Trend windows and a strip visible, with one HWiNFO restart,
+  one app restart and one sleep inside the window. The 1.7.1 exemption
+  does not cover the new history, remote and scheduling paths.
+- A two-machine run with real HWiNFO Remote.
+- Variance from the app's background work between runs.
+
 ### 2026-10-24: 1.7.1.0, soak scope and what the dial looks cost the app
 
 **Soak scope.** The runbook asks for a hardware soak when a release
@@ -639,7 +1190,7 @@ Irreducible rulings (numbers, not vibes):
   already optimally compressed. Palette quantization saves ~47% but is lossy
   (max channel delta 113); rejected, listing images must stay exact.
 - **ui/sdpi-components.js 55,823 B**: Elgato's PI component library, keep
-  ruling stands.
+  ruling stands. (Superseded 2026-11-08: the panels load ui/pi-client.js.)
 - **ui/pi-common.js 11,651 B (2.8 KB in-pack)**: our readable PI source;
   minifying would save ~1.3 KB packed at the cost of a second build
   pipeline. Not worth it.
@@ -713,7 +1264,8 @@ now takes "exit" on stdin like fake-hwinfo).
 | orphans after full suite | (unmeasured) | 0 | PASS, gated by suite:full |
 
 Every FOOTPRINT remainder is ruled irreducible above (koffi.node without a
-toolchain; PNGs already optimal; sdpi-components keep). Parse path is
+toolchain; PNGs already optimal; sdpi-components keep, superseded
+2026-11-08). Parse path is
 incremental with full-rebuild invalidation on any header/identity change.
 Suites at DONE: lint ✓ typecheck ✓ 81 unit ✓ suite:full (e2e ×3 + all
 screenshot pipelines) ✓ zero orphans ✓.

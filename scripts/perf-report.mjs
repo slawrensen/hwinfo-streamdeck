@@ -5,6 +5,11 @@
 // to PERF.md.
 //
 //   node scripts/perf-report.mjs [--no-bench] [--no-proc] [--json]
+//                                [--plugin-dir <dir>] [--pack <file>]
+//
+// --plugin-dir sizes another build's .sdPlugin and --pack another pack
+// (for example the extracted 1.7.1 release asset and the release asset
+// itself), so a baseline is sized by the same code as the candidate.
 import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -14,10 +19,15 @@ import zlib from "node:zlib";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const sdPlugin = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
-const packPath = path.join(repoRoot, "release", "com.lawrensen.hwinfo.streamDeckPlugin");
+const argv = process.argv.slice(2);
+const valueOf = (flag) => {
+	const i = argv.indexOf(flag);
+	return i === -1 ? undefined : argv[i + 1];
+};
+const sdPlugin = path.resolve(valueOf("--plugin-dir") ?? path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin"));
+const packPath = path.resolve(valueOf("--pack") ?? path.join(repoRoot, "release", "com.lawrensen.hwinfo.streamDeckPlugin"));
 
-const args = new Set(process.argv.slice(2));
+const args = new Set(argv.filter((a, i) => !["--plugin-dir", "--pack"].includes(argv[i - 1]) && !["--plugin-dir", "--pack"].includes(a)));
 const wantBench = !args.has("--no-bench");
 const wantProc = !args.has("--no-proc");
 
@@ -51,7 +61,6 @@ function collectSizes() {
 		bundleB: duBytes(bundle),
 		bundleGzipB: fs.existsSync(bundle) ? gzipSize(bundle) : null,
 		components: {
-			"bin/node_modules (total)": duBytes(path.join(sdPlugin, "bin", "node_modules")),
 			"bin/hwsm.node": duBytes(path.join(sdPlugin, "bin", "hwsm.node")),
 			"ui/": duBytes(path.join(sdPlugin, "ui")),
 			"imgs/": duBytes(path.join(sdPlugin, "imgs")),

@@ -79,6 +79,21 @@ export function glassSurfaces(palette: Palette): GlassSurfaces {
  * selected-row colors then resolve through the existing code.
  */
 export function glassTextPalette(palette: Palette): Palette {
+	// A pure function of the palette, asked for on every Glass frame: its
+	// readable lifts are binary searches (about 70 us a face), and a deck
+	// draws only a handful of palettes (themes, type accents).
+	const key = `${palette.bg}${palette.track}${palette.value}${palette.label}${palette.unit}${palette.accent}`;
+	const cached = GLASS_TEXT_CACHE.get(key);
+	if (cached !== undefined) return { ...palette, bg: cached.bg, track: cached.track, value: cached.value, label: cached.label };
+	if (GLASS_TEXT_CACHE.size >= 64) GLASS_TEXT_CACHE.clear();
+	const resolved = glassTextPaletteOf(palette);
+	GLASS_TEXT_CACHE.set(key, { bg: resolved.bg, track: resolved.track, value: resolved.value, label: resolved.label });
+	return resolved;
+}
+
+const GLASS_TEXT_CACHE = new Map<string, Pick<Palette, "bg" | "track" | "value" | "label">>();
+
+function glassTextPaletteOf(palette: Palette): Palette {
 	const { surface, band } = glassSurfaces(palette);
 	const value = readableValueColor(palette.value, band);
 	const unit = readableValueColor(palette.unit, palette.bg);
@@ -88,8 +103,9 @@ export function glassTextPalette(palette: Palette): Palette {
 }
 
 /** A flat translucent paint: one color at one opacity, as a vertical
- * two-stop gradient in user space (the form measured cheapest). */
-function flatPaint(id: string, color: string, opacity: number): string {
+ * two-stop gradient in user space (the form measured cheapest). Shared with
+ * the touch strip panels (src/strip/scene.ts). */
+export function flatPaint(id: string, color: string, opacity: number): string {
 	const stop = (offset: number): string => `<stop offset="${offset}" stop-color="${color}" stop-opacity="${opacity}"/>`;
 	return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100">${stop(0)}${stop(1)}</linearGradient>`;
 }

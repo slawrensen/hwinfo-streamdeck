@@ -41,12 +41,14 @@ com.lawrensen.hwinfo.sdPlugin/logs/
 *.log
 .DS_Store
 
-# node-gyp build output for the hwsm native bridge, plus the generated
-# source-id header (scripts/native-source-id.mjs) and native build manifest
-# (scripts/native-manifest.mjs)
+# node-gyp build output for the native addon (hwsm), plus the
+# generated source-id header (scripts/native-source-id.mjs), the native
+# build manifest (scripts/native-manifest.mjs) and the toolchain record
+# (scripts/native-toolchain.mjs)
 native/hwsm/build/
 native/hwsm/source-id.h
 /release-native-manifest.json
+/native-toolchain.json
 
 # Jekyll documentation build output
 .sass-cache/

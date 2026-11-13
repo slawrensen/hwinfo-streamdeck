@@ -1,0 +1,1821 @@
+{
+	"about": "Help budget for the settings panels (scripts/e2e-pi-help.mjs). states: 1.7.1's panels (bb4aede) measured by the same suite at 378 CSS px and DPR 1.5, per state; counterpart names the 1.7.1 state used where 1.7.1 could not show this one. added: the 1.8.0 measurement of each section or fold 1.7.1 did not have, and of each whole state 1.7.1 could not show (the art looks), so it cannot grow either. Lines and px may go down, never up.",
+	"states": {
+		"key-empty": {
+			"opened": {
+				"lines": 3,
+				"height": 54.3
+			},
+			"total": {
+				"lines": 7,
+				"height": 121.7
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 4,
+					"height": 67.4
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"key-configured": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 6,
+				"height": 102.6
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 4,
+					"height": 67.4
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"key-see-through": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 6,
+				"height": 102.6
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 4,
+					"height": 67.4
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"key-details": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 9,
+				"height": 153.9
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 4,
+					"height": 67.4
+				},
+				"sec-interaction": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 2,
+					"height": 36.2
+				},
+				"hw-how:How the detail view works": {
+					"lines": 5,
+					"height": 88.5
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"key-quad": {
+			"opened": {
+				"lines": 4,
+				"height": 70.4
+			},
+			"total": {
+				"lines": 9,
+				"height": 153.9
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 5,
+					"height": 83.5
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-empty": {
+			"opened": {
+				"lines": 8,
+				"height": 143.8
+			},
+			"total": {
+				"lines": 18,
+				"height": 313.8
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 5,
+					"height": 89.5
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-configured": {
+			"opened": {
+				"lines": 8,
+				"height": 143.8
+			},
+			"total": {
+				"lines": 18,
+				"height": 313.8
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 5,
+					"height": 89.5
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-see-through": {
+			"opened": {
+				"lines": 11,
+				"height": 195.1
+			},
+			"total": {
+				"lines": 21,
+				"height": 365.1
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 8,
+					"height": 140.8
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-overview": {
+			"opened": {
+				"lines": 9,
+				"height": 159.9
+			},
+			"total": {
+				"lines": 19,
+				"height": 329.9
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 6,
+					"height": 105.6
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-two-row": {
+			"opened": {
+				"lines": 9,
+				"height": 159.9
+			},
+			"total": {
+				"lines": 19,
+				"height": 329.9
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 6,
+					"height": 105.6
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-strip": {
+			"opened": {
+				"lines": 11,
+				"height": 195.1
+			},
+			"total": {
+				"lines": 21,
+				"height": 365.1
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 8,
+					"height": 140.8
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-strip-member": {
+			"opened": {
+				"lines": 8,
+				"height": 143.8
+			},
+			"total": {
+				"lines": 18,
+				"height": 313.8
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 5,
+					"height": 89.5
+				},
+				"sec-alerts": {
+					"lines": 6,
+					"height": 99.6
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"control-default": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 5,
+				"height": 86.5
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-command": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-advanced": {
+					"lines": 3,
+					"height": 51.3
+				}
+			},
+			"folds": {}
+		},
+		"control-snooze": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 5,
+				"height": 86.5
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-command": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-advanced": {
+					"lines": 3,
+					"height": 51.3
+				}
+			},
+			"folds": {}
+		},
+		"control-strip": {
+			"opened": {
+				"lines": 2,
+				"height": 35.2
+			},
+			"total": {
+				"lines": 5,
+				"height": 86.5
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-command": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-advanced": {
+					"lines": 3,
+					"height": 51.3
+				}
+			},
+			"folds": {}
+		},
+		"slot-reading": {
+			"opened": {
+				"lines": 0,
+				"height": 0
+			},
+			"total": {
+				"lines": 0,
+				"height": 0
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {}
+		},
+		"slot-back": {
+			"opened": {
+				"lines": 0,
+				"height": 0
+			},
+			"total": {
+				"lines": 0,
+				"height": 0
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {}
+		}
+	},
+	"added": {
+		"key-empty": {
+			"sections": {},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"key-configured": {
+			"sections": {},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"key-see-through": {
+			"sections": {},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"key-details": {
+			"sections": {},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"key-quad": {
+			"sections": {},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-empty": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-configured": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-see-through": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-overview": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-two-row": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-strip": {
+			"sections": {
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"dial-strip-member": {
+			"sections": {
+				"sec-strip": {
+					"lines": 2,
+					"height": 38.2
+				}
+			},
+			"folds": {
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-stripmore": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-formats": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-timing": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				}
+			}
+		},
+		"key-art": {
+			"opened": {
+				"lines": 0,
+				"height": 0
+			},
+			"total": {
+				"lines": 3,
+				"height": 51.3
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-alerts": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"key-art-paper": {
+			"opened": {
+				"lines": 1,
+				"height": 19.1
+			},
+			"total": {
+				"lines": 4,
+				"height": 70.4
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-alerts": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"shared-art": {
+			"opened": {
+				"lines": 0,
+				"height": 0
+			},
+			"total": {
+				"lines": 3,
+				"height": 51.3
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-display": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-alerts": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-interaction": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-how:How Display works": {
+					"lines": 3,
+					"height": 52.3
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-sub hw-layout:Page layout": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the detail view works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-art": {
+			"opened": {
+				"lines": 5,
+				"height": 89.5
+			},
+			"total": {
+				"lines": 12,
+				"height": 211.2
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-strip": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-reading": {
+					"lines": 3,
+					"height": 54.3
+				},
+				"sec-display": {
+					"lines": 2,
+					"height": 35.2
+				},
+				"sec-alerts": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-interaction": {
+					"lines": 4,
+					"height": 70.4
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-formats": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-how:How Display works": {
+					"lines": 10,
+					"height": 169
+				},
+				"sec-timing": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"hw-how:How the presets work": {
+					"lines": 6,
+					"height": 100.6
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		},
+		"dial-strip-art": {
+			"opened": {
+				"lines": 2,
+				"height": 38.2
+			},
+			"total": {
+				"lines": 5,
+				"height": 134.5
+			},
+			"sections": {
+				"top": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-theme": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-strip": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-reading": {
+					"lines": 1,
+					"height": 32.1
+				},
+				"sec-display": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-alerts": {
+					"lines": 1,
+					"height": 32.1
+				},
+				"sec-interaction": {
+					"lines": 1,
+					"height": 32.1
+				},
+				"sec-advanced": {
+					"lines": 0,
+					"height": 0
+				}
+			},
+			"folds": {
+				"sec-striplink": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-stripmore": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the strip works": {
+					"lines": 1,
+					"height": 20.1
+				},
+				"sec-formats": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How Display works": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-timing": {
+					"lines": 0,
+					"height": 0
+				},
+				"hw-how:How the presets work": {
+					"lines": 0,
+					"height": 0
+				},
+				"sec-shared": {
+					"lines": 2,
+					"height": 38.2
+				},
+				"sec-connection": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"setup-help": {
+					"lines": 7,
+					"height": 116.7
+				},
+				"sec-links": {
+					"lines": 3,
+					"height": 59.3
+				},
+				"sec-calc": {
+					"lines": 1,
+					"height": 19.1
+				},
+				"sec-support": {
+					"lines": 3,
+					"height": 51.3
+				},
+				"sec-config": {
+					"lines": 5,
+					"height": 83.5
+				}
+			}
+		}
+	}
+}

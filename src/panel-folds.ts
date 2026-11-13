@@ -21,8 +21,9 @@ export type Folds = Record<string, boolean>;
 
 const KINDS: readonly PanelKind[] = ["key", "dial", "control"];
 const SECTION_ID = /^sec-[a-z]{1,24}$/;
-/** More sections than any panel has; a bound on what a panel can store. */
-const MAX_SECTIONS = 12;
+/** More sections than any panel has; a bound on what a panel can store.
+ * Memory only, so raising it costs nothing stored. */
+export const MAX_SECTIONS = 24;
 
 export function panelKindOf(raw: unknown): PanelKind | undefined {
 	return typeof raw === "string" && (KINDS as readonly string[]).includes(raw) ? (raw as PanelKind) : undefined;

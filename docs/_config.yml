@@ -40,13 +40,13 @@ enable_copy_code_button: true
 docs_preview: false
 docs_legacy: true
 plugin_release:
-  version: 1.7.1
-  package_version: 1.7.1.0
-  tag: v1.7.1
-  download: https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.7.1/com.lawrensen.hwinfo.streamDeckPlugin
-  notes: https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.7.1
+  version: 1.8.0
+  package_version: 1.8.0.0
+  tag: v1.8.0
+  download: https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v1.8.0/com.lawrensen.hwinfo.streamDeckPlugin
+  notes: https://github.com/slawrensen/hwinfo-streamdeck/releases/tag/v1.8.0
   marketplace_version: 1.7.1.0
-  checked: 2026-10-27
+  checked: 2026-11-13
 
 # Internal release runbooks: kept next to the docs, never published.
 exclude:

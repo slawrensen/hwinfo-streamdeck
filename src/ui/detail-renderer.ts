@@ -7,6 +7,7 @@
  */
 import { wrapLabelTwoLines, wrapLabelTwoLinesBy } from "./format";
 import { isTahoma } from "./face-font";
+import { keyFace, type KeyBackground } from "./key-background";
 import { escapeXml, fontFamily, inKeyLens, renderStatusKey, svgOpen } from "./key-renderer";
 import { mixToward, type TextColors } from "./text-colors";
 import type { Palette } from "./themes";
@@ -17,21 +18,22 @@ export interface DetailTitleKeyOptions {
 	rangeText: string;
 	palette: Palette;
 	text: TextColors;
+	/** The opener's key look (key-background.ts); absent is Theme. */
+	background?: KeyBackground;
 }
 
 /** The title/page tile: the group name over the visible slot range. */
 export function renderDetailTitleKey(opts: DetailTitleKeyOptions): string {
-	const parts = svgOpen(144, 144, opts.palette.bg);
+	const face = keyFace(opts.background, opts.palette);
 	// Tahoma: each 16 px line keeps its ink inside the key's lens.
 	const lineFits = (line: string): boolean => inKeyLens([{ text: line, fontSize: 16 }]);
 	const lines = isTahoma() ? wrapLabelTwoLinesBy(opts.title, lineFits, lineFits) : wrapLabelTwoLines(opts.title, 14, 14);
 	const single = lines.length === 1;
 	for (let i = 0; i < lines.length; i++) {
-		parts.push(`<text x="72" y="${single ? 56 : 44 + i * 24}" text-anchor="middle" font-family="${fontFamily()}" font-size="16" font-weight="600" fill="${opts.text.label}">${escapeXml(lines[i] as string)}</text>`);
+		face.mark(`<text x="72" y="${single ? 56 : 44 + i * 24}" text-anchor="middle" font-family="${fontFamily()}" font-size="16" font-weight="600" fill="${opts.text.label}">${escapeXml(lines[i] as string)}</text>`);
 	}
-	parts.push(`<text x="72" y="110" text-anchor="middle" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${opts.text.unit}">${escapeXml(opts.rangeText)}</text>`);
-	parts.push("</svg>");
-	return parts.join("");
+	face.mark(`<text x="72" y="110" text-anchor="middle" font-family="${fontFamily()}" font-size="18" font-weight="600" fill="${opts.text.unit}">${escapeXml(opts.rangeText)}</text>`);
+	return face.end();
 }
 
 export interface DetailPagerKeyOptions {
@@ -40,16 +42,17 @@ export interface DetailPagerKeyOptions {
 	enabled: boolean;
 	palette: Palette;
 	text: TextColors;
+	/** The opener's key look (key-background.ts); absent is Theme. */
+	background?: KeyBackground;
 }
 
 /** A pager tile: one large chevron, dimmed toward the face at a boundary. */
 export function renderDetailPagerKey(opts: DetailPagerKeyOptions): string {
 	const color = opts.enabled ? opts.text.value : mixToward(opts.text.value, opts.palette.bg, 0.72);
 	const points = opts.direction === "previous" ? "82,48 58,72 82,96" : "62,48 86,72 62,96";
-	const parts = svgOpen(144, 144, opts.palette.bg);
-	parts.push(`<polyline points="${points}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`);
-	parts.push("</svg>");
-	return parts.join("");
+	const face = keyFace(opts.background, opts.palette);
+	face.mark(`<polyline points="${points}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`);
+	return face.end();
 }
 
 /** The detail profile is visible but the plugin holds no selected state
@@ -69,11 +72,12 @@ export function renderDetailIdleBackKey(): string {
 	return parts.join("");
 }
 
-/** An unconfigured slot past the group's end: just the themed face. */
-export function renderDetailBlankKey(palette: Palette): string {
-	const parts = svgOpen(144, 144, palette.bg);
-	parts.push("</svg>");
-	return parts.join("");
+/** An unconfigured slot past the group's end: just the themed face, or
+ * under a see-through look only what the look itself draws (Glass's and
+ * Tint's panel; nothing at all on Outline and Clear, so the page
+ * background shows whole). */
+export function renderDetailBlankKey(palette: Palette, background?: KeyBackground): string {
+	return keyFace(background, palette).end();
 }
 
 /** Pure black, nothing else: the face a just-left detail surface wears

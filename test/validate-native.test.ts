@@ -6,6 +6,7 @@
 // rest of test:native.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -19,7 +20,10 @@ after(() => { for (const dir of staged) fs.rmSync(dir, { recursive: true, force:
 
 const STAGED_FILES = [
 	"scripts/validate-native.mjs",
-	"scripts/lib/soak-producer-freshness.mjs",
+	"scripts/lib/native-binaries.mjs",
+	"scripts/lib/pe.mjs",
+	"scripts/lib/authenticode.mjs",
+	"scripts/lib/authenticode-windows.mjs",
 	"src/hwinfo/hwsm-loader.ts",
 	"native/hwsm/hwsm.c",
 	"native/hwsm/hwsm.rc",
@@ -43,7 +47,9 @@ function run(root: string): { status: number | null; stdout: string; stderr: str
 	return spawnSync(process.execPath, [path.join(root, "scripts", "validate-native.mjs")], { cwd: root, encoding: "utf8" });
 }
 
-describe("native packaging gate: the vendored addon matches the native sources", { skip: !onWindows ? "win32-x64 only" : !fs.existsSync(addon) ? "bin/hwsm.node not built" : false }, () => {
+const skip = !onWindows ? "win32-x64 only" : !fs.existsSync(addon) ? "bin/hwsm.node not built" : false;
+
+describe("native packaging gate: the vendored addon matches the native sources", { skip }, () => {
 	it("passes on an addon built from this tree's native sources", () => {
 		const result = run(stage());
 		assert.equal(result.status, 0, result.stderr);
@@ -75,5 +81,54 @@ describe("native packaging gate: the vendored addon matches the native sources",
 		const result = run(root);
 		assert.equal(result.status, 1);
 		assert.match(result.stderr, /protocol/);
+	});
+});
+
+describe("native packaging gate: what the pack carries", { skip }, () => {
+	it("refuses a pack without the addon", () => {
+		const result = run(stage((dir) => fs.rmSync(path.join(dir, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"))));
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /bin\/hwsm\.node is missing/);
+	});
+
+	it("refuses a test build copied under the shipped name: same file name, version resource and source id, plus hooks", () => {
+		const testBuild = path.join(ROOT, "native", "hwsm", "build", "Release", "hwsm_test.node");
+		if (!fs.existsSync(testBuild)) {
+			assert.fail(`${testBuild} is not built; run npm run build:native`);
+		}
+		const result = run(stage((root) => fs.copyFileSync(testBuild, path.join(root, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"))));
+		assert.equal(result.status, 1, result.stdout);
+		assert.match(result.stderr, /bin\/hwsm\.node carries the test-only hook _testControl/);
+		assert.doesNotMatch(result.stderr, /built from other native sources|no version resource naming it/, "the test build passes every other identity check, which is why the hook check exists");
+	});
+
+	it("refuses every test-only build in the pack", () => {
+		for (const name of ["hwsm_test.node", "hwsm_protomm.node"]) {
+			const result = run(stage((dir) => fs.copyFileSync(path.join(dir, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"), path.join(dir, "com.lawrensen.hwinfo.sdPlugin", "bin", name))));
+			assert.equal(result.status, 1, name);
+			assert.ok(result.stderr.includes(`test-only addon must not ship: bin${path.sep}${name}`), `${name}: ${result.stderr}`);
+		}
+	});
+
+	it("holds a version 2 native manifest to the binary and refuses a version 1 one", () => {
+		const sha = (file: string): string => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+		const write = (root: string, manifest: unknown): void => fs.writeFileSync(path.join(root, "release-native-manifest.json"), JSON.stringify(manifest));
+		const good = stage();
+		const hwsmSha = sha(path.join(good, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"));
+		// An unsigned record names the file as its own unsigned build and,
+		// with the linker's CheckSum 0, as its own neutral form.
+		const record = (file: string, hash: string): Record<string, string> => ({ file, sha256: hash, unsignedSha256: hash, authenticodeNeutralSha256: hash });
+		write(good, { sha256: hwsmSha, manifestVersion: 2, binaries: [record("hwsm.node", hwsmSha)] });
+		const passing = run(good);
+		assert.equal(passing.status, 0, passing.stderr);
+		const stale = stage();
+		write(stale, { sha256: hwsmSha, manifestVersion: 2, binaries: [{ ...record("hwsm.node", hwsmSha), sha256: "0".repeat(64) }] });
+		assert.match(run(stale).stderr, /records hwsm\.node as 000000000000/);
+		const partial = stage();
+		write(partial, { sha256: hwsmSha, manifestVersion: 2, binaries: [] });
+		assert.match(run(partial).stderr, /does not describe hwsm\.node/);
+		const legacy = stage();
+		write(legacy, { sha256: hwsmSha });
+		assert.match(run(legacy).stderr, /version 1 manifest, with no record per binary/);
 	});
 });

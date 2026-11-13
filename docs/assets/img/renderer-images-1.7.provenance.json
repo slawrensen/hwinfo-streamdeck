@@ -1,5 +1,5 @@
 {
-	"version": "1.7.0",
+	"version": "1.8.0",
 	"command": "npx tsx scripts/docs-v17-images.mjs",
 	"note": "Boards use fixed sample data and the production renderers without any art or color overrides. They are not physical hardware captures.",
 	"assets": [
@@ -7,7 +7,7 @@
 			"file": "dial-reading-colors-1.7.png",
 			"width": 1340,
 			"height": 884,
-			"sha256": "fd0bfb641ee7eecf5b78f1903bd67965f1742daa48f7dcc74013098701796247",
+			"sha256": "794bb2877df3cecf32f0f68fd747e374d645384d002e477036865bef99e885d6",
 			"kind": "production-renderer board",
 			"source": "src/actions/sensor-dial.ts: composeDialSvg",
 			"sampleData": true,
@@ -314,7 +314,7 @@
 			"file": "reading-status-1.7.png",
 			"width": 1360,
 			"height": 704,
-			"sha256": "2b9baa9ed6d19cb6a0a239a6c2087c41078f20cd5cdc937403242494885a53b3",
+			"sha256": "d7651be4abedf497f1a6b13efef78cf4798347da97384bfeefcc67169aef4afb",
 			"kind": "production-renderer board",
 			"source": [
 				"src/ui/state-screens.ts: statusScreen",

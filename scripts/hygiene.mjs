@@ -8,11 +8,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { NATIVE_BINARIES } from "./lib/native-binaries.mjs";
 import { classifyNewProcesses, ownedDescendants, processIdentity, processSnapshot, terminateProcesses } from "./lib/process-ownership.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// Every suite below drives bin/plugin.js and bin/hwsm.node, never src. A
+// Every suite below drives bin/plugin.js and the bin/ addons, never src. A
 // bundle older than its inputs qualifies the previous build under the
 // current source tree's name, silently; refuse to start on one.
 function newestMtime(dir, matches) {
@@ -26,7 +27,7 @@ function newestMtime(dir, matches) {
 }
 for (const [built, inputs, remedy] of [
 	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "plugin.js"), Math.max(newestMtime(path.join(repoRoot, "src"), (name) => name.endsWith(".ts")), fs.statSync(path.join(repoRoot, "rollup.config.mjs")).mtimeMs, fs.statSync(path.join(repoRoot, "package-lock.json")).mtimeMs), "npm run build"],
-	[path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", "hwsm.node"), newestMtime(path.join(repoRoot, "native", "hwsm"), (name) => ["hwsm.c", "hwsm.rc", "hwsm-version.h", "binding.gyp"].includes(name)), "npm run build:native && npm run build"]
+	...NATIVE_BINARIES.map((binary) => [path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin", "bin", binary.file), newestMtime(path.join(repoRoot, ...binary.dir.split("/")), (name) => binary.sources.includes(name)), "npm run build:native && npm run build"])
 ]) {
 	if (!fs.existsSync(built) || fs.statSync(built).mtimeMs < inputs) {
 		console.error(`suite:full: ${path.relative(repoRoot, built)} is ${fs.existsSync(built) ? "older than its sources" : "missing"}; run \`${remedy}\` first.`);
@@ -127,12 +128,21 @@ const steps = [
 	["e2e:gadget", () => run("e2e:gadget", ["scripts/e2e-gadget.mjs"])],
 	["e2e:gadget-raw", () => run("e2e:gadget-raw", ["scripts/e2e-gadget-raw.mjs", path.join(outRoot, "gadget-raw")])],
 	["e2e:reading-links", () => run("e2e:reading-links", ["scripts/e2e-reading-links.mjs", path.join(outRoot, "reading-links")])],
+	["e2e:calculated", () => run("e2e:calculated", ["scripts/e2e-calculated.mjs", path.join(outRoot, "calculated")])],
+	["e2e:trend-window", () => run("e2e:trend-window", ["--import", "tsx", "scripts/e2e-trend-window.mjs"])],
+	["e2e:strip", () => run("e2e:strip", ["scripts/e2e-strip.mjs"])],
+	["e2e:key-alerts", () => run("e2e:key-alerts", ["scripts/e2e-key-alerts.mjs"])],
 	["e2e:dead-fallback", () => run("e2e:dead-fallback", ["scripts/e2e-dead-fallback.mjs"])],
 	["e2e:native-edge", () => run("e2e:native-edge", ["scripts/e2e-native-edge.mjs"])],
 	["e2e:load", () => run("e2e:load", ["scripts/e2e-load.mjs"], { env: { ...process.env, LOAD_SOAK_SEC: "45" } })],
 	["e2e:drilldown", () => run("e2e:drilldown", ["scripts/e2e-drilldown.mjs"])],
 	["e2e:pi", () => run("e2e:pi", ["scripts/e2e-pi-persistence.mjs"])],
 	["e2e:pi-panels", () => run("e2e:pi-panels", ["--import", "tsx", "scripts/e2e-pi-panels.mjs"])],
+	["e2e:pi-keys", () => run("e2e:pi-keys", ["--import", "tsx", "scripts/e2e-pi-keys.mjs"])],
+	["e2e:pi-dial-alerts", () => run("e2e:pi-dial-alerts", ["--import", "tsx", "scripts/e2e-pi-dial-alerts.mjs"])],
+	["e2e:pi-strip", () => run("e2e:pi-strip", ["--import", "tsx", "scripts/e2e-pi-strip.mjs"])],
+	["e2e:pi-l10n", () => run("e2e:pi-l10n", ["--import", "tsx", "scripts/e2e-pi-l10n.mjs"])],
+	["e2e:pi-help", () => run("e2e:pi-help", ["--import", "tsx", "scripts/e2e-pi-help.mjs"])],
 	["e2e:socket-close", () => run("e2e:socket-close", ["scripts/e2e-socket-close.mjs"])],
 	// After the timing-sensitive UI suites: its 10k-read soak saturates a
 	// core, which can flake the frame-timing assertions above.

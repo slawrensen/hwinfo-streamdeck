@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PLUGIN_ROOT, SHIPPED_MEMBERS } from "./pack-contract.mjs";
+import { buildPe } from "./pe-fixture.mjs";
 import { writeZip } from "./zip.mjs";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -29,7 +30,7 @@ export function makeStaging(prefix = "hwinfo-pack-fixture-") {
 
 export function fixtureContent(rel, manifest) {
 	if (rel === "manifest.json") return `${JSON.stringify(manifest, null, "\t")}\n`;
-	if (rel === "bin/hwsm.node") return Buffer.concat([Buffer.from("MZ"), Buffer.alloc(200, 7)]);
+	if (rel === "bin/hwsm.node") return buildPe({ pdb: "hwsm.pdb", code: Buffer.from("fixture hwsm code") });
 	if (rel === "bin/plugin.js") return "const bridge = require(\"./hwsm.node\");\nconsole.log(bridge);\n";
 	if (rel === "bin/package.json") return "{\"type\":\"module\"}";
 	return `fixture content of ${rel}\n`;

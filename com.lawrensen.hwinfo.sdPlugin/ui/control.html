@@ -3,9 +3,9 @@
 	<head>
 		<meta charset="utf-8" />
 		<title>HWiNFO Control settings</title>
-		<script src="sdpi-components.js"></script>
+		<script src="pi-client.js?v=1.8.0.0-54"></script>
 		<!-- ?v= busts the webview cache; bump it with the plugin version. -->
-		<link rel="stylesheet" href="pi.css?v=1.7.1.0-1" />
+		<link rel="stylesheet" href="pi.css?v=1.8.0.0-54" />
 	</head>
 	<body data-kind="control">
 		<header class="hw-head" id="hw-head" data-kind="control">
@@ -21,7 +21,7 @@
 				<p class="hw-head-source" id="control-target">Sends to every dial</p>
 			</div>
 		</header>
-		<p class="hw-lede">Steers Sensor Dial actions from any key, pedal, G-key or Multi Action step, on this or another Stream Deck. The key shows a tick when the command reached at least one dial and an alert when none matched.</p>
+		<p class="hw-lede">Steers Sensor Dial actions from any key, pedal, G-key or Multi Action step, on this or another Stream Deck. The key shows a tick when the command reached at least one dial (a strip, for the Strip commands) and an alert when none matched.</p>
 
 		<details class="hw-sec" id="sec-command" open>
 			<summary><span class="hw-sec-title">Command</span><span class="hw-sec-sum" data-summary="command"></span></summary>
@@ -45,21 +45,33 @@
 						<option value="unpin">Unpin reading</option>
 						<option value="togglePin">Pin/unpin reading</option>
 						<option value="resetStats">Reset session stats</option>
+						<option value="snoozeAlerts">Snooze alerts</option>
+						<option value="unsnoozeAlerts">End alert snooze</option>
+						<option value="stripLive">Strip: back to live</option>
+						<option value="stripInspect">Strip: inspect (pause the view)</option>
+						<option value="stripToggleInspect">Strip: inspect or back to live</option>
+						<option value="stripWindowNext">Strip: longer time window</option>
+						<option value="stripWindowPrev">Strip: shorter time window</option>
+						<option value="stripSeriesNext">Strip: highlight next reading</option>
+						<option value="stripSeriesPrev">Strip: highlight previous reading</option>
+						<option value="stripScreenNext">Strip: next screen</option>
+						<option value="stripScreenPrev">Strip: previous screen</option>
+						<option value="stripScreenFirst">Strip: first screen</option>
 					</select>
 				</div>
 				<div class="hw-field" id="reset-reach">
-					<label for="f-reset">A reset clears</label>
+					<label for="f-reset">A stats reset clears</label>
 					<select id="f-reset" data-setting="resetScope" data-default="current" aria-describedby="reset-help">
 						<option value="current">The dial's current reading</option>
 						<option value="set">The dial's rotation set</option>
 						<option value="all">Every dial, everywhere (use with care)</option>
 					</select>
-					<p class="hw-help" id="reset-help">"Every dial, everywhere" ignores the Target and clears session stats on all dials, on all Stream Decks, including hidden ones.</p>
+					<p class="hw-help" id="reset-help">"Every dial, everywhere" ignores the Link ID and clears session stats on all dials, on all Stream Decks, including hidden ones.</p>
 				</div>
 				<div class="hw-field">
-					<label for="f-target">Target</label>
+					<label for="f-target">Link ID</label>
 					<input id="f-target" type="text" data-setting="target" placeholder="Every dial" aria-describedby="target-help" autocomplete="off" spellcheck="false" />
-					<p class="hw-help" id="target-help">A Link ID (set on a dial under Controls) steers only the dials that carry it.</p>
+					<p class="hw-help" id="target-help"><span id="target-text">Steers only the dials with this Link ID.</span><span id="snooze-help" hidden> Each uses its own snooze length.</span></p>
 				</div>
 			</div>
 		</details>
@@ -72,9 +84,10 @@
 			</div>
 		</details>
 
-		<script src="pi-model.js?v=1.7.1.0-1"></script>
-		<script src="pi-shell.js?v=1.7.1.0-1"></script>
-		<script src="pi-command.js?v=1.7.1.0-1"></script>
-		<script src="pi-control.js?v=1.7.1.0-1"></script>
+		<script src="pi-model.js?v=1.8.0.0-54"></script>
+		<script src="pi-strings.js?v=1.8.0.0-54"></script>
+		<script src="pi-shell.js?v=1.8.0.0-54"></script>
+		<script src="pi-command.js?v=1.8.0.0-54"></script>
+		<script src="pi-control.js?v=1.8.0.0-54"></script>
 	</body>
 </html>

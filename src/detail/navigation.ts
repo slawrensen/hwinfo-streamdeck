@@ -9,12 +9,38 @@
  * previous-profile hop), and pagination never switches profiles at all —
  * it only moves plugin state inside the one active page.
  */
+import type { JsonValue } from "@elgato/utils";
+
 import { monotonicNow } from "../clock";
+import type { SnapshotSource } from "../hwinfo/provider";
 import type { SensorSnapshot } from "../hwinfo/types";
+import { referencedSlotKeys } from "../alerts/key-alerts";
+import { stampForLimitsCopy } from "../alerts/rules";
 import { isStatMode, nextStatMode, type DecimalsSetting, type StatMode } from "../ui/format";
+import { formatsForKeys } from "../ui/reading-format";
 import { pageOf, projectDetailTiles, resolveDetailGroup, type DetailGroup, type DetailGroupSettings, type DetailPage } from "./detail-group";
-import { detailDensityOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
-import { detailProfileFor, readingSlotCapacity } from "./managed-profiles";
+import { detailSourceOf, type DetailSource } from "./detail-scope";
+import { detailDensityOf, detailGapsOf, detailModeOf, detailTilesOf, type DetailDensity, type DetailTileSpec } from "./detail-settings";
+import { detailProfileFor, readingSlotCapacity, type ManagedDetailProfile, type SlotCell } from "./managed-profiles";
+import { gapSignature, reservedSlotsFor } from "./placement";
+
+/** The opener's formats a detail session carries: the entries the key face
+ * itself can find for the readings it draws, that is under each slot's
+ * saved key and under every key of that slot reading's own walk (its key,
+ * then its confirmed aliases, as readingFormatEntryOf looks), so an entry
+ * filed under a linked spelling formats the tiles and the Back tile exactly
+ * as it formats the key. Nothing when there are none. */
+function formatsPresentation(settings: Parameters<typeof referencedSlotKeys>[0] & { readingFormats?: JsonValue }, snapshot: SensorSnapshot | null): { readingFormats?: JsonValue } {
+	const keys: (string | undefined)[] = [];
+	for (const slot of referencedSlotKeys(settings)) {
+		if (slot === undefined) continue;
+		keys.push(slot);
+		const reading = snapshot?.byKey.get(slot);
+		if (reading !== undefined) keys.push(reading.key, ...(reading.linkedKeys ?? []));
+	}
+	const carried = formatsForKeys(settings.readingFormats, keys);
+	return carried === undefined ? {} : { readingFormats: carried as JsonValue };
+}
 
 export type SwitchProfileFn = (deviceId: string, profileName?: string, page?: number) => Promise<void>;
 
@@ -28,9 +54,30 @@ export type DetailPresentation = {
 	readonly textMode?: string;
 	readonly textColor?: string;
 	readonly textDimSecondary?: boolean;
+	/** The opener's key look and accent words, carried verbatim (read only
+	 * through keyBackgroundOf and keyAccentWordsOf): the detail tiles draw
+	 * in the opener's look as they draw in its theme. */
+	readonly keyBackground?: string;
+	readonly keyAccentWords?: boolean;
+	/** The opener's Sky (its keyStars and keySkyColor), carried verbatim
+	 * (read only through keySkyFor). */
+	readonly keyStars?: string;
+	readonly keySkyColor?: string;
 	readonly warnValue?: string;
 	readonly critValue?: string;
 	readonly alertBelow?: boolean;
+	/** The opener's per-reading limits and its stamped display unit, for
+	 * the Back tile's stateless fallback (the same rule resolution the key
+	 * face uses); carried verbatim, never parsed here. */
+	readonly alertRules?: JsonValue;
+	readonly alertDisplayUnit?: JsonValue;
+	/** What alertDisplayUnit was saved with (rules.ts stampedDisplayUnit). */
+	readonly alertDisplayUnitFor?: JsonValue;
+	/** The opener's per-reading formats (issue #59), only the entries the
+	 * key face can find for the readings it draws (each slot's saved key and
+	 * that reading's own key walk, formatsPresentation at entry), carried as
+	 * stored and resolved by the faces like the key resolves them. */
+	readonly readingFormats?: JsonValue;
 };
 
 export type DeviceDetailState = {
@@ -57,9 +104,29 @@ export type DeviceDetailState = {
 	/** The reading-slot index acting as the mirror Back (controller-fed
 	 *  from the registered slots' coordinates); null = no mirror. */
 	mirrorSlotIndex: number | null;
+	/** The action context of the key that opened the view, so the Back
+	 *  tile shows that key's live alert state (dwell, recovery, snooze)
+	 *  rather than a stateless comparison. Absent when unknown. */
+	readonly openerContext?: string;
 	offset: number;
 	/** Ephemeral per-reading stat modes for this detail session. */
 	readonly statModes: Map<string, StatMode>;
+	/** The bundle this session runs on; the opener's intentional empty
+	 *  cells are kept per bundle. Absent on states built outside enter(). */
+	readonly bundle?: ManagedDetailProfile["key"];
+	/** The opener's intentional empty cells on that bundle, per logical
+	 *  page (detailGaps, captured at entry like every other list knob).
+	 *  Absent or empty = the original flow. */
+	readonly gapCells?: readonly (readonly SlotCell[])[];
+	/** Reading-slot index per registered cell ("column,row"), fed by the
+	 *  controller from the slots' own coordinates, so a gap follows the
+	 *  slot the user sees at that position even on a page whose slot
+	 *  actions were moved. */
+	slotIndexByCell?: ReadonlyMap<string, number>;
+	/** The source of the opener's own reading, as detailScope names it;
+	 *  undefined until the reading resolves. Re-resolved on fresh data and
+	 *  kept while it does not resolve, like the group. */
+	openerSource?: DetailSource;
 	/** Registered visible detail slots on this device (controller-fed). */
 	surfaceCount: number;
 	/** True until the first detail slot appears after the switch. */
@@ -171,8 +238,8 @@ export class DetailNavigator {
 	 * stays `pending` until a detail slot appears and quietly expires when
 	 * none ever does.
 	 */
-	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation & { detailDensity?: unknown; detailTiles?: unknown }; snapshot: SensorSnapshot | null; openerCell?: { column: number; row: number } }): Promise<EnterResult> {
-		const { deviceId, deviceType, grid, settings, snapshot, openerCell } = request;
+	async enter(request: { deviceId: string; deviceType: number | undefined; grid?: { columns: number; rows: number }; settings: DetailGroupSettings & DetailPresentation & { detailDensity?: unknown; detailTiles?: unknown; detailGaps?: unknown; keyLayout?: unknown; secondaryReadingKey?: unknown; quadReadingKey3?: unknown; quadReadingKey4?: unknown }; snapshot: SensorSnapshot | null; source?: SnapshotSource; openerCell?: { column: number; row: number }; openerContext?: string }): Promise<EnterResult> {
+		const { deviceId, deviceType, grid, settings, snapshot, source, openerCell, openerContext } = request;
 		const profile = detailProfileFor(deviceType, grid);
 		if (profile === undefined) {
 			this.deps.log?.info(`Detail entry refused: no bundled profile for device type ${deviceType ?? "unknown"}`);
@@ -248,13 +315,29 @@ export class DetailNavigator {
 				textMode: settings.textMode,
 				textColor: settings.textColor,
 				textDimSecondary: settings.textDimSecondary,
+				...(settings.keyBackground !== undefined ? { keyBackground: settings.keyBackground } : {}),
+				...(settings.keyAccentWords !== undefined ? { keyAccentWords: settings.keyAccentWords } : {}),
+				...(settings.keyStars !== undefined ? { keyStars: settings.keyStars } : {}),
+				...(settings.keySkyColor !== undefined ? { keySkyColor: settings.keySkyColor } : {}),
 				warnValue: settings.warnValue,
 				critValue: settings.critValue,
-				alertBelow: settings.alertBelow
+				alertBelow: settings.alertBelow,
+				...(settings.alertRules !== undefined ? { alertRules: settings.alertRules } : {}),
+				// The stamp only while it covers the numbers copied, re-recorded
+				// for the two the copy carries.
+				...(stampForLimitsCopy(settings) ?? {}),
+				...formatsPresentation(settings, snapshot)
 			},
 			group,
+			bundle: profile.key,
+			// Positional, so they apply in every mode; another bundle's cells
+			// (a Virtual Stream Deck that now fits a different layout) never do.
+			gapCells: detailGapsOf(settings, profile),
+			slotIndexByCell: new Map(),
+			openerSource: snapshot === null || source === undefined ? undefined : detailSourceOf(snapshot, group.primaryKey, source),
 			openerCell: openerCell === undefined ? null : { column: openerCell.column, row: openerCell.row },
 			mirrorSlotIndex: null,
+			...(openerContext !== undefined ? { openerContext } : {}),
 			offset: 0,
 			statModes: new Map(),
 			surfaceCount: 0,
@@ -359,9 +442,20 @@ export class DetailNavigator {
 		this.deps.onChanged?.(deviceId);
 	}
 
-	/** The current logical page projection for a device's state. */
+	/** The current logical page projection for a device's state. Without
+	 *  a gap that maps onto a registered slot this is the original single
+	 *  mirror index, byte for byte; with one, each page reserves the mirror
+	 *  plus its own gaps (see placement.ts). */
 	pageFor(state: DeviceDetailState): DetailPage {
-		return pageOf(state.group.keys, state.offset, state.pageSize, state.mirrorSlotIndex ?? undefined, state.density, projectDetailTiles(state.group, state.tilePlan));
+		const reserved = state.gapCells === undefined || state.gapCells.length === 0 ? undefined : reservedSlotsFor(state.gapCells, state.slotIndexByCell ?? new Map(), state.mirrorSlotIndex, state.pageSize);
+		return pageOf(state.group.keys, state.offset, state.pageSize, reserved ?? state.mirrorSlotIndex ?? undefined, state.density, projectDetailTiles(state.group, state.tilePlan));
+	}
+
+	/** The source of the opener this device's detail page was opened
+	 *  from, as detailScope names it; undefined with no session or while
+	 *  the opener's reading has not resolved. */
+	openerSourceFor(deviceId: string): DetailSource | undefined {
+		return this.states.get(deviceId)?.openerSource;
 	}
 
 	/**
@@ -391,6 +485,25 @@ export class DetailNavigator {
 		}
 		state.mirrorSlotIndex = index;
 		this.deps.onChanged?.(deviceId);
+	}
+
+	/**
+	 * Controller: the reading-slot index of every registered cell on this
+	 * device, so the opener's gap cells map onto the slots actually there.
+	 * Stored on every change; a repaint follows only when the slots a gap
+	 * reserves moved (a session without gaps never repaints for this).
+	 */
+	setSlotCells(deviceId: string, cells: ReadonlyMap<string, number>): void {
+		const state = this.states.get(deviceId);
+		if (state === undefined) {
+			return;
+		}
+		const gaps = state.gapCells ?? [];
+		const before = gaps.length === 0 ? "" : gapSignature(gaps, state.slotIndexByCell ?? new Map(), state.pageSize);
+		state.slotIndexByCell = cells;
+		if (gaps.length > 0 && gapSignature(gaps, cells, state.pageSize) !== before) {
+			this.deps.onChanged?.(deviceId);
+		}
 	}
 
 	/** A detail tile press cycles its readings' session-local stat mode:
@@ -423,10 +536,20 @@ export class DetailNavigator {
 	 * the last valid list is ridden on and the offset stays put. Custom
 	 * groups re-project only their configured keys (order is theirs).
 	 */
-	refresh(deviceId: string, snapshot: SensorSnapshot | null): void {
+	refresh(deviceId: string, snapshot: SensorSnapshot | null, source?: SnapshotSource): void {
 		const state = this.states.get(deviceId);
 		if (state === undefined || snapshot === null) {
 			return;
+		}
+		if (source !== undefined) {
+			// The opener's source follows the data source in use (a fallback
+			// to Gadget names it differently) and rides its last value while
+			// the reading does not resolve. Scoped keys repaint on a change.
+			const next = detailSourceOf(snapshot, state.primaryKey, source);
+			if (next !== undefined && (next.id !== state.openerSource?.id || next.name !== state.openerSource.name)) {
+				state.openerSource = next;
+				this.deps.onChanged?.(deviceId);
+			}
 		}
 		const group = resolveDetailGroup(snapshot, state.groupSettings);
 		if (group === null) {

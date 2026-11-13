@@ -21,7 +21,9 @@ export const MAGIC_ACTIVE = 0x53695748;
 /** Magic left behind when HWiNFO disables shared-memory support ("DEAD"). */
 export const MAGIC_DEAD = 0x44414544;
 
-/** Fixed header: 3×u32, i64, 6×u32. */
+/** Fixed header: 3×u32, i64, 6×u32. A newer header is longer (its sensor
+ * section starts later) and holds HEADER.pollingPeriod past this size, which
+ * nothing validates against: an older one simply has no such field. */
 export const HEADER_SIZE = 44;
 export const HEADER = {
 	magic: 0,
@@ -33,7 +35,8 @@ export const HEADER = {
 	sensorElementCount: 28,
 	entrySectionOffset: 32,
 	entryElementSize: 36,
-	entryElementCount: 40
+	entryElementCount: 40,
+	pollingPeriod: 44 // u32, ms between HWiNFO's scans; only when the sensor section starts at 48 or later
 } as const;
 
 /**

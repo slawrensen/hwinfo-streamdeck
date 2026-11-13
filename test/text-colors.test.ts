@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { appliedTextMode, contrastRatio, CUSTOM_SECONDARY_BLEND, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, effectiveTextSettings, mixToward, noDimmerThan, parseTextSettings, quadIdentityColor, readableColor, readableValueColor, resolveTextColors, themeTextColors, type QuadIdentity, type TextSettings } from "../src/ui/text-colors";
+import { appliedTextMode, automaticIdentityColor, contrastRatio, CUSTOM_SECONDARY_BLEND, DIM_SECONDARY_BLEND, DIM_VALUE_BLEND, effectiveTextSettings, mixToward, noDimmerThan, parseTextSettings, quadIdentityColor, readableColor, readableValueColor, resolveTextColors, themeTextColors, type QuadIdentity, type TextSettings } from "../src/ui/text-colors";
 import { loadThemes, resolvePalette } from "../src/ui/themes";
 import { QUAD_DEFAULT_COLORS } from "../src/ui/key-renderer";
 import { contrast } from "./wcag";
@@ -253,6 +253,34 @@ describe("quadIdentityColor", () => {
 		const text = resolveTextColors(VOID, dim, "normal");
 		assert.equal(quadIdentityColor(identity, false, dim, text, VOID), readableValueColor(mixToward(identity.color, VOID.bg, DIM_VALUE_BLEND), VOID.bg));
 		assert.equal(quadIdentityColor(identity, true, dim, text, VOID), readableValueColor(mixToward(identity.color, VOID.bg, DIM_SECONDARY_BLEND), VOID.bg));
+	});
+
+	it("the cached automatic lift equals the uncached one on every hue, mode, role and surface, past the cache bound", () => {
+		// Shipped surfaces (every theme, and Glass's hardest panels via the
+		// key renderer) plus random ones; random hues overflow the 128-entry
+		// bound so the clear-and-refill path runs too, and a second pass asks
+		// again after the clears.
+		let seed = 0x5eed;
+		const next = (): number => {
+			seed = (seed * 1103515245 + 12345) >>> 0;
+			return seed;
+		};
+		const hex = (): string => `#${(next() & 0xffffff).toString(16).padStart(6, "0").toUpperCase()}`;
+		const surfaces = [...Object.values(config.themes).map((p) => p.bg), "#3B434F", "#000000", "#FFFFFF", ...Array.from({ length: 12 }, hex)];
+		const hues = [...QUAD_DEFAULT_COLORS, ...Array.from({ length: 40 }, hex)];
+		const cases: Array<[string, "theme" | "dim", boolean, string]> = [];
+		for (const bg of surfaces) for (const color of hues) for (const mode of ["theme", "dim"] as const) for (const labeled of [false, true]) cases.push([color, mode, labeled, bg]);
+		assert.ok(cases.length > 1000, "enough cases to pass the bound many times");
+		for (let pass = 0; pass < 2; pass++) {
+			for (const [color, mode, labeled, bg] of cases) {
+				const settings: TextSettings = { mode, color: undefined, dimSecondary: false };
+				const want = automaticIdentityColor(color, mode, labeled, bg);
+				assert.equal(want, readableValueColor(mode === "dim" ? mixToward(color, bg, labeled ? DIM_SECONDARY_BLEND : DIM_VALUE_BLEND) : color, bg));
+				const text = resolveTextColors({ ...VOID, bg }, settings, "normal");
+				assert.equal(quadIdentityColor({ color, chosen: false }, labeled, settings, text, { bg }), want, `${color} ${mode} ${labeled} on ${bg}`);
+				assert.equal(quadIdentityColor({ color, chosen: false }, labeled, settings, text, { bg }), want, `${color} ${mode} ${labeled} on ${bg}, asked again`);
+			}
+		}
 	});
 });
 

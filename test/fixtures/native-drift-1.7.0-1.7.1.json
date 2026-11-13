@@ -1,0 +1,355 @@
+{
+	"source": "hwsm.node of the v1.7.0 and v1.7.1 GitHub releases (CI runs 38174409495 and 40072008109): their published release-native-manifest.json files, and the PE facts scripts/lib/pe.mjs reads from the binaries inside the release packs. Same native source id; only the runner image moved.",
+	"v1.7.0": {
+		"manifest": {
+			"file": "hwsm.node",
+			"sha256": "4066d09cf89e20797932f98cea89df9b95c896a5e3503abb40f786a8e9795abe",
+			"byteSize": 156160,
+			"machine": "x64",
+			"linkerVersion": "14.51",
+			"imports": [
+				"KERNEL32.dll",
+				"ADVAPI32.dll"
+			],
+			"delayImports": [
+				"node.exe"
+			],
+			"hardening": {
+				"highEntropyVa": true,
+				"dynamicBase": true,
+				"nxCompat": true,
+				"controlFlowGuard": true,
+				"cetCompat": true,
+				"reproducibleLink": true
+			},
+			"napiVersion": 8,
+			"protocolVersion": 1,
+			"nativeVersion": "1.1.0",
+			"nativeSourceId": "9a59578e9b066121",
+			"compileDefines": [
+				"NAPI_VERSION=8"
+			],
+			"compilerVersion": "19.51.36260",
+			"windowsSdkVersion": "10.0.26100.0",
+			"buildNodeVersion": "v20.20.2",
+			"buildWorkflowRun": "https://github.com/slawrensen/hwinfo-streamdeck/actions/runs/38174409495"
+		},
+		"pe": {
+			"sections": [
+				{
+					"name": ".text",
+					"rawPointer": 1024,
+					"rawSize": 91136,
+					"sha256": "ac83825fc5fc98401f3c0f3ea7e470aac23ee2dd436d8f69367cdb571a1a57fd"
+				},
+				{
+					"name": ".rdata",
+					"rawPointer": 92160,
+					"rawSize": 50688,
+					"sha256": "1bcb66cefa16a1db021a51a65b76360788a902959f911fca84e9b4ec981c7d0f"
+				},
+				{
+					"name": ".data",
+					"rawPointer": 142848,
+					"rawSize": 3072,
+					"sha256": "b9c2f6198b82468dea60bdfea27751da77627983cb53cd3b00e26023a99d87e2"
+				},
+				{
+					"name": ".pdata",
+					"rawPointer": 145920,
+					"rawSize": 5632,
+					"sha256": "44a146bc55fb97a04120e855f90233ebf77a0917bff8ba4a073f9faa183ef7c7"
+				},
+				{
+					"name": ".didat",
+					"rawPointer": 151552,
+					"rawSize": 512,
+					"sha256": "d49a9d95b1452cc36a6c8f4bbda6d63a167dcd9ade340db57d3b9bdc7c6aa141"
+				},
+				{
+					"name": ".fptable",
+					"rawPointer": 152064,
+					"rawSize": 512,
+					"sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+				},
+				{
+					"name": ".rsrc",
+					"rawPointer": 152576,
+					"rawSize": 1536,
+					"sha256": "6e888dfb2ed18247f0f3b8547260c5af5dd996c5ddbf293c38a02d29481cb3dd"
+				},
+				{
+					"name": ".reloc",
+					"rawPointer": 154112,
+					"rawSize": 2048,
+					"sha256": "aa082a8f4f58e7d0f290a33f398e61c9f02cade661df79f0fc4ac671ccf5c9c6"
+				}
+			],
+			"importHints": {
+				"KERNEL32.dll": {
+					"OpenFileMappingW": 1079,
+					"UnmapViewOfFile": 1534,
+					"GetLastError": 653,
+					"HeapReAlloc": 899,
+					"ReleaseMutex": 1254,
+					"HeapAlloc": 892,
+					"GetProcessHeap": 740,
+					"MapViewOfFile": 1042,
+					"OpenMutexW": 1083,
+					"LoadLibraryExA": 1013,
+					"WaitForSingleObject": 1573,
+					"HeapFree": 896,
+					"CloseHandle": 157,
+					"GetModuleHandleA": 674,
+					"QueryPerformanceCounter": 1153,
+					"GetCurrentProcessId": 578,
+					"GetCurrentThreadId": 582,
+					"GetSystemTimeAsFileTime": 794,
+					"InitializeSListHead": 922,
+					"SetUnhandledExceptionFilter": 1464,
+					"GetStartupInfoW": 769,
+					"GetModuleHandleW": 677,
+					"RtlUnwindEx": 1303,
+					"InterlockedFlushSList": 926,
+					"SetLastError": 1400,
+					"FlsAlloc": 450,
+					"FlsGetValue": 452,
+					"FlsSetValue": 454,
+					"FlsFree": 451,
+					"EnterCriticalSection": 343,
+					"LeaveCriticalSection": 1008,
+					"InitializeCriticalSectionEx": 919,
+					"DeleteCriticalSection": 303,
+					"RtlLookupFunctionEntry": 1297,
+					"EncodePointer": 339,
+					"RaiseException": 1176,
+					"RtlPcToFileHeader": 1299,
+					"GetCurrentProcess": 577,
+					"ExitProcess": 390,
+					"TerminateProcess": 1496,
+					"FreeLibrary": 468,
+					"GetModuleHandleExW": 676,
+					"GetProcAddress": 733,
+					"GetModuleFileNameW": 673,
+					"IsProcessorFeaturePresent": 952,
+					"RtlCaptureContext": 1289,
+					"RtlVirtualUnwind": 1304,
+					"IsDebuggerPresent": 944,
+					"UnhandledExceptionFilter": 1531,
+					"GetStdHandle": 771,
+					"GetFileType": 634,
+					"FindClose": 413,
+					"FindFirstFileExW": 419,
+					"FindNextFileW": 436,
+					"IsValidCodePage": 958,
+					"GetACP": 475,
+					"GetOEMCP": 710,
+					"GetCPInfo": 490,
+					"GetCommandLineA": 511,
+					"GetCommandLineW": 512,
+					"MultiByteToWideChar": 1059,
+					"WideCharToMultiByte": 1612,
+					"GetEnvironmentStringsW": 610,
+					"FreeEnvironmentStringsW": 467,
+					"VirtualProtect": 1562,
+					"LoadLibraryExW": 1014,
+					"LCMapStringW": 996,
+					"GetStringTypeW": 776,
+					"SetFilePointerEx": 1385,
+					"SetStdHandle": 1427,
+					"HeapSize": 901,
+					"FlushFileBuffers": 456,
+					"WriteFile": 1632,
+					"GetConsoleOutputCP": 553,
+					"GetConsoleMode": 549,
+					"CreateFileW": 230,
+					"WriteConsoleW": 1631,
+					"GetSystemInfo": 788,
+					"VirtualQuery": 1564
+				},
+				"ADVAPI32.dll": {
+					"RegOpenKeyExW": 648,
+					"RegQueryValueExW": 661,
+					"RegCloseKey": 599
+				}
+			},
+			"headersNeutralSha256": "8aeddb160249b9fddee8cbc3f519f90d6c2db4b4922d003efce0ff87bbecf8a9"
+		}
+	},
+	"v1.7.1": {
+		"manifest": {
+			"file": "hwsm.node",
+			"sha256": "7aa0d75a88f0b70fa0ac1568b1810f499769a73d1def413adb89cab86a3e784f",
+			"byteSize": 156160,
+			"machine": "x64",
+			"linkerVersion": "14.51",
+			"imports": [
+				"KERNEL32.dll",
+				"ADVAPI32.dll"
+			],
+			"delayImports": [
+				"node.exe"
+			],
+			"hardening": {
+				"highEntropyVa": true,
+				"dynamicBase": true,
+				"nxCompat": true,
+				"controlFlowGuard": true,
+				"cetCompat": true,
+				"reproducibleLink": true
+			},
+			"napiVersion": 8,
+			"protocolVersion": 1,
+			"nativeVersion": "1.1.0",
+			"nativeSourceId": "9a59578e9b066121",
+			"compileDefines": [
+				"NAPI_VERSION=8"
+			],
+			"compilerVersion": "19.51.36260",
+			"windowsSdkVersion": "10.0.26100.0",
+			"buildNodeVersion": "v20.20.2",
+			"buildWorkflowRun": "https://github.com/slawrensen/hwinfo-streamdeck/actions/runs/40072008109"
+		},
+		"pe": {
+			"sections": [
+				{
+					"name": ".text",
+					"rawPointer": 1024,
+					"rawSize": 91136,
+					"sha256": "ac83825fc5fc98401f3c0f3ea7e470aac23ee2dd436d8f69367cdb571a1a57fd"
+				},
+				{
+					"name": ".rdata",
+					"rawPointer": 92160,
+					"rawSize": 50688,
+					"sha256": "c2cb67fff6c9512dfb06a59c1bc61c8419aafca441b0c1fba1e03095b760324e"
+				},
+				{
+					"name": ".data",
+					"rawPointer": 142848,
+					"rawSize": 3072,
+					"sha256": "b9c2f6198b82468dea60bdfea27751da77627983cb53cd3b00e26023a99d87e2"
+				},
+				{
+					"name": ".pdata",
+					"rawPointer": 145920,
+					"rawSize": 5632,
+					"sha256": "44a146bc55fb97a04120e855f90233ebf77a0917bff8ba4a073f9faa183ef7c7"
+				},
+				{
+					"name": ".didat",
+					"rawPointer": 151552,
+					"rawSize": 512,
+					"sha256": "d49a9d95b1452cc36a6c8f4bbda6d63a167dcd9ade340db57d3b9bdc7c6aa141"
+				},
+				{
+					"name": ".fptable",
+					"rawPointer": 152064,
+					"rawSize": 512,
+					"sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+				},
+				{
+					"name": ".rsrc",
+					"rawPointer": 152576,
+					"rawSize": 1536,
+					"sha256": "6e888dfb2ed18247f0f3b8547260c5af5dd996c5ddbf293c38a02d29481cb3dd"
+				},
+				{
+					"name": ".reloc",
+					"rawPointer": 154112,
+					"rawSize": 2048,
+					"sha256": "aa082a8f4f58e7d0f290a33f398e61c9f02cade661df79f0fc4ac671ccf5c9c6"
+				}
+			],
+			"importHints": {
+				"KERNEL32.dll": {
+					"OpenFileMappingW": 1084,
+					"UnmapViewOfFile": 1539,
+					"GetLastError": 658,
+					"HeapReAlloc": 904,
+					"ReleaseMutex": 1259,
+					"HeapAlloc": 897,
+					"GetProcessHeap": 745,
+					"MapViewOfFile": 1047,
+					"OpenMutexW": 1088,
+					"LoadLibraryExA": 1018,
+					"WaitForSingleObject": 1578,
+					"HeapFree": 901,
+					"CloseHandle": 162,
+					"GetModuleHandleA": 679,
+					"QueryPerformanceCounter": 1158,
+					"GetCurrentProcessId": 583,
+					"GetCurrentThreadId": 587,
+					"GetSystemTimeAsFileTime": 799,
+					"InitializeSListHead": 927,
+					"SetUnhandledExceptionFilter": 1469,
+					"GetStartupInfoW": 774,
+					"GetModuleHandleW": 682,
+					"RtlUnwindEx": 1308,
+					"InterlockedFlushSList": 931,
+					"SetLastError": 1405,
+					"FlsAlloc": 455,
+					"FlsGetValue": 457,
+					"FlsSetValue": 459,
+					"FlsFree": 456,
+					"EnterCriticalSection": 348,
+					"LeaveCriticalSection": 1013,
+					"InitializeCriticalSectionEx": 924,
+					"DeleteCriticalSection": 308,
+					"RtlLookupFunctionEntry": 1302,
+					"EncodePointer": 344,
+					"RaiseException": 1181,
+					"RtlPcToFileHeader": 1304,
+					"GetCurrentProcess": 582,
+					"ExitProcess": 395,
+					"TerminateProcess": 1501,
+					"FreeLibrary": 473,
+					"GetModuleHandleExW": 681,
+					"GetProcAddress": 738,
+					"GetModuleFileNameW": 678,
+					"IsProcessorFeaturePresent": 957,
+					"RtlCaptureContext": 1294,
+					"RtlVirtualUnwind": 1309,
+					"IsDebuggerPresent": 949,
+					"UnhandledExceptionFilter": 1536,
+					"GetStdHandle": 776,
+					"GetFileType": 639,
+					"FindClose": 418,
+					"FindFirstFileExW": 424,
+					"FindNextFileW": 441,
+					"IsValidCodePage": 963,
+					"GetACP": 480,
+					"GetOEMCP": 715,
+					"GetCPInfo": 495,
+					"GetCommandLineA": 516,
+					"GetCommandLineW": 517,
+					"MultiByteToWideChar": 1064,
+					"WideCharToMultiByte": 1617,
+					"GetEnvironmentStringsW": 615,
+					"FreeEnvironmentStringsW": 472,
+					"VirtualProtect": 1567,
+					"LoadLibraryExW": 1019,
+					"LCMapStringW": 1001,
+					"GetStringTypeW": 781,
+					"SetFilePointerEx": 1390,
+					"SetStdHandle": 1432,
+					"HeapSize": 906,
+					"FlushFileBuffers": 461,
+					"WriteFile": 1637,
+					"GetConsoleOutputCP": 558,
+					"GetConsoleMode": 554,
+					"CreateFileW": 235,
+					"WriteConsoleW": 1636,
+					"GetSystemInfo": 793,
+					"VirtualQuery": 1569
+				},
+				"ADVAPI32.dll": {
+					"RegOpenKeyExW": 648,
+					"RegQueryValueExW": 661,
+					"RegCloseKey": 599
+				}
+			},
+			"headersNeutralSha256": "be2d11c868499f08b165695867dbdd7ca80490f710e10face7f1a32f9c3a4fec"
+		}
+	}
+}

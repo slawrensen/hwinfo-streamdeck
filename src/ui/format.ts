@@ -1,5 +1,6 @@
 /** Value formatting, unit conversion and stat-mode selection. */
 import type { Reading } from "../hwinfo/types";
+import { t } from "../i18n";
 import { faceFont, isTahoma, SEGOE_UI } from "./face-font";
 
 export type StatMode = "current" | "min" | "max" | "avg";
@@ -7,13 +8,20 @@ export type DecimalsSetting = "auto" | "0" | "1" | "2" | "3";
 
 export const STAT_MODES: readonly StatMode[] = ["current", "min", "max", "avg"];
 
-/** Short badge shown when a non-current stat is displayed. */
-export const STAT_BADGE: Record<StatMode, string> = {
+/** Short badge shown when a non-current stat is displayed, in the active
+ * language (src/i18n.ts; English MIN, MAX, AVG). */
+export const STAT_BADGE: Readonly<Record<StatMode, string>> = Object.freeze({
 	current: "",
-	min: "MIN",
-	max: "MAX",
-	avg: "AVG"
-};
+	get min(): string {
+		return t("badge.min");
+	},
+	get max(): string {
+		return t("badge.max");
+	},
+	get avg(): string {
+		return t("badge.avg");
+	}
+});
 
 export function isStatMode(value: unknown): value is StatMode {
 	return typeof value === "string" && (STAT_MODES as readonly string[]).includes(value);
@@ -40,31 +48,57 @@ export function statValue(reading: Reading, mode: StatMode): number {
 
 /** An unavailable historical field must never wear a numeric MIN/MAX/AVG. */
 export function readingStatBadge(reading: Reading | undefined, mode: StatMode): string {
-	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? "N/A" : STAT_BADGE[mode];
+	return mode !== "current" && reading !== undefined && !Number.isFinite(statValue(reading, mode)) ? t("badge.unavailable") : STAT_BADGE[mode];
 }
 
 /** One badge shared by several rows reads N/A only when no present row has
  * the stat; while any row has it, the badge names the stat, as 1.6.0's did. */
 export function sharedStatBadge(readings: ReadonlyArray<Reading | undefined>, mode: StatMode): string {
 	const present = readings.filter((reading): reading is Reading => reading !== undefined);
-	return mode !== "current" && present.length > 0 && present.every((reading) => !Number.isFinite(statValue(reading, mode))) ? "N/A" : STAT_BADGE[mode];
+	return mode !== "current" && present.length > 0 && present.every((reading) => !Number.isFinite(statValue(reading, mode))) ? t("badge.unavailable") : STAT_BADGE[mode];
 }
 
-/** Converts a value for display; only °C→°F is meaningful in HWiNFO data. */
+/** Converts a value for display; only °C→°F is meaningful in HWiNFO data.
+ * A temperature difference (Δ°C, published by calculated readings) scales
+ * by 1.8 with no offset: a 10 degree Celsius gap is an 18 degree Fahrenheit
+ * gap, never 50. */
 export function convertUnit(value: number, unit: string, fahrenheit: boolean): { value: number; unit: string } {
 	if (fahrenheit && unit === "°C") {
 		return { value: value * 1.8 + 32, unit: "°F" };
 	}
+	if (fahrenheit && unit === "Δ°C") {
+		return { value: value * 1.8, unit: "Δ°F" };
+	}
 	return { value, unit };
 }
 
+/**
+ * A value moved between two units the plugin converts between: identity,
+ * °C and °F (offset 32, factor 1.8), or the temperature differences Δ°C
+ * and Δ°F (factor 1.8, no offset); undefined for any other pair. The one
+ * place alerts, strip bands and strip scale ends learn what °F means.
+ */
+export function valueBetweenUnits(value: number, unit: string, target: string): number | undefined {
+	if (unit === target) return value;
+	if (unit === "°C" && target === "°F") return value * 1.8 + 32;
+	if (unit === "°F" && target === "°C") return (value - 32) / 1.8;
+	if (unit === "Δ°C" && target === "Δ°F") return value * 1.8;
+	if (unit === "Δ°F" && target === "Δ°C") return value / 1.8;
+	return undefined;
+}
+
+type Magnitude = { readonly suffix: string; readonly scale: number };
+
 /** The generic magnitude ladder auto-compaction climbs (thousand steps). */
-const MAGNITUDES = [
+const MAGNITUDES: readonly Magnitude[] = [
 	{ suffix: "k", scale: 1_000 },
 	{ suffix: "M", scale: 1_000_000 },
 	{ suffix: "G", scale: 1_000_000_000 },
 	{ suffix: "T", scale: 1_000_000_000_000 }
-] as const;
+];
+/** The same ladder on through P and E, for formatCompactValue: a fixed
+ * unit prints values up to 1e21 (measure.ts FIXED_LIMIT), past T's reach. */
+const WIDE_MAGNITUDES: readonly Magnitude[] = [...MAGNITUDES, { suffix: "P", scale: 1e15 }, { suffix: "E", scale: 1e18 }];
 
 /**
  * Precision by magnitude band: whole numbers from 100, one decimal from 10,
@@ -94,20 +128,25 @@ export function formatValue(value: number, decimals: DecimalsSetting): string {
 	if (decimals !== "auto") {
 		return fixed(value, Number(decimals));
 	}
+	return autoText(value, MAGNITUDES);
+}
+
+/** formatValue's Auto text for a finite value over a magnitude ladder. */
+function autoText(value: number, magnitudes: readonly Magnitude[]): string {
 	const abs = Math.abs(value);
 	if (abs < 10_000) {
 		return fixed(value, bandPrecision(abs));
 	}
 	let tier = 0;
-	while (tier < MAGNITUDES.length - 1 && abs / (MAGNITUDES[tier] as (typeof MAGNITUDES)[number]).scale >= 1000) {
+	while (tier < magnitudes.length - 1 && abs / (magnitudes[tier] as Magnitude).scale >= 1000) {
 		tier++;
 	}
 	for (;;) {
-		const { suffix, scale } = MAGNITUDES[tier] as (typeof MAGNITUDES)[number];
+		const { suffix, scale } = magnitudes[tier] as Magnitude;
 		const scaled = value / scale;
 		const text = fixed(scaled, bandPrecision(Math.abs(scaled)));
 		const rounded = Math.abs(Number(text));
-		if (rounded >= 1000 && tier < MAGNITUDES.length - 1) {
+		if (rounded >= 1000 && tier < magnitudes.length - 1) {
 			tier++;
 			continue;
 		}
@@ -130,20 +169,16 @@ export function formatQuadValue(value: number, decimals: DecimalsSetting): strin
 	if (!Number.isFinite(value)) {
 		return "—";
 	}
-	const startPrecision = (abs: number): number => {
-		if (decimals !== "auto") {
-			return Number(decimals);
-		}
-		return bandPrecision(abs);
-	};
-	const tiers = [
-		{ suffix: "", scale: 1 },
-		{ suffix: "k", scale: 1_000 },
-		{ suffix: "M", scale: 1_000_000 },
-		{ suffix: "G", scale: 1_000_000_000 },
-		{ suffix: "T", scale: 1_000_000_000_000 }
-	];
-	for (const { suffix, scale } of tiers) {
+	// Past ±9999T, which no HWiNFO reading approaches: no tier fits, so the
+	// T-scaled text runs long and the renderer truncates it.
+	return quadText(value, decimals, MAGNITUDES) ?? `${Math.round(value / 1_000_000_000_000)}T`;
+}
+
+/** formatQuadValue's four glyphs over a magnitude ladder: decimals drop
+ * first, then the magnitude climbs; null when no step holds four. */
+function quadText(value: number, decimals: DecimalsSetting, magnitudes: readonly Magnitude[]): string | null {
+	const startPrecision = (abs: number): number => (decimals !== "auto" ? Number(decimals) : bandPrecision(abs));
+	for (const { suffix, scale } of [{ suffix: "", scale: 1 }, ...magnitudes]) {
 		const scaled = value / scale;
 		for (let d = startPrecision(Math.abs(scaled)); d >= 0; d--) {
 			const text = `${fixed(scaled, d)}${suffix}`;
@@ -152,9 +187,38 @@ export function formatQuadValue(value: number, decimals: DecimalsSetting): strin
 			}
 		}
 	}
-	// Past ±9999T, which no HWiNFO reading approaches: no tier fits, so the
-	// T-scaled text runs long and the renderer truncates it.
-	return `${Math.round(value / 1_000_000_000_000)}T`;
+	return null;
+}
+
+/**
+ * The compact text a face with no room for a reading's own text draws
+ * last (measure.ts exactFallback): a four-reading key's four glyphs
+ * (formatQuadValue, "123k"), any other face the Auto compaction
+ * (formatValue, "22.0T"), both climbing on through P and E, so every
+ * number a fixed unit prints compacts.
+ */
+export function formatCompactValue(value: number, decimals: DecimalsSetting, quad: boolean): string {
+	if (!Number.isFinite(value)) {
+		return "—";
+	}
+	if (!quad) {
+		return autoText(value, WIDE_MAGNITUDES);
+	}
+	return quadText(value, decimals, WIDE_MAGNITUDES) ?? `${Math.round(value / 1e18)}E`;
+}
+
+/**
+ * The text a reading with its own format draws (issue #59): the first of
+ * its texts (the exact one, then exactFallback's) that the layout's own
+ * fit holds, else the last, which the layout draws at its normal size.
+ * `fits` says whether the picked text passed the layout's fit.
+ */
+export function exactRung<R>(rungs: readonly [R, ...R[]], holds: (rung: R, index: number) => boolean): { rung: R; index: number; fits: boolean } {
+	for (const [index, rung] of rungs.entries()) {
+		if (holds(rung, index)) return { rung, index, fits: true };
+	}
+	const index = rungs.length - 1;
+	return { rung: rungs[index] as R, index, fits: false };
 }
 
 /** Parses a threshold field coming from the PI (string or number, may be empty). */

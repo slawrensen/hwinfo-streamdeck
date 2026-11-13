@@ -12,6 +12,7 @@
 import { GadgetRegistryProvider } from "./hwinfo/gadget-registry";
 import { SharedMemoryProvider, type SnapshotProvider } from "./hwinfo/provider";
 import { HwinfoError, SensorType, type Reading, type SensorSnapshot } from "./hwinfo/types";
+import { readProbeSnapshot } from "./hwinfo/probe-read";
 
 const args = new Set(process.argv.slice(2));
 const showAll = args.has("--all");
@@ -20,7 +21,7 @@ const forceGadget = args.has("--gadget");
 
 const GUIDANCE: Record<string, string> = {
 	"unsupported-platform": "This probe needs 64-bit Windows (x64); HWiNFO's interfaces aren't readable here.",
-	"not-running": "Start HWiNFO and enable Settings → 'Shared Memory Support' (Sensors window open, or Sensors-only mode), or enable Gadget reporting and tick sensors (free, no 12-hour limit).",
+	"not-running": "Start HWiNFO and enable Settings → 'Shared Memory Support' (Sensors window open, or Sensors-only mode), or enable Gadget reporting and tick sensors.",
 	busy: "The shared-memory consistency mutex was busy at this instant. Run the probe again; the plugin itself just retries on its next poll.",
 	"gadget-empty": "The Gadget registry exists but is empty. In HWiNFO, open Configure Sensors -> HWiNFO Gadget and tick 'Report value in Gadget' for the sensors you need.",
 	"access-denied": "HWiNFO and this process run at different privilege levels. Run both elevated or both non-elevated.",
@@ -42,16 +43,11 @@ function fmt(r: Reading): string {
 	return `${r.label.padEnd(38)} ${r.value.toFixed(2).padStart(12)} ${r.unit.padEnd(8)} (${stats})  [${SensorType[r.type]}]`;
 }
 
-function read(provider: SnapshotProvider): SensorSnapshot {
-	const snapshot = provider.read();
+async function read(provider: SnapshotProvider): Promise<SensorSnapshot> {
+	const snapshot = await readProbeSnapshot(provider, () => console.error("The HWiNFO mutex is busy; retrying for up to 150 ms..."));
 	if (snapshot === null) {
-		console.error("Could not acquire the HWiNFO mutex within 150 ms; trying once more...");
-		const retry = provider.read();
-		if (retry === null) {
-			console.error("Still locked; giving up.");
-			process.exit(1);
-		}
-		return retry;
+		console.error("Still locked; giving up.");
+		process.exit(1);
 	}
 	return snapshot;
 }
@@ -82,7 +78,7 @@ try {
 	// read()/parseSnapshot can throw HwinfoError too ("disabled" when the free
 	// version's 12 h timer wrote the DEAD magic, "invalid" mid-restart); route
 	// those through the same guidance table instead of a raw stack trace.
-	const first = read(session);
+	const first = await read(session);
 	// The shared-memory parser reuses its snapshot. Retain scalar evidence
 	// before the next read mutates it.
 	const firstPollTime = first.pollTime;
@@ -92,7 +88,7 @@ try {
 	// A second read ~2.6 s later proves values are actually flowing (HWiNFO
 	// polls every ~2 s by default, so poll time should advance within a cycle).
 	await new Promise((resolve) => setTimeout(resolve, 2600));
-	const snapshot = read(session);
+	const snapshot = await read(session);
 	const advancing = session.source === "gadget"
 		? (snapshot.freshnessRevision ?? 0) > firstFreshnessRevision
 		: snapshot.pollTime !== firstPollTime || (snapshot.freshnessRevision ?? snapshot.valueRevision) !== firstEvidenceRevision;

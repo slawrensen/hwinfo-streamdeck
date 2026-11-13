@@ -31,6 +31,7 @@ const images = []; // { context, svg }
 const switches = []; // { device, profile, page }
 const setSettings = []; // { context, payload }
 const showAlerts = []; // context
+const piMessages = []; // every payload the plugin sent to a panel
 
 const latestSvg = (context) => latestSvgIn(images, context);
 /** The first text node of a face: a reading tile's label. */
@@ -68,6 +69,7 @@ wss.on("connection", (ws) => {
 				showAlerts.push(msg.context);
 				break;
 			case "sendToPropertyInspector":
+				piMessages.push(msg.payload ?? {});
 				// The tree arrives on the PI channel; capture it for the scenario.
 				if (msg.payload?.event === "sensorTree") {
 					results.tree = msg.payload;
@@ -615,6 +617,33 @@ async function scenario(send) {
 	removeDetailSurface(send, "devden4", fltCells);
 	await sleep(300);
 
+	// W1. A "|" union (issue #35): "core 3 | test fan" names the last row
+	// first, and the view still lists HWiNFO's order: Test Fan (the second
+	// row) on slot 0, Core 3 VID (the last) on slot 1, under 1-2 / 2, and
+	// nothing on slot 2.
+	const orOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "core 3 | test fan", detailMirrorBack: false };
+	appearOpener(send, "ctx-or", "devor", orOpener, { column: 2, row: 1 });
+	await sleep(300);
+	const switchesBeforeOr = switches.length;
+	await keyPress(send, "ctx-or", "devor", orOpener);
+	await waitUntil(() => switches.length > switchesBeforeOr, 500);
+	results.orSwitch = switches.length > switchesBeforeOr ? switches.at(-1) : undefined;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-or", device: "devor", payload: { settings: orOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devor", fltCells);
+	await sleep(1600);
+	results.orTitleFace = latestSvg(slotCtx("devor", cellOfRole(fltCells, "title").coord));
+	results.orSlot0Face = latestSvg(slotCtx("devor", cellOfIndex(fltCells, 0).coord));
+	results.orSlot1Face = latestSvg(slotCtx("devor", cellOfIndex(fltCells, 1).coord));
+	results.orSlot2Face = latestSvg(slotCtx("devor", cellOfIndex(fltCells, 2).coord));
+	const orBackCtx = slotCtx("devor", den2BackCell.coord);
+	const switchesBeforeOrBack = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: orBackCtx, device: "devor", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: orBackCtx, device: "devor", payload: { settings: den2BackCell.settings, coordinates: { column: den2BackCol, row: den2BackRow } } });
+	await waitUntil(() => switches.length > switchesBeforeOrBack, 500);
+	results.orBackSwitch = switches.length > switchesBeforeOrBack ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devor", fltCells);
+	await sleep(300);
+
 	// W2. Paging, forward and back, on a page smaller than the list. The
 	// Stream Deck + bundle holds four reading slots and the six "*"
 	// readings after "cores" take two pages. The opener sits on the
@@ -766,6 +795,134 @@ async function scenario(send) {
 	removeDetailSurface(send, "devgrp", fltCells);
 	await sleep(300);
 
+	// GP. The opener's own page layout (detailGaps, 7E): on the Stream Deck +
+	// bundle (four reading slots) the opener keeps (3,0) empty on page one
+	// only. Page one then holds three readings around the space (1-3 / 6),
+	// the space draws the page's blank and its press does nothing, page two
+	// holds the next three with no space (4-6 / 6), and Previous lands back
+	// on page one. Its own device, so no earlier leg's frames are read.
+	const gapCells = profileCells("profiles/detail-r3-plus");
+	const gapOpener = { readingKey: primary.key, pressBehavior: "open-details", detailMode: "filter", detailFilter: "*", detailGaps: { plus: [[{ column: 3, row: 0 }]], standard: [[{ column: 2, row: 0 }]] } };
+	const gapAt = { column: 0, row: 0 };
+	send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-gap", device: "devgap", payload: { settings: gapOpener, coordinates: gapAt, controller: "Keypad", isInMultiAction: false } });
+	await sleep(300);
+	const switchesBeforeGap = switches.length;
+	send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: "ctx-gap", device: "devgap", payload: { settings: gapOpener, coordinates: gapAt } });
+	send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: "ctx-gap", device: "devgap", payload: { settings: gapOpener, coordinates: gapAt } });
+	await waitUntil(() => switches.length > switchesBeforeGap, 500);
+	results.gapSwitch = switches.length > switchesBeforeGap ? switches.at(-1) : undefined;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-gap", device: "devgap", payload: { settings: gapOpener, coordinates: gapAt, controller: "Keypad", isInMultiAction: false } });
+	installDetailSurface(send, "devgap", gapCells);
+	await sleep(1600);
+	const gapTitleCtx = slotCtx("devgap", cellOfRole(gapCells, "title").coord);
+	const gapSlotCtx = (index) => slotCtx("devgap", cellOfIndex(gapCells, index).coord);
+	results.gapTitle1 = latestSvg(gapTitleCtx);
+	results.gapPage1 = [0, 1, 2, 3].map((i) => latestSvg(gapSlotCtx(i)));
+	const gapSlot = cellOfIndex(gapCells, 1);
+	const gapFramesBefore = images.filter((i) => i.context === gapSlotCtx(1)).length;
+	slotPress(send, "devgap", gapSlot.coord, gapSlot.settings);
+	await sleep(700);
+	results.gapPressFrames = images.filter((i) => i.context === gapSlotCtx(1)).length - gapFramesBefore;
+	results.gapPressFace = latestSvg(gapSlotCtx(1));
+	const gapNext = cellOfRole(gapCells, "next");
+	slotPress(send, "devgap", gapNext.coord, gapNext.settings);
+	await sleep(900);
+	results.gapTitle2 = latestSvg(gapTitleCtx);
+	results.gapPage2 = [0, 1, 2, 3].map((i) => latestSvg(gapSlotCtx(i)));
+	const gapPrevious = cellOfRole(gapCells, "previous");
+	slotPress(send, "devgap", gapPrevious.coord, gapPrevious.settings);
+	await sleep(900);
+	results.gapTitle3 = latestSvg(gapTitleCtx);
+	results.gapSlot1Again = latestSvg(gapSlotCtx(1));
+	results.gapWrites = setSettings.filter((s) => s.context === "ctx-gap" || s.context.startsWith("slot-devgap")).length;
+	const gapBackCell = gapCells.find((c) => c.settings.detailRole === "back");
+	const [gapBackCol, gapBackRow] = gapBackCell.coord.split(",").map(Number);
+	const switchesBeforeGapBack = switches.length;
+	send({ event: "keyDown", action: gapBackCell.uuid, context: slotCtx("devgap", gapBackCell.coord), device: "devgap", payload: { settings: gapBackCell.settings, coordinates: { column: gapBackCol, row: gapBackRow } } });
+	send({ event: "keyUp", action: gapBackCell.uuid, context: slotCtx("devgap", gapBackCell.coord), device: "devgap", payload: { settings: gapBackCell.settings, coordinates: { column: gapBackCol, row: gapBackRow } } });
+	await waitUntil(() => switches.length > switchesBeforeGapBack, 500);
+	results.gapBackSwitch = switches.length > switchesBeforeGapBack ? switches.at(-1) : undefined;
+	removeDetailSurface(send, "devgap", gapCells);
+	await sleep(300);
+
+	// SC. Keys placed by hand on the shared detail page, limited by
+	// detailScope (7E). Three Sensor Reading keys take the place of three
+	// slots: one limited to another sensor ("abcd:0") draws blank and its
+	// press does nothing, one limited to this opener's sensor
+	// ("f0001234:0", the fake's Test Source) is live and its press cycles
+	// as always, and an unscoped one shows as before. Its panel learns the
+	// page's source and its scope through a question that writes nothing;
+	// the read-only page preview answers the same way. Through the switch
+	// beat after Back the limited key stays blank.
+	const scCells = profileCells("profiles/detail-r3-standard");
+	const placedAt = ["4,2", "3,2", "2,2"];
+	const scOpener = { readingKey: primary.key, pressBehavior: "open-details" };
+	const placed = [
+		{ context: "ctx-sc-other", coord: "4,2", settings: { readingKey: primary.key, detailScope: { sources: ["abcd:0"] } } },
+		{ context: "ctx-sc-own", coord: "3,2", settings: { readingKey: primary.key, detailScope: { sources: ["f0001234:0"] } } },
+		{ context: "ctx-sc-plain", coord: "2,2", settings: { readingKey: primary.key } }
+	];
+	appearOpener(send, "ctx-sc", "devsc", scOpener, { column: 2, row: 1 });
+	await sleep(300);
+	const switchesBeforeSc = switches.length;
+	await keyPress(send, "ctx-sc", "devsc", scOpener);
+	await waitUntil(() => switches.length > switchesBeforeSc, 500);
+	results.scSwitch = switches.length > switchesBeforeSc ? switches.at(-1) : undefined;
+	send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-sc", device: "devsc", payload: { settings: scOpener, coordinates: { column: 2, row: 1 }, controller: "Keypad", isInMultiAction: false } });
+	for (const key of placed) {
+		const [column, row] = key.coord.split(",").map(Number);
+		send({ event: "willAppear", action: "com.lawrensen.hwinfo.reading", context: key.context, device: "devsc", payload: { settings: key.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false } });
+	}
+	installDetailSurface(send, "devsc", scCells.filter((c) => !placedAt.includes(c.coord)));
+	await sleep(1600);
+	results.scOtherFace = latestSvg("ctx-sc-other");
+	results.scOwnFace = latestSvg("ctx-sc-own");
+	results.scPlainFace = latestSvg("ctx-sc-plain");
+	const scWrites = (context) => setSettings.filter((s) => s.context === context).length;
+	const pressPlaced = async (key) => {
+		const [column, row] = key.coord.split(",").map(Number);
+		send({ event: "keyDown", action: "com.lawrensen.hwinfo.reading", context: key.context, device: "devsc", payload: { settings: key.settings, coordinates: { column, row } } });
+		send({ event: "keyUp", action: "com.lawrensen.hwinfo.reading", context: key.context, device: "devsc", payload: { settings: key.settings, coordinates: { column, row } } });
+		await sleep(500);
+	};
+	const switchesBeforeScPress = switches.length;
+	const otherFramesBefore = images.filter((i) => i.context === "ctx-sc-other").length;
+	await pressPlaced(placed[0]);
+	results.scOtherPressWrites = scWrites("ctx-sc-other");
+	results.scOtherPressFrames = images.filter((i) => i.context === "ctx-sc-other").length - otherFramesBefore;
+	results.scOtherPressAlert = showAlerts.includes("ctx-sc-other");
+	await pressPlaced(placed[1]);
+	results.scOwnPressCycled = setSettings.some((s) => s.context === "ctx-sc-own" && s.payload?.statMode === "min");
+	results.scPressSwitches = switches.length - switchesBeforeScPress;
+	// The limited key's panel asks where it is; then the opener-less preview
+	// question from the same panel. Neither writes.
+	const piBefore = piMessages.length;
+	const writesBeforePi = setSettings.length;
+	send({ event: "propertyInspectorDidAppear", action: "com.lawrensen.hwinfo.reading", context: "ctx-sc-other", device: "devsc" });
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-sc-other", payload: { event: "getDetailScope" } });
+	send({ event: "sendToPlugin", action: "com.lawrensen.hwinfo.reading", context: "ctx-sc-other", payload: { event: "getDetailPreview", draft: { readingKey: primary.key, detailMode: "filter", detailFilter: "*", detailGaps: { standard: [[{ column: 2, row: 0 }]] } }, page: 0 } });
+	await waitUntil(() => piMessages.slice(piBefore).some((p) => p.event === "detailPreview"), 900);
+	results.scScopeMsg = piMessages.slice(piBefore).filter((p) => p.event === "detailScope").at(-1);
+	results.scPreviewMsg = piMessages.slice(piBefore).filter((p) => p.event === "detailPreview").at(-1);
+	send({ event: "propertyInspectorDidDisappear", action: "com.lawrensen.hwinfo.reading", context: "ctx-sc-other", device: "devsc" });
+	await sleep(200);
+	results.scPiWrites = setSettings.length - writesBeforePi;
+	const scBackCell = scCells.find((c) => c.settings.detailRole === "back");
+	const [scBackCol, scBackRow] = scBackCell.coord.split(",").map(Number);
+	const switchesBeforeScBack = switches.length;
+	send({ event: "keyDown", action: scBackCell.uuid, context: slotCtx("devsc", scBackCell.coord), device: "devsc", payload: { settings: scBackCell.settings, coordinates: { column: scBackCol, row: scBackRow } } });
+	send({ event: "keyUp", action: scBackCell.uuid, context: slotCtx("devsc", scBackCell.coord), device: "devsc", payload: { settings: scBackCell.settings, coordinates: { column: scBackCol, row: scBackRow } } });
+	await waitUntil(() => switches.length > switchesBeforeScBack, 500);
+	await sleep(200);
+	results.scBackSwitch = switches.length > switchesBeforeScBack ? switches.at(-1) : undefined;
+	results.scOtherAfterBack = latestSvg("ctx-sc-other");
+	for (const key of placed) {
+		const [column, row] = key.coord.split(",").map(Number);
+		send({ event: "willDisappear", action: "com.lawrensen.hwinfo.reading", context: key.context, device: "devsc", payload: { settings: key.settings, coordinates: { column, row }, controller: "Keypad", isInMultiAction: false } });
+	}
+	removeDetailSurface(send, "devsc", scCells.filter((c) => !placedAt.includes(c.coord)));
+	await sleep(300);
+
 	// Teardown: every action gone, the poller must idle, the process exit.
 	for (const ctx of ["ctx-ped", "ctx-gone", "ctx-th"]) {
 		const device = ctx === "ctx-ped" ? "devped" : "dev1";
@@ -899,6 +1056,16 @@ async function finish() {
 		typeof results.den4Slot0Face === "string" && [">1.05<", ">1.15<", ">1.25<", ">1.35<"].every((v) => results.den4Slot0Face.includes(v)),
 		(results.den4Slot0Face ?? "no frame").slice(0, 200)
 	);
+	check("a | union entry switched devor to the class profile", results.orSwitch?.device === "devor" && results.orSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.orSwitch));
+	check("a | union title counts both patterns' readings (1-2 / 2)", typeof results.orTitleFace === "string" && results.orTitleFace.includes(">1-2 / 2<"), (results.orTitleFace ?? "no frame").slice(0, 160));
+	check(
+		"a | union keeps HWiNFO's order, not the typed order: Test Fan, then Core 3 VID, then nothing",
+		typeof results.orSlot0Face === "string" && results.orSlot0Face.includes(">Test Fan<") && results.orSlot0Face.includes(">1200<") &&
+			typeof results.orSlot1Face === "string" && /Core 3 VID/.test(results.orSlot1Face) && results.orSlot1Face.includes(">1.35<") &&
+			typeof results.orSlot2Face === "string" && !results.orSlot2Face.includes("<text"),
+		`${(results.orSlot0Face ?? "no frame").slice(0, 120)} | ${(results.orSlot1Face ?? "no frame").slice(0, 120)}`
+	);
+	check("a | union: Back left the view", results.orBackSwitch?.device === "devor" && results.orBackSwitch?.profile === undefined, JSON.stringify(results.orBackSwitch));
 	check("density 3 + mirror keeps the READING count honest (1-6 / 6)", typeof results.den3TitleFace === "string" && results.den3TitleFace.includes(">1-6 / 6<"), (results.den3TitleFace ?? "no frame").slice(0, 160));
 	check(
 		// The three CONSTANT row values plus both separators prove three
@@ -937,6 +1104,44 @@ async function finish() {
 		typeof results.grpQuadMin === "string" && results.grpQuadMin.includes(">11.9<") && (results.grpQuadMin.match(/>MIN</g) ?? []).length === 1,
 		(results.grpQuadMin ?? "no frame").slice(0, 240)
 	);
+
+	// Opener page layout (detailGaps) and scoped placed keys (detailScope).
+	const hasText = (svg) => typeof svg === "string" && svg.includes("<text");
+	const blankFace = (svg) => typeof svg === "string" && svg.length > 0 && !svg.includes("<text");
+	check("page layout: the + entered its own bundle", results.gapSwitch?.device === "devgap" && results.gapSwitch?.profile === "profiles/detail-r3-plus", JSON.stringify(results.gapSwitch));
+	check(
+		"page layout: page one holds three readings around the kept-empty cell (1-3 / 6)",
+		typeof results.gapTitle1 === "string" && results.gapTitle1.includes(">1-3 / 6<") && hasText(results.gapPage1?.[0]) && blankFace(results.gapPage1?.[1]) && hasText(results.gapPage1?.[2]) && hasText(results.gapPage1?.[3]),
+		`${(results.gapTitle1 ?? "no frame").slice(0, 120)} | ${(results.gapPage1 ?? []).map((f) => firstText(f) ?? "(blank)").join(", ")}`
+	);
+	check("page layout: the kept-empty cell is the same blank as a tile past the list end", blankFace(results.gapPage1?.[1]) && results.gapPage1?.[1] === results.gapPage2?.[3]);
+	check("page layout: a press on the kept-empty cell does nothing", results.gapPressFrames === 0 && results.gapPressFace === results.gapPage1?.[1], `${results.gapPressFrames} new frames`);
+	check(
+		"page layout: page two holds the next three with no space (4-6 / 6)",
+		typeof results.gapTitle2 === "string" && results.gapTitle2.includes(">4-6 / 6<") && hasText(results.gapPage2?.[0]) && hasText(results.gapPage2?.[1]) && hasText(results.gapPage2?.[2]) && blankFace(results.gapPage2?.[3]),
+		`${(results.gapTitle2 ?? "no frame").slice(0, 120)} | ${(results.gapPage2 ?? []).map((f) => firstText(f) ?? "(blank)").join(", ")}`
+	);
+	check("page layout: Previous lands back on page one and its kept-empty cell", typeof results.gapTitle3 === "string" && results.gapTitle3.includes(">1-3 / 6<") && results.gapSlot1Again === results.gapPage1?.[1], (results.gapTitle3 ?? "no frame").slice(0, 120));
+	check("page layout: nothing writes settings", results.gapWrites === 0, `${results.gapWrites} writes`);
+	check("page layout: Back restores the previous profile", results.gapBackSwitch?.device === "devgap" && results.gapBackSwitch?.profile === undefined, JSON.stringify(results.gapBackSwitch));
+	check("scoped keys: the opener entered its bundle", results.scSwitch?.device === "devsc" && results.scSwitch?.profile === "profiles/detail-r3-standard", JSON.stringify(results.scSwitch));
+	check("scoped keys: a key limited to another sensor draws blank on this sensor's page", blankFace(results.scOtherFace), (results.scOtherFace ?? "no frame").slice(0, 120));
+	check("scoped keys: its press writes nothing, opens nothing and repaints nothing", results.scOtherPressWrites === 0 && results.scOtherPressAlert === false && results.scOtherPressFrames === 0, `${results.scOtherPressWrites} writes, ${results.scOtherPressFrames} frames`);
+	check("scoped keys: a key limited to this sensor is live, and its press cycles as always", hasText(results.scOwnFace) && results.scOwnPressCycled === true, (results.scOwnFace ?? "no frame").slice(0, 120));
+	check("scoped keys: an unscoped placed key shows on every detail page", hasText(results.scPlainFace), (results.scPlainFace ?? "no frame").slice(0, 120));
+	check("scoped keys: placed key presses never switch profiles", results.scPressSwitches === 0, `${results.scPressSwitches} switches`);
+	check(
+		"scoped keys: the panel learns the page's sensor and the key's scope, a sensor that left said to be absent",
+		results.scScopeMsg?.onDetailPage === true && results.scScopeMsg?.opener?.id === "f0001234:0" && results.scScopeMsg?.opener?.name === "Test Source" && JSON.stringify(results.scScopeMsg?.sources) === JSON.stringify([{ id: "abcd:0", name: null, state: "absent" }]),
+		JSON.stringify(results.scScopeMsg)
+	);
+	check(
+		"scoped keys: the read-only page preview shows the kept-empty cell",
+		results.scPreviewMsg?.supported === true && results.scPreviewMsg?.bundle === "standard" && results.scPreviewMsg?.cells?.[0]?.kind === "gap" && results.scPreviewMsg?.cells?.[0]?.column === 2 && results.scPreviewMsg?.cells?.[0]?.row === 0,
+		JSON.stringify(results.scPreviewMsg)?.slice(0, 200)
+	);
+	check("scoped keys: the panel's questions write nothing", results.scPiWrites === 0, `${results.scPiWrites} writes`);
+	check("scoped keys: Back leaves, and the limited key stays blank through the beat", results.scBackSwitch?.device === "devsc" && results.scBackSwitch?.profile === undefined && blankFace(results.scOtherAfterBack), JSON.stringify(results.scBackSwitch));
 
 	check("poller idles once every action is gone", results.idleDelta === 0, `${results.idleDelta} frames in 2.5 s`);
 
@@ -984,12 +1189,17 @@ const info = buildInfo({
 		{ id: "devden3", name: "Harness Deck F", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devden4", name: "Harness Deck G", size: { columns: 5, rows: 3 }, type: 0 },
 		{ id: "devgrp", name: "Harness Deck H", size: { columns: 5, rows: 3 }, type: 0 },
+		{ id: "devor", name: "Harness Deck I", size: { columns: 5, rows: 3 }, type: 0 },
 		// A Stream Deck + (type 7, 4x2): its bundle holds four reading slots,
 		// the smallest page the paging leg can overflow with six readings.
 		{ id: "devpage", name: "Harness Plus", size: { columns: 4, rows: 2 }, type: 7 },
 		{ id: "devxl", name: "Harness + XL", size: { columns: 9, rows: 4 }, type: 13 },
 		{ id: "devped", name: "Harness Pedal", size: { columns: 3, rows: 1 }, type: 5 },
-		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 }
+		{ id: "devvsd", name: "Harness Virtual", size: { columns: 10, rows: 10 }, type: 11 },
+		// The page layout leg (a second Stream Deck +) and the scoped placed
+		// keys leg, each on a device no other leg touches.
+		{ id: "devgap", name: "Harness Plus B", size: { columns: 4, rows: 2 }, type: 7 },
+		{ id: "devsc", name: "Harness Deck J", size: { columns: 5, rows: 3 }, type: 0 }
 	]
 });
 

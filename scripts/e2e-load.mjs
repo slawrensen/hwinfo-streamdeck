@@ -5,6 +5,12 @@
 //
 //   npm run e2e:load                 (default 90 s soak)
 //   LOAD_SOAK_SEC=30 npm run e2e:load
+//   HWINFO_E2E_PLUGIN_DIR=<dir> npm run e2e:load   (another build's .sdPlugin,
+//                                                   e.g. an extracted release pack)
+//
+// It also reports, without gating on them, the bytes of every setImage and
+// setFeedback message (p50/p95/max) and the setFeedback calls per second per
+// dial context over the soak.
 //
 // PASS criteria: every reading context renders ≥1 valid frame; plugin
 // survives churn; RSS peak < 300 MB and soak growth < 25 MB; zero frames
@@ -14,8 +20,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { WebSocketServer } from "ws";
-import { buildInfo, decodeSvg, makeCheck, pluginArgv, sleep } from "./lib/e2e-common.mjs";
+import { buildInfo, decodeSvg, makeCheck, pluginArgv, resolvePluginDir, sleep } from "./lib/e2e-common.mjs";
 import { assessLoadMetrics, expectedRssSampleCount } from "./lib/load-metrics.mjs";
+import { trafficStats } from "./lib/perf-metrics.mjs";
 
 const PORT = 28995;
 const SOAK_SEC = Number(process.env.LOAD_SOAK_SEC ?? "90");
@@ -24,7 +31,8 @@ const SAMPLE_MS = 15_000;
 const EXPECTED_SAMPLES = expectedRssSampleCount(SOAK_MS, SAMPLE_MS);
 const POLL_MS = 250;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pluginDir = path.join(repoRoot, "com.lawrensen.hwinfo.sdPlugin");
+const pluginDir = resolvePluginDir(repoRoot);
+console.log(`plugin directory: ${pluginDir}`);
 
 let failures = 0;
 const check = makeCheck(() => {
@@ -50,12 +58,17 @@ let totalFrames = 0;
 let totalFeedbacks = 0;
 let invalidFrames = 0;
 let pluginWs = null;
+/** Every frame message: { at, event, context, bytes } (bytes on the socket). */
+const traffic = [];
 
 const wss = new WebSocketServer({ host: "127.0.0.1", port: PORT });
 wss.on("connection", (ws) => {
 	pluginWs = ws;
 	ws.on("message", (data) => {
 		const msg = JSON.parse(data.toString());
+		if (msg.event === "setImage" || msg.event === "setFeedback") {
+			traffic.push({ at: Date.now(), event: msg.event, context: msg.context, bytes: data.length });
+		}
 		if (msg.event === "getGlobalSettings") {
 			send({ event: "didReceiveGlobalSettings", payload: { settings: { pollIntervalMs: String(POLL_MS) } } });
 		} else if (msg.event === "setImage") {
@@ -183,6 +196,11 @@ try {
 		const due = soakStart + Math.min(sample * SAMPLE_MS, SOAK_MS);
 		await sleep(Math.max(0, due - performance.now()));
 		samples.push(rssMB());
+	}
+	const soakTraffic = trafficStats(traffic, Date.now() - SOAK_MS, Date.now());
+	for (const kind of ["setImage", "setFeedback"]) {
+		const t = soakTraffic[kind];
+		console.log(`soak ${kind}: ${t.calls} calls on ${t.contexts} contexts, ${t.callsPerSec?.toFixed(1)}/s aggregate, per context median ${t.perContextPerSec.median?.toFixed(2)}/s max ${t.perContextPerSec.max?.toFixed(2)}/s (peak ${t.peakIn1sPerContext} in 1 s), bytes per call p50 ${t.bytesPerCall.p50} p95 ${t.bytesPerCall.p95} max ${t.bytesPerCall.max}, ${Math.round(t.bytesPerSec ?? 0)} B/s`);
 	}
 	const metrics = assessLoadMetrics(samples, EXPECTED_SAMPLES, invalidFrames);
 	console.log(`RSS samples (MB): start=${rssStart} ${samples.map((sample) => sample > 0 ? sample : "FAILED").join(" → ")}`);

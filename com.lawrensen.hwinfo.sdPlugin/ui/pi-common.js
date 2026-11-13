@@ -8,14 +8,14 @@
    sensor-dial.html): every element is looked up by id here, and a panel
    without a section simply leaves it inert. pi-shell.js (loaded first)
    owns the header, the status line and the native control bindings. */
-/* global SDPIComponents, hwShell */
+/* global SDPIComponents, hwShell, hwT */
 (() => {
 	"use strict";
 
 	// Build stamp: the panel names the code it actually runs, because the
 	// webview outlives on-disk refreshes and caches sub-resources. Read
 	// window.__hwPiVersion (or the console line) before trusting a repro.
-	const PI_BUILD = "1.7.1.0-1";
+	const PI_BUILD = "1.8.0.0-54";
 	window.__hwPiVersion = PI_BUILD;
 	console.log(`hwinfo PI build ${PI_BUILD}`);
 
@@ -637,6 +637,13 @@
 			button.setAttribute("aria-disabled", enabled ? "false" : "true");
 			button.setAttribute("aria-label", label);
 			button.title = TOOL_KEYS[button.dataset.tool] === undefined ? label : `${label} (${TOOL_KEYS[button.dataset.tool]} in the list)`;
+			// Earlier and Later step the same reading on with each quick press
+			// of one gesture, its name changing at a group's edge (pi-shell's
+			// one gesture, one action).
+			if (button.dataset.tool === "earlier" || button.dataset.tool === "later") {
+				if (place === null) delete button.dataset.step;
+				else button.dataset.step = `rotation-${button.dataset.tool}:${rotationSel.key}`;
+			}
 		}
 	}
 
@@ -2053,77 +2060,13 @@
 	// exactly what its pattern gathers before the user ever presses the key.
 	let detailFilterValue = "";
 
-	/** Mirrors compileDetailFilter in src/detail/detail-settings.ts (same
-	 * wildcard grammar, same source-plus-label candidate, same iterative
-	 * two-pointer walk, same code-unit fold); keep in sync. Not a RegExp:
-	 * the `*` to `.*` translation backtracks exponentially on hostile
-	 * patterns ("*?a" repeated stalls one test for minutes within the
-	 * 128-char caps), while this walk is O(pattern x candidate). Case
-	 * folds per UTF-16 code unit the way the runtime's old non-unicode
-	 * `i` regex canonicalized: uppercase, except a non-ASCII unit never
-	 * folds onto an ASCII one (so the panel count and the deck view
-	 * agree on µ, ß, and friends); `?` eats exactly one unit, `*` any
-	 * run, and a wildcard-free pattern matches as a substring. */
-	const GLOB_STAR = 42; // "*".charCodeAt(0)
-	const GLOB_QUERY = 63; // "?".charCodeAt(0)
-
-	function foldCodeUnit(code) {
-		if (code < 128) {
-			return code >= 97 && code <= 122 ? code - 32 : code;
-		}
-		const upper = String.fromCharCode(code).toUpperCase();
-		if (upper.length !== 1) return code;
-		const upperCode = upper.charCodeAt(0);
-		return upperCode < 128 ? code : upperCode;
-	}
-
-	function foldedUnits(text) {
-		const units = new Array(text.length);
-		for (let i = 0; i < text.length; i++) {
-			units[i] = foldCodeUnit(text.charCodeAt(i));
-		}
-		return units;
-	}
-
-	function detailFilterMatcher(pattern) {
-		const anchored = /[*?]/.test(pattern) ? pattern : `*${pattern}*`;
-		const p = foldedUnits(anchored);
-		return (candidate) => {
-			const s = foldedUnits(candidate);
-			let pi = 0;
-			let si = 0;
-			let star = -1;
-			let mark = 0;
-			while (si < s.length) {
-				// The literal branch skips the star unit: a candidate's own
-				// literal "*" must never swallow the wildcard before its
-				// backtrack anchor is recorded (mirrors the runtime fix).
-				if (pi < p.length && (p[pi] === GLOB_QUERY || (p[pi] !== GLOB_STAR && p[pi] === s[si]))) {
-					pi++;
-					si++;
-				} else if (pi < p.length && p[pi] === GLOB_STAR) {
-					star = pi;
-					pi++;
-					mark = si;
-				} else if (star !== -1) {
-					// Backtrack to the last star, retrying one candidate
-					// unit later: linear, never nested.
-					pi = star + 1;
-					mark++;
-					si = mark;
-				} else {
-					return false;
-				}
-			}
-			while (pi < p.length && p[pi] === GLOB_STAR) pi++;
-			return pi === p.length;
-		};
-	}
-
 	function updateFilterCount() {
 		const el = document.getElementById("detail-filter-count");
 		if (el === null) return;
-		const pattern = detailFilterValue.trim().slice(0, 128);
+		// Trimmed, capped, and "" when every alternative is empty: the
+		// runtime's detailFilterOf, so the refusal message shows exactly
+		// when the deck would refuse to open.
+		const pattern = model.detailFilterPattern(detailFilterValue);
 		if (pattern === "") {
 			el.hidden = false;
 			el.textContent = "Type a pattern; the view refuses to open while it is empty.";
@@ -2133,7 +2076,7 @@
 			el.hidden = true;
 			return;
 		}
-		const matches = detailFilterMatcher(pattern);
+		const matches = model.detailFilterMatcher(pattern);
 		let count = 0;
 		for (const group of tree) {
 			// matchName is the RAW source name ("" for orphans), the exact
@@ -2722,6 +2665,10 @@
 		up.setAttribute("aria-label", `Move ${spokenName} up the list`);
 		up.textContent = "↑";
 		up.disabled = index === 0;
+		// Each quick press of one gesture moves this reading again while the
+		// arrow under the pointer is still its own (pi-shell's one gesture,
+		// one action).
+		up.dataset.step = `detail-move-up:${key}`;
 		const down = document.createElement("button");
 		down.type = "button";
 		down.className = "hw-detail-move";
@@ -2730,6 +2677,7 @@
 		down.setAttribute("aria-label", `Move ${spokenName} down the list`);
 		down.textContent = "↓";
 		down.disabled = index === listedDetailKeys().length - 1;
+		down.dataset.step = `detail-move-down:${key}`;
 		const remove = document.createElement("button");
 		remove.type = "button";
 		remove.className = "hw-set-remove";
@@ -2976,8 +2924,8 @@
 			// after it. The list is a wrapping flex row and the tiles are
 			// inline-flex, so two short tiles share a row: a top/bottom
 			// midpoint cannot tell same-row neighbours apart, and the chips
-			// inside already split on x. Registered before wireAppendDrop so
-			// a tile payload can stop the key-append path on the same element.
+			// inside already split on x. Registered before wireTileChromeDrop
+			// so a tile payload stops the chip-edge drop on the same element.
 			holder.addEventListener("dragover", (ev) => {
 				if (detailTileDrag === null) return;
 				ev.preventDefault();
@@ -3040,6 +2988,10 @@
 			size.title = "Cells on this tile; click to cycle 1, 2, 3, 4";
 			size.setAttribute("aria-label", `Tile ${tileIdx + 1}: ${tile.size} cell${tile.size === 1 ? "" : "s"}; click to cycle 1, 2, 3, 4`);
 			size.textContent = `×${tile.size}`;
+			// Each quick press of one gesture steps this tile's size again,
+			// the rebuilt button for the same tile under the pointer
+			// (pi-shell's one gesture, one action).
+			size.dataset.step = `tile-size:${tileIdx}`;
 			holder.appendChild(size);
 			// The quad knobs follow the READINGS, not the stored size. Only the
 			// tail tile can hold fewer readings than its size says, and the deck
@@ -3117,6 +3069,46 @@
 	// always reachable and visible when the list opens.
 	const pickers = [];
 	let optionSeq = 0;
+
+	// A press lands where it began. An inline checklist (.hw-inline) sits in
+	// the page's flow, so closing it at mousedown (a press outside it, or
+	// the focus that press moves) shrinks the page under a held pointer, and
+	// the release lands on whatever slid up: on the Strip section a press on
+	// More moved 60.8 px and the release hit the preview below it (traced
+	// 2026-10-26). While a pointer is down an inline list stays open; it
+	// closes after the release, once the click has gone to its target.
+	let pointerHeld = false;
+	const closeAfterPress = new Set();
+	/** Closes `picker` now, or after the press when closing it now would
+	 * move the page under the pointer. */
+	const closePicker = (picker) => {
+		if (pointerHeld && picker.list.classList.contains("hw-inline")) closeAfterPress.add(picker);
+		else picker.close();
+	};
+	document.addEventListener("pointerdown", () => {
+		pointerHeld = true;
+	}, true);
+	const pressEnded = () => {
+		if (!pointerHeld) return;
+		pointerHeld = false;
+		if (closeAfterPress.size === 0) return;
+		// A task later: the release's click has reached its target first.
+		setTimeout(() => {
+			const active = document.activeElement;
+			let closed = false;
+			for (const picker of closeAfterPress) {
+				const inside = active !== null && (picker.root.contains(active) || (picker.alsoWithin !== null && picker.alsoWithin.contains(active)));
+				if (!picker.isOpen() || inside) continue;
+				picker.close();
+				closed = true;
+			}
+			closeAfterPress.clear();
+			if (closed && active instanceof Element && active !== document.body) requestAnimationFrame(() => active.scrollIntoView({ block: "nearest" }));
+		}, 0);
+	};
+	window.addEventListener("pointerup", pressEnded, true);
+	window.addEventListener("pointercancel", pressEnded, true);
+	window.addEventListener("blur", pressEnded);
 
 	function createPicker(config) {
 		const searchEl = config.search;
@@ -3486,6 +3478,7 @@
 
 		function commit(key) {
 			if (!combobox || !key) return;
+			config.onCommit?.(key); // a pick made here, never an echo
 			selectedKey = key;
 			setKey(selectedKey);
 			closeList();
@@ -3711,7 +3704,7 @@
 			if (!(to instanceof Node)) return;
 			if (picker.root.contains(to)) return;
 			if (picker.alsoWithin !== null && picker.alsoWithin.contains(to)) return;
-			closeList();
+			closePicker(picker);
 		});
 		pickers.push(picker);
 		return picker;
@@ -3722,6 +3715,10 @@
 		refresh: document.getElementById("picker-refresh"),
 		list: document.getElementById("picker-list"),
 		setting: "readingKey",
+		// A reading picked here leads a whole-sensor list again.
+		onCommit: () => {
+			sensorLead = null;
+		},
 		onSelectionEcho: () => {
 			renderRotationSet();
 			rotationPicker?.renderList();
@@ -3830,7 +3827,7 @@
 		// Checked per picker so opening one never strands the other open.
 		const path = ev.composedPath();
 		for (const picker of pickers) {
-			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) picker.close();
+			if (picker.isOpen() && !path.includes(picker.root) && !(picker.alsoWithin !== null && path.includes(picker.alsoWithin))) closePicker(picker);
 		}
 	});
 
@@ -3872,10 +3869,10 @@
 		for (const picker of pickers) {
 			if (!picker.isOpen()) continue;
 			const inside = picker.root.contains(target) || (picker.alsoWithin !== null && picker.alsoWithin.contains(target));
-			if (!inside) {
+			if (!inside && !(pointerHeld && picker.list.classList.contains("hw-inline"))) {
 				picker.close();
 				closed = true;
-			}
+			} else if (!inside) closePicker(picker);
 		}
 		// Closing an inline checklist shrinks the page after the browser
 		// already scrolled the new focus into view, which can leave it under
@@ -4064,8 +4061,8 @@
 			if (quadRowsEl !== null) quadRowsEl.hidden = !quad;
 			if (quadDisplayEl !== null) quadDisplayEl.hidden = !quad;
 			if (displayItemEl !== null) displayItemEl.hidden = dual || triple || quad;
-			// Alerts read reading 1 alone; with several readings the Alerts
-			// section says so where the thresholds are typed.
+			// The limits above are reading 1's; with several readings the
+			// Alerts help says so, and each other reading has a row below.
 			if (alertsFirstEl !== null) alertsFirstEl.hidden = !(dual || triple || quad);
 			labelHints(quad);
 			// The face silently keeps its single layout until the extra slots
@@ -4100,7 +4097,7 @@
 		// One renderer over both polled facts, so whichever poll answers
 		// last still leaves the panel consistent.
 		const applyPressState = () => {
-			const details = !backRole && (pressValue === "open-details" || pressValue === "tap-cycle-hold-details");
+			const details = !backRole && model.detailsBehavior(pressValue);
 			detailConfigEl.hidden = !details;
 			if (pressBlockEl !== null) pressBlockEl.hidden = backRole;
 			if (roleNoteEl !== null) roleNoteEl.hidden = !backRole;
@@ -4145,6 +4142,658 @@
 		streamDeckClient.send("sendToPlugin", { event: "getDetailSupport" });
 	}
 
+	// --- the opener's page layout and a placed key's detail pages (7E) -------
+	// Page layout: the opener's intentional empty cells (detailGaps), kept
+	// per kind of deck and per logical page. Detail pages: a key placed by
+	// hand on the shared detail page can be limited to the detail pages of
+	// some sensors (detailScope). Each explicit press saves exactly one of
+	// those two fields, in one frame; opening, paging, the preview and
+	// folding the editor away only ask the plugin and save nothing. The
+	// plugin draws every preview with the deck's own resolver and page walk,
+	// so the panel keeps no layout math of its own.
+	const isPlainDoc = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+
+	/** detailGaps with one cell toggled on one page of one kind of deck.
+	 * Every other deck kind, page, entry and field rides along as stored;
+	 * pages left holding nothing at the end are dropped (the runtime reads
+	 * them as no gaps either way). */
+	function toggledDetailGaps(raw, bundle, pageIndex, cell) {
+		const next = isPlainDoc(raw) ? { ...raw } : {};
+		const pages = Array.isArray(next[bundle]) ? [...next[bundle]] : [];
+		while (pages.length <= pageIndex) pages.push([]);
+		const page = Array.isArray(pages[pageIndex]) ? pages[pageIndex] : [];
+		const isCell = (entry) => isPlainDoc(entry) && entry.column === cell.column && entry.row === cell.row;
+		pages[pageIndex] = page.some(isCell) ? page.filter((entry) => !isCell(entry)) : [...page, { column: cell.column, row: cell.row }];
+		while (pages.length > 0 && Array.isArray(pages[pages.length - 1]) && pages[pages.length - 1].length === 0) pages.pop();
+		if (pages.length === 0) delete next[bundle];
+		else next[bundle] = pages;
+		return next;
+	}
+
+	/** detailScope with one source id added (kept byte for byte) or
+	 * removed; other fields and entries ride along as stored. */
+	function scopeWithSource(raw, id) {
+		const next = isPlainDoc(raw) ? { ...raw } : {};
+		const sources = Array.isArray(next.sources) ? [...next.sources] : [];
+		if (!sources.includes(id)) sources.push(id);
+		next.sources = sources;
+		return next;
+	}
+
+	function scopeWithoutSource(raw, id) {
+		const next = isPlainDoc(raw) ? { ...raw } : {};
+		next.sources = Array.isArray(next.sources) ? next.sources.filter((entry) => entry !== id) : [];
+		return next;
+	}
+
+	// Page layout editor (reading PI only, inside the detail settings).
+	// The grid's buttons are built once per kind of deck and then updated
+	// in place, so a press, a preview answer or a page step never takes
+	// focus off the cell or button it is on. A control that would do
+	// nothing says so with aria-disabled and stays focusable (the Open all
+	// and Fold all convention).
+	const layoutBoxEl = document.getElementById("detail-layout");
+	const layoutGridEl = document.getElementById("layout-grid");
+	const layoutFoldEl = layoutBoxEl === null ? null : layoutBoxEl.querySelector("details");
+	if (layoutBoxEl !== null && layoutGridEl !== null && layoutFoldEl !== null) {
+		const pageEl = document.getElementById("layout-page");
+		const prevEl = document.getElementById("layout-prev");
+		const nextEl = document.getElementById("layout-next");
+		const noteEl = document.getElementById("layout-note");
+		// Every note sits in the same place at once, the shown one visible:
+		// the area keeps the tallest note's height, so a note coming or going
+		// on live data (HWiNFO stopping, a page filling up) moves nothing.
+		const notes = noteEl === null ? [] : Array.from(noteEl.querySelectorAll("[data-note]"));
+		const [getGaps, setGaps] = useSettings("detailGaps", () => {}, null);
+		// Mirrors DETAIL_GAP_PAGES_MAX in src/detail/detail-settings.ts.
+		const LAYOUT_PAGES_MAX = 16;
+		const NAV_NAMES = { back: "Back", title: "Title", previous: "Previous", next: "Next" };
+		let support = null; // the plugin's detailSupport answer: the bundle's grid
+		let shown = null; // the plugin's last detailPreview answer
+		let pageIndex = 0;
+		let gridShape = ""; // the grid the buttons were built for
+		const cellButtons = new Map(); // "column,row" -> its button
+		const cellId = (cell) => `${cell.column},${cell.row}`;
+		const layoutOpen = () => layoutFoldEl.open === true;
+		/** Asks the plugin for the page as the deck would lay it out. Only a
+		 * question: nothing is saved, whatever the answer. */
+		const askPreview = () => {
+			if (!layoutOpen() || support === null) return;
+			streamDeckClient.send("sendToPlugin", { event: "getDetailPreview", draft: hw.state.settings, page: pageIndex });
+		};
+		const storedPages = () => {
+			const raw = hw.state.settings?.detailGaps;
+			const pages = isPlainDoc(raw) && support !== null && Object.hasOwn(raw, support.bundle) ? raw[support.bundle] : undefined;
+			return Array.isArray(pages) ? Math.min(pages.length, LAYOUT_PAGES_MAX) : 0;
+		};
+		/** Pages the deck has for this list (at least one, and at least the
+		 * pages a stored layout reaches): what the label says. */
+		const pageTotal = () => Math.max(1, typeof shown?.pageCount === "number" ? shown.pageCount : 0, storedPages());
+		/** Pages the editor steps through: empty cells reach page 16. */
+		const pageSteps = () => Math.min(LAYOUT_PAGES_MAX, pageTotal());
+		const sameCell = (a, b) => isPlainDoc(a) && isPlainDoc(b) && a.column === b.column && a.row === b.row;
+		const readingCells = () => (Array.isArray(support?.readings) ? support.readings.filter(isPlainDoc) : []);
+		/** The opener's own cell while the second Back takes it (on unless
+		 * exactly false, like the runtime), else null. */
+		const mirrorCell = () => (hw.state.settings?.detailMirrorBack !== false && isPlainDoc(support?.opener) && readingCells().some((c) => sameCell(c, support.opener)) ? support.opener : null);
+		const setAttr = (el, name, value) => {
+			if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+		};
+		const setText = (el, text) => {
+			if (el !== null && el.textContent !== text) el.textContent = text;
+		};
+		/** The bundle's cells as buttons (reading cells) and labels (the
+		 * navigation cells), once per grid shape. */
+		const buildGrid = () => {
+			const shape = JSON.stringify([support.columns, support.rows, support.nav ?? null, readingCells()]);
+			if (shape === gridShape) return;
+			gridShape = shape;
+			cellButtons.clear();
+			layoutGridEl.style.setProperty?.("--hw-layout-cols", String(support.columns));
+			const nodes = [];
+			for (let row = 0; row < support.rows; row++) {
+				for (let column = 0; column < support.columns; column++) {
+					const at = { column, row };
+					const place = `column ${column + 1}, row ${row + 1}`;
+					const role = Object.keys(NAV_NAMES).find((name) => sameCell(support.nav?.[name], at));
+					if (role !== undefined) {
+						const span = document.createElement("span");
+						span.className = "hw-layout-cell";
+						span.dataset.kind = "nav";
+						span.textContent = NAV_NAMES[role];
+						span.setAttribute("aria-label", `${NAV_NAMES[role]}, ${place}`);
+						nodes.push(span);
+						continue;
+					}
+					if (!readingCells().some((cell) => sameCell(cell, at))) {
+						// Neither a navigation nor a reading cell: keeps the
+						// grid's columns in step, says nothing.
+						const spacer = document.createElement("span");
+						spacer.className = "hw-layout-cell";
+						spacer.dataset.kind = "none";
+						spacer.setAttribute("aria-hidden", "true");
+						nodes.push(spacer);
+						continue;
+					}
+					const button = document.createElement("button");
+					button.type = "button";
+					button.className = "hw-layout-cell";
+					button.dataset.column = String(column);
+					button.dataset.row = String(row);
+					button.dataset.place = place;
+					button.appendChild(document.createElement("span"));
+					cellButtons.set(cellId(at), button);
+					nodes.push(button);
+				}
+			}
+			layoutGridEl.replaceChildren(...nodes);
+		};
+		/** Draws the current page. Returns true when the page index had to
+		 * come down (the list or the stored layout got shorter), so the
+		 * caller asks for the page now shown. */
+		const renderLayout = () => {
+			layoutBoxEl.hidden = support === null;
+			if (support === null) return false;
+			buildGrid();
+			const total = pageTotal();
+			const steps = pageSteps();
+			let clamped = false;
+			if (pageIndex > steps - 1) {
+				pageIndex = steps - 1;
+				clamped = true;
+			}
+			setText(pageEl, `Page ${pageIndex + 1} of ${total}`);
+			if (prevEl !== null) setAttr(prevEl, "aria-disabled", String(pageIndex === 0));
+			if (nextEl !== null) setAttr(nextEl, "aria-disabled", String(pageIndex >= steps - 1));
+			const preview = shown !== null && shown.pageIndex === pageIndex && Array.isArray(shown.cells) ? shown : null;
+			const cells = preview === null ? [] : preview.cells.filter(isPlainDoc);
+			const ignored = cells.some((c) => c.kind === "gap" && c.ignored === true);
+			const note = preview !== null && preview.resolved === false ? "unresolved" : ignored ? "ignored" : total > LAYOUT_PAGES_MAX && pageIndex === steps - 1 ? "limit" : "";
+			for (const el of notes) {
+				const on = String(el.dataset.note === note);
+				if (el.dataset.shown !== on) el.dataset.shown = on;
+			}
+			// A cell that is not kept empty and not the mirror can take a
+			// reading; the last one on a page cannot be emptied (the deck
+			// ignores a page whose every cell is empty).
+			const free = cells.filter((c) => c.kind === "reading" || c.kind === "empty").length;
+			for (const at of readingCells()) {
+				const button = cellButtons.get(cellId(at));
+				if (button === undefined) continue;
+				const cell = cells.find((c) => sameCell(c, at));
+				const kind = cell?.kind ?? "empty";
+				const gapIgnored = kind === "gap" && cell?.ignored === true;
+				const waiting = preview === null;
+				const last = !waiting && (kind === "reading" || kind === "empty") && free <= 1;
+				const text = waiting ? "" : kind === "gap" ? "Empty" : kind === "back" ? "Back" : kind === "reading" && typeof cell.label === "string" ? cell.label : "";
+				const name = waiting ? "Loading" : kind === "gap" ? (gapIgnored ? "Kept empty, ignored on this full page" : "Kept empty") : kind === "back" ? "Back, this key's own position" : kind === "reading" ? text : "No reading";
+				const title = waiting ? "This page is still loading" : kind === "back" ? "Goes back from this key's own position" : gapIgnored ? "Kept empty, but ignored while this page has no cell for readings. Press to let a reading in." : kind === "gap" ? "Kept empty on this page. Press to let a reading in." : last ? "The last cell left for readings on this page cannot be emptied" : "Press to keep this cell empty on this page";
+				if (button.dataset.kind !== kind) button.dataset.kind = kind;
+				const ignoredMark = String(gapIgnored);
+				if (button.dataset.ignored !== ignoredMark) button.dataset.ignored = ignoredMark;
+				setAttr(button, "aria-disabled", String(waiting || kind === "back" || last));
+				setAttr(button, "aria-pressed", String(kind === "gap"));
+				setAttr(button, "aria-label", `${name}, ${button.dataset.place}`);
+				if (button.title !== title) button.title = title;
+				setText(button.firstElementChild ?? button.children?.[0] ?? null, text);
+			}
+			return clamped;
+		};
+		layoutGridEl.addEventListener("click", (ev) => {
+			const button = ev.target instanceof Element ? ev.target.closest("button[data-column]") : null;
+			if (button === null || button.getAttribute("aria-disabled") === "true" || support === null) return;
+			const cell = { column: Number(button.dataset.column), row: Number(button.dataset.row) };
+			const bundle = support.bundle;
+			const page = pageIndex;
+			const readings = readingCells();
+			const mirror = mirrorCell();
+			// One explicit press, one frame, one field.
+			getGaps().then((raw) => {
+				const next = toggledDetailGaps(raw, bundle, page, cell);
+				const before = isPlainDoc(raw) && Array.isArray(raw[bundle]) && Array.isArray(raw[bundle][page]) ? raw[bundle][page] : [];
+				const after = Array.isArray(next[bundle]) && Array.isArray(next[bundle][page]) ? next[bundle][page] : [];
+				// A press that would leave the page no cell for readings (two
+				// quick presses before the plugin redrew the page) saves
+				// nothing: the deck would ignore the whole page's layout.
+				const adding = !before.some((entry) => sameCell(entry, cell));
+				const covered = readings.filter((c) => sameCell(c, mirror) || after.some((entry) => sameCell(entry, c))).length;
+				if (adding && covered >= readings.length) return;
+				setGaps(next);
+			});
+		});
+		const step = (delta) => {
+			const next = Math.min(Math.max(0, pageIndex + delta), pageSteps() - 1);
+			if (next === pageIndex) return;
+			pageIndex = next;
+			renderLayout();
+			askPreview();
+		};
+		prevEl?.addEventListener("click", () => step(-1));
+		nextEl?.addEventListener("click", () => step(1));
+		layoutFoldEl.addEventListener("toggle", () => {
+			if (layoutOpen()) askPreview();
+		});
+		// Any saved change (this editor's own, the list, an echo) and a new
+		// sensor list re-ask while the editor is open.
+		hw.on("settings", askPreview);
+		hw.on("tree", askPreview);
+		streamDeckClient.sendToPropertyInspector.subscribe((ev) => {
+			const p = ev && ev.payload;
+			if (!isPlainDoc(p)) return;
+			if (p.event === "detailSupport") {
+				support = p.supported === true && typeof p.bundle === "string" && Number.isInteger(p.columns) && Number.isInteger(p.rows) ? p : null;
+				shown = null;
+				renderLayout();
+				askPreview();
+			} else if (p.event === "detailPreview") {
+				if (typeof p.context === "string" && hw.state.context !== "" && p.context !== hw.state.context) return;
+				if (p.supported !== true || support === null || p.bundle !== support.bundle) return;
+				shown = p;
+				// The answer can say the list got shorter than the page shown
+				// (a shorter list, a narrower filter, a gap taken off the last
+				// page): the page comes down and is asked for at once.
+				if (renderLayout()) askPreview();
+			}
+		});
+	}
+
+	// A placed key's detail pages (reading PI only): shown while the key
+	// sits on a managed detail page, or once it is limited to some sensors.
+	// Once shown it stays for this panel, and on a detail page its button
+	// holds its place whatever the data says (waiting for the drill-down's
+	// sensor, offering it, or saying it is listed), so live data never
+	// moves the sections under it.
+	const scopeEl = document.getElementById("detail-scope");
+	if (scopeEl !== null) {
+		const scopeHelpEl = document.getElementById("scope-help");
+		const scopeAddEl = document.getElementById("scope-add");
+		const scopeListEl = document.getElementById("scope-list");
+		const [getScope, setScope] = useSettings("detailScope", () => {}, null);
+		let scopeInfo = null; // the plugin's detailScope answer
+		let backTile = false;
+		let scopeShown = false;
+		let listSignature = "";
+		/** One listed sensor as the panel words it. */
+		const entryText = (s) => {
+			const label = typeof s.name === "string" && s.name !== "" ? s.name : `Sensor ${s.id}`;
+			const state = typeof s.state === "string" ? s.state : typeof s.name === "string" ? "present" : "absent";
+			if (state === "present") return label;
+			if (state === "no-data") return `${label}, waiting for HWiNFO data`;
+			if (state === "other-source") return s.savedWith === "gadget" ? `${label}, saved with the Gadget registry; the plugin reads Shared Memory now` : `${label}, saved with Shared Memory; the plugin reads the Gadget registry now`;
+			return `${label}, not in HWiNFO now`;
+		};
+		const renderScope = () => {
+			const info = scopeInfo;
+			const sources = info !== null && Array.isArray(info.sources) ? info.sources.filter((s) => isPlainDoc(s) && typeof s.id === "string") : [];
+			const onPage = info !== null && info.onDetailPage === true;
+			const opener = onPage && isPlainDoc(info.opener) && typeof info.opener.id === "string" ? info.opener : null;
+			if (!backTile && (onPage || sources.length > 0)) scopeShown = true;
+			scopeEl.hidden = backTile || !scopeShown;
+			if (scopeEl.hidden) return;
+			const listed = opener !== null && sources.some((s) => s.id === opener.id);
+			if (scopeAddEl !== null) {
+				if (scopeAddEl.hidden !== !onPage) scopeAddEl.hidden = !onPage;
+				const name = opener === null ? "" : typeof opener.name === "string" && opener.name !== "" ? opener.name : opener.id;
+				const text = opener === null ? "Show only on this sensor's detail pages" : listed ? `Shows on ${name} detail pages` : sources.length === 0 ? `Show only on ${name} detail pages` : `Also show on ${name} detail pages`;
+				if (scopeAddEl.textContent !== text) scopeAddEl.textContent = text;
+				const off = String(opener === null || listed);
+				if (scopeAddEl.getAttribute("aria-disabled") !== off) scopeAddEl.setAttribute("aria-disabled", off);
+				const title = opener === null ? "This drill-down's sensor shows here once HWiNFO sends data" : listed ? "Listed below" : "";
+				if (scopeAddEl.title !== title) scopeAddEl.title = title;
+				scopeAddEl.dataset.source = opener === null || listed ? "" : opener.id;
+			}
+			if (scopeHelpEl !== null) {
+				const help = sources.length > 0 ? "On other sensors' detail pages this key stays blank and does nothing. Remove every sensor to show it on all of them again." : onPage ? "This key sits on the shared detail page, so it shows on every sensor's details." : "This key shows on every sensor's detail pages.";
+				if (scopeHelpEl.textContent !== help) scopeHelpEl.textContent = help;
+			}
+			if (scopeListEl === null) return;
+			const signature = JSON.stringify(sources.map((s) => [s.id, entryText(s)]));
+			if (signature === listSignature) return;
+			listSignature = signature;
+			// Focus on a Remove that goes away moves to its neighbour, never
+			// to the page: the next sensor's Remove, else the one before,
+			// else the button above, else the help line.
+			const focused = scopeListEl.contains(document.activeElement) ? document.activeElement.closest?.("button[data-source]") : null;
+			const focusedId = focused?.dataset.source;
+			const focusedAt = focused === null || focused === undefined ? -1 : Array.from(scopeListEl.querySelectorAll("button[data-source]")).indexOf(focused);
+			if (scopeListEl.hidden !== (sources.length === 0)) scopeListEl.hidden = sources.length === 0;
+			scopeListEl.replaceChildren(
+				...sources.map((s) => {
+					const item = document.createElement("li");
+					const name = document.createElement("span");
+					name.textContent = entryText(s);
+					const remove = document.createElement("button");
+					remove.type = "button";
+					remove.className = "hw-btn";
+					remove.dataset.source = s.id;
+					remove.textContent = "Remove";
+					remove.setAttribute("aria-label", `Remove ${name.textContent}`);
+					item.append(name, remove);
+					return item;
+				})
+			);
+			if (focusedAt < 0) return;
+			const removes = Array.from(scopeListEl.querySelectorAll("button[data-source]"));
+			const target = removes.find((b) => b.dataset.source === focusedId) ?? removes[Math.min(focusedAt, removes.length - 1)] ?? (scopeAddEl !== null && !scopeAddEl.hidden ? scopeAddEl : null);
+			if (target !== null) target.focus();
+			else if (scopeHelpEl !== null) {
+				scopeHelpEl.tabIndex = -1;
+				scopeHelpEl.focus();
+			}
+		};
+		followSetting("detailRole", (value) => {
+			backTile = value === "back";
+			renderScope();
+		});
+		scopeAddEl?.addEventListener("click", () => {
+			const id = scopeAddEl.dataset.source;
+			if (scopeAddEl.getAttribute("aria-disabled") === "true" || typeof id !== "string" || id === "") return;
+			// One explicit press, one frame, one field.
+			getScope().then((raw) => setScope(scopeWithSource(raw, id)));
+		});
+		scopeListEl?.addEventListener("click", (ev) => {
+			const button = ev.target instanceof Element ? ev.target.closest("button[data-source]") : null;
+			const id = button === null ? undefined : button.dataset.source;
+			if (typeof id !== "string") return;
+			getScope().then((raw) => setScope(scopeWithoutSource(raw, id)));
+		});
+		streamDeckClient.sendToPropertyInspector.subscribe((ev) => {
+			const p = ev && ev.payload;
+			if (!isPlainDoc(p) || p.event !== "detailScope") return;
+			if (typeof p.context === "string" && hw.state.context !== "" && p.context !== hw.state.context) return;
+			scopeInfo = p;
+			renderScope();
+		});
+		// A question only: the plugin answers, and again whenever the answer
+		// changes (an entry, a Back, a scope edit, HWiNFO starting later).
+		streamDeckClient.send("sendToPlugin", { event: "getDetailScope" });
+	}
+
+	// Per-reading alerts (reading PI only). Each reading has one set of
+	// limits. Reading 1's are Warn at and Critical at, exactly as before,
+	// unless it has an alertRules entry of its own: then that entry gets a
+	// row and the fields say they are not in use. Every other configured
+	// reading gets a row that writes alertRules, filed under the reading's
+	// saved key (or the key its limits already sit under); a slot showing a
+	// reading an earlier slot already shows gets a row with no fields.
+	// Numbers keep the unit they were typed in: a row writes its limits
+	// with the plugin's limitUnit, and an edit of reading 1's numbers stamps
+	// alertDisplayUnit with legacyUnit, so a later °C/°F switch converts
+	// them instead of reinterpreting them, and an edit of one field never
+	// changes what the untouched ones mean. Nothing is written for a reading
+	// that is not reporting (there is no unit to save) or from a preview
+	// built for the previous reading of a slot. Opening the panel, a tick, a
+	// sensor list or a preview writes nothing; the notes come from the
+	// plugin's own rule checks (effective.keyAlerts) and never block a write.
+	const alertRowsEl = document.getElementById("alert-rows");
+	if (alertRowsEl !== null && hw.kind === "key") {
+		const SLOT_FIELDS = ["readingKey", "secondaryReadingKey", "quadReadingKey3", "quadReadingKey4"];
+		// The notes the fields already say themselves (their own error line).
+		const FIELD_NOTES = ["warn-not-number", "crit-not-number", "hyst-not-number"];
+		const rulesBinding = useSettings("alertRules", () => renderAlertRows(), null);
+		const displayUnitStage = useSettings("alertDisplayUnit", undefined, null, false);
+		const displayUnitProofStage = useSettings("alertDisplayUnitFor", undefined, null, false);
+		const notes0El = document.getElementById("alert-notes-0");
+		const snoozeItemEl = document.getElementById("snooze-item");
+		const keyAlertsNow = () => hw.state.preview?.effective?.keyAlerts ?? null;
+		/** The plugin's view of a slot while it is about `key`, the reading
+		 * the row stands for; null for no answer yet or a stale one. */
+		const slotInfo = (slot, key = hw.state.settings[SLOT_FIELDS[slot]]) => model.keyAlertSlot(keyAlertsNow(), slot, key);
+		const rulesNow = () => hw.state.settings.alertRules;
+		/** Where a slot's limits live: the key the plugin found them under,
+		 * else the slot's own saved key. */
+		const fileKeyOf = (slot, key) => {
+			const info = slotInfo(slot, key);
+			return info !== null && info.source === "reading" && typeof info.ruleKey === "string" ? info.ruleKey : key;
+		};
+		const entryOf = (fileKey) => {
+			const raw = rulesNow();
+			if (raw === null || typeof raw !== "object" || Array.isArray(raw) || !Object.hasOwn(raw, fileKey)) return null;
+			const entry = raw[fileKey];
+			return entry !== null && typeof entry === "object" && !Array.isArray(entry) ? entry : null;
+		};
+		const textOf = (value) => (typeof value === "string" ? value : typeof value === "number" && Number.isFinite(value) ? String(value) : "");
+		const setText = (el, text) => {
+			if (el === null) return;
+			if (el.textContent !== text) el.textContent = text;
+			el.hidden = text === "";
+		};
+		const flagsText = (info, skip) => {
+			const flags = info?.flags;
+			if (!Array.isArray(flags)) return "";
+			return flags
+				.filter((f) => f !== null && typeof f === "object" && typeof f.message === "string" && !skip.includes(f.code))
+				.map((f) => `${f.message}.`)
+				.join(" ");
+		};
+		/** Says so when numbers sit in the °C/°F counterpart of the unit the
+		 * key shows (the plugin converts them). */
+		const unitNote = (what, limitUnit, displayUnit) =>
+			typeof limitUnit === "string" && typeof displayUnit === "string" && limitUnit !== displayUnit ? `${what} in ${limitUnit}, the unit they were typed in. The key shows ${displayUnit} and converts them.` : "";
+		const joined = (...parts) => parts.filter((p) => p !== "").join(" ");
+
+		const rows = new Map(); // slot -> row parts
+		let saveTimer = 0;
+		let pendingSlot = null;
+
+		/** The unit a row's edit is written with, or null when it cannot be
+		 * written: no answer about this reading yet, or it is not reporting. */
+		const writeUnitOf = (row) => {
+			const unit = slotInfo(row.slot, row.key)?.limitUnit;
+			return typeof unit === "string" ? unit : null;
+		};
+
+		function commitRow(slot) {
+			if (pendingSlot === slot) {
+				clearTimeout(saveTimer);
+				pendingSlot = null;
+			}
+			const row = rows.get(slot);
+			if (row === undefined || row.kind !== "edit") return;
+			const unit = writeUnitOf(row);
+			if (unit === null) return;
+			const raw = rulesNow();
+			const next = model.patchKeyAlertRule(raw, fileKeyOf(slot, row.key), { warn: row.warn.value, crit: row.crit.value, hyst: row.hyst.value, below: row.below.checked }, unit);
+			if (model.sortedJson(next) === model.sortedJson(raw === undefined ? {} : raw)) return;
+			rulesBinding[1](next);
+		}
+		function scheduleRow(slot) {
+			if (pendingSlot !== null && pendingSlot !== slot) commitRow(pendingSlot);
+			clearTimeout(saveTimer);
+			pendingSlot = slot;
+			saveTimer = setTimeout(() => commitRow(slot), 200);
+		}
+		/** A row can be edited only while the plugin answers about its
+		 * reading and the reading reports; the direction box and Clear by
+		 * also wait for a Warn at or Critical at (an entry without one is
+		 * not saved). Disabling never changes a box's size. */
+		const syncEnabled = (row) => {
+			const writable = writeUnitOf(row) !== null;
+			const limited = row.warn.value.trim() !== "" || row.crit.value.trim() !== "";
+			for (const input of [row.warn, row.crit]) input.disabled = !writable;
+			for (const input of [row.hyst, row.below]) input.disabled = !writable || !limited;
+		};
+
+		function buildRow(plan) {
+			const { slot, key, kind } = plan;
+			const el = document.createElement("div");
+			el.className = "hw-alert-row";
+			el.setAttribute("role", "group");
+			el.dataset.slot = String(slot);
+			const nameEl = document.createElement("span");
+			nameEl.className = "hw-label";
+			nameEl.id = `alert-name-${slot}`;
+			el.setAttribute("aria-labelledby", nameEl.id);
+			const notes = document.createElement("p");
+			notes.className = "hw-help";
+			notes.hidden = true;
+			notes.setAttribute("aria-live", "polite");
+			if (kind !== "edit") {
+				el.append(nameEl, notes);
+				return { el, slot, key, kind, of: plan.of, plan, nameEl, notes };
+			}
+			const grid = document.createElement("div");
+			grid.className = "hw-alert-grid";
+			const row = { el, slot, key, kind, of: plan.of, plan, nameEl, notes };
+			const field = (name, label, placeholder) => {
+				const wrap = document.createElement("div");
+				wrap.className = "hw-field";
+				const input = document.createElement("input");
+				input.type = "text";
+				input.inputMode = "decimal";
+				input.autocomplete = "off";
+				input.placeholder = placeholder;
+				input.id = `f-${name}-s${slot}`;
+				const labelEl = document.createElement("label");
+				labelEl.htmlFor = input.id;
+				labelEl.textContent = label;
+				input.addEventListener("input", () => {
+					registerLeaveCommit(input, () => commitRow(slot));
+					syncEnabled(row);
+					scheduleRow(slot);
+				});
+				input.addEventListener("change", () => {
+					dropLeaveCommit(input);
+					commitRow(slot);
+				});
+				wrap.append(labelEl, input);
+				grid.appendChild(wrap);
+				return input;
+			};
+			row.warn = field("warn", "Warn at", "Off");
+			row.crit = field("crit", "Critical at", "Off");
+			row.hyst = field("hyst", "Clear by", "0");
+			const checkLabel = document.createElement("label");
+			checkLabel.className = "hw-check";
+			row.below = document.createElement("input");
+			row.below.type = "checkbox";
+			const checkText = document.createElement("span");
+			checkText.textContent = "Alert when it drops to or below these numbers";
+			checkLabel.append(row.below, checkText);
+			row.below.addEventListener("click", () => commitRow(slot));
+			el.append(nameEl, grid, checkLabel, notes);
+			// Reading 1's row can leave once its numbers are cleared; it waits
+			// until the caret has left it.
+			el.addEventListener("focusout", () => setTimeout(renderAlertRows, 0));
+			return row;
+		}
+
+		function fillRow(row) {
+			const { slot, plan } = row;
+			const info = slotInfo(slot, row.key);
+			const label = hw.labelOf(row.key) ?? (typeof info?.label === "string" ? info.label : null);
+			if (row.kind !== "edit") {
+				setText(row.nameEl, `Reading ${slot + 1}: ${label ?? "not in the sensor list right now"}`);
+				setText(row.notes, plan.ofRow ? `The same reading as reading ${plan.of + 1}, so the limits in its row cover it.` : "The same reading as reading 1, so Warn at and Critical at cover it.");
+				return;
+			}
+			const unit = info?.limitUnit;
+			setText(row.nameEl, `Reading ${slot + 1}: ${label ?? "not in the sensor list right now"}${typeof unit === "string" && unit !== "" ? ` (${unit})` : ""}`);
+			const entry = entryOf(fileKeyOf(slot, row.key));
+			for (const [input, field] of [[row.warn, "warn"], [row.crit, "crit"], [row.hyst, "hyst"]]) {
+				// Never under the caret, never while a save is pending.
+				if (document.activeElement === input || pendingSlot === slot) continue;
+				const text = textOf(entry?.[field]);
+				if (input.value !== text) input.value = text;
+			}
+			const below = entry?.below === true;
+			if (row.below.checked !== below && pendingSlot !== slot) row.below.checked = below;
+			syncEnabled(row);
+			if (info === null) setText(row.notes, "");
+			else if (typeof info.limitUnit !== "string") setText(row.notes, "Limits can be edited once this reading reports.");
+			else setText(row.notes, joined(unitNote("These limits are", info.limitUnit, info.displayUnit), flagsText(info, [])));
+		}
+
+		/** Adds, keeps and removes rows by plan, leaving a kept row (and the
+		 * caret in it) where it is. */
+		function renderAlertRows() {
+			const first = rows.get(0);
+			const keepFirst = first !== undefined && first.kind === "edit" && (first.el.contains(document.activeElement) || pendingSlot === 0);
+			const plan = model.alertRowPlan(hw.state.settings, keyAlertsNow(), keepFirst);
+			const wanted = new Map(plan.map((p) => [p.slot, p]));
+			for (const [slot, row] of [...rows]) {
+				const p = wanted.get(slot);
+				if (p !== undefined && p.key === row.key && p.kind === row.kind && p.of === row.of) {
+					row.plan = p;
+					continue;
+				}
+				if (pendingSlot === slot) commitRow(slot);
+				row.el.remove();
+				rows.delete(slot);
+			}
+			let after = null;
+			for (let i = plan.length - 1; i >= 0; i--) {
+				let row = rows.get(plan[i].slot);
+				if (row === undefined) {
+					row = buildRow(plan[i]);
+					rows.set(row.slot, row);
+					alertRowsEl.insertBefore(row.el, after);
+				}
+				after = row.el;
+			}
+			alertRowsEl.hidden = plan.length === 0;
+			for (const p of plan) fillRow(rows.get(p.slot));
+			const info0 = slotInfo(0);
+			if (info0?.source === "reading") setText(notes0El, "Reading 1 has limits of its own in the row below, so Warn at and Critical at are not in use.");
+			else setText(notes0El, joined(unitNote("Warn at and Critical at are", info0 === null ? null : keyAlertsNow()?.legacyUnit, info0?.displayUnit), flagsText(info0, FIELD_NOTES)));
+		}
+
+		// Reading 1's numbers: the unit they are in rides the field's own
+		// save (staged here, written with the number), with the exact text of
+		// Warn at, Critical at and Clear by it covers (alertDisplayUnitFor),
+		// so a version that retypes them without knowing the stamp cannot
+		// make it misread them. Without an answer about reading 1 (not
+		// reporting, or a stale preview) no unit is staged and a stamp that
+		// still counts stays, recorded for the new text.
+		for (const id of ["f-warn", "f-crit", "f-hyst"]) {
+			const input = document.getElementById(id);
+			if (input === null) continue;
+			const stampLegacyUnit = () => {
+				const unit = slotInfo(0) === null ? undefined : keyAlertsNow()?.legacyUnit;
+				if (typeof unit === "string" && hw.state.settings.alertDisplayUnit !== unit) displayUnitStage[1](unit);
+				if (typeof unit === "string" || model.provenDisplayUnit(hw.state.settings) !== undefined) displayUnitProofStage[1](model.alertStampProof(hw.state.settings, input.dataset.setting, input.value));
+			};
+			input.addEventListener("input", stampLegacyUnit);
+			input.addEventListener("compositionend", stampLegacyUnit);
+		}
+
+		hw.on("settings", renderAlertRows);
+		hw.on("preview", renderAlertRows);
+		hw.on("tree", renderAlertRows);
+		followSetting("detailRole", (value) => {
+			// A Back tile never snoozes: its press always returns.
+			if (snoozeItemEl !== null) snoozeItemEl.hidden = value === "back";
+		});
+		renderAlertRows();
+	}
+
+	// The dial's Warn at and Critical at (dial PI only): an edit of them, or
+	// of Clear by, stamps alertDisplayUnit with the unit the
+	// plugin compares them in (readingAlert.legacyUnit), staged to ride the
+	// field's own save, exactly as reading 1 on a key does. A later °C/°F
+	// switch then converts them instead of reinterpreting them. Without a
+	// current answer about the reading on the dial (not reporting, or a
+	// preview built for the reading before it) nothing is staged and any
+	// stamp already saved stays. Opening, a tick or a preview writes nothing.
+	if (hw.kind === "dial" && document.getElementById("f-warn") !== null) {
+		const dialUnitStage = useSettings("alertDisplayUnit", undefined, null, false);
+		const dialUnitProofStage = useSettings("alertDisplayUnitFor", undefined, null, false);
+		for (const id of ["f-warn", "f-crit", "f-hyst"]) {
+			const input = document.getElementById(id);
+			if (input === null) continue;
+			const stampDialLegacyUnit = () => {
+				const ra = hw.state.preview?.effective?.readingAlert;
+				const key = hw.state.settings.readingKey;
+				const current = ra !== undefined && ra !== null && typeof key === "string" && ra.key === key;
+				const unit = current ? ra.legacyUnit : undefined;
+				if (typeof unit === "string" && hw.state.settings.alertDisplayUnit !== unit) dialUnitStage[1](unit);
+				if (typeof unit === "string" || model.provenDisplayUnit(hw.state.settings) !== undefined) dialUnitProofStage[1](model.alertStampProof(hw.state.settings, input.dataset.setting, input.value));
+			};
+			input.addEventListener("input", stampDialLegacyUnit);
+			input.addEventListener("compositionend", stampDialLegacyUnit);
+		}
+	}
+
 	// Display select (reading PI only): one control for the single layout's
 	// extra strip. It shows the EFFECTIVE mode (a valid displayMode wins,
 	// else the legacy sparkline checkbox's state), and any change writes only
@@ -4156,10 +4805,15 @@
 		// Assign only on a real change: rewriting a select's value can dismiss
 		// its open popup in this webview.
 		const rangeHelpEl = document.getElementById("display-help");
+		const trendWindowEl = document.getElementById("trend-window-item");
 		const show = (mode) => {
 			if (displayModeEl.value !== mode) displayModeEl.value = mode;
 			// The range sentence is about Bar and Ring only.
 			if (rangeHelpEl !== null) rangeHelpEl.hidden = mode !== "bar" && mode !== "ring";
+			// Only the Sparkline strip has a time window (the multi layouts
+			// hide this whole Display row). Visibility only: the stored
+			// window is kept whatever the mode.
+			if (trendWindowEl !== null) trendWindowEl.hidden = mode !== "sparkline";
 		};
 		const showDisplayMode = () => {
 			getDisplayMode().then((mode) => {
@@ -4188,6 +4842,7 @@
 	const overviewRowsEl = document.getElementById("overview-rows");
 	if (overviewRowsEl !== null) {
 		const overviewThreeEl = document.getElementById("overview-three-rows");
+		const trendWindowEl = document.getElementById("trend-window-item");
 		const sensorValueColorsEl = document.getElementById("sensor-value-colors");
 		const barRangeEl = document.getElementById("bar-range");
 		const warnEl = document.getElementById("f-warn");
@@ -4196,6 +4851,8 @@
 			overviewRowsEl.hidden = value !== "overview" && value !== "tworow";
 			if (sensorValueColorsEl !== null) sensorValueColorsEl.hidden = overviewRowsEl.hidden;
 			if (overviewThreeEl !== null) overviewThreeEl.hidden = value !== "overview";
+			// Only the two-row view draws row trends.
+			if (trendWindowEl !== null) trendWindowEl.hidden = value !== "tworow";
 			if (barRangeEl !== null) barRangeEl.hidden = value === "tworow" || value === "overview";
 			// The multi-row views draw no bar: alerts tint the row VALUE
 			// there (the dial renderer's alert indicator), so the threshold
@@ -4206,28 +4863,398 @@
 		};
 		followSetting("dialView", applyView);
 	}
-	// Background (dial PI only): Words in the accent color shows on the looks
-	// that take it (Glass, Tint, Outline). Theme and Clear draw their words as
-	// before whatever is stored, so the box hides there and keeps its value.
-	// The box is unbound like Color numbers by sensor type below: only the
-	// exact true paints it ticked, and only a user's edit writes.
+	// Background (the dial's dialBackground, the key's keyBackground) and
+	// Words in the accent color, each with a Default that follows the shared
+	// default under Advanced (globals of the same names), as Text color does.
+	// Words shows on the looks that take it (Glass, Tint, Outline), the
+	// action's own look or the shared one it follows; Theme and Clear draw
+	// their words as before whatever is stored, so the select hides there
+	// and keeps its value. Its one help line shows only on a see-through
+	// look (Glass, Tint, Outline, Clear), never on an art look. The Words select is unbound: only the exact booleans paint On or
+	// Off, anything else is Default, and only a person's pick writes (true,
+	// false, or "" for Default, the empty value Text color's Default saves).
+	/** An action's Default option in one form everywhere (Text color,
+	 * Background, Words, Stars, Sky color): the value it follows first,
+	 * then where it comes from, "All (shared)", as the fold summaries say
+	 * "theme text (shared)".
+	 * The Theme band keeps "Default (shared: Void)" and, on a strip,
+	 * "Default (this strip, shared: Void)" on purpose (renderThemeLine).
+	 * Folded, the band's chip takes the place of that line's first span
+	 * (pi.css: details.hw-look-fold:not([open]) #theme-current >
+	 * span:first-child), so a line that led with the value would lose the
+	 * theme's name there. Do not move the band to this form; the e2e
+	 * suites pin its words. */
+	const sharedValue = (value) => (typeof hwT === "function" ? hwT("pi.sharedLooks.followsShared", "{value} (shared)", { value }) : `${value} (shared)`);
+	/** Whether the theme this face draws is light (Paper): the art looks
+	 * draw no sky there (deck-art.ts artFits). Set by the Theme section
+	 * (publishDrawnTheme) and said with a "drawnTheme" event. */
+	let drawnThemeLight = false;
+	/** The look this panel's own action draws (its own, else the shared
+	 * one), for Shared defaults: set by the Background block with an
+	 * "ownLook" event. */
+	let ownDrawnLook = null;
+	/** A pair of fields (hw-row2) stacks, one field a row, once a select in
+	 * it holds an option its half cannot show whole (a kept stored value, a
+	 * long translation), by the measure e2e:pi-l10n uses. It stays stacked
+	 * for the page's life, so a later pick never moves the other field up
+	 * under the pointer. Hidden or folded, it waits for the next call. */
+	let fitCanvas = null;
+	function fitPair(row) {
+		if (row === null || row.hidden || row.classList.contains("hw-stack") || row.getClientRects().length === 0) return;
+		fitCanvas ??= document.createElement("canvas").getContext("2d");
+		for (const select of row.querySelectorAll("select")) {
+			if (select.getClientRects().length === 0) continue;
+			const cs = getComputedStyle(select);
+			fitCanvas.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+			const room = select.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 16;
+			for (const option of select.options) {
+				if (option.hidden || fitCanvas.measureText(option.text).width <= room) continue;
+				row.classList.add("hw-stack");
+				return;
+			}
+		}
+	}
+	/** A pair that comes into view or changes width (a fold opens, the
+	 * panel resizes) is measured again; fitPair only ever stacks. */
+	function watchPair(row) {
+		if (row !== null && typeof ResizeObserver === "function") new ResizeObserver(() => fitPair(row)).observe(row);
+	}
+	/** A Stars amount's text, from the panel catalog. */
+	const starsWord = (name) => (typeof hwT === "function" ? hwT(`pi.keyBackground.${model.STARS_TEXT[name][0]}`, model.STARS_TEXT[name][1]) : model.STARS_TEXT[name][1]);
+	/** Offers a Stars select's Off, or hides it (the Stars look keeps at
+	 * least Few, deck-art.ts drawnStars). Hidden, not removed: the option
+	 * comes back as it was when the look changes. Hidden, it reads as the
+	 * Few it draws, so a stored Off shows as Few and picking Few is still a
+	 * change that writes few. */
+	function offerOff(select, offer) {
+		const off = select.querySelector('option[value="off"]:not([data-unknown])');
+		if (off === null) return;
+		if (off.hidden === offer) {
+			off.hidden = !offer;
+			off.disabled = !offer;
+		}
+		const text = starsWord(offer ? "off" : "few");
+		if (off.textContent !== text) off.textContent = text;
+	}
 	const accentWordsEl = document.getElementById("accent-words");
-	const accentWordsToggle = document.getElementById("accent-words-toggle");
-	if (accentWordsEl !== null && accentWordsToggle !== null) {
-		followSetting("dialBackground", (value) => {
-			accentWordsEl.hidden = !model.accentWordsLook({ dialBackground: value });
+	const accentWordsSelect = document.getElementById("f-accent-words");
+	const backgroundHelpEl = document.getElementById("background-help");
+	// The Sky's two settings, Stars and Sky color (art looks only), take the
+	// Words slot: the two never apply together. Each has its own Default.
+	const skyEl = document.getElementById("art-sky");
+	const starsSelect = document.getElementById("f-art-stars");
+	const toneSelect = document.getElementById("f-art-sky-color");
+	// One line under Background on the art looks, which the Sky's two
+	// settings also name, shown only where it adds a fact (renderLook).
+	const artHelpEl = document.getElementById("art-help");
+	const lookSelect = document.getElementById("f-background");
+	/** Points a control's aria-describedby at the lines in `ids` that show,
+	 * and only those (none: no attribute). A line referenced while hidden
+	 * is still read out: the pair on Dusk was described as "Paper draws no
+	 * sky" (as the accessibility tree reads it, e2e:pi-panels). */
+	const describeShown = (el, ids) => {
+		if (el === null) return;
+		const shown = ids.filter((id) => document.getElementById(id)?.hidden === false).join(" ");
+		if (shown === "") el.removeAttribute("aria-describedby");
+		else if (el.getAttribute("aria-describedby") !== shown) el.setAttribute("aria-describedby", shown);
+	};
+	if (accentWordsEl !== null && accentWordsSelect !== null) {
+		const keyPanel = document.body.dataset.kind === "key";
+		const lookSetting = keyPanel ? "keyBackground" : "dialBackground";
+		const accentSetting = keyPanel ? "keyAccentWords" : "dialAccentWords";
+		const starsSetting = keyPanel ? "keyStars" : "dialStars";
+		const toneSetting = keyPanel ? "keySkyColor" : "dialSkyColor";
+		// The panel catalog (ui/pi-strings.js), English where it is absent.
+		const T = (key, english) => (typeof hwT === "function" ? hwT(key, english) : english);
+		const LOOK_NAMES = { theme: "Theme", glass: "Glass", tint: "Tint", outline: "Outline", clear: "Clear", stars: "Stars", dusk: "Dusk", nebula: "Nebula" };
+		const toneText = (name) => T(`pi.keyBackground.${model.TONE_TEXT[name][0]}`, model.TONE_TEXT[name][1]);
+		let own = { look: undefined, words: undefined, stars: undefined, tone: undefined };
+		// On a dial in a running strip, the strip's own (pi-shell redirects).
+		const ownLook = () => hw.fieldValue(lookSetting, own.look);
+		const ownWords = () => hw.fieldValue(accentSetting, own.words);
+		const ownStars = () => hw.fieldValue(starsSetting, own.stars);
+		const ownTone = () => hw.fieldValue(toneSetting, own.tone);
+		const setDefaultText = (select, text) => {
+			const option = select.querySelector('option[value=""]');
+			if (option !== null && option.textContent !== text) option.textContent = text;
+		};
+		const renderLook = () => {
+			const globals = hw.state.globals ?? {};
+			const look = keyPanel ? model.keyBackground({ keyBackground: ownLook() }, globals) : model.dialBackground({ dialBackground: ownLook() }, globals);
+			const seeThrough = look === "glass" || look === "tint" || look === "outline";
+			if (accentWordsEl.hidden === seeThrough) accentWordsEl.hidden = !seeThrough;
+			// The help says the picture set in the app shows: true of the
+			// four see-through looks only (the art looks draw their own).
+			const showsPicture = seeThrough || look === "clear";
+			if (backgroundHelpEl !== null && backgroundHelpEl.hidden === showsPicture) backgroundHelpEl.hidden = !showsPicture;
+			// The Sky shows on the art looks only, as one pair of fields under
+			// Background, the shape Shared defaults gives the same two.
+			const art = model.isArtLook(look);
+			if (skyEl !== null && skyEl.hidden === art) skyEl.hidden = !art;
+			if (starsSelect !== null && toneSelect !== null) {
+				const shared = model.sharedSkyOf(globals, keyPanel ? "key" : "dial");
+				// The Stars look keeps at least Few: no Off on offer there, and
+				// a stored or shared Off shows the Few it draws. Default names
+				// the amount this face draws.
+				offerOff(starsSelect, look !== "stars");
+				setDefaultText(starsSelect, sharedValue(starsWord(model.drawnStars(look, shared.stars))));
+				setDefaultText(toneSelect, sharedValue(toneText(shared.tone)));
+				hw.showValue(starsSelect, model.skyShown(ownStars(), ""));
+				hw.showValue(toneSelect, model.skyShown(ownTone(), ""));
+			}
+			// One line under Background, only where it adds a fact: on a light
+			// theme the art draws no sky (the pair reads as idle and still
+			// writes). It follows the theme alone, so no pick in the pair
+			// moves the pair. The Stars look's Few for an Off has no line: the
+			// select shows the Few it draws, and a line there came and went
+			// with each Stars pick (19.1 px under the pointer).
+			const paper = art && drawnThemeLight;
+			if (skyEl !== null) skyEl.classList.toggle("hw-idle", paper);
+			fitPair(skyEl);
+			if (artHelpEl !== null && artHelpEl.hidden === paper) artHelpEl.hidden = !paper;
+			describeShown(lookSelect, ["background-help", "art-help"]);
+			describeShown(starsSelect, ["art-help"]);
+			describeShown(toneSelect, ["art-help"]);
+			if (ownDrawnLook !== look) {
+				ownDrawnLook = look;
+				hw.emit("ownLook", look);
+			}
+			const sharedLook = model.lookOf(globals[lookSetting]) ?? "theme";
+			const lookDefault = document.querySelector('#f-background option[value=""]');
+			const lookText = sharedValue(T(`pi.keyBackground.${sharedLook}`, LOOK_NAMES[sharedLook]));
+			if (lookDefault !== null && lookDefault.textContent !== lookText) lookDefault.textContent = lookText;
+			const wordsDefault = accentWordsSelect.querySelector('option[value=""]');
+			const wordsText = sharedValue(globals[accentSetting] === true ? T("pi.keyBackground.on", "On") : T("pi.keyBackground.off", "Off"));
+			if (wordsDefault !== null && wordsDefault.textContent !== wordsText) wordsDefault.textContent = wordsText;
+			const words = model.wordsOf(ownWords());
+			const value = words === true ? "on" : words === false ? "off" : "";
+			if (accentWordsSelect.value !== value) accentWordsSelect.value = value;
+		};
+		followSetting(lookSetting, (value) => {
+			own = { ...own, look: value };
+			renderLook();
 		});
-		let painting = false;
-		const [, write] = useSettings("dialAccentWords", () => {}, null);
-		followSetting("dialAccentWords", (value) => {
-			painting = true;
-			accentWordsToggle.checked = value === true;
-			painting = false;
+		const [, write] = useSettings(accentSetting, () => {}, null);
+		followSetting(accentSetting, (value) => {
+			own = { ...own, words: value };
+			renderLook();
 		});
-		accentWordsToggle.addEventListener("change", () => {
-			if (!painting) write(accentWordsToggle.checked);
+		const [, writeStars] = useSettings(starsSetting, () => {}, null);
+		followSetting(starsSetting, (value) => {
+			own = { ...own, stars: value };
+			renderLook();
+		});
+		const [, writeTone] = useSettings(toneSetting, () => {}, null);
+		followSetting(toneSetting, (value) => {
+			own = { ...own, tone: value };
+			renderLook();
+		});
+		hw.on("globals", renderLook);
+		hw.on("redirect", renderLook);
+		hw.on("drawnTheme", renderLook);
+		watchPair(skyEl);
+		// A Background or Words picked here after a "Use it everywhere"
+		// carries that generation (looksGen) in the same write, so the reset
+		// never drops it (src/ui/shared-looks.ts). With no reset ever made,
+		// nothing is added. The look select is bound (pi-shell.js): this
+		// capture listener runs before its save.
+		const stageLooksGen = useSettings("looksGen", undefined, null, false)[1];
+		const stampOwn = (isOwn) => {
+			// A strip's own look carries its generation in the plugin's edit.
+			if (hw.redirected(lookSetting)) return;
+			const gen = model.looksGenOf(hw.state.globals?.looksResetGen);
+			if (isOwn && gen > 0 && model.looksGenOf(hw.state.settings?.looksGen) < gen) stageLooksGen(gen);
+		};
+		document.addEventListener(
+			"change",
+			(ev) => {
+				if (ev.target?.id === "f-background") stampOwn(model.lookOf(ev.target.value) !== null);
+			},
+			true
+		);
+		accentWordsSelect.addEventListener("change", () => {
+			const v = accentWordsSelect.value;
+			const next = v === "on" ? true : v === "off" ? false : "";
+			if (hw.sendRedirected(accentSetting, next)) return;
+			own = { ...own, words: next };
+			stampOwn(next !== "");
+			write(next);
+		});
+		// Stars and Sky color are unbound like Words: only an exact name or
+		// "" (Default) is ever written, and only by a person's pick.
+		const pickSky = (axis, next) => {
+			const setting = axis === "stars" ? starsSetting : toneSetting;
+			if (hw.sendRedirected(setting, next)) return;
+			own = { ...own, [axis]: next };
+			stampOwn(next !== "");
+			(axis === "stars" ? writeStars : writeTone)(next);
+		};
+		starsSelect?.addEventListener("change", () => {
+			if (starsSelect.selectedOptions[0]?.hasAttribute("data-unknown")) return;
+			pickSky("stars", model.starsOf(starsSelect.value) ?? "");
+		});
+		toneSelect?.addEventListener("change", () => {
+			if (toneSelect.selectedOptions[0]?.hasAttribute("data-unknown")) return;
+			pickSky("tone", model.toneOf(toneSelect.value) ?? "");
 		});
 	}
+
+	// Advanced, Shared defaults: one Background and one Words for every key,
+	// dial and strip set to Default (src/ui/shared-looks.ts). A change saves
+	// the key and the dial global together (keyBackground and dialBackground,
+	// keyAccentWords and dialAccentWords) in one write; the panel shows its
+	// own kind's, so a document whose two differ (an earlier 1.8 candidate)
+	// shows what this kind draws until the next change sets both. Words
+	// shows on the looks that take it (Glass, Tint, Outline). Under them,
+	// the count line: the visible keys, dials and strips that keep their own
+	// choice (the plugin counts them), and "Use it everywhere", which sets
+	// both pairs to what is shown and raises looksResetGen in the same
+	// write; the plugin then drops every older own choice, the visible ones
+	// at once and the rest when they next appear. Opening writes nothing.
+	const sharedLookEl = document.getElementById("shared-background");
+	const sharedWordsEl = document.getElementById("shared-accent-words");
+	const sharedWordsItem = document.getElementById("shared-words-item");
+	// The shared Stars and Sky color take the slot under Background, in
+	// Theme's and Text color's columns (renderShared says when).
+	const sharedStarsEl = document.getElementById("shared-stars");
+	const sharedToneEl = document.getElementById("shared-sky-color");
+	const sharedSkyItem = document.getElementById("shared-sky-item");
+	const ownLooksEl = document.getElementById("own-looks");
+	const ownLooksText = document.getElementById("own-looks-text");
+	const ownLooksUse = document.getElementById("own-looks-use");
+	if (sharedLookEl !== null && sharedWordsEl !== null) {
+		const kindLook = hw.kind === "key" ? "keyBackground" : "dialBackground";
+		const kindWords = hw.kind === "key" ? "keyAccentWords" : "dialAccentWords";
+		const kindStars = hw.kind === "key" ? "keyStars" : "dialStars";
+		const kindTone = hw.kind === "key" ? "keySkyColor" : "dialSkyColor";
+		// Staged (not saved) fields ride on the save that follows them.
+		const stageGlobal = (name) => useGlobalSettings(name, undefined, null, false)[1];
+		const saveGlobal = (name) => useGlobalSettings(name, () => {}, null)[1];
+		const stage = { keyBackground: stageGlobal("keyBackground"), keyAccentWords: stageGlobal("keyAccentWords"), dialBackground: stageGlobal("dialBackground"), dialAccentWords: stageGlobal("dialAccentWords"), keyStars: stageGlobal("keyStars"), dialStars: stageGlobal("dialStars"), keySkyColor: stageGlobal("keySkyColor"), dialSkyColor: stageGlobal("dialSkyColor") };
+		const saveLook = saveGlobal("keyBackground");
+		const saveWords = saveGlobal("keyAccentWords");
+		const saveStars = saveGlobal("keyStars");
+		const saveTone = saveGlobal("keySkyColor");
+		const saveGen = saveGlobal("looksResetGen");
+		const shownLook = () => model.lookOf(hw.state.globals?.[kindLook]) ?? "theme";
+		const shownWords = () => hw.state.globals?.[kindWords] === true;
+		// What each select shows: the stored global as it is (a name this
+		// build does not know shows as kept), else the default; the plugin
+		// draws the default for an unknown name.
+		const shownStars = () => model.skyShown(hw.state.globals?.[kindStars], "all");
+		const shownTone = () => model.skyShown(hw.state.globals?.[kindTone], "theme");
+		let count = null;
+		const renderShared = () => {
+			const look = shownLook();
+			if (sharedLookEl.value !== look) sharedLookEl.value = look;
+			if (sharedWordsEl.checked !== shownWords()) sharedWordsEl.checked = shownWords();
+			// One slot under the full-width Background, as on an action: Words
+			// on the looks that take it, the Sky on the art looks. The Sky also
+			// shows while this panel's own action draws an art look, because
+			// its Stars and Sky color Defaults name these two.
+			const takesWords = look === "glass" || look === "tint" || look === "outline";
+			if (sharedWordsItem !== null && sharedWordsItem.hidden === takesWords) sharedWordsItem.hidden = !takesWords;
+			const takesSky = model.isArtLook(look) || model.isArtLook(ownDrawnLook);
+			if (sharedSkyItem !== null && sharedSkyItem.hidden !== !takesSky) sharedSkyItem.hidden = !takesSky;
+			// On Stars, no Off on offer, and a stored Off shows the Few it draws
+			// (offerOff).
+			if (sharedStarsEl !== null) {
+				offerOff(sharedStarsEl, look !== "stars");
+				hw.showValue(sharedStarsEl, shownStars());
+			}
+			if (sharedToneEl !== null) hw.showValue(sharedToneEl, shownTone());
+			fitPair(sharedSkyItem);
+			if (ownLooksEl === null || ownLooksText === null || ownLooksUse === null) return;
+			const line = model.ownLooksLine(count);
+			const tone = line === "" ? "" : "info";
+			if (ownLooksText.textContent !== line) ownLooksText.textContent = line;
+			if (ownLooksUse.hidden !== (line === "")) ownLooksUse.hidden = line === "";
+			if (ownLooksEl.dataset.tone !== tone) ownLooksEl.dataset.tone = tone;
+		};
+		const askCount = () => streamDeckClient.send("sendToPlugin", { event: "getOwnLooks" });
+		streamDeckClient.sendToPropertyInspector.subscribe((ev) => {
+			const p = ev?.payload;
+			if (p?.event !== "ownLooks") return;
+			count = p;
+			renderShared();
+		});
+		hw.on("globals", renderShared);
+		hw.on("ownLook", renderShared);
+		watchPair(sharedSkyItem);
+		// The panel's own choice moves the count: ask again after its write.
+		hw.on("settings", (ev) => {
+			if (ev?.origin === "local") setTimeout(askCount, 50);
+		});
+		sharedLookEl.addEventListener("change", () => {
+			const look = model.lookOf(sharedLookEl.value) ?? "theme";
+			stage.dialBackground(look);
+			saveLook(look);
+			renderShared();
+		});
+		sharedWordsEl.addEventListener("change", () => {
+			stage.dialAccentWords(sharedWordsEl.checked);
+			saveWords(sharedWordsEl.checked);
+		});
+		// One Stars and one Sky color for keys, dials and strips, each in one
+		// write, as Background.
+		sharedStarsEl?.addEventListener("change", () => {
+			const stars = model.starsOf(sharedStarsEl.value);
+			if (stars === null) return;
+			stage.dialStars(stars);
+			saveStars(stars);
+		});
+		sharedToneEl?.addEventListener("change", () => {
+			const tone = model.toneOf(sharedToneEl.value);
+			if (tone === null) return;
+			stage.dialSkyColor(tone);
+			saveTone(tone);
+		});
+		// The first press arms, in words, as Unlink does: the reset reaches
+		// every key, dial and strip with its own look, on every page. The
+		// second (not the second click of a double click) writes once.
+		const USE_WORDS = () => (typeof hwT === "function" ? hwT("pi.sharedLooks.useItEverywhere", "Use it everywhere") : "Use it everywhere");
+		const ARMED_WORDS = () => (typeof hwT === "function" ? hwT("pi.sharedLooks.useArmed", "Press again to use it everywhere") : "Press again to use it everywhere");
+		let useArmedAt = 0;
+		const disarmUse = () => {
+			if (ownLooksUse === null || ownLooksUse.dataset.armed !== "true") return;
+			ownLooksUse.dataset.armed = "false";
+			ownLooksUse.textContent = USE_WORDS();
+		};
+		ownLooksUse?.addEventListener("blur", disarmUse);
+		ownLooksUse?.addEventListener("click", (ev) => {
+			if (ownLooksUse.dataset.armed !== "true") {
+				ownLooksUse.dataset.armed = "true";
+				ownLooksUse.textContent = ARMED_WORDS();
+				useArmedAt = performance.now();
+				hw.announce("own-looks", `${ARMED_WORDS()}.`, { repeat: true });
+				return;
+			}
+			if ((ev?.detail ?? 0) > 1 || performance.now() - useArmedAt < 450) return;
+			disarmUse();
+			// Both pairs take what is shown (only a field that differs is
+			// staged), and the generation goes up, in one write.
+			const globals = hw.state.globals ?? {};
+			const look = shownLook();
+			const words = shownWords();
+			for (const field of ["keyBackground", "dialBackground"]) if ((model.lookOf(globals[field]) ?? "theme") !== look) stage[field](look);
+			for (const field of ["keyAccentWords", "dialAccentWords"]) if ((globals[field] === true) !== words) stage[field](words);
+			// The Sky goes with the Background: the other kind takes the one
+			// this kind draws.
+			const shared = model.sharedSkyOf(globals, hw.kind);
+			for (const kind of ["key", "dial"]) {
+				const now = model.sharedSkyOf(globals, kind);
+				if (now.stars !== shared.stars) stage[`${kind}Stars`](shared.stars);
+				if (now.tone !== shared.tone) stage[`${kind}SkyColor`](shared.tone);
+			}
+			saveGen(model.looksGenOf(globals.looksResetGen) + 1);
+			// The link goes with the line; focus stays in the section.
+			sharedLookEl.focus();
+			setTimeout(askCount, 150);
+		});
+		renderShared();
+		askCount();
+	}
+
 	// An unbound checkbox (no data-setting) avoids the binder's truthy
 	// coercion of malformed settings.
 	// Loading paints exact true without saving; only a user's edit persists.
@@ -4297,12 +5324,97 @@
 		getQuadColors().then(applyQuadColors);
 	}
 
+	// --- a dial's whole-sensor lists ------------------------------------------
+	// A dial with no rotation set lists its reading's whole sensor in Reading
+	// colors and in Unit and decimals per reading: up to 149 readings on a
+	// CPU. While such a list is longer than SENSOR_LIST_ROWS, it shows its
+	// first rows in its own order, the reading it leads with, every reading
+	// with its own color or format, and "Show all N readings" under it. A row
+	// once shown stays until the list is planned again (another sensor, a
+	// pick made in this panel, a rotation set, the panel reopened), so the
+	// dial turning or a cleared setting never takes a row away. Show all adds
+	// the other rows after the shown ones, where the button was, moves the
+	// focus to the first of them, and lasts while the panel is open. Rotation
+	// sets, keys and the strip list every row.
+	const SENSOR_LIST_ROWS = 8;
+	/** The reading a whole-sensor list leads with: the one picked as the
+	 * list came up. It stays while the dial turns through the sensor (each
+	 * step saves the reading it lands on); a pick made in this panel or a
+	 * list of another sensor takes the reading picked then. */
+	let sensorLead = null;
+	/** Whether the dial lists its reading's whole sensor (no rotation set). */
+	function wholeSensorListed() {
+		return (rotationGroups === null ? rotationKeys : unionKeys(rotationGroups)).length === 0;
+	}
+	function sensorListLead(listed) {
+		if (!wholeSensorListed()) sensorLead = null;
+		else if (sensorLead === null || !listed.includes(sensorLead)) sensorLead = listed.find((k) => sameReading(k, primaryPicker.selectedKey())) ?? null;
+		return sensorLead;
+	}
+	/** The rows a list shows, and its Show all button, placed right after
+	 * `listEl`. `render` draws the list again; `focusRow(key)` focuses a
+	 * shown row's first control. */
+	function sensorListCap(listEl, render, focusRow) {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.className = "hw-btn hw-show-all";
+		button.setAttribute("aria-controls", listEl.id);
+		button.hidden = true;
+		listEl.after(button);
+		let identity = null;
+		let order = null; // the keys shown, each in its place
+		let expanded = false;
+		button.addEventListener("click", () => {
+			const first = order === null ? 0 : order.length;
+			expanded = true;
+			// The rows grow under the pointer: a quick second press at this
+			// point presses no row that slid there (Enter and Space still act).
+			hw.markPanelScroll();
+			render();
+			const key = order === null ? undefined : order[first];
+			if (key !== undefined) focusRow(key);
+		});
+		return {
+			/** The keys to show from `keys` (the whole list, in its own
+			 * order): every key unless `whole` and longer than
+			 * SENSOR_LIST_ROWS. `own(key)`: the reading has its own setting
+			 * in this list. */
+			rows(keys, whole, lead, own) {
+				const id = `${whole}\n${lead}\n${keys.join("\n")}`;
+				if (id !== identity) {
+					identity = id;
+					order = null;
+				}
+				if (!whole || keys.length <= SENSOR_LIST_ROWS) order = [...keys];
+				else if (order === null) order = expanded ? [...keys] : keys.filter((k, i) => i < SENSOR_LIST_ROWS || k === lead || own(k));
+				else {
+					const shown = new Set(order);
+					// Show all: the rest after the shown rows. Else a reading
+					// given its own setting elsewhere joins in list order.
+					order = expanded ? [...order, ...keys.filter((k) => !shown.has(k))] : keys.filter((k) => shown.has(k) || own(k));
+				}
+				button.hidden = order.length === keys.length;
+				const text = `Show all ${keys.length} readings`;
+				if (button.textContent !== text) button.textContent = text;
+				return order;
+			}
+		};
+	}
+
 	// Dial colors use the quad's preset/well idiom, but store identities rather
 	// than slots: rotation, group changes and reordering never move a color.
 	const readingColorList = document.getElementById("reading-color-list");
 	const readingColorPreset = document.getElementById("reading-color-preset");
 	let readingColors = {};
 	let readingColorsSignature = "";
+	const readingColorCap =
+		readingColorList === null
+			? null
+			: sensorListCap(
+					readingColorList,
+					() => renderReadingColors(),
+					(key) => [...readingColorList.querySelectorAll("input")].find((well) => well.dataset.key === key)?.focus({ preventScroll: true })
+				);
 	const readingColorBinding = readingColorList === null ? null : useSettings("readingColors", adoptReadingColors, null);
 
 	function adoptReadingColors(value) {
@@ -4361,14 +5473,18 @@
 		// An automatic well shows the color the dial draws for that row (the
 		// resolved theme's value color), not a fixed white; display only.
 		const autoColor = themeValueSeed();
-		const signature = JSON.stringify([rows, autoColor]);
+		// The rows shown: a whole sensor's first rows and every own color.
+		const shownKeys = readingColorCap.rows(colorKeys, wholeSensorListed(), sensorListLead(colorKeys), (k) => readingColorOf(k) !== null);
+		const signature = JSON.stringify([rows, shownKeys, autoColor]);
 		if (signature === readingColorsSignature) return;
 		readingColorPreset.value = rows.every((r) => r.color === null) ? "automatic" : (Object.keys(COLOR_PRESETS).find((preset) => rows.every((r, i) => r.color?.toUpperCase() === COLOR_PRESETS[preset][i % 4])) ?? "custom");
 		// Settings echoes and rotation must not close a native color picker.
 		if (readingColorList.contains(document.activeElement) && document.activeElement.type === "color") return;
 		readingColorsSignature = signature;
 		const frag = document.createDocumentFragment();
-		rows.forEach(({ key, name, shown, color, from }, index) => {
+		const rowOf = new Map(rows.map((r) => [r.key, r]));
+		shownKeys.forEach((rowKey, index) => {
+			const { key, name, shown, color, from } = rowOf.get(rowKey);
 			const row = document.createElement("div");
 			row.className = "hw-quad-colors";
 			const well = document.createElement("input");
@@ -4426,18 +5542,550 @@
 		followSetting("readingColors", adoptReadingColors);
 	}
 
-	// One press, one action: a held Enter clicks a button again on every key
-	// repeat, and a remove moves focus to the next remove, so a held key
-	// emptied a list (d10 rotation, external review AX20 details). On every
-	// control that removes, merges or replaces, a repeat does nothing.
-	const ONE_PRESS = '.hw-set-remove, .hw-group-remove, .hw-set-tools button[data-tool="remove"], [data-set-action="merge"], #config-key-apply, #config-deck-apply';
-	document.addEventListener(
-		"keydown",
-		(ev) => {
-			if (ev.repeat && (ev.key === "Enter" || ev.key === " ") && ev.target instanceof Element && ev.target.closest(ONE_PRESS) !== null) ev.preventDefault();
-		},
-		true
-	);
+	// --- unit and decimals per reading (both panels; issue #59) -------------
+	// One row per reading the action shows: a key's configured slots (a slot
+	// repeating an earlier slot's reading gets a row with no controls), a
+	// dial's Reading colors list (the rotation set, else the picked reading's
+	// source), so the list never moves as the dial turns or auto cycles. Each
+	// row has a native Unit select (Auto plus the fixed units the plugin
+	// lists for that reading in the sensor tree; the panel never matches
+	// units itself) and a Decimals select ("Same as ..." is the absent field).
+	// A select change is the only write: the latest readingFormats is patched
+	// (model.patchReadingFormat: the reading's entries under every key it
+	// has go, one entry is filed under the row key, other entries and
+	// unknown fields stay), a change that changes nothing is dropped, and
+	// clearing the last choice removes the field. Opening, a tick, a tree, a
+	// preview, an echo or a dial step writes nothing; rows are updated in
+	// place and a select under focus is never rebuilt. The note line under
+	// each row is always laid out; while the face draws that reading in a
+	// shorter text than its own (no decimals, or compact), it says what the
+	// face shows and what would fit, from the plugin's own pick
+	// (effective.formatFallback), and it is empty otherwise. While the dial draws
+	// part of a running strip (pi-strip.js redirects readingFormats), the
+	// rows are the strip's readings and a change is one edit of the strip's
+	// own map (issue #59); the dial's own formats stay stored.
+	const formatRowsEl = document.getElementById("format-rows");
+	if (formatRowsEl !== null) {
+		const formatsBinding = useSettings("readingFormats", () => queueMicrotask(renderFormatRows), null);
+		const formatsNoteEl = document.getElementById("formats-note");
+		// Each row's two selects and their labels, in column order.
+		const FORMAT_FIELDS = [
+			["unit", "Unit"],
+			["decimals", "Decimals"]
+		];
+		// The column heads above the rows, in the labels' words. Every select
+		// keeps its own label and aria-label, so screen readers skip the
+		// heads; they hide while no row has selects (pi.css shows them only
+		// where the two selects sit side by side).
+		const formatHeadsEl = document.createElement("div");
+		formatHeadsEl.className = "hw-format-heads";
+		formatHeadsEl.setAttribute("aria-hidden", "true");
+		formatHeadsEl.hidden = true;
+		for (const [, label] of FORMAT_FIELDS) {
+			const head = document.createElement("span");
+			head.textContent = label;
+			formatHeadsEl.appendChild(head);
+		}
+		formatRowsEl.before(formatHeadsEl);
+		// The strip's readings while the rows edit the strip's map, else null.
+		let stripReadings = null;
+		// A dial's whole-sensor rows and their Show all button.
+		const formatsCap =
+			hw.kind === "dial"
+				? sensorListCap(
+						formatRowsEl,
+						() => renderFormatRows(),
+						(key) => {
+							const row = formatRows.get(`k:${key}`);
+							[row?.unit, row?.decimals].find((select) => select !== undefined && !select.disabled)?.focus({ preventScroll: true });
+						}
+					)
+				: null;
+		const inStrip = () => hw.kind === "dial" && Array.isArray(stripReadings) && hw.redirected("readingFormats");
+		const scopeWordOf = () => (inStrip() ? "strip" : hw.kind === "key" ? "key" : "dial");
+		const KEPT = "\u0000kept";
+		const BYTE_ONLY = "Fixed units are for byte readings (MB, GB and similar).";
+		// The panel catalog (ui/pi-strings.js), English where it is absent.
+		const T = (key, english, params) => (typeof hwT === "function" ? hwT(key, english, params) : english.replace(/\{(\w+)\}/g, (m, name) => (Object.hasOwn(params, name) ? String(params[name]) : m)));
+		/** A row's note while the face draws its reading past its own text:
+		 * what it shows on this key or dial (the row's name line names the
+		 * reading, and the note stays one line), then the unit or the
+		 * decimals that would show the reading's own text, when the plugin
+		 * found one. */
+		const fallbackNote = (note) => {
+			const where = hw.kind === "key" ? T("pi.formats.showsOnKey", "Shows {text} on this key.", { text: note.shows }) : T("pi.formats.showsOnDial", "Shows {text} on this dial.", { text: note.shows });
+			const fits = note.fits !== null && typeof note.fits === "object" ? note.fits : null;
+			const count = fits === null ? null : fits.decimals;
+			if (fits === null || typeof count !== "string") return where;
+			if (typeof fits.unit === "string") {
+				const then = count === "auto" ? T("pi.formats.unitFits", "{unit} fits.", { unit: fits.unit }) : count === "0" ? T("pi.formats.unitFitsNoDecimals", "{unit} fits with no decimals.", { unit: fits.unit }) : count === "1" ? T("pi.formats.unitFitsOneDecimal", "{unit} fits with 1 decimal.", { unit: fits.unit }) : T("pi.formats.unitFitsDecimals", "{unit} fits with {count} decimals.", { unit: fits.unit, count });
+				return `${where} ${then}`;
+			}
+			return `${where} ${count === "0" ? T("pi.formats.noDecimalsFit", "Fits with no decimals.", {}) : count === "1" ? T("pi.formats.oneDecimalFits", "1 decimal fits.", {}) : T("pi.formats.decimalsFit", "{count} decimals fit.", { count })}`;
+		};
+		const formatRows = new Map(); // row id -> row parts
+		let formatRowSerial = 0; // ids for each row's label/control pairs
+		let formatsRefusal = "";
+		let formatsSummaryRows = [];
+		const formatsNow = () => (inStrip() ? hw.fieldValue("readingFormats", undefined) : hw.state.settings.readingFormats);
+		const decimalsName = (d) => (d === "0" || d === "1" || d === "2" || d === "3" ? d : "Auto");
+		/** The fixed units the plugin lists for a reading; null while the
+		 * sensor list does not know it. */
+		const unitsOf = (key) => {
+			const entry = treeEntryOf(key);
+			if (entry === null) return null;
+			const units = entry.reading.units;
+			return Array.isArray(units) ? units.filter((u) => typeof u === "string") : [];
+		};
+		const setNote = (el, text) => {
+			if (el === null) return;
+			if (el.textContent !== text) el.textContent = text;
+			el.title = text;
+		};
+
+		function planFormatRows() {
+			if (inStrip()) {
+				// A strip lists every reading: no Show all.
+				const keys = formatsCap.rows(stripReadings, false, null, () => false);
+				const nameOf = (k) => readingLabelOf(k) ?? k;
+				return keys.map((key) => {
+					const tag = twinTagOf(key, keys, nameOf);
+					return { id: `k:${key}`, key, kind: "edit", title: nameOf(key), shown: tag === null ? nameOf(key) : `${nameOf(key)} ${tag}`, spoken: twinSpokenName(key, keys, nameOf) };
+				});
+			}
+			if (hw.kind === "key") {
+				const plan = model.formatRowPlan(hw.state.settings, sameReading);
+				const scope = plan.map((p) => p.key);
+				const nameOf = (k) => readingLabelOf(k) ?? k;
+				return plan.map((p) => {
+					const label = readingLabelOf(p.key);
+					const spoken = label === null ? `Reading ${p.slot + 1}, not in the sensor list right now` : `Reading ${p.slot + 1}: ${twinSpokenName(p.key, scope, nameOf)}`;
+					// Two readings with one name (two GPUs' "GPU Memory
+					// Available") take the tag the dial rows use ("#0", "#1"):
+					// issue #59 G4.
+					const tag = label === null ? null : twinTagOf(p.key, scope, nameOf);
+					return { ...p, id: `s${p.slot}`, title: `Reading ${p.slot + 1}`, shown: `Reading ${p.slot + 1}: ${label ?? "not in the sensor list right now"}${tag === null ? "" : ` ${tag}`}`, spoken };
+				});
+			}
+			// With no rotation set the rows are the picked reading's whole
+			// sensor: the row of the reading it leads with (sensorListLead)
+			// comes first (issue #59 G4), and stays first while the dial turns
+			// through that sensor, so no row moves. The Reading colors list
+			// keeps HWiNFO's order. A long sensor shows its first rows and a
+			// Show all button (sensorListCap).
+			const listed = readingColorKeys();
+			const lead = sensorListLead(listed);
+			const ordered = lead === null ? listed : [lead, ...listed.filter((k) => k !== lead)];
+			const keys = formatsCap.rows(ordered, wholeSensorListed(), lead, (k) => model.readingFormatOf(formatsNow(), readingKeysOf(k)) !== null);
+			const nameOf = (k) => readingNameOf(k) ?? readingLabelOf(k) ?? k;
+			return keys.map((key) => {
+				const tag = twinTagOf(key, ordered, nameOf);
+				return { id: `k:${key}`, key, kind: "edit", title: nameOf(key), shown: tag === null ? nameOf(key) : `${nameOf(key)} ${tag}`, spoken: twinSpokenName(key, ordered, nameOf) };
+			});
+		}
+
+		/** A reading's stored choice for one field: "" when none, the stored
+		 * string, or KEPT for a value this build does not offer. */
+		function storedChoice(key, field, offered) {
+			const found = model.readingFormatOf(formatsNow(), readingKeysOf(key));
+			const raw = found === null || !Object.hasOwn(found.entry, field) ? undefined : found.entry[field];
+			if (raw === undefined) return { value: "", raw };
+			return typeof raw === "string" && offered.includes(raw) ? { value: raw, raw } : { value: KEPT, raw };
+		}
+
+		/** Sets a native select's options only when they change, and its
+		 * value. An entry is [value, text, disabled], or { group, options }
+		 * for a labelled group of them. */
+		function syncSelect(select, options, value, keptText) {
+			if (document.activeElement === select) return;
+			const all = keptText === null ? options : [...options, [KEPT, keptText, true]];
+			const signature = JSON.stringify(all);
+			if (select.dataset.options !== signature) {
+				select.dataset.options = signature;
+				const optionOf = ([v, text, disabled]) => {
+					const option = document.createElement("option");
+					option.value = v;
+					option.textContent = text;
+					if (disabled === true) option.disabled = true;
+					return option;
+				};
+				select.replaceChildren(
+					...all.map((entry) => {
+						if (Array.isArray(entry)) return optionOf(entry);
+						const group = document.createElement("optgroup");
+						group.label = entry.group;
+						group.append(...entry.options.map(optionOf));
+						return group;
+					})
+				);
+			}
+			if (select.value !== value) select.value = value;
+		}
+
+		/** The Unit choices for a reading's fixed units: Auto, then the
+		 * units the plugin lists, the two families of HWiNFO's byte amounts
+		 * in labelled groups (issue #59): KB to TB rescale HWiNFO's number by
+		 * 1000 per step, KiB to TiB count 1024. */
+		const STEPS_1000 = ["KB", "MB", "GB", "TB"];
+		const STEPS_1024 = ["KiB", "MiB", "GiB", "TiB"];
+		function unitOptions(units) {
+			const plain = [["", "Auto"]];
+			const both = STEPS_1000.some((u) => units.includes(u)) && STEPS_1024.some((u) => units.includes(u));
+			if (!both) return [...plain, ...units.map((u) => [u, u])];
+			const rest = units.filter((u) => !STEPS_1000.includes(u) && !STEPS_1024.includes(u)).map((u) => [u, u]);
+			return [...plain, ...rest, { group: "Steps of 1000", options: units.filter((u) => STEPS_1000.includes(u)).map((u) => [u, u]) }, { group: "Steps of 1024", options: units.filter((u) => STEPS_1024.includes(u)).map((u) => [u, u]) }];
+		}
+
+		function writeFormat(row, patch) {
+			const raw = formatsNow();
+			const result = model.patchReadingFormat(raw, readingKeysOf(row.key), row.key, patch);
+			if (result.refused !== undefined) {
+				formatsRefusal = result.refused === "cap" ? `This ${scopeWordOf()} already holds ${model.READING_FORMATS_CAP} reading formats; set one back to Auto and Same as ${scopeWordOf()} before adding another.` : "";
+				renderFormatRows();
+				return;
+			}
+			formatsRefusal = "";
+			const before = raw === undefined || raw === null ? undefined : model.sortedJson(raw);
+			const after = result.next === undefined ? undefined : model.sortedJson(result.next);
+			if (before === after) return;
+			if (inStrip()) hw.sendRedirected("readingFormats", result.next ?? null);
+			else formatsBinding[1](result.next);
+			renderFormatRows();
+		}
+
+		function buildFormatRow(plan) {
+			const index = formatRowSerial++;
+			const el = document.createElement("div");
+			el.className = "hw-format-row";
+			el.setAttribute("role", "group");
+			const nameEl = document.createElement("span");
+			nameEl.className = "hw-label";
+			nameEl.id = `format-name-${index}`;
+			el.setAttribute("aria-labelledby", nameEl.id);
+			const row = { id: plan.id, key: plan.key, kind: plan.kind, of: plan.of, el, nameEl };
+			if (plan.kind !== "edit") {
+				row.note = document.createElement("p");
+				row.note.className = "hw-help";
+				el.append(nameEl, row.note);
+				return row;
+			}
+			const grid = document.createElement("div");
+			grid.className = "hw-row2";
+			const field = (name, label) => {
+				const wrap = document.createElement("div");
+				wrap.className = "hw-field";
+				const select = document.createElement("select");
+				select.id = `format-${name}-${index}`;
+				const labelEl = document.createElement("label");
+				labelEl.htmlFor = select.id;
+				labelEl.textContent = label;
+				wrap.append(labelEl, select);
+				grid.appendChild(wrap);
+				// The panel's own write path: one change, one patched save.
+				select.addEventListener("change", () => {
+					if (select.value === KEPT) return;
+					writeFormat(row, { [name === "unit" ? "unit" : "decimals"]: select.value });
+				});
+				return select;
+			};
+			[row.unit, row.decimals] = FORMAT_FIELDS.map(([name, label]) => field(name, label));
+			row.note = document.createElement("p");
+			row.note.className = "hw-help hw-note-line";
+			row.note.id = `format-note-${index}`;
+			row.unit.setAttribute("aria-describedby", row.note.id);
+			row.decimals.setAttribute("aria-describedby", row.note.id);
+			el.append(nameEl, grid, row.note);
+			return row;
+		}
+
+		function fillFormatRow(row, plan) {
+			const unit = treeEntryOf(row.key)?.reading.unit;
+			const shown = `${plan.shown}${typeof unit === "string" && unit !== "" ? ` (${unit})` : ""}`;
+			if (row.nameEl.textContent !== shown) row.nameEl.textContent = shown;
+			row.nameEl.title = `${plan.spoken} (${row.key})`;
+			if (row.kind !== "edit") {
+				setNote(row.note, `The same reading as reading ${plan.of + 1}, so its row covers it.`);
+				return;
+			}
+			const shape = formatsNow() !== undefined && formatsNow() !== null && (typeof formatsNow() !== "object" || Array.isArray(formatsNow()));
+			const units = unitsOf(row.key);
+			const offeredUnits = units ?? [];
+			const unitChoice = storedChoice(row.key, "unit", offeredUnits);
+			syncSelect(row.unit, unitOptions(offeredUnits), unitChoice.value, unitChoice.value === KEPT ? `Stored value ${JSON.stringify(unitChoice.raw)} (not in this list, kept)` : null);
+			row.unit.disabled = shape || units === null || units.length === 0;
+			row.unit.title = units !== null && units.length === 0 ? BYTE_ONLY : "";
+			row.unit.setAttribute("aria-label", `Unit for ${plan.spoken}`);
+			const decimalChoice = storedChoice(row.key, "decimals", model.FORMAT_DECIMALS);
+			syncSelect(
+				row.decimals,
+				[["", `Same as ${scopeWordOf()} (${decimalsName(hw.fieldValue("decimals", hw.state.settings.decimals))})`], ...model.FORMAT_DECIMALS.map((d) => [d, d === "auto" ? "Auto" : d])],
+				decimalChoice.value,
+				decimalChoice.value === KEPT ? `Stored value ${JSON.stringify(decimalChoice.raw)} (not in this list, kept)` : null
+			);
+			row.decimals.disabled = shape;
+			row.decimals.setAttribute("aria-label", `Decimals for ${plan.spoken}`);
+			// The pick is the dial's own face's; a strip fits its own words.
+			const notes = inStrip() ? undefined : hw.state.preview?.effective?.formatFallback;
+			const note = Array.isArray(notes) ? notes.find((n) => n !== null && typeof n === "object" && typeof n.key === "string" && typeof n.shows === "string" && sameReading(row.key, n.key)) : undefined;
+			setNote(row.note, note === undefined ? "" : fallbackNote(note));
+		}
+
+		/** Adds, keeps and removes rows by plan, leaving a kept row (and the
+		 * focus in it) where it is. */
+		function renderFormatRows() {
+			const plan = planFormatRows();
+			const wanted = new Map(plan.map((p) => [p.id, p]));
+			for (const [id, row] of [...formatRows]) {
+				const p = wanted.get(id);
+				if (p !== undefined && p.key === row.key && p.kind === row.kind && p.of === row.of) continue;
+				// A row under the caret stays until the caret leaves it.
+				if (row.el.contains(document.activeElement)) continue;
+				row.el.remove();
+				formatRows.delete(id);
+			}
+			let after = null;
+			for (let i = plan.length - 1; i >= 0; i--) {
+				let row = formatRows.get(plan[i].id);
+				if (row === undefined) {
+					row = buildFormatRow(plan[i]);
+					formatRows.set(row.id, row);
+				}
+				if (row.el.nextSibling !== after || row.el.parentNode !== formatRowsEl) formatRowsEl.insertBefore(row.el, after);
+				after = row.el;
+			}
+			for (const p of plan) fillFormatRow(formatRows.get(p.id), p);
+			formatHeadsEl.hidden = !plan.some((p) => p.kind === "edit");
+			const raw = formatsNow();
+			const shape = raw !== undefined && raw !== null && (typeof raw !== "object" || Array.isArray(raw));
+			const note = shape ? "Saved in a form this version does not edit; kept." : formatsRefusal;
+			setNote(formatsNoteEl, note);
+			if (formatsNoteEl !== null) formatsNoteEl.hidden = note === "";
+			formatsSummaryRows = plan
+				.filter((p) => p.kind === "edit")
+				.map((p) => {
+					const units = unitsOf(p.key) ?? [];
+					const unit = storedChoice(p.key, "unit", units).value;
+					const decimals = storedChoice(p.key, "decimals", model.FORMAT_DECIMALS).value;
+					return { name: p.title, unit: unit === KEPT ? "" : unit, decimals: decimals === KEPT ? "" : decimals };
+				});
+			hw.scheduleRender();
+		}
+		hw.summary("formats", () => model.formatsSummary(formatsSummaryRows));
+
+		formatRowsEl.addEventListener("focusout", () => queueMicrotask(renderFormatRows));
+		for (const event of ["settings", "tree", "preview", "redirect"]) hw.on(event, () => queueMicrotask(renderFormatRows));
+		hw.on("stripReadings", (keys) => {
+			stripReadings = Array.isArray(keys) ? keys : null;
+			queueMicrotask(renderFormatRows);
+		});
+		renderFormatRows();
+	}
+
+	// --- separate limits for the dial's reading (dial PI only) ---------------
+	// One alertRules entry for the reading on the dial, found the way the
+	// runtime finds it: under its own key first, then its linked keys.
+	// Ticking the box creates it with the unit the reading compares in now
+	// (from the plugin's preview of exactly that reading) and, when the
+	// dial's own limits cover the reading, a copy of them, so ticking alone
+	// changes no alert. Clearing the box removes the entries the runtime
+	// would use for the reading. The fields edit that one entry: its other
+	// fields, every other entry and junk stay as stored, and an edit to
+	// limits whose saved unit no longer compares saves the unit on the face
+	// with it, which turns them back on. Opening, rotating, a preview or an
+	// echo writes nothing.
+	const alertOwnEl = document.getElementById("alert-own");
+	if (alertOwnEl !== null) {
+		const ownLabelEl = document.getElementById("alert-own-label");
+		const ownBelowEl = document.getElementById("alert-own-below");
+		const alertNotesEl = document.getElementById("alert-notes");
+		const unitTags = Array.from(document.querySelectorAll("[data-alert-unit]"));
+		let alertRules;
+		const onDial = () => (typeof hw.state.settings.readingKey === "string" ? hw.state.settings.readingKey : "");
+		const ownOf = (key) => (key === "" ? null : model.alertRuleOf(alertRules, readingKeysOf(key)));
+		// The plugin's view of the reading on the dial, only when it is the
+		// reading this panel has selected (a capture must never take another
+		// reading's unit).
+		const captureFor = (key) => {
+			const ra = hw.state.preview?.effective?.readingAlert;
+			return ra !== undefined && ra !== null && ra.key === key && typeof ra.displayUnit === "string" ? ra : null;
+		};
+		const displayUnitOf = (key) => captureFor(key)?.displayUnit;
+		// One record per field. While it has focus a field is bound to the
+		// reading that was on the dial when it took focus, that reading's
+		// entry and the unit the face showed it in: every save goes there,
+		// even after the auto cycle moves the dial on.
+		const ownFields = [
+			["alert-own-warn", "warn"],
+			["alert-own-crit", "crit"],
+			["alert-own-hyst", "hyst"]
+		]
+			.map(([id, field]) => ({ el: document.getElementById(id), field, reading: null, target: null, unit: undefined, dirty: false, composing: false, timer: 0, flush: () => {} }))
+			.filter((f) => f.el !== null);
+		const ownValues = () => Object.fromEntries(ownFields.map((f) => [f.field, f.el.value]));
+		// aria-invalid for a field that is not a number, said once when
+		// typing makes it so (never on load, never per keystroke); its words
+		// are in the note line, which the field links.
+		const markNumber = (f, typed) => {
+			const was = f.el.getAttribute("aria-invalid") === "true";
+			hw.validateNumber(f.el);
+			if (typed && !was && f.el.getAttribute("aria-invalid") === "true") {
+				const [note] = model.alertOwnFieldNotes({ [f.field]: f.el.value });
+				if (note !== undefined) hw.announce("validate", `${note}.`, { repeat: true });
+			}
+		};
+		// One line that is always laid out: notes coming or going as the dial
+		// rotates never move the panel, and the whole note is its tooltip
+		// when it runs past one line.
+		const renderNotes = (key, found) => {
+			if (alertNotesEl === null) return;
+			const ra = captureFor(key);
+			const text = model.alertNotes(found === null ? null : ownValues(), ra === null ? [] : ra.flags, ra === null ? null : ra.source);
+			if (alertNotesEl.textContent !== text) alertNotesEl.textContent = text;
+			if (alertNotesEl.title !== text) alertNotesEl.title = text;
+		};
+		// True while a field lets go of a reading the dial left (below): the
+		// renders its save and blur cause leave it to the one that called.
+		let releasing = false;
+		const renderOwnLimits = () => {
+			const key = onDial();
+			const found = ownOf(key);
+			const capture = key === "" ? null : captureFor(key);
+			const name = key === "" ? null : (readingNameOf(key) ?? readingLabelOf(key) ?? hw.state.preview?.reading?.label ?? null);
+			const label = name === null ? "Separate limits for the reading on the dial" : `Separate limits for ${name}`;
+			if (ownLabelEl !== null && ownLabelEl.textContent !== label) ownLabelEl.textContent = label;
+			alertOwnEl.checked = found !== null;
+			// A new entry needs the unit the reading reports; an existing one
+			// can always be edited or removed.
+			const waiting = key !== "" && found === null && capture === null;
+			alertOwnEl.disabled = key === "" || waiting;
+			const title = waiting ? "Waits for this reading to report" : "";
+			if (alertOwnEl.title !== title) alertOwnEl.title = title;
+			for (const f of ownFields) {
+				if (document.activeElement === f.el) {
+					// Never under the caret while the field still edits the
+					// reading on the dial. Once the dial has moved on (the auto
+					// cycle), what was typed goes to the reading it was typed
+					// for and the field lets go, so the next keystroke can never
+					// land in another reading's limits.
+					if (releasing || f.reading === null || (f.reading === key && (found?.key ?? null) === f.target)) continue;
+					releasing = true;
+					try {
+						release(f);
+						f.el.blur();
+					} finally {
+						releasing = false;
+					}
+				}
+				f.el.disabled = found === null;
+				const raw = found === null ? undefined : found.entry[f.field];
+				const text = raw === undefined || raw === null ? "" : typeof raw === "string" ? raw : JSON.stringify(raw);
+				if (f.el.value !== text) f.el.value = text;
+				markNumber(f, false);
+			}
+			// The unit the fields are typed in: the entry's while it compares,
+			// else the one an edit (or a tick) saves.
+			const unit = found !== null ? model.alertFieldUnit(found.entry, capture?.displayUnit) : capture !== null ? model.alertRuleSeed(hw.state.settings, capture).unit : "";
+			const tag = typeof unit === "string" && unit !== "" ? `(${unit})` : "";
+			for (const el of unitTags) {
+				if (el.textContent !== tag) el.textContent = tag;
+				if (el.title !== tag) el.title = tag;
+			}
+			if (ownBelowEl !== null) {
+				ownBelowEl.disabled = found === null;
+				ownBelowEl.checked = found !== null && found.entry.below === true;
+			}
+			renderNotes(key, found);
+		};
+		const adoptAlertRules = (value) => {
+			alertRules = value;
+			renderOwnLimits();
+		};
+		const [, saveAlertRules] = useSettings("alertRules", adoptAlertRules, null);
+		const writeRules = (next) => {
+			saveAlertRules(next);
+			adoptAlertRules(next);
+		};
+		alertOwnEl.addEventListener("change", () => {
+			const key = onDial();
+			if (key === "") return renderOwnLimits();
+			if (!alertOwnEl.checked) return writeRules(model.withoutAlertRule(alertRules, readingKeysOf(key)));
+			const capture = captureFor(key);
+			if (capture === null) return renderOwnLimits();
+			writeRules(model.patchAlertRule(alertRules, key, model.alertRuleSeed(hw.state.settings, capture)));
+		});
+		if (ownBelowEl !== null) {
+			ownBelowEl.addEventListener("change", () => {
+				const key = onDial();
+				const found = ownOf(key);
+				if (found === null) return renderOwnLimits();
+				writeRules(model.patchAlertRule(alertRules, found.key, model.alertEditFields(found.entry, displayUnitOf(key), { below: ownBelowEl.checked })));
+			});
+		}
+		// A typed limit saves 200 ms after the last keystroke, never mid
+		// composition, at once on commit, and before the panel goes away,
+		// like every bound text field, to the entry its field is bound to. An
+		// entry removed in between gets nothing (a limit written into no
+		// entry would be one with no unit).
+		const bind = (f) => {
+			const key = onDial();
+			f.reading = key === "" ? null : key;
+			f.target = ownOf(key)?.key ?? null;
+			f.unit = displayUnitOf(key);
+		};
+		const saveField = (f) => {
+			if (f.composing) return; // an IME still owns the text; its end schedules the save
+			clearTimeout(f.timer);
+			f.timer = 0;
+			hw.dropLeaveFlush(f.flush);
+			if (!f.dirty) return;
+			f.dirty = false;
+			const found = f.target === null ? null : model.alertRuleOf(alertRules, [f.target]);
+			if (found === null) return;
+			writeRules(model.patchAlertRule(alertRules, found.key, model.alertEditFields(found.entry, f.unit, { [f.field]: f.el.value })));
+		};
+		const release = (f) => {
+			f.composing = false;
+			saveField(f);
+			f.reading = null;
+			f.target = null;
+			f.unit = undefined;
+		};
+		for (const f of ownFields) {
+			f.flush = () => saveField(f);
+			const schedule = () => {
+				clearTimeout(f.timer);
+				f.timer = setTimeout(f.flush, 200);
+				hw.addLeaveFlush(f.flush);
+			};
+			f.el.addEventListener("focus", () => bind(f));
+			f.el.addEventListener("blur", () => {
+				release(f);
+				if (!releasing) renderOwnLimits();
+			});
+			f.el.addEventListener("compositionstart", () => {
+				f.composing = true;
+			});
+			f.el.addEventListener("compositionend", () => {
+				f.composing = false;
+				schedule();
+			});
+			f.el.addEventListener("input", () => {
+				const key = onDial();
+				if (f.reading === null) bind(f);
+				else if (f.reading === key) f.unit = displayUnitOf(key) ?? f.unit;
+				markNumber(f, true);
+				f.dirty = true;
+				if (!f.composing) schedule();
+				renderNotes(key, ownOf(key));
+			});
+			f.el.addEventListener("change", () => {
+				if (f.timer !== 0) saveField(f);
+			});
+		}
+		followSetting("alertRules", adoptAlertRules);
+		hw.on("render", renderOwnLimits);
+		hw.summary("alert-timing", (st) => model.alertTimingSummary(st.settings));
+	}
 
 	// --- theme preset gallery -------------------------------------------------
 	// Tokens come from the plugin (parsed themes.json) over the message channel;
@@ -4476,6 +6124,23 @@
 	// Counts every change to this key's theme, picked here or delivered, so
 	// a Make shared that finishes after a later pick leaves that pick alone.
 	let themeChoice = 0;
+	// While this dial draws part of a running strip, the strip draws in the
+	// strip's own theme, not the dial's: the section shows and edits that
+	// one ({ theme, set } from pi-strip.js; set sends it to the plugin, the
+	// strip's only writer). The dial's own theme stays stored for when it
+	// leaves. null: the dial's own, as before.
+	let stripTheme = null;
+	/** The theme the section shows: the strip's, else this key's or dial's. */
+	const shownTheme = () => (stripTheme !== null ? stripTheme.theme : themeOverride);
+	/** What the section's theme belongs to, in its words. */
+	const themeWhere = () => (stripTheme !== null ? "strip" : hw.kind === "dial" ? "dial" : "key");
+	hw.on("stripTheme", (next) => {
+		const target = next !== null && typeof next === "object" && typeof next.set === "function" ? { theme: typeof next.theme === "string" ? next.theme : "", set: next.set } : null;
+		const before = stripTheme === null ? null : stripTheme.theme;
+		stripTheme = target;
+		if ((target === null ? null : target.theme) !== before) themeChoice += 1;
+		renderGallery();
+	});
 
 	const setThemeOverride = useSettings(
 		"theme",
@@ -4504,7 +6169,7 @@
 		const isDeck = id === "";
 		const chip = document.createElement("button");
 		chip.type = "button";
-		chip.className = "hw-theme" + (selected ? " selected" : "") + (isDeck ? " hw-theme-deck" : "");
+		chip.className = "hw-theme" + (isDeck ? " hw-theme-deck" : "");
 		chip.dataset.theme = id;
 		chip.title = name;
 		chip.setAttribute("role", "radio");
@@ -4560,7 +6225,7 @@
 	// in the Text select's idiom: "Default (shared: Void)" with Change for the
 	// shared theme, or "Ember (set on this key)". It never follows the
 	// pointer or focus, because every chip carries its own name (round 3,
-	// R04, R38). Change sits outside the ellipsizing span so it keeps its
+	// R04, R38). Change sits outside the theme line so it keeps its
 	// whole hit area, and holds its place (invisible) on an explicit pick,
 	// so a pick never moves the chips. The help line under the chips shows
 	// only where it adds a fact: a key with no reading, an unknown stored
@@ -4631,15 +6296,15 @@
 
 	function renderThemeLine() {
 		if (themeCurrentEl === null || themesConfig === null) return;
-		const id = themeOverride;
-		const where = hw.kind === "dial" ? "dial" : "key";
+		const id = shownTheme();
+		const where = themeWhere();
 		const known = id === "" || knownTheme(id);
 		const shared = model.themeName(resolvedDeckId());
 		const [name, scope, spoken] =
 			id === ""
-				? ["Default", ` (shared: ${shared})`, `Follows the shared theme, now ${shared}.`]
+				? ["Default", where === "strip" ? ` (this strip, shared: ${shared})` : ` (shared: ${shared})`, `${where === "strip" ? "This strip follows" : "Follows"} the shared theme, now ${shared}.`]
 				: known
-					? [model.themeName(id), ` (set on this ${where})`, `Set on this ${where}; kept when the shared theme changes.`]
+					? [model.themeName(id), where === "strip" ? " (this strip)" : ` (set on this ${where})`, `Set on this ${where}; kept when the shared theme changes.`]
 					: [`"${id}"`, ` (unknown; draws ${model.themeName(themesConfig.defaultTheme)})`, ""];
 		const shareable = id !== "" && known && id !== resolvedDeckId();
 		if (themeChangeEl !== null) {
@@ -4665,9 +6330,9 @@
 
 	function renderThemeHelp() {
 		if (themeHelpEl === null || themesConfig === null) return;
-		const scope = hw.kind === "dial" ? "dial" : "key";
+		const scope = themeWhere();
 		const configured = typeof hw.state.settings.readingKey === "string" && hw.state.settings.readingKey !== "";
-		const unknown = themeOverride !== "" && !knownTheme(themeOverride);
+		const unknown = shownTheme() !== "" && !knownTheme(shownTheme());
 		// A key with no reading draws its prompt on fixed black; a dial's
 		// prompt is drawn in its theme, so only a key says so.
 		const text = !configured && hw.kind === "key"
@@ -4683,18 +6348,32 @@
 		themeHelpEl.style.minHeight = themeHelpHeld > 0 ? `${themeHelpHeld}px` : "";
 	}
 
+	/** Says whether the theme this face draws is light (the shown theme, or
+	 * the shared one it follows; an unknown stored id draws the spec
+	 * default), by deck-art.ts artFits (model.lightTheme), and tells the
+	 * Background block with a "drawnTheme" event when that changes. */
+	function publishDrawnTheme() {
+		const shown = shownTheme();
+		const id = shown === "" ? resolvedDeckId() : knownTheme(shown) ? shown : themesConfig.defaultTheme;
+		const light = model.lightTheme(themesConfig.themes[id]?.bg);
+		if (light === drawnThemeLight) return;
+		drawnThemeLight = light;
+		hw.emit("drawnTheme", light);
+	}
+
 	function renderGallery() {
 		if (themesConfig === null) return;
 		const deckId = resolvedDeckId();
 		const deckDisplay = model.themeName(deckId);
 		// A stored theme this version does not know draws the spec default;
 		// no chip is checked for it.
-		const unknown = themeOverride !== "" && !knownTheme(themeOverride);
-		const signature = JSON.stringify([deckId, themesConfig.themes, hw.kind]);
+		const shown = shownTheme();
+		const unknown = shown !== "" && !knownTheme(shown);
+		const signature = JSON.stringify([deckId, themesConfig.themes, themeWhere()]);
 		if (signature !== gallerySignature || galleryEl.children.length === 0) {
 			gallerySignature = signature;
 			const frag = document.createDocumentFragment();
-			const deckChip = themeChip("", themesConfig.themes[deckId], "Default", themeOverride === "");
+			const deckChip = themeChip("", themesConfig.themes[deckId], "Default", shown === "");
 			// The Default chip's accessible name says what it resolves to. No
 			// tooltip: the line above the chips shows the same words, and a
 			// title repeating the name is read twice (round 3, R46).
@@ -4703,9 +6382,9 @@
 			frag.appendChild(deckChip);
 			for (const id of themeOrderOf(themesConfig)) {
 				const palette = themesConfig.themes[id];
-				const chip = themeChip(id, palette, model.themeName(id), themeOverride === id);
+				const chip = themeChip(id, palette, model.themeName(id), shown === id);
 				chip.removeAttribute("title");
-				chip.setAttribute("aria-label", `${model.themeName(id)} theme for this ${hw.kind === "dial" ? "dial" : "key"}`);
+				chip.setAttribute("aria-label", `${model.themeName(id)} theme for this ${themeWhere()}`);
 				frag.appendChild(chip);
 			}
 			// Rebuilding under focus would drop it; keep the focused chip focused.
@@ -4716,9 +6395,8 @@
 		// The selection changes in place: the focused swatch stays the same
 		// element while arrow keys move through the group.
 		for (const chip of galleryEl.querySelectorAll(".hw-theme")) {
-			const selected = chip.dataset.theme === themeOverride;
+			const selected = chip.dataset.theme === shown;
 			chip.setAttribute("aria-checked", selected ? "true" : "false");
-			chip.classList.toggle("selected", selected);
 			// An unknown stored theme checks no chip; the group still needs
 			// its one Tab stop, so the Default chip takes it.
 			chip.tabIndex = selected || (unknown && chip.dataset.theme === "") ? 0 : -1;
@@ -4726,6 +6404,7 @@
 		renderThemeLine();
 		renderThemeHelp();
 		renderThemeFold();
+		publishDrawnTheme();
 		labelSharedOptions();
 		renderReadingColors(); // automatic wells show the theme's value color
 	}
@@ -4756,7 +6435,7 @@
 		if (option === null) return;
 		getSharedText().then((mode) => {
 			const name = mode === "dim" ? "Dimmed" : mode === "custom" ? "Custom color" : "Theme text";
-			const text = `Default (shared: ${name})`;
+			const text = sharedValue(name);
 			if (option.textContent !== text) option.textContent = text;
 		});
 	}
@@ -4773,10 +6452,16 @@
 	});
 
 	function pickTheme(id) {
-		if (id === themeOverride) return;
+		if (id === shownTheme()) return;
 		themeChoice += 1;
-		themeOverride = id;
-		setThemeOverride(themeOverride);
+		if (stripTheme !== null) {
+			// The strip's theme: one edit to the plugin; the dial's own stays.
+			stripTheme.theme = id;
+			stripTheme.set(id);
+		} else {
+			themeOverride = id;
+			setThemeOverride(themeOverride);
+		}
 		renderGallery();
 	}
 
@@ -4814,13 +6499,13 @@
 		const press = sharePress;
 		sharePress = null;
 		if (press !== null && press.choice !== themeChoice) return;
-		const id = themeOverride;
+		const id = shownTheme();
 		const choice = themeChoice;
 		// A stale press (the state moved on), or one while a share is still
 		// being written, does nothing.
 		if (themeSharing || themesConfig === null || id === "" || !knownTheme(id) || id === resolvedDeckId()) return;
 		const was = model.themeName(resolvedDeckId());
-		const where = hw.kind === "dial" ? "dial" : "key";
+		const where = themeWhere();
 		// A keyboard press (detail 0) has no point for a double click to land on.
 		themeSharePoint = ev.detail > 0 ? { x: ev.clientX, y: ev.clientY } : null;
 		themeShareAt = performance.now();
@@ -4847,7 +6532,8 @@
 			hw.resyncBound(["theme"]);
 			// An unknown stored theme is said the way the line shows it
 			// (external review AX15).
-			const now = themeOverride === "" ? "follows it" : knownTheme(themeOverride) ? `keeps ${model.themeName(themeOverride)}` : `keeps its stored theme "${themeOverride}" (unknown; draws ${model.themeName(themesConfig.defaultTheme)})`;
+			const kept = shownTheme();
+			const now = kept === "" ? "follows it" : knownTheme(kept) ? `keeps ${model.themeName(kept)}` : `keeps its stored theme "${kept}" (unknown; draws ${model.themeName(themesConfig.defaultTheme)})`;
 			hw.announce("theme-share", `${model.themeName(id)} is now the shared theme, was ${was}. This ${where} ${now}.`, { repeat: true });
 			return;
 		}
@@ -4898,7 +6584,8 @@
 	streamDeckClient.send("sendToPlugin", { event: "getThemes" });
 
 	// --- Text setting (issue #2) ----------------------------------------------
-	// The Text selects are sdpi-managed; this block reveals the conditional
+	// The Text selects are native selects pi-shell.js binds to textMode
+	// (data-setting, bindControl); this block reveals the conditional
 	// Custom rows (color well + dim checkbox) for the local and the deck-wide
 	// scope, and binds the color wells. Wells write only on change, so absent
 	// settings stay absent; an unset well shows the resolved theme's value
@@ -4907,15 +6594,21 @@
 		if (themesConfig === null) return "#ffffff";
 		// Empty follows the deck. An unknown explicit id follows the runtime
 		// palette resolver's spec default, even on a different deck theme.
-		const id = themeOverride === "" ? resolvedDeckId() : Object.hasOwn(themesConfig.themes, themeOverride) ? themeOverride : themesConfig.defaultTheme;
+		const shown = shownTheme();
+		const id = shown === "" ? resolvedDeckId() : Object.hasOwn(themesConfig.themes, shown) ? shown : themesConfig.defaultTheme;
 		const palette = themesConfig.themes[id];
 		return palette ? palette.value.toLowerCase() : "#ffffff";
 	}
 
 	function bindTextControls(customEl, colorEl, useStore, event) {
 		if (customEl === null || colorEl === null) return;
-		const [getMode] = useStore("textMode", () => {}, null);
-		const [getColor, setColor] = useStore("textColor", () => {}, null);
+		const own = event === "settings";
+		// A dial in a running strip shows and edits the strip's (pi-shell redirects).
+		const [getStoredMode] = useStore("textMode", () => {}, null);
+		const [getStoredColor, saveColor] = useStore("textColor", () => {}, null);
+		const getMode = () => getStoredMode().then((v) => (own ? hw.fieldValue("textMode", v) : v));
+		const getColor = () => getStoredColor().then((v) => (own ? hw.fieldValue("textColor", v) : v));
+		const setColor = (value) => (own && hw.sendRedirected("textColor", value) ? undefined : saveColor(value));
 		const codeEl = document.getElementById(`${colorEl.id}-code`);
 		const refresh = () => {
 			getMode().then((mode) => {
@@ -4935,6 +6628,7 @@
 		colorEl.addEventListener("change", () => setColor(colorEl.value));
 		refresh();
 		hw.on(event, refresh);
+		if (own) hw.on("redirect", refresh);
 	}
 
 	bindTextControls(document.getElementById("text-custom"), document.getElementById("text-color"), useSettings, "settings");
@@ -5426,8 +7120,10 @@
 			}
 		});
 		// A press selects the member under the pointer at once, before the
-		// list takes focus, so the focus rule below never picks another one.
-		rotationSetEl.addEventListener("pointerdown", (ev) => {
+		// list takes focus, so the focus rule below never picks another one;
+		// at its mousedown, which pi-shell's one-gesture rule holds when a
+		// later click of a double click lands on another member.
+		rotationSetEl.addEventListener("mousedown", (ev) => {
 			const option = ev.target instanceof Element ? ev.target.closest('.hw-set-list [role="option"]') : null;
 			if (option === null) return;
 			selectRotationMember(option.dataset.key, option.dataset.group === undefined ? null : Number(option.dataset.group));
@@ -5533,8 +7229,9 @@
 	// no parallel schema to drift, and fields a build does not know ride
 	// along untouched (the futureBlob discipline). Apply replaces the
 	// whole document through the socket and reloads the panel: the
-	// per-field sdpi stores cache what they last saw, and a reload is the
-	// one honest way to make every control adopt a wholesale write.
+	// settings stores in pi-client.js keep the copy they last saw, and a
+	// reload is the one honest way to make every control adopt a wholesale
+	// write.
 	const configKeyEl = document.getElementById("config-key");
 	if (configKeyEl !== null) {
 		const configDeckEl = document.getElementById("config-deck");
@@ -5569,7 +7266,9 @@
 			const doc = el === configKeyEl ? (await streamDeckClient.getConnectionInfo(), hw.state.settings) : (await hw.globalsReady, hw.state.globals);
 			// A late reply cannot replace a draft or a newer read of this well.
 			if (dirty.has(el) || fills.get(el) !== request) return;
-			el.value = canonical(el === configKeyEl ? mapReadingKeys(doc, namedKey) : doc);
+			// The shared document leaves out the fields that belong to this
+			// machine alone (pi-model.js), so a copy never carries them.
+			el.value = canonical(el === configKeyEl ? mapReadingKeys(doc, namedKey) : model.sharedDocForWell(doc));
 			dirty.delete(el);
 		};
 		// A well the user has typed into keeps its draft: reopening the fold is
@@ -5681,8 +7380,29 @@
 		};
 		document.getElementById("config-key-copy")?.addEventListener("click", copy(configKeyEl));
 		document.getElementById("config-deck-copy")?.addEventListener("click", copy(configDeckEl));
-		document.getElementById("config-key-apply")?.addEventListener("click", apply(configKeyEl, (doc) => streamDeckClient.setSettings(doc), hw.kind === "dial" ? "dial" : "key", false));
-		document.getElementById("config-deck-apply")?.addEventListener("click", apply(configDeckEl, (doc) => streamDeckClient.setGlobalSettings(doc), "shared", true));
+		// A document put in place after a "Use it everywhere" is a choice made
+		// now: its own Background and Words carry that generation, so the
+		// reset never drops them (src/ui/shared-looks.ts). The generation is
+		// in the shared document, so a Replace waits for it: before it
+		// arrives the panel holds none, which reads as no reset made here.
+		document.getElementById("config-key-apply")?.addEventListener(
+			"click",
+			apply(configKeyEl, (doc) => hw.globalsReady.then(() => streamDeckClient.setSettings(model.stampOwnLooks(doc, hw.kind === "dial" ? "dial" : "key", hw.state.globals?.looksResetGen))), hw.kind === "dial" ? "dial" : "key", false)
+		);
+		// Replace keeps this machine's own fields and ignores them in the
+		// pasted text (pi-model.js). The current document is the one the
+		// host sent (a Replace waits for it, as a fill does).
+		document.getElementById("config-deck-apply")?.addEventListener(
+			"click",
+			apply(
+				configDeckEl,
+				// Explicit: a backup taken before a Link or Save press in this
+				// session replaces the lists too (the shell's splice stands down).
+				(doc) => hw.globalsReady.then(() => streamDeckClient.setGlobalSettings(model.sharedDocToWrite(doc, hw.state.globals), { explicit: true })),
+				"shared",
+				true
+			)
+		);
 	}
 
 	// --- section summaries --------------------------------------------------
@@ -5694,13 +7414,41 @@
 	const labelFor = (key) => readingLabelOf(key);
 	if (hw.kind === "key" || hw.kind === "dial") {
 		hw.summary("reading", (st) => model.readingSummary(hw.kind, st.settings, st.preview, labelFor));
-		hw.summary("display", (st) => model.displaySummary(hw.kind, st.settings, st.globals, st.preview));
-		hw.summary("alerts", (st) => model.alertsSummary(hw.kind, st.settings, st.preview));
+		hw.summary("display", (st) => {
+			if (!hw.redirected("textMode")) return model.displaySummary(hw.kind, st.settings, st.globals, st.preview);
+			// On a strip: the strip's text, decimals, °F and look, no dial view.
+			const strip = { ...st.settings };
+			for (const field of ["textMode", "textColor", "textDimSecondary", "dialBackground", "dialAccentWords", "decimals", "fahrenheit"]) {
+				const v = hw.fieldValue(field, undefined);
+				if (v === undefined || v === null || v === "") delete strip[field];
+				else strip[field] = v;
+			}
+			return model.displaySummary(hw.kind, strip, st.globals, null).split(" · ").slice(1).join(" · ");
+		});
+		// The line keeps the room of its live endings ("critical now"), so a
+		// live alert change never moves the sections under it.
+		hw.summary(
+			"alerts",
+			(st) => model.alertsSummary(hw.kind, st.settings, st.preview),
+			(st) => model.alertsRoom(hw.kind, st.settings, st.preview)
+		);
 		hw.summary("interaction", (st) => (hw.kind === "key" ? model.keyInteractionSummary(st.settings, detailsSupported) : model.dialInteractionSummary(st.settings, st.preview)));
+		if (hw.kind === "key" && document.querySelector('[data-summary="alert-timing"]') !== null) hw.summary("alert-timing", (st) => model.keyAlertTimingSummary(st.settings));
 		hw.summary("advanced", (st) => model.advancedSummary(st.globals));
 		hw.summary("shared", (st) => model.sharedDefaultsSummary(st.globals, themesConfig === null ? undefined : resolvedDeckId()));
 		hw.summary("connection", (st) => model.connectionSummary(st.globals));
 	}
+
+	// For the dial panel's Strip section (pi-strip.js, loaded after this
+	// file): the same reading checklist and tree lookups as every picker
+	// here, so the strip's readings resolve aliases the way the dial does.
+	hw.pickers = {
+		create: createPicker,
+		treeEntryOf,
+		keyIsMissing,
+		typeName: (type) => SENSOR_TYPE_NAMES[type] || "",
+		hasSnapshot: () => treeHasSnapshot
+	};
 
 	requestTree();
 })();

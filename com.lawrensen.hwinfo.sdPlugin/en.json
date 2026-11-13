@@ -1,0 +1,199 @@
+{
+	"Name": "HWiNFO Sensors",
+	"Description": "Live HWiNFO sensor readings on your Stream Deck: temperatures, clocks, fan speeds, voltages, power and usage, with seven display themes, sensor-type accents, warn and critical alert colors, sparklines that can span the last 1, 5 or 15 minutes, and bar and ring gauges. A key can show one reading or stack two, three or four, and each reading can carry its own alert limits with an optional wait, recovery margin and snooze. On the Stream Deck + and + XL, a dial shows one reading or a rotation overview over the theme or the touch strip picture, and the dials can join into one graph across the touch strip or two side by side. A key press can open a detail page of related readings. Calculated readings combine 2 to 8 readings, and reading links made in the settings panel keep a saved reading working on both sources. Requires HWiNFO with Shared Memory Support or Gadget reporting enabled; Auto can switch to Gadget, and saved readings need explicit source links. Not affiliated with or endorsed by REALiX, s.r.o. (HWiNFO) or Elgato.",
+	"com.lawrensen.hwinfo.reading": {
+		"Name": "Sensor Reading",
+		"Tooltip": "Display up to four live HWiNFO sensor readings on a key: single, stacked, three rows or a quad grid, with alert thresholds on every layout and a sparkline, bar or ring on the single layout."
+	},
+	"com.lawrensen.hwinfo.control": {
+		"Name": "HWiNFO Control",
+		"Tooltip": "Control Sensor Dials and strips from any key, pedal or Multi Action: switch readings or strip screens, pause the auto cycle, pin, reset session stats."
+	},
+	"com.lawrensen.hwinfo.detail-slot": {
+		"Name": "Sensor Detail Slot",
+		"Tooltip": "Internal tile of the plugin-managed sensor detail view. Not placeable by hand: it appears only inside the bundled detail profiles."
+	},
+	"com.lawrensen.hwinfo.dial": {
+		"Name": "Sensor Dial",
+		"Tooltip": "Show HWiNFO readings on the touchscreen as one reading or a two- or three-row overview, or join the other dials in one graph across the touch strip.",
+		"Encoder": {
+			"TriggerDescription": {
+				"Rotate": "Cycle readings (set or sensor)",
+				"Push": "Reset session min/max",
+				"Touch": "Cycle stat mode",
+				"LongTouch": "Back to current value"
+			}
+		}
+	},
+	"Localization": {
+		"face": {
+			"staleGadget": {
+				"title": "Age unknown",
+				"hint": "check Gadget"
+			},
+			"staleShared": {
+				"title": "Not updating",
+				"hint": "check sharing"
+			},
+			"notRunning": {
+				"title": "Start HWiNFO",
+				"hint": "not detected"
+			},
+			"busy": {
+				"title": "Source busy",
+				"hint": "retrying"
+			},
+			"gadgetEmpty": {
+				"title": "Tick sensors",
+				"hint": "in Gadget"
+			},
+			"disabled": {
+				"title": "Shared Memory",
+				"hint": "is off"
+			},
+			"accessDenied": {
+				"title": "Access denied",
+				"hint": "open settings"
+			},
+			"unsupported": {
+				"title": "Needs x64",
+				"hint": "Windows"
+			},
+			"bridgeFailed": {
+				"title": "Bridge failed",
+				"hint": "reinstall"
+			},
+			"sourceError": {
+				"title": "Source error",
+				"hint": "open settings"
+			},
+			"noSelection": {
+				"title": "Pick a sensor",
+				"hint": "in settings"
+			},
+			"missing": {
+				"title": "Sensor missing",
+				"hint": "pick again"
+			}
+		},
+		"dial": {
+			"staleGadget": {
+				"title": "Age unknown",
+				"value": "check Gadget"
+			},
+			"staleShared": {
+				"title": "Not updating",
+				"value": "check sharing"
+			},
+			"notRunning": {
+				"title": "Start HWiNFO",
+				"value": "not detected"
+			},
+			"busy": {
+				"title": "Source busy",
+				"value": "retrying"
+			},
+			"gadgetEmpty": {
+				"title": "Tick sensors",
+				"value": "in Gadget"
+			},
+			"disabled": {
+				"title": "Shared Memory off",
+				"value": "enable in HWiNFO"
+			},
+			"accessDenied": {
+				"title": "Access denied",
+				"value": "open settings"
+			},
+			"unsupported": {
+				"title": "Needs x64 Windows"
+			},
+			"bridgeFailed": {
+				"title": "Bridge failed",
+				"value": "reinstall it"
+			},
+			"sourceError": {
+				"title": "Source error",
+				"value": "open settings"
+			},
+			"noSelection": {
+				"title": "Pick a sensor",
+				"value": "rotate to pick",
+				"hint": "or use the settings panel"
+			},
+			"missing": {
+				"title": "Sensor missing",
+				"value": "waiting",
+				"hint": "reselect in settings"
+			}
+		},
+		"badge": {
+			"min": "MIN",
+			"max": "MAX",
+			"avg": "AVG",
+			"unavailable": "N/A"
+		},
+		"sentence": {
+			"gadgetOk": "Reading via HWiNFO's Gadget registry (current values only, no min/max/avg). A value change was observed; the registry has no producer timestamp. Auto switches providers; saved keys need explicit reading links to work across sources. Enable Shared Memory Support for stable hardware IDs.",
+			"gadgetStale": "Gadget freshness is unknown. Unchanged values may be steady readings or left by a killed or crashed HWiNFO. A successful registry read cannot distinguish them. Check HWiNFO and Gadget reporting, or use Shared Memory Support.",
+			"sharedStale": "No new Shared Memory measurement evidence for {seconds}s. Check HWiNFO and Shared Memory Support; a busy connection can also prevent reads.",
+			"gadgetWithheldNames": "Gadget rows with an incomplete name are withheld, and so are two ticked readings that share a source name and label (HWiNFO lists some twice, such as a fan in RPM and in percent). Untick or relabel one of the two in HWiNFO and the other comes back on its own.",
+			"gadgetContradictory": "A Gadget row whose formatted value contradicts its raw value is withheld; the plugin log names the slot.",
+			"notRunning": "The plugin could not open a sensor feed. Check that HWiNFO is running in Sensors-only mode with Shared Memory Support enabled, or enable Gadget reporting and tick the sensors you need.",
+			"busy": "The sensor source was busy or changed during a read. The plugin retries automatically. If this persists, choose \"Copy support report\" under Advanced, Support.",
+			"gadgetEmpty": "The Gadget registry is present but has no readable sensor rows. In HWiNFO, open Configure Sensors and the HWiNFO Gadget tab. Check Enable reporting to Gadget and tick \"Report value in Gadget\" for the readings you need.",
+			"disabled": "HWiNFO reports Shared Memory Support as disabled. Re-enable it in HWiNFO Settings; the free version switches it off after 12 hours.",
+			"accessDenied": "Windows denied access needed to read the sensor source. Choose \"Copy support report\" under Advanced, Support. This error alone does not identify which access rule failed.",
+			"unsupported": "This plugin needs 64-bit (x64) Windows: HWiNFO's interfaces aren't readable on this system (macOS and Windows-on-ARM are unsupported).",
+			"bridgeFailed": "The native HWiNFO bridge (bin/hwsm.node) could not load. Reinstall the plugin from its release package. If Windows or security software reports a block, keep that report and the package hash for support. A load failure alone does not identify the cause.",
+			"sourceError": "The sensor source could not be opened or validated. Choose \"Copy support report\" under Advanced, Support."
+		},
+		"preview": {
+			"unknownSensor": "Unknown sensor",
+			"statsGadget": "Historical statistics unavailable in Gadget",
+			"stats": "min {min} · max {max} · avg {avg}"
+		},
+		"strip": {
+			"chooseReadings": "Choose readings in the dial settings",
+			"lanesNeedSecond": "Lanes needs a second reading",
+			"compareNeedSecond": "Compare needs a second reading",
+			"noHistoryRoom": "no history room",
+			"events": {
+				"noLimit": "no limit",
+				"yesNever": "never Yes in {window}",
+				"yesOnce": "Yes once in {window}",
+				"yesMany": "Yes {count} times in {window}",
+				"pastNever": "never past {limit} in {window}",
+				"pastOnce": "once past {limit} in {window}",
+				"pastMany": "{count} times past {limit} in {window}",
+				"underNever": "never under {limit} in {window}",
+				"underOnce": "once under {limit} in {window}",
+				"underMany": "{count} times under {limit} in {window}"
+			},
+			"group": {
+				"shown": "{shown} of {total} shown",
+				"otherUnits": "{count} in other units left out",
+				"historyFull": "history full: {kept} of {total}",
+				"notFound": "{count} not found",
+				"position": "{n} of {total}",
+				"highest": "max of {total}",
+				"lowest": "min of {total}",
+				"needsReading": "Pick a reading: the strip graphs its folder",
+				"readingMissing": "The folder's reading is not in HWiNFO's list now",
+				"needsFilter": "Type a filter in the dial settings",
+				"matchesNothing": "Matches nothing in HWiNFO's list right now",
+				"listEmpty": "Tick readings for this graph in the dial settings"
+			},
+			"ambient": {
+				"mark": "{window}",
+				"stale": "stale",
+				"unavailable": "unavailable"
+			},
+			"screen": {
+				"place": "{n} of {count}",
+				"more": "{name} +{count}",
+				"everyUnit": "Every {unit}"
+			}
+		}
+	}
+}

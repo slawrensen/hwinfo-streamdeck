@@ -6,6 +6,10 @@ description: Join Sensor Dials into one graph across the touch strip, or two gra
 
 A **strip display** joins the Sensor Dials of a Stream Deck + or + XL into one graph across the touch strip. Each dial keeps its own reading and settings for when it leaves the strip.
 
+<a class="image-link" data-image-viewer href="{{ '/assets/img/deck-plus-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/deck-plus-1.8.png' | relative_url }}" width="1600" height="960" loading="lazy" decoding="async" alt="A Stream Deck + with eight Sensor Reading keys and, across the whole touch strip under them, one Trend graph of CPU and GPU temperature over five minutes: both lines rise during a load and fall back. Keys and strip are on Tint over a blue to violet to orange gradient."></a>
+
+*Production-rendered fixed sample data, not a device capture: a **Trend** across the four dials of a Stream Deck +, with every key and the strip on **Tint** over a gradient drawn for the picture.*
+
 > **New in 1.8.** A whole strip has run on my Stream Deck + XL since 2026-10-25. An equal split and the Stream Deck + have run on simulated decks only. [Hardware](hardware.md) says what is still unmeasured.
 
 ## Make a strip
@@ -66,6 +70,10 @@ On a running Equal split, **Fill both halves** at the end of the line under the 
 | [**Ambient**](#ambient) | Up to 48, any units | Many readings as colored lines, with no numbers or scale. |
 | [**Meters**](#meters-and-events) | One per dial | Current values in large digits, each with a bar against its limits. |
 | [**Events**](#meters-and-events) | 1 to 4, Yes/No or with alert bands | When a Yes/No reading said Yes or a reading passed a limit. |
+
+<a class="image-link" data-image-viewer href="{{ '/assets/img/strip-graphs-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/strip-graphs-1.8.png' | relative_url }}" width="1920" height="2536" loading="lazy" decoding="async" alt="Eleven whole Stream Deck + XL strips, one under the other, each named: Trend with two temperature lines; Area with one filled line; Compare with three temperatures on one scale; Lanes with a temperature, a load and a power reading in three lanes; Heat as colored time bins with an amber cap where the reading passed its warn limit; Group with one large value and eight thin lines; Group in its Tiles view with sixteen small graphs; Ambient as many colored lines; Meters with six large values and bars; Events with amber bars where a Yes/No reading said Yes; and an Equal split with a Liquid meter of CPU usage in one half and memory usage in the other."></a>
+
+*Production-rendered fixed sample data on the Void theme, not device captures. The last row is an [Equal split](#equal-split-pairs).*
 
 Tick readings in the order you want them drawn. A graph keeps up to six readings and each style draws the first ones up to its limit; a reading past that stays saved and its row says **not drawn in Trend** (for example). The **Graph** list offers only styles that can draw every ticked reading. A Compare saved with several units still draws them, and says so. A reading the plugin's history memory has no room for says **no history room**.
 

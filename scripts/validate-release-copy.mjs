@@ -384,6 +384,10 @@ const MARKETING = [
 	["marketing/shot-6-multi.png", 1920, 960],
 	["marketing/shot-7-dial-views.png", 1920, 960],
 	["marketing/shot-8-drilldown.png", 1920, 960],
+	["marketing/shot-9-backgrounds.png", 1920, 960],
+	["marketing/shot-10-strip.png", 1920, 960],
+	["marketing/shot-11-deck-backgrounds.png", 1920, 960],
+	["marketing/shot-12-key-backgrounds.png", 1920, 960],
 ];
 for (const [rel, w, h] of MARKETING) {
 	if (!exists(rel)) { fail(rel, 0, "marketing asset missing"); continue; }

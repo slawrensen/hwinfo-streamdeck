@@ -72,6 +72,18 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
       <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/dial-backgrounds-strip.jpg' | relative_url }}" aria-label="Enlarge transparent background examples" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped for the touch strip. Auroras: NASA." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0 (Cosmic Cliffs)" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><picture><source type="image/webp" srcset="{{ '/assets/img/showcase/backgrounds-detail.webp' | relative_url }}"><img src="{{ '/assets/img/showcase/backgrounds-detail.jpg' | relative_url }}" width="621" height="332" loading="lazy" decoding="async" alt="Separate dial slots over space, aurora and pale backgrounds in the Stream Deck app."></picture></a>
       <figcaption><h3><a href="{{ '/sensor-dial.html#transparent-background' | relative_url }}">Backgrounds <span aria-hidden="true">→</span></a></h3><p>Your touch strip picture, behind each dial.<br><span class="capture-type">App captures. Cosmic Cliffs: <a href="https://esawebb.org/images/weic2205a/">NASA, ESA, CSA, and STScI</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; cropped. Auroras: NASA.</span></p></figcaption>
     </figure>
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/strip-graphs-1.8.png' | relative_url }}" aria-label="Enlarge strip display examples"><img src="{{ '/assets/img/showcase/strip-detail.png' | relative_url }}" width="800" height="324" loading="lazy" decoding="async" alt="Three Stream Deck + touch strips, each one graph across all four dials: a Trend of two temperatures, a Heat graph and Meters with four large values."></a>
+      <figcaption><h3><a href="{{ '/strip-display.html' | relative_url }}">Strip display <span aria-hidden="true">→</span></a></h3><p>One graph across the touch strip, or two side by side.<br><span class="capture-type">Sample rendering. Stream Deck + / + XL. New in 1.8.</span></p></figcaption>
+    </figure>
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/deck-dusk-1.8.png' | relative_url }}" aria-label="Enlarge deck background example"><img src="{{ '/assets/img/showcase/deck-backgrounds-detail.png' | relative_url }}" width="640" height="400" loading="lazy" decoding="async" alt="A Stream Deck + XL page with Background Dusk: a blue-violet glow behind the lower key rows and a Trend graph across the strip."></a>
+      <figcaption><h3><a href="{{ '/themes.html#deck-backgrounds-stars-dusk-and-nebula' | relative_url }}">Deck backgrounds <span aria-hidden="true">→</span></a></h3><p>Stars, Dusk or Nebula: one picture the plugin draws across the deck.<br><span class="capture-type">Sample rendering. New in 1.8.</span></p></figcaption>
+    </figure>
+    <figure>
+      <a class="image-link showcase-image" data-image-viewer href="{{ '/assets/img/key-backgrounds-deck-1.8.png' | relative_url }}" aria-label="Enlarge key background example"><img src="{{ '/assets/img/showcase/key-backgrounds-detail.png' | relative_url }}" width="640" height="400" loading="lazy" decoding="async" alt="A Stream Deck + XL page with every key and dial on Tint over a blue to violet to orange gradient."></a>
+      <figcaption><h3><a href="{{ '/sensor-reading.html#background' | relative_url }}">Key backgrounds <span aria-hidden="true">→</span></a></h3><p>Your page picture, behind each key.<br><span class="capture-type">Sample rendering over a gradient drawn for it. New in 1.8.</span></p></figcaption>
+    </figure>
   </div>
 </section>
 

@@ -139,6 +139,12 @@ body.docs-site .search-results { left: 0; top: 54px; width: min(760px, calc(100v
 .main-content .theme-sample figcaption code { font-size: var(--font-small); }
 @container article (min-width: 600px) { .main-content .theme-gallery { grid-template-columns: repeat(4,minmax(0,1fr)); } }
 @container article (min-width: 1080px) { .main-content .theme-gallery { grid-template-columns: repeat(7,minmax(0,1fr)); } }
+.main-content .deck-gallery { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px 16px; margin: 24px 0 12px; max-width: 1400px; }
+.main-content .deck-gallery figure { margin: 0; min-width: 0; }
+.deck-gallery .image-link { width: 100%; }
+.deck-gallery img { width: 100%; }
+.deck-gallery figcaption strong { display: block; margin-bottom: 3px; font-size: var(--font-ui); }
+@container article (min-width: 720px) { .main-content .deck-gallery { grid-template-columns: repeat(3,minmax(0,1fr)); } }
 .table-wrapper { max-width: min(100%, var(--table-measure)); margin: 22px 0 28px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; }
 .main-content table { margin: 0; display: table; min-width: 100%; width: 100%; border-collapse: collapse; font-size: var(--font-ui); line-height: 1.65; }
 .main-content th, .main-content td { font-size: inherit !important; padding: 13px 16px; border: 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; background: var(--canvas); min-width: 100px; }

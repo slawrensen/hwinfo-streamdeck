@@ -60,6 +60,10 @@
 - **Unit and decimals per reading** ([issue #59](https://github.com/slawrensen/hwinfo-streamdeck/issues/59)): each reading can have its own decimals, and a byte reading can keep one unit. Binary data units now read HWiNFO's KB to TB as 1024-based (12,100 MB read 11.27 GiB and now read 11.82 GiB). [Unit and decimals per reading](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html#unit-and-decimals-per-reading)
 - **Key backgrounds and deck pictures**: a Sensor Reading key can show the page picture behind it, and Stars, Dusk and Nebula draw one picture across the whole deck. A see-through key is checked in renderer tests only. [Background](https://docs.slawrensen.com/hwinfo-streamdeck/sensor-reading.html#background)
 
+<img src="docs/assets/img/deck-dusk-1.8.png" width="100%" alt="A Stream Deck + XL page of 36 Sensor Reading keys on the Ultraviolet theme with Background Dusk, a blue-violet glow behind the lower key rows, and a Trend graph of two temperatures across the whole touch strip">
+
+<sub>Production-rendered fixed sample data, not a device capture: Background **Dusk** on every key and a **Trend** strip display, each face drawn at its place in Elgato's published layout of the Stream Deck + XL display.</sub>
+
 The upgrade rewrites no stored settings, and 1.7.1 ignores the new ones if you go back. The [changelog](CHANGELOG.md) has the details. Upgrading from 1.6: [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html) says where an upgrade needs you to act.
 
 ## Keys

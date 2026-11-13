@@ -15,6 +15,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { BOARDS } from "../scripts/lib/boards-18";
 import { dialGalleryFixture } from "../scripts/lib/dial-gallery";
 import { composeDialSvg } from "../src/actions/sensor-dial";
 import { applyGlobalThemeSettings } from "../src/ui/theme-store";
@@ -84,6 +85,34 @@ describe("the dial color panel capture matches its recorded provenance", () => {
 		assert.ok(held.length >= 3, "the record names the panel sources");
 		for (const [source, hash] of held) {
 			assert.equal(sha256(fs.readFileSync(path.join(ROOT, source))), hash, `${source} changed since the capture; regenerate it with node scripts/capture-pi-reading-colors.mjs`);
+		}
+	});
+});
+
+// The 1.8 picture boards (whole decks, key looks, strip graphs and the
+// Marketplace stills made from them) are drawn by scripts/docs-v18-images.mjs
+// from fixed sample values. The record holds each PNG's hash and the hash of
+// every face the board drew, in drawing order, so a renderer change that
+// would leave a committed picture showing what the plugin no longer draws
+// fails here.
+describe("the 1.8 picture boards match their recorded provenance", () => {
+	type Recorded = { file: string; sha256: string; faces: string[] };
+	const record = JSON.parse(fs.readFileSync(path.join(IMG, "renderer-images-1.8.provenance.json"), "utf8")) as { command: string; assets: Recorded[] };
+
+	it("the record lists the boards the generator draws, in its order", () => {
+		assert.deepEqual(record.assets.map((asset) => asset.file), BOARDS.map((board) => board.file));
+	});
+
+	it("every recorded PNG is the committed file", () => {
+		for (const asset of record.assets) {
+			assert.equal(sha256(fs.readFileSync(path.join(ROOT, asset.file))), asset.sha256, asset.file);
+		}
+	});
+
+	it("every board's faces still compose to the recorded SVGs", () => {
+		for (const board of BOARDS) {
+			const recorded = record.assets.find((asset) => asset.file === board.file);
+			assert.deepEqual(board.faces().map((svg) => sha256(svg)), recorded?.faces, `${board.file}: the composers no longer draw the committed board; regenerate it with ${record.command}`);
 		}
 	});
 });

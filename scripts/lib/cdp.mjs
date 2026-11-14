@@ -121,6 +121,26 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 		on,
 		async goto(targetUrl) {
 			if (failure !== null) throw failure;
+			const started = performance.now();
+			let navigationResult = null;
+			const trace = [];
+			let droppedEvents = 0;
+			const traceEvent = (method, select = (event) => event) => on(method, (event) => {
+				const detail = select(event);
+				if (detail === null) return;
+				if (trace.length === 64) { trace.shift(); droppedEvents++; }
+				trace.push({ elapsedMs: Math.round(performance.now() - started), method, detail });
+			});
+			const responseDetail = (response) => response && ({ url: response.url, status: response.status, mimeType: response.mimeType, headers: response.headers });
+			const traceOff = [
+				traceEvent("Page.frameStartedNavigating"),
+				traceEvent("Page.frameRequestedNavigation"),
+				traceEvent("Page.frameNavigated", ({ frame }) => ({ id: frame.id, parentId: frame.parentId, url: frame.url, loaderId: frame.loaderId, mimeType: frame.mimeType, unreachableUrl: frame.unreachableUrl })),
+				traceEvent("Page.lifecycleEvent"),
+				traceEvent("Network.requestWillBeSent", (event) => event.type !== "Document" ? null : ({ requestId: event.requestId, loaderId: event.loaderId, frameId: event.frameId, timestamp: event.timestamp, url: event.request.url, method: event.request.method, redirectResponse: responseDetail(event.redirectResponse) })),
+				traceEvent("Network.responseReceived", (event) => event.type !== "Document" ? null : ({ requestId: event.requestId, loaderId: event.loaderId, frameId: event.frameId, timestamp: event.timestamp, response: responseDetail(event.response) })),
+				traceEvent("Network.loadingFailed", (event) => event.type !== "Document" ? null : event)
+			];
 			let off;
 			let timer;
 			let rejectLoad;
@@ -152,8 +172,9 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 			try {
 				// Attach both rejection handlers before either operation can fail.
 				await Promise.all([loaded, send("Page.navigate", { url: targetUrl }).then((result) => {
+					navigationResult = result;
 					if (!result || typeof result.frameId !== "string") throw new Error("Page.navigate: response has no frameId");
-					if (result.errorText) throw new Error(`Page.navigate: ${result.errorText} (${targetUrl})`);
+					if (result.errorText) throw new Error(`Page.navigate: ${result.errorText} (${targetUrl}); result=${JSON.stringify(result)}`);
 					if (result.isDownload) throw new Error(`Page.navigate: download instead of a page (${targetUrl})`);
 					// Same-document navigations have no loader and emit no load event.
 					if (!result.loaderId) resolveLoad();
@@ -163,8 +184,12 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 					}
 					earlyLoads.clear();
 				})]);
+			} catch (error) {
+				error.cdpNavigation = { result: navigationResult, events: trace, droppedEvents };
+				throw error;
 			} finally {
 				off();
+				for (const stop of traceOff) stop();
 				clearTimeout(timer);
 				earlyLoads.clear();
 				failureWaiters.delete(rejectLoad);
@@ -300,6 +325,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 					const entries = history.status === "fulfilled" ? history.value?.entries : null;
 					console.error("CDP navigation failure state:", JSON.stringify({
 						targetId: target.id, requestedUrl: targetUrl,
+						navigation: error.cdpNavigation,
 						frame: current && { id: current.id, url: current.url, loaderId: current.loaderId },
 						history: entries?.slice(-3).map(({ id, url, transitionType }) => ({ id, url, transitionType })),
 						frameError: frame.status === "rejected" ? frame.reason.message : undefined,
@@ -389,6 +415,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 		await send("Page.enable");
 		await send("Page.setLifecycleEventsEnabled", { enabled: true });
 		await send("Runtime.enable");
+		await send("Network.enable");
 		await waitForInitialDocument(transport);
 		// A property inspector the person is using is a focused page. Headless
 		// Chromium on Windows is not, and there a scripted focus() moves

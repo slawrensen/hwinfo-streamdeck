@@ -104,6 +104,38 @@ test("navigation errors fail even if a load event arrives first", { timeout: 500
 	await assert.rejects(client.goto("http://127.0.0.1/unavailable"), /Page\.navigate: net::ERR_CONNECTION_REFUSED/);
 });
 
+test("a navigation failure retains its protocol result and ordered document evidence", { timeout: 5000 }, async (t) => {
+	const client = await peer(t, (socket, message) => {
+		const emit = (method, params) => socket.send(JSON.stringify({ method, params }));
+		emit("Network.requestWillBeSent", { type: "Document", requestId: "request", frameId: "main", loaderId: "load", request: { url: "http://127.0.0.1/file", method: "GET" } });
+		emit("Network.responseReceived", { type: "Document", requestId: "request", response: { status: 200, mimeType: "application/octet-stream", headers: { "Content-Disposition": "attachment" } } });
+		emit("Network.loadingFailed", { type: "Document", requestId: "request", errorText: "net::ERR_ABORTED", canceled: true });
+		socket.send(JSON.stringify({ id: message.id, result: { frameId: "main", loaderId: "load", errorText: "net::ERR_ABORTED", isDownload: true } }));
+	});
+	await assert.rejects(client.goto("http://127.0.0.1/file"), (error) => {
+		assert.match(error.message, /net::ERR_ABORTED.*"isDownload":true/);
+		assert.equal(error.cdpNavigation.result.isDownload, true);
+		assert.deepEqual(error.cdpNavigation.events.map((e) => e.method), ["Network.requestWillBeSent", "Network.responseReceived", "Network.loadingFailed"]);
+		assert.equal(error.cdpNavigation.events[1].detail.response.headers["Content-Disposition"], "attachment");
+		assert.equal(error.cdpNavigation.events[2].detail.canceled, true);
+		return true;
+	});
+});
+
+test("navigation failure evidence is bounded and excludes unrelated subresource requests", { timeout: 5000 }, async (t) => {
+	const client = await peer(t, (socket, message) => {
+		socket.send(JSON.stringify({ method: "Network.requestWillBeSent", params: { type: "Image" } }));
+		for (let i = 0; i < 70; i++) socket.send(JSON.stringify({ method: "Page.lifecycleEvent", params: { name: "init", frameId: "main", loaderId: `load-${i}` } }));
+		socket.send(JSON.stringify({ id: message.id, result: { frameId: "main", errorText: "net::ERR_ABORTED" } }));
+	});
+	await assert.rejects(client.goto("http://127.0.0.1/fails"), (error) => {
+		assert.equal(error.cdpNavigation.events.length, 64);
+		assert.equal(error.cdpNavigation.droppedEvents, 6);
+		assert.equal(error.cdpNavigation.events[0].detail.loaderId, "load-6");
+		return true;
+	});
+});
+
 test("navigation without a load event fails, then a later navigation can complete", { timeout: 5000 }, async (t) => {
 	let count = 0;
 	const client = await peer(t, (socket, message) => {

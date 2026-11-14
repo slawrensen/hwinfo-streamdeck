@@ -1218,7 +1218,17 @@ try {
 		if (firstShown === null) await sleep(10);
 	}
 	sim.foldsDelayMs = 0;
-	check("folds: an answer at the app's measured pace is applied before the sections first show", firstShown === true && (await b.evaluate(`performance.getEntriesByType("mark").some((m) => m.name === "hw-folds-answer")`)), JSON.stringify({ firstShown }));
+	const restoredBeforeShow = firstShown === true && (await b.evaluate(`performance.getEntriesByType("mark").some((m) => m.name === "hw-folds-answer")`));
+	const foldEvidence = { firstShown };
+	if (!restoredBeforeShow) {
+		try {
+			foldEvidence.page = await b.evaluate(`({ now: performance.now(), readyState: document.readyState, pending: document.documentElement.hasAttribute("data-folds-pending"), open: document.getElementById("sec-alerts").open, marks: performance.getEntriesByType("mark").filter((m) => m.name === "hw-connected" || m.name.startsWith("hw-folds-")).map((m) => ({ name: m.name, at: m.startTime })) })`);
+		} catch (error) {
+			foldEvidence.diagnosticsError = error.message;
+		}
+		foldEvidence.responses = sim.toPiLog.filter((p) => p.event === "panelFolds").slice(-3);
+	}
+	check("folds: an answer at the app's measured pace is applied before the sections first show", restoredBeforeShow, JSON.stringify(foldEvidence));
 	await open("dial-configured");
 	await sleep(120);
 	check("folds: each kind of panel keeps its own", (await foldsOf())["sec-alerts"] === false);

@@ -216,6 +216,9 @@ html:not(.docs-js) .hero-gallery figure + figure { margin-top: 28px; }
 .showcase-image { height: 180px; width: 100%; background: #0b0d10; display: flex; align-items: center; justify-content: center; padding: 12px; border: 1px solid var(--line-soft); border-radius: var(--radius); }
 .showcase-image picture { display: contents; }
 .showcase-image img { width: auto; height: auto; max-height: 100%; max-width: 100%; border-radius: 0; }
+/* A close-up fills its tile edge to edge; a narrower tile keeps the middle of it. */
+.showcase-image.fills { padding: 0; overflow: hidden; }
+.showcase-image.fills img { width: 100%; height: 100%; max-height: none; max-width: none; object-fit: cover; }
 .showcase-grid figcaption { margin-top: 16px; }
 .main-content .showcase-grid h3 { font-size: 17px !important; margin: 0 0 6px; }
 .showcase-grid h3 a { color: var(--ink); text-decoration: none; display: flex; justify-content: space-between; }

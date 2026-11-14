@@ -544,6 +544,27 @@ const deviceBoard = (file: string, deck: DeckSpec, shows: string): Board => ({ f
 /** A deck as its bare display: only where no official device image is at hand yet (the Stream Deck +). */
 const displayBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => deckPng(deck, scale) });
 
+/** What a close look keeps: the nine caps across, two key rows down, cut mid-gap, in the device image's own pixels. */
+const CLOSE = { w: 1584, h: 350 } as const;
+/**
+ * Two key rows of a + XL deck on Elgato's device image, close up and not
+ * resized: the home page tiles fill their frame with it, so a tile shows
+ * faces large enough to read where the gallery above it shows whole decks.
+ */
+async function closeUp(deck: DeckSpec, firstRow: number): Promise<Buffer> {
+	const { cap, crop } = OFFICIAL;
+	const columns = DEVICES[deck.device].columns;
+	const middleX = (cap.left(0) + cap.left(columns - 1) + cap.w) / 2;
+	const middleY = ((cap.top[firstRow] as number) + (cap.top[firstRow + 1] as number) + cap.h) / 2;
+	return sharp(await officialOnce(deck)).extract({ left: Math.round(middleX - CLOSE.w / 2) - crop.left, top: Math.round(middleY - CLOSE.h / 2) - crop.top, width: CLOSE.w, height: CLOSE.h }).png().toBuffer();
+}
+/** The key faces of the two rows a close look shows. */
+const rowFaces = (deck: DeckSpec, firstRow: number): string[] => {
+	const columns = DEVICES[deck.device].columns;
+	return deckFaces(deck).keys.slice(firstRow * columns, (firstRow + 2) * columns);
+};
+const closeBoard = (file: string, deck: DeckSpec, firstRow: number, shows: string): Board => ({ file, shows, faces: () => rowFaces(deck, firstRow), draw: () => encoded(file, closeUp(deck, firstRow)) });
+
 async function stripBoard(): Promise<Buffer> {
 	const pad = 60;
 	const step = 150 + 76;
@@ -648,8 +669,8 @@ export const BOARDS: readonly Board[] = [
 	{ file: `${IMG}/reading-units-1.8.png`, shows: "One two-reading key of two GPUs' free memory (12100 MB and 453 MB) on Void: on Auto, and with GB and 2 decimals set for each reading.", faces: unitFaces, draw: unitsBoard },
 	{ file: `${IMG}/strip-graphs-1.8.png`, shows: "The nine Strip display graph styles, Group's Tiles view and an Equal split, each across a whole Stream Deck + XL strip on Void.", faces: () => STRIP_ROWS.flatMap((r) => stripOf(r.scene)), draw: stripBoard },
 	{ file: `${IMG}/showcase/strip-detail.png`, shows: "The home page tile: Trend, Heat and Meters, each across a whole Stream Deck + strip on Void.", faces: () => PLUS_STRIPS.flatMap((scene) => stripOf(scene, "plus")), draw: plusStrips },
-	{ file: `${IMG}/showcase/deck-backgrounds-detail.jpg`, shows: "The home page tile: the Dusk deck on Elgato's device image, small.", faces: () => facesOf(DECKS.dusk), draw: async () => encoded(".jpg", fit(await officialOnce(DECKS.dusk), 640, 573)) },
-	{ file: `${IMG}/showcase/key-backgrounds-detail.jpg`, shows: "The home page tile: the Cosmic Cliffs deck on Elgato's device image, small.", faces: () => facesOf(DECKS.cliffs), draw: async () => encoded(".jpg", fit(await officialOnce(DECKS.cliffs), 640, 573)) },
+	closeBoard(`${IMG}/showcase/deck-backgrounds-detail.jpg`, DECKS.dusk, 2, "The home page tile: the two lower key rows of the Dusk deck on Elgato's device image, close up."),
+	closeBoard(`${IMG}/showcase/key-backgrounds-detail.jpg`, DECKS.cliffs, 1, "The home page tile: the two middle key rows of the Cosmic Cliffs deck on Elgato's device image, close up."),
 	{ file: "marketing/shot-10-strip.png", shows: "Marketplace still: Trend, Lanes, Heat and Meters across a whole strip.", faces: () => SHOT_STRIPS.flatMap((n) => stripOf(rowOf(n).scene)), draw: shotStrip },
 	{ file: "marketing/shot-11-deck-backgrounds.png", shows: "Marketplace still: the Stars, Dusk and Nebula decks on Elgato's device image, side by side.", faces: () => SHOT_DECKS.flatMap((n) => facesOf(DECKS[n])), draw: shotDecks },
 	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the Cosmic Cliffs, on Elgato's device image.", faces: () => facesOf(DECKS.cliffs), draw: shotKeys }

@@ -26,7 +26,7 @@ if (typeof outDir !== "string" || typeof root !== "string" || !/^https?:\/\//.te
 	process.exit(2);
 }
 const base = root.endsWith("/") ? root : `${root}/`;
-const PAGES = ["", "installation.html", "getting-started.html", "sensor-reading.html", "sensor-details.html", "sensor-dial.html", "controls.html", "themes.html", "thresholds-alerts.html", "data-sources.html", "hardware.html", "whats-new-1.7.html", "changelog.html", "status-screens.html", "troubleshooting.html", "faq.html", "404.html"];
+const PAGES = ["", "installation.html", "getting-started.html", "sensor-reading.html", "sensor-details.html", "sensor-dial.html", "controls.html", "themes.html", "thresholds-alerts.html", "data-sources.html", "hardware.html", "whats-new-1.8.html", "whats-new-1.7.html", "changelog.html", "status-screens.html", "troubleshooting.html", "faq.html", "404.html"];
 const pages = only.length > 0 ? only : PAGES;
 const VIEWPORTS = process.env.DOCS_SHOTS_VIEWPORTS
 	? process.env.DOCS_SHOTS_VIEWPORTS.split(",").map((item) => {

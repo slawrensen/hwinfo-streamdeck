@@ -6,7 +6,7 @@ description: Answers about requirements, data, privacy, installation and everyda
 
 For setup and source errors, see [Data sources](data-sources.md) or [Troubleshooting](troubleshooting.md).
 
-For version-specific changes, see [What changed in 1.7](whats-new-1.7.md).
+For version-specific changes, see [What's new in 1.8](whats-new-1.8.md) and [What changed in 1.7](whats-new-1.7.md).
 
 ## Platform and requirements
 

@@ -1,6 +1,6 @@
 ---
 title: What changed in 1.7
-nav_order: 1.5
+nav_order: 1.6
 description: Changes in 1.7 and 1.7.1, including backgrounds and source behavior.
 ---
 
@@ -30,7 +30,7 @@ The theme strip names the current theme and whether it is local or shared. **Def
 <a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-theme-strip.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-theme-strip.png' | relative_url }}" width="800" height="420" loading="lazy" decoding="async" alt="The top of the key&#x27;s settings panel: the header with the key&#x27;s live face, the reading&#x27;s name and source, and Live · Shared Memory, then the theme line reading Theme, Default (shared: Void) and a Change link, above eight named chips: Default, selected, then Void, Graphite, Ultraviolet, Midnight, Forest, Ember and Paper."></a>
 
 *Actual 1.7.0 settings-panel capture using live HWiNFO readings in a mock
-Stream Deck host. This is not a photograph of the physical deck.*
+Stream Deck host.*
 
 The sections follow: **Reading**, **Display**, **Alerts**, **Press**
 (**Controls** on a dial) and **Advanced**, which holds **Shared defaults**,
@@ -124,7 +124,7 @@ color of every reading in the list.
 <a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The dial&#x27;s Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button."></a>
 
 *Actual 1.7.1 settings-panel capture using live HWiNFO readings in a mock
-Stream Deck host. This is not a photograph of the physical deck.*
+Stream Deck host.*
 
 Colors follow reading identity through rotation and reordering. On a
 confirmed source link, an exact color for the displayed key wins; otherwise
@@ -140,9 +140,6 @@ remains the preferred source because it supplies hardware identifiers,
 history and a consistency mutex.
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Key and dial status examples for a busy source, Shared Memory with no new data, and Gadget with unknown age."></a>
-
-*Production status renderers with controlled failure scenarios. These are
-rendered examples, not measurements from a hardware fault test.*
 
 Gadget rereads each row to catch fields that change during a scan, and a row
 whose formatted value keeps contradicting its raw value is withheld on its own

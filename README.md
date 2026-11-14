@@ -62,7 +62,7 @@
 
 <img src="docs/assets/img/deck-dusk-1.8.jpg" width="100%" alt="A Stream Deck + XL page of 36 Sensor Reading keys on the Ultraviolet theme with Background Dusk, a blue-violet glow behind the lower key rows, and a Trend graph of two temperatures across the whole touch strip">
 
-The upgrade rewrites no stored settings, and 1.7.1 ignores the new ones if you go back. The [changelog](CHANGELOG.md) has the details. Upgrading from 1.6: [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html) says where an upgrade needs you to act.
+The upgrade rewrites no stored settings, and 1.7.1 ignores the new ones if you go back. [What's new in 1.8](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.8.html) covers the release, and the [changelog](CHANGELOG.md) has every change. Upgrading from 1.6: [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html) says where an upgrade needs you to act.
 
 ## Keys
 

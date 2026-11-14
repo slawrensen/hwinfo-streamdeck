@@ -90,6 +90,7 @@ description: Live HWiNFO temperatures, clocks, fan speeds and power on your Stre
 <section class="home-paths" aria-labelledby="start-here">
   <h2 id="start-here">Find what you need</h2>
   <ul>
+    <li><a href="{{ '/whats-new-1.8.html' | relative_url }}">See what's new in 1.8 <span aria-hidden="true">→</span></a><span>Strip display, backgrounds, and a unit and limits for each reading.</span></li>
     <li><a href="{{ '/themes.html' | relative_url }}">Compare the seven themes <span aria-hidden="true">→</span></a><span>Pick a palette and set reading colors.</span></li>
     <li><a href="{{ '/strip-display.html' | relative_url }}">Join dials across the touch strip <span aria-hidden="true">→</span></a><span>One graph across the strip, or two side by side.</span></li>
     <li><a href="{{ '/data-sources.html' | relative_url }}">Understand your data source <span aria-hidden="true">→</span></a><span>Sharing, freshness, history, reading links and calculated readings.</span></li>

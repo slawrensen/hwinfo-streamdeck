@@ -11,6 +11,8 @@
  * is drawn over a page picture cut to the same rects; the glass between
  * the keys is black, as on the device.
  */
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -445,23 +447,102 @@ const facesOf = (spec: DeckSpec): string[] => {
 const stripOf = (scene: StripScene, device: DeviceName = "plusxl"): string[] => stripFaces(device, scene).filter((s): s is string => s !== null);
 const rowOf = (name: string): (typeof STRIP_ROWS)[number] => STRIP_ROWS.find((r) => r.name === name) as (typeof STRIP_ROWS)[number];
 
+// ---- a deck on Elgato's device image -------------------------------------------
+
+/**
+ * Elgato's official front-facing image of the Stream Deck + XL (Media Room
+ * press kit, "SD + XL (Product Shot) 01", 3840 x 3840 PNG). A whole deck is
+ * shown on it, never drawn: Elgato asks that its hardware be depicted with
+ * its official resources, and it is a key's cap, not its 112 px image, that
+ * sets how close the keys sit (158 px caps on a 176 px pitch here). The file
+ * is Elgato's and is not in this repository: put it in
+ * release/official-elgato/press-kit/ (ignored) or name its folder in
+ * ELGATO_PRESS_KIT. The positions below were measured on that exact file.
+ */
+const OFFICIAL = {
+	file: "SD_XL_Product_Shot_01.png",
+	sha256: "4667e7243dd578981982043e83d82f1c807218044e2fb2ea8f287b843f56ec85",
+	/** A key cap's box, black outline to black outline. */
+	cap: { w: 158, h: 158, radius: 31, left: (c: number) => Math.round(1137 + 176.1 * c), top: [1271, 1446, 1620, 1796] },
+	/** The lit window inside a cap box, between the rim highlights. */
+	window: { left: 14, top: 13, w: 131, h: 130, radius: 20 },
+	/** The clean dark cap (column, row) every cap is redrawn from, so no demo icon's glow stays on a rim. */
+	template: { c: 3, r: 2 },
+	/** The strip's lit area: six segments of 248.3 px, 124 px tall. */
+	strip: { x: 1175, y: 2068, w: 1490, h: 124 },
+	/** What a picture keeps of the image: the device and a margin. */
+	crop: { left: 928, top: 1096, width: 1984, height: 1776 }
+} as const;
+
+/**
+ * A + XL deck's faces on Elgato's device image, 1984 x 1776: the device, its
+ * caps and every distance are the image's own pixels. Each cap is redrawn
+ * from one clean dark cap, the face (over its piece of the page picture for
+ * a see-through look) fills the cap's window, and the strip faces fill the
+ * strip's lit area.
+ */
+async function officialDeckPng(spec: DeckSpec): Promise<Buffer> {
+	const source = path.join(process.env.ELGATO_PRESS_KIT ?? path.join(ROOT, "release", "official-elgato", "press-kit"), OFFICIAL.file);
+	let bytes: Buffer;
+	try {
+		bytes = readFileSync(source);
+	} catch {
+		throw new Error(`Elgato's device image is not at ${source}: download "SD + XL (Product Shot) 01" (PNG) from the Stream Deck + XL press kit in the Elgato Media Room, or set ELGATO_PRESS_KIT to its folder`);
+	}
+	if (createHash("sha256").update(bytes).digest("hex") !== OFFICIAL.sha256) throw new Error(`${source} is not the image the cap positions were measured on`);
+	const faces = deckFaces(spec);
+	const device = DEVICES[spec.device];
+	const panel = panelOf(spec.device);
+	const { cap, window: win, strip, template: from, crop } = OFFICIAL;
+	const cut = await sharp(bytes).extract({ left: cap.left(from.c), top: cap.top[from.r] as number, width: cap.w, height: cap.h }).png().toBuffer();
+	// Only the cap itself, inside its rounded outline: the body around it stays the image's own.
+	const template = await sharp(cut).composite([{ input: rounded(cap.w, cap.h, cap.radius), blend: "dest-in" }]).png().toBuffer();
+	// The page picture in LCD pixels at 2x: each window shows its own key's piece.
+	const P = 2;
+	const picture = spec.picture === undefined ? null : await picturePng(spec.picture, panel.w * P, panel.h * P);
+	const under = async (rect: PanelRect, w: number, h: number): Promise<ReturnType<typeof sharp>> =>
+		picture === null ? blank(w, h, 1) : sharp(await sharp(picture).extract({ left: rect.x * P, top: rect.y * P, width: rect.w * P, height: rect.h * P }).resize(w, h, { fit: "fill" }).png().toBuffer());
+	const layers: Layer[] = [];
+	for (const [i, svg] of faces.keys.entries()) {
+		const c = i % device.columns;
+		const r = Math.floor(i / device.columns);
+		const left = cap.left(c);
+		const top = cap.top[r] as number;
+		layers.push({ input: template, left, top });
+		const face = await sharp(Buffer.from(svg.replace('width="144" height="144"', `width="${win.w}" height="${win.h}" preserveAspectRatio="none"`))).png().toBuffer();
+		const flat = await (await under(keyRect(panel, c, r) as PanelRect, win.w, win.h)).composite([{ input: face, left: 0, top: 0 }]).png().toBuffer();
+		layers.push({ input: await sharp(flat).composite([{ input: rounded(win.w, win.h, win.radius), blend: "dest-in" }]).png().toBuffer(), left: left + win.left, top: top + win.top });
+	}
+	const lcd = panel.strip as PanelRect;
+	const slices: Layer[] = [];
+	for (const [c, svg] of faces.strip.entries()) if (svg !== null) slices.push({ input: await sharp(sized(svg, 'width="200" height="100"', 200 * P, 100 * P)).png().toBuffer(), left: c * 200 * P, top: 0 });
+	const stripFlat = await (await under(lcd, lcd.w * P, lcd.h * P)).composite(slices).png().toBuffer();
+	layers.push({ input: await sharp(stripFlat).resize(strip.w, strip.h, { fit: "fill", kernel: "lanczos3" }).png().toBuffer(), left: strip.x, top: strip.y });
+	const whole = await sharp(bytes).composite(layers).png().toBuffer();
+	return sharp(whole).extract(crop).flatten({ background: SHOT_BG }).png().toBuffer();
+}
+
+/** The picture size the docs show a deck at. */
+const DECK_PICTURE = { w: 1600, h: 1432 } as const;
+
 const rendered = new Map<string, Promise<Buffer>>();
-/** One render of a deck per scale, shared by every board that shows it. */
-function deckOnce(deck: DeckSpec, scale: number): Promise<Buffer> {
-	const name = Object.entries(DECKS).find(([, spec]) => spec === deck)?.[0];
-	if (name === undefined) return deckPng(deck, scale);
-	const key = `${name}@${scale}`;
-	let png = rendered.get(key);
-	if (png === undefined) rendered.set(key, (png = deckPng(deck, scale)));
+/** One composite of a deck, shared by every board that shows it. */
+function officialOnce(deck: DeckSpec): Promise<Buffer> {
+	const name = Object.entries(DECKS).find(([, spec]) => spec === deck)?.[0] ?? "";
+	let png = rendered.get(name);
+	if (png === undefined) rendered.set(name, (png = officialDeckPng(deck)));
 	return png;
 }
-/** A board's bytes in the format its file name asks for: PNG as drawn, JPEG for a deck over a photograph, WebP for the copy a page shows inline. */
+/** A board's bytes in the format its file name asks for: PNG as drawn, JPEG for a device picture. */
 async function encoded(file: string, png: Promise<Buffer>): Promise<Buffer> {
-	if (file.endsWith(".jpg")) return sharp(await png).jpeg({ quality: 90, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
-	if (file.endsWith(".webp")) return sharp(await png).webp({ quality: 84 }).toBuffer();
+	if (file.endsWith(".jpg")) return sharp(await png).jpeg({ quality: 88, chromaSubsampling: "4:4:4", mozjpeg: true }).toBuffer();
 	return png;
 }
-const deckBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => encoded(file, deckOnce(deck, scale)) });
+const fit = (png: Buffer, w: number, h: number): Promise<Buffer> => sharp(png).resize(w, h, { kernel: "lanczos3" }).png().toBuffer();
+/** A + XL deck on Elgato's device image, at the docs' size. */
+const deviceBoard = (file: string, deck: DeckSpec, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: async () => encoded(file, fit(await officialOnce(deck), DECK_PICTURE.w, DECK_PICTURE.h)) });
+/** A deck as its bare display: only where no official device image is at hand yet (the Stream Deck +). */
+const displayBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => deckPng(deck, scale) });
 
 async function stripBoard(): Promise<Buffer> {
 	const pad = 60;
@@ -520,8 +601,6 @@ const shotText = (title: string, sub: string, foot: string): string[] => [
 	label(SHOT.w / 2, 170, 25, sub, { anchor: "middle", fill: BODY }),
 	label(SHOT.w / 2, 908, 15, foot, { anchor: "middle", fill: MUTED, family: MONO })
 ];
-const fit = (png: Buffer, w: number, h: number): Promise<Buffer> => sharp(png).resize(w, h, { kernel: "lanczos3" }).png().toBuffer();
-
 const SHOT_STRIPS = ["Trend", "Lanes", "Heat", "Meters"] as const;
 async function shotStrip(): Promise<Buffer> {
 	const layers: Layer[] = [];
@@ -536,47 +615,42 @@ async function shotStrip(): Promise<Buffer> {
 
 const SHOT_DECKS = ["stars", "dusk", "nebula"] as const;
 async function shotDecks(): Promise<Buffer> {
-	const w = 608;
-	const h = 380;
+	const w = 606;
+	const h = 542;
 	const layers: Layer[] = [];
-	const elements = shotText("One picture across the whole deck.", "Background: Stars, Dusk or Nebula. The plugin draws it behind every key, dial and strip graph.", "sample values drawn by the plugin's renderer at the Stream Deck + XL's published key and strip positions");
+	const elements = shotText("One picture across the whole deck.", "Background: Stars, Dusk or Nebula. The plugin draws it behind every key, dial and strip graph.", "sample values drawn by the plugin's renderer · device image: Elgato");
 	for (const [i, name] of SHOT_DECKS.entries()) {
 		const deck = DECKS[name];
-		const left = 30 + i * (w + 18);
-		layers.push({ input: await fit(await deckOnce(deck, 1.5), w, h), left, top: 276 });
-		elements.push(label(left + w / 2, 716, 26, LOOK_NAMES[deck.look] as string, { anchor: "middle", weight: 600 }) + label(left + w / 2, 750, 20, `on the ${THEME_NAMES[deck.theme] as string} theme`, { anchor: "middle", fill: BODY }));
+		const left = 30 + i * (w + 21);
+		layers.push({ input: await fit(await officialOnce(deck), w, h), left, top: 204 });
+		elements.push(label(left + w / 2, 790, 26, LOOK_NAMES[deck.look] as string, { anchor: "middle", weight: 600 }) + label(left + w / 2, 822, 20, `on the ${THEME_NAMES[deck.theme] as string} theme`, { anchor: "middle", fill: BODY }));
 	}
 	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, layers);
 }
 
 async function shotKeys(): Promise<Buffer> {
-	const w = 1040;
-	const h = 650;
-	const elements = shotText("Keys over your page picture.", "Background: Glass, Tint, Outline or Clear on a key, as on a dial. Here every key and the strip are on Tint.", `sample values drawn by the plugin's renderer · picture: Cosmic Cliffs, ${PICTURES.cliffs.credit} (${PICTURES.cliffs.license}), cropped`);
-	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, [{ input: await fit(await deckOnce(DECKS.cliffs, 1.5), w, h), left: (SHOT.w - w) / 2, top: 218 }]);
+	const w = 751;
+	const h = 672;
+	const elements = shotText("Keys over your page picture.", "Background: Glass, Tint, Outline or Clear on a key, as on a dial. Here every key and the strip are on Tint.", `sample values drawn by the plugin's renderer · device image: Elgato · picture: Cosmic Cliffs, ${PICTURES.cliffs.credit} (${PICTURES.cliffs.license}), cropped`);
+	return flatten(SHOT.w, SHOT.h, SHOT_BG, elements, [{ input: await fit(await officialOnce(DECKS.cliffs), w, h), left: Math.round((SHOT.w - w) / 2), top: 202 }]);
 }
 
 const IMG = "docs/assets/img";
 
 export const BOARDS: readonly Board[] = [
-	deckBoard(`${IMG}/deck-stars-1.8.png`, DECKS.stars, 1.5, "A Stream Deck + XL on Midnight with Background Stars on every key and on six independent dials."),
-	deckBoard(`${IMG}/deck-dusk-1.8.png`, DECKS.dusk, 1.5, "A Stream Deck + XL on Ultraviolet with Background Dusk on every key and on a whole-strip Trend graph."),
-	deckBoard(`${IMG}/deck-nebula-1.8.png`, DECKS.nebula, 1.5, "A Stream Deck + XL on Void with Background Nebula on every key and on a whole-strip Area graph."),
-	deckBoard(`${IMG}/deck-stars-1.8.webp`, DECKS.stars, 1.5, "The Stars deck again, for the home page to show inline."),
-	deckBoard(`${IMG}/deck-dusk-1.8.webp`, DECKS.dusk, 1.5, "The Dusk deck again, for the home page to show inline."),
-	deckBoard(`${IMG}/deck-nebula-1.8.webp`, DECKS.nebula, 1.5, "The Nebula deck again, for the home page to show inline."),
-	deckBoard(`${IMG}/deck-cliffs-1.8.jpg`, DECKS.cliffs, 1.5, "A Stream Deck + XL on Void with Background Tint on every key and on a whole-strip Trend graph, over the Cosmic Cliffs as the page and strip picture."),
-	deckBoard(`${IMG}/deck-cliffs-1.8.webp`, DECKS.cliffs, 1.5, "The Cosmic Cliffs deck again, for the home page to show inline."),
-	deckBoard(`${IMG}/deck-deep-field-1.8.jpg`, DECKS.deepField, 1.5, "A Stream Deck + XL on Void with Background Outline on every key and on six independent dials, over Webb's First Deep Field as the page and strip picture."),
-	deckBoard(`${IMG}/deck-deep-field-1.8.webp`, DECKS.deepField, 1.5, "The deep field deck again, for the home page to show inline."),
-	deckBoard(`${IMG}/deck-plus-1.8.png`, DECKS.plus, 2, "A Stream Deck + on Void with Background Tint on every key and on a whole-strip Trend graph, over a dusk gradient as the page picture."),
+	deviceBoard(`${IMG}/deck-cliffs-1.8.jpg`, DECKS.cliffs, "Elgato's Stream Deck + XL image with Background Tint on every key and on a whole-strip Trend graph, over the Cosmic Cliffs as the page and strip picture, on Void."),
+	deviceBoard(`${IMG}/deck-nebula-1.8.jpg`, DECKS.nebula, "Elgato's Stream Deck + XL image with Background Nebula on every key and on a whole-strip Area graph, on Void."),
+	deviceBoard(`${IMG}/deck-deep-field-1.8.jpg`, DECKS.deepField, "Elgato's Stream Deck + XL image with Background Outline on every key and on six independent dials, over Webb's First Deep Field as the page and strip picture, on Void."),
+	deviceBoard(`${IMG}/deck-dusk-1.8.jpg`, DECKS.dusk, "Elgato's Stream Deck + XL image with Background Dusk on every key and on a whole-strip Trend graph, on Ultraviolet."),
+	deviceBoard(`${IMG}/deck-stars-1.8.jpg`, DECKS.stars, "Elgato's Stream Deck + XL image with Background Stars on every key and on six independent dials, on Midnight."),
+	displayBoard(`${IMG}/deck-plus-1.8.png`, DECKS.plus, 2, "A Stream Deck + display on Void with Background Tint on every key and on a whole-strip Trend graph, over a dusk gradient as the page picture."),
 	{ file: `${IMG}/key-backgrounds-looks-1.8.png`, shows: "Theme, Glass, Tint, Outline and Clear on a one-reading key with a sparkline, a two-reading key and a four-reading key, over a dusk gradient.", faces: lookFaces, draw: looksBoard },
 	{ file: `${IMG}/reading-units-1.8.png`, shows: "One two-reading key of two GPUs' free memory (12100 MB and 453 MB) on Void: on Auto, and with GB and 2 decimals set for each reading.", faces: unitFaces, draw: unitsBoard },
 	{ file: `${IMG}/strip-graphs-1.8.png`, shows: "The nine Strip display graph styles, Group's Tiles view and an Equal split, each across a whole Stream Deck + XL strip on Void.", faces: () => STRIP_ROWS.flatMap((r) => stripOf(r.scene)), draw: stripBoard },
 	{ file: `${IMG}/showcase/strip-detail.png`, shows: "The home page tile: Trend, Heat and Meters, each across a whole Stream Deck + strip on Void.", faces: () => PLUS_STRIPS.flatMap((scene) => stripOf(scene, "plus")), draw: plusStrips },
-	{ file: `${IMG}/showcase/deck-backgrounds-detail.png`, shows: "The home page tile: the Dusk deck, small.", faces: () => facesOf(DECKS.dusk), draw: async () => fit(await deckOnce(DECKS.dusk, 1.5), 640, 400) },
-	{ file: `${IMG}/showcase/key-backgrounds-detail.jpg`, shows: "The home page tile: the Cosmic Cliffs deck, small.", faces: () => facesOf(DECKS.cliffs), draw: async () => encoded(".jpg", fit(await deckOnce(DECKS.cliffs, 1.5), 640, 400)) },
+	{ file: `${IMG}/showcase/deck-backgrounds-detail.jpg`, shows: "The home page tile: the Dusk deck on Elgato's device image, small.", faces: () => facesOf(DECKS.dusk), draw: async () => encoded(".jpg", fit(await officialOnce(DECKS.dusk), 640, 573)) },
+	{ file: `${IMG}/showcase/key-backgrounds-detail.jpg`, shows: "The home page tile: the Cosmic Cliffs deck on Elgato's device image, small.", faces: () => facesOf(DECKS.cliffs), draw: async () => encoded(".jpg", fit(await officialOnce(DECKS.cliffs), 640, 573)) },
 	{ file: "marketing/shot-10-strip.png", shows: "Marketplace still: Trend, Lanes, Heat and Meters across a whole strip.", faces: () => SHOT_STRIPS.flatMap((n) => stripOf(rowOf(n).scene)), draw: shotStrip },
-	{ file: "marketing/shot-11-deck-backgrounds.png", shows: "Marketplace still: the Stars, Dusk and Nebula decks side by side.", faces: () => SHOT_DECKS.flatMap((n) => facesOf(DECKS[n])), draw: shotDecks },
-	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the Cosmic Cliffs.", faces: () => facesOf(DECKS.cliffs), draw: shotKeys }
+	{ file: "marketing/shot-11-deck-backgrounds.png", shows: "Marketplace still: the Stars, Dusk and Nebula decks on Elgato's device image, side by side.", faces: () => SHOT_DECKS.flatMap((n) => facesOf(DECKS[n])), draw: shotDecks },
+	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the Cosmic Cliffs, on Elgato's device image.", faces: () => facesOf(DECKS.cliffs), draw: shotKeys }
 ];

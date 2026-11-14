@@ -46,8 +46,8 @@ Paper and unknown categories keep normal text.
 | `shot-5-dials.png` | Generated, not uploaded: Stream Deck + dials | 1920x960 |
 | `shot-9-backgrounds.png` | Dials over touch strip pictures: Stream Deck app captures (1.7.1) | 1920x960 |
 | `shot-10-strip.png` | Strip display: Trend, Lanes, Heat and Meters across a whole strip | 1920x960 |
-| `shot-11-deck-backgrounds.png` | Stars, Dusk and Nebula, each across a whole Stream Deck + XL | 1920x960 |
-| `shot-12-key-backgrounds.png` | Keys on Tint over a page picture | 1920x960 |
+| `shot-11-deck-backgrounds.png` | Stars, Dusk and Nebula, each across a whole Stream Deck + XL (Elgato's device image) | 1920x960 |
+| `shot-12-key-backgrounds.png` | Keys on Tint over a page picture (Elgato's device image) | 1920x960 |
 | `hwinfo-streamdeckxlplus.png` | Photo master: Camera Raw develop of the Sony A7 III capture | source |
 | `hwinfo-streamdeckxlplus-squared.png` | Photo master as the board consumes it; the board's default source | source |
 
@@ -60,12 +60,18 @@ are not size-checked.
 
 Shots 10, 11 and 12 need no HWiNFO: `npx tsx scripts/docs-v18-images.mjs`
 draws them with the 1.8 documentation boards from fixed sample values
-(`scripts/lib/boards-18.ts`). Each key and strip slice is drawn by the
-production composers at its place in Elgato's published layout of the
-Stream Deck + XL display. The picture behind the keys in shot 12 is the
-Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/),
+(`scripts/lib/boards-18.ts`). Shots 11 and 12 show whole decks, so they
+put the plugin's faces on Elgato's own front-facing image of the Stream
+Deck + XL ("SD + XL (Product Shot) 01" from the Stream Deck + XL press
+kit in the Elgato Media Room): Elgato asks that its hardware be shown
+with its official resources. That file is Elgato's and is not in this
+repository; put it in `release/official-elgato/press-kit/` or name its
+folder in `ELGATO_PRESS_KIT` before running the script. The picture
+behind the keys in shot 12 is the Cosmic Cliffs
+([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/),
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped), from
-`docs/assets/img/showcase/pictures/`; the still's footnote carries the credit.
+`docs/assets/img/showcase/pictures/`; each still's footnote carries its
+credits.
 
 Shots 1, 3, 5, 6, 7, 8 and the thumbnail render straight from the renderers
 with live HWiNFO running. Shot 8 shows the GPU's fans, so render it with the

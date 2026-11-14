@@ -6,9 +6,9 @@ description: Join Sensor Dials into one graph across the touch strip, or two gra
 
 A **strip display** joins the Sensor Dials of a Stream Deck + or + XL into one graph across the touch strip. Each dial keeps its own reading and settings for when it leaves the strip.
 
-<a class="image-link" data-image-viewer href="{{ '/assets/img/deck-plus-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/deck-plus-1.8.png' | relative_url }}" width="1600" height="960" loading="lazy" decoding="async" alt="A Stream Deck + with eight Sensor Reading keys and, across the whole touch strip under them, one Trend graph of CPU and GPU temperature over five minutes: both lines rise during a load and fall back. Keys and strip are on Tint over a blue to violet to orange gradient."></a>
+<a class="image-link" data-image-viewer href="{{ '/assets/img/deck-dusk-1.8.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Device image: Elgato."><img src="{{ '/assets/img/deck-dusk-1.8.jpg' | relative_url }}" width="1600" height="1432" loading="lazy" decoding="async" alt="A Stream Deck + XL, front on, with 36 Sensor Reading keys and, across the whole touch strip under them, one Trend graph of CPU and GPU temperature over five minutes: both lines rise during a load and fall back. Keys and strip draw the Dusk background."></a>
 
-*Production-rendered fixed sample data, not a device capture: a **Trend** across the four dials of a Stream Deck +, with every key and the strip on **Tint** over a gradient drawn for the picture.*
+*Production-rendered fixed sample data on Elgato's device image, not a device capture: a **Trend** across the six dials of a Stream Deck + XL, on the Ultraviolet theme with Background **Dusk**. Device image: Elgato.*
 
 > **New in 1.8.** A whole strip has run on my Stream Deck + XL since 2026-10-25. An equal split and the Stream Deck + have run on simulated decks only. [Hardware](hardware.md) says what is still unmeasured.
 

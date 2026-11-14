@@ -191,11 +191,11 @@ body.docs-site .search-results { left: 0; top: 54px; width: min(760px, calc(100v
 .main-content .button-secondary:hover { background: var(--surface-raised); }
 .main-content .home-requirements { color: var(--muted); font-size: var(--font-small); line-height: 1.8; margin: 0; }
 .home-requirements strong { color: var(--copy); font-weight: 600; }
-.main-content .hero-gallery { margin: 28px 0 48px; width: 100%; max-width: var(--table-measure); min-width: 0; }
+.main-content .hero-gallery { margin: 28px 0 48px; width: 100%; max-width: min(var(--table-measure), 760px); min-width: 0; }
 .hero-gallery .gallery-slides { min-width: 0; }
 .main-content .hero-gallery figure { margin: 0; }
 .hero-gallery .image-link { width: 100%; border-radius: var(--radius); overflow: hidden; background: #2d2d2d; }
-.hero-gallery img { width: 100%; height: auto; aspect-ratio: 8 / 5; border-radius: 0; }
+.hero-gallery img { width: 100%; height: auto; aspect-ratio: 1600 / 1432; border-radius: 0; }
 .hero-gallery figcaption { min-height: 3.2em; }
 .gallery-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 10px; }
 .main-content .gallery-position { margin: 0; color: var(--muted); font-size: var(--font-small); line-height: 1.5; font-variant-numeric: tabular-nums; }

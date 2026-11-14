@@ -29,7 +29,6 @@ jobs:
     env:
       PI_SUITE: e2e:${{ matrix.suite }}
       PI_EVIDENCE_DIR: qa-evidence/${{ matrix.suite }}
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/hwinfo-pi-browsers
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -38,7 +37,11 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install the lockfile's Chromium
-        run: node node_modules/playwright/cli.js install chromium
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $env:RUNNER_TEMP 'hwinfo-pi-browsers'
+          "PLAYWRIGHT_BROWSERS_PATH=$env:PLAYWRIGHT_BROWSERS_PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          node node_modules/playwright/cli.js install chromium
       - name: Prepare Chromium sandbox access and record source identity
         shell: pwsh
         run: |

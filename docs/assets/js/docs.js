@@ -138,8 +138,8 @@
 		const galleries = new WeakMap();
 		function updateViewerHelp() {
 			viewerHelp.textContent = stage.classList.contains("is-full")
-				? "Scroll or use arrow keys in the image to pan. Escape closes."
-				: `${group.length > 1 ? "Use Left and Right to browse. " : ""}Actual size shows the original pixels. Escape closes.`;
+				? "Scroll or use arrow keys in the image to pan. Click the picture or press Escape to close."
+				: `${group.length > 1 ? "Use Left and Right to browse. " : ""}Actual size shows the original pixels. Click the picture or press Escape to close.`;
 		}
 		function setFull(full) {
 			stage.classList.toggle("is-full", full);
@@ -279,6 +279,20 @@
 				if (event.target !== viewer) return;
 				const rect = viewer.getBoundingClientRect();
 				if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeViewer();
+			});
+			// A click on the picture, or on the stage around it, closes the viewer.
+			// The dialog fills the window, so the stage is the dark area a reader
+			// clicks to dismiss, and the click has no other job: Actual size has its
+			// own button and panning is by scroll. A press that moved (a drag), a
+			// modified click and a click on a scrollbar do nothing.
+			let pressX = 0, pressY = 0;
+			stage.addEventListener("pointerdown", (event) => { pressX = event.clientX; pressY = event.clientY; });
+			stage.addEventListener("click", (event) => {
+				if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+				if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > 4) return;
+				const box = stage.getBoundingClientRect();
+				if (event.clientX >= box.left + stage.clientLeft + stage.clientWidth || event.clientY >= box.top + stage.clientTop + stage.clientHeight) return;
+				closeViewer();
 			});
 		}
 		function openViewer(link, trigger = link) {

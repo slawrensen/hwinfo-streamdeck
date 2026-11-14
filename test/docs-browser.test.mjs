@@ -4,6 +4,7 @@
 // Run once for each locally built base path, then against the deployed site.
 /* global document, window */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { chromium } from "playwright";
 
@@ -11,6 +12,7 @@ const base = process.env.DOCS_TEST_URL ? new URL(process.env.DOCS_TEST_URL.endsW
 const enabled = Boolean(base);
 const options = { skip: enabled ? false : "UNAVAILABLE: set DOCS_TEST_URL to a real Jekyll build or published site" };
 const isPreview = Boolean(base?.pathname.includes("preview"));
+const packageVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 let browser;
 
 before(async () => {
@@ -205,7 +207,6 @@ for (const viewport of [{ width: 360, height: 800 }, { width: 1280, height: 800 
 				"inline technical names": ".main-content :not(pre) > code",
 				"code examples": ".main-content pre code",
 				"navigation links": "#site-nav .nav-list-link",
-				"image captions": ".main-content > p > em:only-child",
 				"sidebar help": ".site-footer, .site-footer a, .site-footer span"
 			};
 			const samples = Object.entries(roles).map(([role, selector]) => {
@@ -224,6 +225,12 @@ for (const viewport of [{ width: 360, height: 800 }, { width: 1280, height: 800 
 			"essential copy, controls and technical references must not shrink below a readable 14px minimum");
 		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true,
 			"readable reference text must fit the page; wide tables and code scroll within their own regions");
+		// Troubleshooting has no captioned picture; a caption is sampled where one is.
+		await page.goto(siteUrl("sensor-reading.html"));
+		const captions = await page.locator(".main-content > p > em:only-child").evaluateAll(elements => elements
+			.filter(element => element.textContent.trim()).map(element => Number.parseFloat(window.getComputedStyle(element).fontSize)));
+		assert.ok(captions.length > 0, "image captions must be present in the rendered reference");
+		assert.ok(Math.min(...captions) >= 14, "an image caption must not shrink below a readable 14px minimum");
 	});
 }
 
@@ -238,7 +245,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 			assert.ok(box && box.y >= 0 && box.y + box.height <= viewport.height, `${selector} must be readable before the first viewport ends`);
 		}
 		const primary = page.locator(".home-actions .button-primary");
-		assert.match(await primary.getAttribute("href"), /^https:\/\/github\.com\/slawrensen\/hwinfo-streamdeck\/releases\/download\/v1\.7\.1\/com\.lawrensen\.hwinfo\.streamDeckPlugin$/);
+		assert.equal(await primary.getAttribute("href"), `https://github.com/slawrensen/hwinfo-streamdeck/releases/download/v${packageVersion}/com.lawrensen.hwinfo.streamDeckPlugin`,
+			"the download is the release this checkout's package.json names");
 		assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, "the document must not overflow horizontally");
 		if (base.pathname.includes("preview")) {
 			assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
@@ -682,6 +690,47 @@ test("image viewer contains Shift+Tab from Actual size and restores its opener",
 	assert.equal(await opener.evaluate(element => element === document.activeElement), true);
 });
 
+test("a click on the enlarged picture or the stage around it closes the viewer, and a drag does not", options, async t => {
+	const page = await pageFor(t);
+	await page.goto(siteUrl());
+	const opener = page.locator("[data-gallery-slide]:not([hidden]) .image-link[data-image-viewer]");
+	const dialog = page.locator("dialog.image-viewer");
+	const stage = dialog.locator(".viewer-stage");
+	const centre = async () => {
+		const box = await stage.boundingBox();
+		return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
+	};
+	await opener.click();
+	await viewerGeometry(page);
+	assert.equal(await stage.evaluate(element => window.getComputedStyle(element).cursor), "zoom-out", "the pointer says a click leaves the enlarged view");
+	let at = await centre();
+	await page.mouse.click(at.x, at.y);
+	await dialog.waitFor({ state: "hidden" });
+	assert.equal(await opener.evaluate(element => element === document.activeElement), true, "a click on the picture returns focus to the image link");
+	await opener.click();
+	await viewerGeometry(page);
+	at = await centre();
+	await page.mouse.click(at.box.x + 4, at.box.y + 4);
+	await dialog.waitFor({ state: "hidden" });
+	await opener.click();
+	await viewerGeometry(page);
+	at = await centre();
+	await page.mouse.move(at.x, at.y);
+	await page.mouse.down();
+	await page.mouse.move(at.x + 60, at.y + 30, { steps: 6 });
+	await page.mouse.up();
+	assert.equal(await dialog.isVisible(), true, "a press that moves across the picture leaves the viewer open");
+	await page.keyboard.down("Control");
+	await page.mouse.click(at.x, at.y);
+	await page.keyboard.up("Control");
+	assert.equal(await dialog.isVisible(), true, "a modified click leaves the viewer open");
+	await dialog.getByRole("button", { name: "Actual size", exact: true }).click();
+	await viewerGeometry(page);
+	await page.mouse.click(at.x, at.y);
+	await dialog.waitFor({ state: "hidden" });
+	assert.equal(await page.evaluate(() => document.body.style.overflow), "", "the page scrolls again after a click closes Actual size");
+});
+
 test("an open image viewer blocks background navigation", options, async t => {
 	const page = await pageFor(t);
 	await page.goto(siteUrl());
@@ -769,8 +818,8 @@ test("gallery preserves its decoded frame during a slow replacement and ignores 
 	const sources = await slides.locator("a[data-image-viewer]").evaluateAll(links => links.map(link => link.href));
 	await waitForGalleryImage(page, sources[0]);
 	const firstCaption = await slides.nth(0).locator("figcaption").innerText();
-	const delayedSource = slides.nth(1).locator("source").first();
-	const delayed = new URL(await delayedSource.getAttribute("srcset"), base);
+	const delayedImage = slides.nth(1).locator("img");
+	const delayed = new URL(await delayedImage.getAttribute("src"), base);
 	delayed.searchParams.set("gallery-test", "slow-image");
 	let release, requested;
 	const gate = new Promise(resolve => { release = resolve; });
@@ -781,7 +830,7 @@ test("gallery preserves its decoded frame during a slow replacement and ignores 
 		await gate;
 		await route.continue();
 	});
-	await delayedSource.evaluate((source, href) => { source.srcset = href; }, delayed.href);
+	await delayedImage.evaluate((image, href) => { image.src = href; }, delayed.href);
 	const next = gallery.getByRole("button", { name: "Next look", exact: true });
 	await next.click();
 	await requestSeen;

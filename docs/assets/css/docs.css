@@ -243,7 +243,7 @@ html:not(.docs-js) .hero-gallery figure + figure { margin-top: 28px; }
 .viewer-caption { flex: 1; color: var(--copy); font-size: var(--font-small); line-height: 1.5; margin: 0; max-height: 4.5em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .viewer-toolbar button { flex: none; min-height: 44px; padding: 8px 16px; background: var(--surface-raised); border: 1px solid #485566; border-radius: var(--radius); color: var(--ink); cursor: pointer; font-size: var(--font-ui); font-weight: 600; }
 .viewer-toolbar button:hover { background: #293340; }
-.viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; padding: 24px; overscroll-behavior: contain; }
+.viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; padding: 24px; overscroll-behavior: contain; cursor: zoom-out; }
 /* Auto margins center spare space without making overflowing image edges unreachable. */
 .viewer-stage img { display: block; flex: none; width: auto; height: auto; max-width: none; max-height: none; margin: auto; }
 .viewer-stage.is-fit { overflow: hidden; }

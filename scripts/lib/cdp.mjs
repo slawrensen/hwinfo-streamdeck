@@ -1,7 +1,7 @@
 /**
  * A small Chrome DevTools Protocol client for the property-inspector labs:
  * launches a headless Chromium with its own throwaway profile, attaches to
- * the first page, and exposes the handful of commands the panel suites use
+ * a page created for the suite, and exposes the handful of commands it uses
  * (evaluate, screenshot, viewport, real key and mouse input). Plain CDP over
  * `ws`, the pattern capture-pi.mjs and e2e-pi-persistence.mjs already use,
  * so no browser-automation dependency joins the repo.
@@ -178,10 +178,24 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 	};
 }
 
-/** /json/list can expose a target before the command-line about:blank
- * navigation has committed. Do not let that startup navigation cancel the
- * first fixture. An initial empty document can already say "complete", so
- * require a history entry and a stable committed loader as well. */
+/** Create our page explicitly; the command-line startup page can still have
+ * browser-initiated navigation queued even when its current document is ready.
+ * A failed creation is fatal, not retried with some other page from /json/list. */
+export async function createPageTarget(debuggerOrigin, timeoutMs = 5000) {
+	const response = await fetch(`${debuggerOrigin}/json/new?about:blank`, { method: "PUT", signal: AbortSignal.timeout(timeoutMs) });
+	if (!response.ok) throw new Error(`chromium page creation failed: HTTP ${response.status}`);
+	const target = await response.json();
+	if (target?.type !== "page" || typeof target.id !== "string" || target.id === "" || typeof target.webSocketDebuggerUrl !== "string") {
+		throw new Error("chromium page creation returned no page target");
+	}
+	const expectedSocket = new URL(`/devtools/page/${encodeURIComponent(target.id)}`, debuggerOrigin);
+	expectedSocket.protocol = "ws:";
+	if (target.webSocketDebuggerUrl !== expectedSocket.href) throw new Error("chromium page creation returned a socket for a different target or browser");
+	return target;
+}
+
+/** An initial empty document can already say "complete", so require a
+ * history entry and a stable committed loader before driving our page. */
 export async function waitForInitialDocument(client, timeoutMs = 10_000) {
 	const deadline = performance.now() + timeoutMs;
 	let last = null;
@@ -245,24 +259,26 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 	// profile, so the debugger found is always this browser (external review
 	// AX40). Another browser on a fixed port, or a stale run, can never be
 	// driven or reported as evidence.
-	let target = null;
+	let debuggerOrigin = null;
+	let target;
 	let transport;
 	try {
 		const deadline = performance.now() + 15_000;
-		while (target === null && performance.now() < deadline) {
+		while (debuggerOrigin === null && performance.now() < deadline) {
 			if (launchError !== null) throw launchError;
 			if ((proc.exitCode !== null && proc.exitCode !== 0) || proc.signalCode !== null) throw new Error(`chromium exited before its debugger was ready (${proc.exitCode ?? proc.signalCode})`);
 			try {
 				const remaining = Math.max(1, Math.ceil(deadline - performance.now()));
-				const response = await fetch(`http://127.0.0.1:${browserDebuggerPort(profile)}/json/list`, { signal: AbortSignal.timeout(Math.min(1000, remaining)) });
-				const list = await response.json();
-				target = list.find((t) => t.type === "page") ?? null;
+				const origin = `http://127.0.0.1:${browserDebuggerPort(profile)}`;
+				const response = await fetch(`${origin}/json/version`, { signal: AbortSignal.timeout(Math.min(1000, remaining)) });
+				if (response.ok && typeof (await response.json()).webSocketDebuggerUrl === "string") debuggerOrigin = origin;
 			} catch {
 				/* debugger not up yet; each request has its own deadline */
 			}
-			if (target === null) await sleep(250);
+			if (debuggerOrigin === null) await sleep(250);
 		}
-		if (target === null) throw new Error("chromium debugger never came up within 15000 ms");
+		if (debuggerOrigin === null) throw new Error("chromium debugger never came up within 15000 ms");
+		target = await createPageTarget(debuggerOrigin, connectTimeoutMs);
 		transport = await connectCdp(target.webSocketDebuggerUrl, { connectTimeoutMs, commandTimeoutMs, navigationTimeoutMs });
 	} catch (error) {
 		await stopBrowser(); // a launch that fails never leaves its browser behind
@@ -273,7 +289,28 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 	const client = {
 		send,
 		on,
-		goto,
+		async goto(targetUrl) {
+			try {
+				await goto(targetUrl);
+			} catch (error) {
+				// Evidence only: failed diagnostics cannot change the original verdict.
+				try {
+					const [frame, history] = await Promise.allSettled([send("Page.getFrameTree"), send("Page.getNavigationHistory")]);
+					const current = frame.status === "fulfilled" ? frame.value?.frameTree?.frame : null;
+					const entries = history.status === "fulfilled" ? history.value?.entries : null;
+					console.error("CDP navigation failure state:", JSON.stringify({
+						targetId: target.id, requestedUrl: targetUrl,
+						frame: current && { id: current.id, url: current.url, loaderId: current.loaderId },
+						history: entries?.slice(-3).map(({ id, url, transitionType }) => ({ id, url, transitionType })),
+						frameError: frame.status === "rejected" ? frame.reason.message : undefined,
+						historyError: history.status === "rejected" ? history.reason.message : undefined
+					}));
+				} catch {
+					/* Preserve the original navigation error even if evidence cannot be read. */
+				}
+				throw error;
+			}
+		},
 		async viewport(w, h, s = 1) {
 			await send("Emulation.setDeviceMetricsOverride", { width: Math.round(w), height: Math.round(h), deviceScaleFactor: s, mobile: false });
 		},

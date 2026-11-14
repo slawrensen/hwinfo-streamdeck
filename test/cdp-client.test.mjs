@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { test } from "node:test";
 import { WebSocketServer } from "ws";
-import { connectCdp, waitForInitialDocument } from "../scripts/lib/cdp.mjs";
+import { connectCdp, createPageTarget, waitForInitialDocument } from "../scripts/lib/cdp.mjs";
 
 async function peer(t, handler, options = {}) {
 	const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -161,6 +161,69 @@ test("same-document navigation completes without waiting for an event that canno
 test("a download is not accepted as a loaded page", { timeout: 5000 }, async (t) => {
 	const client = await peer(t, (socket, message) => socket.send(JSON.stringify({ id: message.id, result: { frameId: "main", isDownload: true } })));
 	await assert.rejects(client.goto("http://127.0.0.1/file"), /download instead of a page/);
+});
+
+test("page creation attaches the returned target, never the preexisting startup page", { timeout: 5000 }, async (t) => {
+	const requests = [];
+	const attached = [];
+	let origin;
+	const target = (id) => ({ type: "page", id, webSocketDebuggerUrl: `${origin.replace("http:", "ws:")}/devtools/page/${id}` });
+	const server = createServer((request, response) => {
+		requests.push({ method: request.method, url: request.url });
+		response.setHeader("content-type", "application/json");
+		if (request.method === "PUT" && request.url === "/json/new?about:blank") response.end(JSON.stringify(target("owned")));
+		else if (request.url === "/json/list") response.end(JSON.stringify([target("startup"), target("owned")]));
+		else { response.writeHead(404); response.end(); }
+	});
+	const sockets = new WebSocketServer({ server });
+	let client;
+	sockets.on("connection", (socket, request) => {
+		attached.push(request.url);
+		socket.on("message", (bytes) => socket.send(JSON.stringify({ id: JSON.parse(bytes.toString()).id, result: { target: request.url } })));
+	});
+	t.after(async () => {
+		client?.close();
+		for (const socket of sockets.clients) socket.terminate();
+		await new Promise((resolve) => sockets.close(resolve));
+		server.closeAllConnections();
+		await new Promise((resolve) => server.close(resolve));
+	});
+	server.listen(0, "127.0.0.1");
+	await once(server, "listening");
+	origin = `http://127.0.0.1:${server.address().port}`;
+	const created = await createPageTarget(origin);
+	client = await connectCdp(created.webSocketDebuggerUrl);
+	assert.deepEqual(await client.send("Runtime.identify"), { target: "/devtools/page/owned" });
+	assert.deepEqual(requests, [{ method: "PUT", url: "/json/new?about:blank" }]);
+	assert.deepEqual(attached, ["/devtools/page/owned"]);
+});
+
+test("page creation refuses a socket that names a different target", { timeout: 5000 }, async (t) => {
+	const server = createServer((_request, response) => response.end(JSON.stringify({
+		type: "page", id: "owned", webSocketDebuggerUrl: `ws://127.0.0.1:${server.address().port}/devtools/page/startup`
+	})));
+	t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+	server.listen(0, "127.0.0.1");
+	await once(server, "listening");
+	await assert.rejects(createPageTarget(`http://127.0.0.1:${server.address().port}`), /socket for a different target or browser/);
+});
+
+test("page creation failure is not retried with an unrelated page", { timeout: 5000 }, async (t) => {
+	let requests = 0;
+	const server = createServer((_request, response) => { requests++; response.writeHead(503); response.end(); });
+	t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+	server.listen(0, "127.0.0.1");
+	await once(server, "listening");
+	await assert.rejects(createPageTarget(`http://127.0.0.1:${server.address().port}`), /page creation failed: HTTP 503/);
+	assert.equal(requests, 1);
+});
+
+test("page creation times out a stalled response body", { timeout: 5000 }, async (t) => {
+	const server = createServer((_request, response) => { response.writeHead(200, { "content-type": "application/json" }); response.write('{"type":'); });
+	t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); });
+	server.listen(0, "127.0.0.1");
+	await once(server, "listening");
+	await assert.rejects(createPageTarget(`http://127.0.0.1:${server.address().port}`, 60), (error) => error.name === "AbortError" || error.name === "TimeoutError");
 });
 
 test("startup waits for a committed blank page, not an already-complete initial placeholder", { timeout: 5000 }, async (t) => {

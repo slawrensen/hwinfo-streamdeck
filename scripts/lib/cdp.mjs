@@ -133,6 +133,8 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 			});
 			const responseDetail = (response) => response && ({ url: response.url, status: response.status, mimeType: response.mimeType, headers: response.headers });
 			const traceOff = [
+				traceEvent("Inspector.targetCrashed"),
+				traceEvent("Inspector.detached"),
 				traceEvent("Page.frameStartedNavigating"),
 				traceEvent("Page.frameRequestedNavigation"),
 				traceEvent("Page.frameNavigated", ({ frame }) => ({ id: frame.id, parentId: frame.parentId, url: frame.url, loaderId: frame.loaderId, mimeType: frame.mimeType, unreachableUrl: frame.unreachableUrl })),
@@ -246,7 +248,10 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 	const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--hide-scrollbars", "--font-render-hinting=none", "about:blank"];
 	if (process.platform === "linux" && process.getuid?.() === 0) args.unshift("--no-sandbox");
 	const startedAt = new Date().toISOString();
-	const proc = spawn(executable, args, { stdio: "ignore" });
+	const proc = spawn(executable, args, { stdio: ["ignore", "ignore", "pipe"] });
+	let browserStderr = "";
+	proc.stderr.setEncoding("utf8");
+	proc.stderr.on("data", (chunk) => { browserStderr = (browserStderr + chunk).slice(-16_384); });
 	let launchError = null;
 	proc.once("error", (error) => { launchError = error; });
 	let stopPromise;
@@ -307,6 +312,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 		transport = await connectCdp(target.webSocketDebuggerUrl, { connectTimeoutMs, commandTimeoutMs, navigationTimeoutMs });
 	} catch (error) {
 		await stopBrowser(); // a launch that fails never leaves its browser behind
+		if (browserStderr) console.error("Chromium launch stderr:", browserStderr);
 		throw error;
 	}
 	const { send, on, goto } = transport;
@@ -325,6 +331,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 					const entries = history.status === "fulfilled" ? history.value?.entries : null;
 					console.error("CDP navigation failure state:", JSON.stringify({
 						targetId: target.id, requestedUrl: targetUrl,
+						browserStderr,
 						navigation: error.cdpNavigation,
 						frame: current && { id: current.id, url: current.url, loaderId: current.loaderId },
 						history: entries?.slice(-3).map(({ id, url, transitionType }) => ({ id, url, transitionType })),
@@ -426,6 +433,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 		await client.viewport(width, height, scale);
 	} catch (error) {
 		await client.close();
+		if (browserStderr) console.error("Chromium initialization stderr:", browserStderr);
 		throw error;
 	}
 	return client;

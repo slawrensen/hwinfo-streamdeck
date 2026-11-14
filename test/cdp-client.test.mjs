@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { test } from "node:test";
 import { WebSocketServer } from "ws";
-import { connectCdp } from "../scripts/lib/cdp.mjs";
+import { connectCdp, waitForInitialDocument } from "../scripts/lib/cdp.mjs";
 
 async function peer(t, handler, options = {}) {
 	const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
@@ -161,4 +161,45 @@ test("same-document navigation completes without waiting for an event that canno
 test("a download is not accepted as a loaded page", { timeout: 5000 }, async (t) => {
 	const client = await peer(t, (socket, message) => socket.send(JSON.stringify({ id: message.id, result: { frameId: "main", isDownload: true } })));
 	await assert.rejects(client.goto("http://127.0.0.1/file"), /download instead of a page/);
+});
+
+test("startup waits for a committed blank page, not an already-complete initial placeholder", { timeout: 5000 }, async (t) => {
+	let histories = 0;
+	let evaluatedBeforeCommit = false;
+	const client = await peer(t, (socket, message) => {
+		let result;
+		if (message.method === "Page.getNavigationHistory") {
+			result = ++histories === 1 ? { currentIndex: -1, entries: [] } : { currentIndex: 0, entries: [{ url: "about:blank" }] };
+		} else if (message.method === "Page.getFrameTree") {
+			result = { frameTree: { frame: { id: "main", url: "about:blank", loaderId: histories === 1 ? "placeholder" : "committed" } } };
+		} else if (message.method === "Runtime.evaluate") {
+			evaluatedBeforeCommit ||= histories === 1;
+			result = { result: { value: { ready: "complete", url: "about:blank" } } };
+		}
+		socket.send(JSON.stringify({ id: message.id, result }));
+	});
+	await waitForInitialDocument(client, 500);
+	assert.equal(histories, 2);
+	assert.equal(evaluatedBeforeCommit, false);
+});
+
+test("startup rechecks when the document loader changes during its readiness check", { timeout: 5000 }, async (t) => {
+	let frames = 0;
+	const client = await peer(t, (socket, message) => {
+		let result;
+		if (message.method === "Page.getNavigationHistory") result = { currentIndex: 0, entries: [{ url: "about:blank" }] };
+		else if (message.method === "Page.getFrameTree") result = { frameTree: { frame: { id: "main", url: "about:blank", loaderId: ++frames === 1 ? "old" : "settled" } } };
+		else if (message.method === "Runtime.evaluate") result = { result: { value: { ready: "complete", url: "about:blank" } } };
+		socket.send(JSON.stringify({ id: message.id, result }));
+	});
+	await waitForInitialDocument(client, 500);
+	assert.equal(frames, 4);
+});
+
+test("startup fails instead of navigating a fixture when no initial page commits", { timeout: 5000 }, async (t) => {
+	const client = await peer(t, (socket, message) => {
+		const result = message.method === "Page.getNavigationHistory" ? { currentIndex: -1, entries: [] } : { frameTree: { frame: { id: "main", url: "about:blank", loaderId: "placeholder" } } };
+		socket.send(JSON.stringify({ id: message.id, result }));
+	});
+	await assert.rejects(waitForInitialDocument(client, 60), /initial about:blank did not settle within 60 ms/);
 });

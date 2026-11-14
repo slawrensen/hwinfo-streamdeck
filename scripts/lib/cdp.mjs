@@ -178,6 +178,28 @@ export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutM
 	};
 }
 
+/** /json/list can expose a target before the command-line about:blank
+ * navigation has committed. Do not let that startup navigation cancel the
+ * first fixture. An initial empty document can already say "complete", so
+ * require a history entry and a stable committed loader as well. */
+export async function waitForInitialDocument(client, timeoutMs = 10_000) {
+	const deadline = performance.now() + timeoutMs;
+	let last = null;
+	while (performance.now() < deadline) {
+		const history = await client.send("Page.getNavigationHistory");
+		const before = (await client.send("Page.getFrameTree")).frameTree?.frame;
+		last = { entry: history.entries?.[history.currentIndex]?.url, frame: before?.url, loaderId: before?.loaderId };
+		if (last.entry === "about:blank" && last.frame === "about:blank" && typeof before.loaderId === "string" && before.loaderId !== "") {
+			const document = await client.send("Runtime.evaluate", { expression: '({ ready: document.readyState, url: location.href })', returnByValue: true });
+			if (document.exceptionDetails) throw new Error(`chromium initial document failed: ${document.exceptionDetails.text}`);
+			const after = (await client.send("Page.getFrameTree")).frameTree?.frame;
+			if (document.result?.value?.ready === "complete" && document.result.value.url === "about:blank" && after?.id === before.id && after?.loaderId === before.loaderId) return;
+		}
+		await sleep(25);
+	}
+	throw new Error(`chromium initial about:blank did not settle within ${timeoutMs} ms (${JSON.stringify(last)})`);
+}
+
 /** Launches Chromium on a free port and resolves a connected client. */
 export async function launch({ width = 400, height = 900, scale = 1, connectTimeoutMs = 5000, commandTimeoutMs = 10_000, navigationTimeoutMs = 10_000 } = {}) {
 	const executable = chromePath();
@@ -330,6 +352,7 @@ export async function launch({ width = 400, height = 900, scale = 1, connectTime
 		await send("Page.enable");
 		await send("Page.setLifecycleEventsEnabled", { enabled: true });
 		await send("Runtime.enable");
+		await waitForInitialDocument(transport);
 		// A property inspector the person is using is a focused page. Headless
 		// Chromium on Windows is not, and there a scripted focus() moves
 		// activeElement without firing focus events, so a combobox that opens

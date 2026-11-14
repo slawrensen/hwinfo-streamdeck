@@ -1,7 +1,8 @@
 # Static, unit, native and built-plugin recovery verification on every
 # push/PR. Recovery uses an isolated synthetic producer and mock Stream Deck
-# socket on the hosted runner. The full browser/capture suite remains local
-# (`npm run suite:full`); neither harness proves physical device behavior.
+# socket on the hosted runner. pi-browser.yml separately exercises six
+# simulated-host panel suites. The full capture/hardware sequence remains
+# local (`npm run suite:full`); neither CI workflow proves physical devices.
 #
 # The runner label is pinned (not windows-latest) so a wholesale image family
 # change is a reviewed diff here. That is all the pin buys: the MSVC toolset

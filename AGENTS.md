@@ -65,8 +65,9 @@ Gate map (what runs where, and against which bytes):
 | `e2e:resilience` on the checkout | CI `verify` and locally | `bin/` of that checkout | automatic |
 | pack + archive contract + extraction, ABI and `e2e:resilience` on the extracted bytes | CI `verify` and locally | the archive that run packed | automatic (`qualify.mjs --stages pack,archive,abi,recovery,tree`); the CI pack and record are retained as the `ci-pack-qualification` artifact |
 | ABI matrix (Node 20, 22, 24) | CI `abi-matrix` | the CI-built addons, unchanged | automatic |
+| panel interactions, alerts, strip editor, localization and help | CI `pi-browser`, six isolated Windows jobs | source panels in lockfile-selected Chromium, sample data and simulated host | automatic; retains environment, result and console evidence, never attests to a physical device |
 | copy validator, `streamdeck validate`, the whole sequence with a record | local only (`npm run release:validate`) | the local build and its archive | explicit; ordinary CI does not attest to it |
-| `npm run suite:full` (browser and capture suites, process hygiene) | local only | `bin/` of the checkout | explicit; ordinary CI does not attest to it |
+| `npm run suite:full` (complete browser and capture sequence, process hygiene) | local only | `bin/` of the checkout | explicit; the CI panel subset does not attest to the complete sequence |
 | installation through the Stream Deck app, hardware soak | a physical deck | the installed package | by hand; the runbook and PERF.md record the result |
 
 The CI-built addon and a locally built one carry the same source identity

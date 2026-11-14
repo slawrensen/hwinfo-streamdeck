@@ -32,24 +32,179 @@ export function chromePath() {
 	throw new Error("No Chromium found: set CHROME to a Chrome or Chromium binary.");
 }
 
+/** The bounded CDP connection, also used by the loopback fault tests. */
+export async function connectCdp(url, { connectTimeoutMs = 5000, commandTimeoutMs = 10_000, navigationTimeoutMs = 10_000 } = {}) {
+	for (const [name, value] of Object.entries({ connectTimeoutMs, commandTimeoutMs, navigationTimeoutMs })) {
+		if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`);
+	}
+	const ws = new WebSocket(url, { maxPayload: 256 * 1024 * 1024 });
+	let seq = 0;
+	let failure = null;
+	const pending = new Map();
+	const listeners = new Map();
+	const failureWaiters = new Set();
+	const fail = (error) => {
+		if (failure !== null) return;
+		failure = error;
+		for (const request of pending.values()) request.finish(error);
+		for (const reject of failureWaiters) reject(error);
+		failureWaiters.clear();
+	};
+	ws.on("error", (error) => fail(new Error(`CDP socket error: ${error.message}`, { cause: error })));
+	ws.on("close", (code) => fail(new Error(`CDP socket closed (${code})`)));
+	ws.on("message", (data) => {
+		let msg;
+		try {
+			msg = JSON.parse(data.toString());
+			if (msg === null || typeof msg !== "object") throw new Error("expected an object");
+		} catch (error) {
+			fail(new Error(`Invalid CDP response: ${error.message}`, { cause: error }));
+			ws.terminate();
+			return;
+		}
+		if (msg.id !== undefined && pending.has(msg.id)) {
+			const request = pending.get(msg.id);
+			request.finish(msg.error ? new Error(`${request.method}: ${msg.error.message}`) : null, msg.result);
+		} else if (msg.method !== undefined) {
+			for (const fn of listeners.get(msg.method) ?? []) fn(msg.params);
+		}
+	});
+	try {
+		await new Promise((resolve, reject) => {
+			const opened = () => { cleanup(); resolve(); };
+			const rejected = (error) => { cleanup(); reject(error); };
+			const timer = setTimeout(() => fail(new Error(`CDP connect timed out after ${connectTimeoutMs} ms`)), connectTimeoutMs);
+			const cleanup = () => {
+				clearTimeout(timer);
+				ws.off("open", opened);
+				failureWaiters.delete(rejected);
+			};
+			failureWaiters.add(rejected);
+			ws.once("open", opened);
+		});
+	} catch (error) {
+		ws.terminate();
+		throw error;
+	}
+	const send = (method, params = {}) => new Promise((resolve, reject) => {
+		if (failure !== null) return reject(failure);
+		if (ws.readyState !== WebSocket.OPEN) return reject(new Error("CDP socket is not open"));
+		const id = ++seq;
+		const finish = (error, result) => {
+			if (!pending.delete(id)) return;
+			clearTimeout(timer);
+			if (error) reject(error);
+			else resolve(result);
+		};
+		const timer = setTimeout(() => finish(new Error(`${method}: CDP command timed out after ${commandTimeoutMs} ms`)), commandTimeoutMs);
+		pending.set(id, { method, finish });
+		try {
+			ws.send(JSON.stringify({ id, method, params }), (error) => {
+				if (error) fail(new Error(`CDP send failed: ${error.message}`, { cause: error }));
+			});
+		} catch (error) {
+			finish(error);
+		}
+	});
+	const on = (method, fn) => {
+		const list = listeners.get(method) ?? [];
+		list.push(fn);
+		listeners.set(method, list);
+		return () => {
+			const at = list.indexOf(fn);
+			if (at >= 0) list.splice(at, 1);
+			if (list.length === 0) listeners.delete(method);
+		};
+	};
+	return {
+		send,
+		on,
+		async goto(targetUrl) {
+			if (failure !== null) throw failure;
+			let off;
+			let timer;
+			let rejectLoad;
+			let resolveLoad;
+			let expectedLoad = null;
+			const earlyLoads = new Set();
+			const loaded = new Promise((resolve, reject) => {
+				resolveLoad = resolve;
+				rejectLoad = reject;
+				failureWaiters.add(reject);
+				// A timed-out previous page may finish while this one navigates.
+				// Only this navigation's frame and loader can prove it loaded.
+				// Fast pages can report load before Page.navigate replies.
+				off = on("Page.lifecycleEvent", (event) => {
+					if (event?.name !== "load" || typeof event.frameId !== "string" || typeof event.loaderId !== "string") return;
+					const key = JSON.stringify([event.frameId, event.loaderId]);
+					if (expectedLoad !== null) {
+						if (key === expectedLoad) resolve();
+					} else {
+						if (!earlyLoads.has(key) && earlyLoads.size >= 64) {
+							reject(new Error("Page.navigate: too many load events before its reply"));
+							return;
+						}
+						earlyLoads.add(key);
+					}
+				});
+				timer = setTimeout(() => reject(new Error(`Page.navigate: load timed out after ${navigationTimeoutMs} ms (${targetUrl})`)), navigationTimeoutMs);
+			});
+			try {
+				// Attach both rejection handlers before either operation can fail.
+				await Promise.all([loaded, send("Page.navigate", { url: targetUrl }).then((result) => {
+					if (!result || typeof result.frameId !== "string") throw new Error("Page.navigate: response has no frameId");
+					if (result.errorText) throw new Error(`Page.navigate: ${result.errorText} (${targetUrl})`);
+					if (result.isDownload) throw new Error(`Page.navigate: download instead of a page (${targetUrl})`);
+					// Same-document navigations have no loader and emit no load event.
+					if (!result.loaderId) resolveLoad();
+					else {
+						expectedLoad = JSON.stringify([result.frameId, result.loaderId]);
+						if (earlyLoads.has(expectedLoad)) resolveLoad();
+					}
+					earlyLoads.clear();
+				})]);
+			} finally {
+				off();
+				clearTimeout(timer);
+				earlyLoads.clear();
+				failureWaiters.delete(rejectLoad);
+			}
+		},
+		close() {
+			fail(new Error("CDP connection closed by client"));
+			listeners.clear();
+			ws.terminate();
+		}
+	};
+}
+
 /** Launches Chromium on a free port and resolves a connected client. */
-export async function launch({ width = 400, height = 900, scale = 1 } = {}) {
+export async function launch({ width = 400, height = 900, scale = 1, connectTimeoutMs = 5000, commandTimeoutMs = 10_000, navigationTimeoutMs = 10_000 } = {}) {
+	const executable = chromePath();
 	const profile = mkdtempSync(path.join(os.tmpdir(), "hw-pi-lab-"));
 	const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--hide-scrollbars", "--font-render-hinting=none", "about:blank"];
 	if (process.platform === "linux" && process.getuid?.() === 0) args.unshift("--no-sandbox");
 	const startedAt = new Date().toISOString();
-	const proc = spawn(chromePath(), args, { stdio: "ignore" });
+	const proc = spawn(executable, args, { stdio: "ignore" });
+	let launchError = null;
+	proc.once("error", (error) => { launchError = error; });
+	let stopPromise;
 	/** Stops this launch's browser and removes its profile. */
-	const stopBrowser = async () => {
+	const stopBrowser = () => stopPromise ??= (async () => {
 		await new Promise((resolve) => {
-			if (proc.exitCode !== null) return resolve();
-			proc.once("exit", resolve);
+			if (!proc.pid || proc.exitCode !== null || proc.signalCode !== null) return resolve();
+			const done = () => {
+				clearTimeout(killTimer);
+				clearTimeout(exitTimer);
+				proc.off("exit", done);
+				resolve();
+			};
+			const killTimer = setTimeout(() => {
+				if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
+			}, 3000);
+			const exitTimer = setTimeout(done, 5000);
+			proc.once("exit", done);
 			proc.kill("SIGTERM");
-			setTimeout(() => {
-				if (proc.exitCode === null) proc.kill("SIGKILL");
-			}, 3000).unref();
-			// A process that cannot be ended never holds the run open.
-			setTimeout(resolve, 5000).unref();
 		});
 		if (process.platform === "win32") {
 			try {
@@ -63,67 +218,40 @@ export async function launch({ width = 400, height = 900, scale = 1 } = {}) {
 		} catch {
 			/* a straggling renderer may still hold a file; the OS temp sweep owns it */
 		}
-	};
+	})();
 	// Port zero: Chromium binds a free port and names it in this launch's own
 	// profile, so the debugger found is always this browser (external review
 	// AX40). Another browser on a fixed port, or a stale run, can never be
 	// driven or reported as evidence.
 	let target = null;
-	for (let i = 0; i < 60 && target === null; i++) {
-		await sleep(250);
-		try {
-			const list = await (await fetch(`http://127.0.0.1:${browserDebuggerPort(profile)}/json/list`)).json();
-			target = list.find((t) => t.type === "page") ?? null;
-		} catch {
-			/* debugger not up yet */
-		}
-	}
-	if (target === null) {
-		await stopBrowser();
-		throw new Error("chromium debugger never came up");
-	}
-	const ws = new WebSocket(target.webSocketDebuggerUrl, { maxPayload: 256 * 1024 * 1024 });
+	let transport;
 	try {
-		await new Promise((resolve, reject) => {
-			ws.once("open", resolve);
-			ws.once("error", reject);
-		});
+		const deadline = performance.now() + 15_000;
+		while (target === null && performance.now() < deadline) {
+			if (launchError !== null) throw launchError;
+			if ((proc.exitCode !== null && proc.exitCode !== 0) || proc.signalCode !== null) throw new Error(`chromium exited before its debugger was ready (${proc.exitCode ?? proc.signalCode})`);
+			try {
+				const remaining = Math.max(1, Math.ceil(deadline - performance.now()));
+				const response = await fetch(`http://127.0.0.1:${browserDebuggerPort(profile)}/json/list`, { signal: AbortSignal.timeout(Math.min(1000, remaining)) });
+				const list = await response.json();
+				target = list.find((t) => t.type === "page") ?? null;
+			} catch {
+				/* debugger not up yet; each request has its own deadline */
+			}
+			if (target === null) await sleep(250);
+		}
+		if (target === null) throw new Error("chromium debugger never came up within 15000 ms");
+		transport = await connectCdp(target.webSocketDebuggerUrl, { connectTimeoutMs, commandTimeoutMs, navigationTimeoutMs });
 	} catch (error) {
 		await stopBrowser(); // a launch that fails never leaves its browser behind
 		throw error;
 	}
-	let seq = 0;
-	const pending = new Map();
-	const listeners = new Map();
-	ws.on("message", (data) => {
-		const msg = JSON.parse(data.toString());
-		if (msg.id !== undefined && pending.has(msg.id)) {
-			pending.get(msg.id)(msg);
-			pending.delete(msg.id);
-		} else if (msg.method !== undefined) {
-			for (const fn of listeners.get(msg.method) ?? []) fn(msg.params);
-		}
-	});
-	const send = (method, params = {}) =>
-		new Promise((resolve, reject) => {
-			const id = ++seq;
-			pending.set(id, (msg) => (msg.error ? reject(new Error(`${method}: ${msg.error.message}`)) : resolve(msg.result)));
-			ws.send(JSON.stringify({ id, method, params }));
-		});
-	/** Subscribes to a CDP event; returns the unsubscribe. */
-	const on = (method, fn) => {
-		const list = listeners.get(method) ?? [];
-		list.push(fn);
-		listeners.set(method, list);
-		return () => {
-			const at = list.indexOf(fn);
-			if (at >= 0) list.splice(at, 1);
-		};
-	};
+	const { send, on, goto } = transport;
 
 	const client = {
 		send,
 		on,
+		goto,
 		async viewport(w, h, s = 1) {
 			await send("Emulation.setDeviceMetricsOverride", { width: Math.round(w), height: Math.round(h), deviceScaleFactor: s, mobile: false });
 		},
@@ -134,22 +262,6 @@ export async function launch({ width = 400, height = 900, scale = 1 } = {}) {
 				throw new Error(`evaluate threw: ${res.exceptionDetails.exception?.description ?? res.exceptionDetails.text}`);
 			}
 			return res.result?.value;
-		},
-		async goto(url) {
-			// Each navigation drops its listener and deadline once settled, so
-			// neither accumulates across a suite's hundreds of navigations.
-			let off = () => {};
-			let deadline;
-			const loaded = new Promise((resolve) => {
-				off = on("Page.loadEventFired", resolve);
-			});
-			try {
-				await send("Page.navigate", { url });
-				await Promise.race([loaded, new Promise((resolve) => (deadline = setTimeout(resolve, 10000)))]);
-			} finally {
-				off();
-				clearTimeout(deadline);
-			}
 		},
 		/** PNG of the page; `full` captures the whole scroll height. */
 		async screenshot({ full = true } = {}) {
@@ -209,17 +321,14 @@ export async function launch({ width = 400, height = 900, scale = 1 } = {}) {
 			await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y });
 		},
 		async close() {
-			try {
-				ws.close();
-			} catch {
-				/* already closed */
-			}
+			transport.close();
 			await stopBrowser();
 		},
 		pid: proc.pid
 	};
 	try {
 		await send("Page.enable");
+		await send("Page.setLifecycleEventsEnabled", { enabled: true });
 		await send("Runtime.enable");
 		// A property inspector the person is using is a focused page. Headless
 		// Chromium on Windows is not, and there a scripted focus() moves

@@ -1,0 +1,111 @@
+# The real shipped panels in Chromium against the existing simulated host.
+# These checks exercise UI outcomes and settings writes, not the Stream Deck
+# app, installed package, physical keys/dials, or HWiNFO hardware readings.
+name: pi-browser
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi-browser-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interactions:
+    # Keep public PRs on isolated hosted runners. A persistent hardware lab
+    # runs reviewed commits separately; it must not execute fork code.
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [pi-panels, pi-keys, pi-dial-alerts, pi-strip, pi-l10n, pi-help]
+    env:
+      PI_SUITE: e2e:${{ matrix.suite }}
+      PI_EVIDENCE_DIR: qa-evidence/${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install the lockfile's Chromium
+        run: node node_modules/playwright/cli.js install chromium
+      - name: Resolve Chromium and record source identity
+        shell: pwsh
+        run: |
+          $browser = (& node --input-type=module -e "import { chromium } from 'playwright'; process.stdout.write(chromium.executablePath())").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $browser -PathType Leaf)) { throw 'The pinned Chromium executable is unavailable' }
+          "CHROME=$browser" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          New-Item -ItemType Directory -Force -Path $env:PI_EVIDENCE_DIR | Out-Null
+          $record = [ordered]@{
+            schemaVersion = 1
+            suite = $env:PI_SUITE
+            scope = 'source panels, simulated host, sample data'
+            commit = (& git rev-parse HEAD).Trim()
+            workingTree = @(& git status --porcelain)
+            node = (& node --version).Trim()
+            runnerOS = $env:RUNNER_OS
+            browserPath = $browser
+            browserSha256 = (Get-FileHash -LiteralPath $browser -Algorithm SHA256).Hash.ToLower()
+            lockSha256 = (Get-FileHash -LiteralPath package-lock.json -Algorithm SHA256).Hash.ToLower()
+            startedAt = (Get-Date).ToUniversalTime().ToString('o')
+          }
+          $record | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$env:PI_EVIDENCE_DIR/environment.json" -Encoding utf8
+      - name: Verify CDP transport failure handling
+        run: node --test test/cdp-client.test.mjs
+      - name: Run the existing interaction suite and retain its result
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $started = (Get-Date).ToUniversalTime()
+          & npm run $env:PI_SUITE 2>&1 | Tee-Object -FilePath "$env:PI_EVIDENCE_DIR/console.log"
+          $resultCode = $LASTEXITCODE
+          $finished = (Get-Date).ToUniversalTime()
+          $result = [ordered]@{
+            schemaVersion = 1
+            suite = $env:PI_SUITE
+            scope = 'source panels, simulated host, sample data'
+            status = $(if ($resultCode -eq 0) { 'PASS' } else { 'FAIL' })
+            exitCode = $resultCode
+            startedAt = $started.ToString('o')
+            finishedAt = $finished.ToString('o')
+            durationSeconds = ($finished - $started).TotalSeconds
+          }
+          $result | ConvertTo-Json | Set-Content -LiteralPath "$env:PI_EVIDENCE_DIR/result.json" -Encoding utf8
+          "### $env:PI_SUITE" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          "$($result.status), source panels with a simulated host. Exit code: $resultCode." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          exit $resultCode
+      - name: Record an incomplete run explicitly
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:PI_EVIDENCE_DIR | Out-Null
+          $resultFile = "$env:PI_EVIDENCE_DIR/result.json"
+          if (-not (Test-Path -LiteralPath $resultFile)) {
+            [ordered]@{
+              schemaVersion = 1
+              suite = $env:PI_SUITE
+              scope = 'source panels, simulated host, sample data'
+              status = 'INCOMPLETE'
+              exitCode = $null
+              reason = 'Setup, transport checks, or the interaction step did not finish. Inspect the job log; this is not a pass.'
+              finishedAt = (Get-Date).ToUniversalTime().ToString('o')
+            } | ConvertTo-Json | Set-Content -LiteralPath $resultFile -Encoding utf8
+          }
+      - name: Retain evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pi-browser-${{ matrix.suite }}
+          path: ${{ env.PI_EVIDENCE_DIR }}/
+          if-no-files-found: warn
+          retention-days: 14

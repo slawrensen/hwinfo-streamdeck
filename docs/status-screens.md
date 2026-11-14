@@ -6,8 +6,6 @@ description: Identify key, dial and settings-panel messages.
 
 The first line names the observed state; the second gives a next step. A key and a dial use the same first line for the same state; only the second line differs where a dial needs another step or fewer letters. Use the tables below to identify the message, then follow [Troubleshooting](troubleshooting.md) for a full repair path. Source errors usually recover when readable data returns; **Bridge failed** can require an installation repair and plugin restart.
 
-> The image uses simulated source states rendered by production code. It is not a hardware photograph.
-
 ## Key screens
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial status examples: Source busy and retrying; Not updating with check sharing; Age unknown with check Gadget."></a>

@@ -119,8 +119,7 @@ color of every reading in the list.
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dials with identical readings, comparing automatic text color against individual number colors."></a>
 
-*Production dial renderer with fixed sample readings and generated histories.
-The layouts and values are identical on both sides; only number colors change.*
+*The layouts and values are identical on both sides; only number colors change.*
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/v1.7/pi-dial-reading-colors-1.7.png' | relative_url }}" width="800" height="1540" loading="lazy" decoding="async" alt="The dial&#x27;s Display section: Text color on Theme text, Background on Theme, View on Overview, three rows, Decimals, the °F box, Row labels, Context line and Separators, the Color numbers by sensor type box, and Reading colors on Signal with five readings, each with its color well and an Auto button."></a>
 

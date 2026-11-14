@@ -39,8 +39,6 @@ When a key cannot show a reading, it shows a two-line status message. A dial sho
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-status-1.7.png' | relative_url }}" width="1360" height="704" loading="lazy" decoding="async" alt="Production-rendered key and dial faces for three source states: Source busy / retrying on both; Not updating / check sharing on both for Shared Memory; and Age unknown / check Gadget on both for Gadget."></a>
 
-*Simulated source states rendered by the 1.8 production code, not a hardware photograph.*
-
 ---
 
 ## Keys show "Start HWiNFO"

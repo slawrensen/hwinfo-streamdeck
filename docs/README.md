@@ -59,7 +59,7 @@ The publisher keeps the prior preview commit as a parent and uses an explicit ex
 
 `assets/js/just-the-docs.js` is the upstream v0.10.1 script with a small documented patch for input/paste, queries entered before search data arrives, and preserving scroll position during search. Its MIT license is adjacent. Recheck these differences when upgrading the pinned theme.
 
-Use genuine captures or production-renderer output. Optimized showcase derivatives retain source hashes, crop coordinates and release provenance in `assets/img/showcase/provenance.json`. Preserve masters, distinguish samples/app captures/hardware photographs, retain credits, and add intrinsic dimensions. Do not describe a shared touch-strip picture as a graph spanning multiple dials.
+Use genuine captures or production-renderer output. Optimized showcase derivatives retain source hashes, crop coordinates and release provenance in `assets/img/showcase/provenance.json`. Preserve masters, distinguish samples/app captures/hardware photographs in those records, retain credits, and add intrinsic dimensions. A caption says what its picture shows and carries its credits; it does not label the picture a sample rendering. Do not describe a shared touch-strip picture as a graph spanning multiple dials.
 
 ### Prose and display gallery
 

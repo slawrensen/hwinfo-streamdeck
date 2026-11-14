@@ -164,7 +164,7 @@ measurement to avoid that.
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/dial-reading-colors-1.7.png' | relative_url }}" width="1340" height="884" loading="lazy" decoding="async" alt="Three-row and two-row dial examples comparing automatic text with individual reading colors. CPU temperature is blue, GPU temperature pink, pump speed green, GPU power gold and GPU load blue."></a>
 
-*Production-rendered fixed sample data. Both sides use Void, Text color Theme text and Accent colors Theme accent everywhere; only the individual reading colors change. This is not a hardware photograph.*
+*Both sides use Void, Text color Theme text and Accent colors Theme accent everywhere; only the individual reading colors change.*
 
 For automatic category colors, tick **Color numbers by sensor type** and leave **Accent colors** (Advanced, Shared defaults) on **By sensor type**: temperature numbers share pink, fans cyan, power gold and load purple. The option is off by default. Paper, the theme accent everywhere and unknown categories keep normal text. Automatic colors adjust for readability on each row's background.
 

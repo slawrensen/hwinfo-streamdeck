@@ -82,11 +82,11 @@ The Stream Deck app can show one picture behind all the keys of a page: right-cl
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/key-backgrounds-looks-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/key-backgrounds-looks-1.8.png' | relative_url }}" width="1040" height="662" loading="lazy" decoding="async" alt="Fifteen key faces in five columns, Theme, Glass, Tint, Outline and Clear, over a blue to violet to orange gradient: a one-reading key with a sparkline, a two-reading key and a four-reading key in each. Theme hides the gradient, Glass lets a little through, Tint shows it darkened with outlined words, and Outline and Clear show it at full strength, with outlined words on Outline only."></a>
 
-*Production-rendered fixed sample data on the Void theme, over a gradient drawn for the board in place of a page picture. Not a device capture.*
+*On the Void theme, over a gradient drawn for the board in place of a page picture.*
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/deck-cliffs-1.8.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Cosmic Cliffs: NASA, ESA, CSA, and STScI. Cropped to the display. Device image: Elgato." data-image-credit-url="https://esawebb.org/images/weic2205a/" data-image-license="CC BY 4.0 (Cosmic Cliffs)" data-image-license-url="https://creativecommons.org/licenses/by/4.0/"><img src="{{ '/assets/img/deck-cliffs-1.8.jpg' | relative_url }}" width="1600" height="1432" loading="lazy" decoding="async" alt="A Stream Deck + XL, front on, with all 36 Sensor Reading keys on Tint over the Cosmic Cliffs as the page picture: each key shows its own part of the picture, blue sky and stars behind the top rows and orange cliffs behind the lower ones, darkened by the tint, and every word has a thin dark outline. A Trend graph crosses the whole touch strip over the same picture."></a>
 
-*Production-rendered fixed sample data on Elgato's device image, not a device capture: every key and the strip on **Tint** on the Void theme. Picture: the Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped), standing in for a page and strip picture set in the Stream Deck app. Device image: Elgato.*
+*Every key and the strip on **Tint** on the Void theme. Picture: the Cosmic Cliffs ([NASA, ESA, CSA, and STScI](https://esawebb.org/images/weic2205a/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), cropped), standing in for a page and strip picture set in the Stream Deck app. Device image: Elgato.*
 
 **Default** (new keys start on it, and it names the look it follows, for example *Theme (shared)*) follows **Advanced → Shared defaults → Background**, which is Theme until you change it; picking a look here keeps that look on this key whatever the shared one is ([Per-key vs. shared](themes.md#per-key-vs-shared)).
 
@@ -200,7 +200,7 @@ Three HWiNFO memory readings read:
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/reading-units-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/reading-units-1.8.png' | relative_url }}" width="648" height="348" loading="lazy" decoding="async" alt="The same two-reading key twice, with the free memory of two GPUs. On Auto it reads 12.1 GB over 453 MB. With GB and 2 decimals set for each reading it reads 12.10 GB over 0.45 GB."></a>
 
-*Production-rendered fixed sample data: 12100 MB and 453 MB on one two-reading key, on the Void theme.*
+*12100 MB and 453 MB on one two-reading key, on the Void theme.*
 
 The two families count differently. **KB** to **TB** rescale HWiNFO's number by 1000 per step, the way Decimal [Data units](#advanced-shared-by-all-keys-and-dials) does: 12100 MB reads 12.10 GB, HWiNFO's figure in thousands, not a drive maker's gigabytes. **KiB** to **TiB** read HWiNFO's KB, MB, GB and TB as the 1024-based units they are (HWiNFO's author wrote on the HWiNFO forum in January 2021 that its MB and GB are multiples of 1024, disk capacity aside; on my RTX 5080, HWiNFO's 16,303 MB is the 16,303 MiB `nvidia-smi` reports), the way Binary Data units does: 12100 MB reads 11.82 GiB, the unit `nvidia-smi` counts in. Pick GB to match HWiNFO's own numbers, GiB to match `nvidia-smi`. Rounding works as everywhere else on the face.
 

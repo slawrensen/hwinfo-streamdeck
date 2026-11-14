@@ -8,7 +8,7 @@ A **strip display** joins the Sensor Dials of a Stream Deck + or + XL into one g
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/deck-dusk-1.8.jpg' | relative_url }}" aria-label="Enlarge image" data-image-credit="Device image: Elgato."><img src="{{ '/assets/img/deck-dusk-1.8.jpg' | relative_url }}" width="1600" height="1432" loading="lazy" decoding="async" alt="A Stream Deck + XL, front on, with 36 Sensor Reading keys and, across the whole touch strip under them, one Trend graph of CPU and GPU temperature over five minutes: both lines rise during a load and fall back. Keys and strip draw the Dusk background."></a>
 
-*Production-rendered fixed sample data on Elgato's device image, not a device capture: a **Trend** across the six dials of a Stream Deck + XL, on the Ultraviolet theme with Background **Dusk**. Device image: Elgato.*
+*A **Trend** across the six dials of a Stream Deck + XL, on the Ultraviolet theme with Background **Dusk**. Device image: Elgato.*
 
 > **New in 1.8.** A whole strip has run on my Stream Deck + XL since 2026-10-25. An equal split and the Stream Deck + have run on simulated decks only. [Hardware](hardware.md) says what is still unmeasured.
 
@@ -73,7 +73,7 @@ On a running Equal split, **Fill both halves** at the end of the line under the 
 
 <a class="image-link" data-image-viewer href="{{ '/assets/img/strip-graphs-1.8.png' | relative_url }}" aria-label="Enlarge image"><img src="{{ '/assets/img/strip-graphs-1.8.png' | relative_url }}" width="1920" height="2536" loading="lazy" decoding="async" alt="Eleven whole Stream Deck + XL strips, one under the other, each named: Trend with two temperature lines; Area with one filled line; Compare with three temperatures on one scale; Lanes with a temperature, a load and a power reading in three lanes; Heat as colored time bins with an amber cap where the reading passed its warn limit; Group with one large value and eight thin lines; Group in its Tiles view with sixteen small graphs; Ambient as many colored lines; Meters with six large values and bars; Events with amber bars where a Yes/No reading said Yes; and an Equal split with a Liquid meter of CPU usage in one half and memory usage in the other."></a>
 
-*Production-rendered fixed sample data on the Void theme, not device captures. The last row is an [Equal split](#equal-split-pairs).*
+*On the Void theme. The last row is an [Equal split](#equal-split-pairs).*
 
 Tick readings in the order you want them drawn. A graph keeps up to six readings and each style draws the first ones up to its limit; a reading past that stays saved and its row says **not drawn in Trend** (for example). The **Graph** list offers only styles that can draw every ticked reading. A Compare saved with several units still draws them, and says so. A reading the plugin's history memory has no room for says **no history room**.
 

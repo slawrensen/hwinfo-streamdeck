@@ -459,11 +459,13 @@ const rowOf = (name: string): (typeof STRIP_ROWS)[number] => STRIP_ROWS.find((r)
  * release/official-elgato/press-kit/ (ignored) or name its folder in
  * ELGATO_PRESS_KIT. The positions below were measured on that exact file.
  */
+/** From one cap's left edge to the next, in the image's pixels. */
+const CAP_PITCH = 176.1;
 const OFFICIAL = {
 	file: "SD_XL_Product_Shot_01.png",
 	sha256: "4667e7243dd578981982043e83d82f1c807218044e2fb2ea8f287b843f56ec85",
 	/** A key cap's box, black outline to black outline. */
-	cap: { w: 158, h: 158, radius: 31, left: (c: number) => Math.round(1137 + 176.1 * c), top: [1271, 1446, 1620, 1796] },
+	cap: { w: 158, h: 158, radius: 31, left: (c: number) => Math.round(1137 + CAP_PITCH * c), top: [1271, 1446, 1620, 1796] },
 	/** The lit window inside a cap box, between the rim highlights. */
 	window: { left: 14, top: 13, w: 131, h: 130, radius: 20 },
 	/** The clean dark cap (column, row) every cap is redrawn from, so no demo icon's glow stays on a rim. */
@@ -544,26 +546,31 @@ const deviceBoard = (file: string, deck: DeckSpec, shows: string): Board => ({ f
 /** A deck as its bare display: only where no official device image is at hand yet (the Stream Deck +). */
 const displayBoard = (file: string, deck: DeckSpec, scale: number, shows: string): Board => ({ file, shows, faces: () => facesOf(deck), draw: () => deckPng(deck, scale) });
 
-/** What a close look keeps: the nine caps across, two key rows down, cut mid-gap, in the device image's own pixels. */
-const CLOSE = { w: 1584, h: 350 } as const;
+/** A close look is two key rows tall, cut mid-gap above and below, in the device image's own pixels. */
+const CLOSE_HEIGHT = 350;
 /**
  * Two key rows of a + XL deck on Elgato's device image, close up and not
- * resized: the home page tiles fill their frame with it, so a tile shows
- * faces large enough to read where the gallery above it shows whole decks.
+ * resized, from one column to the last. It starts mid-gap and is a whole
+ * number of key pitches wide, so the home page tile that fills its frame
+ * with it can keep as many whole keys as fit and never cut one (docs.css,
+ * `.showcase-image.fills`: its 50.314cqh is CAP_PITCH over CLOSE_HEIGHT).
+ * A tile then shows faces large enough to read where the gallery above it
+ * shows whole decks.
  */
-async function closeUp(deck: DeckSpec, firstRow: number): Promise<Buffer> {
+async function closeUp(deck: DeckSpec, firstRow: number, firstColumn: number): Promise<Buffer> {
 	const { cap, crop } = OFFICIAL;
 	const columns = DEVICES[deck.device].columns;
-	const middleX = (cap.left(0) + cap.left(columns - 1) + cap.w) / 2;
-	const middleY = ((cap.top[firstRow] as number) + (cap.top[firstRow + 1] as number) + cap.h) / 2;
-	return sharp(await officialOnce(deck)).extract({ left: Math.round(middleX - CLOSE.w / 2) - crop.left, top: Math.round(middleY - CLOSE.h / 2) - crop.top, width: CLOSE.w, height: CLOSE.h }).png().toBuffer();
+	const left = Math.round(cap.left(firstColumn) - (CAP_PITCH - cap.w) / 2);
+	const middle = ((cap.top[firstRow] as number) + (cap.top[firstRow + 1] as number) + cap.h) / 2;
+	return sharp(await officialOnce(deck)).extract({ left: left - crop.left, top: Math.round(middle - CLOSE_HEIGHT / 2) - crop.top, width: Math.round((columns - firstColumn) * CAP_PITCH), height: CLOSE_HEIGHT }).png().toBuffer();
 }
-/** The key faces of the two rows a close look shows. */
-const rowFaces = (deck: DeckSpec, firstRow: number): string[] => {
+/** The key faces a close look shows: two rows, from its first column on. */
+const closeFaces = (deck: DeckSpec, firstRow: number, firstColumn: number): string[] => {
 	const columns = DEVICES[deck.device].columns;
-	return deckFaces(deck).keys.slice(firstRow * columns, (firstRow + 2) * columns);
+	const keys = deckFaces(deck).keys;
+	return [firstRow, firstRow + 1].flatMap((row) => keys.slice(row * columns + firstColumn, (row + 1) * columns));
 };
-const closeBoard = (file: string, deck: DeckSpec, firstRow: number, shows: string): Board => ({ file, shows, faces: () => rowFaces(deck, firstRow), draw: () => encoded(file, closeUp(deck, firstRow)) });
+const closeBoard = (file: string, deck: DeckSpec, firstRow: number, firstColumn: number, shows: string): Board => ({ file, shows, faces: () => closeFaces(deck, firstRow, firstColumn), draw: () => encoded(file, closeUp(deck, firstRow, firstColumn)) });
 
 async function stripBoard(): Promise<Buffer> {
 	const pad = 60;
@@ -669,8 +676,8 @@ export const BOARDS: readonly Board[] = [
 	{ file: `${IMG}/reading-units-1.8.png`, shows: "One two-reading key of two GPUs' free memory (12100 MB and 453 MB) on Void: on Auto, and with GB and 2 decimals set for each reading.", faces: unitFaces, draw: unitsBoard },
 	{ file: `${IMG}/strip-graphs-1.8.png`, shows: "The nine Strip display graph styles, Group's Tiles view and an Equal split, each across a whole Stream Deck + XL strip on Void.", faces: () => STRIP_ROWS.flatMap((r) => stripOf(r.scene)), draw: stripBoard },
 	{ file: `${IMG}/showcase/strip-detail.png`, shows: "The home page tile: Trend, Heat and Meters, each across a whole Stream Deck + strip on Void.", faces: () => PLUS_STRIPS.flatMap((scene) => stripOf(scene, "plus")), draw: plusStrips },
-	closeBoard(`${IMG}/showcase/deck-backgrounds-detail.jpg`, DECKS.dusk, 2, "The home page tile: the two lower key rows of the Dusk deck on Elgato's device image, close up."),
-	closeBoard(`${IMG}/showcase/key-backgrounds-detail.jpg`, DECKS.cliffs, 1, "The home page tile: the two middle key rows of the Cosmic Cliffs deck on Elgato's device image, close up."),
+	closeBoard(`${IMG}/showcase/deck-backgrounds-detail.jpg`, DECKS.dusk, 2, 0, "The home page tile: the two lower key rows of the Dusk deck on Elgato's device image, close up, from the first column."),
+	closeBoard(`${IMG}/showcase/key-backgrounds-detail.jpg`, DECKS.cliffs, 1, 4, "The home page tile: the two middle key rows of the Cosmic Cliffs deck on Elgato's device image, close up, from the fifth column."),
 	{ file: "marketing/shot-10-strip.png", shows: "Marketplace still: Trend, Lanes, Heat and Meters across a whole strip.", faces: () => SHOT_STRIPS.flatMap((n) => stripOf(rowOf(n).scene)), draw: shotStrip },
 	{ file: "marketing/shot-11-deck-backgrounds.png", shows: "Marketplace still: the Stars, Dusk and Nebula decks on Elgato's device image, side by side.", faces: () => SHOT_DECKS.flatMap((n) => facesOf(DECKS[n])), draw: shotDecks },
 	{ file: "marketing/shot-12-key-backgrounds.png", shows: "Marketplace still: the Tint deck over the Cosmic Cliffs, on Elgato's device image.", faces: () => facesOf(DECKS.cliffs), draw: shotKeys }

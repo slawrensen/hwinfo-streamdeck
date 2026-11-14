@@ -62,8 +62,6 @@
 
 <img src="docs/assets/img/deck-dusk-1.8.png" width="100%" alt="A Stream Deck + XL page of 36 Sensor Reading keys on the Ultraviolet theme with Background Dusk, a blue-violet glow behind the lower key rows, and a Trend graph of two temperatures across the whole touch strip">
 
-<sub>Production-rendered fixed sample data, not a device capture: Background **Dusk** on every key and a **Trend** strip display, each face drawn at its place in Elgato's published layout of the Stream Deck + XL display.</sub>
-
 The upgrade rewrites no stored settings, and 1.7.1 ignores the new ones if you go back. The [changelog](CHANGELOG.md) has the details. Upgrading from 1.6: [what changed in 1.7](https://docs.slawrensen.com/hwinfo-streamdeck/whats-new-1.7.html) says where an upgrade needs you to act.
 
 ## Keys

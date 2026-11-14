@@ -55,7 +55,7 @@ The publisher keeps the prior preview commit as a parent and uses an explicit ex
 
 ## Shared frontend and assets
 
-`_data/navigation.yml` groups existing routes without creating replacement URLs. `_layouts/default.html` and `_includes/components/` provide the shell. `assets/css/docs.css` contains shared tokens and responsive styles; `assets/js/docs.js` adds table/code scroll regions, contents, disclosure reveal, and the native image dialog. Basic navigation, articles and full-image links remain usable without JavaScript.
+`_data/navigation.yml` groups existing routes without creating replacement URLs. `_layouts/default.html` and `_includes/components/` provide the shell. The header and the footer each carry one link up to the docs hub at docs.slawrensen.com (**All docs**), whose own mark leads to slawrensen.com. `assets/css/docs.css` contains shared tokens and responsive styles; `assets/js/docs.js` adds table/code scroll regions, contents, disclosure reveal, and the native image dialog. Basic navigation, articles and full-image links remain usable without JavaScript.
 
 `assets/js/just-the-docs.js` is the upstream v0.10.1 script with a small documented patch for input/paste, queries entered before search data arrives, and preserving scroll position during search. Its MIT license is adjacent. Recheck these differences when upgrading the pinned theme.
 

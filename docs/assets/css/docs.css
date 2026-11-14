@@ -86,7 +86,7 @@ body.docs-site .search-input:focus { outline: 2px solid var(--accent); outline-o
 body.docs-site .search-label { z-index: 2; pointer-events: none; justify-content: center; top: 0; height: 44px; width: 42px; color: var(--muted); padding: 0; }
 body.docs-site .search-icon { color: var(--muted); width: 18px; height: 18px; }
 body.docs-site .search-shortcut { z-index: 2; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; background: transparent; border: 1px solid var(--line); color: var(--muted); box-shadow: none; border-radius: 3px; padding: 1px 5px; font-family: inherit; font-size: var(--font-small); line-height: 16px; }
-.header-links { margin-left: auto; display: flex; align-items: center; flex: none; font-size: var(--font-small); }
+.header-links { margin-left: auto; display: flex; align-items: center; gap: 22px; flex: none; font-size: var(--font-small); }
 .header-links a { color: var(--muted); display: flex; gap: 8px; padding: 10px 0; text-decoration: none; }
 .header-links a:hover { color: var(--ink); }
 body.docs-site .search-results { left: 0; top: 54px; width: min(760px, calc(100vw - var(--sidebar) - 88px)); max-height: calc(100dvh - 150px); border-radius: var(--radius); background: var(--surface); box-shadow: 0 12px 35px #0008; border: 1px solid var(--line); padding: 0; }

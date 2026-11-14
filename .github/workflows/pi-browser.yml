@@ -29,6 +29,7 @@ jobs:
     env:
       PI_SUITE: e2e:${{ matrix.suite }}
       PI_EVIDENCE_DIR: qa-evidence/${{ matrix.suite }}
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/hwinfo-pi-browsers
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -38,13 +39,37 @@ jobs:
       - run: npm ci
       - name: Install the lockfile's Chromium
         run: node node_modules/playwright/cli.js install chromium
-      - name: Resolve Chromium and record source identity
+      - name: Prepare Chromium sandbox access and record source identity
         shell: pwsh
         run: |
           $browser = (& node --input-type=module -e "import { chromium } from 'playwright'; process.stdout.write(chromium.executablePath())").Trim()
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $browser -PathType Leaf)) { throw 'The pinned Chromium executable is unavailable' }
-          "CHROME=$browser" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           New-Item -ItemType Directory -Force -Path $env:PI_EVIDENCE_DIR | Out-Null
+          $browserRoot = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'hwinfo-pi-browsers'))
+          $browser = [IO.Path]::GetFullPath($browser)
+          if ([IO.Path]::GetFullPath($env:PLAYWRIGHT_BROWSERS_PATH) -ne $browserRoot -or -not $browser.StartsWith($browserRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Chromium must be inside this job dedicated browser directory' }
+          # Chromium's AppContainer and LPAC processes need RX on their exe,
+          # DLLs and data. Keep the sandbox enabled and scope both grants to
+          # this disposable browser tree, preserving its existing permissions.
+          # https://chromium.googlesource.com/chromium/src/+/main/testing/scripts/common.py
+          # https://chromium.googlesource.com/chromium/src/+/main/docs/design/sandbox.md
+          $packageSids = @('S-1-15-2-1', 'S-1-15-2-2')
+          $aclOutput = & icacls $browserRoot /grant '*S-1-15-2-1:(OI)(CI)(RX)' '*S-1-15-2-2:(OI)(CI)(RX)' /T /Q 2>&1
+          $aclExit = $LASTEXITCODE
+          $aclOutput | Set-Content -LiteralPath "$env:PI_EVIDENCE_DIR/browser-acl.log" -Encoding utf8
+          if ($aclExit -ne 0) { throw "Chromium sandbox ACL setup failed with exit code $aclExit" }
+          $aclRecords = @()
+          foreach ($item in @($browserRoot, $browser)) {
+            $acl = Get-Acl -LiteralPath $item
+            $rules = $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
+            foreach ($sid in $packageSids) {
+              $rx = [Security.AccessControl.FileSystemRights]::ReadAndExecute
+              $allow = @($rules | Where-Object { $_.IdentityReference.Value -eq $sid -and $_.AccessControlType -eq 'Allow' -and ($_.FileSystemRights -band $rx) -eq $rx })
+              if ($allow.Count -eq 0) { throw "Missing sandbox read/execute permission for $sid on $item" }
+            }
+            $aclRecords += [ordered]@{ path = $item; sddl = $acl.Sddl }
+          }
+          "CHROME=$browser" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $record = [ordered]@{
             schemaVersion = 1
             suite = $env:PI_SUITE
@@ -54,6 +79,7 @@ jobs:
             node = (& node --version).Trim()
             runnerOS = $env:RUNNER_OS
             browserPath = $browser
+            browserSandboxAccess = [ordered]@{ root = $browserRoot; principals = $packageSids; grantedRights = 'ReadAndExecute'; recursive = $true; records = $aclRecords }
             browserSha256 = (Get-FileHash -LiteralPath $browser -Algorithm SHA256).Hash.ToLower()
             lockSha256 = (Get-FileHash -LiteralPath package-lock.json -Algorithm SHA256).Hash.ToLower()
             startedAt = (Get-Date).ToUniversalTime().ToString('o')

@@ -89,6 +89,34 @@ async function open(fixture, overrides) {
 	}
 	await b.evaluate("new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
 }
+
+/** Configuration Replace schedules its own reload. Observe that new document
+ * and its restored panel before the suite opens another fixture; a settings
+ * write alone does not mean the interaction has finished. */
+async function withReplaceReload(fixture, activate) {
+	if (fixture !== "key-configured") return activate();
+	const before = (await b.send("Page.getFrameTree")).frameTree.frame;
+	const context = sim.context;
+	let loaded = null;
+	const off = b.on("Page.lifecycleEvent", (event) => {
+		if (event.name === "load" && event.frameId === before.id) loaded = event.loaderId;
+	});
+	try {
+		await activate();
+		const deadline = performance.now() + 3500;
+		while (performance.now() < deadline) {
+			const current = (await b.send("Page.getFrameTree")).frameTree.frame;
+			if (current.id === before.id && current.url === before.url && current.loaderId !== before.loaderId && current.loaderId === loaded) {
+				const ready = await b.evaluate(`document.readyState === "complete" && window.__hwPanel?.context === ${JSON.stringify(context)} && window.__hwPanel?.tree != null && !document.documentElement.hasAttribute("data-folds-pending")`);
+				if (ready) return;
+			}
+			await sleep(25);
+		}
+		throw new Error("Configuration Replace did not reload and restore its panel within 3500 ms");
+	} finally {
+		off();
+	}
+}
 const writes = () => ({ settings: sim.writes.length, globals: sim.globalWrites.length });
 const noWrites = (name) => check(`${name}: no writes`, sim.writes.length === 0 && sim.globalWrites.length === 0, JSON.stringify(writes()));
 const lastWrite = () => sim.writes.at(-1);
@@ -764,7 +792,7 @@ try {
 			const armed = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
 			check(`${name}: a double click ${gap} ms apart only arms`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
 			if (gap === 650) {
-				await singleClick(p);
+				await withReplaceReload(fixture, () => singleClick(p));
 				check(`${name}: a separate click after the double click confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 			}
 		}
@@ -794,7 +822,7 @@ try {
 			await sleep(250);
 			const armed = await b.evaluate(`document.querySelector(${JSON.stringify(sel)})?.dataset.armed ?? null`);
 			check(`${name}: a mouse held while ${key === " " ? "Space" : key} arms it does not confirm on its release`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
-			await singleClick(p);
+			await withReplaceReload(fixture, () => singleClick(p));
 			check(`${name}: a fresh click after that (${key === " " ? "Space" : key}) confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 		}
 		{
@@ -819,10 +847,12 @@ try {
 			await b.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
 			await b.evaluate(`document.activeElement?.blur()`);
 			await sleep(100);
-			for (let i = 0; i < 2; i++) {
-				await b.evaluate(`document.querySelector(${JSON.stringify(sel)}).click()`);
-				await sleep(650);
-			}
+			await withReplaceReload(fixture, async () => {
+				for (let i = 0; i < 2; i++) {
+					await b.evaluate(`document.querySelector(${JSON.stringify(sel)}).click()`);
+					await sleep(650);
+				}
+			});
 			check(`${name}: a screen reader's second activation confirms after a lost Enter keyup`, count() === 1, JSON.stringify({ writes: count() }));
 		}
 	}
@@ -854,7 +884,7 @@ try {
 			const after = second === "right button" ? "the right button was pressed too" : `a ${second} began on the armed button`;
 			check(`${name}: a mouse held from before the arm does not confirm after ${after}`, count() === 0 && armed === "true", JSON.stringify({ writes: count(), armed }));
 			if (second === "touch") {
-				await touch("touchEnd", p);
+				await withReplaceReload(fixture, () => touch("touchEnd", p));
 				await sleep(300);
 				check(`${name}: the touch that began on the armed button confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 				continue;
@@ -863,7 +893,7 @@ try {
 				await buttons("mouseReleased", "right", 0, p);
 				await sleep(150);
 			}
-			await singleClick(p);
+			await withReplaceReload(fixture, () => singleClick(p));
 			check(`${name}: a fresh click after the ${second} confirms once`, count() === 1, JSON.stringify({ writes: count() }));
 		}
 	}
@@ -880,7 +910,8 @@ try {
 			await b.click(sel);
 			await b.evaluate(`(() => { const real = Date.now; Date.now = () => real() + ${jump}; })()`);
 			await sleep(gap);
-			await b.click(sel);
+			if (confirms) await withReplaceReload(fixture, () => b.click(sel));
+			else await b.click(sel);
 			await sleep(250);
 			check(`${name}: a clock set an hour ${jump > 0 ? "on" : "back"} between the presses ${confirms ? "still confirms 600 ms later" : "does not confirm 100 ms later"}`, count() === (confirms ? 1 : 0), JSON.stringify({ writes: count() }));
 		}
@@ -2948,7 +2979,7 @@ try {
 	const armedLook = await b.evaluate(`(() => { const probe = document.createElement("div"); probe.style.background = "var(--hw-danger-bg)"; document.body.append(probe); const danger = getComputedStyle(probe).backgroundColor; probe.remove(); return { danger, button: getComputedStyle(document.getElementById("config-deck-apply")).backgroundColor }; })()`);
 	check("replace: the armed Replace shared settings turns the danger color", armedLook.button === armedLook.danger, JSON.stringify(armedLook));
 	await sleep(5500);
-	await b.click("#config-deck-apply");
+	await withReplaceReload("key-configured", () => b.click("#config-deck-apply"));
 	await sleep(250);
 	check("replace: still armed after 5.5 s, the next press replaces the shared settings once", sim.globalWrites.length === 1, JSON.stringify(writes()));
 	await open("dial-configured");
